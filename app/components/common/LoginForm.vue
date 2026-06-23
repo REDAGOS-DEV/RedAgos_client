@@ -114,6 +114,8 @@
                   v-model="email"
                   type="email"
                   placeholder="you@example.com"
+                  required
+                  autocomplete="email"
                 >
               </div>
             </div>
@@ -149,6 +151,8 @@
                   v-model="password"
                   :type="showPassword ? 'text' : 'password'"
                   placeholder="********"
+                  required
+                  autocomplete="current-password"
                 >
 
                 <button
@@ -185,7 +189,17 @@
               </NuxtLink>
             </div>
 
-            <button class="sign-in-button">
+            <p
+              v-if="errorMessage"
+              class="error-message"
+            >
+              {{ errorMessage }}
+            </p>
+
+            <button
+              class="sign-in-button"
+              :disabled="loading"
+            >
               <svg
                 aria-hidden="true"
                 fill="none"
@@ -208,7 +222,7 @@
                   d="M15 12H3"
                 />
               </svg>
-              Sign In
+              {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
             <p class="signup-text">
@@ -277,13 +291,39 @@
 </template>
 
 <script setup>
+import { authService } from '~~/api/auth/AuthService'
 import logo from '~/assets/images/RedAgosLogo.png'
+
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const loading = ref(false)
+const errorMessage = ref('')
 
-const login = () => {
-  console.log('Login')
+const login = async () => {
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await authService.login({
+      email: email.value,
+      password: password.value,
+    })
+
+    const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
+
+    if (token) {
+      localStorage.setItem('_token', token)
+    }
+
+    await navigateTo('/')
+  } catch (error) {
+    errorMessage.value = error instanceof Error
+      ? error.message
+      : 'Unable to sign in. Please check your credentials.'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -708,9 +748,22 @@ input::placeholder {
   background: #185dac;
 }
 
+.sign-in-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .sign-in-button svg {
   width: 24px;
   height: 24px;
+}
+
+.error-message {
+  margin: 16px 0 0;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .signup-text {
