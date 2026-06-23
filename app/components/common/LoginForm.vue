@@ -2,16 +2,21 @@
   <main class="login-screen">
     <div class="login-shell">
       <aside class="brand-panel">
+        <div class="particle particle1"></div>
+        <div class="particle particle2"></div>
+        <div class="particle particle3"></div>
+        <div class="particle particle4"></div>
+
         <div class="circle circle-top"></div>
         <div class="circle circle-bottom"></div>
 
-        <div class="brand-lockup">
-          <div class="brand-mark">
-            <div class="brand-mark-inner">
-              <span class="brand-drop">&#9830;</span>
-              <span class="brand-letter">A</span>
-            </div>
-          </div>
+        <div class="top-ring"></div>
+        <div class="top-ring-2"></div>
+
+      <div class="brand-lockup">
+        <div class="brand-mark">
+          <img :src="logo" alt="RedAgos Logo" class="logo-image">
+        </div>
 
           <div>
             <p class="brand-name">
@@ -50,6 +55,7 @@
             <span>Digital</span>
           </div>
         </div>
+        <div class="red-glow"></div>
       </aside>
 
       <section class="form-panel">
@@ -271,6 +277,7 @@
 </template>
 
 <script setup>
+import logo from '~/assets/images/RedAgosLogo.png'
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -306,6 +313,67 @@ const login = () => {
   background: #206fbd;
   color: #ffffff;
 }
+.top-ring{
+  position:absolute;
+  top:-120px;
+  left:-120px;
+  width:320px;
+  height:320px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.15);
+}
+
+.top-ring-2{
+  position:absolute;
+  top:-70px;
+  left:-70px;
+  width:220px;
+  height:220px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.15);
+}
+
+.dots{
+  position:absolute;
+  top:60px;
+  left:40px;
+  width:80px;
+  height:80px;
+  background-image:
+  radial-gradient( rgba(255,255,255,.65) 1.5px, transparent 1.5px);
+  background-size:16px 16px;
+}
+
+.particle{
+  position:absolute;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:#ff5a74;
+}
+
+.particle1{
+  left:60px;
+  bottom:260px;
+  animation:float 6s infinite ease-in-out;
+}
+
+.particle2{
+  left:200px;
+  bottom:340px;
+  animation:float 8s infinite ease-in-out;
+}
+
+.particle3{
+  left:500px;
+  bottom:220px;
+  animation:float 7s infinite ease-in-out;
+}
+.particle4{
+  left:420px;
+  bottom:160px;
+  animation:float 9s infinite ease-in-out;
+}
 
 .circle {
   position: absolute;
@@ -328,12 +396,8 @@ const login = () => {
   height: 384px;
 }
 
-.brand-lockup {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.brand-lockup{
+  animation:logoFloat 5s infinite ease-in-out;
 }
 
 .brand-mark {
@@ -360,7 +424,7 @@ const login = () => {
 .brand-drop {
   position: absolute;
   top: -6px;
-  color: #ff2f55;
+  color: #ff2f559c;
   font-size: 20px;
   line-height: 1;
 }
@@ -375,7 +439,7 @@ const login = () => {
 .brand-name {
   margin: 0;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -389,7 +453,7 @@ const login = () => {
   margin: 8px 0 0;
   color: #ffffff;
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 3px;
   line-height: 1;
   text-transform: uppercase;
@@ -418,6 +482,23 @@ const login = () => {
   line-height: 2.15;
 }
 
+.red-glow{
+  position:absolute;
+  left:-120px;
+  bottom:-250px;
+  width:650px;
+  height:650px;
+  border-radius:50%;
+  background:
+  radial-gradient(
+      circle,
+      #ff4d6d 0%,
+      #ff2f55 20%,
+      rgba(255,47,85,.4) 60%,
+      transparent 85% );
+  filter:blur(100px);
+}
+
 .stats-row {
   position: absolute;
   z-index: 1;
@@ -441,7 +522,7 @@ const login = () => {
   margin-top: 8px;
   color: rgba(255, 255, 255, 0.55);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .form-panel {
@@ -699,6 +780,9 @@ input::placeholder {
 .blood-center:hover {
   border-color: #2da1ff;
 }
+@keyframes logoFloat{ 0%,100%{ transform:translateY(0);} 50% { transform:translateY(-8px);}}
+@keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-18px);}}
+@keyframes floatParticle { 0%, 100% { transform:translateY(0);} 50% { transform:translateY(-20px);}}
 
 @media (max-width: 1023px) {
   .login-shell {
