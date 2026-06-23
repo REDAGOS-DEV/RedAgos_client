@@ -11,6 +11,10 @@ class AuthService extends BaseService {
     }
  
     private resource = '/auths';
+
+    async login(payload: { email: string; password: string }): Promise<any> {
+        return await this.request('/login', 'POST', payload);
+    }
  
     async list(params: object = {}): Promise<any> {
         return await this.request(this.resource, 'GET', params);
