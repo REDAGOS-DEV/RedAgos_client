@@ -1,5 +1,5 @@
 <template>
     <main class="h-screen">
-        <LoginForm />
+        <CommonLoginForm/>
     </main>
 </template>
