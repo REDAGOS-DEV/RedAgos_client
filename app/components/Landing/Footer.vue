@@ -64,11 +64,11 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 const quickLinks = [
-  { label: 'Home',            to: '#' },
-  { label: 'Features',        to: '#features' },
-  { label: 'Donation Drives', to: '#drives' },
-  { label: 'About',           to: '#about' },
-  { label: 'Contact',         to: '#contact' },
+  { label: 'Home',            to: 'home' },
+  { label: 'Features',        to: 'features' },
+  { label: 'Donation Drives', to: 'drives' },
+  { label: 'About',           to: 'about' },
+  { label: 'Contact',         to: 'contact' },
 ]
 </script>
 

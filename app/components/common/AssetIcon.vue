@@ -38,6 +38,7 @@ import settings from '~/assets/icons/settings.svg?raw'
 import shield from '~/assets/icons/shield.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
+import qrCode from '~/assets/icons/qr-code.svg?raw'
 
 const icons = {
   activity,
@@ -68,6 +69,7 @@ const icons = {
   shield,
   'star-fill': starFill,
   users,
+  'qr-code': qrCode
 }
 
 const props = defineProps({
