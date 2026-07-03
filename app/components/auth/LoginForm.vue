@@ -12,11 +12,9 @@
             <p class="brand-subtitle">Blood Bank System</p>
           </div>
 
-          <NuxtLink
-            to="/"
-            class="back-link"
-          >
-            &larr; Back to Home
+          <NuxtLink to="/" class="back-link">
+            <AssetIcon name="chevron-left" :size="18" />
+             Back to Home
           </NuxtLink>
 
           <h1>Welcome Back!</h1>
@@ -180,8 +178,8 @@
 
             <p class="signup-text">
               Need an account?
-              <NuxtLink to="/signup">
-                Sign Up
+              <NuxtLink to="/register">
+                Register Now
               </NuxtLink>
             </p>
 
@@ -247,6 +245,7 @@
 import { authService } from '~~/api/auth/AuthService'
 import { reactive, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const email = ref('')
 const password = ref('')

@@ -71,13 +71,13 @@
     <!-- RIGHT SIDE -->
     <main class="form-panel">
       <div class="form-topbar">
-        <NuxtLink to="/signup" class="back-link">
+        <NuxtLink to="/register" class="back-link">
           <AssetIcon name="chevron-left" :size="16" />
           Back to Role Selection
         </NuxtLink>
 
         <span class="role-badge">
-          <AssetIcon name="heart" :size="14" />
+          <AssetIcon name="heart" :size="16" />
           Donor
         </span>
       </div>
@@ -91,17 +91,17 @@
         <div class="form-row">
           <div class="form-field">
             <label for="firstName">First Name</label>
-            <input id="firstName" v-model="form.firstName" type="text" placeholder="Juan" />
+            <input id="firstName" v-model="form.firstName" type="text" placeholder="yannie" />
           </div>
           <div class="form-field">
             <label for="lastName">Last Name</label>
-            <input id="lastName" v-model="form.lastName" type="text" placeholder="Dela Cruz" />
+            <input id="lastName" v-model="form.lastName" type="text" placeholder="chen" />
           </div>
         </div>
 
         <div class="form-field">
           <label for="email">Email Address</label>
-          <input id="email" v-model="form.email" type="email" placeholder="juan@email.com" />
+          <input id="email" v-model="form.email" type="email" placeholder="yanchen@email.com" />
         </div>
 
         <div class="form-row">
@@ -125,7 +125,6 @@
             <label for="dob">Date of Birth</label>
             <div class="input-icon-wrap">
               <input id="dob" v-model="form.dob" type="date" placeholder="mm/dd/yyyy" />
-              <AssetIcon class="field-icon" name="calendar" :size="16" />
             </div>
           </div>
           <div class="form-field">
@@ -200,7 +199,7 @@
 
         <p class="signin-row">
           Already have an account?
-          <NuxtLink to="/login">Sign Up</NuxtLink>
+          <NuxtLink to="/login">Sign In</NuxtLink>
         </p>
       </form>
     </main>
@@ -214,6 +213,7 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 definePageMeta({
   layout: 'auth',
+  alias: ['/register/donor'],
 })
 
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -236,7 +236,6 @@ const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
 function handleSubmit() {
-  // TODO: wire up to Laravel API endpoint (e.g. POST /api/donors/register)
   console.log('Submitting donor registration:', form)
 }
 </script>

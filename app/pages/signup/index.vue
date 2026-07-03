@@ -13,7 +13,8 @@
           </div>
 
           <NuxtLink to="/" class="back-link">
-            &larr; Back to Home
+            <AssetIcon name="chevron-left" :size="18" />
+             Back to Home
           </NuxtLink>
 
           <h1>Create an Account</h1>
@@ -115,6 +116,11 @@
 <script setup>
 import { ref } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
+
+definePageMeta({
+  alias: ['/register'],
+})
 
 const selectedRole = ref('')
 
@@ -156,7 +162,7 @@ const selectRole = (roleId) => {
 const continueWithRole = async () => {
   if (!selectedRole.value) return
 
-  await navigateTo(`/signup/${selectedRole.value}`)
+  await navigateTo(`/register/${selectedRole.value}`)
 }
 </script>
 

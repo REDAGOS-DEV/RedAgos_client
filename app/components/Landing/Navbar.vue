@@ -60,7 +60,7 @@
 
     <div class="nav-actions">
       <button class="btn-login" @click="navigateTo('/login')">Log In</button>
-      <button class="btn-started" @click="navigateTo('/login')">Get Started ›</button>
+      <button class="btn-started" @click="navigateTo('/')">Get Started ›</button>
     </div>
   </nav>
 </template>
@@ -194,7 +194,7 @@ onUnmounted(() => {
 .btn-started {
   font-size: 14px; font-weight: 600; color: #fff;
   background: #2563eb; border: none; cursor: pointer;
-  padding: 9px 18px; border-radius: 6px;
+  padding: 9px 18px; border-radius: 6px; display: inline-flex;
   transition: background 0.2s ease, transform 0.15s ease;
 }
 .btn-started:hover { background: #1d4ed8; transform: translateY(-1px); }
