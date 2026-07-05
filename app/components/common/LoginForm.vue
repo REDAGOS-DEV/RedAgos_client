@@ -291,7 +291,7 @@
 </template>
 
 <script setup>
-import { authService } from '~~/api/auth/AuthService'
+import { authService } from '~/api/auth/AuthService'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 const email = ref('')
