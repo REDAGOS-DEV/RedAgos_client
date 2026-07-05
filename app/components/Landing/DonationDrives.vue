@@ -1,5 +1,5 @@
 <template>
-  <section id="drives" class="donation-drives" ref="sectionRef">
+  <section id="drives" class="drives" ref="sectionRef">
     <div class="section-inner">
       <div class="badge" :class="{ 'animate-in': visible }">
         <span class="badge-dot"></span>
