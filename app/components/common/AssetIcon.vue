@@ -35,6 +35,7 @@ import filePlus from '~/assets/icons/file-plus.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
 import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import hospital from '~/assets/icons/hospital.svg?raw'
+import idCard from '~/assets/icons/id-card.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
 import lock from '~/assets/icons/lock.svg?raw'
 import logIn from '~/assets/icons/log-in.svg?raw'
@@ -80,6 +81,7 @@ const icons = {
   heart,
   'heart-fill': heartFill,
   hospital,
+  idCard,
   info,
   lock,
   'log-in': logIn,

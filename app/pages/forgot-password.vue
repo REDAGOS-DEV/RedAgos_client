@@ -13,7 +13,8 @@
           </div>
 
           <NuxtLink to="/login" class="back-link">
-            &larr; Back to Sign In
+            <AssetIcon name="chevron-left" :size="18" />
+             Back to Sign In
           </NuxtLink>
 
           <h1>Forgot Password</h1>
@@ -28,10 +29,7 @@
 
               <div class="input-shell">
                 <span class="field-icon">
-                  <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16v12H4z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m4 7 8 6 8-6" />
-                  </svg>
+                  <AssetIcon name="mail" :size="18" />
                 </span>
 
                 <input
@@ -54,11 +52,7 @@
             </p>
 
             <button class="sign-in-button" :disabled="loading">
-              <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 3h4v18h-4" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="m10 17 5-5-5-5" />
-                <path stroke-linecap="round" d="M15 12H3" />
-              </svg>
+              <AssetIcon name="log-in" :size="24" />
               {{ loading ? 'Sending...' : 'Send Reset Link' }}
             </button>
           </form>
@@ -70,6 +64,7 @@
 
 <script setup>
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const email = ref('')
 const loading = ref(false)

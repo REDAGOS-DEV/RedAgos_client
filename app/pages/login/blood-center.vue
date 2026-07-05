@@ -17,10 +17,10 @@
              Back to Home
           </NuxtLink>
 
-          <h1>Welcome Back!</h1>
+          <h1>Welcome, Blood Steward!</h1>
 
           <p class="form-subtitle">
-            Sign in to your RedAgos account
+            Sign in to your blood center account
           </p>
 
           <form
@@ -32,24 +32,7 @@
 
               <div class="input-shell">
                 <span class="field-icon">
-                  <svg
-                    aria-hidden="true"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M4 6h16v12H4z"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="m4 7 8 6 8-6"
-                    />
-                  </svg>
+                  <AssetIcon name="mail" :size="18" />
                 </span>
 
                 <input
@@ -70,25 +53,7 @@
 
               <div class="input-shell">
                 <span class="field-icon">
-                  <svg
-                    aria-hidden="true"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <rect
-                      width="14"
-                      height="10"
-                      x="5"
-                      y="11"
-                      rx="2"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      d="M8 11V8a4 4 0 1 1 8 0v3"
-                    />
-                  </svg>
+                  <AssetIcon name="lock" :size="18" />
                 </span>
 
                 <input
@@ -108,25 +73,28 @@
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
-                  <svg
-                    aria-hidden="true"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"
-                    />
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="3"
-                    />
-                  </svg>
+                  <AssetIcon :name="showPassword ? 'eye-off' : 'eye'" :size="18" />
                 </button>
+              </div>
+            </div>
+
+            <div class="field-group license-group">
+              <label for="license-number">DOH License Number</label>
+
+              <div class="input-shell">
+                <span class="field-icon">
+                  <AssetIcon name="idCard" :size="18" />
+                </span>
+
+                <input
+                  id="license-number"
+                  v-model="licenseNumber"
+                  type="text"
+                  class="typed-input"
+                  :class="{ typed: typed.licenseNumber }"
+                  placeholder="e.g. DOH-BC-00123"
+                  required
+                >
               </div>
             </div>
 
@@ -151,34 +119,13 @@
               class="sign-in-button"
               :disabled="loading"
             >
-              <svg
-                aria-hidden="true"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="3"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15 3h4v18h-4"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="m10 17 5-5-5-5"
-                />
-                <path
-                  stroke-linecap="round"
-                  d="M15 12H3"
-                />
-              </svg>
+              <AssetIcon name="log-in" :size="24" />
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
             <p class="signup-text">
               Need an account?
-              <NuxtLink to="/register">
+              <NuxtLink to="/register/blood-center">
                 Register Now
               </NuxtLink>
             </p>
@@ -193,45 +140,19 @@
               <button
                 type="button"
                 class="role-button hospital"
+                @click="navigateTo('/login')"
               >
-                <svg
-                  aria-hidden="true"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M4 21h16M6 21V7l6-3 6 3v14M9 11h2M13 11h2M9 15h2M13 15h2"
-                  />
-                </svg>
-                Hospital
+                <AssetIcon name="users" :size="20" />
+                Donor
               </button>
 
               <button
                 type="button"
                 class="role-button blood-center"
+                @click="navigateTo('/login/hospital')"
               >
-                <svg
-                  aria-hidden="true"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M12 3s6 6.1 6 10a6 6 0 1 1-12 0c0-3.9 6-10 6-10z"
-                  />
-                  <path
-                    stroke-linecap="round"
-                    d="M9.5 14.5a2.5 2.5 0 0 0 5 0"
-                  />
-                </svg>
-                Blood Center
+                <AssetIcon name="hospital" :size="20" />
+                Hospital
               </button>
             </div>
           </form>
@@ -243,16 +164,21 @@
 
 <script setup>
 import { authService } from '~~/api/auth/AuthService'
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
+useHead({
+  title: 'Blood Center Sign In · RedAgos'
+})
+
 const email = ref('')
 const password = ref('')
+const licenseNumber = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-const typed = reactive({ email: false, password: false })
+const typed = reactive({ email: false, password: false, licenseNumber: false })
 
 watch(email, (value) => {
   typed.email = value.trim().length > 0
@@ -260,6 +186,10 @@ watch(email, (value) => {
 
 watch(password, (value) => {
   typed.password = value.trim().length > 0
+})
+
+watch(licenseNumber, (value) => {
+  typed.licenseNumber = value.trim().length > 0
 })
 
 const goToForgotPassword = () => {
@@ -274,6 +204,8 @@ const login = async () => {
     const response = await authService.login({
       email: email.value,
       password: password.value,
+      role: 'blood-center',
+      licenseNumber: licenseNumber.value,
     })
 
     const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
@@ -353,7 +285,7 @@ const login = async () => {
 h1 {
   margin: 46px 0 0;
   color: #1f2937;
-  font-size: 38px;
+  font-size: 36px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.18;
@@ -374,7 +306,8 @@ h1 {
   margin: 0;
 }
 
-.password-group {
+.password-group,
+.license-group {
   margin-top: 19px;
 }
 
@@ -470,6 +403,20 @@ input::placeholder {
 
 .forgot-row a:hover,
 .signup-text a:hover {
+  color: #0d4f9c;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #1266c3;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.link-button:hover {
   color: #0d4f9c;
 }
 
