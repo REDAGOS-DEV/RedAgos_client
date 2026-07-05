@@ -204,7 +204,7 @@ onUnmounted(() => observer?.disconnect())
 /* ── SECTION ── */
 .features {
   background: #eef2fb;
-  padding: 90px 3rem 100px;
+  padding: 90px 0 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -277,7 +277,7 @@ onUnmounted(() => observer?.disconnect())
 .card {
   background: #fff;
   border-radius: 16px;
-  padding: 28px 24px 32px;
+  padding: 28px 20px 32px;
   display: flex;
   flex-direction: column;
   gap: 0;

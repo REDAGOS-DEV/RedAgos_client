@@ -27,7 +27,7 @@
         </p>
 
         <div class="hero-btns">
-          <NuxtLink to="/signup" class="btn-primary">Register Now →</NuxtLink>
+          <NuxtLink to="/register" class="btn-primary">Register Now →</NuxtLink>
           <button class="btn-secondary" @click="navigateTo('/login')">Sign In</button>
         </div>
       </div>

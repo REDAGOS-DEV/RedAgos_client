@@ -11,6 +11,8 @@
 import { computed } from 'vue'
 
 import activity from '~/assets/icons/activity.svg?raw'
+import alert from '~/assets/icons/alert.svg?raw'
+import archive from '~/assets/icons/archive.svg?raw'
 import arrowRight from '~/assets/icons/arrow-right.svg?raw'
 import barChart from '~/assets/icons/bar-chart.svg?raw'
 import bell from '~/assets/icons/bell.svg?raw'
@@ -24,23 +26,38 @@ import chart from '~/assets/icons/chart.svg?raw'
 import chevronLeft from '~/assets/icons/chevron-left.svg?raw'
 import chevronRight from '~/assets/icons/chevron-right.svg?raw'
 import clipboard from '~/assets/icons/clipboard.svg?raw'
+import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
+import eye from '~/assets/icons/eye.svg?raw'
+import eyeOff from '~/assets/icons/eye-off.svg?raw'
+import filePlus from '~/assets/icons/file-plus.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
 import heartFill from '~/assets/icons/heart-fill.svg?raw'
+import hospital from '~/assets/icons/hospital.svg?raw'
+import info from '~/assets/icons/info.svg?raw'
+import lock from '~/assets/icons/lock.svg?raw'
+import logIn from '~/assets/icons/log-in.svg?raw'
 import mail from '~/assets/icons/mail.svg?raw'
 import mapPin from '~/assets/icons/map-pin.svg?raw'
 import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
+import qrCode from '~/assets/icons/qr-code.svg?raw'
 import quote from '~/assets/icons/quote.svg?raw'
+import receipt from '~/assets/icons/receipt.svg?raw'
 import search from '~/assets/icons/search.svg?raw'
 import settings from '~/assets/icons/settings.svg?raw'
 import shield from '~/assets/icons/shield.svg?raw'
+import shieldCheck from '~/assets/icons/shield-check.svg?raw'
+import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
+import truck from '~/assets/icons/truck.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
 
 const icons = {
   activity,
+  alert,
+  archive,
   'arrow-right': arrowRight,
   'bar-chart': barChart,
   bell,
@@ -54,19 +71,32 @@ const icons = {
   'chevron-left': chevronLeft,
   'chevron-right': chevronRight,
   clipboard,
+  'clipboard-plus': clipboardPlus,
   clock,
   'dollar-sign': dollarSign,
+  eye,
+  'eye-off': eyeOff,
+  'file-plus': filePlus,
   heart,
   'heart-fill': heartFill,
+  hospital,
+  info,
+  lock,
+  'log-in': logIn,
   mail,
   'map-pin': mapPin,
   'map-pin-simple': mapPinSimple,
   phone,
+  'qr-code': qrCode,
   quote,
+  receipt,
   search,
   settings,
   shield,
+  'shield-check': shieldCheck,
+  'shield-plus': shieldPlus,
   'star-fill': starFill,
+  truck,
   users,
 }
 

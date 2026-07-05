@@ -6,6 +6,7 @@
     <LandingDonationDrives /> 
     <LandingAboutSection />
     <LandingContactSection />
-    <LandingFooter /> 
+    <LandingFooter />
+     
   </div>
 </template>
