@@ -22,9 +22,7 @@
 
         <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'mobile' }"
           @click="selectType('mobile')">
-          <span class="type-card__icon">
-            <AssetIcon name="truck" :size="16" />
-          </span>
+          <AssetIcon name="truck" :size="16" class="type-card__icon" />
           <span class="type-card__body">
             <span class="type-card__title">Register for mobile drive</span>
             <span class="type-card__desc">Join an upcoming community blood drive</span>
@@ -53,25 +51,38 @@
     <!-- Step 2 (mobile): choose blood drive -->
     <div v-else-if="appointmentType === 'mobile'" class="step-section fade-in" style="--delay: 100ms">
       <h2 class="step-label">Step 2 - Choose blood drive</h2>
-      <div class="drive-list">
+
+      <div v-if="drivesLoading" class="drive-state">
+        <div class="spinner" />
+        <p>Loading blood drives...</p>
+      </div>
+
+      <div v-else-if="bloodDrives.length" class="drive-list">
         <button v-for="drive in bloodDrives" :key="drive.id" type="button" class="drive-card"
-          :class="{ 'drive-card--active': selectedDriveId === drive.id }" :disabled="drive.slotsLeft === 0"
+          :class="{ 'drive-card--active': selectedDriveId === drive.id }" :disabled="driveSlotsLeft(drive) === 0"
           @click="selectedDriveId = drive.id">
           <div class="drive-card__top">
             <div>
               <p class="drive-card__name">{{ drive.name }}</p>
               <p class="drive-card__meta">{{ drive.date }} · {{ drive.time }}</p>
             </div>
-            <span class="badge" :class="drive.statusClass">{{ drive.statusLabel }}</span>
+            <span class="badge" :class="driveStatusClass(drive)">{{ driveStatusLabel(drive) }}</span>
           </div>
           <div class="progress-track">
-            <div class="progress-fill" :class="drive.progressClass" :style="{ width: drive.progressPct + '%' }" />
+            <div class="progress-fill" :class="driveProgressClass(drive)"
+              :style="{ width: driveProgressPct(drive) + '%' }" />
           </div>
           <div class="drive-card__bottom">
             <span>{{ drive.registered }} registered</span>
-            <span>{{ drive.slotsLeft }} slots left</span>
+            <span>{{ driveSlotsLeft(drive) }} slots left</span>
           </div>
         </button>
+      </div>
+
+      <div v-else class="drive-state">
+        <AssetIcon name="truck" :size="32" style="color:#e5e7eb" />
+        <p>No blood drives posted yet.</p>
+        <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
       </div>
     </div>
 
@@ -84,7 +95,17 @@
           <input v-model="selectedDate" type="date" class="form-input form-input--lg">
 
           <p class="slots-heading">Available time slots - {{ formattedSelectedDate }}</p>
-          <div class="slots-grid">
+
+          <div v-if="slotsLoading" class="drive-state">
+            <div class="spinner" />
+            <p>Loading time slots...</p>
+          </div>
+
+          <div v-else-if="slotsError" class="drive-state">
+            <p>{{ slotsError }}</p>
+          </div>
+
+          <div v-else-if="timeSlots.length" class="slots-grid">
             <button v-for="slot in timeSlots" :key="slot.time" type="button" class="slot-btn"
               :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
               :disabled="slot.available === 0" @click="selectedTimeSlot = slot.time">
@@ -92,6 +113,12 @@
               <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} of ${slot.total}
                 available` }}</span>
             </button>
+          </div>
+
+          <div v-else class="drive-state">
+            <AssetIcon name="calendar" :size="32" style="color:#e5e7eb" />
+            <p>No time slots set for this date.</p>
+            <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet — try another date.</p>
           </div>
         </div>
       </div>
@@ -110,7 +137,7 @@
           <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
           <div class="summary-row"><span>Date</span><span>{{ summaryDateLabel }}</span></div>
           <div v-if="appointmentType === 'walkin'" class="summary-row"><span>Time slot</span><span>{{ selectedTimeSlot
-          }}</span></div>
+              }}</span></div>
         </div>
         <button type="button" class="btn-primary btn-block" :disabled="confirming" @click="handleConfirm">
           <span>{{ confirming ? 'Confirming...' : 'Confirm Appointment' }}</span>
@@ -143,47 +170,216 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
 
-const form = ref({
-  date: '',
-  time: '',
-  center: '',
+definePageMeta({
+  middleware: 'auth',
+  layout: 'dashboard'
 })
 
-const loading = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
+const router = useRouter()
 
-const submitBooking = async () => {
-  loading.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+const appointmentType = ref('walkin')
+const selectedCenterId = ref('subnational')
+const selectedDriveId = ref(null)
+const selectedDate = ref('2026-04-20')
+const selectedTimeSlot = ref(null)
 
+const showSummary = ref(false)
+const showConfirmation = ref(false)
+const confirming = ref(false)
+
+function selectType(type) {
+  appointmentType.value = type
+  selectedTimeSlot.value = null
+}
+
+const bloodCenters = reactive([
+  { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon – Fri 8 AM – 3 PM', status: 'Open today' },
+  { id: 'prc', name: 'PRC Davao Blood Services', location: 'Davao City', hours: 'Mon – Sat 7 AM – 4 PM', status: 'Open today' },
+  { id: 'spmc', name: 'SPMC Blood Bank', location: 'Davao City', hours: '24/7', status: 'Open today' },
+])
+
+// Backend contract: GET /api/time-slots?center_id=&date=
+// The blood center configures its own slot schedule and capacity per day —
+// donors only ever see whatever the center has actually set for that date.
+// Response fields: [{ time, available, total }]
+const timeSlots = ref([])
+const slotsLoading = ref(false)
+const slotsError = ref('')
+
+async function fetchTimeSlots() {
+  if (!selectedCenterId.value || !selectedDate.value) {
+    timeSlots.value = []
+    return
+  }
+  slotsLoading.value = true
+  slotsError.value = ''
   try {
-    await new Promise(resolve => setTimeout(resolve, 1200))
-    successMessage.value = 'Appointment confirmed! Check your email for details.'
-    setTimeout(() => {
-      navigateTo('/signup/donor')
-    }, 2000)
-  } catch (error) {
-    errorMessage.value = 'Booking failed. Please try again.'
+    const data = await $fetch('/api/time-slots', {
+      query: { center_id: selectedCenterId.value, date: selectedDate.value },
+    })
+    timeSlots.value = data ?? []
+  } catch (err) {
+    console.error('Failed to load time slots:', err)
+    slotsError.value = 'Could not load time slots. Please try again.'
+    timeSlots.value = []
+  } finally {
+    slotsLoading.value = false
+  }
+}
+
+// Refetch whenever the donor is on the walk-in flow and changes center or date;
+// also reset the picked slot since it may no longer apply.
+watch([selectedCenterId, selectedDate], () => {
+  selectedTimeSlot.value = null
+  if (appointmentType.value === 'walkin') fetchTimeSlots()
+})
+
+watch(appointmentType, (type) => {
+  if (type === 'walkin') fetchTimeSlots()
+})
+
+onMounted(() => {
+  if (appointmentType.value === 'walkin') fetchTimeSlots()
+})
+
+// Backend contract: GET /api/blood-drives
+// Only returns drives that a blood center has actually posted/scheduled —
+// donors should only ever see events that exist in the backend, never mock/placeholder ones.
+// Response fields: [{ id, name, date, time, registered, total_slots, status }]
+// status: 'upcoming' | 'open' | 'closed' (closed = past cutoff, before slots run out)
+const bloodDrives = ref([])
+const drivesLoading = ref(false)
+const drivesError = ref('')
+
+async function fetchBloodDrives() {
+  drivesLoading.value = true
+  drivesError.value = ''
+  try {
+    const data = await $fetch('/api/blood-drives')
+    bloodDrives.value = data ?? []
+  } catch (err) {
+    console.error('Failed to load blood drives:', err)
+    drivesError.value = 'Could not load blood drives. Please try again.'
+    bloodDrives.value = []
+  } finally {
+    drivesLoading.value = false
+  }
+}
+
+function driveSlotsLeft(drive) {
+  return Math.max((drive.total_slots ?? 0) - (drive.registered ?? 0), 0)
+}
+
+function driveProgressPct(drive) {
+  if (!drive.total_slots) return 0
+  return Math.round(((drive.registered ?? 0) / drive.total_slots) * 100)
+}
+
+function driveProgressClass(drive) {
+  return driveSlotsLeft(drive) === 0 ? 'progress-fill--full' : drive.status === 'upcoming' ? 'progress-fill--blue' : 'progress-fill--green'
+}
+
+function driveStatusLabel(drive) {
+  if (driveSlotsLeft(drive) === 0) return 'Full'
+  if (drive.status === 'upcoming') return 'Upcoming'
+  return 'Open'
+}
+
+function driveStatusClass(drive) {
+  if (driveSlotsLeft(drive) === 0) return 'badge--full'
+  if (drive.status === 'upcoming') return 'badge--info'
+  return 'badge--success'
+}
+
+// Fetch drives as soon as the donor switches to the "mobile drive" flow,
+// and only once — re-selecting the tab won't refetch.
+let drivesFetched = false
+watch(appointmentType, (type) => {
+  if (type === 'mobile' && !drivesFetched) {
+    drivesFetched = true
+    fetchBloodDrives()
+  }
+})
+
+function formatDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
+
+const selectedDrive = computed(() => bloodDrives.value.find(d => d.id === selectedDriveId.value) || null)
+const selectedCenter = computed(() => bloodCenters.find(c => c.id === selectedCenterId.value) || null)
+
+const canContinue = computed(() => {
+  if (appointmentType.value === 'walkin') {
+    return !!(selectedCenterId.value && selectedDate.value && selectedTimeSlot.value)
+  }
+  if (appointmentType.value === 'mobile') {
+    return !!selectedDriveId.value
+  }
+  return false
+})
+
+const typeLabel = computed(() => appointmentType.value === 'walkin' ? 'Walk-in at blood center' : 'Register for mobile drive')
+
+const locationLabel = computed(() => {
+  if (appointmentType.value === 'walkin') return selectedCenter.value?.name || '—'
+  return selectedDrive.value?.name || '—'
+})
+
+const summaryDateLabel = computed(() => {
+  if (appointmentType.value === 'walkin') return formattedSelectedDate.value
+  return selectedDrive.value?.date || '—'
+})
+
+const confirmDateTimeLabel = computed(() => {
+  if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${selectedTimeSlot.value}`
+  return `${selectedDrive.value?.date || '—'} - ${selectedDrive.value?.time || '—'}`
+})
+
+async function handleConfirm() {
+  confirming.value = true
+  try {
+    // Backend contract: POST /api/appointments
+    // Body: { type, center_id | drive_id, date, time_slot }
+    // Response: mag-generate ug QR code para sa appointment/registration
+    await $fetch('/api/appointments', {
+      method: 'POST',
+      body: {
+        type: appointmentType.value,
+        center_id: appointmentType.value === 'walkin' ? selectedCenterId.value : null,
+        drive_id: appointmentType.value === 'mobile' ? selectedDriveId.value : null,
+        date: appointmentType.value === 'walkin' ? selectedDate.value : selectedDrive.value?.date,
+        time_slot: appointmentType.value === 'walkin' ? selectedTimeSlot.value : selectedDrive.value?.time,
+      },
+    })
+  } catch (err) {
+    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/appointments endpoint,
+    // so mag-fail gyud ni nga call. Padayon lang ta sa pag-ipakita sa confirmation
+    // modal aron dili maka-block sa UI flow — tangtangon na lang ni nga catch
+    // (o himuon nga mag-alert) sa dihang naka-connect na ang tinuod nga backend.
+    console.error('Failed to confirm appointment (expected while backend is not yet wired up):', err)
   } finally {
     confirming.value = false
   }
   showSummary.value = false
   showConfirmation.value = true
 }
- 
+
 function viewQr() {
   router.push('/signup/donor/MyQRCode')
 }
- 
+
 function goDashboard() {
   router.push('/signup/donor/Dashboard')
 }
 </script>
- 
+
 <style scoped>
 .appointment-page {
   --primary: #1565c0;
@@ -200,48 +396,48 @@ function goDashboard() {
   flex-direction: column;
   gap: 24px;
 }
- 
+
 .header-row {
   display: flex;
   flex-direction: column;
 }
- 
+
 .page-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
- 
+
 .page-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
- 
+
 .fade-in {
   animation: fadeInUp 0.5s ease both;
   animation-delay: var(--delay, 0ms);
 }
- 
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
     transform: translateY(12px);
   }
- 
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
- 
+
 .step-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
- 
+
 .step-label {
   font-size: 12.5px;
   font-weight: 700;
@@ -250,14 +446,14 @@ function goDashboard() {
   text-transform: uppercase;
   margin: 0;
 }
- 
+
 /* Type cards */
 .type-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
- 
+
 .type-card {
   display: flex;
   align-items: center;
@@ -270,12 +466,12 @@ function goDashboard() {
   text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
- 
+
 .type-card--active {
   background: #eaf3fc;
   border-color: var(--primary);
 }
- 
+
 .type-card__icon {
   width: 40px;
   height: 40px;
@@ -287,25 +483,25 @@ function goDashboard() {
   background: #eaf3fc;
   color: var(--primary);
 }
- 
+
 .type-card__body {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1;
 }
- 
+
 .type-card__title {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
 }
- 
+
 .type-card__desc {
   font-size: 12.5px;
   color: var(--text-secondary);
 }
- 
+
 .radio {
   width: 20px;
   height: 20px;
@@ -314,11 +510,11 @@ function goDashboard() {
   flex-shrink: 0;
   position: relative;
 }
- 
+
 .radio--active {
   border-color: var(--primary);
 }
- 
+
 .radio--active::after {
   content: '';
   position: absolute;
@@ -326,14 +522,14 @@ function goDashboard() {
   border-radius: 999px;
   background: var(--primary);
 }
- 
+
 /* Center cards */
 .center-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
- 
+
 .center-card {
   display: flex;
   flex-direction: column;
@@ -346,30 +542,30 @@ function goDashboard() {
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
- 
+
 .center-card--active {
   background: #eaf3fc;
   border-color: var(--primary);
 }
- 
+
 .center-card__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
- 
+
 .center-card__name {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
 }
- 
+
 .center-card__meta {
   font-size: 12px;
   color: var(--text-secondary);
 }
- 
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -380,17 +576,22 @@ function goDashboard() {
   font-weight: 700;
   width: fit-content;
 }
- 
+
 .badge--success {
   background: #eaf6ea;
   color: var(--success);
 }
- 
+
 .badge--info {
   background: #dbeafe;
   color: #1e40af;
 }
- 
+
+.badge--full {
+  background: #f3f4f6;
+  color: var(--text-secondary);
+}
+
 /* Date & time panel */
 .panel {
   background: white;
@@ -399,11 +600,11 @@ function goDashboard() {
   border: 1px solid #eef0f3;
   overflow: hidden;
 }
- 
+
 .form-body {
   padding: 20px;
 }
- 
+
 .form-label {
   display: block;
   font-size: 12px;
@@ -411,7 +612,7 @@ function goDashboard() {
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
- 
+
 .form-input {
   width: 100%;
   padding: 10px 12px;
@@ -422,30 +623,30 @@ function goDashboard() {
   background: white;
   transition: border-color 0.15s ease;
 }
- 
+
 .form-input:focus {
   outline: none;
   border-color: var(--primary);
 }
- 
+
 .form-input--lg {
   padding: 12px 14px;
   font-weight: 700;
 }
- 
+
 .slots-heading {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 20px 0 12px;
 }
- 
+
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
- 
+
 .slot-btn {
   display: flex;
   flex-direction: column;
@@ -458,40 +659,40 @@ function goDashboard() {
   cursor: pointer;
   transition: all 0.15s ease;
 }
- 
+
 .slot-btn--active {
   background: #eaf3fc;
   border-color: var(--primary);
 }
- 
+
 .slot-btn--full {
   background: #f3f4f6;
   color: var(--text-secondary);
   cursor: not-allowed;
 }
- 
+
 .slot-btn__time {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
 }
- 
+
 .slot-btn--full .slot-btn__time {
   color: var(--text-secondary);
 }
- 
+
 .slot-btn__avail {
   font-size: 11.5px;
   color: var(--text-secondary);
 }
- 
+
 /* Drive cards */
 .drive-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
- 
+
 .drive-card {
   display: flex;
   flex-direction: column;
@@ -504,37 +705,37 @@ function goDashboard() {
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
- 
+
 .drive-card--active {
   background: #eaf3fc;
   border-color: var(--primary);
 }
- 
+
 .drive-card:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
- 
+
 .drive-card__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
- 
+
 .drive-card__name {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
- 
+
 .drive-card__meta {
   font-size: 12.5px;
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
- 
+
 .progress-track {
   width: 100%;
   height: 6px;
@@ -542,33 +743,57 @@ function goDashboard() {
   background: #e5e7eb;
   overflow: hidden;
 }
- 
+
 .progress-fill {
   height: 100%;
   border-radius: 999px;
 }
- 
+
 .progress-fill--blue {
   background: var(--primary);
 }
- 
+
 .progress-fill--green {
   background: var(--success);
 }
- 
+
+.progress-fill--full {
+  background: #d1d5db;
+}
+
+.drive-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  background: white;
+  border: 1px solid #eef0f3;
+  border-radius: 12px;
+}
+
+.drive-state__sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -4px 0 0;
+}
+
 .drive-card__bottom {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-secondary);
 }
- 
+
 /* Continue button row */
 .continue-row {
   display: flex;
   justify-content: flex-end;
 }
- 
+
 /* Buttons */
 .btn-primary {
   display: inline-flex;
@@ -585,20 +810,20 @@ function goDashboard() {
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
- 
+
 .btn-primary:hover:not(:disabled) {
   opacity: 0.92;
 }
- 
+
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
- 
+
 .btn-block {
   width: 100%;
 }
- 
+
 .btn-outline {
   display: inline-flex;
   align-items: center;
@@ -613,11 +838,11 @@ function goDashboard() {
   cursor: pointer;
   transition: background 0.15s ease;
 }
- 
+
 .btn-outline:hover {
   background: #e5e7eb;
 }
- 
+
 /* Modals */
 .modal-overlay {
   position: fixed;
@@ -629,7 +854,7 @@ function goDashboard() {
   padding: 20px;
   z-index: 100;
 }
- 
+
 .modal-card {
   background: white;
   border-radius: 16px;
@@ -641,18 +866,18 @@ function goDashboard() {
   gap: 4px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
 }
- 
+
 .modal-title {
   font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 12px;
 }
- 
+
 .modal-title--center {
   text-align: center;
 }
- 
+
 .modal-sub {
   font-size: 13px;
   color: var(--text-secondary);
@@ -660,14 +885,14 @@ function goDashboard() {
   margin: 0 0 16px;
   line-height: 1.5;
 }
- 
+
 .summary-list {
   display: flex;
   flex-direction: column;
   width: 100%;
   margin-bottom: 18px;
 }
- 
+
 .summary-row {
   display: flex;
   justify-content: space-between;
@@ -677,20 +902,20 @@ function goDashboard() {
   font-size: 13px;
   color: var(--text-secondary);
 }
- 
+
 .summary-row span:last-child {
   font-weight: 700;
   color: var(--text-primary);
 }
- 
+
 .summary-row:last-child {
   border-bottom: none;
 }
- 
+
 .valid-text {
   color: var(--success) !important;
 }
- 
+
 .modal-note {
   font-size: 11.5px;
   color: var(--text-secondary);
@@ -698,12 +923,12 @@ function goDashboard() {
   margin: 4px 0 0;
   line-height: 1.5;
 }
- 
+
 .modal-card--confirm {
   align-items: center;
   text-align: center;
 }
- 
+
 .confirm-icon {
   width: 48px;
   height: 48px;
@@ -716,38 +941,38 @@ function goDashboard() {
   margin: 0 auto 12px;
   flex-shrink: 0;
 }
- 
+
 .confirm-icon__svg {
   color: white;
 }
- 
+
 .confirm-actions {
   display: flex;
   gap: 10px;
   width: 100%;
   margin-top: 4px;
 }
- 
+
 .confirm-actions .btn-outline,
 .confirm-actions .btn-primary {
   flex: 1;
   padding: 11px 12px;
 }
- 
+
 @media (max-width: 900px) {
   .center-grid {
     grid-template-columns: 1fr;
   }
- 
+
   .type-grid {
     grid-template-columns: 1fr;
   }
- 
+
   .slots-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
- 
+
 @media (max-width: 640px) {
   .appointment-page {
     padding: 16px 16px 40px;

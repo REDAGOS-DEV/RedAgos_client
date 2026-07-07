@@ -251,8 +251,7 @@
             </div>
             <div class="eligibility-body">
               <div class="eligibility-status-row" :style="{
-                background: eligibilityStatus === 'eligible' ? '#E8F5E9' : eligibilityStatus === 'deferred' ? '#FFEBEE' : '#FFF8E1'
-              }">
+                background: eligibilityStatus === 'eligible' ? '#E8F5E9' : eligibilityStatus === 'deferred' ? '#FFEBEE' : '#FFF8E1'}">
                 <AssetIcon name="shield-check" :size="20"
                   :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }" />
                 <div>
@@ -306,12 +305,110 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 
-const stats = ref({
-  totalDonations: 8,
-  nextEligibleDate: 15,
-  upcomingAppointments: 1,
+definePageMeta({
+  middleware: 'auth',
+  layout: 'dashboard'
+})
+
+const loading = ref(true)
+
+// Core donor data
+const profile = ref(null)
+const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'pending'
+const bloodType = ref('—')
+const totalDonations = ref(0)
+const upcomingAppointment = ref(null)
+const recentDonations = ref([])
+const monthlyTrend = ref([])
+
+// Trend chart state
+const hoveredMonth = ref(null)
+const lowThreshold = 1
+
+const maxTrendCount = computed(() => {
+  const max = Math.max(0, ...monthlyTrend.value.map(m => m.count))
+  return max > 0 ? max : 1
+})
+
+const hasTrendData = computed(() => monthlyTrend.value.some(m => m.count > 0))
+
+const yTicks = computed(() => {
+  const max = maxTrendCount.value
+  return [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0]
+})
+
+function barHeight(count) {
+  return Math.round((count / maxTrendCount.value) * 100)
+}
+
+const nextApptDate = computed(() => {
+  if (!upcomingAppointment.value) return '—'
+  return formatDate(upcomingAppointment.value.appointment_datetime, 'MMM D')
+})
+
+const quickActions = [
+  { path: '/signup/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
+  { path: '/signup/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
+  { path: '/signup/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
+  { path: '/signup/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
+]
+
+// Lightweight date formatter supporting the tokens used in this page:
+// 'D', 'MMM', 'MMM D', 'MMM D, YYYY', 'h:mm A'
+function formatDate(value, fmt) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+
+  const day = d.getDate()
+  const monthShort = d.toLocaleDateString('en-US', { month: 'short' })
+  const year = d.getFullYear()
+  let hours = d.getHours()
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+
+  switch (fmt) {
+    case 'D':
+      return String(day)
+    case 'MMM':
+      return monthShort
+    case 'MMM D':
+      return `${monthShort} ${day}`
+    case 'MMM D, YYYY':
+      return `${monthShort} ${day}, ${year}`
+    case 'h:mm A':
+      return `${hours}:${minutes} ${ampm}`
+    default:
+      return d.toLocaleDateString()
+  }
+}
+
+onMounted(async () => {
+  try {
+    // Backend contract: GET /api/donor/dashboard
+    // Response fields:
+    // { profile, eligibility_status, blood_type, total_donations,
+    //   upcoming_appointment, recent_donations: [...], monthly_trend: [{ key, month, count }, ...12] }
+    const data = await $fetch('/api/donor/dashboard')
+    profile.value = data.profile ?? null
+    eligibilityStatus.value = data.eligibility_status ?? 'pending'
+    bloodType.value = data.blood_type ?? '—'
+    totalDonations.value = data.total_donations ?? 0
+    upcomingAppointment.value = data.upcoming_appointment ?? null
+    recentDonations.value = data.recent_donations ?? []
+    monthlyTrend.value = data.monthly_trend ?? []
+  } catch (err) {
+    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/donor/dashboard endpoint,
+    // so mag-fail gyud ni nga call. Naa'y safe defaults pud (empty arrays, 'pending')
+    // aron dili mag-crash ang template samtang wala pa naka-connect ang tinuod nga backend.
+    console.error('Failed to load dashboard data (expected while backend is not yet wired up):', err)
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 

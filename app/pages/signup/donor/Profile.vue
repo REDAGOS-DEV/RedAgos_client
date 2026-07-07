@@ -163,7 +163,9 @@
 <script setup>
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ 
+    middleware: 'auth',
+    layout: 'dashboard' })
 
 const router = useRouter()
 const { user, fetchUser, updateAvatar, clearUser } = useUser()
@@ -309,6 +311,7 @@ async function handleLogout() {
   margin: 0 auto;
   padding: 24px 32px 40px;
   display: flex;
+  background: #F5F7FA;
   flex-direction: column;
   gap: 20px;
 }
@@ -329,7 +332,6 @@ async function handleLogout() {
 .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
 .col-left, .col-right { display: flex; flex-direction: column; gap: 20px; }
 
-/* Card look matched to reference: rounder corners, softer visible shadow, no harsh border */
 .panel {
   background: white;
   border-radius: 14px;
@@ -387,7 +389,6 @@ async function handleLogout() {
 }
 .btn-outline:hover { background: #e5e7eb; }
 
-/* Full-width buttons for stacked card actions (Status card) */
 .btn-block { width: 100%; }
 
 /* Forms */

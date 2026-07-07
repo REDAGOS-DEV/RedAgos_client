@@ -134,7 +134,11 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-definePageMeta({ layout: 'dashboard' })
+
+definePageMeta({
+  middleware: 'auth',
+  layout: 'dashboard'
+})
 
 const router = useRouter()
 const submitting = ref(false)
