@@ -242,7 +242,7 @@
 </template>
 
 <script setup>
-import { authService } from '~~/api/auth/AuthService'
+import { authService } from '~/api/auth/AuthService'
 import { reactive, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -282,7 +282,11 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/')
+    const redirectPath = typeof useRoute().query.redirect === 'string'
+      ? useRoute().query.redirect
+      : '/signup/donor/dashboard'
+
+    await navigateTo(redirectPath)
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

@@ -40,6 +40,10 @@
 <script setup>
 import { ref } from 'vue'
 
+definePageMeta({
+  middleware: 'auth',
+})
+
 const stats = ref({
   totalDonations: 8,
   nextEligibleDate: 15,

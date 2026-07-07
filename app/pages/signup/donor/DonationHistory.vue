@@ -31,6 +31,10 @@
 <script setup>
 import { ref } from 'vue'
 
+definePageMeta({
+  middleware: 'auth',
+})
+
 const donations = ref([
   { id: 1, date: '2026-06-15', center: 'Main Blood Center', amount: '450 ml', status: 'completed' },
   { id: 2, date: '2026-05-20', center: 'Southern Philippines Medical Center', amount: '450 ml', status: 'completed' },
