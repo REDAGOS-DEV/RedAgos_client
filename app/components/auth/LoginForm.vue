@@ -282,7 +282,11 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/')
+    const redirectPath = typeof useRoute().query.redirect === 'string'
+      ? useRoute().query.redirect
+      : '/signup/donor/dashboard'
+
+    await navigateTo(redirectPath)
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
