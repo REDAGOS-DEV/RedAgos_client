@@ -24,8 +24,10 @@ import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
 import calendar from '~/assets/icons/calendar.svg?raw'
 import chart from '~/assets/icons/chart.svg?raw'
+import check from '~/assets/icons/check.svg?raw'
 import chevronLeft from '~/assets/icons/chevron-left.svg?raw'
 import chevronRight from '~/assets/icons/chevron-right.svg?raw'
+import chevronDown from '~/assets/icons/chevron-down.svg?raw'
 import clipboard from '~/assets/icons/clipboard.svg?raw'
 import clipboardCheck from '~/assets/icons/clipboard-check.svg?raw'
 import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
@@ -44,9 +46,11 @@ import idCard from '~/assets/icons/id-card.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
 import lock from '~/assets/icons/lock.svg?raw'
 import logIn from '~/assets/icons/log-in.svg?raw'
+import logOut from '~/assets/icons/log-out.svg?raw'
 import mail from '~/assets/icons/mail.svg?raw'
 import mapPin from '~/assets/icons/map-pin.svg?raw'
 import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
+import menu from '~/assets/icons/menu.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
 import quote from '~/assets/icons/quote.svg?raw'
@@ -60,7 +64,7 @@ import starFill from '~/assets/icons/star-fill.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
-
+import x from '~/assets/icons/x.svg?raw'
 const icons = {
   activity,
   alert,
@@ -76,8 +80,10 @@ const icons = {
   box,
   calendar,
   chart,
+  check,
   'chevron-left': chevronLeft,
   'chevron-right': chevronRight,
+  'chevron-down' :chevronDown,
   clipboard,
   'clipboard-plus': clipboardPlus,
   'clipboard-check': clipboardCheck,
@@ -96,9 +102,11 @@ const icons = {
   info,
   lock,
   'log-in': logIn,
+  'log-out': logOut,
   mail,
   'map-pin': mapPin,
   'map-pin-simple': mapPinSimple,
+  menu,
   phone,
   'qr-code': qrCode,
   quote,
@@ -112,6 +120,7 @@ const icons = {
   truck,
   users,
   'user-circle': userCircle,
+  x
 }
 
 const props = defineProps({

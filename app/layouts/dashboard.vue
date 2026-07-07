@@ -10,3 +10,13 @@
     </div>
   </div>
 </template>
+<script setup>
+import { onMounted } from 'vue'
+import { useUser } from '@/composables/useUser'
+
+const { user, fetchUser } = useUser()
+
+onMounted(() => {
+  if (!user.value) fetchUser()
+})
+</script>

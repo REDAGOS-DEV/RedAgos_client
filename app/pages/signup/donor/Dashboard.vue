@@ -16,7 +16,7 @@
             <AssetIcon name="bell" :size="16" />
             <span v-if="eligibilityStatus === 'eligible'" class="bell-dot" />
           </button>
-          <NuxtLink to="/book-appointment" class="btn-primary">
+          <NuxtLink to="/signup/donor/Appointments" class="btn-primary">
             <AssetIcon name="calendar" :size="16" />
             Book Appointment
           </NuxtLink>
@@ -29,9 +29,15 @@
         <p class="banner-text">
           Eligibility screening is valid. Present your QR code at the blood center on arrival.
         </p>
-        <NuxtLink to="/eligibility" class="banner-link">View QR</NuxtLink>
+        <NuxtLink to="/signup/donor/Eligibility" class="banner-link">View QR</NuxtLink>
       </div>
-
+      <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning fade-in" style="--delay: 60ms">
+        <AssetIcon name="alert" :size="16" class="banner-icon" />
+        <p class="banner-text">
+          Your eligibility screening is deferred. Please contact the blood center for more information.
+        </p>
+        <NuxtLink to="/signup/donor/Eligibility" class="banner-link">View Details</NuxtLink>
+      </div>
       <!-- Stat cards -->
       <div class="stats-grid">
         <div class="stat-card stat-card--hero fade-in" style="--delay: 100ms">
@@ -68,16 +74,16 @@
         <div class="stat-card fade-in" style="--delay: 200ms">
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
-            <div
-              class="stat-card__badge"
-              :style="{ background: eligibilityStatus === 'eligible' ? '#E8F5E9' : '#FFF3E0' }"
-            >
-              <AssetIcon name="shield-check" :size="14" :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }" />
+            <div class="stat-card__badge"
+              :style="{ background: eligibilityStatus === 'eligible' ? '#E8F5E9' : '#FFF3E0' }">
+              <AssetIcon name="shield-check" :size="14"
+                :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }" />
             </div>
           </div>
           <div>
             <p class="stat-card__value" :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }">
-              {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus === 'deferred' ? 'Deferred' : 'Pending' }}
+              {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus === 'deferred' ? 'Deferred' : 'Pending'
+              }}
             </p>
             <p class="stat-card__meta-text">
               {{ eligibilityStatus === 'eligible' && profile?.screening_valid_until
@@ -112,38 +118,37 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Donation Trend</h2>
-                <p class="panel-subtitle">Your donation activity over time</p>
+                <p class="panel-subtitle">Completed donations over the last 12 months</p>
               </div>
             </div>
+
             <div class="trend-chart">
-              <svg v-if="trendPoints.length" viewBox="0 0 300 100" preserveAspectRatio="none" class="trend-svg">
-                <polyline
-                  :points="trendPolyline"
-                  fill="none"
-                  stroke="#1565C0"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="trend-line"
-                />
-                <polygon :points="trendAreaPolygon" fill="url(#trendGradient)" class="trend-area" />
-                <defs>
-                  <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#1565C0" stop-opacity="0.25" />
-                    <stop offset="100%" stop-color="#1565C0" stop-opacity="0" />
-                  </linearGradient>
-                </defs>
-                <circle
-                  v-for="(p, i) in trendPoints"
-                  :key="i"
-                  :cx="p.x"
-                  :cy="p.y"
-                  r="2.5"
-                  fill="#1565C0"
-                  class="trend-dot"
-                  :style="{ '--dot-delay': `${400 + i * 60}ms` }"
-                />
-              </svg>
+              <div v-if="hasTrendData" class="chart">
+                <!-- Y axis -->
+                <div class="chart__yaxis">
+                  <span v-for="n in yTicks" :key="n">{{ n }}</span>
+                </div>
+
+                <!-- Bars -->
+                <div class="chart__plot">
+                  <div v-for="(m, i) in monthlyTrend" :key="m.key" class="chart__col" @mouseenter="hoveredMonth = i"
+                    @mouseleave="hoveredMonth = null">
+                    <div class="chart__tooltip" v-if="hoveredMonth === i">
+                      {{ m.count }} donation{{ m.count !== 1 ? 's' : '' }}
+                    </div>
+
+                    <div class="chart__track">
+                      <div class="chart__bar" :class="{
+                        'chart__bar--low': m.count > 0 && m.count <= lowThreshold,
+                        'chart__bar--empty': m.count === 0
+                      }" :style="{ height: `${barHeight(m.count)}%` }" />
+                    </div>
+
+                    <span class="chart__label">{{ m.month }}</span>
+                  </div>
+                </div>
+              </div>
+
               <div v-else class="trend-empty">
                 <AssetIcon name="trending-up" :size="40" style="color:#e5e7eb" />
                 <p>Not enough data yet to show a trend</p>
@@ -158,38 +163,36 @@
                 <h2 class="panel-title">Recent Donations</h2>
                 <p class="panel-subtitle">Your latest donation activity</p>
               </div>
-              <NuxtLink to="/donation-history" class="panel-link">
-                View All <AssetIcon name="chevron-right" :size="14" />
+              <NuxtLink to="/signup/donor/History" class="panel-link">
+                View All
+                <AssetIcon name="chevron-right" :size="14" />
               </NuxtLink>
             </div>
 
             <div v-if="recentDonations.length" class="donation-list">
               <div v-for="d in recentDonations" :key="d.id" class="donation-item">
                 <div class="donation-item__left">
-                  <div
-                    class="donation-icon"
-                    :style="{ background: d.status === 'completed' ? '#E8F5E9' : '#FFF3E0' }"
-                  >
-                    <AssetIcon name="blood-drop" :size="16" :style="{ color: d.status === 'completed' ? '#2E7D32' : '#F57C00' }" />
+                  <div class="donation-icon" :style="{ background: d.status === 'completed' ? '#E8F5E9' : '#FFF3E0' }">
+                    <AssetIcon name="blood-drop" :size="16"
+                      :style="{ color: d.status === 'completed' ? '#2E7D32' : '#F57C00' }" />
                   </div>
                   <div>
                     <p class="donation-title">
-                      {{ d.status === 'completed' ? 'Successful Donation' : d.status === 'deferred' ? 'Deferred' : 'Pending' }}
+                      {{ d.status === 'completed' ? 'Successful Donation' : d.status === 'deferred' ? 'Deferred' :
+                      'Pending' }}
                     </p>
                     <p class="donation-meta">
-                      {{ d.blood_type }} · {{ d.facility_name }} · {{ d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
+                      {{ d.blood_type }} · {{ d.facility_name }} · {{ d.donation_type === 'walk_in' ? 'Walk-in' :
+                      'Booked' }}
                     </p>
                   </div>
                 </div>
                 <div class="donation-item__right">
                   <p class="donation-date">{{ formatDate(d.donation_date, 'MMM D, YYYY') }}</p>
-                  <span
-                    class="badge capitalize"
-                    :style="{
-                      background: d.status === 'completed' ? '#E8F5E9' : '#FFF3E0',
-                      color: d.status === 'completed' ? '#2E7D32' : '#F57C00',
-                    }"
-                  >
+                  <span class="badge capitalize" :style="{
+                    background: d.status === 'completed' ? '#E8F5E9' : '#FFF3E0',
+                    color: d.status === 'completed' ? '#2E7D32' : '#F57C00',
+                  }">
                     {{ d.status === 'completed' ? 'Completed' : d.status }}
                   </span>
                 </div>
@@ -201,21 +204,22 @@
             </div>
           </div>
         </div>
-
         <!-- Right column -->
         <div class="col-right">
           <!-- Upcoming appointment -->
           <div class="panel fade-in" style="--delay: 300ms">
             <div class="panel-header">
               <h2 class="panel-title">Upcoming Appointment</h2>
-              <NuxtLink to="/book-appointment" class="panel-link-plain">Manage</NuxtLink>
+              <NuxtLink to="/signup/donor/Appointments" class="panel-link-plain">Manage</NuxtLink>
             </div>
 
             <div v-if="upcomingAppointment" class="appt-body">
               <div class="appt-row">
                 <div class="appt-date-chip">
-                  <span class="appt-date-chip__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D') }}</span>
-                  <span class="appt-date-chip__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM') }}</span>
+                  <span class="appt-date-chip__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D')
+                  }}</span>
+                  <span class="appt-date-chip__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM')
+                  }}</span>
                 </div>
                 <div class="appt-info">
                   <p class="appt-type">
@@ -236,7 +240,7 @@
             <div v-else class="empty-state">
               <AssetIcon name="calendar" :size="40" style="color:#e5e7eb" />
               <p class="mb-3">No upcoming appointments</p>
-              <NuxtLink to="/book-appointment" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
+              <NuxtLink to="/signup/donor/Appointments" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
             </div>
           </div>
 
@@ -246,22 +250,14 @@
               <h2 class="panel-title">Eligibility Status</h2>
             </div>
             <div class="eligibility-body">
-              <div
-                class="eligibility-status-row"
-                :style="{
-                  background: eligibilityStatus === 'eligible' ? '#E8F5E9' : eligibilityStatus === 'deferred' ? '#FFEBEE' : '#FFF8E1'
-                }"
-              >
-                <AssetIcon
-                  name="shield-check"
-                  :size="20"
-                  :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }"
-                />
+              <div class="eligibility-status-row" :style="{
+                background: eligibilityStatus === 'eligible' ? '#E8F5E9' : eligibilityStatus === 'deferred' ? '#FFEBEE' : '#FFF8E1'
+              }">
+                <AssetIcon name="shield-check" :size="20"
+                  :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }" />
                 <div>
-                  <p
-                    class="eligibility-status capitalize"
-                    :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }"
-                  >
+                  <p class="eligibility-status capitalize"
+                    :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }">
                     {{ eligibilityStatus }}
                   </p>
                   <p v-if="profile?.screening_valid_until" class="eligibility-until">
@@ -273,7 +269,8 @@
               <div class="eligibility-details">
                 <div v-if="profile?.screening_date" class="eligibility-details__row">
                   <span class="eligibility-details__label">Screening date</span>
-                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY') }}</span>
+                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY')
+                  }}</span>
                 </div>
                 <div class="eligibility-details__row">
                   <span class="eligibility-details__label">Blood type</span>
@@ -281,7 +278,7 @@
                 </div>
               </div>
 
-              <NuxtLink to="/eligibility" class="btn-danger">
+              <NuxtLink to="/signup/donor/Eligibility" class="btn-danger">
                 {{ eligibilityStatus === 'eligible' ? 'Retake Screening' : 'Take Screening' }}
               </NuxtLink>
             </div>
@@ -293,12 +290,7 @@
               <h2 class="panel-title">Quick Actions</h2>
             </div>
             <div class="quick-actions">
-              <NuxtLink
-                v-for="item in quickActions"
-                :key="item.path"
-                :to="item.path"
-                class="quick-action"
-              >
+              <NuxtLink v-for="item in quickActions" :key="item.path" :to="item.path" class="quick-action">
                 <div class="quick-action__icon" :style="{ background: `${item.color}12` }">
                   <AssetIcon :name="item.icon" :size="16" :style="{ color: item.color }" />
                 </div>
@@ -356,7 +348,7 @@ async function load() {
   loading.value = true
   try {
     // Placeholder mock data — replace with real API calls
-    user.value = { id: 'u1', full_name: 'Lusi Santos' }
+    user.value = { id: 'u1', full_name: 'Lusi Shang' }
     profile.value = {
       blood_type: 'O+',
       total_donations: 4,
@@ -400,33 +392,55 @@ const nextApptDate = computed(() =>
 )
 const recentDonations = computed(() => donations.value.slice(0, 4))
 
-// --- Trend chart (lightweight inline SVG, no external chart library needed) ---
-const trendPoints = computed(() => {
-  const completed = [...donations.value]
-    .filter(d => d.status === 'completed')
-    .sort((a, b) => new Date(a.donation_date) - new Date(b.donation_date))
-  if (completed.length < 2) return []
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-  const width = 300
-  const height = 100
-  const padding = 10
-  return completed.map((_, i) => ({
-    x: padding + (i * (width - padding * 2)) / (completed.length - 1),
-    y: height - padding - ((i + 1) / completed.length) * (height - padding * 2),
-  }))
+const lowThreshold = 1 // months with this count or fewer get flagged as "low"
+const hoveredMonth = ref(null)
+
+const monthlyTrend = computed(() => {
+  const now = new Date()
+  const buckets = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1)
+    return {
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      month: MONTHS_SHORT[d.getMonth()],
+      year: d.getFullYear(),
+      m: d.getMonth(),
+      count: 0,
+    }
+  })
+
+  donations.value.forEach((d) => {
+    if (d.status !== 'completed') return
+    const date = new Date(d.donation_date)
+    const bucket = buckets.find((b) => b.year === date.getFullYear() && b.m === date.getMonth())
+    if (bucket) bucket.count += 1
+  })
+
+  return buckets
 })
-const trendPolyline = computed(() => trendPoints.value.map(p => `${p.x},${p.y}`).join(' '))
-const trendAreaPolygon = computed(() => {
-  if (!trendPoints.value.length) return ''
-  const first = trendPoints.value[0]
-  const last = trendPoints.value[trendPoints.value.length - 1]
-  return `${first.x},100 ${trendPolyline.value} ${last.x},100`
+
+const hasTrendData = computed(() => monthlyTrend.value.some((m) => m.count > 0))
+
+const trendMaxCount = computed(() => Math.max(...monthlyTrend.value.map((m) => m.count), 1))
+const yMax = computed(() => Math.max(trendMaxCount.value, 4))
+
+const yTicks = computed(() => {
+  const step = Math.ceil(yMax.value / 4)
+  const ticks = []
+  for (let v = step * 4; v >= 0; v -= step) ticks.push(v)
+  return ticks
 })
+
+function barHeight(count) {
+  if (count === 0) return 3
+  return Math.max((count / yMax.value) * 100, 8)
+}
 
 const quickActions = [
-  { label: 'Book Appointment', path: '/book-appointment', icon: 'calendar', color: '#1565C0' },
-  { label: 'Donation History', path: '/donation-history', icon: 'history', color: '#42A5F5' },
-  { label: 'Update Profile', path: '/profile', icon: 'user-circle', color: '#6B7280' },
+  { label: 'Book Appointment', path: '/signup/donor/Appointments', icon: 'calendar', color: '#1565C0' },
+  { label: 'Donation History', path: '/signup/donor/History', icon: 'history', color: '#42A5F5' },
+  { label: 'Update Profile', path: '/signup/donor/Profile', icon: 'user-circle', color: '#6B7280' },
 ]
 </script>
 
@@ -452,6 +466,7 @@ const quickActions = [
   justify-content: center;
   height: 60vh;
 }
+
 .spinner {
   width: 32px;
   height: 32px;
@@ -460,8 +475,164 @@ const quickActions = [
   border-top-color: var(--primary);
   animation: spin 0.8s linear infinite;
 }
+
+.bar-chart {
+  padding: 16px 20px 20px;
+}
+
+.bar-chart__grid {
+  position: relative;
+  height: 0;
+}
+
+.bar-chart__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 140px;
+}
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.bar-col__track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar-col__fill {
+  position: relative;
+  width: 60%;
+  max-width: 22px;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--accent);
+  transition: height 0.6s ease;
+}
+
+.bar-col__fill--low {
+  background: #F57C00;
+}
+
+.bar-col__fill--empty {
+  background: #f1f1f1;
+}
+
+.bar-col__warning-dot {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #F57C00;
+}
+
+.bar-col__label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.bar-col__label--current {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.chart {
+  display: flex;
+  gap: 8px;
+  height: 160px;
+  padding: 16px 20px 20px;
+}
+
+.chart__yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-bottom: 20px;
+  text-align: right;
+  width: 20px;
+}
+
+.chart__plot {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.chart__col {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.chart__tooltip {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.chart__track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.chart__bar {
+  width: 60%;
+  max-width: 18px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  transition: height 0.4s ease, background 0.2s ease;
+}
+
+.chart__bar--low {
+  background: var(--warning);
+}
+
+.chart__bar--empty {
+  background: #e3ebf6;
+}
+
+.chart__label {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Entrance animation */
@@ -469,21 +640,60 @@ const quickActions = [
   animation: fadeInUp 0.5s ease both;
   animation-delay: var(--delay, 0ms);
 }
+
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fade-in, .spinner, .trend-dot { animation: none !important; }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.dashboard-inner { display: flex; flex-direction: column; gap: 24px; }
+@media (prefers-reduced-motion: reduce) {
+
+  .fade-in,
+  .spinner,
+  .trend-dot {
+    animation: none !important;
+  }
+}
+
+.dashboard-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
 /* Header */
-.header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.page-title { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.page-subtitle { font-size: 14px; color: var(--text-secondary); margin: 2px 0 0; }
-.header-actions { display: flex; align-items: center; gap: 12px; }
+.header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
 .bell-btn {
   position: relative;
@@ -491,11 +701,15 @@ const quickActions = [
   border-radius: 12px;
   background: white;
   border: 1px solid #f3f4f6;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.bell-btn:hover { background: #f9fafb; }
+
+.bell-btn:hover {
+  background: #f9fafb;
+}
+
 .bell-dot {
   position: absolute;
   top: 6px;
@@ -516,14 +730,23 @@ const quickActions = [
   font-weight: 600;
   color: white;
   background: var(--primary);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: opacity 0.15s ease, transform 0.15s ease;
   border: none;
   cursor: pointer;
   text-decoration: none;
 }
-.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-.btn-primary--sm { padding: 8px 20px; font-size: 12px; border-radius: 12px; }
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-primary--sm {
+  padding: 8px 20px;
+  font-size: 12px;
+  border-radius: 12px;
+}
 
 .btn-danger {
   display: block;
@@ -538,7 +761,10 @@ const quickActions = [
   text-decoration: none;
   transition: opacity 0.15s ease;
 }
-.btn-danger:hover { opacity: 0.92; }
+
+.btn-danger:hover {
+  opacity: 0.92;
+}
 
 /* Banner */
 .banner {
@@ -550,17 +776,40 @@ const quickActions = [
   background: #e8f5e9;
   border: 1px solid #a5d6a7;
 }
-.banner-icon { color: var(--success); flex-shrink: 0; }
-.banner-text { font-size: 12px; font-weight: 500; color: var(--success); margin: 0; }
-.banner-link { margin-left: auto; font-size: 12px; font-weight: 700; text-decoration: underline; color: var(--success); flex-shrink: 0; }
+
+.banner-icon {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.banner-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success);
+  margin: 0;
+}
+
+.banner-link {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  color: var(--success);
+  flex-shrink: 0;
+}
 
 /* Stats */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
 .stat-card {
   background: white;
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   border: 1px solid #f3f4f6;
   display: flex;
   flex-direction: column;
@@ -570,149 +819,534 @@ const quickActions = [
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
-.stat-card--hero { background: var(--primary); border: none; }
-.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
-.stat-card__label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin: 0; }
-.stat-card__label--light { color: rgba(255,255,255,0.8); }
-.stat-card__badge {
-  width: 28px; height: 28px; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center;
-}
-.stat-card__badge--light { background: rgba(255,255,255,0.15); }
-.stat-card__value { font-size: 26px; font-weight: 800; margin: 0; line-height: 1; }
-.stat-card__value--hero { color: white; font-size: 36px; }
-.stat-card__meta { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
-.stat-card__meta-text { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0; }
-.stat-card__meta-text--light { color: rgba(255,255,255,0.6); margin: 0; }
 
-.deco-circle { position: absolute; border-radius: 999px; background: rgba(255,255,255,0.08); }
-.deco-circle--1 { width: 80px; height: 80px; right: -16px; bottom: -16px; }
-.deco-circle--2 { width: 112px; height: 112px; right: -8px; bottom: -32px; background: rgba(255,255,255,0.05); }
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.stat-card--hero {
+  background: var(--primary);
+  border: none;
+}
+
+.stat-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.stat-card__label--light {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.stat-card__badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-card__badge--light {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.stat-card__value {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1;
+}
+
+.stat-card__value--hero {
+  color: white;
+  font-size: 36px;
+}
+
+.stat-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.stat-card__meta-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.stat-card__meta-text--light {
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.deco-circle {
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.deco-circle--1 {
+  width: 80px;
+  height: 80px;
+  right: -16px;
+  bottom: -16px;
+}
+
+.deco-circle--2 {
+  width: 112px;
+  height: 112px;
+  right: -8px;
+  bottom: -32px;
+  background: rgba(255, 255, 255, 0.05);
+}
 
 /* Layout */
-.main-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; }
-.col-left, .col-right { display: flex; flex-direction: column; gap: 24px; }
+.main-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 24px;
+}
+
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
 /* Panels */
 .panel {
   background: white;
   border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   border: 1px solid #f3f4f6;
   overflow: hidden;
 }
+
 .panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
 }
-.panel-header--simple { padding: 16px 20px; }
-.panel-title { font-weight: 700; font-size: 14px; color: var(--text-primary); margin: 0; }
-.panel-subtitle { font-size: 12px; color: var(--text-secondary); margin: 2px 0 0; }
+
+.panel-header--simple {
+  padding: 16px 20px;
+}
+
+.panel-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
 .panel-link {
-  font-size: 12px; font-weight: 600; color: var(--primary);
-  display: flex; align-items: center; gap: 2px; text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
 }
-.panel-link:hover { text-decoration: underline; }
-.panel-link-plain { font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; }
-.panel-link-plain:hover { text-decoration: underline; }
+
+.panel-link:hover {
+  text-decoration: underline;
+}
+
+.panel-link-plain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.panel-link-plain:hover {
+  text-decoration: underline;
+}
 
 /* Trend chart */
-.trend-chart { padding: 16px 20px 20px; }
-.trend-svg { width: 100%; height: 120px; }
+.trend-chart {
+  padding: 16px 20px 20px;
+}
+
+.trend-svg {
+  width: 100%;
+  height: 120px;
+}
+
 .trend-line {
   stroke-dasharray: 400;
   stroke-dashoffset: 400;
   animation: drawLine 1s ease forwards;
   animation-delay: 350ms;
 }
+
 @keyframes drawLine {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
-.trend-area { opacity: 0; animation: fadeInUp 0.6s ease forwards; animation-delay: 700ms; }
-.trend-dot { opacity: 0; animation: popIn 0.3s ease forwards; animation-delay: var(--dot-delay, 0ms); }
+
+.trend-area {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease forwards;
+  animation-delay: 700ms;
+}
+
+.trend-dot {
+  opacity: 0;
+  animation: popIn 0.3s ease forwards;
+  animation-delay: var(--dot-delay, 0ms);
+}
+
 @keyframes popIn {
-  from { opacity: 0; transform: scale(0); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-.trend-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; color: var(--text-secondary); font-size: 13px; }
+
+.trend-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
 
 /* Donation list */
-.donation-list { display: flex; flex-direction: column; }
-.donation-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; border-bottom: 1px solid #fafafa;
+.donation-list {
+  display: flex;
+  flex-direction: column;
 }
-.donation-item:last-child { border-bottom: none; }
-.donation-item__left { display: flex; align-items: center; gap: 12px; }
-.donation-icon { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.donation-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.donation-meta { font-size: 12px; color: var(--text-secondary); margin: 2px 0 0; }
-.donation-item__right { text-align: right; flex-shrink: 0; }
-.donation-date { font-size: 12px; color: var(--text-secondary); margin: 0; }
 
-.badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; display: inline-block; margin-top: 4px; }
-.capitalize { text-transform: capitalize; }
+.donation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #fafafa;
+}
 
-.empty-state { padding: 32px; text-align: center; color: var(--text-secondary); }
-.icon-empty { width: 40px; height: 40px; margin: 0 auto 8px; color: #e5e7eb; }
+.donation-item:last-child {
+  border-bottom: none;
+}
+
+.donation-item__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.donation-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.donation-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.donation-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.donation-item__right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.donation-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.capitalize {
+  text-transform: capitalize;
+}
+
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.icon-empty {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 8px;
+  color: #e5e7eb;
+}
 
 /* Appointment */
-.appt-body { padding: 20px; }
-.appt-row { display: flex; align-items: flex-start; gap: 16px; }
-.appt-date-chip {
-  width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+.appt-body {
+  padding: 20px;
 }
-.appt-date-chip__day { color: white; font-weight: 800; font-size: 20px; line-height: 1; }
-.appt-date-chip__month { color: rgba(255,255,255,0.7); font-size: 10px; text-transform: uppercase; font-weight: 700; }
-.appt-info { flex: 1; min-width: 0; }
-.appt-type { font-weight: 700; font-size: 14px; margin: 0; color: var(--text-primary); }
-.appt-meta-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
-.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.appt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.appt-date-chip {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.appt-date-chip__day {
+  color: white;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.appt-date-chip__month {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.appt-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.appt-type {
+  font-weight: 700;
+  font-size: 14px;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.appt-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .appt-notice {
-  margin-top: 16px; border-radius: 12px; padding: 10px 16px; font-size: 12px; font-weight: 600;
-  text-align: center; background: #e3f2fd; color: var(--primary);
+  margin-top: 16px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  background: #e3f2fd;
+  color: var(--primary);
 }
 
 /* Eligibility */
-.eligibility-body { padding: 20px; }
-.eligibility-status-row { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 12px; margin-bottom: 16px; }
-.eligibility-status { font-size: 14px; font-weight: 700; margin: 0; }
-.eligibility-until { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
-.eligibility-details { display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-bottom: 16px; }
-.eligibility-details__row { display: flex; justify-content: space-between; }
-.eligibility-details__label { color: var(--text-secondary); }
-.eligibility-details__value { font-weight: 700; color: #374151; }
+.eligibility-body {
+  padding: 20px;
+}
+
+.eligibility-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.eligibility-status {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.eligibility-until {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+.eligibility-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.eligibility-details__row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.eligibility-details__label {
+  color: var(--text-secondary);
+}
+
+.eligibility-details__value {
+  font-weight: 700;
+  color: #374151;
+}
 
 /* Quick actions */
-.quick-actions { padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-.quick-action {
-  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-  border-radius: 12px; text-decoration: none; transition: background 0.15s ease;
+.quick-actions {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.quick-action:hover { background: #f9fafb; }
-.quick-action__icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.quick-action__label { font-size: 14px; font-weight: 600; color: #374151; flex: 1; }
-.quick-action__chevron { color: #d1d5db; transition: color 0.15s ease; }
-.quick-action:hover .quick-action__chevron { color: #9ca3af; }
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.quick-action:hover {
+  background: #f9fafb;
+}
+
+.quick-action__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.quick-action__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  flex: 1;
+}
+
+.quick-action__chevron {
+  color: #d1d5db;
+  transition: color 0.15s ease;
+}
+
+.quick-action:hover .quick-action__chevron {
+  color: #9ca3af;
+}
 
 /* Icon sizing */
-.icon-xs { width: 14px; height: 14px; }
-.icon-sm { width: 16px; height: 16px; }
-.icon-md { width: 20px; height: 20px; flex-shrink: 0; }
-.icon-white { color: white; }
-.icon-white-faded { color: rgba(255,255,255,0.6); }
+.icon-xs {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-md {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.icon-white {
+  color: white;
+}
+
+.icon-white-faded {
+  color: rgba(255, 255, 255, 0.6);
+}
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .main-grid { grid-template-columns: 1fr; }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
 }
+
 @media (max-width: 640px) {
-  .dashboard { padding: 16px 16px 32px; }
-  .header-row { flex-direction: column; align-items: stretch; }
-  .header-actions { justify-content: space-between; }
+  .dashboard {
+    padding: 16px 16px 32px;
+  }
+
+  .header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: space-between;
+  }
 }
 </style>
