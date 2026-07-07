@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-import { authService } from '~~/api/auth/AuthService'
+import { authService } from '~/api/auth/AuthService'
 import { reactive, ref, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
