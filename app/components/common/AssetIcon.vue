@@ -24,16 +24,21 @@ import bolt from '~/assets/icons/bolt.svg?raw'
 import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
 import calendar from '~/assets/icons/calendar.svg?raw'
+import camera from '~/assets/icons/camera.svg?raw'
 import chart from '~/assets/icons/chart.svg?raw'
+import checkCircle from '~/assets/icons/check-circle.svg?raw'
 import check from '~/assets/icons/check.svg?raw'
 import chevronLeft from '~/assets/icons/chevron-left.svg?raw'
 import chevronRight from '~/assets/icons/chevron-right.svg?raw'
 import chevronDown from '~/assets/icons/chevron-down.svg?raw'
+import chevronUp from '~/assets/icons/chevron-up.svg?raw'
 import clipboard from '~/assets/icons/clipboard.svg?raw'
 import clipboardCheck from '~/assets/icons/clipboard-check.svg?raw'
 import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
+import creditCard from '~/assets/icons/credit-card.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
+import droplets from '~/assets/icons/droplets.svg?raw'
 import download from '~/assets/icons/download.svg?raw'
 import eye from '~/assets/icons/eye.svg?raw'
 import eyeOff from '~/assets/icons/eye-off.svg?raw'
@@ -54,6 +59,7 @@ import mapPin from '~/assets/icons/map-pin.svg?raw'
 import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import menu from '~/assets/icons/menu.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
+import plus from '~/assets/icons/plus.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
 import quote from '~/assets/icons/quote.svg?raw'
 import receipt from '~/assets/icons/receipt.svg?raw'
@@ -65,9 +71,12 @@ import shieldCheck from '~/assets/icons/shield-check.svg?raw'
 import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
+import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
+import userCheck from '~/assets/icons/user-check.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
+import userX from '~/assets/icons/user-x.svg?raw'
 import x from '~/assets/icons/x.svg?raw'
 const icons = {
   activity,
@@ -84,16 +93,21 @@ const icons = {
   'bolt-fill': boltFill,
   box,
   calendar,
+  camera,
   chart,
+  'check-circle': checkCircle,
   check,
   'chevron-left': chevronLeft,
   'chevron-right': chevronRight,
   'chevron-down' :chevronDown,
+  'chevron-up': chevronUp,
   clipboard,
   'clipboard-plus': clipboardPlus,
   'clipboard-check': clipboardCheck,
   clock,
+  'credit-card': creditCard,
   'dollar-sign': dollarSign,
+  droplets,
   download,
   eye,
   'eye-off': eyeOff,
@@ -114,6 +128,7 @@ const icons = {
   'map-pin-simple': mapPinSimple,
   menu,
   phone,
+  plus,
   'qr-code': qrCode,
   quote,
   receipt,
@@ -124,10 +139,13 @@ const icons = {
   'shield-check': shieldCheck,
   'shield-plus': shieldPlus,
   'star-fill': starFill,
+  'trending-up': trendingUp,
   truck,
   'trash-2': trash,
   users,
+  'user-check' : userCheck,
   'user-circle': userCircle,
+  'user-x' : userX,
   x
 }
 

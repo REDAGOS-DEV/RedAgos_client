@@ -1,6 +1,7 @@
 <template>
   <div>
     <DonorSidebar />
+    <BloodCenterSidebar />
 
     <!-- main content area, naay left padding para dili ma-overlap sa fixed sidebar (w-64 = 16rem) -->
     <div class="lg:pl-64">

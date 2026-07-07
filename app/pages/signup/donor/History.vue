@@ -43,7 +43,7 @@
             </div>
 
             <div v-else-if="donations.length === 0" class="state-wrap state-wrap--empty">
-                <AssetIcon name="droplet" :size="32" style="color:#e5e7eb" />
+                <AssetIcon name="droplets" :size="32" style="color:#e5e7eb" />
                 <p class="state-title">No donations recorded yet</p>
                 <p class="state-sub">
                     Once a blood center staff logs a completed donation for you, it will show up here automatically.
@@ -56,7 +56,7 @@
             <div v-else class="history-list">
                 <div v-for="record in donations" :key="record.id" class="history-row">
                     <div class="history-row__icon">
-                        <AssetIcon name="droplet" :size="18" />
+                        <AssetIcon name="droplets" :size="18" />
                     </div>
 
                     <div class="history-row__body">
