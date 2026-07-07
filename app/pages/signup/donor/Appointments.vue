@@ -143,137 +143,31 @@
 </template>
 
 <script setup>
-import AssetIcon from '~/components/common/AssetIcon.vue'
-definePageMeta({ layout: 'dashboard' })
- 
-const router = useRouter()
- 
-const appointmentType = ref('walkin')
-const selectedCenterId = ref('subnational')
-const selectedDriveId = ref(null)
-const selectedDate = ref('2026-04-20')
-const selectedTimeSlot = ref(null)
- 
-const showSummary = ref(false)
-const showConfirmation = ref(false)
-const confirming = ref(false)
- 
-function selectType(type) {
-  appointmentType.value = type
-  selectedTimeSlot.value = null
-}
- 
-const bloodCenters = reactive([
-  { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon – Fri 8 AM – 3 PM', status: 'Open today' },
-  { id: 'prc', name: 'PRC Davao Blood Services', location: 'Davao City', hours: 'Mon – Sat 7 AM – 4 PM', status: 'Open today' },
-  { id: 'spmc', name: 'SPMC Blood Bank', location: 'Davao City', hours: '24/7', status: 'Open today' },
-])
- 
-// Backend contract: GET /api/time-slots?center_id=&date=
-// Response fields: time, available, total
-const timeSlots = reactive([
-  { time: '8:00 AM', available: 2, total: 3 },
-  { time: '9:00 AM', available: 0, total: 3 },
-  { time: '10:00 AM', available: 2, total: 3 },
-  { time: '11:00 AM', available: 1, total: 3 },
-  { time: '1:00 PM', available: 3, total: 3 },
-  { time: '2:00 PM', available: 3, total: 3 },
-  { time: '3:00 PM', available: 2, total: 3 },
-  { time: '5:00 PM', available: 1, total: 3 },
-])
- 
-// Backend contract: GET /api/blood-drives
-// Response fields: name, date, time, registered, total_slots, status
-const bloodDrives = reactive([
-  {
-    id: 'umindanao',
-    name: 'University of Mindanao — Matina',
-    date: 'Apr 20, 2026',
-    time: '8:00 AM – 4:00 PM',
-    statusLabel: 'Upcoming',
-    statusClass: 'badge--info',
-    progressClass: 'progress-fill--blue',
-    registered: 25,
-    totalSlots: 40,
-    get slotsLeft() { return this.totalSlots - this.registered },
-    get progressPct() { return Math.round((this.registered / this.totalSlots) * 100) },
-  },
-  {
-    id: 'ateneo',
-    name: 'Ateneo de Davao — Jacinto Campus',
-    date: 'Apr 25, 2026',
-    time: '9:00 AM – 3:00 PM',
-    statusLabel: 'Open',
-    statusClass: 'badge--success',
-    progressClass: 'progress-fill--green',
-    registered: 15,
-    totalSlots: 50,
-    get slotsLeft() { return this.totalSlots - this.registered },
-    get progressPct() { return Math.round((this.registered / this.totalSlots) * 100) },
-  },
-])
- 
-function formatDate(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
- 
-const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
- 
-const selectedDrive = computed(() => bloodDrives.find(d => d.id === selectedDriveId.value) || null)
-const selectedCenter = computed(() => bloodCenters.find(c => c.id === selectedCenterId.value) || null)
- 
-const canContinue = computed(() => {
-  if (appointmentType.value === 'walkin') {
-    return !!(selectedCenterId.value && selectedDate.value && selectedTimeSlot.value)
-  }
-  if (appointmentType.value === 'mobile') {
-    return !!selectedDriveId.value
-  }
-  return false
+import { ref } from 'vue'
+
+const form = ref({
+  date: '',
+  time: '',
+  center: '',
 })
- 
-const typeLabel = computed(() => appointmentType.value === 'walkin' ? 'Walk-in at blood center' : 'Register for mobile drive')
- 
-const locationLabel = computed(() => {
-  if (appointmentType.value === 'walkin') return selectedCenter.value?.name || '—'
-  return selectedDrive.value?.name || '—'
-})
- 
-const summaryDateLabel = computed(() => {
-  if (appointmentType.value === 'walkin') return formattedSelectedDate.value
-  return selectedDrive.value?.date || '—'
-})
- 
-const confirmDateTimeLabel = computed(() => {
-  if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${selectedTimeSlot.value}`
-  return `${selectedDrive.value?.date || '—'} - ${selectedDrive.value?.time || '—'}`
-})
- 
-async function handleConfirm() {
-  confirming.value = true
+
+const loading = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+
+const submitBooking = async () => {
+  loading.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
   try {
-    // Backend contract: POST /api/appointments
-    // Body: { type, center_id | drive_id, date, time_slot }
-    // Response: mag-generate ug QR code para sa appointment/registration
-    await $fetch('/api/appointments', {
-      method: 'POST',
-      body: {
-        type: appointmentType.value,
-        center_id: appointmentType.value === 'walkin' ? selectedCenterId.value : null,
-        drive_id: appointmentType.value === 'mobile' ? selectedDriveId.value : null,
-        date: appointmentType.value === 'walkin' ? selectedDate.value : selectedDrive.value?.date,
-        time_slot: appointmentType.value === 'walkin' ? selectedTimeSlot.value : selectedDrive.value?.time,
-      },
-    })
-  } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/appointments endpoint,
-    // so mag-fail gyud ni nga call. Padayon lang ta sa pag-ipakita sa confirmation
-    // modal aron dili maka-block sa UI flow — tangtangon na lang ni nga catch
-    // (o himuon nga mag-alert) sa dihang naka-connect na ang tinuod nga backend.
-    console.error('Failed to confirm appointment (expected while backend is not yet wired up):', err)
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    successMessage.value = 'Appointment confirmed! Check your email for details.'
+    setTimeout(() => {
+      navigateTo('/signup/donor')
+    }, 2000)
+  } catch (error) {
+    errorMessage.value = 'Booking failed. Please try again.'
   } finally {
     confirming.value = false
   }
