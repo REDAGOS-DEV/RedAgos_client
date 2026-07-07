@@ -33,6 +33,7 @@ import { ref } from 'vue'
 
 definePageMeta({
   middleware: 'auth',
+  layout: 'dashboard'
 })
 
 const donations = ref([

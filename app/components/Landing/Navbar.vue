@@ -59,8 +59,8 @@
     </ul>
 
     <div class="nav-actions">
-      <button class="btn-login" @click="navigateTo('/login')">Log In</button>
-      <button class="btn-started" @click="navigateTo('/')">Get Started ›</button>
+      <button class="btn-login" @click="navigateTo('/login/')">Log In</button>
+      <button class="btn-started" @click="navigateTo('/#home')">Get Started</button>
     </div>
   </nav>
 </template>
