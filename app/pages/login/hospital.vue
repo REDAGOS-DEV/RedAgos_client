@@ -83,7 +83,7 @@
 
               <div class="input-shell">
                 <span class="field-icon">
-                  <AssetIcon name="idCard" :size="18" />
+                  <AssetIcon name="id-card" :size="18" />
                 </span>
 
                 <input
@@ -140,7 +140,7 @@
               <button
                 type="button"
                 class="role-button hospital"
-                @click="navigateTo('/login')"
+                @click="navigateTo('/login/donor')"
               >
                 <AssetIcon name="users" :size="20" />
                 Donor
@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-import { authService } from '~~/api/auth/AuthService'
+import { authService } from '~/api/auth/AuthService'
 import { reactive, ref, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/')
+    await navigateTo('/hospital/Dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

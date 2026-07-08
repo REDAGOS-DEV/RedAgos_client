@@ -13,12 +13,12 @@
         </div>
         <div class="header-actions">
           <button class="bell-btn">
-            <NuxtLink to="/signup/donor/Notifications" >
+            <NuxtLink to="/donor/Notifications" >
             <AssetIcon name="bell" :size="16" />
             <span v-if="eligibilityStatus === 'eligible'" class="bell-dot" />
             </NuxtLink>
           </button>
-          <NuxtLink to="/signup/donor/Appointments" class="btn-primary">
+          <NuxtLink to="/donor/Appointments" class="btn-primary">
             <AssetIcon name="calendar" :size="16" />
             Book Appointment
           </NuxtLink>
@@ -31,14 +31,14 @@
         <p class="banner-text">
           Eligibility screening is valid. Present your QR code at the blood center on arrival.
         </p>
-        <NuxtLink to="/signup/donor/Eligibility" class="banner-link">View QR</NuxtLink>
+        <NuxtLink to="/donor/Eligibility" class="banner-link">View QR</NuxtLink>
       </div>
       <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning fade-in" style="--delay: 60ms">
         <AssetIcon name="alert" :size="16" class="banner-icon" />
         <p class="banner-text">
           Your eligibility screening is deferred. Please contact the blood center for more information.
         </p>
-        <NuxtLink to="/signup/donor/Eligibility" class="banner-link">View Details</NuxtLink>
+        <NuxtLink to="/donor/Eligibility" class="banner-link">View Details</NuxtLink>
       </div>
       <!-- Stat cards -->
       <div class="stats-grid">
@@ -165,7 +165,7 @@
                 <h2 class="panel-title">Recent Donations</h2>
                 <p class="panel-subtitle">Your latest donation activity</p>
               </div>
-              <NuxtLink to="/signup/donor/History" class="panel-link">
+              <NuxtLink to="/donor/History" class="panel-link">
                 View All
                 <AssetIcon name="chevron-right" :size="14" />
               </NuxtLink>
@@ -212,7 +212,7 @@
           <div class="panel fade-in" style="--delay: 300ms">
             <div class="panel-header">
               <h2 class="panel-title">Upcoming Appointment</h2>
-              <NuxtLink to="/signup/donor/Appointments" class="panel-link-plain">Manage</NuxtLink>
+              <NuxtLink to="/donor/Appointments" class="panel-link-plain">Manage</NuxtLink>
             </div>
 
             <div v-if="upcomingAppointment" class="appt-body">
@@ -242,7 +242,7 @@
             <div v-else class="empty-state">
               <AssetIcon name="calendar" :size="40" style="color:#e5e7eb" />
               <p class="mb-3">No upcoming appointments</p>
-              <NuxtLink to="/signup/donor/Appointments" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
+              <NuxtLink to="/donor/Appointments" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
             </div>
           </div>
 
@@ -352,10 +352,10 @@ const nextApptDate = computed(() => {
 })
 
 const quickActions = [
-  { path: '/signup/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
-  { path: '/signup/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
-  { path: '/signup/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
-  { path: '/signup/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
+  { path: '/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
+  { path: '/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
+  { path: '/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
+  { path: '/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
 ]
 
 // Lightweight date formatter supporting the tokens used in this page:

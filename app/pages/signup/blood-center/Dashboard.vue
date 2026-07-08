@@ -253,7 +253,7 @@ onMounted(async () => {
     todaysAppointments.value = data.todays_appointments ?? []
     stockSummary.value = data.stock_summary ?? []
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/bloodcenter/dashboard endpoint,
+    // sa dev/UI stage pa lang, wala pay live nga /api/bloodcenter/dashboard endpoint,
     // so mag-fail gyud ni nga call. Nagpabilin ra sa default nga 0/empty values,
     // so mag-display ug empty states ang UI imbes mag-crash o mag-display ug fake data.
     console.error('Failed to load dashboard data (expected while backend is not yet wired up):', err)
