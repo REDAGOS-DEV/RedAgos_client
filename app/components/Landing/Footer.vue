@@ -49,11 +49,18 @@
     </div>
 
     <!-- Bottom bar -->
+    <!-- Bottom bar -->
     <div class="footer-bottom">
       <span>© 2026 RedAgos. All rights reserved.</span>
+
       <div class="footer-bottom-links">
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms of Service</a>
+        <NuxtLink to="/legal/Privacy">
+          Privacy Policy
+        </NuxtLink>
+
+        <NuxtLink to="/legal/Terms">
+          Terms of Service
+        </NuxtLink>
       </div>
     </div>
   </footer>
@@ -64,16 +71,22 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 const quickLinks = [
-  { label: 'Home',            to: '#home' },
-  { label: 'Features',        to: '#features' },
+  { label: 'Home', to: '#home' },
+  { label: 'Features', to: '#features' },
   { label: 'Donation Drives', to: '#drives' },
-  { label: 'About',           to: '#about' },
-  { label: 'Contact',         to: '#contact' },
+  { label: 'About', to: '#about' },
+  { label: 'Contact', to: '#contact' },
 ]
 </script>
 
 <style scoped>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 .footer {
   background: #0d1117;
@@ -92,15 +105,27 @@ const quickLinks = [
 }
 
 /* ── Brand ── */
-.footer-logo{
-  display:flex;
-  align-items:center;
-  gap:12px;
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.footer-logo-image { width:42px; height:42px; object-fit:contain;}
-.logo-text   { font-size: 20px; font-weight: 800; color: #ffffff; }
-.logo-accent { color: #e53935; }
+.footer-logo-image {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.logo-accent {
+  color: #e53935;
+}
 
 .logo-sub {
   font-size: 9px;
@@ -125,7 +150,10 @@ const quickLinks = [
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
 }
-.cap-icon { color: #e53935; }
+
+.cap-icon {
+  color: #e53935;
+}
 
 /* ── Quick Links ── */
 .footer-links h4,
@@ -143,24 +171,30 @@ const quickLinks = [
   flex-direction: column;
   gap: 10px;
 }
+
 .footer-links li {
   display: flex;
   align-items: center;
   gap: 0;
 }
+
 .footer-links li::before {
   content: '•';
   color: rgba(255, 255, 255, 0.25);
   margin-right: 8px;
   font-size: 10px;
 }
+
 .footer-links a {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color 0.2s;
 }
-.footer-links a:hover { color: #ffffff; }
+
+.footer-links a:hover {
+  color: #ffffff;
+}
 
 /* ── Contact ── */
 .footer-contact ul {
@@ -169,6 +203,7 @@ const quickLinks = [
   flex-direction: column;
   gap: 14px;
 }
+
 .footer-contact li {
   display: flex;
   align-items: flex-start;
@@ -177,13 +212,22 @@ const quickLinks = [
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.5;
 }
-.contact-icon { color: #2563eb; flex-shrink: 0; margin-top: 2px; }
+
+.contact-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .footer-contact a {
   color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color 0.2s;
 }
-.footer-contact a:hover { color: #ffffff; }
+
+.footer-contact a:hover {
+  color: #ffffff;
+}
 
 /* ── Bottom bar ── */
 .footer-bottom {
@@ -196,16 +240,21 @@ const quickLinks = [
   font-size: 12px;
   color: rgba(255, 255, 255, 0.3);
 }
+
 .footer-bottom-links {
   display: flex;
   gap: 24px;
 }
+
 .footer-bottom-links a {
   color: rgba(255, 255, 255, 0.3);
   text-decoration: none;
   transition: color 0.2s;
 }
-.footer-bottom-links a:hover { color: rgba(255, 255, 255, 0.7); }
+
+.footer-bottom-links a:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
@@ -213,12 +262,26 @@ const quickLinks = [
     grid-template-columns: 1fr 1fr;
     gap: 40px;
   }
-  .footer-brand { grid-column: 1 / -1; }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
-  .footer         { padding: 48px 1.25rem 0; }
-  .footer-inner   { grid-template-columns: 1fr; gap: 32px; }
-  .footer-bottom  { flex-direction: column; gap: 12px; text-align: center; }
+  .footer {
+    padding: 48px 1.25rem 0;
+  }
+
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
 }
 </style>

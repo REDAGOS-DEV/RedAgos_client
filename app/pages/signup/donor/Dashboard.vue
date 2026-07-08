@@ -13,8 +13,10 @@
         </div>
         <div class="header-actions">
           <button class="bell-btn">
+            <NuxtLink to="/signup/donor/Notifications" >
             <AssetIcon name="bell" :size="16" />
             <span v-if="eligibilityStatus === 'eligible'" class="bell-dot" />
+            </NuxtLink>
           </button>
           <NuxtLink to="/signup/donor/Appointments" class="btn-primary">
             <AssetIcon name="calendar" :size="16" />

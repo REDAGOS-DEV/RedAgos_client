@@ -129,6 +129,51 @@
                 </button>
             </div>
         </div>
+
+        <!-- Success modal: shown only when the submitted screening comes back eligible -->
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div v-if="showPassedModal" class="modal-backdrop" @click.self="showPassedModal = false">
+                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="epm-title">
+                        <div class="modal-check">
+                            <AssetIcon name="check" :size="26" />
+                        </div>
+
+                        <h2 id="epm-title" class="modal-title">Eligibility screening passed!</h2>
+                        <p class="modal-subtitle">
+                            Your QR code has been generated. Present it at the blood center
+                            to proceed with your next test.
+                        </p>
+
+                        <div class="modal-qr-wrap">
+                            <img
+                                v-if="qrCodeDataUrl"
+                                :src="qrCodeDataUrl"
+                                alt="Donor eligibility QR code"
+                                class="modal-qr-image"
+                            >
+                            <div v-else class="modal-qr-image modal-qr-image--placeholder">
+                                <div class="modal-spinner" />
+                            </div>
+                        </div>
+
+                        <p class="modal-validity">
+                            Valid for {{ qrValidityDays }} days · Expires {{ formattedQrExpiry }}
+                        </p>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn-outline" @click="goToFullQr">
+                                View full QR
+                            </button>
+                            <button type="button" class="btn-primary" @click="goToBookAppointment">
+                                Book Appointment
+                                <AssetIcon name="arrow-right" :size="16" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
 </template>
 
@@ -136,12 +181,18 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
+  layout: 'dashboard',
   middleware: 'auth',
-  layout: 'dashboard'
 })
 
 const router = useRouter()
 const submitting = ref(false)
+
+// Modal + QR state shown after an eligible result
+const showPassedModal = ref(false)
+const qrCodeDataUrl = ref('')
+const qrExpiresOn = ref(null)
+const qrValidityDays = ref(14)
 
 // Step indicator: 1 = General Health, 2 = Medical History, 3 = Vital Information,
 // 4 = Ready to submit. Auto-advances as the user finishes each card — dili na
@@ -214,21 +265,62 @@ const resultTextClass = computed(() => {
     return isFlagged.value ? 'result-box__value--danger' : 'result-box__value--success'
 })
 
+const formattedQrExpiry = computed(() => {
+    if (!qrExpiresOn.value) return '—'
+    const d = new Date(qrExpiresOn.value)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+})
+
+function goToFullQr() {
+    showPassedModal.value = false
+    router.push('/signup/donor/MyQRCode')
+}
+
+function goToBookAppointment() {
+    showPassedModal.value = false
+    router.push('/signup/donor/Appointments')
+}
+
 async function handleSubmit() {
     submitting.value = true
     try {
+        const result = isFlagged.value ? 'not_eligible' : 'eligible'
+
         // Backend contract: POST /api/eligibility/screening
         // Body: { answers: [{ id, answer }], vitals, result: 'eligible' | 'not_eligible' }
-        // Response: mag-generate ug QR code kung eligible ang result
-        await $fetch('/api/eligibility/screening', {
+        // Response when result === 'eligible':
+        //   { qr_token, screening_valid_until, qr_valid_days }
+        // qr_token is the opaque value to encode in the QR — never encode raw vitals/answers.
+        const data = await $fetch('/api/eligibility/screening', {
             method: 'POST',
             body: {
                 answers: allQuestions.value.map(q => ({ id: q.id, answer: q.answer })),
                 vitals: { ...vitals },
-                result: isFlagged.value ? 'not_eligible' : 'eligible',
+                result,
             },
         })
-        router.push('/signup/donor/MyQRCode')
+
+        if (result === 'not_eligible') {
+            // Deferred donors just land on MyQRCode, which already renders the
+            // "screening was deferred" empty state for them.
+            router.push('/signup/donor/MyQRCode')
+            return
+        }
+
+        qrExpiresOn.value = data?.screening_valid_until ?? null
+        qrValidityDays.value = data?.qr_valid_days ?? 14
+
+        if (data?.qr_token) {
+            // QRCode is assumed globally available, same as on the MyQRCode page
+            qrCodeDataUrl.value = await QRCode.toDataURL(data.qr_token, {
+                width: 220,
+                margin: 1,
+                color: { dark: '#1f2937', light: '#ffffff' },
+            })
+        }
+
+        showPassedModal.value = true
     } catch (err) {
         console.error('Failed to submit screening:', err)
     } finally {
@@ -608,5 +700,149 @@ async function handleSubmit() {
     .step__line {
         width: 32px;
     }
+}
+
+/* Eligibility passed modal */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.modal-card {
+    width: 100%;
+    max-width: 380px;
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+}
+
+.modal-check {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: #e8f5e9;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-subtitle {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 6px 0 20px;
+    max-width: 300px;
+}
+
+.modal-qr-wrap {
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid #eef0f3;
+    margin-bottom: 14px;
+}
+
+.modal-qr-image {
+    width: 180px;
+    height: 180px;
+    display: block;
+}
+
+.modal-qr-image--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9fafb;
+}
+
+.modal-spinner {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 3px solid #e3ebf6;
+    border-top-color: var(--primary);
+    animation: modal-spin 0.8s linear infinite;
+}
+
+@keyframes modal-spin {
+    to { transform: rotate(360deg); }
+}
+
+.modal-validity {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 20px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.modal-actions .btn-primary,
+.modal-actions .btn-outline {
+    flex: 1;
+    width: auto;
+}
+
+.btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: #f3f4f6;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-outline:hover {
+    background: #e5e7eb;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+    opacity: 0;
+}
+
+.modal-fade-enter-active .modal-card,
+.modal-fade-leave-active .modal-card {
+    transition: transform 0.2s ease;
+}
+
+.modal-fade-enter-from .modal-card,
+.modal-fade-leave-to .modal-card {
+    transform: scale(0.96) translateY(8px);
 }
 </style>
