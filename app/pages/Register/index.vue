@@ -12,7 +12,7 @@
             <p class="brand-subtitle">Blood Bank System</p>
           </div>
 
-          <NuxtLink to="/" class="back-link">
+          <NuxtLink to="/#home" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
              Back to Home
           </NuxtLink>
@@ -119,7 +119,7 @@ import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  alias: ['/register'],
+  alias: ['/#home'],
 })
 
 const selectedRole = ref('')

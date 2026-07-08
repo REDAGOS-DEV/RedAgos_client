@@ -71,7 +71,7 @@
     <!-- RIGHT SIDE -->
     <main class="form-panel">
       <div class="form-topbar">
-        <NuxtLink to="/register" class="back-link">
+        <NuxtLink to="/" class="back-link">
           <AssetIcon name="chevron-left" :size="16" />
           Back to Role Selection
         </NuxtLink>
@@ -150,13 +150,8 @@
             <label for="password">Password</label>
             <div class="input-icon-wrap">
               <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-              <input
-                id="password"
-                v-model="form.password"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="********"
-                class="has-left-icon"
-              />
+              <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'"
+                placeholder="********" class="has-left-icon" />
               <button type="button" class="toggle-visibility" @click="showPassword = !showPassword">
                 <AssetIcon v-if="!showPassword" name="eye" :size="16" />
                 <AssetIcon v-else name="eye-off" :size="16" />
@@ -168,13 +163,8 @@
             <label for="confirmPassword">Confirm Password</label>
             <div class="input-icon-wrap">
               <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-              <input
-                id="confirmPassword"
-                v-model="form.confirmPassword"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                placeholder="********"
-                class="has-left-icon"
-              />
+              <input id="confirmPassword" v-model="form.confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'" placeholder="********" class="has-left-icon" />
               <button type="button" class="toggle-visibility" @click="showConfirmPassword = !showConfirmPassword">
                 <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
                 <AssetIcon v-else name="eye-off" :size="16" />
@@ -192,9 +182,10 @@
             <NuxtLink to="/privacy">Privacy Policy</NuxtLink>
           </span>
         </label>
+        <p v-if="submitError" class="submit-error">{{ submitError }}</p>
 
-        <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms">
-          Submit Registration
+        <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms || isSubmitting">
+          {{ isSubmitting ? 'Submitting...' : 'Submit Registration' }}
         </button>
 
         <p class="signin-row">
@@ -235,8 +226,32 @@ const form = reactive({
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-function handleSubmit() {
-  console.log('Submitting donor registration:', form)
+const isSubmitting = ref(false)
+const submitError = ref('')
+
+async function handleSubmit() {
+  if (isSubmitting.value) return
+
+  isSubmitting.value = true
+  submitError.value = ''
+
+  try {
+    // i-uncomment/i-adjust ni pag naa nay backend/API endpoint
+    // const { error } = await useFetch('/api/register/donor', {
+    //   method: 'POST',
+    //   body: form,
+    // })
+    // if (error.value) throw error.value
+
+    console.log('Submitting donor registration:', form)
+
+    await navigateTo('/login')
+  } catch (err) {
+    submitError.value = 'Something went wrong while creating your account. Please try again.'
+    console.error('Donor registration failed:', err)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -466,18 +481,24 @@ function handleSubmit() {
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-8px);
   }
 }
 
 @keyframes logoFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-6px);
   }
@@ -730,6 +751,7 @@ function handleSubmit() {
   .form-panel {
     padding: 32px 20px;
   }
+
   .form-row {
     grid-template-columns: 1fr;
   }

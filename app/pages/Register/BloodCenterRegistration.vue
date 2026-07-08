@@ -324,7 +324,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/')
+      navigateTo('/login/blood-center')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
@@ -332,6 +332,7 @@ const submitRegistration = async () => {
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>
