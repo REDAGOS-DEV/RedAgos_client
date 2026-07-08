@@ -190,7 +190,7 @@ const login = async () => {
 
     const redirectPath = typeof useRoute().query.redirect === 'string'
       ? useRoute().query.redirect
-      : '/donor/Dashboard'
+      : '/signup/donor/Dashboard'
 
     await navigateTo(redirectPath)
   } catch (error) {
