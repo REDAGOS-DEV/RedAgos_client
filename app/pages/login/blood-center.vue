@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/blood-center/Dashboard')
+    await navigateTo('/signup/blood-center/Dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

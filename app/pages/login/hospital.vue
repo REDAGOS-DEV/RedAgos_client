@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/hospital/Dashboard')
+    await navigateTo('/signup/hospital/Dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
