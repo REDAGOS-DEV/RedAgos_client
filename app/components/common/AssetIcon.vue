@@ -23,7 +23,9 @@ import bloodDropSmile from '~/assets/icons/blood-drop-smile.svg?raw'
 import bolt from '~/assets/icons/bolt.svg?raw'
 import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
+import briefcase from '~/assets/icons/briefcase.svg?raw'
 import calendar from '~/assets/icons/calendar.svg?raw'
+import calendarCheck from '~/assets/icons/calendar-check.svg?raw'
 import camera from '~/assets/icons/camera.svg?raw'
 import chart from '~/assets/icons/chart.svg?raw'
 import checkCircle from '~/assets/icons/check-circle.svg?raw'
@@ -43,6 +45,7 @@ import download from '~/assets/icons/download.svg?raw'
 import eye from '~/assets/icons/eye.svg?raw'
 import eyeOff from '~/assets/icons/eye-off.svg?raw'
 import filePlus from '~/assets/icons/file-plus.svg?raw'
+import flag from '~/assets/icons/flag.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
 import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import helpCircle from '~/assets/icons/help-circle.svg?raw'
@@ -51,6 +54,7 @@ import hospital from '~/assets/icons/hospital.svg?raw'
 import house from '~/assets/icons/house.svg?raw'
 import idCard from '~/assets/icons/id-card.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
+import loader from '~/assets/icons/loader.svg?raw'
 import lock from '~/assets/icons/lock.svg?raw'
 import logIn from '~/assets/icons/log-in.svg?raw'
 import logOut from '~/assets/icons/log-out.svg?raw'
@@ -58,6 +62,9 @@ import mail from '~/assets/icons/mail.svg?raw'
 import mapPin from '~/assets/icons/map-pin.svg?raw'
 import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import menu from '~/assets/icons/menu.svg?raw'
+import monitor from '~/assets/icons/monitor.svg?raw'
+import palette from '~/assets/icons/palette.svg?raw'
+import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
 import plus from '~/assets/icons/plus.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
@@ -73,6 +80,7 @@ import starFill from '~/assets/icons/star-fill.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
+import user from '~/assets/icons/user.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
 import userCheck from '~/assets/icons/user-check.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
@@ -92,7 +100,9 @@ const icons = {
   bolt,
   'bolt-fill': boltFill,
   box,
+  briefcase,
   calendar,
+  'calendar-check': calendarCheck,
   camera,
   chart,
   'check-circle': checkCircle,
@@ -112,21 +122,26 @@ const icons = {
   eye,
   'eye-off': eyeOff,
   'file-plus': filePlus,
+  flag,
   heart,
   'heart-fill': heartFill,
   'help-circle': helpCircle,
   history,
   hospital,
   house,
-  idCard,
+  'id-card': idCard,
   info,
   lock,
+  loader,
   'log-in': logIn,
   'log-out': logOut,
   mail,
   'map-pin': mapPin,
   'map-pin-simple': mapPinSimple,
   menu,
+  monitor,
+  palette,
+  pencil,
   phone,
   plus,
   'qr-code': qrCode,
@@ -142,6 +157,7 @@ const icons = {
   'trending-up': trendingUp,
   truck,
   'trash-2': trash,
+  user,
   users,
   'user-check' : userCheck,
   'user-circle': userCircle,
