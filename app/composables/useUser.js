@@ -5,16 +5,15 @@ export function useUser() {
   async function fetchUser() {
     loading.value = true
     try {
-      // Backend contract:
-      // GET /api/auth/me
-      // Response: { id, full_name, email, avatar_url, ... }
-      const res = await $fetch('/api/auth/me')
+      const res = await $fetch('/user')
 
       user.value = {
         id: res.id,
-        full_name: res.full_name,
+        full_name: `${res.first_name} ${res.last_name}`.trim(),
         email: res.email,
-        avatar: res.avatar_url,
+        username: res.username,
+        // avatar: res.avatar_url, // i-uncomment rani if naa nay 'avatar_url' column sa backend
+        // role: res.role, //i-uncomment rani if naa nay 'role' column sa backend
       }
     } catch (err) {
       console.error('Failed to load user:', err)

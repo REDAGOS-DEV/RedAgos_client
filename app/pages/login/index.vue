@@ -105,7 +105,7 @@
 
             <p class="signup-text">
               Need an account?
-              <NuxtLink to="/register/donor">
+              <NuxtLink to="/register">
                 Register Now
               </NuxtLink>
             </p>
@@ -190,7 +190,7 @@ const login = async () => {
 
     const redirectPath = typeof useRoute().query.redirect === 'string'
       ? useRoute().query.redirect
-      : '/signup/donor/dashboard'
+      : '/signup/donor/Dashboard'
 
     await navigateTo(redirectPath)
   } catch (error) {

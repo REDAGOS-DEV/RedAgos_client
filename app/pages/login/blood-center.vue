@@ -83,7 +83,7 @@
 
               <div class="input-shell">
                 <span class="field-icon">
-                  <AssetIcon name="idCard" :size="18" />
+                  <AssetIcon name="id-card" :size="18" />
                 </span>
 
                 <input
@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/')
+    await navigateTo('/signup/blood-center/Dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

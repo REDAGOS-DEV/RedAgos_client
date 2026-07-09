@@ -38,7 +38,7 @@
         <p class="banner-text">
           Your eligibility screening is deferred. Please contact the blood center for more information.
         </p>
-        <NuxtLink to="/signup/donor/Eligibility" class="banner-link">View Details</NuxtLink>
+        <NuxtLink to="/donor/Eligibility" class="banner-link">View Details</NuxtLink>
       </div>
       <!-- Stat cards -->
       <div class="stats-grid">
@@ -352,10 +352,10 @@ const nextApptDate = computed(() => {
 })
 
 const quickActions = [
-  { path: '/signup/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
-  { path: '/signup/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
-  { path: '/signup/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
-  { path: '/signup/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
+  { path: '/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
+  { path: '/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
+  { path: '/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
+  { path: '/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
 ]
 
 // Lightweight date formatter supporting the tokens used in this page:

@@ -294,7 +294,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/')
+      navigateTo('/login')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
