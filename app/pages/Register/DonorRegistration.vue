@@ -92,22 +92,26 @@
           <div class="form-field">
             <label for="firstName">First Name</label>
             <input id="firstName" v-model="form.firstName" type="text" placeholder="yannie" />
+            <p v-if="fieldErrors.first_name" class="field-error">{{ fieldErrors.first_name }}</p>
           </div>
           <div class="form-field">
             <label for="lastName">Last Name</label>
             <input id="lastName" v-model="form.lastName" type="text" placeholder="chen" />
+            <p v-if="fieldErrors.last_name" class="field-error">{{ fieldErrors.last_name }}</p>
           </div>
         </div>
 
         <div class="form-field">
           <label for="email">Email Address</label>
           <input id="email" v-model="form.email" type="email" placeholder="yanchen@email.com" />
+          <p v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</p>
         </div>
 
         <div class="form-row">
           <div class="form-field">
             <label for="phone">Phone Number</label>
             <input id="phone" v-model="form.phone" type="tel" placeholder="+63 9XX XXX XXXX" />
+            <p v-if="fieldErrors.phone" class="field-error">{{ fieldErrors.phone }}</p>
           </div>
           <div class="form-field">
             <label for="bloodType">Blood Type</label>
@@ -117,6 +121,7 @@
                 <option v-for="type in bloodTypes" :key="type" :value="type">{{ type }}</option>
               </select>
             </div>
+            <p v-if="fieldErrors.blood_type" class="field-error">{{ fieldErrors.blood_type }}</p>
           </div>
         </div>
 
@@ -126,6 +131,7 @@
             <div class="input-icon-wrap">
               <input id="dob" v-model="form.dob" type="date" placeholder="mm/dd/yyyy" />
             </div>
+            <p v-if="fieldErrors.birth_date" class="field-error">{{ fieldErrors.birth_date }}</p>
           </div>
           <div class="form-field">
             <label for="gender">Gender</label>
@@ -137,12 +143,14 @@
                 <option value="other">Other</option>
               </select>
             </div>
+            <p v-if="fieldErrors.gender" class="field-error">{{ fieldErrors.gender }}</p>
           </div>
         </div>
 
         <div class="form-field">
           <label for="address">Address</label>
           <input id="address" v-model="form.address" type="text" placeholder="Barangay, City, Province" />
+          <p v-if="fieldErrors.address" class="field-error">{{ fieldErrors.address }}</p>
         </div>
 
         <div class="form-row">
@@ -157,6 +165,7 @@
                 <AssetIcon v-else name="eye-off" :size="16" />
               </button>
             </div>
+            <p v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</p>
           </div>
 
           <div class="form-field">
@@ -170,6 +179,7 @@
                 <AssetIcon v-else name="eye-off" :size="16" />
               </button>
             </div>
+            <p v-if="fieldErrors.password_confirmation" class="field-error">{{ fieldErrors.password_confirmation }}</p>
           </div>
         </div>
 
@@ -182,6 +192,8 @@
             <NuxtLink to="/privacy">Privacy Policy</NuxtLink>
           </span>
         </label>
+        <p v-if="fieldErrors.terms_accepted" class="field-error">{{ fieldErrors.terms_accepted }}</p>
+        <p v-if="submitSuccess" class="submit-success">{{ submitSuccess }}</p>
         <p v-if="submitError" class="submit-error">{{ submitError }}</p>
 
         <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms || isSubmitting">
@@ -201,6 +213,7 @@
 import { reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
+import { donorService } from '~/api/donor/DonorService'
 
 definePageMeta({
   layout: 'auth',
@@ -228,29 +241,53 @@ const showConfirmPassword = ref(false)
 
 const isSubmitting = ref(false)
 const submitError = ref('')
+const submitSuccess = ref('')
+const fieldErrors = reactive({})
 
 async function handleSubmit() {
   if (isSubmitting.value) return
 
   isSubmitting.value = true
   submitError.value = ''
+  submitSuccess.value = ''
+  clearFieldErrors()
 
   try {
-    // i-uncomment/i-adjust ni pag naa nay backend/API endpoint
-    // const { error } = await useFetch('/api/register/donor', {
-    //   method: 'POST',
-    //   body: form,
-    // })
-    // if (error.value) throw error.value
+    const response = await donorService.register({
+      first_name: form.firstName,
+      last_name: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      blood_type: form.bloodType,
+      gender: form.gender,
+      birth_date: form.dob,
+      address: form.address,
+      password: form.password,
+      password_confirmation: form.confirmPassword,
+      terms_accepted: form.agreedToTerms,
+    })
 
-    console.log('Submitting donor registration:', form)
-
-    await navigateTo('/login')
+    submitSuccess.value = response?.message || 'Registration submitted successfully.'
+    setTimeout(() => navigateTo('/login'), 900)
   } catch (err) {
-    submitError.value = 'Something went wrong while creating your account. Please try again.'
-    console.error('Donor registration failed:', err)
+    applyValidationErrors(err)
+    submitError.value = err?.message || 'Something went wrong while creating your account. Please try again.'
   } finally {
     isSubmitting.value = false
+  }
+}
+
+function clearFieldErrors() {
+  for (const key of Object.keys(fieldErrors)) {
+    delete fieldErrors[key]
+  }
+}
+
+function applyValidationErrors(error) {
+  if (!error?.errors) return
+
+  for (const [field, messages] of Object.entries(error.errors)) {
+    fieldErrors[field] = Array.isArray(messages) ? messages[0] : String(messages)
   }
 }
 </script>
@@ -705,6 +742,21 @@ async function handleSubmit() {
 
 .terms-row a:hover {
   text-decoration: underline;
+}
+
+.field-error,
+.submit-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.submit-success {
+  margin: 0;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .submit-btn {
