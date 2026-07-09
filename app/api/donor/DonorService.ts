@@ -11,6 +11,30 @@ class DonorService extends BaseService {
     }
  
     private resource = '/donors';
+
+    async register(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/register`, 'POST', payload);
+    }
+
+    async dashboard(): Promise<any> {
+        return await this.request(`${this.resource}/dashboard`, 'GET');
+    }
+
+    async profile(): Promise<any> {
+        return await this.request(`${this.resource}/profile`, 'GET');
+    }
+
+    async updateProfile(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/profile`, 'PATCH', payload);
+    }
+
+    async updatePassword(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/password`, 'POST', payload);
+    }
+
+    async updateNotificationPreferences(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/notification-preferences`, 'PATCH', payload);
+    }
  
     async list(params: object = {}): Promise<any> {
         return await this.request(this.resource, 'GET', params);
