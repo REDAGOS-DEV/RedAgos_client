@@ -158,6 +158,7 @@ import { useRoute, useRouter } from 'vue-router'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser.js'
+import { donorService } from '~/api/donor/DonorService'
 
 const NAVY = '#0F2044'
 const NAVY_LIGHT = '#162B58'
@@ -166,8 +167,8 @@ const NAVY_HOVER = '#1A3468'
 const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
-const user = ref(null)
 const eligibilityStatus = ref(null)
+const { user, fetchUser, clearUser } = useUser()
 
 const activePath = ref(route.path || '/')
 
@@ -234,13 +235,12 @@ const vClickOutside = {
 }
 const loadUser = async () => {
   try {
-    // const me = await $fetch('/api/auth/me')
-    // user.value = me
-    // const profile = await $fetch(`/api/donor-profile/${me.id}`)
-    // eligibilityStatus.value = profile.eligibility_status
+    if (!user.value) {
+      await fetchUser()
+    }
 
-    user.value = { id: 1, full_name: 'Lusi Shang', email: 'lusicutie@example.com' }
-    eligibilityStatus.value = 'eligible'
+    const dashboard = await donorService.dashboard()
+    eligibilityStatus.value = dashboard.eligibility_status || 'pending'
   } catch (err) {
     console.error(err)
   }
@@ -267,7 +267,6 @@ const navStyle = (path) => {
     color: active || hovered ? '#FFFFFF' : 'rgba(255,255,255,.6)'
   }
 }
-const { clearUser } = useUser()
 const handleLogout = async () => {
   try {
     showUserMenu.value = false

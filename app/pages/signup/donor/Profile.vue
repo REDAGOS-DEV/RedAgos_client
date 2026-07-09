@@ -66,6 +66,10 @@
           </div>
           <div class="form-body">
             <div class="form-grid">
+              <div class="form-field form-field--full">
+                <label class="form-label">Current Password</label>
+                <input v-model="passwordForm.currentPassword" type="password" class="form-input" placeholder="current password">
+              </div>
               <div class="form-field">
                 <label class="form-label">New Password</label>
                 <input v-model="passwordForm.newPassword" type="password" class="form-input" placeholder="new password">
@@ -162,6 +166,7 @@
 
 <script setup>
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
+import { donorService } from '~/api/donor/DonorService'
 
 definePageMeta({ 
     middleware: 'auth',
@@ -187,6 +192,7 @@ const profileForm = reactive({
 })
 
 const passwordForm = reactive({
+  currentPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
@@ -207,7 +213,7 @@ async function load() {
     // Response fields: donor_code, blood_type, total_donations,
     // last_donation_date, next_eligible_date, eligibility_status,
     // first_name, last_name, date_of_birth, contact_number, address
-    const res = await $fetch('/api/donor-profile/me')
+    const res = await donorService.profile()
     profile.value = res
 
     // Ang matag field diri kay direkta gikan sa registration data sa user
@@ -254,10 +260,17 @@ async function handleProfileSave() {
     // Backend contract: PUT /api/donor-profile/me
     // Body: { first_name, last_name, date_of_birth, blood_type, contact_number, email, address }
     // Kini mag-UPDATE sa existing row sa user, dili mag-create og bag-o
-    await $fetch('/api/donor-profile/me', {
-      method: 'PUT',
-      body: { ...profileForm },
+    const response = await donorService.updateProfile({
+      first_name: profileForm.first_name,
+      last_name: profileForm.last_name,
+      birth_date: profileForm.date_of_birth,
+      blood_type: profileForm.blood_type,
+      phone: profileForm.contact_number,
+      email: profileForm.email,
+      address: profileForm.address,
     })
+    profile.value = response?.data || profile.value
+    await fetchUser()
   } catch (err) {
     console.error('Failed to save profile:', err)
   } finally {
@@ -275,10 +288,12 @@ async function handlePasswordUpdate() {
   try {
     // Backend contract: POST /api/profile/password
     // Body: { password: string }
-    await $fetch('/api/profile/password', {
-      method: 'POST',
-      body: { password: passwordForm.newPassword },
+    await donorService.updatePassword({
+      current_password: passwordForm.currentPassword,
+      password: passwordForm.newPassword,
+      password_confirmation: passwordForm.confirmPassword,
     })
+    passwordForm.currentPassword = ''
     passwordForm.newPassword = ''
     passwordForm.confirmPassword = ''
   } catch (err) {

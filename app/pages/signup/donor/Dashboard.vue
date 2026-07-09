@@ -309,6 +309,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
+import { donorService } from '~/api/donor/DonorService'
 
 definePageMeta({
   middleware: 'auth',
@@ -352,10 +353,10 @@ const nextApptDate = computed(() => {
 })
 
 const quickActions = [
-  { path: '/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
-  { path: '/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
-  { path: '/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
-  { path: '/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
+  { path: '/signup/donor/Appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
+  { path: '/signup/donor/History', icon: 'history', color: '#2E7D32', label: 'Donation History' },
+  { path: '/signup/donor/Eligibility', icon: 'shield-check', color: '#F57C00', label: 'Eligibility Screening' },
+  { path: '/signup/donor/MyQRCode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
 ]
 
 // Lightweight date formatter supporting the tokens used in this page:
@@ -391,11 +392,7 @@ function formatDate(value, fmt) {
 
 onMounted(async () => {
   try {
-    // Backend contract: GET /api/donor/dashboard
-    // Response fields:
-    // { profile, eligibility_status, blood_type, total_donations,
-    //   upcoming_appointment, recent_donations: [...], monthly_trend: [{ key, month, count }, ...12] }
-    const data = await $fetch('/api/donor/dashboard')
+    const data = await donorService.dashboard()
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
     bloodType.value = data.blood_type ?? '—'
@@ -404,10 +401,7 @@ onMounted(async () => {
     recentDonations.value = data.recent_donations ?? []
     monthlyTrend.value = data.monthly_trend ?? []
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/donor/dashboard endpoint,
-    // so mag-fail gyud ni nga call. Naa'y safe defaults pud (empty arrays, 'pending')
-    // aron dili mag-crash ang template samtang wala pa naka-connect ang tinuod nga backend.
-    console.error('Failed to load dashboard data (expected while backend is not yet wired up):', err)
+    console.error('Failed to load donor dashboard data:', err)
   } finally {
     loading.value = false
   }
