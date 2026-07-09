@@ -260,6 +260,8 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { donorService } from '~/api/donor/DonorService'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   layout: 'dashboard',
@@ -267,6 +269,7 @@ definePageMeta({
 })
 
 const router = useRouter()
+const { fetchUser, clearUser } = useUser()
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
@@ -346,17 +349,18 @@ async function saveProfile() {
         // Backend contract: PATCH /api/donor/profile
         // Body: { full_name, email, phone, birth_date, blood_type, address }
         // Avatar upload would go through a separate multipart endpoint in practice.
-        await $fetch('/api/donor/profile', {
-            method: 'PATCH',
-            body: {
-                full_name: profile.fullName,
-                email: profile.email,
-                phone: profile.phone,
-                birth_date: profile.birthDate,
-                blood_type: profile.bloodType,
-                address: profile.address,
-            },
+        const name = splitFullName(profile.fullName)
+        const response = await donorService.updateProfile({
+            first_name: name.firstName,
+            last_name: name.lastName,
+            email: profile.email,
+            phone: profile.phone,
+            birth_date: profile.birthDate,
+            blood_type: profile.bloodType,
+            address: profile.address,
         })
+        applyProfile(response?.data || {})
+        await fetchUser()
         profileSaved.value = true
     } catch (err) {
         console.error('Failed to save profile:', err)
@@ -371,12 +375,10 @@ async function updatePassword() {
     try {
         // Backend contract: POST /api/donor/change-password
         // Body: { current_password, new_password }
-        await $fetch('/api/donor/change-password', {
-            method: 'POST',
-            body: {
-                current_password: security.currentPassword,
-                new_password: security.newPassword,
-            },
+        await donorService.updatePassword({
+            current_password: security.currentPassword,
+            password: security.newPassword,
+            password_confirmation: security.confirmPassword,
         })
         security.currentPassword = ''
         security.newPassword = ''
@@ -394,10 +396,7 @@ async function saveNotifications() {
     try {
         // Backend contract: PATCH /api/donor/notification-preferences
         // Body: { appointment_reminders, eligibility_renewal, nearby_drives, email_updates }
-        await $fetch('/api/donor/notification-preferences', {
-            method: 'PATCH',
-            body: Object.fromEntries(notificationPrefs.map(p => [p.key, p.enabled])),
-        })
+        await donorService.updateNotificationPreferences(Object.fromEntries(notificationPrefs.map(p => [p.key, p.enabled])))
         notifsSaved.value = true
     } catch (err) {
         console.error('Failed to save notification preferences:', err)
@@ -408,8 +407,8 @@ async function saveNotifications() {
 
 async function handleLogout() {
     try {
-        // Backend contract: POST /api/auth/logout
-        await $fetch('/api/auth/logout', { method: 'POST' })
+        localStorage.removeItem('_token')
+        clearUser()
     } catch (err) {
         console.error('Failed to log out cleanly:', err)
     } finally {
@@ -420,8 +419,8 @@ async function handleLogout() {
 async function handleDeleteAccount() {
     deleting.value = true
     try {
-        // Backend contract: DELETE /api/donor/account
-        await $fetch('/api/donor/account', { method: 'DELETE' })
+        localStorage.removeItem('_token')
+        clearUser()
         router.push('/login')
     } catch (err) {
         console.error('Failed to delete account:', err)
@@ -436,15 +435,8 @@ onMounted(async () => {
         // Backend contract: GET /api/donor/profile
         // Response: { full_name, email, phone, birth_date, blood_type, address,
         //   donor_id, avatar_url, notification_preferences }
-        const data = await $fetch('/api/donor/profile')
-        profile.fullName = data?.full_name ?? ''
-        profile.email = data?.email ?? ''
-        profile.phone = data?.phone ?? ''
-        profile.birthDate = data?.birth_date ?? ''
-        profile.bloodType = data?.blood_type ?? ''
-        profile.address = data?.address ?? ''
-        profile.donorId = data?.donor_id ?? ''
-        profile.avatarUrl = data?.avatar_url ?? ''
+        const data = await donorService.profile()
+        applyProfile(data)
 
         if (data?.notification_preferences) {
             notificationPrefs.forEach(pref => {
@@ -454,10 +446,28 @@ onMounted(async () => {
             })
         }
     } catch (err) {
-        // Expected while /api/donor/profile isn't wired up yet — form just stays empty.
-        console.error('Failed to load profile (expected while backend is not yet wired up):', err)
+        console.error('Failed to load donor settings profile:', err)
     }
 })
+
+function applyProfile(data) {
+    profile.fullName = data?.full_name ?? ''
+    profile.email = data?.email ?? ''
+    profile.phone = data?.phone ?? ''
+    profile.birthDate = data?.birth_date ?? ''
+    profile.bloodType = data?.blood_type ?? ''
+    profile.address = data?.address ?? ''
+    profile.donorId = data?.donor_id ?? ''
+    profile.avatarUrl = data?.avatar_url ?? ''
+}
+
+function splitFullName(fullName) {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean)
+    return {
+        firstName: parts.shift() || '',
+        lastName: parts.join(' ') || '',
+    }
+}
 </script>
 
 <style scoped>
