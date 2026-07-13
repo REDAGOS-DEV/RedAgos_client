@@ -12,7 +12,7 @@
             <p class="brand-subtitle">Blood Bank System</p>
           </div>
 
-          <NuxtLink to="/login" class="back-link">
+          <NuxtLink to="/auth/donor/login" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
              Back to Sign In
           </NuxtLink>

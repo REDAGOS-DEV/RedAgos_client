@@ -102,7 +102,7 @@
 
             <p class="signin-text">
               Already have an account?
-              <NuxtLink to="/login">
+              <NuxtLink to="/auth/donor/login">
                 Sign In
               </NuxtLink>
             </p>
@@ -119,7 +119,7 @@ import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  alias: ['/#home'],
+  alias: ['/home'],
 })
 
 const selectedRole = ref('')

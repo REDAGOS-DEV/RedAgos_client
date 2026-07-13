@@ -182,38 +182,38 @@ const navGroups = [
   {
     label: null,
     items: [
-      { label: 'Notifications', path: '/signup/donor/Notifications', icon: 'bell' },
-      { label: 'Dashboard', path: '/signup/donor/Dashboard', icon: 'house' }
+      { label: 'Notifications', path: '/donor/Notifications', icon: 'bell' },
+      { label: 'Dashboard', path: '/donor/Dashboard', icon: 'house' }
     ]
   },
   {
     label: 'Donors',
     items: [
-      { label: 'Eligibility Screening', path: '/signup/donor/Eligibility', icon: 'clipboard-check' },
-      { label: 'Book Appointment', path: '/signup/donor/Appointments', icon: 'calendar' }
+      { label: 'Eligibility Screening', path: '/donor/Eligibility', icon: 'clipboard-check' },
+      { label: 'Book Appointment', path: '/donor/Appointments', icon: 'calendar' }
     ]
   },
   {
     label: 'Records',
     items: [
-      { label: 'Donation History', path: '/signup/donor/History', icon: 'history' },
-      { label: 'My QR Code', path: '/signup/donor/MyQRCode', icon: 'qr-code', badge: true },
-      { label: 'My Profile', path: '/signup/donor/Profile', icon: 'user-circle' }
+      { label: 'Donation History', path: '/donor/History', icon: 'history' },
+      { label: 'My QR Code', path: '/donor/MyQRCode', icon: 'qr-code', badge: true },
+      { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' }
     ]
   }
 ]
 
 const bottomItems = [
-  { label: 'Settings', path: '/signup/donor/Settings', icon: 'settings' },
-  { label: 'Help', path: '/signup/donor/Help', icon: 'help-circle' }
+  { label: 'Settings', path: '/donor/Settings', icon: 'settings' },
+  { label: 'Help', path: '/donor/Help', icon: 'help-circle' }
 ]
 const showUserMenu = ref(false)
 
 const userMenuItems = [
-  { label: 'My Profile', path: '/signup/donor/Profile', icon: 'user-circle' },
-  { label: 'Donation History', path: '/signup/donor/History', icon: 'history' },
-  { label: 'View My QR Code', path: '/signup/donor/MyQRCode', icon: 'qr-code' },
-  { label: 'Notification Settings', path: '/signup/donor/Settings', icon: 'bell' }
+  { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' },
+  { label: 'Donation History', path: '/donor/History', icon: 'history' },
+  { label: 'View My QR Code', path: '/donor/MyQRCode', icon: 'qr-code' },
+  { label: 'Notification Settings', path: '/donor/Settings', icon: 'bell' }
 ]
 
 const closeUserMenu = () => {
@@ -272,7 +272,7 @@ const handleLogout = async () => {
     showUserMenu.value = false
     // await $fetch('/api/logout', { method: 'POST' })
     clearUser()
-    router.push('/login')
+    router.push('/auth/donor/login')
   } catch (err) {
     console.error(err)
   }

@@ -15,7 +15,7 @@
         </div>
         <div class="header-actions">
           <button class="bell-btn">
-            <NuxtLink to="/signup/blood-center/Notifications">
+            <NuxtLink to="/blood-center/Notifications">
               <AssetIcon name="bell" :size="16" />
               <span v-if="alerts.length" class="bell-dot" />
             </NuxtLink>
@@ -89,7 +89,7 @@
         <div class="panel fade-in" style="--delay: 320ms">
           <div class="panel-header">
             <h2 class="panel-title">Today's Appointments</h2>
-            <NuxtLink to="/signup/blood-center/Appointments" class="panel-link-plain">View All</NuxtLink>
+            <NuxtLink to="/blood-center/Appointments" class="panel-link-plain">View All</NuxtLink>
           </div>
 
           <div v-if="todaysAppointments.length" class="appt-list">
@@ -113,7 +113,7 @@
         <div class="panel fade-in" style="--delay: 350ms">
           <div class="panel-header">
             <h2 class="panel-title">Recent Blood Requests</h2>
-            <NuxtLink to="/signup/blood-center/Requests" class="panel-link">
+            <NuxtLink to="/blood-center/Requests" class="panel-link">
               View All
               <AssetIcon name="chevron-right" :size="14" />
             </NuxtLink>
@@ -128,7 +128,7 @@
               <span>Action</span>
             </div>
             <div v-for="r in recentRequests" :key="r.id" class="request-table__row">
-              <NuxtLink :to="`/signup/blood-center/Requests?ref=${r.reference}`" class="request-table__ref">{{ r.reference }}</NuxtLink>
+              <NuxtLink :to="`/blood-center/Requests?ref=${r.reference}`" class="request-table__ref">{{ r.reference }}</NuxtLink>
               <span class="request-table__blood" :style="{ color: requestBadgeColor(r.status) }">{{ r.blood_type }}</span>
               <span class="request-table__status" :style="{ color: requestBadgeColor(r.status) }">{{ statusLabel(r.status) }}</span>
               <span class="request-table__hospital">{{ r.facility_name }}</span>
@@ -144,7 +144,7 @@
         <div class="panel fade-in" style="--delay: 370ms">
           <div class="panel-header">
             <h2 class="panel-title">Stock Summary</h2>
-            <NuxtLink to="/signup/blood-center/Inventory" class="panel-link-plain">Full Inventory</NuxtLink>
+            <NuxtLink to="/blood-center/Inventory" class="panel-link-plain">Full Inventory</NuxtLink>
           </div>
 
           <div v-if="stockSummary.length" class="stock-grid">
@@ -229,7 +229,7 @@ function requestActionLabel(status) {
 }
 
 function requestActionPath(r) {
-  return `/signup/blood-center/Requests?ref=${r.reference}`
+  return `/blood-center/Requests?ref=${r.reference}`
 }
 
 onMounted(async () => {
