@@ -71,7 +71,7 @@
     <!-- RIGHT SIDE -->
     <main class="form-panel">
       <div class="form-topbar">
-        <NuxtLink to="/" class="back-link">
+        <NuxtLink to="/auth/role-selection" class="back-link">
           <AssetIcon name="chevron-left" :size="16" />
           Back to Role Selection
         </NuxtLink>

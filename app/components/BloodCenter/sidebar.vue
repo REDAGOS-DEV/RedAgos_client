@@ -187,50 +187,50 @@ const navGroups = [
   {
     label: null,
     items: [
-      { label: 'Notifications', path: '/signup/blood-center/Notifications', icon: 'bell' },
-      { label: 'Dashboard', path: '/signup/blood-center/Dashboard', icon: 'house' }
+      { label: 'Notifications', path: '/blood-center/Notifications', icon: 'bell' },
+      { label: 'Dashboard', path: '/blood-center/Dashboard', icon: 'house' }
     ]
   },
   {
     label: 'Requests & Supply',
     items: [
-      { label: 'Blood Requests', path: '/signup/blood-center/Requests', icon: 'clipboard-check', countKey: 'pendingRequests', urgent: true },
-      { label: 'Inventory', path: '/signup/blood-center/Inventory', icon: 'archive' }
+      { label: 'Blood Requests', path: '/blood-center/Requests', icon: 'clipboard-check', countKey: 'pendingRequests', urgent: true },
+      { label: 'Inventory', path: '/blood-center/Inventory', icon: 'archive' }
     ]
   },
   {
     label: 'Donors',
     items: [
-      { label: 'Donors', path: '/signup/blood-center/Donors', icon: 'users' },
-      { label: 'Appointments', path: '/signup/blood-center/Appointments', icon: 'calendar', countKey: 'todayAppointments' },
-      { label: 'Mobile Drives', path: '/signup/blood-center/MobileDrives', icon: 'truck' }
+      { label: 'Donors', path: '/blood-center/Donors', icon: 'users' },
+      { label: 'Appointments', path: '/blood-center/Appointments', icon: 'calendar', countKey: 'todayAppointments' },
+      { label: 'Mobile Drives', path: '/blood-center/MobileDrives', icon: 'truck' }
     ]
   },
   {
     label: 'Finance',
     items: [
-      { label: 'Billing', path: '/signup/blood-center/Billing', icon: 'credit-card' }
+      { label: 'Billing', path: '/blood-center/Billing', icon: 'credit-card' }
     ]
   },
   {
     label: 'Insights',
     items: [
-      { label: 'Demand Forecasting', path: '/signup/blood-center/Reports', icon: 'bar-chart' }
+      { label: 'Demand Forecasting', path: '/blood-center/Reports', icon: 'bar-chart' }
     ]
   }
 ]
 
 const bottomItems = [
-  { label: 'Settings', path: '/signup/blood-center/Settings', icon: 'settings' },
-  { label: 'Help', path: '/signup/blood-center/Help', icon: 'help-circle' }
+  { label: 'Settings', path: '/blood-center/Settings', icon: 'settings' },
+  { label: 'Help', path: '/blood-center/Help', icon: 'help-circle' }
 ]
 
 const showUserMenu = ref(false)
 
 const userMenuItems = [
-  { label: 'My Profile', path: '/signup/blood-center/Profile', icon: 'user-circle' },
-  { label: 'Blood Requests', path: '/signup/blood-center/Requests', icon: 'clipboard-check' },
-  { label: 'Billing', path: '/signup/blood-center/Billing', icon: 'credit-card' }
+  { label: 'My Profile', path: '/blood-center/Profile', icon: 'user-circle' },
+  { label: 'Blood Requests', path: '/blood-center/Requests', icon: 'clipboard-check' },
+  { label: 'Billing', path: '/blood-center/Billing', icon: 'credit-card' }
 ]
 
 const closeUserMenu = () => {
@@ -294,7 +294,7 @@ const handleLogout = async () => {
     showUserMenu.value = false
     // await $fetch('/api/logout', { method: 'POST' })
     clearUser()
-    router.push('/login')
+    router.push('/auth/blood-center/login')
   } catch (err) {
     console.error(err)
   }

@@ -17,10 +17,10 @@
              Back to Home
           </NuxtLink>
 
-          <h1>Welcome, Blood Steward!</h1>
+          <h1>Welcome, Lifesaver!</h1>
 
           <p class="form-subtitle">
-            Sign in to your blood center account
+            Sign in to your RedAgos account
           </p>
 
           <form
@@ -78,26 +78,6 @@
               </div>
             </div>
 
-            <div class="field-group license-group">
-              <label for="license-number">DOH License Number</label>
-
-              <div class="input-shell">
-                <span class="field-icon">
-                  <AssetIcon name="id-card" :size="18" />
-                </span>
-
-                <input
-                  id="license-number"
-                  v-model="licenseNumber"
-                  type="text"
-                  class="typed-input"
-                  :class="{ typed: typed.licenseNumber }"
-                  placeholder="e.g. DOH-BC-00123"
-                  required
-                >
-              </div>
-            </div>
-
             <div class="forgot-row">
               <button
                 type="button"
@@ -125,7 +105,7 @@
 
             <p class="signup-text">
               Need an account?
-              <NuxtLink to="/register/blood-center">
+              <NuxtLink to="/auth/donor/register">
                 Register Now
               </NuxtLink>
             </p>
@@ -140,19 +120,19 @@
               <button
                 type="button"
                 class="role-button hospital"
-                @click="navigateTo('/login')"
+                @click="navigateTo('/auth/hospital/login')"
               >
-                <AssetIcon name="users" :size="20" />
-                Donor
+                <AssetIcon name="hospital" :size="20" />
+                Hospital
               </button>
 
               <button
                 type="button"
                 class="role-button blood-center"
-                @click="navigateTo('/login/hospital')"
+                @click="navigateTo('/auth/blood-center/login')"
               >
-                <AssetIcon name="hospital" :size="20" />
-                Hospital
+                <AssetIcon name="blood-drop" :size="20" />
+                Blood Center
               </button>
             </div>
           </form>
@@ -164,21 +144,20 @@
 
 <script setup>
 import { authService } from '~/api/auth/AuthService'
-import { reactive, ref, watch } from 'vue'
+import { reactive, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 useHead({
-  title: 'Blood Center Sign In · RedAgos'
+  title: 'Sign In · RedAgos'
 })
 
 const email = ref('')
 const password = ref('')
-const licenseNumber = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-const typed = reactive({ email: false, password: false, licenseNumber: false })
+const typed = reactive({ email: false, password: false })
 
 watch(email, (value) => {
   typed.email = value.trim().length > 0
@@ -188,12 +167,8 @@ watch(password, (value) => {
   typed.password = value.trim().length > 0
 })
 
-watch(licenseNumber, (value) => {
-  typed.licenseNumber = value.trim().length > 0
-})
-
 const goToForgotPassword = () => {
-  return navigateTo('/forgot-password')
+  return navigateTo('/auth/donor/forgot-password')
 }
 
 const login = async () => {
@@ -204,8 +179,7 @@ const login = async () => {
     const response = await authService.login({
       email: email.value,
       password: password.value,
-      role: 'blood-center',
-      licenseNumber: licenseNumber.value,
+      role: 'donor',
     })
 
     const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
@@ -214,7 +188,11 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/signup/blood-center/Dashboard')
+    const redirectPath = typeof useRoute().query.redirect === 'string'
+      ? useRoute().query.redirect
+      : '/donor/Dashboard'
+
+    await navigateTo(redirectPath)
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
@@ -285,7 +263,7 @@ const login = async () => {
 h1 {
   margin: 46px 0 0;
   color: #1f2937;
-  font-size: 36px;
+  font-size: 38px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.18;
@@ -306,8 +284,7 @@ h1 {
   margin: 0;
 }
 
-.password-group,
-.license-group {
+.password-group {
   margin-top: 19px;
 }
 

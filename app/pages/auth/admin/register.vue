@@ -28,245 +28,215 @@
 
       <section class="brand-copy">
         <h2>
-          Blood Center<br />
-          Staff Portal
+          System<br />
+          Administrator<br />
+          Access
         </h2>
 
         <p>
-          For staff at SNBC and Philippine Red Cross Davao
-          Chapter managing blood donations and inventory.
+          For authorized system administrators responsible for
+          managing accounts, roles, and system configuration.
         </p>
       </section>
 
       <div class="what-you-get">
-        <p class="wyg-label">CENTER STAFF TOOLS</p>
+        <p class="wyg-label">ADMIN PRIVILEGES</p>
 
         <ul class="wyg-list">
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="archive" :size="18" />
+              <AssetIcon name="settings" :size="18" />
             </span>
-            <span>Manage blood inventory</span>
+            <span>System configuration</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
               <AssetIcon name="users" :size="18" />
             </span>
-            <span>Donor management</span>
+            <span>Account management</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="truck" :size="18" />
+              <AssetIcon name="hospital" :size="18" />
             </span>
-            <span>Schedule mobile drives</span>
+            <span>Facility registration</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="receipt" :size="18" />
+              <AssetIcon name="shield-plus" :size="18" />
             </span>
-            <span>Process billing & payments</span>
+            <span>Role & permission control</span>
           </li>
         </ul>
       </div>
       <div class="red-glow"></div>
     </aside>
 
-    <!-- RIGHT SIDE -->
-    <main class="form-panel">
-      <div class="form-card">
-        <div class="top-row">
-          <NuxtLink to="/register" class="back-link">
-            <AssetIcon name="chevron-left" :size="18" />
-             Back to Role Selection
-          </NuxtLink>
+<!-- RIGHT SIDE -->
+<main class="form-panel">
+  <div class="form-card">
+    <div class="top-row">
+      <NuxtLink to="/auth/role-selection" class="back-link">
+        <AssetIcon name="chevron-left" :size="18" />
+        Back to Role Selection
+      </NuxtLink>
 
-          <span class="role-badge">
-            <AssetIcon name="blood-drop" :size="20" />
-            Blood Center
-          </span>
-        </div>
+      <span class="role-badge">
+        <AssetIcon name="shield-check" :size="18" />
+        Administrator
+      </span>
+    </div>
 
-        <div class="header-row">
-          <div>
-            <h1>Blood Center Staff Registration</h1>
-            <p class="form-subtitle">Register your blood center to join the RedAgos network</p>
-          </div>
-        </div>
-
-        <div class="info-banner">
-          <AssetIcon name="info" :size="14" />
-          <span>Account requires approval from the System Administrator before activation.</span>
-        </div>
-
-        <form class="signup-form" @submit.prevent="submitRegistration">
-          <div class="form-group">
-            <label for="centerName">Blood Center Name</label>
-            <input
-              id="centerName"
-              v-model="form.centerName"
-              type="text"
-              name="centerName"
-              placeholder="e.g., Southern Philippines Medical Center"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="dohLicense">DOH License Number</label>
-            <input
-              id="dohLicense"
-              v-model="form.dohLicense"
-              type="text"
-              name="dohLicense"
-              placeholder="e.g., DOH-XI-0000-000"
-            />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="contactPerson">Contact Person (Full Name)</label>
-              <input
-                id="contactPerson"
-                v-model="form.contactPerson"
-                type="text"
-                name="contactPerson"
-                autocomplete="name"
-                placeholder="Name of authorized representative"/>
-            </div>
-          
-
-            <div class="form-group">
-              <label for="role">Role/Position</label>
-              <div class="input-icon-wrap">
-              <select id="role" v-model="form.role" name="role">
-                <option value="" disabled selected>Select role</option>
-                <option value="admin">Blood Bank Administrator</option>
-                <option value="staff">Medical Staff</option>
-                <option value="coordinator">Donor Coordinator</option>
-              </select>
-              <AssetIcon class="select-icon" name="chevron-left" :size="16" />
-            </div>
-          </div>
-        </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input
-                id="email"
-                v-model="form.email"
-                type="email"
-                name="email"
-                autocomplete="email"
-                placeholder="facility@email.com"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="phone">Phone Number</label>
-              <input
-                id="phone"
-                v-model="form.phone"
-                type="tel"
-                name="phone"
-                autocomplete="tel"
-                placeholder="+63 (82) 000-0000"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="address">Facility Address</label>
-            <input
-              id="address"
-              v-model="form.address"
-              type="text"
-              name="address"
-              autocomplete="street-address"
-              placeholder="Complete facility address"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="description">Brief Description (Optional)</label>
-            <textarea
-              id="description"
-              v-model="form.description"
-              rows="3"
-              placeholder="Describe your facility..."
-            ></textarea>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="password">Password</label>
-              <div class="input-icon-wrap">
-                <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-                <input
-                  id="password"
-                  v-model="form.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  name="password"
-                  autocomplete="new-password"
-                  placeholder="********"
-                  class="has-left-icon"
-                />
-                <button
-                  type="button"
-                  class="toggle-visibility"
-                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                  @click="showPassword = !showPassword"
-                >
-                  <AssetIcon v-if="!showPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="confirmPassword">Confirm Password</label>
-              <div class="input-icon-wrap">
-                <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-                <input
-                  id="confirmPassword"
-                  v-model="form.confirmPassword"
-                  :type="showConfirmPassword ? 'text' : 'password'"
-                  name="confirmPassword"
-                  autocomplete="new-password"
-                  placeholder="********"
-                  class="has-left-icon"
-                />
-                <button
-                  type="button"
-                  class="toggle-visibility"
-                  :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
-                  @click="showConfirmPassword = !showConfirmPassword"
-                >
-                  <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <p v-if="errorMessage" class="form-message error">{{ errorMessage }}</p>
-          <p v-if="successMessage" class="form-message success">{{ successMessage }}</p>
-
-          <button type="submit" class="submit-btn" :disabled="loading">
-            {{ loading ? 'Submitting...' : 'Submit Registration' }}
-          </button>
-
-          <p class="signin-row">
-            Already have an account?
-            <NuxtLink to="/login">Sign In</NuxtLink>
-          </p>
-        </form>
+    <div class="header-row">
+      <div>
+        <h1>Administrator Registration</h1>
+        <p class="form-subtitle">Register as a system administrator</p>
       </div>
-      
-    </main>
+    </div>
+
+    <div class="info-banner">
+      <AssetIcon name="alert" :size="18" />
+      <div>
+        <p class="banner-title">Admin Registration Notice</p>
+        <p class="banner-text">Administrator accounts require a valid access code and are subject to verification. Unauthorized registration attempts will be logged.</p>
+      </div>
+    </div>
+
+    <form class="signup-form" @submit.prevent="submitRegistration">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input
+            id="firstName"
+            v-model="form.firstName"
+            type="text"
+            name="firstName"
+            autocomplete="given-name"
+            placeholder="Juan"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input
+            id="lastName"
+            v-model="form.lastName"
+            type="text"
+            name="lastName"
+            autocomplete="family-name"
+            placeholder="Dela Cruz"
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input
+          id="email"
+          v-model="form.email"
+          type="email"
+          name="email"
+          autocomplete="email"
+          placeholder="juan@email.com"
+        />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="accessCode">Admin Access Code</label>
+          <input
+            id="accessCode"
+            v-model="form.accessCode"
+            type="text"
+            name="accessCode"
+            placeholder="Enter the admin registration code"
+          />
+          <p class="field-hint">This code is provided by the system super administrator.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="adminLevel">Admin Level</label>
+          <div class="select-wrap">
+            <select id="adminLevel" v-model="form.adminLevel" name="adminLevel">
+              <option value="" disabled selected>Select level</option>
+              <option value="super">Super Administrator</option>
+              <option value="regular">Administrator</option>
+            </select>
+            <AssetIcon class="select-icon" name="chevron-left" :size="16" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="input-icon-wrap">
+            <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
+            <input
+              id="password"
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              name="password"
+              autocomplete="new-password"
+              placeholder="********"
+              class="has-left-icon"
+            />
+            <button
+              type="button"
+              class="toggle-visibility"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              @click="showPassword = !showPassword"
+            >
+              <AssetIcon v-if="!showPassword" name="eye" :size="16" />
+              <AssetIcon v-else name="eye-off" :size="16" />
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <div class="input-icon-wrap">
+            <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
+            <input
+              id="confirmPassword"
+              v-model="form.confirmPassword"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              name="confirmPassword"
+              autocomplete="new-password"
+              placeholder="********"
+              class="has-left-icon"
+            />
+            <button
+              type="button"
+              class="toggle-visibility"
+              :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+              @click="showConfirmPassword = !showConfirmPassword"
+            >
+              <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
+              <AssetIcon v-else name="eye-off" :size="16" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="errorMessage" class="form-message error">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="form-message success">{{ successMessage }}</p>
+
+      <button type="submit" class="submit-btn" :disabled="loading">
+        {{ loading ? 'Submitting...' : 'Submit Registration' }}
+      </button>
+
+      <p class="signin-row">
+        Already have an account?
+        <NuxtLink to="/login">Sign Up</NuxtLink>
+      </p>
+    </form>
   </div>
+</main>
+</div>
 </template>
 
 <script setup>
@@ -275,7 +245,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 definePageMeta({
-  alias: ['/register/blood-center'],
+  alias: ['/register/admin'],
 })
 
 const form = reactive({
@@ -324,7 +294,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/login/blood-center')
+      navigateTo('/login')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
@@ -332,7 +302,6 @@ const submitRegistration = async () => {
     loading.value = false
   }
 }
-
 </script>
 
 <style scoped>
@@ -625,18 +594,20 @@ const submitRegistration = async () => {
   margin: 0 0 24px;
 }
 
-/* Role badge with glow, matching donor.vue */
 .role-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
   border-radius: 999px;
-  background: #ecfdf5;
-  color: #15803d;
+  background: linear-gradient(180deg, #f3d9ff 0%, #e4b8ff 100%);
+  color: #9333ea;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 0 0 1px #bbf7d0, 0 0 16px rgba(21, 128, 61, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(147, 51, 234, 0.1),
+    0 4px 12px rgba(147, 51, 234, 0.2),
+    0 0 40px rgba(192, 132, 252, 0.35);
 }
 
 /* Info banner */
@@ -644,9 +615,9 @@ const submitRegistration = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #eff6ff;
-  border-left: 4px solid #2563eb;
-  color: #1e3a8a;
+  background: #fef3e2;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
   font-weight: 600;
   font-size: 14px;
   padding: 16px 20px;
@@ -656,7 +627,26 @@ const submitRegistration = async () => {
 
 .info-banner svg {
   flex-shrink: 0;
-  color: #2563eb;
+  color: #f59e0b;
+}
+.banner-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.banner-text {
+  margin: 0;
+  font-weight: 500;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.field-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
 }
 
 /* Form grid */

@@ -17,10 +17,10 @@
              Back to Home
           </NuxtLink>
 
-          <h1>Welcome, Blood Guardian! </h1>
+          <h1>Welcome, Blood Steward!</h1>
 
           <p class="form-subtitle">
-            Sign in to your hospital blood bank account
+            Sign in to your blood center account
           </p>
 
           <form
@@ -125,7 +125,7 @@
 
             <p class="signup-text">
               Need an account?
-              <NuxtLink to="/register/hospital">
+              <NuxtLink to="/register/blood-center">
                 Register Now
               </NuxtLink>
             </p>
@@ -140,7 +140,7 @@
               <button
                 type="button"
                 class="role-button hospital"
-                @click="navigateTo('/login/donor')"
+                @click="navigateTo('/login')"
               >
                 <AssetIcon name="users" :size="20" />
                 Donor
@@ -149,7 +149,7 @@
               <button
                 type="button"
                 class="role-button blood-center"
-                @click="navigateTo('/login/blood-center')"
+                @click="navigateTo('/login/hospital')"
               >
                 <AssetIcon name="hospital" :size="20" />
                 Hospital
@@ -193,7 +193,7 @@ watch(licenseNumber, (value) => {
 })
 
 const goToForgotPassword = () => {
-  return navigateTo('/forgot-password')
+  return navigateTo('/auth/admin/forgot-password')
 }
 
 const login = async () => {
@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/signup/hospital/Dashboard')
+    await navigateTo('/admin/Dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
@@ -285,7 +285,7 @@ const login = async () => {
 h1 {
   margin: 46px 0 0;
   color: #1f2937;
-  font-size: 38px;
+  font-size: 36px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.18;

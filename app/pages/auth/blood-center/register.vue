@@ -28,47 +28,46 @@
 
       <section class="brand-copy">
         <h2>
-          Hospital<br />
-          Blood Bank<br />
-          Portal
+          Blood Center<br />
+          Staff Portal
         </h2>
 
         <p>
-          For medical technologists and hospital blood bank
-          personnel at SPMC and partner facilities.
+          For staff at SNBC and Philippine Red Cross Davao
+          Chapter managing blood donations and inventory.
         </p>
       </section>
 
       <div class="what-you-get">
-        <p class="wyg-label">STAFF CAPABILITIES</p>
+        <p class="wyg-label">CENTER STAFF TOOLS</p>
 
         <ul class="wyg-list">
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="file-plus" :size="18" />
+              <AssetIcon name="archive" :size="18" />
             </span>
-            <span>Create & track blood requests</span>
+            <span>Manage blood inventory</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="search" :size="18" />
+              <AssetIcon name="users" :size="18" />
             </span>
-            <span>Search blood availability</span>
+            <span>Donor management</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="clipboard-plus" :size="18" />
+              <AssetIcon name="truck" :size="18" />
             </span>
-            <span>Generate usage reports</span>
+            <span>Schedule mobile drives</span>
           </li>
 
           <li class="wyg-item">
             <span class="wyg-icon">
-              <AssetIcon name="bell" :size="18" />
+              <AssetIcon name="receipt" :size="18" />
             </span>
-            <span>Real-time notifications</span>
+            <span>Process billing & payments</span>
           </li>
         </ul>
       </div>
@@ -79,21 +78,21 @@
     <main class="form-panel">
       <div class="form-card">
         <div class="top-row">
-          <NuxtLink to="/register" class="back-link">
-            <AssetIcon name="chevron-left" :size="16" />
+          <NuxtLink to="/auth/role-selection" class="back-link">
+            <AssetIcon name="chevron-left" :size="18" />
              Back to Role Selection
           </NuxtLink>
 
           <span class="role-badge">
-            <AssetIcon name="hospital" :size="24" />
-            Blood Banks
+            <AssetIcon name="blood-drop" :size="20" />
+            Blood Center
           </span>
         </div>
 
         <div class="header-row">
           <div>
-            <h1>Hospital Blood Bank Staff Registration</h1>
-            <p class="form-subtitle">Register your hospital blood bank to access blood services</p>
+            <h1>Blood Center Staff Registration</h1>
+            <p class="form-subtitle">Register your blood center to join the RedAgos network</p>
           </div>
         </div>
 
@@ -276,7 +275,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 definePageMeta({
-  alias: ['/register/hospital'],
+  alias: ['/register/blood-center'],
 })
 
 const form = reactive({
@@ -325,7 +324,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/login/hospital')
+      navigateTo('/login/blood-center')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
@@ -333,6 +332,7 @@ const submitRegistration = async () => {
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>
@@ -632,14 +632,11 @@ const submitRegistration = async () => {
   gap: 8px;
   padding: 12px 24px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #dceaff 0%, #bcd9ff 100%);
-  color: #2563eb;
+  background: #ecfdf5;
+  color: #15803d;
   font-size: 14px;
   font-weight: 700;
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.1),
-    0 4px 12px rgba(37, 99, 235, 0.2),
-    0 0 40px rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 0 1px #bbf7d0, 0 0 16px rgba(21, 128, 61, 0.25);
 }
 
 /* Info banner */
