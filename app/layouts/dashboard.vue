@@ -7,7 +7,7 @@
     
         <!-- for testing --> 
     <DonorSidebar :donor="user" />
-
+    
     <div class="lg:pl-64">
       <main class="min-h-screen">
         <slot />
