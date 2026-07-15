@@ -181,7 +181,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'donordashboard',
   middleware: 'auth',
 })
 

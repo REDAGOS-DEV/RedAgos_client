@@ -194,7 +194,7 @@ import { ref, reactive, onMounted } from 'vue'
 
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'blood-centerdashboard'
 })
 
 const loading = ref(true)

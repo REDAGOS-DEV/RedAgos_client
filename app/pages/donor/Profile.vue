@@ -170,7 +170,7 @@ import { donorService } from '~/api/donor/DonorService'
 
 definePageMeta({ 
     middleware: 'auth',
-    layout: 'dashboard' })
+    layout: 'donordashboard' })
 
 const router = useRouter()
 const { user, fetchUser, updateAvatar, clearUser } = useUser()

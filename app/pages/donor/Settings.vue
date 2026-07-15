@@ -264,7 +264,7 @@ import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'donordashboard',
   middleware: 'auth',
 })
 
