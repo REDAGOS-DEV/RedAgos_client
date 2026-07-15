@@ -48,7 +48,7 @@
                 <p class="state-sub">
                     Once a blood center staff logs a completed donation for you, it will show up here automatically.
                 </p>
-                <NuxtLink to="/signup/donor/Appointments" class="btn-primary">
+                <NuxtLink to="/donor/appointments" class="btn-primary">
                     Book an Appointment
                 </NuxtLink>
             </div>

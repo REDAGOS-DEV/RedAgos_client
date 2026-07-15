@@ -54,8 +54,8 @@
           </div>
 
           <div class="status-actions">
-            <NuxtLink to="/signup/donor/MyQRCode" class="btn-outline btn-block">View QR Code</NuxtLink>
-            <NuxtLink to="/signup/donor/eligibility" class="btn-primary btn-block">Retake Screening</NuxtLink>
+            <NuxtLink to="/donor/qrcode" class="btn-outline btn-block">View QR Code</NuxtLink>
+            <NuxtLink to="/donor/eligibility" class="btn-primary btn-block">Retake Screening</NuxtLink>
           </div>
         </div>
 

@@ -96,13 +96,13 @@
           </template>
 
           <div class="drive-card__actions">
-            <NuxtLink :to="`/signup/bloodcenter/MobileDrives/${drive.id}/Donors`" class="btn-outline">
+            <NuxtLink :to="`/blood-center/drives/${drive.id}/Donors`" class="btn-outline">
               View all {{ drive.registered_count }} donors
             </NuxtLink>
-            <NuxtLink v-if="drive.status !== 'planning'" :to="`/signup/bloodcenter/MobileDrives/${drive.id}/Attendance`" class="btn-outline-blue">
+            <NuxtLink v-if="drive.status !== 'planning'" :to="`/blood-center/drives/${drive.id}/Attendance`" class="btn-outline-blue">
               Mark Attendance
             </NuxtLink>
-            <NuxtLink :to="`/signup/bloodcenter/MobileDrives/${drive.id}`" class="btn-primary btn-primary--sm">
+            <NuxtLink :to="`-/blood-center/drives/${drive.id}`" class="btn-primary btn-primary--sm">
               Manage Drive
             </NuxtLink>
           </div>

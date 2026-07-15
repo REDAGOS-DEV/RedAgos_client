@@ -74,7 +74,7 @@
                   ? "Please contact the blood center for more information, then retake the screening once you're cleared."
                   : 'Take the eligibility screening first. Your QR code is generated automatically once you pass.' }}
               </p>
-              <NuxtLink to="/signup/donor/Eligibility" class="btn-primary">
+              <NuxtLink to="/donor/eligibility" class="btn-primary">
                 {{ eligibilityStatus === 'deferred' ? 'Retake Screening' : 'Take Screening' }}
               </NuxtLink>
             </div>

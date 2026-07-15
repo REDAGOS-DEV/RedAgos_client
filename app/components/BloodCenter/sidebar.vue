@@ -187,50 +187,50 @@ const navGroups = [
   {
     label: null,
     items: [
-      { label: 'Notifications', path: '/blood-center/Notifications', icon: 'bell' },
-      { label: 'Dashboard', path: '/blood-center/Dashboard', icon: 'house' }
+      { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell' },
+      { label: 'Dashboard', path: '/blood-center/dashboard', icon: 'house' }
     ]
   },
   {
     label: 'Requests & Supply',
     items: [
-      { label: 'Blood Requests', path: '/blood-center/Requests', icon: 'clipboard-check', countKey: 'pendingRequests', urgent: true },
-      { label: 'Inventory', path: '/blood-center/Inventory', icon: 'archive' }
+      { label: 'Blood Requests', path: '/blood-center/requests', icon: 'clipboard-check', countKey: 'pendingRequests', urgent: true },
+      { label: 'Inventory', path: '/blood-center/inventory', icon: 'archive' }
     ]
   },
   {
     label: 'Donors',
     items: [
-      { label: 'Donors', path: '/blood-center/Donors', icon: 'users' },
-      { label: 'Appointments', path: '/blood-center/Appointments', icon: 'calendar', countKey: 'todayAppointments' },
-      { label: 'Mobile Drives', path: '/blood-center/MobileDrives', icon: 'truck' }
+      { label: 'Donors', path: '/blood-center/donors', icon: 'users' },
+      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', countKey: 'todayAppointments' },
+      { label: 'Mobile Drives', path: '/blood-center/drives', icon: 'truck' }
     ]
   },
   {
     label: 'Finance',
     items: [
-      { label: 'Billing', path: '/blood-center/Billing', icon: 'credit-card' }
+      { label: 'Billing', path: '/blood-center/billing', icon: 'credit-card' }
     ]
   },
   {
     label: 'Insights',
     items: [
-      { label: 'Demand Forecasting', path: '/blood-center/Reports', icon: 'bar-chart' }
+      { label: 'Demand Forecasting', path: '/blood-center/reports', icon: 'bar-chart' }
     ]
   }
 ]
 
 const bottomItems = [
-  { label: 'Settings', path: '/blood-center/Settings', icon: 'settings' },
-  { label: 'Help', path: '/blood-center/Help', icon: 'help-circle' }
+  { label: 'Settings', path: '/blood-center/settings', icon: 'settings' },
+  { label: 'Help', path: '/blood-center/help', icon: 'help-circle' }
 ]
 
 const showUserMenu = ref(false)
 
 const userMenuItems = [
-  { label: 'My Profile', path: '/blood-center/Profile', icon: 'user-circle' },
-  { label: 'Blood Requests', path: '/blood-center/Requests', icon: 'clipboard-check' },
-  { label: 'Billing', path: '/blood-center/Billing', icon: 'credit-card' }
+  { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle' },
+  { label: 'Blood Requests', path: '/blood-center/requests', icon: 'clipboard-check' },
+  { label: 'Billing', path: '/blood-center/billing', icon: 'credit-card' }
 ]
 
 const closeUserMenu = () => {

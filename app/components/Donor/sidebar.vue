@@ -182,38 +182,38 @@ const navGroups = [
   {
     label: null,
     items: [
-      { label: 'Notifications', path: '/donor/Notifications', icon: 'bell' },
-      { label: 'Dashboard', path: '/donor/Dashboard', icon: 'house' }
+      { label: 'Notifications', path: '/donor/notifications', icon: 'bell' },
+      { label: 'Dashboard', path: '/donor/dashboard', icon: 'house' }
     ]
   },
   {
     label: 'Donors',
     items: [
-      { label: 'Eligibility Screening', path: '/donor/Eligibility', icon: 'clipboard-check' },
-      { label: 'Book Appointment', path: '/donor/Appointments', icon: 'calendar' }
+      { label: 'Eligibility Screening', path: '/donor/eligibility', icon: 'clipboard-check' },
+      { label: 'Book Appointment', path: '/donor/appointments', icon: 'calendar' }
     ]
   },
   {
     label: 'Records',
     items: [
-      { label: 'Donation History', path: '/donor/History', icon: 'history' },
-      { label: 'My QR Code', path: '/donor/MyQRCode', icon: 'qr-code', badge: true },
-      { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' }
+      { label: 'Donation History', path: '/donor/history', icon: 'history' },
+      { label: 'My QR Code', path: '/donor/qrcode', icon: 'qr-code', badge: true },
+      { label: 'My Profile', path: '/donor/profile', icon: 'user-circle' }
     ]
   }
 ]
 
 const bottomItems = [
-  { label: 'Settings', path: '/donor/Settings', icon: 'settings' },
-  { label: 'Help', path: '/donor/Help', icon: 'help-circle' }
+  { label: 'Settings', path: '/donor/settings', icon: 'settings' },
+  { label: 'Help', path: '/donor/help', icon: 'help-circle' }
 ]
 const showUserMenu = ref(false)
 
 const userMenuItems = [
   { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' },
-  { label: 'Donation History', path: '/donor/History', icon: 'history' },
-  { label: 'View My QR Code', path: '/donor/MyQRCode', icon: 'qr-code' },
-  { label: 'Notification Settings', path: '/donor/Settings', icon: 'bell' }
+  { label: 'Donation History', path: '/donor/history', icon: 'history' },
+  { label: 'View My QR Code', path: '/donor/qrcode', icon: 'qr-code' },
+  { label: 'Notification Settings', path: '/donor/settings', icon: 'bell' }
 ]
 
 const closeUserMenu = () => {

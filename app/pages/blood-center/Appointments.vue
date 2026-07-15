@@ -170,7 +170,7 @@
                 <!-- BLOOD DRIVE REGISTRATIONS TAB -->
                 <section v-else class="tab-content">
                     <div class="drives-header">
-                        <NuxtLink to="/signup/blood-center/MobileDrives" class="btn-outline-blue">
+                        <NuxtLink to="/blood-center/drives" class="btn-outline-blue">
                             Go to Mobile Drives
                             <AssetIcon name="arrow-right" :size="14" />
                         </NuxtLink>
