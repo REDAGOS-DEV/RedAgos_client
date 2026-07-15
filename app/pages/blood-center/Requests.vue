@@ -386,7 +386,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 
 definePageMeta({
     middleware: 'auth',
-    layout: 'dashboard',
+    layout: 'blood-centerdashboard',
 })
 
 /**

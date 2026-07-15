@@ -174,7 +174,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'donordashboard'
 })
 
 const router = useRouter()

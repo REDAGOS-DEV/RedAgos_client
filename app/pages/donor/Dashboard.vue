@@ -313,7 +313,7 @@ import { donorService } from '~/api/donor/DonorService'
 
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'donordashboard'
 })
 
 const loading = ref(true)

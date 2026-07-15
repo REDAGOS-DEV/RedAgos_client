@@ -119,7 +119,7 @@ import { ref, computed, onMounted } from 'vue'
 
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard',
+  layout: 'donordashboard',
 })
 
 const loading = ref(true)

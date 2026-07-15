@@ -1,13 +1,7 @@
 <template>
-  <div>
-    <!-- i-uncomment ni ug i-condition base sa role if naa nay 'role' column sa backend -->
-    <!-- <DonorSidebar v-if="user?.role === 'donor'" :donor="user" /> -->
-    <!-- <BloodCenterSidebar v-else-if="user?.role === 'blood-center'" :blood-center="user" /> -->
-
-    
-        <!-- for testing --> 
+  <div>  <!-- for testing --> 
     <DonorSidebar :donor="user" />
-    
+     <!-- <BloodCenterSidebar :blood-center="user" /> -->
     <div class="lg:pl-64">
       <main class="min-h-screen">
         <slot />
