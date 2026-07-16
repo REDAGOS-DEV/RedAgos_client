@@ -1043,4 +1043,47 @@ function splitFullName(fullName) {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .settings-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .panel-header--simple) { border-color: #334155; }
+
+:global(.dark .avatar) { background: rgba(66,165,245,0.16); }
+
+:global(.dark .form-input) {
+    background: #0F172A;
+    border-color: #334155;
+    color: #F1F5F9;
+}
+
+:global(.dark .password-toggle:hover) { color: #F1F5F9; background: #263449; }
+
+:global(.dark .toggle-row) { border-color: #263449; }
+:global(.dark .toggle-switch) { background: #1565c0; }
+
+:global(.dark .account-action) { border-color: #263449; }
+
+:global(.dark .btn-outline) {
+    background: #263449;
+    color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+
+:global(.dark .modal-card) {
+    background: #1E293B;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+}
+:global(.dark .modal-check) { background: rgba(102,187,106,0.16); }
+:global(.dark .modal-check--danger) { background: rgba(239,83,80,0.16); }
 </style>

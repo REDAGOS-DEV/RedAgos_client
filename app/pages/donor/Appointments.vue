@@ -395,6 +395,7 @@ function goDashboard() {
   background: #F5F7FA;
   flex-direction: column;
   gap: 24px;
+  transition: background-color 0.2s ease;
 }
 
 .header-row {
@@ -978,4 +979,54 @@ function goDashboard() {
     padding: 16px 16px 40px;
   }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .appointment-page) {
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  background: #0F172A;
+}
+
+:global(.dark .type-card),
+:global(.dark .center-card),
+:global(.dark .drive-card),
+:global(.dark .drive-state),
+:global(.dark .panel),
+:global(.dark .slot-btn),
+:global(.dark .modal-card) {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+:global(.dark .type-card--active),
+:global(.dark .center-card--active),
+:global(.dark .drive-card--active),
+:global(.dark .slot-btn--active) {
+  background: rgba(66,165,245,0.14);
+}
+
+:global(.dark .type-card__icon) { background: rgba(66,165,245,0.16); }
+
+:global(.dark .form-input) {
+  background: #0F172A;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+
+:global(.dark .slot-btn--full) { background: #263449; }
+
+:global(.dark .badge--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
+:global(.dark .badge--full) { background: #263449; }
+
+:global(.dark .progress-track) { background: #334155; }
+:global(.dark .progress-fill--full) { background: #475569; }
+
+:global(.dark .btn-outline) {
+  background: #263449;
+  color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover) { background: #334155; }
+
+:global(.dark .summary-row) { border-color: #263449; }
 </style>

@@ -540,4 +540,45 @@ onMounted(async () => {
         margin-left: 50px;
     }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .notifications-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .tabs-bar) { border-color: #334155; }
+:global(.dark .tab-btn:hover) { color: #F1F5F9; }
+
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .spinner) { border-color: #334155; border-top-color: var(--primary); }
+
+:global(.dark .notif-row) { border-color: #263449; }
+:global(.dark .notif-row--unread) { background: #172033; }
+
+:global(.dark .notif-row__icon--warning) { background: rgba(245,124,0,0.16); }
+:global(.dark .notif-row__icon--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .notif-row__icon--primary) { background: rgba(66,165,245,0.16); }
+:global(.dark .notif-row__icon--danger) { background: rgba(239,83,80,0.16); }
+
+:global(.dark .notif-row__meta) { color: #64748b; }
+
+:global(.dark .notif-tag--reminder) { background: rgba(245,124,0,0.16); }
+:global(.dark .notif-tag--donation) { background: rgba(102,187,106,0.16); }
+:global(.dark .notif-tag--screening) { background: rgba(66,165,245,0.16); }
+:global(.dark .notif-tag--system) { background: #263449; color: #94a3b8; }
+
+:global(.dark .notif-row__read-status) { color: #475569; }
+
+:global(.dark .btn-outline) {
+    background: #263449;
+    color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; 
+}
 </style>

@@ -82,8 +82,8 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  layout: 'donordashboard',
-  middleware: 'auth',
+    layout: 'donordashboard',
+    middleware: 'auth',
 })
 
 const loading = ref(true)
@@ -176,8 +176,15 @@ onMounted(async () => {
 }
 
 @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .header-row {
@@ -226,9 +233,20 @@ onMounted(async () => {
     flex-shrink: 0;
 }
 
-.stat-card__icon--primary { background: #eaf3fc; color: var(--primary); }
-.stat-card__icon--success { background: #eaf6ea; color: var(--success); }
-.stat-card__icon--warning { background: #fff4e5; color: var(--warning); }
+.stat-card__icon--primary {
+    background: #eaf3fc;
+    color: var(--primary);
+}
+
+.stat-card__icon--success {
+    background: #eaf6ea;
+    color: var(--success);
+}
+
+.stat-card__icon--warning {
+    background: #fff4e5;
+    color: var(--warning);
+}
 
 .stat-card__value {
     font-size: 17px;
@@ -291,7 +309,9 @@ onMounted(async () => {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* History rows */
@@ -434,5 +454,69 @@ onMounted(async () => {
         margin-left: 50px;
         min-width: 0;
     }
+}
+
+/* ============ Dark mode ============ */
+:global(.dark .history-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .stat-card),
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .stat-card__icon--primary) {
+    background: rgba(66, 165, 245, 0.16);
+}
+
+:global(.dark .stat-card__icon--success) {
+    background: rgba(102, 187, 106, 0.16);
+}
+
+:global(.dark .stat-card__icon--warning) {
+    background: rgba(255, 167, 38, 0.16);
+}
+
+:global(.dark .history-row) {
+    border-color: #263449;
+}
+
+:global(.dark .history-row__icon) {
+    background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .history-row__meta) {
+    color: #94A3B8;
+}
+
+:global(.dark .history-row__date) {
+    color: #64748B;
+}
+
+:global(.dark .history-tag) {
+    background: rgba(66, 165, 245, 0.16);
+    color: #90CAF9;
+}
+
+:global(.dark .history-status--completed) {
+    background: rgba(102, 187, 106, 0.16);
+}
+
+:global(.dark .history-status--deferred) {
+    background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .spinner) {
+    border-color: #334155;
+    border-top-color: var(--primary);
+}
+
+:global(.dark .state-title) {
+    color: #F1F5F9;
+
 }
 </style>

@@ -127,7 +127,7 @@ const quickTopics = [
         tone: 'primary',
         title: 'Eligibility Screening',
         desc: 'Retake the screening or check why you were deferred.',
-        route: '/signup/donor/Eligibility',
+        route: '/donor/eligibility',
     },
     {
         key: 'qr',
@@ -135,7 +135,7 @@ const quickTopics = [
         tone: 'success',
         title: 'QR Code & Appointments',
         desc: "Your QR expired, or you need to book a visit.",
-        route: '/signup/donor/MyQRCode',
+        route: '/donor/qrcode',
     },
     {
         key: 'history',
@@ -143,7 +143,7 @@ const quickTopics = [
         tone: 'warning',
         title: 'Donation History',
         desc: "A donation isn't showing up in your records.",
-        route: '/signup/donor/History',
+        route: '/donor/history',
     },
     {
         key: 'account',
@@ -151,7 +151,7 @@ const quickTopics = [
         tone: 'danger',
         title: 'Account & Security',
         desc: 'Change your password or manage your account.',
-        route: '/signup/donor/Settings',
+        route: '/donor/settings',
     },
 ]
 
@@ -210,6 +210,7 @@ function toggleFaq(id) {
     background: #F5F7FA;
     flex-direction: column;
     gap: 20px;
+    transition: background-color 0.2s ease;
 }
 
 .fade-in {
@@ -503,4 +504,34 @@ a.contact-row__value:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .help-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .topic-card),
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .topic-card:hover) {
+    border-color: #42A5F5;
+    box-shadow: 0 4px 10px rgba(66,165,245,0.14);
+}
+
+:global(.dark .topic-card__icon--primary) { background: rgba(66,165,245,0.16); }
+:global(.dark .topic-card__icon--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .topic-card__icon--warning) { background: rgba(255,167,38,0.16); }
+:global(.dark .topic-card__icon--danger) { background: rgba(239,83,80,0.16); }
+
+:global(.dark .panel-header--simple),
+:global(.dark .faq-item) {
+    border-color: #334155;
+}
+
+:global(.dark .contact-row__icon) { background: rgba(66,165,245,0.16); }
 </style>

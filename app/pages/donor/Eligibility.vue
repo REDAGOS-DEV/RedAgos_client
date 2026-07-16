@@ -344,6 +344,7 @@ async function handleSubmit() {
     background: #F5F7FA;
     flex-direction: column;
     gap: 20px;
+    transition: background-color 0.2s ease;
 }
 
 .header-row {
@@ -845,4 +846,59 @@ async function handleSubmit() {
 .modal-fade-leave-to .modal-card {
     transform: scale(0.96) translateY(8px);
 }
+
+/* ============ Dark mode ============ */
+:global(.dark) .eligibility-page {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark) .panel,
+:global(.dark) .modal-card,
+:global(.dark) .modal-qr-wrap {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark) .panel-header--simple { border-color: #334155; }
+
+:global(.dark) .info-banner {
+    background: rgba(66,165,245,0.14);
+    border-color: rgba(66,165,245,0.3);
+}
+:global(.dark) .info-banner__text,
+:global(.dark) .banner-icon { color: #90CAF9; }
+
+:global(.dark) .step__circle { background: #263449; }
+:global(.dark) .step__line { background: #334155; }
+
+:global(.dark) .question-card { background: #172033; }
+
+:global(.dark) .answer-btn {
+    background: #1E293B;
+    border-color: #334155;
+    color: #F1F5F9;
+}
+:global(.dark) .answer-btn:hover:not(.answer-btn--active) { background: #263449; }
+:global(.dark) .answer-btn--yes.answer-btn--active { background: rgba(102,187,106,0.16); }
+:global(.dark) .answer-btn--no.answer-btn--active { background: rgba(239,83,80,0.16); }
+
+:global(.dark) .form-input {
+    background: #0F172A;
+    border-color: #334155;
+    color: #F1F5F9;
+}
+
+:global(.dark) .result-box--pending { background: #263449; }
+:global(.dark) .result-box--success { background: rgba(102,187,106,0.16); }
+:global(.dark) .result-box--danger { background: rgba(239,83,80,0.16); }
+
+:global(.dark) .btn-outline {
+    background: #263449;
+    color: #E2E8F0;
+}
+:global(.dark) .btn-outline:hover { background: #334155; }
+
+:global(.dark) .modal-qr-image--placeholder { background: #172033; }
 </style>

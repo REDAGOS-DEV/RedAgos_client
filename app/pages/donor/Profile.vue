@@ -14,7 +14,7 @@
         <div class="panel fade-in profile-card" style="--delay: 100ms">
           <AvatarUpload
             :current-avatar="user?.avatar"
-            :fallback-initial="user?.full_name?.charAt(0) || 'D'"
+            :fallback-initial="user?.full_name?.charAt(0) || '?'"
             @updated="handleAvatarUpdated"
           />
           <h2 class="profile-card__name">{{ user?.full_name }}</h2>
@@ -185,7 +185,7 @@ const profileForm = reactive({
   first_name: '',
   last_name: '',
   date_of_birth: '',
-  blood_type: 'O+',
+  blood_type: '',
   contact_number: '',
   email: '',
   address: '',
@@ -207,12 +207,6 @@ async function load() {
   if (!user.value) await fetchUser()
 
   try {
-    // IMPORTANTE: kini nga endpoint dapat mo-return sa TINUOD nga
-    // data nga gi-submit sa authenticated user pag-register — dili demo/mock.
-    // Backend contract: GET /api/donor-profile/me
-    // Response fields: donor_code, blood_type, total_donations,
-    // last_donation_date, next_eligible_date, eligibility_status,
-    // first_name, last_name, date_of_birth, contact_number, address
     const res = await donorService.profile()
     profile.value = res
 
@@ -366,6 +360,10 @@ async function handleLogout() {
   text-align: center;
   gap: 2px;
 }
+.profile-card :deep(.avatar-upload) {
+  width: 100%;
+  justify-content: center;
+}
 .profile-card__name { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 12px 0 0; }
 .profile-card__meta { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 0; }
 .profile-card__eligible {
@@ -452,4 +450,35 @@ async function handleLogout() {
   .profile-page { padding: 16px 16px 32px; }
   .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .profile-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .panel-header--simple) { border-color: #334155; }
+
+:global(.dark .status-row) { border-color: #263449; }
+
+:global(.dark .form-input) {
+    background: #0F172A;
+    border-color: #334155;
+    color: #F1F5F9;
+}
+
+:global(.dark .btn-outline) {
+    background: #263449;
+    color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover) { background: #334155; }
+
+:global(.dark .toggle-row) { border-color: #263449; }
+:global(.dark .toggle-switch) { background: #334155; }
 </style>

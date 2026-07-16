@@ -63,6 +63,7 @@ import mapPin from '~/assets/icons/map-pin.svg?raw'
 import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import menu from '~/assets/icons/menu.svg?raw'
 import monitor from '~/assets/icons/monitor.svg?raw'
+import moon from '~/assets/icons/moon.svg?raw'
 import palette from '~/assets/icons/palette.svg?raw'
 import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
@@ -77,6 +78,7 @@ import shield from '~/assets/icons/shield.svg?raw'
 import shieldCheck from '~/assets/icons/shield-check.svg?raw'
 import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
+import sun from '~/assets/icons/sun.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
@@ -140,6 +142,7 @@ const icons = {
   'map-pin-simple': mapPinSimple,
   menu,
   monitor,
+  moon,
   palette,
   pencil,
   phone,
@@ -156,6 +159,7 @@ const icons = {
   'star-fill': starFill,
   'trending-up': trendingUp,
   truck,
+  sun,
   'trash-2': trash,
   user,
   users,
