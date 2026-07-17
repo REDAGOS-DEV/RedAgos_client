@@ -1,6 +1,6 @@
 <template>
   <div>
-     <<BloodCenterSidebar :blood-center="user" />
+    <BloodCenterSidebar :blood-center="user" />
     <div class="lg:pl-64">
       <main class="min-h-screen">
         <slot />
