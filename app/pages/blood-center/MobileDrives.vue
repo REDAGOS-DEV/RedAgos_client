@@ -17,7 +17,7 @@
         </button>
       </div>
 
-      <!-- Summary stats -->
+      <!-- ===== ENHANCED STATS CARDS ===== -->
       <div class="stats-row fade-in" style="--delay: 60ms">
         <div class="stat-card stat-card--blue">
           <div class="stat-card__icon">
@@ -53,9 +53,31 @@
         </div>
       </div>
 
-      <!-- Drive list -->
-      <div v-if="drives.length" class="drive-list">
-        <div v-for="(drive, i) in drives" :key="drive.id" class="drive-card fade-in" :style="{ '--delay': `${100 + i * 50}ms` }">
+      <!-- ===== FILTER BAR (NEW) ===== -->
+      <div class="filter-bar fade-in" style="--delay: 80ms">
+        <div class="filter-left">
+          <AssetIcon name="filter" :size="16" class="filter-icon" />
+          <span class="filter-label">Filter by status:</span>
+        </div>
+        <div class="filter-options">
+          <button
+            v-for="status in statusFilters"
+            :key="status.value"
+            class="filter-chip"
+            :class="{ 'filter-chip--active': selectedStatus === status.value }"
+            @click="selectedStatus = status.value"
+          >
+            {{ status.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== DRIVE LIST ===== -->
+      <div v-if="filteredDrives.length" class="drive-list">
+        <div v-for="(drive, i) in filteredDrives" :key="drive.id" class="drive-card fade-in" :style="{ '--delay': `${100 + i * 50}ms` }">
+          <!-- Status indicator line at top -->
+          <div class="drive-card__status-line" :class="`drive-card__status-line--${drive.status}`" />
+
           <div class="drive-card__top">
             <div>
               <p class="drive-card__title">{{ drive.facility_name }} · {{ drive.location }}</p>
@@ -109,9 +131,10 @@
         </div>
       </div>
 
+      <!-- Empty state -->
       <div v-else class="empty-state fade-in" style="--delay: 100ms">
-        <AssetIcon name="truck" :size="40" style="color:#e5e7eb" />
-        <p>No mobile drives scheduled yet</p>
+        <AssetIcon name="truck" :size="40" class="empty-icon" />
+        <p>No mobile drives match the current filter.</p>
         <button type="button" class="btn-primary btn-primary--sm" @click="openCreateModal">Create your first drive</button>
       </div>
     </div>
@@ -190,7 +213,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 
 definePageMeta({
   middleware: 'auth',
@@ -201,6 +224,17 @@ const loading = ref(true)
 const submitting = ref(false)
 const showCreateModal = ref(false)
 
+// ===== FILTER =====
+const statusFilters = [
+  { value: 'all', label: 'All' },
+  { value: 'open', label: 'Open' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'planning', label: 'Planning' },
+]
+const selectedStatus = ref('all')
+
+// ===== DRIVE FORM =====
 const driveForm = reactive({
   venue: '',
   date: '',
@@ -233,9 +267,6 @@ function closeCreateModal() {
 async function handleCreateDrive() {
   submitting.value = true
   try {
-    // Backend contract: POST /api/bloodcenter/mobile-drives
-    // Body: { venue, date, capacity, start_time, end_time, assigned_staff, announcement }
-    // Response: the newly created drive record, same shape as items in `drives`
     const newDrive = await $fetch('/api/bloodcenter/mobile-drives', {
       method: 'POST',
       body: { ...driveForm },
@@ -244,26 +275,25 @@ async function handleCreateDrive() {
     upcomingDrivesCount.value += 1
     closeCreateModal()
   } catch (err) {
-    // NOTE: wala pay live nga endpoint karon, so mag-fail ni nga call sa dev/UI stage.
-    // Wala tay ipakita nga fake/optimistic drive card aron dili mag-mismatch sa tinuod nga data
-    // sa higayon nga naka-connect na ang backend.
     console.error('Failed to create mobile drive (expected while backend is not yet wired up):', err)
   } finally {
     submitting.value = false
   }
 }
 
-// All values start empty/zero — populated only from the API response.
+// ===== DATA =====
 const upcomingDrivesCount = ref(0)
 const totalRegistered = ref(0)
 const unitsCollectedMonth = ref(0)
 const drives = ref([])
-// drive shape: {
-//   id, facility_name, location, event_date, start_time, end_time, capacity,
-//   registered_count, status: 'planning' | 'open' | 'upcoming' | 'completed',
-//   donor_preview: [{ id, full_name, blood_type, registered_at, screening_status, attendance_status }]
-// }
 
+// ===== COMPUTED FILTER =====
+const filteredDrives = computed(() => {
+  if (selectedStatus.value === 'all') return drives.value
+  return drives.value.filter(d => d.status === selectedStatus.value)
+})
+
+// ===== HELPERS =====
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
 
 function avatarColor(index) {
@@ -305,7 +335,6 @@ function donorStatusLabel(status) {
   return map[status] ?? status
 }
 
-// Lightweight date formatter for tokens used in this page: 'MMM D, YYYY' and short date range
 function formatDate(value) {
   if (!value) return '—'
   const d = new Date(value)
@@ -326,20 +355,15 @@ function formatDateRange(eventDate, startTime, endTime) {
   return `${monthShort} ${day}, ${year}${timeRange}`
 }
 
+// ===== ON MOUNT =====
 onMounted(async () => {
   try {
-    // Backend contract: GET /api/bloodcenter/mobile-drives
-    // Response fields:
-    // { upcoming_drives_count, total_registered, units_collected_month, drives: [...] }
     const data = await $fetch('/api/bloodcenter/mobile-drives')
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
     totalRegistered.value = data.total_registered ?? 0
     unitsCollectedMonth.value = data.units_collected_month ?? 0
     drives.value = data.drives ?? []
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/bloodcenter/mobile-drives endpoint,
-    // so mag-fail gyud ni nga call. Nagpabilin ra sa default nga 0/empty values,
-    // so mag-display ug empty state ang UI imbes mag-crash o mag-display ug fake data.
     console.error('Failed to load mobile drives (expected while backend is not yet wired up):', err)
   } finally {
     loading.value = false
@@ -348,27 +372,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ===== BASE ===== */
 .drives-page {
   --primary: #1565c0;
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  --text-secondary: #6b7280;
   max-width: 1152px;
-  background: #F5F7FA;
+  background: #f5f7fa;
   margin: 0 auto;
   padding: 24px 32px 40px;
 }
 
-/* Loading */
+/* ===== LOADING ===== */
 .loading-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 60vh;
 }
-
 .spinner {
   width: 32px;
   height: 32px;
@@ -377,46 +401,33 @@ onMounted(async () => {
   border-top-color: var(--primary);
   animation: spin 0.8s linear infinite;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .fade-in {
   animation: fadeInUp 0.5s ease both;
   animation-delay: var(--delay, 0ms);
 }
-
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@media (prefers-reduced-motion: reduce) { .fade-in, .spinner { animation: none !important; } }
 
-@media (prefers-reduced-motion: reduce) {
-  .fade-in, .spinner { animation: none !important; }
-}
+.drives-inner { display: flex; flex-direction: column; gap: 20px; }
 
-.drives-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Header */
+/* ===== HEADER ===== */
 .header-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
-
 .page-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
-
 .page-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
@@ -436,18 +447,14 @@ onMounted(async () => {
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s;
   flex-shrink: 0;
 }
+.btn-primary:hover { opacity: 0.92; transform: scale(1.02); }
+.btn-primary--sm { padding: 8px 14px; font-size: 12px; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.btn-primary:hover { opacity: 0.92; }
-
-.btn-primary--sm {
-  padding: 8px 14px;
-  font-size: 12px;
-}
-
-/* Stats row */
+/* ===== STATS ROW ===== */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -456,43 +463,51 @@ onMounted(async () => {
 
 .stat-card {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 16px;
   background: white;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  padding: 18px 20px;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  padding: 18px 22px;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
-
 .stat-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px rgba(0,0,0,0.08);
+  border-color: #d1d9e6;
 }
 
 .stat-card__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.stat-card--blue .stat-card__icon { background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); color: var(--primary); }
-.stat-card--violet .stat-card__icon { background: linear-gradient(135deg, #EDE7F6 0%, #D1C4E9 100%); color: #5E35B1; }
-.stat-card--green .stat-card__icon { background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); color: var(--success); }
+.stat-card--blue .stat-card__icon {
+  background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+  color: var(--primary);
+}
+.stat-card--violet .stat-card__icon {
+  background: linear-gradient(135deg, #EDE7F6, #D1C4E9);
+  color: #5E35B1;
+}
+.stat-card--green .stat-card__icon {
+  background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+  color: var(--success);
+}
 
-.stat-card--blue { background: linear-gradient(135deg, #ffffff 0%, #f0f7fe 100%);}
-.stat-card--violet { background: linear-gradient(135deg, #ffffff 0%, #f4f1fb 100%);}
-.stat-card--green { background: linear-gradient(135deg, #ffffff 0%, #f0f9f0 100%);}
+.stat-card--blue { background: linear-gradient(135deg, #ffffff, #f0f7fe); }
+.stat-card--violet { background: linear-gradient(135deg, #ffffff, #f4f1fb); }
+.stat-card--green { background: linear-gradient(135deg, #ffffff, #f0f9f0); }
 
 .stat-card__body {
   min-width: 0;
 }
-
 .stat-card__label {
   font-size: 10.5px;
   font-weight: 700;
@@ -501,22 +516,66 @@ onMounted(async () => {
   color: var(--text-secondary);
   margin: 0;
 }
-
 .stat-card__value {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.1;
-  margin: 4px 0 2px;
+  margin: 2px 0 0;
 }
-
 .stat-card__caption {
   font-size: 11.5px;
   color: var(--text-secondary);
-  margin: 0;
+  margin: 2px 0 0;
 }
 
-/* Drive cards */
+/* ===== FILTER BAR ===== */
+.filter-bar {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #eef0f3;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.filter-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-icon { color: var(--text-secondary); }
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.filter-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-chip:hover { background: #f3f4f6; }
+.filter-chip--active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* ===== DRIVE CARDS ===== */
 .drive-list {
   display: flex;
   flex-direction: column;
@@ -525,46 +584,46 @@ onMounted(async () => {
 
 .drive-card {
   position: relative;
-  background: linear-gradient(135deg, #f1f6fb 0%, #e4f0fc 45%, #d3e8fb 100%);
-  border-radius: 14px;
-  border: 1px solid #cfe3f7;
-  box-shadow: 0 1px 2px rgba(21, 101, 192, 0.06);
-  padding: 18px 20px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #eef0f3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  padding: 20px 24px;
   overflow: hidden;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.drive-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
 }
 
-.drive-card::before {
-  content: '';
+.drive-card__status-line {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #1565c0, #42a5f5);
 }
-
-.drive-card:hover {
-  box-shadow: 0 8px 20px rgba(21, 101, 192, 0.09);
-  transform: translateY(-2px);
-}
+.drive-card__status-line--upcoming { background: var(--primary); }
+.drive-card__status-line--open { background: var(--success); }
+.drive-card__status-line--planning { background: #9ca3af; }
+.drive-card__status-line--completed { background: #6b7280; }
 
 .drive-card__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  margin-top: 6px;
 }
-
 .drive-card__title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
-
 .drive-card__meta {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   margin: 4px 0 0;
 }
@@ -572,18 +631,17 @@ onMounted(async () => {
 .status-badge {
   font-size: 10.5px;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   flex-shrink: 0;
   white-space: nowrap;
 }
-
 .status-badge--upcoming { background: #E3F2FD; color: var(--primary); }
 .status-badge--open { background: #E8F5E9; color: var(--success); }
 .status-badge--planning { background: #F3F4F6; color: #6b7280; }
 .status-badge--completed { background: #ECEFF1; color: #455A64; }
 
-/* Progress bar */
+/* Progress */
 .progress-track {
   margin-top: 14px;
   height: 6px;
@@ -591,17 +649,13 @@ onMounted(async () => {
   background: #eef0f3;
   overflow: hidden;
 }
-
 .progress-fill {
   height: 100%;
   border-radius: 999px;
   background: var(--primary);
-  transition: width 0.4s ease;
+  transition: width 0.5s ease;
 }
-
-.progress-fill--full {
-  background: var(--success);
-}
+.progress-fill--full { background: var(--success); }
 
 .progress-meta {
   display: flex;
@@ -622,19 +676,16 @@ onMounted(async () => {
   border-top: 1px solid #f3f4f6;
   padding-top: 14px;
 }
-
 .donor-preview-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
 .donor-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
-
 .donor-row__avatar {
   width: 32px;
   height: 32px;
@@ -647,25 +698,21 @@ onMounted(async () => {
   font-weight: 700;
   flex-shrink: 0;
 }
-
 .donor-row__info {
   flex: 1;
   min-width: 0;
 }
-
 .donor-row__name {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
-
 .donor-row__meta {
   font-size: 11.5px;
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
-
 .donor-badge {
   font-size: 10.5px;
   font-weight: 700;
@@ -673,7 +720,6 @@ onMounted(async () => {
   border-radius: 999px;
   flex-shrink: 0;
 }
-
 .donor-badge--confirmed { background: #E8F5E9; color: var(--success); }
 .donor-badge--pending { background: #FFF3E0; color: var(--warning); }
 .donor-badge--attended { background: #E3F2FD; color: var(--primary); }
@@ -684,12 +730,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid #f3f4f6;
   flex-wrap: wrap;
 }
-
 .btn-outline {
   padding: 8px 14px;
   border-radius: 10px;
@@ -700,10 +745,9 @@ onMounted(async () => {
   border: none;
   text-decoration: none;
   transition: background 0.15s ease;
+  cursor: pointer;
 }
-
 .btn-outline:hover { background: #e5e7eb; }
-
 .btn-outline-blue {
   padding: 8px 14px;
   border-radius: 10px;
@@ -714,14 +758,14 @@ onMounted(async () => {
   border: none;
   text-decoration: none;
   transition: background 0.15s ease;
+  cursor: pointer;
 }
-
 .btn-outline-blue:hover { background: #d3e6fa; }
 
 /* Empty state */
 .empty-state {
   background: white;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid #eef0f3;
   padding: 48px 24px;
   text-align: center;
@@ -729,10 +773,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
+.empty-icon { color: #d1d5db; }
 
-/* Modal */
+/* ===== MODAL ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -744,7 +789,6 @@ onMounted(async () => {
   padding: 20px;
   z-index: 100;
 }
-
 .modal-card {
   background: white;
   border-radius: 16px;
@@ -754,7 +798,6 @@ onMounted(async () => {
   overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
 }
-
 .modal-card__header {
   display: flex;
   align-items: center;
@@ -762,14 +805,12 @@ onMounted(async () => {
   padding: 18px 20px;
   border-bottom: 1px solid #f3f4f6;
 }
-
 .modal-card__title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
-
 .modal-card__close {
   background: none;
   border: none;
@@ -777,32 +818,25 @@ onMounted(async () => {
   color: var(--text-secondary);
   padding: 4px;
   display: flex;
-  transition: color 0.15s ease;
+  transition: color 0.15s;
 }
-
-.modal-card__close:hover {
-  color: var(--text-primary);
-}
-
+.modal-card__close:hover { color: var(--text-primary); }
 .modal-form {
   padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .form-label {
   font-size: 11px;
   font-weight: 700;
@@ -810,9 +844,7 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-
-.form-input,
-.form-textarea {
+.form-input, .form-textarea {
   width: 100%;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -823,47 +855,28 @@ onMounted(async () => {
   font-family: inherit;
   transition: border-color 0.15s ease;
 }
-
-.form-input:focus,
-.form-textarea:focus {
+.form-input:focus, .form-textarea:focus {
   outline: none;
   border-color: var(--primary);
   background: white;
 }
-
-.form-textarea {
-  resize: vertical;
-  min-height: 64px;
-}
+.form-textarea { resize: vertical; min-height: 64px; }
 
 .stepper {
   position: relative;
   display: flex;
   align-items: center;
 }
-
-.stepper__input {
-  padding-right: 32px;
-}
-
+.stepper__input { padding-right: 32px; }
 .stepper__input::-webkit-inner-spin-button,
-.stepper__input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.stepper__input {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
+.stepper__input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper__input { -moz-appearance: textfield; appearance: textfield; }
 .stepper__controls {
   position: absolute;
   right: 4px;
   display: flex;
   flex-direction: column;
 }
-
 .stepper__btn {
   background: none;
   border: none;
@@ -871,12 +884,9 @@ onMounted(async () => {
   color: var(--text-secondary);
   padding: 1px 6px;
   display: flex;
-  transition: color 0.15s ease;
+  transition: color 0.15s;
 }
-
-.stepper__btn:hover {
-  color: var(--primary);
-}
+.stepper__btn:hover { color: var(--primary); }
 
 .modal-actions {
   display: flex;
@@ -885,7 +895,6 @@ onMounted(async () => {
   gap: 10px;
   margin-top: 4px;
 }
-
 .btn-cancel {
   padding: 10px 16px;
   border-radius: 10px;
@@ -895,34 +904,22 @@ onMounted(async () => {
   color: #374151;
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s;
 }
+.btn-cancel:hover { background: #e5e7eb; }
 
-.btn-cancel:hover {
-  background: #e5e7eb;
-}
+.modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
 
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-  .drives-page { padding: 16px 16px 32px; }
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .drives-page { padding: 16px; }
   .header-row { flex-direction: column; align-items: stretch; }
   .stats-row { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-options { justify-content: center; }
   .drive-card__actions { flex-direction: column; align-items: stretch; }
   .drive-card__actions a { text-align: center; }
+  .form-row { grid-template-columns: 1fr; }
 }
 </style>
