@@ -1,13 +1,60 @@
 <template>
   <div class="qr-page">
-    <div v-if="loading" class="loading-wrap">
-      <div class="spinner" />
+    <div v-if="loading" class="qr-page-inner">
+      <div class="header-row fade-in" style="--delay: 0ms">
+        <div class="skeleton skeleton-line" style="width:120px;height:20px" />
+        <div class="skeleton skeleton-line" style="width:320px;height:13px;margin-top:8px" />
+      </div>
+
+      <div class="main-grid">
+        <!-- QR skeleton -->
+        <div class="panel qr-panel fade-in" style="--delay: 50ms">
+          <div class="skeleton skeleton-line" style="width:160px;height:15px" />
+          <div class="skeleton skeleton-line" style="width:220px;height:12.5px;margin-top:10px;margin-bottom:20px" />
+
+          <div class="qr-image-wrap">
+            <div class="skeleton" style="width:200px;height:200px;border-radius:8px" />
+          </div>
+
+          <div class="qr-details">
+            <div v-for="n in 6" :key="n" class="qr-details__row">
+              <div class="skeleton skeleton-line" style="width:90px;height:11px" />
+              <div class="skeleton skeleton-line" style="width:70px;height:11px" />
+            </div>
+          </div>
+
+          <div class="qr-actions">
+            <div class="skeleton skeleton-btn" />
+            <div class="skeleton skeleton-btn" />
+          </div>
+        </div>
+
+        <!-- Steps skeleton -->
+        <div class="panel steps-panel fade-in" style="--delay: 100ms">
+          <div class="skeleton skeleton-line" style="width:150px;height:15px;margin-bottom:20px" />
+
+          <div class="steps-list">
+            <div v-for="n in 5" :key="n" class="step-row">
+              <div class="step-row__marker">
+                <span class="skeleton" style="width:14px;height:14px;border-radius:999px" />
+                <span v-if="n < 5" class="step-line" />
+              </div>
+              <div class="step-row__body" style="width:100%">
+                <div class="skeleton skeleton-line" style="width:70%;height:13px" />
+                <div class="skeleton skeleton-line" style="width:95%;height:11px;margin-top:8px" />
+              </div>
+            </div>
+          </div>
+
+          <div class="skeleton" style="width:100%;height:56px;border-radius:12px;margin-top:4px" />
+        </div>
+      </div>
     </div>
 
     <div v-else class="qr-page-inner">
       <div class="header-row fade-in" style="--delay: 0ms">
-        <h1 class="page-title">QR Code</h1>
-        <p class="page-subtitle">Here is your full QR Code that you can download and present during your visit.</p>
+        <h1 class="page-title">Quick check-in</h1>
+        <p class="page-subtitle">Access your personal QR Code for faster check-in during appointments and donation visits.</p>
       </div>
 
       <div class="main-grid">
@@ -239,35 +286,6 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 24px 32px 60px;
   background: #F5F7FA;
-}
-
-/* Loading */
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  border: 4px solid #e3ebf6;
-  border-top-color: var(--primary);
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner--sm {
-  width: 20px;
-  height: 20px;
-  border-width: 3px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .fade-in {
@@ -578,6 +596,36 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
+/* Spinner (kept for the QR image lazy-render placeholder) */
+.spinner--sm {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 3px solid #e3ebf6;
+  border-top-color: var(--primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #eef0f3 25%, #e4e7ec 37%, #eef0f3 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+.skeleton-line { border-radius: 4px; }
+.skeleton-btn { height: 40px; border-radius: 10px; }
+
 @media (max-width: 900px) {
   .main-grid {
     grid-template-columns: 1fr;
@@ -602,7 +650,7 @@ onMounted(async () => {
     border-color: #334155;
 }
 
-:global(.dark .spinner) { border-color: #334155; border-top-color: var(--primary); }
+:global(.dark .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
 
 :global(.dark .qr-image-wrap) { border-color: #334155; }
 :global(.dark .qr-image--placeholder) { background: #172033; }
@@ -624,4 +672,9 @@ onMounted(async () => {
     color: #E2E8F0;
 }
 :global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
+    background-size: 400% 100%;
+}
 </style>

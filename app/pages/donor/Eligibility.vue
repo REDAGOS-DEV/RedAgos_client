@@ -1,134 +1,153 @@
 <template>
     <div class="eligibility-page">
-        <div class="header-row fade-in" style="--delay: 0ms">
-            <h1 class="page-title">Eligibility Screening</h1>
-            <p class="page-subtitle">Complete this quick survey to check whether you're currently eligible to donate
-                blood.</p>
-        </div>
-
-        <!-- Info banner -->
-        <div class="info-banner fade-in" style="--delay: 50ms">
-            <span class="info-banner__icon">
-                <AssetIcon name="info" :size="16" class="banner-icon" />
-            </span>
-            <p class="info-banner__text">
-                This screening is valid for 90 days. Once you pass, a QR code will be generated for you to present at
-                the donation center.
-            </p>
-        </div>
-
-        <!-- Step indicator -->
-        <div class="step-indicator fade-in" style="--delay: 100ms">
-            <template v-for="(step, idx) in steps" :key="step.number">
-                <span class="step__circle" :class="{ 'step__circle--filled': step.number <= currentStep }">{{
-                    step.number }}</span>
-                <div v-if="idx < steps.length - 1" class="step__line"
-                    :class="{ 'step__line--active': step.number < currentStep }" />
-            </template>
-        </div>
-
-        <div class="main-grid">
-            <!-- Left column: questions -->
-            <div class="col-left">
-                <div class="panel fade-in" style="--delay: 150ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Section 1 - General Health</h2>
-                    </div>
-                    <div class="question-list">
-                        <div v-for="q in section1" :key="q.id" class="question-card">
-                            <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
-                            <div class="answer-toggle">
-                                <button type="button" class="answer-btn answer-btn--yes"
-                                    :class="{ 'answer-btn--active': q.answer === true }"
-                                    @click="q.answer = true">Yes</button>
-                                <button type="button" class="answer-btn answer-btn--no"
-                                    :class="{ 'answer-btn--active': q.answer === false }"
-                                    @click="q.answer = false">No</button>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Skeleton loading state -->
+        <div v-if="loading" class="skeleton-wrap">
+            <div class="skeleton skeleton--header" />
+            <div class="skeleton skeleton--banner" />
+            <div class="skeleton skeleton--steps" />
+            <div class="skeleton-main-grid">
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:280px" />
+                    <div class="skeleton skeleton--panel" style="height:280px" />
                 </div>
-
-                <div class="panel fade-in" style="--delay: 200ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Section 2 - Medical History</h2>
-                    </div>
-                    <div class="question-list">
-                        <div v-for="q in section2" :key="q.id" class="question-card">
-                            <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
-                            <div class="answer-toggle">
-                                <button type="button" class="answer-btn answer-btn--yes"
-                                    :class="{ 'answer-btn--active': q.answer === true }"
-                                    @click="q.answer = true">Yes</button>
-                                <button type="button" class="answer-btn answer-btn--no"
-                                    :class="{ 'answer-btn--active': q.answer === false }"
-                                    @click="q.answer = false">No</button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:240px" />
+                    <div class="skeleton skeleton--panel" style="height:140px" />
+                    <div class="skeleton skeleton--button" />
                 </div>
             </div>
+        </div>
 
-            <!-- Right column: vitals + result -->
-            <div class="col-right">
-                <div class="panel fade-in" style="--delay: 150ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Vital Information</h2>
-                    </div>
-                    <div class="form-body">
-                        <div class="form-stack">
-                            <div class="form-field">
-                                <label class="form-label">Age</label>
-                                <input v-model.number="vitals.age" type="number" min="0" class="form-input"
-                                    placeholder="29">
-                            </div>
-                            <div class="form-field">
-                                <label class="form-label">Weight (kg)</label>
-                                <input v-model.number="vitals.weight" type="number" min="0" class="form-input"
-                                    placeholder="72">
-                            </div>
-                            <div class="form-field">
-                                <label class="form-label">Blood type (if known)</label>
-                                <div class="select-wrap">
-                                    <select v-model="vitals.bloodType" class="form-input form-input--select">
-                                        <option value="">Select</option>
-                                        <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
-                                    </select>
-                                    <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
+        <template v-else>
+            <div class="header-row fade-in" style="--delay: 0ms">
+                <h1 class="page-title">Check your donation readiness</h1>
+                <p class="page-subtitle">Complete the short health assessment below to determine whether you're currently eligible to donate blood.</p>
+            </div>
+
+            <!-- Info banner -->
+            <div class="info-banner fade-in" style="--delay: 50ms">
+                <span class="info-banner__icon">
+                    <AssetIcon name="info" :size="16" class="banner-icon" />
+                </span>
+                <p class="info-banner__text">
+                    This screening is valid for 90 days. Once you pass, a QR code will be generated for you to present at
+                    the donation center.
+                </p>
+            </div>
+
+            <!-- Step indicator -->
+            <div class="step-indicator fade-in" style="--delay: 100ms">
+                <template v-for="(step, idx) in steps" :key="step.number">
+                    <span class="step__circle" :class="{ 'step__circle--filled': step.number <= currentStep }">{{
+                        step.number }}</span>
+                    <div v-if="idx < steps.length - 1" class="step__line"
+                        :class="{ 'step__line--active': step.number < currentStep }" />
+                </template>
+            </div>
+
+            <div class="main-grid">
+                <!-- Left column: questions -->
+                <div class="col-left">
+                    <div class="panel fade-in" style="--delay: 150ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Section 1 - General Health</h2>
+                        </div>
+                        <div class="question-list">
+                            <div v-for="q in section1" :key="q.id" class="question-card">
+                                <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
+                                <div class="answer-toggle">
+                                    <button type="button" class="answer-btn answer-btn--yes"
+                                        :class="{ 'answer-btn--active': q.answer === true }"
+                                        @click="q.answer = true">Yes</button>
+                                    <button type="button" class="answer-btn answer-btn--no"
+                                        :class="{ 'answer-btn--active': q.answer === false }"
+                                        @click="q.answer = false">No</button>
                                 </div>
                             </div>
-                            <div class="form-field">
-                                <label class="form-label">Last blood donation date</label>
-                                <input v-model="vitals.lastDonationDate" type="date" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="panel fade-in" style="--delay: 200ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Section 2 - Medical History</h2>
+                        </div>
+                        <div class="question-list">
+                            <div v-for="q in section2" :key="q.id" class="question-card">
+                                <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
+                                <div class="answer-toggle">
+                                    <button type="button" class="answer-btn answer-btn--yes"
+                                        :class="{ 'answer-btn--active': q.answer === true }"
+                                        @click="q.answer = true">Yes</button>
+                                    <button type="button" class="answer-btn answer-btn--no"
+                                        :class="{ 'answer-btn--active': q.answer === false }"
+                                        @click="q.answer = false">No</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Result preview -->
-                <div class="panel fade-in" style="--delay: 200ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Screening result preview</h2>
-                    </div>
-                    <div class="result-body">
-                        <div class="result-box" :class="resultPanelClass">
-                            <p class="result-box__label">Based on your answers</p>
-                            <p class="result-box__value" :class="resultTextClass">{{ resultLabel }}</p>
+                <!-- Right column: vitals + result -->
+                <div class="col-right">
+                    <div class="panel fade-in" style="--delay: 150ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Vital Information</h2>
                         </div>
-                        <p class="result-body__note">
-                            Final eligibility is confirmed upon submission. If you pass, a QR code will be generated
-                            automatically for your next donation.
-                        </p>
+                        <div class="form-body">
+                            <div class="form-stack">
+                                <div class="form-field">
+                                    <label class="form-label">Age</label>
+                                    <input v-model.number="vitals.age" type="number" min="0" class="form-input"
+                                        placeholder="29">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Weight (kg)</label>
+                                    <input v-model.number="vitals.weight" type="number" min="0" class="form-input"
+                                        placeholder="72">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Blood type (if known)</label>
+                                    <div class="select-wrap">
+                                        <select v-model="vitals.bloodType" class="form-input form-input--select">
+                                            <option value="">Select</option>
+                                            <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
+                                        </select>
+                                        <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
+                                    </div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Last blood donation date</label>
+                                    <input v-model="vitals.lastDonationDate" type="date" class="form-input">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <button type="button" class="btn-primary btn-block btn-submit fade-in" style="--delay: 250ms"
-                    :disabled="submitting || !allAnswered" @click="handleSubmit">
-                    <span>{{ submitting ? 'Submitting...' : 'Submit screening' }}</span>
-                    <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
-                </button>
+                    <!-- Result preview -->
+                    <div class="panel fade-in" style="--delay: 200ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Screening result preview</h2>
+                        </div>
+                        <div class="result-body">
+                            <div class="result-box" :class="resultPanelClass">
+                                <p class="result-box__label">Based on your answers</p>
+                                <p class="result-box__value" :class="resultTextClass">{{ resultLabel }}</p>
+                            </div>
+                            <p class="result-body__note">
+                                Final eligibility is confirmed upon submission. If you pass, a QR code will be generated
+                                automatically for your next donation.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-primary btn-block btn-submit fade-in" style="--delay: 250ms"
+                        :disabled="submitting || !allAnswered" @click="handleSubmit">
+                        <span>{{ submitting ? 'Submitting...' : 'Submit screening' }}</span>
+                        <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
+                    </button>
+                </div>
             </div>
-        </div>
+        </template>
 
         <!-- Success modal: shown only when the submitted screening comes back eligible -->
         <Teleport to="body">
@@ -187,6 +206,11 @@ definePageMeta({
 
 const router = useRouter()
 const submitting = ref(false)
+
+// Page-load skeleton — mirrors the Dashboard's pattern. Real work here is
+// pre-filling the vitals the donor already has on file (e.g. blood type),
+// so returning donors don't have to retype what the system already knows.
+const loading = ref(true)
 
 // Modal + QR state shown after an eligible result
 const showPassedModal = ref(false)
@@ -327,6 +351,25 @@ async function handleSubmit() {
         submitting.value = false
     }
 }
+
+onMounted(async () => {
+    try {
+        // Backend contract: GET /api/eligibility/prefill
+        // Optional convenience for returning donors — pre-fills whatever the
+        // system already has on file (currently just blood type) so they
+        // don't have to retype it every screening.
+        // Response: { blood_type }
+        const data = await $fetch('/api/eligibility/prefill')
+        if (data?.blood_type) vitals.bloodType = data.blood_type
+    } catch (err) {
+        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/eligibility/prefill
+        // endpoint, so mag-fail gyud ni nga call. Dili ni problema — mag-start ra
+        // gihapon ang form nga blangko, sama sa una nga behavior.
+        console.error('Failed to load eligibility prefill data (expected while backend is not yet wired up):', err)
+    } finally {
+        loading.value = false
+    }
+})
 </script>
 
 <style scoped>
@@ -379,6 +422,73 @@ async function handleSubmit() {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* Skeleton loading */
+.skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+    background-size: 400% 100%;
+    border-radius: 14px;
+    animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--header {
+    height: 40px;
+    max-width: 300px;
+}
+
+.skeleton--banner {
+    height: 52px;
+    border-radius: 10px;
+}
+
+.skeleton--steps {
+    height: 30px;
+    max-width: 420px;
+    border-radius: 999px;
+}
+
+.skeleton-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    align-items: start;
+}
+
+.skeleton-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton--panel {
+    border-radius: 14px;
+}
+
+.skeleton--button {
+    height: 46px;
+    border-radius: 10px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton, .fade-in { animation: none !important; }
+}
+
+@media (max-width: 900px) {
+    .skeleton-main-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -848,57 +958,61 @@ async function handleSubmit() {
 }
 
 /* ============ Dark mode ============ */
-:global(.dark) .eligibility-page {
+:global(.dark .eligibility-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
     background: #0F172A;
 }
 
-:global(.dark) .panel,
-:global(.dark) .modal-card,
-:global(.dark) .modal-qr-wrap {
+:global(.dark .panel),
+:global(.dark .modal-card),
+:global(.dark .modal-qr-wrap) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark) .panel-header--simple { border-color: #334155; }
+:global(.dark .panel-header--simple) { border-color: #334155; }
 
-:global(.dark) .info-banner {
+:global(.dark .info-banner) {
     background: rgba(66,165,245,0.14);
     border-color: rgba(66,165,245,0.3);
 }
-:global(.dark) .info-banner__text,
-:global(.dark) .banner-icon { color: #90CAF9; }
+:global(.dark .info-banner__text),
+:global(.dark .banner-icon) { color: #90CAF9; }
 
-:global(.dark) .step__circle { background: #263449; }
-:global(.dark) .step__line { background: #334155; }
+:global(.dark .step__circle) { background: #263449; }
+:global(.dark .step__line) { background: #334155; }
 
-:global(.dark) .question-card { background: #172033; }
+:global(.dark .question-card) { background: #172033; }
 
-:global(.dark) .answer-btn {
+:global(.dark .answer-btn) {
     background: #1E293B;
     border-color: #334155;
     color: #F1F5F9;
 }
-:global(.dark) .answer-btn:hover:not(.answer-btn--active) { background: #263449; }
-:global(.dark) .answer-btn--yes.answer-btn--active { background: rgba(102,187,106,0.16); }
-:global(.dark) .answer-btn--no.answer-btn--active { background: rgba(239,83,80,0.16); }
+:global(.dark .answer-btn:hover:not(.answer-btn--active)) { background: #263449; }
+:global(.dark .answer-btn--yes.answer-btn--active) { background: rgba(102,187,106,0.16); }
+:global(.dark .answer-btn--no.answer-btn--active) { background: rgba(239,83,80,0.16); }
 
-:global(.dark) .form-input {
+:global(.dark .form-input) {
     background: #0F172A;
     border-color: #334155;
     color: #F1F5F9;
 }
 
-:global(.dark) .result-box--pending { background: #263449; }
-:global(.dark) .result-box--success { background: rgba(102,187,106,0.16); }
-:global(.dark) .result-box--danger { background: rgba(239,83,80,0.16); }
+:global(.dark .result-box--pending) { background: #263449; }
+:global(.dark .result-box--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .result-box--danger) { background: rgba(239,83,80,0.16); }
 
-:global(.dark) .btn-outline {
+:global(.dark .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark) .btn-outline:hover { background: #334155; }
+:global(.dark .btn-outline:hover) { background: #334155; }
 
-:global(.dark) .modal-qr-image--placeholder { background: #172033; }
+:global(.dark .modal-qr-image--placeholder) { background: #172033; }
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
 </style>

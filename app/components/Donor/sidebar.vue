@@ -93,9 +93,6 @@ import { useUser } from '~/composables/useUser.js'
 import { donorService } from '~/api/donor/DonorService'
 
 // --- Dark mode awareness ---
-// This component doesn't own the toggle (the topbar layout does) — it just
-// watches the `dark` class on <html> so its inline-styled tokens below can
-// react whenever the person switches themes.
 const isDark = ref(false)
 let themeObserver = null
 

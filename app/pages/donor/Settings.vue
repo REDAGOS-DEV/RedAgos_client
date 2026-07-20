@@ -1,235 +1,252 @@
 <template>
     <div class="settings-page">
-        <div class="header-row fade-in" style="--delay: 0ms">
-            <h1 class="page-title">Settings</h1>
-            <p class="page-subtitle">Manage your profile, notifications, and account preferences.</p>
+        <!-- Skeleton loading state -->
+        <div v-if="loading" class="skeleton-wrap">
+            <div class="skeleton skeleton--header" />
+            <div class="skeleton-main-grid">
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:360px" />
+                    <div class="skeleton skeleton--panel" style="height:220px" />
+                </div>
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:260px" />
+                    <div class="skeleton skeleton--panel" style="height:180px" />
+                </div>
+            </div>
         </div>
 
-        <div class="main-grid">
-            <!-- Left column: profile + security -->
-            <div class="col-left">
-                <!-- Profile information -->
-                <div class="panel fade-in" style="--delay: 50ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Profile Information</h2>
-                    </div>
-                    <div class="form-body">
-                        <div class="avatar-row">
-                            <div class="avatar">
-                                <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile photo" class="avatar__img">
-                                <span v-else class="avatar__initials">{{ initials }}</span>
-                                <button type="button" class="avatar__edit" @click="triggerAvatarPick" aria-label="Change photo">
-                                    <AssetIcon name="camera" :size="14" />
+        <template v-else>
+            <div class="header-row fade-in" style="--delay: 0ms">
+                <h1 class="page-title">Personalize your experience</h1>
+                <p class="page-subtitle">Manage your account preferences, notification settings, and privacy options.</p>
+            </div>
+
+            <div class="main-grid">
+                <!-- Left column: profile + security -->
+                <div class="col-left">
+                    <!-- Profile information -->
+                    <div class="panel fade-in" style="--delay: 50ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Profile Information</h2>
+                        </div>
+                        <div class="form-body">
+                            <div class="avatar-row">
+                                <div class="avatar">
+                                    <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile photo" class="avatar__img">
+                                    <span v-else class="avatar__initials">{{ initials }}</span>
+                                    <button type="button" class="avatar__edit" @click="triggerAvatarPick" aria-label="Change photo">
+                                        <AssetIcon name="camera" :size="14" />
+                                    </button>
+                                </div>
+                                <input ref="avatarInput" type="file" accept="image/*" class="avatar-input-hidden" @change="onAvatarChange">
+                                <div>
+                                    <p class="avatar-row__name">{{ profile.fullName || 'Your name' }}</p>
+                                    <p class="avatar-row__meta">Donor ID: {{ profile.donorId || '—' }}</p>
+                                </div>
+                            </div>
+
+                            <div class="form-stack">
+                                <div class="form-field">
+                                    <label class="form-label">Full name</label>
+                                    <input v-model="profile.fullName" type="text" class="form-input" placeholder="Juan Dela Cruz">
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label class="form-label">Email address</label>
+                                        <div class="input-icon-field">
+                                            <AssetIcon name="mail" :size="16" class="input-icon-field__icon" />
+                                            <input v-model="profile.email" type="email" class="form-input form-input--with-icon" placeholder="juan@email.com">
+                                        </div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label class="form-label">Phone number</label>
+                                        <div class="input-icon-field">
+                                            <AssetIcon name="phone" :size="16" class="input-icon-field__icon" />
+                                            <input v-model="profile.phone" type="tel" class="form-input form-input--with-icon" placeholder="09XX XXX XXXX">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label class="form-label">Date of birth</label>
+                                        <input v-model="profile.birthDate" type="date" class="form-input">
+                                    </div>
+                                    <div class="form-field">
+                                        <label class="form-label">Blood type</label>
+                                        <div class="select-wrap">
+                                            <select v-model="profile.bloodType" class="form-input form-input--select">
+                                                <option value="">Unknown</option>
+                                                <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
+                                            </select>
+                                            <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-field">
+                                    <label class="form-label">Address</label>
+                                    <input v-model="profile.address" type="text" class="form-input" placeholder="Street, Barangay, City">
+                                </div>
+                            </div>
+
+                            <div class="form-footer">
+                                <span v-if="profileSaved" class="saved-note">
+                                    <AssetIcon name="check" :size="14" />
+                                    Saved
+                                </span>
+                                <button type="button" class="btn-primary" :disabled="savingProfile" @click="saveProfile">
+                                    {{ savingProfile ? 'Saving...' : 'Save changes' }}
                                 </button>
                             </div>
-                            <input ref="avatarInput" type="file" accept="image/*" class="avatar-input-hidden" @change="onAvatarChange">
-                            <div>
-                                <p class="avatar-row__name">{{ profile.fullName || 'Your name' }}</p>
-                                <p class="avatar-row__meta">Donor ID: {{ profile.donorId || '—' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Password & security -->
+                    <div class="panel fade-in" style="--delay: 100ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Password &amp; Security</h2>
+                        </div>
+                        <div class="form-body">
+                            <div class="form-stack">
+                                <div class="form-field">
+                                    <label class="form-label">Current password</label>
+                                    <div class="password-field">
+                                        <input
+                                            v-model="security.currentPassword"
+                                            :type="showCurrentPassword ? 'text' : 'password'"
+                                            class="form-input"
+                                            placeholder="••••••••"
+                                        >
+                                        <button
+                                            type="button"
+                                            class="password-toggle"
+                                            :aria-label="showCurrentPassword ? 'Hide password' : 'Show password'"
+                                            @click="showCurrentPassword = !showCurrentPassword"
+                                        >
+                                            <AssetIcon :name="showCurrentPassword ? 'eye-off' : 'eye'" :size="16" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label class="form-label">New password</label>
+                                        <div class="password-field">
+                                            <input
+                                                v-model="security.newPassword"
+                                                :type="showNewPassword ? 'text' : 'password'"
+                                                class="form-input"
+                                                placeholder="••••••••"
+                                            >
+                                            <button
+                                                type="button"
+                                                class="password-toggle"
+                                                :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
+                                                @click="showNewPassword = !showNewPassword"
+                                            >
+                                                <AssetIcon :name="showNewPassword ? 'eye-off' : 'eye'" :size="16" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label class="form-label">Confirm new password</label>
+                                        <div class="password-field">
+                                            <input
+                                                v-model="security.confirmPassword"
+                                                :type="showConfirmPassword ? 'text' : 'password'"
+                                                class="form-input"
+                                                placeholder="••••••••"
+                                            >
+                                            <button
+                                                type="button"
+                                                class="password-toggle"
+                                                :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+                                                @click="showConfirmPassword = !showConfirmPassword"
+                                            >
+                                                <AssetIcon :name="showConfirmPassword ? 'eye-off' : 'eye'" :size="16" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p v-if="passwordMismatch" class="field-error">
+                                    <AssetIcon name="alert" :size="13" />
+                                    New password and confirmation don't match.
+                                </p>
+                            </div>
+
+                            <div class="form-footer">
+                                <button
+                                    type="button"
+                                    class="btn-primary"
+                                    :disabled="savingPassword || !canSubmitPassword"
+                                    @click="updatePassword"
+                                >
+                                    {{ savingPassword ? 'Updating...' : 'Update password' }}
+                                </button>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="form-stack">
-                            <div class="form-field">
-                                <label class="form-label">Full name</label>
-                                <input v-model="profile.fullName" type="text" class="form-input" placeholder="Juan Dela Cruz">
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-field">
-                                    <label class="form-label">Email address</label>
-                                    <div class="input-icon-field">
-                                        <AssetIcon name="mail" :size="16" class="input-icon-field__icon" />
-                                        <input v-model="profile.email" type="email" class="form-input form-input--with-icon" placeholder="juan@email.com">
-                                    </div>
+                <!-- Right column: notifications + account -->
+                <div class="col-right">
+                    <!-- Notification preferences -->
+                    <div class="panel fade-in" style="--delay: 50ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Notification Preferences</h2>
+                        </div>
+                        <div class="toggle-list">
+                            <div v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
+                                <div class="toggle-row__text">
+                                    <p class="toggle-row__label">{{ pref.label }}</p>
+                                    <p class="toggle-row__desc">{{ pref.desc }}</p>
                                 </div>
-                                <div class="form-field">
-                                    <label class="form-label">Phone number</label>
-                                    <div class="input-icon-field">
-                                        <AssetIcon name="phone" :size="16" class="input-icon-field__icon" />
-                                        <input v-model="profile.phone" type="tel" class="form-input form-input--with-icon" placeholder="09XX XXX XXXX">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-field">
-                                    <label class="form-label">Date of birth</label>
-                                    <input v-model="profile.birthDate" type="date" class="form-input">
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Blood type</label>
-                                    <div class="select-wrap">
-                                        <select v-model="profile.bloodType" class="form-input form-input--select">
-                                            <option value="">Unknown</option>
-                                            <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
-                                        </select>
-                                        <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-field">
-                                <label class="form-label">Address</label>
-                                <input v-model="profile.address" type="text" class="form-input" placeholder="Street, Barangay, City">
+                                <button
+                                    type="button"
+                                    class="toggle-switch"
+                                    :class="{ 'toggle-switch--on': pref.enabled }"
+                                    role="switch"
+                                    :aria-checked="pref.enabled"
+                                    @click="pref.enabled = !pref.enabled"
+                                >
+                                    <span class="toggle-switch__knob" />
+                                </button>
                             </div>
                         </div>
-
-                        <div class="form-footer">
-                            <span v-if="profileSaved" class="saved-note">
+                        <div class="panel-footer">
+                            <span v-if="notifsSaved" class="saved-note">
                                 <AssetIcon name="check" :size="14" />
                                 Saved
                             </span>
-                            <button type="button" class="btn-primary" :disabled="savingProfile" @click="saveProfile">
-                                {{ savingProfile ? 'Saving...' : 'Save changes' }}
+                            <button type="button" class="btn-outline btn-block" :disabled="savingNotifs" @click="saveNotifications">
+                                {{ savingNotifs ? 'Saving...' : 'Save preferences' }}
                             </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Password & security -->
-                <div class="panel fade-in" style="--delay: 100ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Password &amp; Security</h2>
-                    </div>
-                    <div class="form-body">
-                        <div class="form-stack">
-                            <div class="form-field">
-                                <label class="form-label">Current password</label>
-                                <div class="password-field">
-                                    <input
-                                        v-model="security.currentPassword"
-                                        :type="showCurrentPassword ? 'text' : 'password'"
-                                        class="form-input"
-                                        placeholder="••••••••"
-                                    >
-                                    <button
-                                        type="button"
-                                        class="password-toggle"
-                                        :aria-label="showCurrentPassword ? 'Hide password' : 'Show password'"
-                                        @click="showCurrentPassword = !showCurrentPassword"
-                                    >
-                                        <AssetIcon :name="showCurrentPassword ? 'eye-off' : 'eye'" :size="16" />
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-field">
-                                    <label class="form-label">New password</label>
-                                    <div class="password-field">
-                                        <input
-                                            v-model="security.newPassword"
-                                            :type="showNewPassword ? 'text' : 'password'"
-                                            class="form-input"
-                                            placeholder="••••••••"
-                                        >
-                                        <button
-                                            type="button"
-                                            class="password-toggle"
-                                            :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
-                                            @click="showNewPassword = !showNewPassword"
-                                        >
-                                            <AssetIcon :name="showNewPassword ? 'eye-off' : 'eye'" :size="16" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Confirm new password</label>
-                                    <div class="password-field">
-                                        <input
-                                            v-model="security.confirmPassword"
-                                            :type="showConfirmPassword ? 'text' : 'password'"
-                                            class="form-input"
-                                            placeholder="••••••••"
-                                        >
-                                        <button
-                                            type="button"
-                                            class="password-toggle"
-                                            :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
-                                            @click="showConfirmPassword = !showConfirmPassword"
-                                        >
-                                            <AssetIcon :name="showConfirmPassword ? 'eye-off' : 'eye'" :size="16" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p v-if="passwordMismatch" class="field-error">
-                                <AssetIcon name="alert" :size="13" />
-                                New password and confirmation don't match.
-                            </p>
+                    <!-- Account -->
+                    <div class="panel fade-in" style="--delay: 100ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Account</h2>
                         </div>
-
-                        <div class="form-footer">
-                            <button
-                                type="button"
-                                class="btn-primary"
-                                :disabled="savingPassword || !canSubmitPassword"
-                                @click="updatePassword"
-                            >
-                                {{ savingPassword ? 'Updating...' : 'Update password' }}
+                        <div class="account-actions">
+                            <button type="button" class="account-action" @click="handleLogout">
+                                <AssetIcon name="log-out" :size="16" />
+                                <span>Log out</span>
+                            </button>
+                            <button type="button" class="account-action account-action--danger" @click="confirmDeleteOpen = true">
+                                <AssetIcon name="trash-2" :size="16" />
+                                <span>Delete account</span>
                             </button>
                         </div>
+                        <p class="account-note">
+                            Deleting your account permanently removes your donor profile, screening history, and QR code.
+                        </p>
                     </div>
                 </div>
             </div>
-
-            <!-- Right column: notifications + account -->
-            <div class="col-right">
-                <!-- Notification preferences -->
-                <div class="panel fade-in" style="--delay: 50ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Notification Preferences</h2>
-                    </div>
-                    <div class="toggle-list">
-                        <div v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
-                            <div class="toggle-row__text">
-                                <p class="toggle-row__label">{{ pref.label }}</p>
-                                <p class="toggle-row__desc">{{ pref.desc }}</p>
-                            </div>
-                            <button
-                                type="button"
-                                class="toggle-switch"
-                                :class="{ 'toggle-switch--on': pref.enabled }"
-                                role="switch"
-                                :aria-checked="pref.enabled"
-                                @click="pref.enabled = !pref.enabled"
-                            >
-                                <span class="toggle-switch__knob" />
-                            </button>
-                        </div>
-                    </div>
-                    <div class="panel-footer">
-                        <span v-if="notifsSaved" class="saved-note">
-                            <AssetIcon name="check" :size="14" />
-                            Saved
-                        </span>
-                        <button type="button" class="btn-outline btn-block" :disabled="savingNotifs" @click="saveNotifications">
-                            {{ savingNotifs ? 'Saving...' : 'Save preferences' }}
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Account -->
-                <div class="panel fade-in" style="--delay: 100ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Account</h2>
-                    </div>
-                    <div class="account-actions">
-                        <button type="button" class="account-action" @click="handleLogout">
-                            <AssetIcon name="log-out" :size="16" />
-                            <span>Log out</span>
-                        </button>
-                        <button type="button" class="account-action account-action--danger" @click="confirmDeleteOpen = true">
-                            <AssetIcon name="trash-2" :size="16" />
-                            <span>Delete account</span>
-                        </button>
-                    </div>
-                    <p class="account-note">
-                        Deleting your account permanently removes your donor profile, screening history, and QR code.
-                    </p>
-                </div>
-            </div>
-        </div>
+        </template>
 
         <!-- Delete account confirmation -->
         <Teleport to="body">
@@ -270,6 +287,11 @@ definePageMeta({
 
 const router = useRouter()
 const { fetchUser, clearUser } = useUser()
+
+// Page-load skeleton — same pattern as Dashboard/Eligibility. Flips off once
+// the profile fetch below settles (success or fail), so the form never
+// flashes empty placeholders before the donor's real data is in.
+const loading = ref(true)
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
@@ -447,6 +469,8 @@ onMounted(async () => {
         }
     } catch (err) {
         console.error('Failed to load donor settings profile:', err)
+    } finally {
+        loading.value = false
     }
 })
 
@@ -513,6 +537,57 @@ function splitFullName(fullName) {
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton loading */
+.skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+    background-size: 400% 100%;
+    border-radius: 14px;
+    animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--header {
+    height: 40px;
+    max-width: 260px;
+}
+
+.skeleton-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    align-items: start;
+}
+
+.skeleton-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton--panel {
+    border-radius: 14px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton, .fade-in { animation: none !important; }
+}
+
+@media (max-width: 900px) {
+    .skeleton-main-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .main-grid {
@@ -1086,4 +1161,8 @@ function splitFullName(fullName) {
 }
 :global(.dark .modal-check) { background: rgba(102,187,106,0.16); }
 :global(.dark .modal-check--danger) { background: rgba(239,83,80,0.16); }
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
 </style>

@@ -23,8 +23,8 @@
       <!-- Top header row -->
       <div class="header-row fade-in" style="--delay: 0ms">
         <div>
-          <h1 class="page-title">Dashboard</h1>
-          <p class="page-subtitle">Track your donations, eligibility, and upcoming appointments.</p>
+          <h1 class="page-title">Here's your donor overview</h1>
+          <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
         </div>
         <div class="header-actions">
               <span v-if="eligibilityStatus === 'eligible'" class="icon-btn__dot" />
@@ -51,6 +51,43 @@
         <NuxtLink to="/donor/eligibility" class="banner-link">View Details</NuxtLink>
       </div>
 
+      <!-- Onboarding checklist, only shown to new donors na wala pa na-complete ang core flow -->
+      <div v-if="showOnboarding" class="onboarding-card fade-in" style="--delay: 80ms">
+        <div class="onboarding-card__header">
+          <div>
+            <p class="onboarding-card__title">Get started with RedAgos</p>
+            <p class="onboarding-card__subtitle">{{ completedSteps }} of {{ onboardingSteps.length }} steps completed</p>
+          </div>
+          <div class="onboarding-card__progress-ring">
+            <svg viewBox="0 0 36 36" class="progress-ring__svg">
+              <circle class="progress-ring__bg" cx="18" cy="18" r="15.5" />
+              <circle
+                class="progress-ring__fill"
+                cx="18" cy="18" r="15.5"
+                :style="{ strokeDasharray: `${progressPercent}, 100` }"
+              />
+            </svg>
+            <span class="progress-ring__label">{{ Math.round(progressPercent) }}%</span>
+          </div>
+        </div>
+
+        <div class="onboarding-steps">
+          <NuxtLink
+            v-for="step in onboardingSteps"
+            :key="step.key"
+            :to="step.done ? undefined : step.path"
+            class="onboarding-step"
+            :class="{ 'onboarding-step--done': step.done, 'onboarding-step--disabled': step.done }"
+          >
+            <span class="onboarding-step__check">
+              <AssetIcon v-if="step.done" name="check" :size="12" />
+            </span>
+            <span class="onboarding-step__label">{{ step.label }}</span>
+            <AssetIcon v-if="!step.done" name="chevron-right" :size="14" class="onboarding-step__arrow" />
+          </NuxtLink>
+        </div>
+      </div>
+
       <!-- Stat cards -->
       <div class="stats-grid">
         <div class="stat-card fade-in" style="--delay: 100ms">
@@ -75,7 +112,11 @@
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
         </div>
 
-        <div class="stat-card fade-in" style="--delay: 200ms">
+        <div
+          class="stat-card fade-in"
+          :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }"
+          style="--delay: 200ms"
+        >
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
             <div class="stat-card__badge"
@@ -365,7 +406,40 @@ const quickActions = [
   { path: '/donor/qrcode', icon: 'qr-code', color: '#D32F2F', label: 'My QR Code' },
 ]
 
-// Lightweight date formatter supporting the tokens used in this page:
+// --- Onboarding checklist ---
+const onboardingSteps = computed(() => [
+  {
+    key: 'screening',
+    label: 'Complete eligibility screening',
+    path: '/donor/eligibility',
+    done: eligibilityStatus.value === 'eligible',
+  },
+  {
+    key: 'appointment',
+    label: 'Book your first appointment',
+    path: '/donor/appointments',
+    done: !!upcomingAppointment.value || totalDonations.value > 0,
+  },
+  {
+    key: 'donation',
+    label: 'Complete your first donation',
+    path: '/donor/appointments',
+    done: totalDonations.value > 0,
+  },
+  {
+    key: 'profile',
+    label: 'Complete your profile details',
+    path: '/donor/profile',
+    done: !!(profile.value?.blood_type && profile.value?.contact_number),
+  },
+])
+
+const completedSteps = computed(() => onboardingSteps.value.filter(s => s.done).length)
+const progressPercent = computed(() => (completedSteps.value / onboardingSteps.value.length) * 100)
+
+// once everything is complete, mawala nani sya.
+const showOnboarding = computed(() => completedSteps.value < onboardingSteps.value.length)
+
 // 'D', 'MMM', 'MMM D', 'MMM D, YYYY', 'h:mm A'
 function formatDate(value, fmt) {
   if (!value) return '—'
@@ -617,6 +691,127 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+/* Onboarding checklist */
+.onboarding-card {
+  background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+  border-radius: 14px;
+  padding: 18px 20px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.18);
+}
+
+.onboarding-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.onboarding-card__title {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.onboarding-card__subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 2px 0 0;
+}
+
+.onboarding-card__progress-ring {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.progress-ring__svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring__bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 3;
+}
+
+.progress-ring__fill {
+  fill: none;
+  stroke: white;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.progress-ring__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.onboarding-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onboarding-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.onboarding-step:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.onboarding-step--done {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.onboarding-step--disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.onboarding-step__check {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.onboarding-step--done .onboarding-step__check {
+  background: white;
+  color: #1565C0;
+  border-color: white;
+}
+
+.onboarding-step__arrow {
+  opacity: 0.6;
+}
+
 /* Stats */
 .stats-grid {
   display: grid;
@@ -640,6 +835,12 @@ onMounted(async () => {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
   border-color: #e2e8f0;
+}
+
+/* Emphasized stat card */
+.stat-card--emphasized {
+  border-color: #F57C0040;
+  box-shadow: 0 0 0 1px #F57C0020, 0 4px 14px rgba(245, 124, 0, 0.08);
 }
 
 .stat-card__top {
@@ -1180,6 +1381,11 @@ onMounted(async () => {
 
 :global(.dark .stat-card:hover) { border-color: #475569; }
 
+:global(.dark .stat-card--emphasized) {
+  border-color: #F57C0055;
+  box-shadow: 0 0 0 1px #F57C0033, 0 4px 14px rgba(245, 124, 0, 0.12);
+}
+
 :global(.dark .stat-chip--neutral),
 :global(.dark .period-pill) {
   background: #243247;
@@ -1200,6 +1406,8 @@ onMounted(async () => {
 
 :global(.dark .banner) { background: rgba(102,187,106,0.14); border-color: rgba(102,187,106,0.3); }
 :global(.dark .banner--warning) { background: rgba(255,167,38,0.14); border-color: rgba(255,167,38,0.3); }
+
+:global(.dark .onboarding-step) { background: rgba(255,255,255,0.1); }
 
 :global(.dark .skeleton) {
   background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);

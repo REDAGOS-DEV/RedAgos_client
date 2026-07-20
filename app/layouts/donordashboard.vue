@@ -5,10 +5,16 @@
     <div class="lg:pl-64">
       <!-- Top bar -->
       <header
-        class="sticky top-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 lg:relative transition-colors duration-150"
-        style="border-color:#EEF1F5; box-shadow: 0 1px 2px rgba(15,23,42,0.05)">
+        class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
+        style="border-color: #eef1f5; box-shadow: 0 1px 2px rgba(15,23,42,0.05)">
 
-        <!-- Mobile: search icon button (only visible <sm, hidden once expanded) -->
+        <!-- Breadcrumb + greeting -->
+        <div class="hidden lg:flex flex-col justify-center min-w-[160px] flex-shrink-0">
+          <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
+          <span class="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{{ greeting }}</span>
+        </div>
+
+        <!-- Mobile -->
         <button
           v-if="!searchOpenMobile"
           @click="openMobileSearch"
@@ -18,7 +24,7 @@
           <AssetIcon name="search" :size="17" class="text-[#64748b] dark:text-slate-300" />
         </button>
 
-        <!-- Search bar: full-width overlay on mobile when open, inline on sm+, centered-absolute on lg+ -->
+        <!-- Search bar -->
         <div
           v-show="searchOpenMobile || true"
           v-click-outside="closeSearchResults"
@@ -27,7 +33,7 @@
             searchOpenMobile
               ? 'flex absolute left-3 right-3 top-1/2 -translate-y-1/2 z-20 sm:static sm:translate-y-0 sm:flex-1 sm:left-auto sm:right-auto'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-[38%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-[50%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]"
         >
           <AssetIcon name="search" :size="15" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
@@ -35,7 +41,7 @@
             ref="searchInput"
             v-model="searchQuery"
             type="text"
-            placeholder="Search..."
+            placeholder="Search pages, records..."
             class="text-sm flex-1 min-w-0 bg-transparent outline-none placeholder:text-[#94a3b8] dark:placeholder:text-slate-500 text-gray-800 dark:text-slate-100"
             @focus="showSearchResults = true"
             @keydown.enter="goToTopResult"
@@ -90,7 +96,7 @@
           </Transition>
         </div>
 
-        <!-- Right cluster: theme toggle, notifications, divider, profile -->
+        <!-- Right cluster -->
         <div
           v-show="!searchOpenMobile"
           class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ml-auto"
@@ -104,12 +110,14 @@
           <NuxtLink to="/donor/notifications"
             class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
             <AssetIcon name="bell" :size="16" class="text-[#64748b] dark:text-slate-300" />
-            <span v-if="hasUnreadNotifications"
-              class="absolute top-2 right-2 w-1.5 h-1.5 rounded-full ring-2 ring-white dark:ring-slate-900"
-              style="background:#D32F2F" />
+            <span v-if="unreadCount > 0"
+              class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-white dark:ring-slate-900"
+              style="background:#D32F2F">
+              {{ unreadCount > 9 ? '9+' : unreadCount }}
+            </span>
           </NuxtLink>
 
-          <!-- Divider: hidden on smallest screens to save space -->
+          <!-- Divider -->
           <div class="hidden xs:block w-px h-6 mx-1 bg-[#EEF1F5] dark:bg-slate-700" />
 
           <div class="relative">
@@ -121,7 +129,9 @@
                 <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                 <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
               </div>
-              <AssetIcon name="chevron-down" :size="14" class="text-[#94a3b8] dark:text-slate-500 hidden sm:block" />
+              <AssetIcon name="chevron-down" :size="14"
+                class="text-[#94a3b8] dark:text-slate-500 hidden sm:block transition-transform duration-150"
+                :class="{ 'rotate-180': showUserMenu }" />
             </button>
 
             <Transition name="popup">
@@ -168,7 +178,7 @@
           </div>
         </div>
 
-        <!-- Mobile search close button (only when search overlay is open) -->
+        <!-- Mobile search close button -->
         <button
           v-if="searchOpenMobile"
           @click="closeMobileSearch"
@@ -179,7 +189,7 @@
         </button>
       </header>
 
-      <main class="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
+      <main class="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-150 pt-16">
         <slot />
       </main>
     </div>
@@ -188,12 +198,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const router = useRouter()
+const route = useRoute()
 const { user, fetchUser, clearUser } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
@@ -201,8 +212,29 @@ onMounted(() => {
   if (!user.value) fetchUser()
 })
 
-// --- Notifications ---
-const hasUnreadNotifications = ref(false)
+// --- Breadcrumb + greeting ---
+const pageLabels = {
+  '/donor/dashboard': 'Dashboard',
+  '/donor/appointments': 'Book Appointment',
+  '/donor/history': 'Donation History',
+  '/donor/eligibility': 'Eligibility Screening',
+  '/donor/qrcode': 'My QR Code',
+  '/donor/notifications': 'Notifications',
+  '/donor/profile': 'My Profile',
+  '/donor/settings': 'Settings',
+  '/donor/help': 'Help',
+}
+const breadcrumb = computed(() => `Donor Portal / ${pageLabels[route.path] || ''}`)
+
+function getGreeting() {
+  const h = new Date().getHours()
+  const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  const first = user.value?.full_name?.split(' ')[0] || 'Donor'
+  return `${time}, ${first}`
+}
+const greeting = ref(getGreeting())
+
+const unreadCount = ref(0)
 
 // --- Profile dropdown ---
 const showUserMenu = ref(false)
@@ -219,7 +251,6 @@ const searchOpenMobile = ref(false)
 
 function openMobileSearch() {
   searchOpenMobile.value = true
-  // Wait for the DOM to render the input before focusing
   nextTick(() => searchInput.value?.focus())
 }
 

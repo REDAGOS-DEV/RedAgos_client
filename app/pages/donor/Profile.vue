@@ -2,12 +2,104 @@
   <div class="profile-page">
     <div class="header-row fade-in" style="--delay: 0ms">
       <div>
-        <h1 class="page-title">My Profile</h1>
-        <p class="page-subtitle">Manage your personal and donation information.</p>
+        <h1 class="page-title">Your donor profile</h1>
+        <p class="page-subtitle">View and update your personal information, contact details, and donor profile.</p>
       </div>
     </div>
 
-    <div class="main-grid">
+    <!-- Skeleton state -->
+    <div v-if="loading" class="main-grid">
+      <div class="col-left">
+        <div class="panel fade-in profile-card" style="--delay: 100ms">
+          <div class="skeleton skeleton-avatar" />
+          <div class="skeleton skeleton-line" style="width:140px;height:16px;margin-top:14px" />
+          <div class="skeleton skeleton-line" style="width:100px;height:12px;margin-top:8px" />
+        </div>
+
+        <div class="panel fade-in" style="--delay: 150ms">
+          <div class="panel-header panel-header--simple">
+            <div class="skeleton skeleton-line" style="width:70px;height:14px" />
+          </div>
+          <div class="status-list">
+            <div v-for="n in 4" :key="n" class="status-row">
+              <div class="skeleton skeleton-line" style="width:110px;height:12px" />
+              <div class="skeleton skeleton-line" style="width:60px;height:12px" />
+            </div>
+          </div>
+          <div class="status-actions">
+            <div class="skeleton skeleton-btn" />
+            <div class="skeleton skeleton-btn" />
+          </div>
+        </div>
+
+        <div class="panel fade-in" style="--delay: 200ms">
+          <div class="panel-header panel-header--simple">
+            <div class="skeleton skeleton-line" style="width:160px;height:14px" />
+          </div>
+          <div class="form-body">
+            <div class="form-grid">
+              <div class="form-field form-field--full">
+                <div class="skeleton skeleton-line" style="width:110px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+              <div class="form-field">
+                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+              <div class="form-field">
+                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <div class="skeleton skeleton-btn" style="width:140px" />
+              <div class="skeleton skeleton-btn" style="width:90px" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-right">
+        <div class="panel fade-in" style="--delay: 100ms">
+          <div class="panel-header panel-header--simple">
+            <div class="skeleton skeleton-line" style="width:150px;height:14px" />
+          </div>
+          <div class="form-body">
+            <div class="form-grid">
+              <div v-for="n in 6" :key="n" class="form-field">
+                <div class="skeleton skeleton-line" style="width:80px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+              <div class="form-field form-field--full">
+                <div class="skeleton skeleton-line" style="width:70px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <div class="skeleton skeleton-btn" style="width:130px" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fade-in" style="--delay: 150ms">
+          <div class="panel-header panel-header--simple">
+            <div class="skeleton skeleton-line" style="width:180px;height:14px" />
+          </div>
+          <div class="toggle-list">
+            <div v-for="n in 3" :key="n" class="toggle-row">
+              <div style="flex:1">
+                <div class="skeleton skeleton-line" style="width:160px;height:13px" />
+                <div class="skeleton skeleton-line" style="width:220px;height:11px;margin-top:8px" />
+              </div>
+              <div class="skeleton" style="width:40px;height:22px;border-radius:999px" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loaded state -->
+    <div v-else class="main-grid">
       <!-- Left column -->
       <div class="col-left">
         <!-- Avatar + basic info card -->
@@ -176,6 +268,7 @@ const router = useRouter()
 const { user, fetchUser, updateAvatar, clearUser } = useUser()
 
 const profile = ref(null)
+const loading = ref(true)
 const savingProfile = ref(false)
 const savingPassword = ref(false)
 
@@ -204,9 +297,10 @@ const notificationPrefs = reactive([
 ])
 
 async function load() {
-  if (!user.value) await fetchUser()
-
+  loading.value = true
   try {
+    if (!user.value) await fetchUser()
+
     const res = await donorService.profile()
     profile.value = res
 
@@ -220,6 +314,8 @@ async function load() {
     profileForm.address = res.address || ''
   } catch (err) {
     console.error('Failed to load profile:', err)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -301,7 +397,7 @@ async function handleLogout() {
   try {
     // await $fetch('/api/logout', { method: 'POST' })
     clearUser()
-    router.push('/login')
+    router.push('/auth/donor/login')
   } catch (err) {
     console.error(err)
   }
@@ -443,6 +539,22 @@ async function handleLogout() {
 }
 .toggle-switch--on .toggle-switch__knob { transform: translateX(18px); }
 
+/* Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #eef0f3 25%, #e4e7ec 37%, #eef0f3 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+.skeleton-avatar { width: 80px; height: 80px; border-radius: 999px; }
+.skeleton-line { border-radius: 4px; }
+.skeleton-input { width: 100%; height: 36px; border-radius: 8px; }
+.skeleton-btn { height: 38px; border-radius: 8px; flex: 1; }
+
 @media (max-width: 900px) {
   .main-grid { grid-template-columns: 1fr; }
 }
@@ -481,4 +593,9 @@ async function handleLogout() {
 
 :global(.dark .toggle-row) { border-color: #263449; }
 :global(.dark .toggle-switch) { background: #334155; }
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
+    background-size: 400% 100%;
+}
 </style>

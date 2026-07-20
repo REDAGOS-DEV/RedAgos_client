@@ -1,114 +1,133 @@
 <template>
     <div class="help-page">
-        <div class="header-row fade-in" style="--delay: 0ms">
-            <h1 class="page-title">Help &amp; Support</h1>
-            <p class="page-subtitle">Answers to common questions, plus ways to reach us if you need more help.</p>
-        </div>
-
-        <!-- Quick help topics -->
-        <div class="topics-grid fade-in" style="--delay: 50ms">
-            <NuxtLink
-                v-for="topic in quickTopics"
-                :key="topic.key"
-                :to="topic.route"
-                class="topic-card"
-            >
-                <div class="topic-card__icon" :class="`topic-card__icon--${topic.tone}`">
-                    <AssetIcon :name="topic.icon" :size="18" />
-                </div>
-                <div class="topic-card__body">
-                    <p class="topic-card__title">{{ topic.title }}</p>
-                    <p class="topic-card__desc">{{ topic.desc }}</p>
-                </div>
-                <AssetIcon name="arrow-right" :size="16" class="topic-card__arrow" />
-            </NuxtLink>
-        </div>
-
-        <div class="main-grid">
-            <!-- FAQ -->
-            <div class="col-left">
-                <div class="panel fade-in" style="--delay: 100ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Frequently Asked Questions</h2>
-                    </div>
-                    <div class="faq-list">
-                        <div v-for="faq in faqs" :key="faq.id" class="faq-item">
-                            <button
-                                type="button"
-                                class="faq-question"
-                                :aria-expanded="openFaqId === faq.id"
-                                @click="toggleFaq(faq.id)"
-                            >
-                                <span>{{ faq.question }}</span>
-                                <AssetIcon
-                                    name="chevron-down"
-                                    :size="16"
-                                    class="faq-question__chevron"
-                                    :class="{ 'faq-question__chevron--open': openFaqId === faq.id }"
-                                />
-                            </button>
-                            <div v-if="openFaqId === faq.id" class="faq-answer">
-                                <p>{{ faq.answer }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <!-- Skeleton loading state -->
+        <div v-if="loading" class="skeleton-wrap">
+            <div class="skeleton skeleton--header" />
+            <div class="skeleton-topics-grid">
+                <div class="skeleton skeleton--topic" v-for="n in 4" :key="n" />
             </div>
-
-            <!-- Contact support -->
-            <div class="col-right">
-                <div class="panel fade-in" style="--delay: 150ms">
-                    <div class="panel-header panel-header--simple">
-                        <h2 class="panel-title">Contact Support</h2>
-                    </div>
-                    <div class="contact-list">
-                        <div class="contact-row">
-                            <div class="contact-row__icon">
-                                <AssetIcon name="phone" :size="16" />
-                            </div>
-                            <div>
-                                <p class="contact-row__label">Hotline</p>
-                                <a href="tel:+63281234567" class="contact-row__value">(02) 8123-4567</a>
-                            </div>
-                        </div>
-                        <div class="contact-row">
-                            <div class="contact-row__icon">
-                                <AssetIcon name="mail" :size="16" />
-                            </div>
-                            <div>
-                                <p class="contact-row__label">Email</p>
-                                <a href="mailto:support@bloodcenter.example" class="contact-row__value">support@bloodcenter.example</a>
-                            </div>
-                        </div>
-                        <div class="contact-row">
-                            <div class="contact-row__icon">
-                                <AssetIcon name="clock" :size="16" />
-                            </div>
-                            <div>
-                                <p class="contact-row__label">Support hours</p>
-                                <p class="contact-row__value">Mon–Sat, 8:00 AM – 5:00 PM</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <a href="mailto:support@bloodcenter.example?subject=Report%20a%20problem" class="btn-primary btn-block">
-                        <AssetIcon name="flag" :size="16" />
-                        Report a problem
-                    </a>
+            <div class="skeleton-main-grid">
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:420px" />
                 </div>
-
-                <div class="panel fade-in legal-panel" style="--delay: 200ms">
-                    <NuxtLink to="/legal/Terms" class="legal-link">
-                        Terms of Service
-                        <AssetIcon name="arrow-right" :size="14" />
-                    </NuxtLink>
-                    <NuxtLink to="/legal/Privacy" class="legal-link">
-                        Privacy Policy
-                        <AssetIcon name="arrow-right" :size="14" />
-                    </NuxtLink>
+                <div class="skeleton-col">
+                    <div class="skeleton skeleton--panel" style="height:220px" />
+                    <div class="skeleton skeleton--panel" style="height:90px" />
                 </div>
             </div>
         </div>
+
+        <template v-else>
+            <div class="header-row fade-in" style="--delay: 0ms">
+                <h1 class="page-title">We're here to help!</h1>
+                <p class="page-subtitle">Find answers to common questions or contact our support team for assistance.</p>
+            </div>
+
+            <!-- Quick help topics -->
+            <div class="topics-grid fade-in" style="--delay: 50ms">
+                <NuxtLink
+                    v-for="topic in quickTopics"
+                    :key="topic.key"
+                    :to="topic.route"
+                    class="topic-card"
+                >
+                    <div class="topic-card__icon" :class="`topic-card__icon--${topic.tone}`">
+                        <AssetIcon :name="topic.icon" :size="18" />
+                    </div>
+                    <div class="topic-card__body">
+                        <p class="topic-card__title">{{ topic.title }}</p>
+                        <p class="topic-card__desc">{{ topic.desc }}</p>
+                    </div>
+                    <AssetIcon name="arrow-right" :size="16" class="topic-card__arrow" />
+                </NuxtLink>
+            </div>
+
+            <div class="main-grid">
+                <!-- FAQ -->
+                <div class="col-left">
+                    <div class="panel fade-in" style="--delay: 100ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Frequently Asked Questions</h2>
+                        </div>
+                        <div class="faq-list">
+                            <div v-for="faq in faqs" :key="faq.id" class="faq-item">
+                                <button
+                                    type="button"
+                                    class="faq-question"
+                                    :aria-expanded="openFaqId === faq.id"
+                                    @click="toggleFaq(faq.id)"
+                                >
+                                    <span>{{ faq.question }}</span>
+                                    <AssetIcon
+                                        name="chevron-down"
+                                        :size="16"
+                                        class="faq-question__chevron"
+                                        :class="{ 'faq-question__chevron--open': openFaqId === faq.id }"
+                                    />
+                                </button>
+                                <div v-if="openFaqId === faq.id" class="faq-answer">
+                                    <p>{{ faq.answer }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact support -->
+                <div class="col-right">
+                    <div class="panel fade-in" style="--delay: 150ms">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Contact Support</h2>
+                        </div>
+                        <div class="contact-list">
+                            <div class="contact-row">
+                                <div class="contact-row__icon">
+                                    <AssetIcon name="phone" :size="16" />
+                                </div>
+                                <div>
+                                    <p class="contact-row__label">Hotline</p>
+                                    <a :href="`tel:${contactInfo.hotline}`" class="contact-row__value">{{ contactInfo.hotlineLabel }}</a>
+                                </div>
+                            </div>
+                            <div class="contact-row">
+                                <div class="contact-row__icon">
+                                    <AssetIcon name="mail" :size="16" />
+                                </div>
+                                <div>
+                                    <p class="contact-row__label">Email</p>
+                                    <a :href="`mailto:${contactInfo.email}`" class="contact-row__value">{{ contactInfo.email }}</a>
+                                </div>
+                            </div>
+                            <div class="contact-row">
+                                <div class="contact-row__icon">
+                                    <AssetIcon name="clock" :size="16" />
+                                </div>
+                                <div>
+                                    <p class="contact-row__label">Support hours</p>
+                                    <p class="contact-row__value">{{ contactInfo.hours }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <a :href="`mailto:${contactInfo.email}?subject=Report%20a%20problem`" class="btn-primary btn-block">
+                            <AssetIcon name="flag" :size="16" />
+                            Report a problem
+                        </a>
+                    </div>
+
+                    <div class="panel fade-in legal-panel" style="--delay: 200ms">
+                        <NuxtLink to="/legal/Terms" class="legal-link">
+                            Terms of Service
+                            <AssetIcon name="arrow-right" :size="14" />
+                        </NuxtLink>
+                        <NuxtLink to="/legal/Privacy" class="legal-link">
+                            Privacy Policy
+                            <AssetIcon name="arrow-right" :size="14" />
+                        </NuxtLink>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </template>
 
@@ -118,6 +137,19 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 definePageMeta({
   layout: 'donordashboard',
   middleware: 'auth',
+})
+
+// Page-load skeleton — same pattern as the rest of the dashboard. The FAQ
+// topics themselves are static copy, but contact info (hotline/email/hours)
+// is the kind of thing a blood center admin would actually configure on the
+// backend, so that's what gates the loading state here.
+const loading = ref(true)
+
+const contactInfo = reactive({
+    hotline: '+63281234567',
+    hotlineLabel: '(02) 8123-4567',
+    email: 'support@bloodcenter.example',
+    hours: 'Mon–Sat, 8:00 AM – 5:00 PM',
 })
 
 const quickTopics = [
@@ -193,6 +225,26 @@ const openFaqId = ref(null)
 function toggleFaq(id) {
     openFaqId.value = openFaqId.value === id ? null : id
 }
+
+onMounted(async () => {
+    try {
+        // Backend contract: GET /api/support/contact-info
+        // Lets a blood center admin change the hotline/email/hours without a
+        // redeploy. Response: { hotline, hotline_label, email, hours }
+        const data = await $fetch('/api/support/contact-info')
+        if (data?.hotline) contactInfo.hotline = data.hotline
+        if (data?.hotline_label) contactInfo.hotlineLabel = data.hotline_label
+        if (data?.email) contactInfo.email = data.email
+        if (data?.hours) contactInfo.hours = data.hours
+    } catch (err) {
+        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/support/contact-info
+        // endpoint, so mag-fail gyud ni nga call. Mag-fallback ra sa hardcoded
+        // contact details sa taas — dili ni problema.
+        console.error('Failed to load support contact info (expected while backend is not yet wired up):', err)
+    } finally {
+        loading.value = false
+    }
+})
 </script>
 
 <style scoped>
@@ -221,6 +273,66 @@ function toggleFaq(id) {
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton loading */
+.skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+    background-size: 400% 100%;
+    border-radius: 14px;
+    animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--header {
+    height: 40px;
+    max-width: 280px;
+}
+
+.skeleton-topics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.skeleton--topic {
+    height: 76px;
+}
+
+.skeleton-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    align-items: start;
+}
+
+.skeleton-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton--panel {
+    border-radius: 14px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton, .fade-in { animation: none !important; }
+}
+
+@media (max-width: 900px) {
+    .skeleton-topics-grid { grid-template-columns: 1fr 1fr; }
+    .skeleton-main-grid { grid-template-columns: 1fr; }
 }
 
 .header-row {
@@ -534,4 +646,8 @@ a.contact-row__value:hover {
 }
 
 :global(.dark .contact-row__icon) { background: rgba(66,165,245,0.16); }
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
 </style>

@@ -60,7 +60,7 @@
 
     <div class="nav-actions">
       <button class="btn-login" @click="navigateTo('/auth/donor/login/')">Log In</button>
-      <button class="btn-started" @click="navigateTo('/')">Get Started</button>
+      <button class="btn-started" @click="goHome">Get Started</button>
     </div>
   </nav>
 </template>
@@ -75,6 +75,14 @@ const sectionIds = ['home', 'features', 'drives', 'about', 'contact']
 let scrollHandler
 let resizeHandler
 let ticking = false
+
+const router = useRouter()
+
+const goHome = () => {
+  setTimeout(() => {
+    navigateTo('/')
+  }, 3000)
+}
 
 const getSections = () =>
   sectionIds
