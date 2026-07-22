@@ -202,7 +202,8 @@
 
         <p class="signin-row">
           Already have an account?
-          <NuxtLink to="/login">Sign In</NuxtLink>
+          <!-- KEPT YANNIE'S VERSION – full path -->
+          <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
         </p>
       </form>
     </main>
@@ -268,7 +269,8 @@ async function handleSubmit() {
     })
 
     submitSuccess.value = response?.message || 'Registration submitted successfully.'
-    setTimeout(() => navigateTo('/login'), 900)
+    // KEPT YANNIE'S VERSION – redirect to donor dashboard
+    setTimeout(() => navigateTo('/donor/dashboard'), 900)
   } catch (err) {
     applyValidationErrors(err)
     submitError.value = err?.message || 'Something went wrong while creating your account. Please try again.'

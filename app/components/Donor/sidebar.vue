@@ -1,173 +1,132 @@
 <template>
   <!-- Mobile Menu Button -->
   <div>
-  <button @click="mobileOpen = true"
-    class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-md border border-gray-200">
-    <AssetIcon name="menu" :size="20" />
-  </button>
-
-  <!-- Mobile Overlay -->
-  <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-black/50" @click="mobileOpen = false" />
-
-  <aside
-    class="fixed top-0 left-0 h-screen w-64 z-50 flex flex-col shadow-2xl transition-transform duration-200 lg:translate-x-0"
-    :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'" :style="{ background: NAVY }">
-    <!-- Close button -->
-    <button class="lg:hidden absolute top-4 right-4 z-10" @click="mobileOpen = false"
-      style="color: rgba(255,255,255,.7)">
-      <AssetIcon name="x" :size="20" />
+    <button @click="mobileOpen = true"
+      class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-slate-900 shadow-md border border-gray-200 dark:border-slate-700">
+      <AssetIcon name="menu" :size="20" />
     </button>
 
-    <!-- Logo -->
-    <div class="px-4 pt-5 pb-4 flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-        style="background: #A3B8DA">
-        <img :src="logo" alt="RedAgos Logo" class="logo-image">
-      </div>
+    <!-- Mobile Overlay -->
+    <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-black/40" @click="mobileOpen = false" />
 
-      <div>
-        <h1 class="font-extrabold text-base leading-none" style="color:#fff">
-          Red<span style="color:#EF5350">Agos</span>
-        </h1>
-        <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,.4)">
-          Donor Portal
-        </p>
-      </div>
-    </div>
-
-    <!-- Search -->
-    <div class="px-4 mb-2">
-      <div class="flex items-center gap-2 px-3 py-2 rounded-lg" :style="{ background: NAVY_LIGHT }">
-        <AssetIcon name="search" :size="14" style="color:rgba(255,255,255,.35)" />
-        <span class="text-sm flex-1" style="color:rgba(255,255,255,.35)">Search...</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-          style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.3)">
-          ⌘F
-        </span>
-      </div>
-    </div>
-
-    <!-- Navigation -->
-    <nav class="flex-1 overflow-y-auto px-3">
-      <template v-for="(group, gIndex) in navGroups" :key="gIndex">
-        <p v-if="group.label" class="text-[10px] font-bold uppercase tracking-widest px-3 mb-1 mt-4"
-          style="color:rgba(255,255,255,.3)">
-          {{ group.label }}
-        </p>
-
-        <NuxtLink v-for="item in group.items" :key="item.path" :to="item.path" @click="closeSidebar"
-          @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null"
-          @touchstart="() => {}"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150"
-          :style="navStyle(item.path)">
-          <AssetIcon :name="item.icon" :size="16" />
-          <span class="flex-1 font-medium">{{ item.label }}</span>
-
-          <span v-if="item.badge && eligibilityStatus" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :style="{
-            background: eligibilityStatus === 'eligible' ? '#1B5E20' : 'rgba(255,255,255,.12)',
-            color: eligibilityStatus === 'eligible' ? '#69F0AE' : 'rgba(255,255,255,.4)'
-          }">
-            {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus }}
-          </span>
-        </NuxtLink>
-      </template>
-
-      <!-- Settings / Help -->
-      <div class="mt-4 border-t pt-3" style="border-color:rgba(255,255,255,.08)">
-        <NuxtLink v-for="item in bottomItems" :key="item.path" :to="item.path" @click="closeSidebar"
-          @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null"
-          @touchstart="() => {}"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150"
-          :style="navStyle(item.path)">
-          <AssetIcon :name="item.icon" :size="16" />
-          <span class="flex-1 font-medium">{{ item.label }}</span>
-        </NuxtLink>
-      </div>
-    </nav>
-
-    <!-- Footer -->
-    <div class="relative px-3 pb-4 pt-2 border-t" style="border-color:rgba(255,255,255,.08)">
-      <button @click="showUserMenu = !showUserMenu"
-        class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-all hover:bg-white/10">
-        <div
-          class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-          style="background:#1565C0">
-          <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-          <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
-        </div>
-
-        <div class="flex-1 text-left min-w-0">
-          <p class="text-sm font-semibold truncate text-white">{{ user?.full_name || 'Donor' }}</p>
-          <p class="text-[11px] truncate" style="color:rgba(255,255,255,.4)">{{ user?.email }}</p>
-        </div>
-
-        <AssetIcon name="chevron-right" :size="16" style="color:rgba(255,255,255,.3)"
-          class="transition-transform duration-150" :class="showUserMenu ? '-rotate-90' : ''" />
+    <aside
+      class="fixed top-0 left-0 h-screen w-64 z-50 flex flex-col transition-transform duration-200 lg:translate-x-0"
+      :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
+      :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow }">
+      <!-- Close button -->
+      <button class="lg:hidden absolute top-4 right-4 z-10" @click="mobileOpen = false"
+        :style="{ color: SIDEBAR_IDLE_TEXT }">
+        <AssetIcon name="x" :size="20" />
       </button>
 
-      <!-- User Menu Popup -->
-      <Transition name="popup">
-        <div v-if="showUserMenu" v-click-outside="closeUserMenu"
-          class="absolute left-3 right-3 bottom-full mb-2 rounded-xl shadow-2xl overflow-hidden bg-white">
-          <!-- User info header -->
-          <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-100">
-            <div
-              class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-              style="background:#1565C0">
-              <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-              <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold truncate text-gray-900">{{ user?.full_name || 'Donor' }}</p>
-              <p class="text-xs truncate text-gray-500">{{ user?.email }}</p>
-            </div>
-          </div>
-
-          <!-- Menu items -->
-          <div class="py-2">
-            <NuxtLink v-for="item in userMenuItems" :key="item.path" :to="item.path" @click="closeUserMenu"
-              class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <AssetIcon :name="item.icon" :size="16" class="text-gray-400" />
-              <span>{{ item.label }}</span>
-            </NuxtLink>
-          </div>
-
-          <div class="border-t border-gray-100 py-2">
-            <button @click="handleLogout"
-              class="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50"
-              style="color:#D32F2F">
-              <AssetIcon name="log-out" :size="16" />
-              <span>Log Out</span>
-            </button>
-          </div>
-
-          <div class="px-4 py-2 border-t border-gray-100">
-            <p class="text-[11px] text-center text-gray-400">v1.0.0 · Terms & Conditions</p>
-          </div>
+      <!-- Logo -->
+      <div
+        class="h-16 px-4 flex items-center gap-3 border-b dark:border-slate-700 flex-shrink-0 transition-colors duration-150"
+        style="border-color:#EEF1F5">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+          style="background: linear-gradient(135deg, #1565C0, #42A5F5); box-shadow: 0 4px 12px rgba(21,101,192,0.25)">
+          <img :src="logo" alt="RedAgos Logo" class="logo-image">
         </div>
-      </Transition>
-    </div>
-  </aside>
+
+        <div>
+          <h1 class="font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
+            Red<span style="color:#D32F2F">Agos</span>
+          </h1>
+          <p class="text-[11px] mt-0.5" :style="{ color: SIDEBAR_IDLE_TEXT }">
+            Donor Portal
+          </p>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 overflow-y-auto px-3 pt-4" :class="isDark ? 'nav-dark' : ''">
+        <template v-for="(group, gIndex) in navGroups" :key="gIndex">
+          <p v-if="group.label"
+            class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 mb-1 mt-5"
+            :style="{ color: SIDEBAR_IDLE_TEXT }">
+            <span class="w-3 h-[2px] rounded-full" :style="{ background: isDark ? '#475569' : '#CBD5E1' }" />
+            {{ group.label }}
+          </p>
+
+          <NuxtLink v-for="item in group.items" :key="item.path" :to="item.path" @click="closeSidebar"
+            @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null" @touchstart="() => { }"
+            class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-all duration-150"
+            :style="navStyle(item.path)">
+            <span
+              class="flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors duration-150"
+              :style="{ background: isActive(item.path) ? '#1565C0' : 'transparent' }">
+              <AssetIcon :name="item.icon" :size="14"
+                :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
+            </span>
+            <span class="flex-1 font-medium">{{ item.label }}</span>
+
+            <span v-if="item.badge && eligibilityStatus" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :style="{
+              background: eligibilityStatus === 'eligible' ? '#2E7D3214' : (isDark ? '#334155' : '#F1F5F9'),
+              color: eligibilityStatus === 'eligible' ? '#2E7D32' : SIDEBAR_IDLE_TEXT
+            }">
+              {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus }}
+            </span>
+          </NuxtLink>
+        </template>
+
+        <!-- Settings / Help -->
+        <div class="mt-4 border-t pt-3" :style="{ borderColor: SIDEBAR_BORDER }">
+          <NuxtLink v-for="item in bottomItems" :key="item.path" :to="item.path" @click="closeSidebar"
+            @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null" @touchstart="() => { }"
+            class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-all duration-150"
+            :style="navStyle(item.path)">
+            <AssetIcon :name="item.icon" :size="16" />
+            <span class="flex-1 font-medium">{{ item.label }}</span>
+          </NuxtLink>
+        </div>
+      </nav>
+    </aside>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router' // added useRouter
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser.js'
 import { donorService } from '~/api/donor/DonorService'
 
-const NAVY = '#0F2044'
-const NAVY_LIGHT = '#162B58'
-const NAVY_HOVER = '#1A3468'
+// --- Dark mode awareness ---
+const isDark = ref(false)
+let themeObserver = null
+
+onMounted(() => {
+  isDark.value = document.documentElement.classList.contains('dark')
+  themeObserver = new MutationObserver(() => {
+    isDark.value = document.documentElement.classList.contains('dark')
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+})
+
+onUnmounted(() => {
+  themeObserver?.disconnect()
+})
+
+// Light/dark theme tokens — matched to the redesigned dashboard's palette
+const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#FFFFFF'))
+const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#EEF1F5'))
+const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? '#42A5F529' : '#1565C014'))
+const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
+const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
+const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1f2937'))
+const sidebarShadow = computed(() =>
+  isDark.value
+    ? '1px 0 0 #1E293B, 4px 0 24px rgba(0,0,0,0.35)'
+    : '1px 0 0 #EEF1F5, 4px 0 24px rgba(15,23,42,0.04)'
+)
 
 const route = useRoute()
-const router = useRouter()
+const router = useRouter() // needed for logout
 const mobileOpen = ref(false)
 const eligibilityStatus = ref(null)
+
+// Keep clearUser from your version
 const { user, fetchUser, clearUser } = useUser()
 
 const activePath = ref(route.path || '/')
@@ -178,42 +137,46 @@ watch(
     activePath.value = newPath
   }
 )
+
 const navGroups = [
   {
     label: null,
     items: [
-      { label: 'Notifications', path: '/donor/Notifications', icon: 'bell' },
-      { label: 'Dashboard', path: '/donor/Dashboard', icon: 'house' }
+      // Lowercase paths (Yannie's version)
+      { label: 'Notifications', path: '/donor/notifications', icon: 'bell' },
+      { label: 'Dashboard', path: '/donor/dashboard', icon: 'house' }
     ]
   },
   {
     label: 'Donors',
     items: [
-      { label: 'Eligibility Screening', path: '/donor/Eligibility', icon: 'clipboard-check' },
-      { label: 'Book Appointment', path: '/donor/Appointments', icon: 'calendar' }
+      { label: 'Eligibility Screening', path: '/donor/eligibility', icon: 'clipboard-check' },
+      { label: 'Book Appointment', path: '/donor/appointments', icon: 'calendar' }
     ]
   },
   {
     label: 'Records',
     items: [
-      { label: 'Donation History', path: '/donor/History', icon: 'history' },
-      { label: 'My QR Code', path: '/donor/MyQRCode', icon: 'qr-code', badge: true },
-      { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' }
+      { label: 'Donation History', path: '/donor/history', icon: 'history' },
+      { label: 'My QR Code', path: '/donor/qrcode', icon: 'qr-code', badge: true },
+      { label: 'My Profile', path: '/donor/profile', icon: 'user-circle' }
     ]
   }
 ]
 
+// Keep your user menu and logout functionality
 const bottomItems = [
-  { label: 'Settings', path: '/donor/Settings', icon: 'settings' },
-  { label: 'Help', path: '/donor/Help', icon: 'help-circle' }
+  { label: 'Settings', path: '/donor/settings', icon: 'settings' },
+  { label: 'Help', path: '/donor/help', icon: 'help-circle' }
 ]
+
 const showUserMenu = ref(false)
 
 const userMenuItems = [
-  { label: 'My Profile', path: '/donor/Profile', icon: 'user-circle' },
-  { label: 'Donation History', path: '/donor/History', icon: 'history' },
-  { label: 'View My QR Code', path: '/donor/MyQRCode', icon: 'qr-code' },
-  { label: 'Notification Settings', path: '/donor/Settings', icon: 'bell' }
+  { label: 'My Profile', path: '/donor/profile', icon: 'user-circle' },
+  { label: 'Donation History', path: '/donor/history', icon: 'history' },
+  { label: 'View My QR Code', path: '/donor/qrcode', icon: 'qr-code' },
+  { label: 'Notification Settings', path: '/donor/settings', icon: 'bell' }
 ]
 
 const closeUserMenu = () => {
@@ -233,6 +196,7 @@ const vClickOutside = {
     document.removeEventListener('click', el._clickOutside, true)
   }
 }
+
 const loadUser = async () => {
   try {
     if (!user.value) {
@@ -258,15 +222,20 @@ const hoveredPath = ref(null)
 
 const isActive = (path) => route.path === path
 
+// Keep Yannie's navStyle (better dark mode and active indicator)
 const navStyle = (path) => {
   const active = isActive(path)
   const hovered = hoveredPath.value === path
 
   return {
-    background: active || hovered ? NAVY_HOVER : 'transparent',
-    color: active || hovered ? '#FFFFFF' : 'rgba(255,255,255,.6)'
+    background: active || hovered ? SIDEBAR_ACTIVE_BG.value : 'transparent',
+    color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
+    fontWeight: active ? '700' : '500',
+    boxShadow: active ? `inset 3px 0 0 ${SIDEBAR_ACTIVE_TEXT.value}` : 'none'
   }
 }
+
+// Your handleLogout function
 const handleLogout = async () => {
   try {
     showUserMenu.value = false
@@ -280,9 +249,16 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6px;
+}
+
 nav {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 nav::-webkit-scrollbar {
@@ -290,12 +266,20 @@ nav::-webkit-scrollbar {
 }
 
 nav::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: #cbd5e1;
   border-radius: 999px;
 }
 
 nav::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.nav-dark::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+
+.nav-dark {
+  scrollbar-color: #334155 transparent;
 }
 
 .popup-enter-active,
@@ -313,9 +297,10 @@ nav::-webkit-scrollbar-track {
   nav a {
     transition: background 0.1s ease, color 0.1s ease;
   }
+
   nav a:active {
-    background: #1A3468 !important;
-    color: #FFFFFF !important;
+    background: #1565C014 !important;
+    color: #1565C0 !important;
   }
 }
 </style>

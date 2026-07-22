@@ -2,8 +2,8 @@
     <div class="notifications-page">
         <div class="header-row fade-in" style="--delay: 0ms">
             <div>
-                <h1 class="page-title">Notifications</h1>
-                <p class="page-subtitle">System alerts, appointment reminders, and donation updates.</p>
+                <h1 class="page-title">Stay updated!</h1>
+                <p class="page-subtitle">Stay informed with appointment reminders, donation updates, and important announcements.</p>
             </div>
             <button
                 type="button"
@@ -16,7 +16,7 @@
         </div>
 
         <!-- Tabs -->
-        <div class="tabs-bar fade-in" style="--delay: 50ms">
+        <div v-if="!loading" class="tabs-bar fade-in" style="--delay: 50ms">
             <button
                 v-for="tab in tabs"
                 :key="tab.key"
@@ -29,11 +29,26 @@
                 <span v-if="tab.unread > 0" class="tab-badge" :class="`tab-badge--${tab.tone}`">{{ tab.unread }}</span>
             </button>
         </div>
+        <div v-else class="tabs-bar fade-in" style="--delay: 50ms">
+            <div v-for="n in 5" :key="n" class="skeleton skeleton-tab" />
+        </div>
 
         <!-- List -->
         <div class="panel fade-in" style="--delay: 100ms">
-            <div v-if="loading" class="state-wrap">
-                <div class="spinner" />
+            <div v-if="loading" class="notif-list">
+                <div v-for="n in 5" :key="n" class="notif-row">
+                    <span class="notif-row__dot" />
+                    <div class="skeleton skeleton-icon" />
+                    <div class="notif-row__body">
+                        <div class="skeleton skeleton-line" style="width:55%;height:13.5px" />
+                        <div class="skeleton skeleton-line" style="width:85%;height:12px;margin-top:8px" />
+                        <div class="skeleton skeleton-line" style="width:30%;height:11px;margin-top:8px" />
+                    </div>
+                    <div class="notif-row__side">
+                        <div class="skeleton skeleton-line" style="width:64px;height:18px;border-radius:999px" />
+                        <div class="skeleton skeleton-line" style="width:70px;height:12px" />
+                    </div>
+                </div>
             </div>
 
             <div v-else-if="filteredNotifications.length === 0" class="state-wrap state-wrap--empty">
@@ -265,6 +280,7 @@ onMounted(async () => {
     align-items: center;
     gap: 4px;
     border-bottom: 1px solid #e5e7eb;
+    min-height: 41px;
 }
 
 .tab-btn {
@@ -345,19 +361,6 @@ onMounted(async () => {
     margin: 0;
     max-width: 320px;
     line-height: 1.5;
-}
-
-.spinner {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    border: 4px solid #e3ebf6;
-    border-top-color: var(--primary);
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 /* Notification rows */
@@ -517,6 +520,21 @@ onMounted(async () => {
     cursor: not-allowed;
 }
 
+/* Skeleton */
+.skeleton {
+    background: linear-gradient(90deg, #eef0f3 25%, #e4e7ec 37%, #eef0f3 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: 6px;
+}
+@keyframes skeleton-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+.skeleton-line { border-radius: 4px; }
+.skeleton-icon { width: 36px; height: 36px; border-radius: 999px; flex-shrink: 0; }
+.skeleton-tab { width: 78px; height: 16px; margin: 12px 6px; border-radius: 4px; }
+
 @media (max-width: 640px) {
     .notifications-page {
         padding: 16px 16px 32px;
@@ -539,5 +557,49 @@ onMounted(async () => {
         flex-wrap: wrap;
         margin-left: 50px;
     }
+}
+
+/* ============ Dark mode ============ */
+:global(.dark .notifications-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .tabs-bar) { border-color: #334155; }
+:global(.dark .tab-btn:hover) { color: #F1F5F9; }
+
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .notif-row) { border-color: #263449; }
+:global(.dark .notif-row--unread) { background: #172033; }
+
+:global(.dark .notif-row__icon--warning) { background: rgba(245,124,0,0.16); }
+:global(.dark .notif-row__icon--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .notif-row__icon--primary) { background: rgba(66,165,245,0.16); }
+:global(.dark .notif-row__icon--danger) { background: rgba(239,83,80,0.16); }
+
+:global(.dark .notif-row__meta) { color: #64748b; }
+
+:global(.dark .notif-tag--reminder) { background: rgba(245,124,0,0.16); }
+:global(.dark .notif-tag--donation) { background: rgba(102,187,106,0.16); }
+:global(.dark .notif-tag--screening) { background: rgba(66,165,245,0.16); }
+:global(.dark .notif-tag--system) { background: #263449; color: #94a3b8; }
+
+:global(.dark .notif-row__read-status) { color: #475569; }
+
+:global(.dark .btn-outline) {
+    background: #263449;
+    color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; 
+}
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
+    background-size: 400% 100%;
 }
 </style>

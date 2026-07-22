@@ -15,7 +15,8 @@
         </div>
         <div class="header-actions">
           <button class="bell-btn">
-            <NuxtLink to="/blood-center/Notifications">
+            <!-- KEPT YANNIE'S lowercase path -->
+            <NuxtLink to="/blood-center/notifications">
               <AssetIcon name="bell" :size="16" />
               <span v-if="alerts.length" class="bell-dot" />
             </NuxtLink>
@@ -89,7 +90,8 @@
         <div class="panel fade-in" style="--delay: 320ms">
           <div class="panel-header">
             <h2 class="panel-title">Today's Appointments</h2>
-            <NuxtLink to="/blood-center/Appointments" class="panel-link-plain">View All</NuxtLink>
+            <!-- KEPT YANNIE'S lowercase path -->
+            <NuxtLink to="/blood-center/appointments" class="panel-link-plain">View All</NuxtLink>
           </div>
 
           <div v-if="todaysAppointments.length" class="appt-list">
@@ -113,7 +115,8 @@
         <div class="panel fade-in" style="--delay: 350ms">
           <div class="panel-header">
             <h2 class="panel-title">Recent Blood Requests</h2>
-            <NuxtLink to="/blood-center/Requests" class="panel-link">
+            <!-- KEPT YANNIE'S lowercase path -->
+            <NuxtLink to="/blood-center/requests" class="panel-link">
               View All
               <AssetIcon name="chevron-right" :size="14" />
             </NuxtLink>
@@ -128,7 +131,8 @@
               <span>Action</span>
             </div>
             <div v-for="r in recentRequests" :key="r.id" class="request-table__row">
-              <NuxtLink :to="`/blood-center/Requests?ref=${r.reference}`" class="request-table__ref">{{ r.reference }}</NuxtLink>
+              <!-- KEPT YANNIE'S lowercase path in the link -->
+              <NuxtLink :to="`/blood-center/requests?ref=${r.reference}`" class="request-table__ref">{{ r.reference }}</NuxtLink>
               <span class="request-table__blood" :style="{ color: requestBadgeColor(r.status) }">{{ r.blood_type }}</span>
               <span class="request-table__status" :style="{ color: requestBadgeColor(r.status) }">{{ statusLabel(r.status) }}</span>
               <span class="request-table__hospital">{{ r.facility_name }}</span>
@@ -144,7 +148,8 @@
         <div class="panel fade-in" style="--delay: 370ms">
           <div class="panel-header">
             <h2 class="panel-title">Stock Summary</h2>
-            <NuxtLink to="/blood-center/Inventory" class="panel-link-plain">Full Inventory</NuxtLink>
+            <!-- KEPT YANNIE'S lowercase path -->
+            <NuxtLink to="/blood-center/inventory" class="panel-link-plain">Full Inventory</NuxtLink>
           </div>
 
           <div v-if="stockSummary.length" class="stock-grid">
@@ -229,7 +234,8 @@ function requestActionLabel(status) {
 }
 
 function requestActionPath(r) {
-  return `/blood-center/Requests?ref=${r.reference}`
+  // KEPT YANNIE'S lowercase path
+  return `/blood-center/requests?ref=${r.reference}`
 }
 
 onMounted(async () => {

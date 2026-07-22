@@ -1,80 +1,87 @@
 <template>
     <div class="history-page">
-        <div class="header-row fade-in" style="--delay: 0ms">
-            <h1 class="page-title">Donation History</h1>
-            <p class="page-subtitle">A record of every donation you've completed.</p>
+        <!-- Skeleton loading state -->
+        <div v-if="loading" class="skeleton-wrap">
+            <div class="skeleton skeleton--header" />
+            <div class="skeleton-stats-grid">
+                <div class="skeleton skeleton--stat" v-for="n in 3" :key="n" />
+            </div>
+            <div class="skeleton skeleton--panel" style="height:320px" />
         </div>
 
-        <!-- Summary stats -->
-        <div v-if="!loading && donations.length > 0" class="stats-grid fade-in" style="--delay: 50ms">
-            <div class="stat-card">
-                <div class="stat-card__icon stat-card__icon--primary">
-                    <AssetIcon name="droplet" :size="18" />
-                </div>
-                <div>
-                    <p class="stat-card__value">{{ stats.totalDonations }}</p>
-                    <p class="stat-card__label">Total donations</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-card__icon stat-card__icon--success">
-                    <AssetIcon name="calendar" :size="18" />
-                </div>
-                <div>
-                    <p class="stat-card__value">{{ formattedLastDonation }}</p>
-                    <p class="stat-card__label">Last donation</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-card__icon stat-card__icon--warning">
-                    <AssetIcon name="heart" :size="18" />
-                </div>
-                <div>
-                    <p class="stat-card__value">{{ stats.livesImpacted ?? '—' }}</p>
-                    <p class="stat-card__label">Lives potentially helped</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- List -->
-        <div class="panel fade-in" style="--delay: 100ms">
-            <div v-if="loading" class="state-wrap">
-                <div class="spinner" />
+        <template v-else>
+            <div class="header-row fade-in" style="--delay: 0ms">
+                <h1 class="page-title">Your donation journey</h1>
+                <p class="page-subtitle">Review your complete record of past blood donations.</p>
             </div>
 
-            <div v-else-if="donations.length === 0" class="state-wrap state-wrap--empty">
-                <AssetIcon name="droplets" :size="32" style="color:#e5e7eb" />
-                <p class="state-title">No donations recorded yet</p>
-                <p class="state-sub">
-                    Once a blood center staff logs a completed donation for you, it will show up here automatically.
-                </p>
-                <NuxtLink to="/signup/donor/Appointments" class="btn-primary">
-                    Book an Appointment
-                </NuxtLink>
-            </div>
-
-            <div v-else class="history-list">
-                <div v-for="record in donations" :key="record.id" class="history-row">
-                    <div class="history-row__icon">
-                        <AssetIcon name="droplets" :size="18" />
+            <!-- Summary stats -->
+            <div v-if="donations.length > 0" class="stats-grid fade-in" style="--delay: 50ms">
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--primary">
+                        <AssetIcon name="droplet" :size="18" />
                     </div>
-
-                    <div class="history-row__body">
-                        <p class="history-row__title">{{ record.centerName }}</p>
-                        <p class="history-row__meta">{{ record.address }}</p>
-                        <p class="history-row__date">{{ formatDate(record.donatedOn) }} · {{ record.time }}</p>
+                    <div>
+                        <p class="stat-card__value">{{ stats.totalDonations }}</p>
+                        <p class="stat-card__label">Total donations</p>
                     </div>
-
-                    <div class="history-row__side">
-                        <span class="history-tag">{{ record.bloodType }}</span>
-                        <p class="history-row__volume">{{ record.volumeMl }} mL</p>
-                        <span class="history-status" :class="`history-status--${record.status}`">
-                            {{ statusLabel(record.status) }}
-                        </span>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--success">
+                        <AssetIcon name="calendar" :size="18" />
+                    </div>
+                    <div>
+                        <p class="stat-card__value">{{ formattedLastDonation }}</p>
+                        <p class="stat-card__label">Last donation</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--warning">
+                        <AssetIcon name="heart" :size="18" />
+                    </div>
+                    <div>
+                        <p class="stat-card__value">{{ stats.livesImpacted ?? '—' }}</p>
+                        <p class="stat-card__label">Lives potentially helped</p>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <!-- List -->
+            <div class="panel fade-in" style="--delay: 100ms">
+                <div v-if="donations.length === 0" class="state-wrap state-wrap--empty">
+                    <AssetIcon name="droplets" :size="32" style="color:#e5e7eb" />
+                    <p class="state-title">No donations recorded yet</p>
+                    <p class="state-sub">
+                        Once a blood center staff logs a completed donation for you, it will show up here automatically.
+                    </p>
+                    <NuxtLink to="/donor/appointments" class="btn-primary">
+                        Book an Appointment
+                    </NuxtLink>
+                </div>
+
+                <div v-else class="history-list">
+                    <div v-for="record in donations" :key="record.id" class="history-row">
+                        <div class="history-row__icon">
+                            <AssetIcon name="droplets" :size="18" />
+                        </div>
+
+                        <div class="history-row__body">
+                            <p class="history-row__title">{{ record.centerName }}</p>
+                            <p class="history-row__meta">{{ record.address }}</p>
+                            <p class="history-row__date">{{ formatDate(record.donatedOn) }} · {{ record.time }}</p>
+                        </div>
+
+                        <div class="history-row__side">
+                            <span class="history-tag">{{ record.bloodType }}</span>
+                            <p class="history-row__volume">{{ record.volumeMl }} mL</p>
+                            <span class="history-status" :class="`history-status--${record.status}`">
+                                {{ statusLabel(record.status) }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </template>
 
@@ -82,8 +89,8 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  layout: 'donordashboard',
-  middleware: 'auth',
+    layout: 'donordashboard',
+    middleware: 'auth',
 })
 
 const loading = ref(true)
@@ -176,8 +183,61 @@ onMounted(async () => {
 }
 
 @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Skeleton loading */
+.skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+    background-size: 400% 100%;
+    border-radius: 14px;
+    animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--header {
+    height: 40px;
+    max-width: 280px;
+}
+
+.skeleton-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.skeleton--stat {
+    height: 72px;
+}
+
+.skeleton--panel {
+    border-radius: 14px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton, .fade-in { animation: none !important; }
+}
+
+@media (max-width: 900px) {
+    .skeleton-stats-grid { grid-template-columns: 1fr; }
 }
 
 .header-row {
@@ -226,9 +286,20 @@ onMounted(async () => {
     flex-shrink: 0;
 }
 
-.stat-card__icon--primary { background: #eaf3fc; color: var(--primary); }
-.stat-card__icon--success { background: #eaf6ea; color: var(--success); }
-.stat-card__icon--warning { background: #fff4e5; color: var(--warning); }
+.stat-card__icon--primary {
+    background: #eaf3fc;
+    color: var(--primary);
+}
+
+.stat-card__icon--success {
+    background: #eaf6ea;
+    color: var(--success);
+}
+
+.stat-card__icon--warning {
+    background: #fff4e5;
+    color: var(--warning);
+}
 
 .stat-card__value {
     font-size: 17px;
@@ -279,19 +350,6 @@ onMounted(async () => {
     margin: 0 0 16px;
     max-width: 300px;
     line-height: 1.5;
-}
-
-.spinner {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    border: 4px solid #e3ebf6;
-    border-top-color: var(--primary);
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 /* History rows */
@@ -434,5 +492,67 @@ onMounted(async () => {
         margin-left: 50px;
         min-width: 0;
     }
+}
+
+/* ============ Dark mode ============ */
+:global(.dark .history-page) {
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    background: #0F172A;
+}
+
+:global(.dark .stat-card),
+:global(.dark .panel) {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+:global(.dark .stat-card__icon--primary) {
+    background: rgba(66, 165, 245, 0.16);
+}
+
+:global(.dark .stat-card__icon--success) {
+    background: rgba(102, 187, 106, 0.16);
+}
+
+:global(.dark .stat-card__icon--warning) {
+    background: rgba(255, 167, 38, 0.16);
+}
+
+:global(.dark .history-row) {
+    border-color: #263449;
+}
+
+:global(.dark .history-row__icon) {
+    background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .history-row__meta) {
+    color: #94A3B8;
+}
+
+:global(.dark .history-row__date) {
+    color: #64748B;
+}
+
+:global(.dark .history-tag) {
+    background: rgba(66, 165, 245, 0.16);
+    color: #90CAF9;
+}
+
+:global(.dark .history-status--completed) {
+    background: rgba(102, 187, 106, 0.16);
+}
+
+:global(.dark .history-status--deferred) {
+    background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .state-title) {
+    color: #F1F5F9;
+}
+
+:global(.dark .skeleton) {
+    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>

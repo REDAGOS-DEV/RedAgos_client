@@ -12,7 +12,8 @@
             <p class="brand-subtitle">Blood Bank System</p>
           </div>
 
-          <NuxtLink to="/#home" class="back-link">
+          <!-- KEPT YANNIE'S VERSION – simply "/" -->
+          <NuxtLink to="/" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
              Back to Home
           </NuxtLink>

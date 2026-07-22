@@ -1,131 +1,182 @@
 <template>
   <div class="appointment-page">
-    <div class="header-row fade-in" style="--delay: 0ms">
-      <h1 class="page-title">Book an Appointment</h1>
-      <p class="page-subtitle">Choose where and when you'd like to donate.</p>
+    <!-- Skeleton loading state -->
+    <div v-if="loading" class="appointment-page-inner">
+      <div class="skeleton skeleton--header" />
+      <div class="skeleton skeleton--steps" />
+      <div class="skeleton skeleton--grid">
+        <div class="skeleton skeleton--card" v-for="n in 2" :key="n" />
+      </div>
+      <div class="skeleton skeleton--panel" />
     </div>
 
-    <!-- Step 1: Select type -->
-    <div class="step-section fade-in" style="--delay: 50ms">
-      <h2 class="step-label">Step 1 - Select type</h2>
-      <div class="type-grid">
-        <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'walkin' }"
-          @click="selectType('walkin')">
-          <AssetIcon name="calendar" :size="16" class="type-card__icon" />
-
-          <span class="type-card__body">
-            <span class="type-card__title">Walk-in at blood center</span>
-            <span class="type-card__desc">Book a time slot at a blood center</span>
-          </span>
-          <span class="radio" :class="{ 'radio--active': appointmentType === 'walkin' }" />
-        </button>
-
-        <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'mobile' }"
-          @click="selectType('mobile')">
-          <AssetIcon name="truck" :size="16" class="type-card__icon" />
-          <span class="type-card__body">
-            <span class="type-card__title">Register for mobile drive</span>
-            <span class="type-card__desc">Join an upcoming community blood drive</span>
-          </span>
-          <span class="radio" :class="{ 'radio--active': appointmentType === 'mobile' }" />
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 2 (walk-in): choose blood center -->
-    <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 100ms">
-      <h2 class="step-label">Step 2 - Choose blood center</h2>
-      <div class="center-grid">
-        <button v-for="center in bloodCenters" :key="center.id" type="button" class="center-card"
-          :class="{ 'center-card--active': selectedCenterId === center.id }" @click="selectedCenterId = center.id">
-          <span class="center-card__top">
-            <span class="center-card__name">{{ center.name }}</span>
-            <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
-          </span>
-          <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
-          <span class="badge badge--success">{{ center.status }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 2 (mobile): choose blood drive -->
-    <div v-else-if="appointmentType === 'mobile'" class="step-section fade-in" style="--delay: 100ms">
-      <h2 class="step-label">Step 2 - Choose blood drive</h2>
-
-      <div v-if="drivesLoading" class="drive-state">
-        <div class="spinner" />
-        <p>Loading blood drives...</p>
+    <div v-else class="appointment-page-inner">
+      <div class="header-row fade-in" style="--delay: 0ms">
+        <h1 class="page-title">Plan your next donation!</h1>
+        <p class="page-subtitle">Schedule your next blood donation by choosing your preferred date, time, and donation center.</p>
       </div>
 
-      <div v-else-if="bloodDrives.length" class="drive-list">
-        <button v-for="drive in bloodDrives" :key="drive.id" type="button" class="drive-card"
-          :class="{ 'drive-card--active': selectedDriveId === drive.id }" :disabled="driveSlotsLeft(drive) === 0"
-          @click="selectedDriveId = drive.id">
-          <div class="drive-card__top">
-            <div>
-              <p class="drive-card__name">{{ drive.name }}</p>
-              <p class="drive-card__meta">{{ drive.date }} · {{ drive.time }}</p>
+      <!-- Step indicator -->
+      <div class="step-indicator fade-in" style="--delay: 40ms">
+        <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 1 }">
+          <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 1 }">1</span>
+          <span class="step-indicator__label">Type</span>
+        </div>
+        <div class="step-indicator__line" :class="{ 'step-indicator__line--active': activeStepNum >= 2 }" />
+        <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 2 }">
+          <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 2 }">2</span>
+          <span class="step-indicator__label">{{ appointmentType === 'walkin' ? 'Center' : 'Drive' }}</span>
+        </div>
+        <template v-if="appointmentType === 'walkin'">
+          <div class="step-indicator__line" :class="{ 'step-indicator__line--active': activeStepNum >= 3 }" />
+          <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 3 }">
+            <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 3 }">3</span>
+            <span class="step-indicator__label">Date &amp; Time</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Step 1: Select type -->
+      <div class="step-section fade-in" style="--delay: 80ms">
+        <h2 class="step-label">
+          <span class="step-label__num">1</span>
+          Select type
+        </h2>
+        <div class="type-grid">
+          <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'walkin' }"
+            @click="selectType('walkin')">
+            <span class="type-card__icon">
+              <AssetIcon name="calendar" :size="18" />
+            </span>
+
+            <span class="type-card__body">
+              <span class="type-card__title">Walk-in at blood center</span>
+              <span class="type-card__desc">Book a time slot at a blood center</span>
+            </span>
+            <span class="radio" :class="{ 'radio--active': appointmentType === 'walkin' }" />
+          </button>
+
+          <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'mobile' }"
+            @click="selectType('mobile')">
+            <span class="type-card__icon">
+              <AssetIcon name="truck" :size="18" />
+            </span>
+            <span class="type-card__body">
+              <span class="type-card__title">Register for mobile drive</span>
+              <span class="type-card__desc">Join an upcoming community blood drive</span>
+            </span>
+            <span class="radio" :class="{ 'radio--active': appointmentType === 'mobile' }" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 (walk-in): choose blood center -->
+      <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 120ms">
+        <h2 class="step-label">
+          <span class="step-label__num">2</span>
+          Choose blood center
+        </h2>
+        <div class="center-grid">
+          <button v-for="center in bloodCenters" :key="center.id" type="button" class="center-card"
+            :class="{ 'center-card--active': selectedCenterId === center.id }" @click="selectedCenterId = center.id">
+            <span class="center-card__top">
+              <span class="center-card__name">{{ center.name }}</span>
+              <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
+            </span>
+            <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
+            <span class="badge badge--success">{{ center.status }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 (mobile): choose blood drive -->
+      <div v-else-if="appointmentType === 'mobile'" class="step-section fade-in" style="--delay: 120ms">
+        <h2 class="step-label">
+          <span class="step-label__num">2</span>
+          Choose blood drive
+        </h2>
+
+        <div v-if="drivesLoading" class="drive-state">
+          <div class="spinner" />
+          <p>Loading blood drives...</p>
+        </div>
+
+        <div v-else-if="bloodDrives.length" class="drive-list">
+          <button v-for="drive in bloodDrives" :key="drive.id" type="button" class="drive-card"
+            :class="{ 'drive-card--active': selectedDriveId === drive.id }" :disabled="driveSlotsLeft(drive) === 0"
+            @click="selectedDriveId = drive.id">
+            <div class="drive-card__top">
+              <div>
+                <p class="drive-card__name">{{ drive.name }}</p>
+                <p class="drive-card__meta">{{ drive.date }} · {{ drive.time }}</p>
+              </div>
+              <span class="badge" :class="driveStatusClass(drive)">{{ driveStatusLabel(drive) }}</span>
             </div>
-            <span class="badge" :class="driveStatusClass(drive)">{{ driveStatusLabel(drive) }}</span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" :class="driveProgressClass(drive)"
-              :style="{ width: driveProgressPct(drive) + '%' }" />
-          </div>
-          <div class="drive-card__bottom">
-            <span>{{ drive.registered }} registered</span>
-            <span>{{ driveSlotsLeft(drive) }} slots left</span>
-          </div>
-        </button>
+            <div class="progress-track">
+              <div class="progress-fill" :class="driveProgressClass(drive)"
+                :style="{ width: driveProgressPct(drive) + '%' }" />
+            </div>
+            <div class="drive-card__bottom">
+              <span>{{ drive.registered }} registered</span>
+              <span>{{ driveSlotsLeft(drive) }} slots left</span>
+            </div>
+          </button>
+        </div>
+
+        <div v-else class="drive-state">
+          <AssetIcon name="truck" :size="32" style="color:#e5e7eb" />
+          <p>No blood drives posted yet.</p>
+          <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
+        </div>
       </div>
 
-      <div v-else class="drive-state">
-        <AssetIcon name="truck" :size="32" style="color:#e5e7eb" />
-        <p>No blood drives posted yet.</p>
-        <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
-      </div>
-    </div>
+      <!-- Step 3 (walk-in only): date & time slot -->
+      <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 160ms">
+        <h2 class="step-label">
+          <span class="step-label__num">3</span>
+          Select date &amp; time slot
+        </h2>
+        <div class="panel">
+          <div class="form-body">
+            <label class="form-label">Date</label>
+            <input v-model="selectedDate" type="date" class="form-input form-input--lg">
 
-    <!-- Step 3 (walk-in only): date & time slot -->
-    <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 150ms">
-      <h2 class="step-label">Step 3 - Select date & time slot</h2>
-      <div class="panel">
-        <div class="form-body">
-          <label class="form-label">Date</label>
-          <input v-model="selectedDate" type="date" class="form-input form-input--lg">
+            <p class="slots-heading">Available time slots — {{ formattedSelectedDate }}</p>
 
-          <p class="slots-heading">Available time slots - {{ formattedSelectedDate }}</p>
+            <div v-if="slotsLoading" class="drive-state">
+              <div class="spinner" />
+              <p>Loading time slots...</p>
+            </div>
 
-          <div v-if="slotsLoading" class="drive-state">
-            <div class="spinner" />
-            <p>Loading time slots...</p>
-          </div>
+            <div v-else-if="slotsError" class="drive-state">
+              <p>{{ slotsError }}</p>
+            </div>
 
-          <div v-else-if="slotsError" class="drive-state">
-            <p>{{ slotsError }}</p>
-          </div>
+            <div v-else-if="timeSlots.length" class="slots-grid">
+              <button v-for="slot in timeSlots" :key="slot.time" type="button" class="slot-btn"
+                :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
+                :disabled="slot.available === 0" @click="selectedTimeSlot = slot.time">
+                <span class="slot-btn__time">{{ slot.time }}</span>
+                <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} of ${slot.total}
+                  available` }}</span>
+              </button>
+            </div>
 
-          <div v-else-if="timeSlots.length" class="slots-grid">
-            <button v-for="slot in timeSlots" :key="slot.time" type="button" class="slot-btn"
-              :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
-              :disabled="slot.available === 0" @click="selectedTimeSlot = slot.time">
-              <span class="slot-btn__time">{{ slot.time }}</span>
-              <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} of ${slot.total}
-                available` }}</span>
-            </button>
-          </div>
-
-          <div v-else class="drive-state">
-            <AssetIcon name="calendar" :size="32" style="color:#e5e7eb" />
-            <p>No time slots set for this date.</p>
-            <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet — try another date.</p>
+            <div v-else class="drive-state">
+              <AssetIcon name="calendar" :size="32" style="color:#e5e7eb" />
+              <p>No time slots set for this date.</p>
+              <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet — try another date.</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="continue-row fade-in" style="--delay: 200ms">
-      <button type="button" class="btn-primary" :disabled="!canContinue" @click="showSummary = true">Continue</button>
+      <div class="continue-row fade-in" style="--delay: 200ms">
+        <button type="button" class="btn-primary" :disabled="!canContinue" @click="showSummary = true">
+          Continue
+          <AssetIcon name="arrow-right" :size="15" />
+        </button>
+      </div>
     </div>
 
     <!-- Booking summary modal -->
@@ -179,6 +230,9 @@ definePageMeta({
 
 const router = useRouter()
 
+// Page-level loading state — shows skeleton on mount
+const loading = ref(true)
+
 const appointmentType = ref('walkin')
 const selectedCenterId = ref('subnational')
 const selectedDriveId = ref(null)
@@ -193,6 +247,17 @@ function selectType(type) {
   appointmentType.value = type
   selectedTimeSlot.value = null
 }
+
+// Step indicator progress
+const activeStepNum = computed(() => {
+  if (appointmentType.value === 'walkin') {
+    if (selectedTimeSlot.value) return 3
+    if (selectedCenterId.value) return 2
+    return 1
+  }
+  if (selectedDriveId.value) return 2
+  return 1
+})
 
 const bloodCenters = reactive([
   { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon – Fri 8 AM – 3 PM', status: 'Open today' },
@@ -240,13 +305,14 @@ watch(appointmentType, (type) => {
   if (type === 'walkin') fetchTimeSlots()
 })
 
-onMounted(() => {
-  if (appointmentType.value === 'walkin') fetchTimeSlots()
+onMounted(async () => {
+  if (appointmentType.value === 'walkin') await fetchTimeSlots()
+  loading.value = false
 })
 
 // Backend contract: GET /api/blood-drives
 // Only returns drives that a blood center has actually posted/scheduled —
-// donors should only ever see events that exist in the backend, never mock/placeholder ones.
+// donors should only ever see events that exist in the backend.
 // Response fields: [{ id, name, date, time, registered, total_slots, status }]
 // status: 'upcoming' | 'open' | 'closed' (closed = past cutoff, before slots run out)
 const bloodDrives = ref([])
@@ -293,8 +359,6 @@ function driveStatusClass(drive) {
   return 'badge--success'
 }
 
-// Fetch drives as soon as the donor switches to the "mobile drive" flow,
-// and only once — re-selecting the tab won't refetch.
 let drivesFetched = false
 watch(appointmentType, (type) => {
   if (type === 'mobile' && !drivesFetched) {
@@ -347,7 +411,6 @@ async function handleConfirm() {
   try {
     // Backend contract: POST /api/appointments
     // Body: { type, center_id | drive_id, date, time_slot }
-    // Response: mag-generate ug QR code para sa appointment/registration
     await $fetch('/api/appointments', {
       method: 'POST',
       body: {
@@ -372,27 +435,33 @@ async function handleConfirm() {
 }
 
 function viewQr() {
-  router.push('/signup/donor/MyQRCode')
+  router.push('/donor/qrcode')
 }
 
 function goDashboard() {
-  router.push('/signup/donor/Dashboard')
+  router.push('/donor/dashboard')
 }
 </script>
 
 <style scoped>
 .appointment-page {
   --primary: #1565c0;
+  --primary-dark: #0d47a1;
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
+  --border: #eef0f3;
   max-width: 1152px;
   margin: 0 auto;
   padding: 24px 32px 60px;
-  display: flex;
   background: #F5F7FA;
+  transition: background-color 0.2s ease;
+}
+
+.appointment-page-inner {
+  display: flex;
   flex-direction: column;
   gap: 24px;
 }
@@ -403,8 +472,9 @@ function goDashboard() {
 }
 
 .page-title {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   margin: 0;
 }
@@ -412,7 +482,7 @@ function goDashboard() {
 .page-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
-  margin: 2px 0 0;
+  margin: 3px 0 0;
 }
 
 .fade-in {
@@ -421,37 +491,127 @@ function goDashboard() {
 }
 
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .skeleton { animation: none !important; }
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+  background-size: 400% 100%;
+  border-radius: 14px;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--header { height: 52px; max-width: 340px; }
+.skeleton--steps { height: 40px; max-width: 420px; }
+.skeleton--grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.skeleton--card { height: 84px; border-radius: 12px; }
+.skeleton--panel { height: 220px; border-radius: 14px; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Step indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-indicator__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.step-indicator__item--active {
+  opacity: 1;
+}
+
+.step-indicator__circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.step-indicator__circle--filled {
+  background: var(--primary);
+  color: white;
+}
+
+.step-indicator__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.step-indicator__line {
+  flex: 1;
+  max-width: 48px;
+  height: 2px;
+  background: #e5e7eb;
+  transition: background 0.2s ease;
+}
+
+.step-indicator__line--active {
+  background: var(--primary);
 }
 
 .step-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .step-label {
-  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   color: var(--text-primary);
-  text-transform: uppercase;
   margin: 0;
+}
+
+.step-label__num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #eaf3fc;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 /* Type cards */
 .type-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 .type-card {
@@ -459,12 +619,19 @@ function goDashboard() {
   align-items: center;
   gap: 14px;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 18px 20px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.type-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-color: #d9e2ee;
 }
 
 .type-card--active {
@@ -472,22 +639,32 @@ function goDashboard() {
   border-color: var(--primary);
 }
 
+.type-card--active:hover {
+  box-shadow: 0 6px 16px rgba(21, 101, 192, 0.12);
+}
+
 .type-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #eaf3fc;
   color: var(--primary);
+  transition: background 0.15s ease;
+}
+
+.type-card--active .type-card__icon {
+  background: var(--primary);
+  color: white;
 }
 
 .type-card__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   flex: 1;
 }
 
@@ -500,6 +677,7 @@ function goDashboard() {
 .type-card__desc {
   font-size: 12.5px;
   color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .radio {
@@ -509,6 +687,7 @@ function goDashboard() {
   border: 2px solid #d1d5db;
   flex-shrink: 0;
   position: relative;
+  transition: border-color 0.15s ease;
 }
 
 .radio--active {
@@ -527,20 +706,27 @@ function goDashboard() {
 .center-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
 .center-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   text-align: left;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 16px 18px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.center-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-color: #d9e2ee;
 }
 
 .center-card--active {
@@ -559,6 +745,7 @@ function goDashboard() {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.35;
 }
 
 .center-card__meta {
@@ -597,12 +784,12 @@ function goDashboard() {
   background: white;
   border-radius: 14px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 
 .form-body {
-  padding: 20px;
+  padding: 22px;
 }
 
 .form-label {
@@ -616,7 +803,7 @@ function goDashboard() {
 .form-input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 9px;
   border: 1px solid #e5e7eb;
   font-size: 14px;
   color: var(--text-primary);
@@ -638,13 +825,13 @@ function goDashboard() {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 20px 0 12px;
+  margin: 22px 0 12px;
 }
 
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .slot-btn {
@@ -658,6 +845,11 @@ function goDashboard() {
   background: white;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.slot-btn:hover:not(:disabled):not(.slot-btn--active) {
+  border-color: #b9d3ef;
+  background: #f7fafd;
 }
 
 .slot-btn--active {
@@ -682,7 +874,7 @@ function goDashboard() {
 }
 
 .slot-btn__avail {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
@@ -690,7 +882,7 @@ function goDashboard() {
 .drive-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .drive-card {
@@ -699,11 +891,17 @@ function goDashboard() {
   gap: 12px;
   text-align: left;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 18px 20px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.drive-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
 }
 
 .drive-card--active {
@@ -747,6 +945,7 @@ function goDashboard() {
 .progress-fill {
   height: 100%;
   border-radius: 999px;
+  transition: width 0.3s ease;
 }
 
 .progress-fill--blue {
@@ -771,8 +970,8 @@ function goDashboard() {
   color: var(--text-secondary);
   font-size: 13px;
   background: white;
-  border: 1px solid #eef0f3;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 
 .drive-state__sub {
@@ -792,6 +991,9 @@ function goDashboard() {
 .continue-row {
   display: flex;
   justify-content: flex-end;
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
 }
 
 /* Buttons */
@@ -799,25 +1001,29 @@ function goDashboard() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 24px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 13px 26px;
+  border-radius: 11px;
   font-size: 13.5px;
   font-weight: 700;
   color: white;
   background: var(--primary);
+  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25);
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
+  opacity: 0.94;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(21, 101, 192, 0.3);
 }
 
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-block {
@@ -829,7 +1035,7 @@ function goDashboard() {
   align-items: center;
   justify-content: center;
   padding: 12px 24px;
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
@@ -847,7 +1053,8 @@ function goDashboard() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -857,14 +1064,14 @@ function goDashboard() {
 
 .modal-card {
   background: white;
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 18px;
+  padding: 26px;
   width: 100%;
   max-width: 380px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.2);
 }
 
 .modal-title {
@@ -963,11 +1170,9 @@ function goDashboard() {
   .center-grid {
     grid-template-columns: 1fr;
   }
-
   .type-grid {
     grid-template-columns: 1fr;
   }
-
   .slots-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -977,5 +1182,70 @@ function goDashboard() {
   .appointment-page {
     padding: 16px 16px 40px;
   }
+  .step-indicator__label {
+    display: none;
+  }
+}
+
+/* ============ Dark mode ============ */
+:global(.dark .appointment-page) {
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+  background: #0F172A;
+}
+
+:global(.dark .type-card),
+:global(.dark .center-card),
+:global(.dark .drive-card),
+:global(.dark .drive-state),
+:global(.dark .panel),
+:global(.dark .slot-btn),
+:global(.dark .modal-card) {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+:global(.dark .type-card--active),
+:global(.dark .center-card--active),
+:global(.dark .drive-card--active),
+:global(.dark .slot-btn--active) {
+  background: rgba(66,165,245,0.14);
+}
+
+:global(.dark .type-card__icon) { background: rgba(66,165,245,0.16); }
+:global(.dark .type-card--active .type-card__icon) { background: var(--primary); }
+
+:global(.dark .step-label__num) { background: rgba(66,165,245,0.16); }
+
+:global(.dark .step-indicator__circle) { background: #263449; color: #94a3b8; }
+:global(.dark .step-indicator__line) { background: #263449; }
+
+:global(.dark .form-input) {
+  background: #0F172A;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+
+:global(.dark .slot-btn--full) { background: #263449; }
+:global(.dark .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: #263449; border-color: #3f5878; }
+
+:global(.dark .badge--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
+:global(.dark .badge--full) { background: #263449; }
+
+:global(.dark .progress-track) { background: #334155; }
+:global(.dark .progress-fill--full) { background: #475569; }
+
+:global(.dark .btn-outline) {
+  background: #263449;
+  color: #E2E8F0;
+}
+:global(.dark .btn-outline:hover) { background: #334155; }
+
+:global(.dark .summary-row) { border-color: #263449; }
+
+:global(.dark .skeleton) {
+  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>
