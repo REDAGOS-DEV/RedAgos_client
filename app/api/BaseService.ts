@@ -32,10 +32,17 @@ export class BaseService {
       return await $fetch<T>(url, config);
     } catch (error: any) {
       const status = error?.response?.status;
+      const responseData = error?.response?._data || error?.data || {};
       const message =
-        error?.response?._data?.message ||
-        error?.data?.message ||
+        responseData?.message ||
         error?.message;
+      const requestError = new Error(message || "Something went wrong. Please try again.") as Error & {
+        status?: number;
+        errors?: Record<string, string[]>;
+      };
+
+      requestError.status = status;
+      requestError.errors = responseData?.errors;
  
       switch (status) {
         case 400:
@@ -43,13 +50,12 @@ export class BaseService {
         case 404:
         case 422:
         case 429:
-          throw new Error(message || "Validation or Request Error");
+          throw requestError;
         case 500:
-          throw new Error(
-            message || "Server error. Please try again or contact the administrator.",
-          );
+          requestError.message = message || "Server error. Please try again or contact the administrator.";
+          throw requestError;
         default:
-          throw new Error(message || "Something went wrong. Please try again.");
+          throw requestError;
       }
     }
   }
