@@ -88,6 +88,9 @@
       </div>
 
       <form class="donor-form" @submit.prevent="handleSubmit">
+        <p v-if="errorMessage" class="form-message form-message--error" role="alert">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="form-message form-message--success" role="status">{{ successMessage }}</p>
+
         <div class="form-row">
           <div class="form-field">
             <label for="firstName">First Name</label>
@@ -193,8 +196,8 @@
           </span>
         </label>
 
-        <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms">
-          Submit Registration
+        <button type="submit" class="submit-btn" :disabled="loading || !form.agreedToTerms">
+          {{ loading ? 'Submitting Registration...' : 'Submit Registration' }}
         </button>
 
         <p class="signin-row">
@@ -234,9 +237,57 @@ const form = reactive({
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+const loading = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
 
-function handleSubmit() {
-  console.log('Submitting donor registration:', form)
+function firstValidationMessage(errors) {
+  const messages = Object.values(errors ?? {}).flat()
+  return messages[0] || 'Registration failed. Please review your details and try again.'
+}
+
+async function handleSubmit() {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  if (!form.firstName || !form.lastName || !form.email || !form.phone || !form.bloodType || !form.dob || !form.gender || !form.address || !form.password) {
+    errorMessage.value = 'Please complete all fields.'
+    return
+  }
+
+  if (form.password !== form.confirmPassword) {
+    errorMessage.value = 'Passwords do not match.'
+    return
+  }
+
+  loading.value = true
+
+  try {
+    const config = useRuntimeConfig()
+    const response = await $fetch(`${config.public.apiBaseURL}/donors/register`, {
+      method: 'POST',
+      body: {
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        blood_type: form.bloodType,
+        gender: form.gender,
+        birth_date: form.dob,
+        address: form.address,
+        password: form.password,
+        password_confirmation: form.confirmPassword,
+        terms_accepted: form.agreedToTerms,
+      },
+    })
+
+    successMessage.value = response.message || 'Registration submitted successfully. You can now sign in.'
+    await navigateTo('/login')
+  } catch (error) {
+    errorMessage.value = firstValidationMessage(error?.data?.errors)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -245,6 +296,25 @@ function handleSubmit() {
   display: grid;
   grid-template-columns: 480px 1fr;
   min-height: 100vh;
+}
+
+.form-message {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.form-message--error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+}
+
+.form-message--success {
+  color: #027a48;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
 }
 
 @media (max-width: 1023px) {
