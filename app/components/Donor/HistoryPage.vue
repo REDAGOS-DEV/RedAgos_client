@@ -113,14 +113,14 @@ function statusLabel(status) {
 }
 
 function formatDate(value) {
-    if (!value) return 'â€”'
+    if (!value) return '-'
     const d = new Date(value)
-    if (Number.isNaN(d.getTime())) return 'â€”'
+    if (Number.isNaN(d.getTime())) return '-'
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const formattedLastDonation = computed(() => {
-    if (donations.value.length === 0) return 'â€”'
+    if (donations.value.length === 0) return '-'
     return formatDate(donations.value[0]?.donatedOn)
 })
 

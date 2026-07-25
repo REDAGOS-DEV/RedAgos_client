@@ -152,7 +152,7 @@ Output:
             </div>
         </template>
 
-        <!-- Success modal: shown only when the submitted screening comes back eligible -->
+        <!-- Success modal, makita rani if ang result sa eligibility screening kay "eligible" -->
         <Teleport to="body">
             <Transition name="modal-fade">
                 <div v-if="showPassedModal" class="modal-backdrop" @click.self="showPassedModal = false">
@@ -205,10 +205,6 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const router = useRouter()
 const submitting = ref(false)
-
-// Page-load skeleton â€” mirrors the Dashboard's pattern. Real work here is
-// pre-filling the vitals the donor already has on file (e.g. blood type),
-// so returning donors don't have to retype what the system already knows.
 const loading = ref(true)
 
 // Modal + QR state shown after an eligible result
@@ -218,7 +214,7 @@ const qrExpiresOn = ref(null)
 const qrValidityDays = ref(14)
 
 // Step indicator: 1 = General Health, 2 = Medical History, 3 = Vital Information,
-// 4 = Ready to submit. Auto-advances as the user finishes each card â€” dili na
+// 4 = Ready to submit. Auto-advances as the user finishes each card dili na
 // static, mo-progress base sa gi-answeran na sa user.
 const steps = [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }]
 
@@ -289,9 +285,9 @@ const resultTextClass = computed(() => {
 })
 
 const formattedQrExpiry = computed(() => {
-    if (!qrExpiresOn.value) return 'â€”'
+    if (!qrExpiresOn.value) return '-'
     const d = new Date(qrExpiresOn.value)
-    if (Number.isNaN(d.getTime())) return 'â€”'
+    if (Number.isNaN(d.getTime())) return '-'
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 })
 

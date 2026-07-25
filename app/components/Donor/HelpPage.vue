@@ -138,7 +138,7 @@ Output:
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 
-// Page-load skeleton â€” same pattern as the rest of the dashboard. The FAQ
+// Page-load skeleton same pattern as the rest of the dashboard. The FAQ
 // topics themselves are static copy, but contact info (hotline/email/hours)
 // is the kind of thing a blood center admin would actually configure on the
 // backend, so that's what gates the loading state here.
@@ -148,7 +148,7 @@ const contactInfo = reactive({
     hotline: '+63281234567',
     hotlineLabel: '(02) 8123-4567',
     email: 'support@bloodcenter.example',
-    hours: 'Monâ€“Sat, 8:00 AM â€“ 5:00 PM',
+    hours: 'Mon - Sat, 8:00 AM - 5:00 PM',
 })
 
 const quickTopics = [
@@ -195,7 +195,7 @@ const faqs = reactive([
     {
         id: 'deferred',
         question: "What happens if I'm deferred during screening?",
-        answer: "A deferral just means you're not eligible right now â€” it's usually temporary (e.g. recent illness or travel). Check the reason shown after your screening, and you can retake it once the waiting period has passed.",
+        answer: "A deferral just means you're not eligible right now, it's usually temporary (e.g. recent illness or travel). Check the reason shown after your screening, and you can retake it once the waiting period has passed.",
     },
     {
         id: 'qr-validity',
@@ -205,12 +205,12 @@ const faqs = reactive([
     {
         id: 'qr-share',
         question: 'Is it safe to share my QR code with others?',
-        answer: "No â€” your QR code is personal and tied to your own eligibility result. Don't share it with anyone else; only present it to blood center staff when you arrive for your appointment.",
+        answer: "No, your QR code is personal and tied to your own eligibility result. Don't share it with anyone else; only present it to blood center staff when you arrive for your appointment.",
     },
     {
         id: 'missed-appointment',
         question: 'What if I miss my appointment?',
-        answer: "No worries â€” your eligibility screening stays valid as long as it hasn't expired. Just book a new appointment for another available date and time.",
+        answer: "No worries, your eligibility screening stays valid as long as it hasn't expired. Just book a new appointment for another available date and time.",
     },
     {
         id: 'wrong-blood-type',

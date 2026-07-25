@@ -207,9 +207,9 @@ const steps = computed(() => [
 ])
 
 function formatDate(value) {
-  if (!value) return 'â€”'
+  if (!value) return '-'
   const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return 'â€”'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 

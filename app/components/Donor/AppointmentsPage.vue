@@ -86,7 +86,7 @@ Output:
               <span class="center-card__name">{{ center.name }}</span>
               <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
             </span>
-            <span class="center-card__meta">{{ center.location }} Â· {{ center.hours }}</span>
+            <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
             <span class="badge badge--success">{{ center.status }}</span>
           </button>
         </div>
@@ -144,7 +144,7 @@ Output:
             <label class="form-label">Date</label>
             <input v-model="selectedDate" type="date" class="form-input form-input--lg">
 
-            <p class="slots-heading">Available time slots â€” {{ formattedSelectedDate }}</p>
+            <p class="slots-heading">Available time slots: {{ formattedSelectedDate }}</p>
 
             <div v-if="slotsLoading" class="drive-state">
               <div class="spinner" />
@@ -260,13 +260,13 @@ const activeStepNum = computed(() => {
 })
 
 const bloodCenters = reactive([
-  { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon â€“ Fri 8 AM â€“ 3 PM', status: 'Open today' },
-  { id: 'prc', name: 'PRC Davao Blood Services', location: 'Davao City', hours: 'Mon â€“ Sat 7 AM â€“ 4 PM', status: 'Open today' },
+  { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon - Fri 8 AM - 3 PM', status: 'Open today' },
+  { id: 'prc', name: 'PRC Davao Blood Services', location: 'Davao City', hours: 'Mon - Sat 7 AM - 4 PM', status: 'Open today' },
   { id: 'spmc', name: 'SPMC Blood Bank', location: 'Davao City', hours: '24/7', status: 'Open today' },
 ])
 
 // Backend contract: GET /api/time-slots?center_id=&date=
-// The blood center configures its own slot schedule and capacity per day â€”
+// The blood center configures its own slot schedule and capacity per day
 // donors only ever see whatever the center has actually set for that date.
 // Response fields: [{ time, available, total }]
 const timeSlots = ref([])
@@ -368,9 +368,9 @@ watch(appointmentType, (type) => {
 })
 
 function formatDate(value) {
-  if (!value) return 'â€”'
+  if (!value) return '-'
   const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return 'â€”'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -392,18 +392,18 @@ const canContinue = computed(() => {
 const typeLabel = computed(() => appointmentType.value === 'walkin' ? 'Walk-in at blood center' : 'Register for mobile drive')
 
 const locationLabel = computed(() => {
-  if (appointmentType.value === 'walkin') return selectedCenter.value?.name || 'â€”'
-  return selectedDrive.value?.name || 'â€”'
+  if (appointmentType.value === 'walkin') return selectedCenter.value?.name || '-'
+  return selectedDrive.value?.name || '-'
 })
 
 const summaryDateLabel = computed(() => {
   if (appointmentType.value === 'walkin') return formattedSelectedDate.value
-  return selectedDrive.value?.date || 'â€”'
+  return selectedDrive.value?.date || '-'
 })
 
 const confirmDateTimeLabel = computed(() => {
   if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${selectedTimeSlot.value}`
-  return `${selectedDrive.value?.date || 'â€”'} - ${selectedDrive.value?.time || 'â€”'}`
+  return `${selectedDrive.value?.date || '—'} - ${selectedDrive.value?.time || '—'}`
 })
 
 async function handleConfirm() {

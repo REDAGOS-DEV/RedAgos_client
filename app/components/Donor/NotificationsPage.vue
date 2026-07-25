@@ -214,10 +214,6 @@ onMounted(async () => {
             actionRoute: n.action_route,
         }))
     } catch (err) {
-        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/donor/notifications
-        // endpoint, so mag-fail gyud ni nga call. Mag-fallback sa empty state
-        // (walay laray) â€” ang page kay mag-populate ra gyud kung naa nay
-        // actual notification record sa database para niini nga donor.
         console.error('Failed to load notifications (expected while backend is not yet wired up):', err)
         notifications.value = []
     } finally {

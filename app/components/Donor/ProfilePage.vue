@@ -113,7 +113,7 @@ Output:
             @updated="handleAvatarUpdated"
           />
           <h2 class="profile-card__name">{{ user?.full_name }}</h2>
-          <p class="profile-card__meta">{{ donorCode }} Â· {{ bloodType }}</p>
+          <p class="profile-card__meta">{{ donorCode }} · {{ bloodType }}</p>
           <p v-if="eligibilityStatus === 'eligible'" class="profile-card__eligible">
             Eligible to donate
           </p>
@@ -321,21 +321,21 @@ async function load() {
 
 onMounted(load)
 
-const donorCode = computed(() => profile.value?.donor_code || 'â€”')
-const bloodType = computed(() => profile.value?.blood_type || 'â€”')
+const donorCode = computed(() => profile.value?.donor_code || '-')
+const bloodType = computed(() => profile.value?.blood_type || '-')
 const totalDonations = computed(() => profile.value?.total_donations ?? 0)
 const eligibilityStatus = computed(() => profile.value?.eligibility_status || 'pending')
 
 function formatDate(value) {
-  if (!value) return 'â€”'
+  if (!value) return '-'
   const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return 'â€”'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const lastDonationDate = computed(() => formatDate(profile.value?.last_donation_date))
 const nextEligibleLabel = computed(() => {
-  if (!profile.value?.next_eligible_date) return 'â€”'
+  if (!profile.value?.next_eligible_date) return '-'
   const next = new Date(profile.value.next_eligible_date)
   return next <= new Date() ? 'Now' : formatDate(profile.value.next_eligible_date)
 })

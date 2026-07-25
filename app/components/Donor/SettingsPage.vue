@@ -120,7 +120,7 @@ Output:
                                             v-model="security.currentPassword"
                                             :type="showCurrentPassword ? 'text' : 'password'"
                                             class="form-input"
-                                            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                                            placeholder="**************"
                                         >
                                         <button
                                             type="button"
@@ -128,7 +128,7 @@ Output:
                                             :aria-label="showCurrentPassword ? 'Hide password' : 'Show password'"
                                             @click="showCurrentPassword = !showCurrentPassword"
                                         >
-                                            <AssetIcon :name="showCurrentPassword ? 'eye-off' : 'eye'" :size="16" />
+                                            <AssetIcon :name="showCurrentPassword ? 'eye' : 'eye-off'" :size="16" />
                                         </button>
                                     </div>
                                 </div>
@@ -140,7 +140,7 @@ Output:
                                                 v-model="security.newPassword"
                                                 :type="showNewPassword ? 'text' : 'password'"
                                                 class="form-input"
-                                                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                                                placeholder="**************"
                                             >
                                             <button
                                                 type="button"
@@ -148,7 +148,7 @@ Output:
                                                 :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
                                                 @click="showNewPassword = !showNewPassword"
                                             >
-                                                <AssetIcon :name="showNewPassword ? 'eye-off' : 'eye'" :size="16" />
+                                                <AssetIcon :name="showNewPassword ? 'eye' : 'eye-off'" :size="16" />
                                             </button>
                                         </div>
                                     </div>
@@ -159,7 +159,7 @@ Output:
                                                 v-model="security.confirmPassword"
                                                 :type="showConfirmPassword ? 'text' : 'password'"
                                                 class="form-input"
-                                                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                                                placeholder="**************"
                                             >
                                             <button
                                                 type="button"
@@ -167,7 +167,7 @@ Output:
                                                 :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
                                                 @click="showConfirmPassword = !showConfirmPassword"
                                             >
-                                                <AssetIcon :name="showConfirmPassword ? 'eye-off' : 'eye'" :size="16" />
+                                                <AssetIcon :name="showConfirmPassword ? 'eye' : 'eye-off'" :size="16" />
                                             </button>
                                         </div>
                                     </div>
@@ -286,10 +286,6 @@ import { useUser } from '~/composables/useUser'
 
 const router = useRouter()
 const { fetchUser, clearUser } = useUser()
-
-// Page-load skeleton â€” same pattern as Dashboard/Eligibility. Flips off once
-// the profile fetch below settles (success or fail), so the form never
-// flashes empty placeholders before the donor's real data is in.
 const loading = ref(true)
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
