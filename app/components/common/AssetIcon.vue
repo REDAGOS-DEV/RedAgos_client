@@ -36,6 +36,7 @@ import chevronDown from '~/assets/icons/chevron-down.svg?raw'
 import chevronUp from '~/assets/icons/chevron-up.svg?raw'
 import clipboard from '~/assets/icons/clipboard.svg?raw'
 import clipboardCheck from '~/assets/icons/clipboard-check.svg?raw'
+import clipboardList from '~/assets/icons/clipboard-list.svg?raw'
 import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
 import creditCard from '~/assets/icons/credit-card.svg?raw'
@@ -116,6 +117,7 @@ const icons = {
   clipboard,
   'clipboard-plus': clipboardPlus,
   'clipboard-check': clipboardCheck,
+  'clipboard-list': clipboardList,
   clock,
   'credit-card': creditCard,
   'dollar-sign': dollarSign,
