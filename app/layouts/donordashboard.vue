@@ -8,7 +8,7 @@
         class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
         style="border-color: #eef1f5; box-shadow: 0 1px 2px rgba(15,23,42,0.05)">
 
-        <!-- Breadcrumb + greeting -->
+        <!-- Breadcrumb + greeting (desktop only) -->
         <div class="hidden lg:flex flex-col justify-center min-w-[160px] flex-shrink-0">
           <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
           <span class="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{{ greeting }}</span>
@@ -33,7 +33,7 @@
             searchOpenMobile
               ? 'flex absolute left-3 right-3 top-1/2 -translate-y-1/2 z-20 sm:static sm:translate-y-0 sm:flex-1 sm:left-auto sm:right-auto'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-[50%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-[38%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]"
         >
           <AssetIcon name="search" :size="15" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
@@ -222,18 +222,18 @@ const pageLabels = {
   '/donor/notifications': 'Notifications',
   '/donor/profile': 'My Profile',
   '/donor/settings': 'Settings',
-  '/donor/help': 'Help',
 }
 const breadcrumb = computed(() => `Donor Portal / ${pageLabels[route.path] || ''}`)
 
-function getGreeting() {
+const greeting = computed(() => {
   const h = new Date().getHours()
   const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
   const first = user.value?.full_name?.split(' ')[0] || 'Donor'
   return `${time}, ${first}`
-}
-const greeting = ref(getGreeting())
+})
 
+// --- Notifications ---
+// Replace with real count from your notifications composable/API
 const unreadCount = ref(0)
 
 // --- Profile dropdown ---
@@ -251,6 +251,7 @@ const searchOpenMobile = ref(false)
 
 function openMobileSearch() {
   searchOpenMobile.value = true
+  // Wait for the DOM to render the input before focusing
   nextTick(() => searchInput.value?.focus())
 }
 
