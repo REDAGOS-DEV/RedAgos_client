@@ -238,7 +238,6 @@ const form = reactive({
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
-
 const isSubmitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref('')
