@@ -28,12 +28,12 @@
         <div
           v-show="searchOpenMobile || true"
           v-click-outside="closeSearchResults"
-          class="relative items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-3.5 py-2.5"
+          class="relative items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-4 py-2.5"
           :class="[
             searchOpenMobile
               ? 'flex absolute left-3 right-3 top-1/2 -translate-y-1/2 z-20 sm:static sm:translate-y-0 sm:flex-1 sm:left-auto sm:right-auto'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-[38%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-[48%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]"
         >
           <AssetIcon name="search" :size="15" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
@@ -229,7 +229,7 @@ const greeting = computed(() => {
   const h = new Date().getHours()
   const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
   const first = user.value?.full_name?.split(' ')[0] || 'Donor'
-  return `${time}, ${first}`
+  return `${time}, ${first}!`
 })
 
 // --- Notifications ---
