@@ -161,8 +161,8 @@
               <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'"
                 placeholder="********" class="has-left-icon" />
               <button type="button" class="toggle-visibility" @click="showPassword = !showPassword">
-                <AssetIcon v-if="!showPassword" name="eye" :size="16" />
-                <AssetIcon v-else name="eye-off" :size="16" />
+                <AssetIcon v-if="!showPassword" name="eye-off" :size="16" />
+                <AssetIcon v-else name="eye" :size="16" />
               </button>
             </div>
             <p v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</p>
@@ -175,8 +175,8 @@
               <input id="confirmPassword" v-model="form.confirmPassword"
                 :type="showConfirmPassword ? 'text' : 'password'" placeholder="********" class="has-left-icon" />
               <button type="button" class="toggle-visibility" @click="showConfirmPassword = !showConfirmPassword">
-                <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
-                <AssetIcon v-else name="eye-off" :size="16" />
+                <AssetIcon v-if="!showConfirmPassword" name="eye-off" :size="16" />
+                <AssetIcon v-else name="eye" :size="16" />
               </button>
             </div>
             <p v-if="fieldErrors.password_confirmation" class="field-error">{{ fieldErrors.password_confirmation }}</p>
