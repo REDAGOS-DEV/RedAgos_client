@@ -21,9 +21,9 @@ class HospitalService extends BaseService {
   referenceData() { return this.request<any>('/hospital/reference-data') }
   availability(params: object = {}) { return this.request<any>('/hospital/availability', 'GET', params) }
   requests(params: RequestFilters = {}) { return this.request<any>('/hospital/requests', 'GET', params) }
-  requestDetail(id: string | number) { return this.request<any>(`/hospital/requests/${id}`) }
-  createRequest(payload: BloodRequestPayload) { return this.request<any>('/hospital/requests', 'POST', payload) }
-  cancelRequest(id: string | number, reason?: string) { return this.request<any>(`/hospital/requests/${id}/cancel`, 'POST', { reason }) }
+  requestDetail(id: string | number) { return this.request<any>(`/hospital/bloodrequests/${id}`) }
+  createRequest(payload: BloodRequestPayload) { return this.request<any>('/hospital/bloodrequests', 'POST', payload) }
+  cancelRequest(id: string | number, reason?: string) { return this.request<any>(`/hospital/bloodrequests/${id}/cancel`, 'POST', { reason }) }
   reports(params: object = {}) { return this.request<any>('/hospital/reports', 'GET', params) }
   notifications(params: object = {}) { return this.request<any>('/hospital/notifications', 'GET', params) }
   markNotificationRead(id: string | number) { return this.request<any>(`/hospital/notifications/${id}/read`, 'PATCH') }
