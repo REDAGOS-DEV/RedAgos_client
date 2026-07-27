@@ -15,7 +15,7 @@
         <a
           href="#home"
           :class="{ active: activeSection === 'home' }"
-          @click="setActiveSection('home')"
+          @click.prevent="scrollToSection('home')"
         >
           Home
         </a>
@@ -24,7 +24,7 @@
         <a
           href="#features"
           :class="{ active: activeSection === 'features' }"
-          @click="setActiveSection('features')"
+          @click.prevent="scrollToSection('features')"
         >
           Features
         </a>
@@ -32,8 +32,8 @@
       <li>
         <a
           href="#drives"
-          :class="{ active: activeSection === 'donation-drives' }"
-          @click="setActiveSection('donation-drives')"
+          :class="{ active: activeSection === 'drives' }"
+          @click.prevent="scrollToSection('drives')"
         >
           Donation Drives
         </a>
@@ -42,7 +42,7 @@
         <a
           href="#about"
           :class="{ active: activeSection === 'about' }"
-          @click="setActiveSection('about')"
+          @click.prevent="scrollToSection('about')"
         >
           About
         </a>
@@ -51,7 +51,7 @@
         <a
           href="#contact"
           :class="{ active: activeSection === 'contact' }"
-          @click="setActiveSection('contact')"
+          @click.prevent="scrollToSection('contact')"
         >
           Contact
         </a>
@@ -59,8 +59,8 @@
     </ul>
 
     <div class="nav-actions">
-      <button class="btn-login" @click="navigateTo('/login/')">Log In</button>
-      <button class="btn-started" @click="navigateTo('/#home')">Get Started</button>
+      <button class="btn-login" @click="navigateTo('/auth/donor/login/')">Log In</button>
+      <button class="btn-started" @click="goHome">Get Started</button>
     </div>
   </nav>
 </template>
@@ -70,11 +70,19 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 const isScrolled = ref(false)
 const activeSection = ref('home')
-const sectionIds = ['home', 'features', 'donation-drives', 'about', 'contact']
+const sectionIds = ['home', 'features', 'drives', 'about', 'contact']
 
 let scrollHandler
 let resizeHandler
 let ticking = false
+
+const router = useRouter()
+
+const goHome = () => {
+  setTimeout(() => {
+    navigateTo('/')
+  }, 3000)
+}
 
 const getSections = () =>
   sectionIds
@@ -114,6 +122,17 @@ const requestScrollUpdate = () => {
 
 const setActiveSection = (id) => {
   activeSection.value = id
+}
+
+const scrollToSection = (id) => {
+  const section = document.getElementById(id)
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth' })
+  }
+  setActiveSection(id)
+
+  const path = id === '' ? '/' : `/${id}`
+  window.history.replaceState(null, '', path)
 }
 
 onMounted(() => {
