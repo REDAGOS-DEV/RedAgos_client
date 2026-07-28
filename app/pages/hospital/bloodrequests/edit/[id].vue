@@ -1,329 +1,18 @@
-<script setup>
-/**
- * RedAgos — Hospital Portal
- * Route: /hospital/blood-requests/edit/[id]
- *
- * Editing is only allowed while status === 'Pending'.
- * Everything on this page is fetched from the Laravel backend —
- * no hardcoded data. Adjust the composable method names below
- * (useBloodRequests / useApi) to match your actual API layer.
- */
-import { computed, reactive, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-
-definePageMeta({
-  layout: 'dashboard'
-})
-
-const route = useRoute()
-const router = useRouter()
-const requestId = route.params.id
-
-const api = useApi()
-const bloodRequests = useBloodRequests()
-
-/* ------------------------------------------------------------------ */
-/* State                                                               */
-/* ------------------------------------------------------------------ */
-const isLoading = ref(true)
-const loadError = ref(null)
-
-const originalRequest = ref(null)   // as returned by the API
-const bloodAvailability = ref([])
-const auditHistory = ref([])
-
-const isAvailabilityLoading = ref(true)
-const isAuditLoading = ref(true)
-
-const isSavingDraft = ref(false)
-const isSavingChanges = ref(false)
-const saveError = ref(null)
-
-const form = reactive({
-  hospitalDepartment: '',
-  physician: '',
-  patientRef: '',
-  priority: '',
-  requiredDate: '',
-  bloodType: '',
-  component: '',
-  unitsRequested: null,
-  purpose: '',
-  clinicalIndication: '',
-  diagnosis: '',
-  additionalNotes: '',
-  documents: []
-})
-
-const newDocuments = ref([]) // freshly attached File objects pending upload
-
-const errors = reactive({})
-
-const requiredFields = [
-  'hospitalDepartment',
-  'bloodType',
-  'component',
-  'unitsRequested',
-  'priority',
-  'requiredDate',
-  'clinicalIndication'
-]
-
-const fieldLabels = {
-  hospitalDepartment: 'Hospital Department',
-  physician: 'Requesting Physician',
-  patientRef: 'Patient Reference Number',
-  priority: 'Priority',
-  requiredDate: 'Required Date',
-  bloodType: 'Blood Type',
-  component: 'Blood Component',
-  unitsRequested: 'Units Requested',
-  purpose: 'Purpose',
-  clinicalIndication: 'Clinical Indication',
-  diagnosis: 'Diagnosis',
-  additionalNotes: 'Additional Notes'
-}
-
-/* ------------------------------------------------------------------ */
-/* Fetching                                                             */
-/* ------------------------------------------------------------------ */
-async function loadRequest() {
-  isLoading.value = true
-  loadError.value = null
-  try {
-    const data = await bloodRequests.getById(requestId)
-    originalRequest.value = data
-    hydrateForm(data)
-  } catch (err) {
-    loadError.value = err?.message || 'Unable to load this blood request. Please try again.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-function hydrateForm(data) {
-  if (!data) return
-  form.hospitalDepartment = data.department ?? ''
-  form.physician = data.physician ?? ''
-  form.patientRef = data.patientRef ?? ''
-  form.priority = data.priority ?? ''
-  form.requiredDate = data.requiredDate ? data.requiredDate.slice(0, 10) : ''
-  form.bloodType = data.bloodType ?? ''
-  form.component = data.component ?? ''
-  form.unitsRequested = data.unitsRequested ?? null
-  form.purpose = data.purpose ?? ''
-  form.clinicalIndication = data.clinicalIndication ?? ''
-  form.diagnosis = data.diagnosis ?? ''
-  form.additionalNotes = data.additionalNotes ?? ''
-  form.documents = Array.isArray(data.documents) ? [...data.documents] : []
-}
-
-async function loadBloodAvailability() {
-  isAvailabilityLoading.value = true
-  try {
-    const data = await api.get('/blood-inventory/summary')
-    bloodAvailability.value = Array.isArray(data) ? data : (data?.data ?? [])
-  } catch {
-    bloodAvailability.value = []
-  } finally {
-    isAvailabilityLoading.value = false
-  }
-}
-
-async function loadAuditHistory() {
-  isAuditLoading.value = true
-  try {
-    const data = await api.get(`/blood-requests/${requestId}/audit-log`)
-    auditHistory.value = Array.isArray(data) ? data : (data?.data ?? [])
-  } catch {
-    auditHistory.value = []
-  } finally {
-    isAuditLoading.value = false
-  }
-}
-
-onMounted(() => {
-  loadRequest()
-  loadBloodAvailability()
-  loadAuditHistory()
-})
-
-/* ------------------------------------------------------------------ */
-/* Editability                                                         */
-/* ------------------------------------------------------------------ */
-const isEditable = computed(() => originalRequest.value?.status === 'Pending')
-
-const statusMeta = {
-  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F59E0B' },
-  Approved:           { bg: '#E8F0FE', fg: '#1565C0', dot: '#1565C0' },
-  Processing:         { bg: '#EDE7F6', fg: '#5E35B1', dot: '#5E35B1' },
-  'Ready for Pickup': { bg: '#E3F2FD', fg: '#0277BD', dot: '#0277BD' },
-  Completed:          { bg: '#E8F5E9', fg: '#2E7D32', dot: '#2E7D32' },
-  Rejected:           { bg: '#FDECEA', fg: '#D32F2F', dot: '#D32F2F' },
-  Cancelled:          { bg: '#F1F1F1', fg: '#616161', dot: '#9E9E9E' }
-}
-
-function statusStyle(status) {
-  const m = statusMeta[status] || statusMeta.Pending
-  return { backgroundColor: m.bg, color: m.fg }
-}
-function statusDotStyle(status) {
-  const m = statusMeta[status] || statusMeta.Pending
-  return { backgroundColor: m.dot }
-}
-
-/* ------------------------------------------------------------------ */
-/* Change tracking / summary                                           */
-/* ------------------------------------------------------------------ */
-const trackedFields = [
-  'hospitalDepartment', 'physician', 'patientRef', 'priority', 'requiredDate',
-  'bloodType', 'component', 'unitsRequested', 'purpose',
-  'clinicalIndication', 'diagnosis', 'additionalNotes'
-]
-
-const originalFieldValue = {
-  hospitalDepartment: (d) => d?.department,
-  physician: (d) => d?.physician,
-  patientRef: (d) => d?.patientRef,
-  priority: (d) => d?.priority,
-  requiredDate: (d) => d?.requiredDate ? d.requiredDate.slice(0, 10) : '',
-  bloodType: (d) => d?.bloodType,
-  component: (d) => d?.component,
-  unitsRequested: (d) => d?.unitsRequested,
-  purpose: (d) => d?.purpose,
-  clinicalIndication: (d) => d?.clinicalIndication,
-  diagnosis: (d) => d?.diagnosis,
-  additionalNotes: (d) => d?.additionalNotes
-}
-
-const changedFields = computed(() => {
-  if (!originalRequest.value) return []
-  return trackedFields
-    .map((key) => {
-      const prev = originalFieldValue[key](originalRequest.value)
-      const next = form[key]
-      const prevStr = prev === null || prev === undefined ? '' : String(prev)
-      const nextStr = next === null || next === undefined ? '' : String(next)
-      if (prevStr === nextStr) return null
-      return {
-        key,
-        label: fieldLabels[key],
-        previous: prevStr || '—',
-        updated: nextStr || '—'
-      }
-    })
-    .filter(Boolean)
-})
-
-const hasChanges = computed(() => changedFields.value.length > 0 || newDocuments.value.length > 0)
-
-/* ------------------------------------------------------------------ */
-/* Validation                                                           */
-/* ------------------------------------------------------------------ */
-function validate() {
-  Object.keys(errors).forEach((k) => delete errors[k])
-  requiredFields.forEach((key) => {
-    const val = form[key]
-    const isEmpty = val === null || val === undefined || val === '' ||
-      (key === 'unitsRequested' && (Number.isNaN(Number(val)) || Number(val) <= 0))
-    if (isEmpty) {
-      errors[key] = `${fieldLabels[key]} is required.`
-    }
-  })
-  return Object.keys(errors).length === 0
-}
-
-/* ------------------------------------------------------------------ */
-/* Documents                                                            */
-/* ------------------------------------------------------------------ */
-function handleFileSelect(event) {
-  const files = Array.from(event.target.files || [])
-  newDocuments.value.push(...files)
-  event.target.value = ''
-}
-
-function removeExistingDocument(index) {
-  form.documents.splice(index, 1)
-}
-
-function removeNewDocument(index) {
-  newDocuments.value.splice(index, 1)
-}
-
-/* ------------------------------------------------------------------ */
-/* Actions                                                              */
-/* ------------------------------------------------------------------ */
-function buildPayload() {
-  const payload = new FormData()
-  trackedFields.forEach((key) => payload.append(key, form[key] ?? ''))
-  payload.append('existing_documents', JSON.stringify(form.documents))
-  newDocuments.value.forEach((file) => payload.append('new_documents[]', file))
-  return payload
-}
-
-async function handleSaveDraft() {
-  saveError.value = null
-  isSavingDraft.value = true
-  try {
-    await bloodRequests.saveDraft(requestId, buildPayload())
-    router.push(`/hospital/blood-requests/${requestId}`)
-  } catch (err) {
-    saveError.value = err?.message || 'Unable to save draft. Please try again.'
-  } finally {
-    isSavingDraft.value = false
-  }
-}
-
-async function handleSaveChanges() {
-  saveError.value = null
-  if (!validate()) return
-  isSavingChanges.value = true
-  try {
-    await bloodRequests.update(requestId, buildPayload())
-    router.push(`/hospital/blood-requests/${requestId}`)
-  } catch (err) {
-    saveError.value = err?.message || 'Unable to save changes. Please try again.'
-  } finally {
-    isSavingChanges.value = false
-  }
-}
-
-function handleCancel() {
-  router.push(`/hospital/blood-requests/${requestId}`)
-}
-
-function handleReturnToDetails() {
-  router.push(`/hospital/blood-requests/${requestId}`)
-}
-
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatDateTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-PH', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-  })
-}
-</script>
-
 <template>
   <div class="eb-page">
     <!-- ============================ HEADER ============================ -->
     <div class="eb-header">
-      <NuxtLink :to="`/hospital/blood-requests/${requestId}`" class="eb-back">
+      <NuxtLink :to="`/hospital/bloodrequests/${requestId}`" class="eb-back">
         <span class="eb-back-arrow">←</span> Back to Request Details
       </NuxtLink>
 
-      <nav class="eb-breadcrumb" aria-label="Breadcrumb">
+      <!-- <nav class="eb-breadcrumb" aria-label="Breadcrumb">
         <span>Hospital Portal</span>
         <span class="eb-crumb-sep">/</span>
         <span>Blood Requests</span>
         <span class="eb-crumb-sep">/</span>
         <span class="eb-crumb-current">Edit Request</span>
-      </nav>
+      </nav> -->
 
       <div class="eb-header-row">
         <div class="eb-header-titles">
@@ -620,6 +309,304 @@ function formatDateTime(iso) {
     </div>
   </div>
 </template>
+
+<script setup>
+import { computed, reactive, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+definePageMeta({
+  layout: 'dashboard'
+})
+
+const route = useRoute()
+const router = useRouter()
+const requestId = route.params.id
+
+const api = useApi()
+const bloodRequests = useBloodRequests()
+
+
+/* State   */
+const isLoading = ref(true)
+const loadError = ref(null)
+
+const originalRequest = ref(null)   // as returned by the API
+const bloodAvailability = ref([])
+const auditHistory = ref([])
+
+const isAvailabilityLoading = ref(true)
+const isAuditLoading = ref(true)
+
+const isSavingDraft = ref(false)
+const isSavingChanges = ref(false)
+const saveError = ref(null)
+
+const form = reactive({
+  hospitalDepartment: '',
+  physician: '',
+  patientRef: '',
+  priority: '',
+  requiredDate: '',
+  bloodType: '',
+  component: '',
+  unitsRequested: null,
+  purpose: '',
+  clinicalIndication: '',
+  diagnosis: '',
+  additionalNotes: '',
+  documents: []
+})
+
+const newDocuments = ref([])
+
+const errors = reactive({})
+
+const requiredFields = [
+  'hospitalDepartment',
+  'bloodType',
+  'component',
+  'unitsRequested',
+  'priority',
+  'requiredDate',
+  'clinicalIndication'
+]
+
+const fieldLabels = {
+  hospitalDepartment: 'Hospital Department',
+  physician: 'Requesting Physician',
+  patientRef: 'Patient Reference Number',
+  priority: 'Priority',
+  requiredDate: 'Required Date',
+  bloodType: 'Blood Type',
+  component: 'Blood Component',
+  unitsRequested: 'Units Requested',
+  purpose: 'Purpose',
+  clinicalIndication: 'Clinical Indication',
+  diagnosis: 'Diagnosis',
+  additionalNotes: 'Additional Notes'
+}
+
+/* Fetching  */
+
+async function loadRequest() {
+  isLoading.value = true
+  loadError.value = null
+  try {
+    const data = await bloodRequests.getById(requestId)
+    originalRequest.value = data
+    hydrateForm(data)
+  } catch (err) {
+    loadError.value = err?.message || 'Unable to load this blood request. Please try again.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function hydrateForm(data) {
+  if (!data) return
+  form.hospitalDepartment = data.department ?? ''
+  form.physician = data.physician ?? ''
+  form.patientRef = data.patientRef ?? ''
+  form.priority = data.priority ?? ''
+  form.requiredDate = data.requiredDate ? data.requiredDate.slice(0, 10) : ''
+  form.bloodType = data.bloodType ?? ''
+  form.component = data.component ?? ''
+  form.unitsRequested = data.unitsRequested ?? null
+  form.purpose = data.purpose ?? ''
+  form.clinicalIndication = data.clinicalIndication ?? ''
+  form.diagnosis = data.diagnosis ?? ''
+  form.additionalNotes = data.additionalNotes ?? ''
+  form.documents = Array.isArray(data.documents) ? [...data.documents] : []
+}
+
+async function loadBloodAvailability() {
+  isAvailabilityLoading.value = true
+  try {
+    const data = await api.get('/bloodinventory/summary')
+    bloodAvailability.value = Array.isArray(data) ? data : (data?.data ?? [])
+  } catch {
+    bloodAvailability.value = []
+  } finally {
+    isAvailabilityLoading.value = false
+  }
+}
+
+async function loadAuditHistory() {
+  isAuditLoading.value = true
+  try {
+    const data = await api.get(`/bloodrequests/${requestId}/audit-log`)
+    auditHistory.value = Array.isArray(data) ? data : (data?.data ?? [])
+  } catch {
+    auditHistory.value = []
+  } finally {
+    isAuditLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadRequest()
+  loadBloodAvailability()
+  loadAuditHistory()
+})
+
+
+/* Editability    */
+
+const isEditable = computed(() => originalRequest.value?.status === 'Pending')
+
+const statusMeta = {
+  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F59E0B' },
+  Approved:           { bg: '#E8F0FE', fg: '#1565C0', dot: '#1565C0' },
+  Processing:         { bg: '#EDE7F6', fg: '#5E35B1', dot: '#5E35B1' },
+  'Ready for Pickup': { bg: '#E3F2FD', fg: '#0277BD', dot: '#0277BD' },
+  Completed:          { bg: '#E8F5E9', fg: '#2E7D32', dot: '#2E7D32' },
+  Rejected:           { bg: '#FDECEA', fg: '#D32F2F', dot: '#D32F2F' },
+  Cancelled:          { bg: '#F1F1F1', fg: '#616161', dot: '#9E9E9E' }
+}
+
+function statusStyle(status) {
+  const m = statusMeta[status] || statusMeta.Pending
+  return { backgroundColor: m.bg, color: m.fg }
+}
+function statusDotStyle(status) {
+  const m = statusMeta[status] || statusMeta.Pending
+  return { backgroundColor: m.dot }
+}
+
+
+/* Change tracking / summary   */
+
+const trackedFields = [
+  'hospitalDepartment', 'physician', 'patientRef', 'priority', 'requiredDate',
+  'bloodType', 'component', 'unitsRequested', 'purpose',
+  'clinicalIndication', 'diagnosis', 'additionalNotes'
+]
+
+const originalFieldValue = {
+  hospitalDepartment: (d) => d?.department,
+  physician: (d) => d?.physician,
+  patientRef: (d) => d?.patientRef,
+  priority: (d) => d?.priority,
+  requiredDate: (d) => d?.requiredDate ? d.requiredDate.slice(0, 10) : '',
+  bloodType: (d) => d?.bloodType,
+  component: (d) => d?.component,
+  unitsRequested: (d) => d?.unitsRequested,
+  purpose: (d) => d?.purpose,
+  clinicalIndication: (d) => d?.clinicalIndication,
+  diagnosis: (d) => d?.diagnosis,
+  additionalNotes: (d) => d?.additionalNotes
+}
+
+const changedFields = computed(() => {
+  if (!originalRequest.value) return []
+  return trackedFields
+    .map((key) => {
+      const prev = originalFieldValue[key](originalRequest.value)
+      const next = form[key]
+      const prevStr = prev === null || prev === undefined ? '' : String(prev)
+      const nextStr = next === null || next === undefined ? '' : String(next)
+      if (prevStr === nextStr) return null
+      return {
+        key,
+        label: fieldLabels[key],
+        previous: prevStr || '—',
+        updated: nextStr || '—'
+      }
+    })
+    .filter(Boolean)
+})
+
+const hasChanges = computed(() => changedFields.value.length > 0 || newDocuments.value.length > 0)
+
+
+/* Validation   */
+
+function validate() {
+  Object.keys(errors).forEach((k) => delete errors[k])
+  requiredFields.forEach((key) => {
+    const val = form[key]
+    const isEmpty = val === null || val === undefined || val === '' ||
+      (key === 'unitsRequested' && (Number.isNaN(Number(val)) || Number(val) <= 0))
+    if (isEmpty) {
+      errors[key] = `${fieldLabels[key]} is required.`
+    }
+  })
+  return Object.keys(errors).length === 0
+}
+
+/* Documents     */
+
+function handleFileSelect(event) {
+  const files = Array.from(event.target.files || [])
+  newDocuments.value.push(...files)
+  event.target.value = ''
+}
+
+function removeExistingDocument(index) {
+  form.documents.splice(index, 1)
+}
+
+function removeNewDocument(index) {
+  newDocuments.value.splice(index, 1)
+}
+
+/* Actions      */
+
+function buildPayload() {
+  const payload = new FormData()
+  trackedFields.forEach((key) => payload.append(key, form[key] ?? ''))
+  payload.append('existing_documents', JSON.stringify(form.documents))
+  newDocuments.value.forEach((file) => payload.append('new_documents[]', file))
+  return payload
+}
+
+async function handleSaveDraft() {
+  saveError.value = null
+  isSavingDraft.value = true
+  try {
+    await bloodRequests.saveDraft(requestId, buildPayload())
+    router.push(`/hospital/bloodrequests/${requestId}`)
+  } catch (err) {
+    saveError.value = err?.message || 'Unable to save draft. Please try again.'
+  } finally {
+    isSavingDraft.value = false
+  }
+}
+
+async function handleSaveChanges() {
+  saveError.value = null
+  if (!validate()) return
+  isSavingChanges.value = true
+  try {
+    await bloodRequests.update(requestId, buildPayload())
+    router.push(`/hospital/bloodrequests/${requestId}`)
+  } catch (err) {
+    saveError.value = err?.message || 'Unable to save changes. Please try again.'
+  } finally {
+    isSavingChanges.value = false
+  }
+}
+
+function handleCancel() {
+  router.push(`/hospital/bloodrequests/${requestId}`)
+}
+
+function handleReturnToDetails() {
+  router.push(`/hospital/bloodrequests/${requestId}`)
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-PH', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  })
+}
+</script>
 
 <style scoped>
 .eb-page {
