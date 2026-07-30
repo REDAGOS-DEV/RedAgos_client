@@ -448,5 +448,4 @@ onMounted(() => {
   .hero-left, .hero-right, .stats-bar { opacity: 1; animation: none; }
   .accent::after { animation: none; }
 }
-
 </style>

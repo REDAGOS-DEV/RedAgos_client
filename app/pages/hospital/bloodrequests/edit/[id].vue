@@ -1,18 +1,10 @@
 <template>
   <div class="eb-page">
-    <!-- ============================ HEADER ============================ -->
+    <!-- ======= HEADER ========= -->
     <div class="eb-header">
       <NuxtLink :to="`/hospital/bloodrequests/${requestId}`" class="eb-back">
-        <span class="eb-back-arrow">←</span> Back to Request Details
+        <AssetIcon name="arrow-left" :size="16" class="eb-back-arrow" /> Back to Request Details
       </NuxtLink>
-
-      <!-- <nav class="eb-breadcrumb" aria-label="Breadcrumb">
-        <span>Hospital Portal</span>
-        <span class="eb-crumb-sep">/</span>
-        <span>Blood Requests</span>
-        <span class="eb-crumb-sep">/</span>
-        <span class="eb-crumb-current">Edit Request</span>
-      </nav> -->
 
       <div class="eb-header-row">
         <div class="eb-header-titles">
@@ -33,32 +25,32 @@
       </div>
     </div>
 
-    <!-- ============================ LOADING ============================ -->
+    <!-- ====== LOADING ====== -->
     <div v-if="isLoading" class="eb-skeleton-wrap">
       <div class="eb-skeleton eb-skeleton-banner"></div>
       <div class="eb-skeleton eb-skeleton-card"></div>
       <div class="eb-skeleton eb-skeleton-card"></div>
     </div>
 
-    <!-- ============================ ERROR ============================ -->
+    <!-- ======= ERROR ======= -->
     <div v-else-if="loadError" class="eb-card eb-error-state">
-      <span class="eb-error-icon">⚠</span>
+      <AssetIcon name="triangle-alert" :size="28" class="eb-error-icon" style="color: var(--eb-danger)" />
       <p class="eb-error-text">{{ loadError }}</p>
       <button class="eb-btn eb-btn-outline" @click="loadRequest">Try Again</button>
     </div>
 
-    <!-- ============================ EMPTY ============================ -->
+    <!-- ======== EMPTY ====== -->
     <div v-else-if="!originalRequest" class="eb-card eb-empty-state">
-      <span class="eb-empty-icon">🩸</span>
+      <AssetIcon name="droplets" :size="28" class="eb-empty-icon" style="color: var(--eb-text-muted)" />
       <p class="eb-empty-text">This blood request could not be found.</p>
       <NuxtLink to="/hospital/blood-requests" class="eb-btn eb-btn-outline">Back to Blood Requests</NuxtLink>
     </div>
 
-    <!-- ============================ CONTENT ============================ -->
+    <!-- ====== CONTENT ====== -->
     <template v-else>
       <!-- Locked banner -->
       <div v-if="!isEditable" class="eb-locked-banner">
-        <span class="eb-locked-icon">🔒</span>
+        <AssetIcon name="lock" :size="20" class="eb-locked-icon" style="color: #7a4b00" />
         <div class="eb-locked-text">
           <strong>This request can no longer be edited.</strong>
           <span>
@@ -71,7 +63,7 @@
       <div class="eb-layout">
         <div class="eb-main">
 
-          <!-- ============================ FORM ============================ -->
+          <!-- ===== FORM ====== -->
           <fieldset class="eb-card" :disabled="!isEditable">
             <h2 class="eb-section-title">Request Information</h2>
             <div class="eb-form-grid">
@@ -167,7 +159,7 @@
 
               <div v-if="form.documents.length || newDocuments.length" class="eb-doc-list">
                 <div v-for="(doc, idx) in form.documents" :key="`existing-${idx}`" class="eb-doc-item">
-                  <span class="eb-doc-icon">📄</span>
+                  <AssetIcon name="file-text" :size="18" class="eb-doc-icon" style="color: var(--eb-text-muted)" />
                   <span class="eb-doc-info">
                     <span class="eb-doc-name">{{ doc.name }}</span>
                     <span class="eb-doc-size">{{ doc.size }}</span>
@@ -175,7 +167,7 @@
                   <button v-if="isEditable" type="button" class="eb-doc-remove" @click="removeExistingDocument(idx)">Remove</button>
                 </div>
                 <div v-for="(file, idx) in newDocuments" :key="`new-${idx}`" class="eb-doc-item eb-doc-item-new">
-                  <span class="eb-doc-icon">🆕</span>
+                  <AssetIcon name="file-plus" :size="18" class="eb-doc-icon" style="color: var(--eb-primary)" />
                   <span class="eb-doc-info">
                     <span class="eb-doc-name">{{ file.name }}</span>
                     <span class="eb-doc-size">{{ (file.size / 1024).toFixed(0) }} KB</span>
@@ -186,13 +178,13 @@
               <p v-else class="eb-doc-empty">No supporting documents attached yet.</p>
 
               <label v-if="isEditable" class="eb-upload-btn">
-                + Attach Document
+                <AssetIcon name="paperclip" :size="14" /> Attach Document
                 <input type="file" multiple class="eb-upload-input" @change="handleFileSelect" />
               </label>
             </div>
           </fieldset>
 
-          <!-- ============================ CHANGE SUMMARY ============================ -->
+          <!-- ======== CHANGE SUMMARY ======= -->
           <section v-if="isEditable && changedFields.length" class="eb-card eb-change-card">
             <h2 class="eb-section-title">Change Summary</h2>
             <div class="eb-change-list">
@@ -200,14 +192,14 @@
                 <span class="eb-change-label">{{ change.label }}</span>
                 <div class="eb-change-values">
                   <span class="eb-change-prev">{{ change.previous }}</span>
-                  <span class="eb-change-arrow">↓</span>
+                  <AssetIcon name="arrow-down" :size="14" class="eb-change-arrow" />
                   <span class="eb-change-updated">{{ change.updated }}</span>
                 </div>
               </div>
             </div>
           </section>
 
-          <!-- ============================ AUDIT HISTORY ============================ -->
+          <!-- ======= AUDIT HISTORY ======== -->
           <section class="eb-card">
             <h2 class="eb-section-title">Audit History</h2>
 
@@ -227,7 +219,7 @@
                   </div>
                   <div class="eb-audit-values">
                     <span class="eb-audit-prev">{{ entry.previousValue }}</span>
-                    <span class="eb-audit-arrow">→</span>
+                    <AssetIcon name="arrow-right" :size="12" class="eb-audit-arrow" />
                     <span class="eb-audit-new">{{ entry.newValue }}</span>
                   </div>
                   <span class="eb-audit-by">Edited by {{ entry.editedBy }}</span>
@@ -237,7 +229,7 @@
           </section>
         </div>
 
-        <!-- ============================ RIGHT SIDEBAR ============================ -->
+        <!-- ======== RIGHT SIDEBAR ======= -->
         <aside class="eb-sidebar">
           <div class="eb-card eb-side-card">
             <h3 class="eb-side-title">Current Status</h3>
@@ -289,7 +281,7 @@
       </div>
     </template>
 
-    <!-- ============================ STICKY BOTTOM ACTION BAR ============================ -->
+    <!-- ======= STICKY BOTTOM ACTION BAR ======= -->
     <div v-if="originalRequest && !isLoading" class="eb-action-bar">
       <span v-if="saveError" class="eb-save-error">{{ saveError }}</span>
       <div class="eb-action-bar-buttons">
@@ -311,6 +303,7 @@
 </template>
 
 <script setup>
+import AssetIcon from '~/components/common/AssetIcon.vue'
 import { computed, reactive, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -647,15 +640,7 @@ function formatDateTime(iso) {
   margin-bottom: 10px;
 }
 .eb-back:hover { text-decoration: underline; }
-.eb-back-arrow { font-size: 16px; }
-
-.eb-breadcrumb {
-  font-size: 13px;
-  color: var(--eb-text-muted);
-  margin-bottom: 18px;
-}
-.eb-crumb-sep { margin: 0 6px; color: #c3cbd6; }
-.eb-crumb-current { color: var(--eb-text); font-weight: 600; }
+.eb-back-arrow { flex-shrink: 0; }
 
 .eb-header-row {
   display: flex;
@@ -705,7 +690,7 @@ function formatDateTime(iso) {
   padding: 16px 20px;
   margin-bottom: 20px;
 }
-.eb-locked-icon { font-size: 20px; }
+.eb-locked-icon { flex-shrink: 0; margin-top: 1px; }
 .eb-locked-text { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: #7a4b00; }
 
 /* ---------- buttons ---------- */
@@ -795,7 +780,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   background: #fbfcfe;
 }
 .eb-doc-item-new { border-color: var(--eb-primary); background: #eef5fd; }
-.eb-doc-icon { font-size: 18px; }
+.eb-doc-icon { flex-shrink: 0; }
 .eb-doc-info { display: flex; flex-direction: column; flex: 1; gap: 2px; }
 .eb-doc-name { font-size: 14px; font-weight: 600; }
 .eb-doc-size { font-size: 12px; color: var(--eb-text-muted); }
@@ -839,7 +824,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-change-label { font-size: 13px; font-weight: 700; color: var(--eb-text-muted); min-width: 160px; }
 .eb-change-values { display: flex; align-items: center; gap: 10px; font-size: 14px; flex-wrap: wrap; }
 .eb-change-prev { color: var(--eb-text-muted); text-decoration: line-through; }
-.eb-change-arrow { color: var(--eb-primary); font-weight: 700; }
+.eb-change-arrow { color: var(--eb-primary); flex-shrink: 0; }
 .eb-change-updated { color: var(--eb-success); font-weight: 700; }
 
 /* ---------- audit timeline ---------- */
@@ -870,7 +855,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-audit-date { font-size: 12px; color: var(--eb-text-muted); }
 .eb-audit-values { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .eb-audit-prev { color: var(--eb-text-muted); text-decoration: line-through; }
-.eb-audit-arrow { color: var(--eb-primary); }
+.eb-audit-arrow { color: var(--eb-primary); flex-shrink: 0; }
 .eb-audit-new { color: var(--eb-success); font-weight: 600; }
 .eb-audit-by { font-size: 12px; color: var(--eb-text-muted); }
 
@@ -929,7 +914,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   text-align: center;
   padding: 48px 24px;
 }
-.eb-error-icon, .eb-empty-icon { font-size: 28px; }
+.eb-error-icon, .eb-empty-icon { flex-shrink: 0; }
 .eb-error-text, .eb-empty-text { font-size: 14px; color: var(--eb-text-muted); }
 
 /* ---------- skeleton ---------- */
@@ -979,8 +964,6 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 :global(.dark .eb-rules-list),
 :global(.dark .eb-availability-type),
 :global(.dark .eb-change-label) { color: #8b95a8; }
-:global(.dark .eb-breadcrumb) { color: #8b95a8; }
-:global(.dark .eb-crumb-current) { color: #e6eaf2; }
 :global(.dark .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
 :global(.dark .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
 :global(.dark .eb-side-row),

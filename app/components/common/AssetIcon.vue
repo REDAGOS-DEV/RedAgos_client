@@ -35,6 +35,8 @@ import chevronRight from '~/assets/icons/chevron-right.svg?raw'
 import chevronDown from '~/assets/icons/chevron-down.svg?raw'
 import chevronUp from '~/assets/icons/chevron-up.svg?raw'
 import circleAlert from '~/assets/icons/circle-alert.svg?raw'
+import circleCheck from '~/assets/icons/circle-check-big.svg?raw'
+import circlePlus from '~/assets/icons/circle-plus.svg?raw'
 import circle from '~/assets/icons/circle.svg?raw'
 import circleX from '~/assets/icons/circle-x.svg?raw'
 import clipboard from '~/assets/icons/clipboard.svg?raw'
@@ -46,6 +48,7 @@ import cloudUpload from '~/assets/icons/cloud-upload.svg?raw'
 import creditCard from '~/assets/icons/credit-card.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
 import drawerSlide from '~/assets/icons/drawer-slide.svg?raw'
+import dropletOff from '~/assets/icons/droplet-off.svg?raw'
 import droplets from '~/assets/icons/droplets.svg?raw'
 import download from '~/assets/icons/download.svg?raw'
 import eye from '~/assets/icons/eye.svg?raw'
@@ -63,6 +66,7 @@ import house from '~/assets/icons/house.svg?raw'
 import idCard from '~/assets/icons/id-card.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
 import layoutDashboard from '~/assets/icons/layout-dashboard.svg?raw'
+import list from '~/assets/icons/list.svg?raw'
 import loader from '~/assets/icons/loader.svg?raw'
 import lock from '~/assets/icons/lock.svg?raw'
 import logIn from '~/assets/icons/log-in.svg?raw'
@@ -134,6 +138,8 @@ const icons = {
   'chevron-down' :chevronDown,
   'chevron-up': chevronUp,
   'circle-alert': circleAlert,
+  'circle-plus': circlePlus,
+  'circle-check-big': circleCheck,
   'circle-x': circleX,
   circle,
   clipboard,
@@ -145,6 +151,7 @@ const icons = {
   'credit-card': creditCard,
   'dollar-sign': dollarSign,
   'drawer-slide': drawerSlide,
+  'droplet-off': dropletOff,
   droplets,
   download,
   eye,
@@ -164,6 +171,7 @@ const icons = {
   lock,
   'layout-dashboard': layoutDashboard,
   loader,
+  list,
   'log-in': logIn,
   'log-out': logOut,
   mail,

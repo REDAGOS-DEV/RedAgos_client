@@ -452,7 +452,7 @@ function next() {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  
+
 }
 .featured .avatar-img { outline: 2px solid rgba(255, 255, 255, 0.3); }
 
