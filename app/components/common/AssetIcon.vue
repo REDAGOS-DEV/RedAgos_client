@@ -16,6 +16,7 @@ import archive from '~/assets/icons/archive.svg?raw'
 import arrowLeft from '~/assets/icons/arrow-left.svg?raw'
 import arrowRight from '~/assets/icons/arrow-right.svg?raw'
 import arrowUpRight from '~/assets/icons/arrow-up-right.svg?raw'
+import badgeCheck from '~/assets/icons/badge-check.svg?raw'
 import barChart from '~/assets/icons/bar-chart.svg?raw'
 import bell from '~/assets/icons/bell.svg?raw'
 import bloodDrop from '~/assets/icons/blood-drop.svg?raw'
@@ -24,6 +25,7 @@ import bolt from '~/assets/icons/bolt.svg?raw'
 import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
 import briefcase from '~/assets/icons/briefcase.svg?raw'
+import building2 from '~/assets/icons/building-2.svg?raw'
 import calendar from '~/assets/icons/calendar.svg?raw'
 import calendarCheck from '~/assets/icons/calendar-check.svg?raw'
 import camera from '~/assets/icons/camera.svg?raw'
@@ -66,6 +68,7 @@ import house from '~/assets/icons/house.svg?raw'
 import idCard from '~/assets/icons/id-card.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
 import layoutDashboard from '~/assets/icons/layout-dashboard.svg?raw'
+import link from '~/assets/icons/link.svg?raw'
 import list from '~/assets/icons/list.svg?raw'
 import loader from '~/assets/icons/loader.svg?raw'
 import lock from '~/assets/icons/lock.svg?raw'
@@ -98,6 +101,8 @@ import shield from '~/assets/icons/shield.svg?raw'
 import shieldCheck from '~/assets/icons/shield-check.svg?raw'
 import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import slidersHorizontal from '~/assets/icons/sliders-horizontal.svg?raw'
+import smartphone from '~/assets/icons/smartphone.svg?raw'
+import smile from '~/assets/icons/smile.svg?raw'
 import triangleAlert from '~/assets/icons/triangle-alert.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
 import stethoscope from '~/assets/icons/stethoscope.svg?raw'
@@ -106,6 +111,7 @@ import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
+import upload from '~/assets/icons/upload.svg?raw'
 import user from '~/assets/icons/user.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
 import userCheck from '~/assets/icons/user-check.svg?raw'
@@ -119,6 +125,7 @@ const icons = {
   'arrow-left' : arrowLeft,
   'arrow-right': arrowRight,
   'arrow-up-right': arrowUpRight,
+  'badge-check': badgeCheck,
   'bar-chart': barChart,
   bell,
   'blood-drop': bloodDrop,
@@ -127,6 +134,7 @@ const icons = {
   'bolt-fill': boltFill,
   box,
   briefcase,
+  'building-2': building2,
   calendar,
   'calendar-check': calendarCheck,
   camera,
@@ -171,6 +179,7 @@ const icons = {
   lock,
   'layout-dashboard': layoutDashboard,
   loader,
+  link,
   list,
   'log-in': logIn,
   'log-out': logOut,
@@ -201,6 +210,8 @@ const icons = {
   'shield-check': shieldCheck,
   'shield-plus': shieldPlus,
   'sliders-horizontal': slidersHorizontal,
+  smartphone,
+  smile,
   stethoscope,
   'star-fill': starFill,
   'triangle-alert': triangleAlert,
@@ -209,6 +220,7 @@ const icons = {
   truck,
   sun,
   'trash-2': trash,
+  upload,
   user,
   users,
   'user-check' : userCheck,
