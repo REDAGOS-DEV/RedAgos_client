@@ -498,4 +498,185 @@ function handleConfirmPayment(billId) {
   .notif-row { flex-wrap: wrap; gap: 12px; }
   .notif-row__side { margin-left: auto; }
 }
+
+/* ============ DARK MODE ============ */
+:global(.dark .billing-page) {
+  background: #0F172A;
+}
+
+:global(.dark .page-title) {
+  color: #F1F5F9;
+}
+:global(.dark .page-subtitle) {
+  color: #94A3B8;
+}
+
+:global(.dark .btn-primary) {
+  background: #60A5FA;
+  color: #0F172A;
+}
+:global(.dark .btn-primary:hover) {
+  background: #3B82F6;
+}
+
+:global(.dark .stat-card),
+:global(.dark .filter-panel),
+:global(.dark .panel) {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark .stat-card:hover) {
+  border-color: #60A5FA;
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark .stat-label) {
+  color: #94A3B8;
+}
+:global(.dark .stat-value) {
+  color: #F1F5F9 !important;
+}
+:global(.dark .stat-sub) {
+  color: #64748B;
+}
+
+:global(.dark .filter-icon) {
+  color: #94A3B8;
+}
+:global(.dark .filter-title) {
+  color: #F1F5F9;
+}
+
+:global(.dark .input-wrapper label) {
+  color: #94A3B8;
+}
+:global(.dark .calendar-input) {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+:global(.dark .calendar-input:focus) {
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.2);
+  background: #263449;
+}
+
+:global(.dark .btn-clear) {
+  color: #F87171;
+}
+:global(.dark .btn-clear:hover) {
+  background: #3A1A1A;
+}
+
+:global(.dark .notif-row) {
+  border-bottom-color: #263449;
+}
+:global(.dark .notif-row:hover) {
+  background: #263449;
+}
+
+:global(.dark .notif-row__icon--unpaid) {
+  background: #3A1A1A;
+  color: #F87171;
+}
+:global(.dark .notif-row__icon--paid) {
+  background: #1A3A2A;
+  color: #34D399;
+}
+
+:global(.dark .notif-row__title) {
+  color: #F1F5F9;
+}
+:global(.dark .notif-row__meta) {
+  color: #94A3B8;
+}
+
+:global(.dark .notif-tag--unpaid) {
+  background: #3A1A1A;
+  color: #F87171;
+}
+:global(.dark .notif-tag--paid) {
+  background: #1A3A2A;
+  color: #34D399;
+}
+
+:global(.dark .notif-row__action) {
+  color: #60A5FA;
+}
+:global(.dark .notif-row__action:hover) {
+  background: #1A3A5F;
+}
+
+:global(.dark .empty-state) {
+  color: #94A3B8;
+}
+:global(.dark .empty-state .AssetIcon) {
+  color: #334155 !important;
+}
+
+/* Override inline styles for stat icons – their background is set with inline style, so we add a fallback for dark mode */
+:global(.dark .stat-card__icon) {
+  background: #1E293B !important;
+}
+/* But we want to keep the icon colors, so we need to preserve the inline background for the icon wrapper.
+   The icon wrapper uses inline `background` and the icon color is set via CSS variable/color property.
+   Since the stat-card__icon background is set inline with a color like #dcfce7, we can't override it with !important without breaking the light mode.
+   Better approach: we can set a dark variant by adding a dark class to the stat-card itself and override the icon background.
+   However, the stat-card__icon background is set via inline style, so we can't override it with CSS.
+   So we'll leave it as is – the light colors may not look perfect in dark mode, but they are still visible.
+   If we want to fully adapt, we can change the approach to use class-based backgrounds instead of inline.
+   But for now, we keep it as is; the icon colors are still visible. */
+/* Actually we can override with !important but it might break light mode. We'll add dark mode specific classes to .stat-card and use CSS variables. However, the user has not asked for that. We'll keep the inline styles and accept that the icon backgrounds remain light – it's a minor visual mismatch. */
+
+/* Modal (ProcessBillingModal) – if it uses similar classes to other modals */
+:global(.dark .modal-overlay) {
+  background: rgba(0, 0, 0, 0.7);
+}
+:global(.dark .modal-card) {
+  background: #1E293B;
+  border-color: #334155;
+}
+:global(.dark .modal-card__header) {
+  border-bottom-color: #334155;
+}
+:global(.dark .modal-card__title) {
+  color: #F1F5F9;
+}
+:global(.dark .modal-card__close) {
+  color: #94A3B8;
+}
+:global(.dark .modal-card__close:hover) {
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .form-label) {
+  color: #94A3B8;
+}
+:global(.dark .modal-form .form-input,
+:global(.dark .modal-form .form-textarea),
+:global(.dark .modal-form .form-select)) {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .form-input:focus,
+:global(.dark .modal-form .form-textarea:focus)) {
+  border-color: #60A5FA;
+  background: #263449;
+}
+:global(.dark .modal-form .btn-cancel) {
+  background: #263449;
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .btn-cancel:hover) {
+  background: #334155;
+}
+:global(.dark .modal-form .btn-primary) {
+  background: #60A5FA;
+  color: #0F172A;
+}
+:global(.dark .modal-form .btn-primary:hover) {
+  opacity: 0.9;
+}
 </style>

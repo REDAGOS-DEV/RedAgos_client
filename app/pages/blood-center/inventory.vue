@@ -13,8 +13,8 @@
     </div>
 
     <!-- Reusable Modal for Add & Edit -->
-    <addbatchModal
-      :is-open="isaddbatchModalOpen"
+    <addBatchModal
+      :is-open="isAddBatchModalOpen"
       :edit-item="selectedItem"
       @close="closeModal"
       @save="handleSaveBatch"
@@ -106,14 +106,14 @@
 <script setup>
 import { ref, computed } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import addbatchModal from '~/components/BloodCenter/addbatchModal.vue'
+import addBatchModal from '~/components/blood-center/AddBatchModal.vue'
 
 definePageMeta({
   middleware: 'auth',
   layout: 'blood-centerdashboard'
 })
 
-const isaddbatchModalOpen = ref(false)
+const isAddBatchModalOpen = ref(false)
 const selectedItem = ref(null)
 
 const filterStartDate = ref('')
@@ -177,16 +177,16 @@ function clearDateFilter() {
 
 function openAddModal() {
   selectedItem.value = null
-  isaddbatchModalOpen.value = true
+  isAddBatchModalOpen.value = true
 }
 
 function openEditModal(item) {
   selectedItem.value = { ...item }
-  isaddbatchModalOpen.value = true
+  isAddBatchModalOpen.value = true
 }
 
 function closeModal() {
-  isaddbatchModalOpen.value = false
+  isAddBatchModalOpen.value = false
   selectedItem.value = null
 }
 
@@ -516,5 +516,191 @@ function handleSaveBatch(batchData) {
   .input-wrapper { flex: 1; min-width: 120px; }
   .inventory-row { flex-wrap: wrap; gap: 8px; }
   .col-side { flex: auto; min-width: 80px; }
+}
+
+/* ============ DARK MODE ============ */
+:global(.dark .inventory-page) {
+  background: #0F172A;
+}
+
+:global(.dark .page-title) {
+  color: #F1F5F9;
+}
+:global(.dark .page-subtitle) {
+  color: #94A3B8;
+}
+
+:global(.dark .btn-primary) {
+  background: #60A5FA;
+  color: #0F172A;
+}
+:global(.dark .btn-primary:hover) {
+  background: #3B82F6;
+}
+
+:global(.dark .stat-card),
+:global(.dark .filter-panel),
+:global(.dark .panel) {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+:global(.dark .stat-card:hover) {
+  border-color: #60A5FA;
+  box-shadow: 0 12px 24px -8px rgba(0,0,0,0.4);
+}
+
+:global(.dark .stat-label) {
+  color: #94A3B8;
+}
+:global(.dark .stat-value) {
+  color: #F1F5F9 !important; /* override inline style if needed */
+}
+:global(.dark .stat-sub) {
+  color: #64748B;
+}
+
+:global(.dark .filter-icon) {
+  color: #94A3B8;
+}
+:global(.dark .filter-title) {
+  color: #F1F5F9;
+}
+
+:global(.dark .input-wrapper label) {
+  color: #94A3B8;
+}
+:global(.dark .calendar-input) {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+:global(.dark .calendar-input:focus) {
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.2);
+  background: #263449;
+}
+
+:global(.dark .btn-clear) {
+  color: #F87171;
+}
+:global(.dark .btn-clear:hover) {
+  background: #3A1A1A;
+}
+
+:global(.dark .inventory-row) {
+  border-bottom-color: #263449;
+}
+:global(.dark .inventory-row:hover:not(.inventory-row--header)) {
+  background: #263449;
+}
+:global(.dark .inventory-row--header) {
+  background: #263449;
+  color: #94A3B8;
+}
+
+:global(.dark .col-side) {
+  color: #E2E8F0;
+}
+
+:global(.dark .notif-row__title) {
+  color: #F1F5F9;
+}
+:global(.dark .notif-row__meta) {
+  color: #94A3B8;
+}
+:global(.dark .expiry-text) {
+  color: #E2E8F0;
+}
+
+:global(.dark .notif-tag--primary) {
+  background: #1A3A5F;
+  color: #60A5FA;
+}
+:global(.dark .notif-tag--available) {
+  background: #1A3A2A;
+  color: #34D399;
+}
+:global(.dark .notif-tag--reserved) {
+  background: #3E2C1A;
+  color: #FBBF24;
+}
+
+:global(.dark .status-dot--available) {
+  background: #34D399;
+}
+:global(.dark .status-dot--reserved) {
+  background: #FBBF24;
+}
+
+:global(.dark .notif-row__action) {
+  color: #60A5FA;
+}
+:global(.dark .notif-row__action:hover) {
+  background: #1A3A5F;
+}
+
+:global(.dark .empty-state) {
+  color: #94A3B8;
+}
+:global(.dark .empty-icon) {
+  color: #334155;
+}
+
+/* Also target the modal if it's inside this page (AddBatchModal) – but we assume it's a separate component.
+   To be thorough, we can add dark mode for common modal classes if they appear. 
+   The modal uses .modal-overlay, .modal-card, etc. defined elsewhere, so we should add dark overrides for those globally.
+   However, if the modal is scoped, we may need to add these to the component's own style or global.
+   Since we don't have the modal code, we can add fallback overrides for common classes.
+   If the modal uses the same class names as before, they will be covered by the global dark styles already defined in other pages.
+   For safety, we add them here as well.
+*/
+:global(.dark .modal-overlay) {
+  background: rgba(0, 0, 0, 0.7);
+}
+:global(.dark .modal-card) {
+  background: #1E293B;
+  border-color: #334155;
+}
+:global(.dark .modal-card__header) {
+  border-bottom-color: #334155;
+}
+:global(.dark .modal-card__title) {
+  color: #F1F5F9;
+}
+:global(.dark .modal-card__close) {
+  color: #94A3B8;
+}
+:global(.dark .modal-card__close:hover) {
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .form-label) {
+  color: #94A3B8;
+}
+:global(.dark .modal-form .form-input,
+:global(.dark .modal-form .form-textarea),
+:global(.dark .modal-form .form-select)) {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .form-input:focus,
+:global(.dark .modal-form .form-textarea:focus)) {
+  border-color: #60A5FA;
+  background: #263449;
+}
+:global(.dark .modal-form .btn-cancel) {
+  background: #263449;
+  color: #F1F5F9;
+}
+:global(.dark .modal-form .btn-cancel:hover) {
+  background: #334155;
+}
+:global(.dark .modal-form .btn-primary) {
+  background: #60A5FA;
+  color: #0F172A;
+}
+:global(.dark .modal-form .btn-primary:hover) {
+  opacity: 0.9;
 }
 </style>

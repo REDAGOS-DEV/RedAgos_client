@@ -233,7 +233,8 @@ function requestActionPath(r) {
 }
 
 onMounted(async () => {
-   try {
+  try {
+    // Backend contract: GET /api/bloodcenter/dashboard
     // Response fields:
     // { staff_first_name, total_units, units_change_label,
     //   pending_requests, urgent_requests, near_expiry, donors_today, donors_scheduled,
@@ -708,4 +709,70 @@ onMounted(async () => {
   }
   .request-table__hospital { display: none; }
 }
+
+/* ============ Dark mode ============ */
+:global(.dark .dashboard) {
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  background: #0F172A;
+}
+
+:global(.dark .stat-card),
+:global(.dark .panel),
+:global(.dark .bell-btn) {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+:global(.dark .stat-card--blue) { border-top-color: #60A5FA; }
+:global(.dark .stat-card--red) { border-top-color: #F87171; }
+:global(.dark .stat-card--orange) { border-top-color: #FBBF24; }
+:global(.dark .stat-card--green) { border-top-color: #34D399; }
+
+:global(.dark .stat-card__value) { color: #F1F5F9; }
+:global(.dark .stat-card__label) { color: #94A3B8; }
+:global(.dark .stat-card__trend) { color: #94A3B8; }
+:global(.dark .stat-card__trend--up) { color: #34D399; }
+:global(.dark .stat-card__trend--red) { color: #F87171; }
+:global(.dark .stat-card__trend--orange) { color: #FBBF24; }
+:global(.dark .stat-card__trend--green) { color: #34D399; }
+
+:global(.dark .panel-header) { border-color: #334155; }
+:global(.dark .panel-title) { color: #F1F5F9; }
+
+:global(.dark .alert-item) { background: #1E293B; border-left-color: #60A5FA; }
+:global(.dark .alert-item--critical) { background: #2D1A1A; border-left-color: #F87171; }
+:global(.dark .alert-item--warning) { background: #2D241A; border-left-color: #FBBF24; }
+:global(.dark .alert-item__text) { color: #E2E8F0; }
+:global(.dark .alert-item__text strong) { color: #F1F5F9; }
+
+:global(.dark .appt-slot-row) { background: #1E293B; }
+:global(.dark .appt-slot-row--full) { background: #2D1A1A; }
+:global(.dark .appt-slot-row__time) { color: #F1F5F9; }
+:global(.dark .appt-slot-row__count) { color: #94A3B8; }
+:global(.dark .appt-slot-row__count--full) { color: #F87171; }
+
+:global(.dark .request-table__head) { color: #94A3B8; border-color: #334155; }
+:global(.dark .request-table__row) { border-color: #263449; }
+:global(.dark .request-table__ref) { color: #60A5FA; }
+:global(.dark .request-table__hospital) { color: #94A3B8; }
+:global(.dark .request-table__action) { color: #60A5FA; }
+:global(.dark .request-table__blood) { color: #F1F5F9; }
+:global(.dark .request-table__status) { color: #F1F5F9; }
+
+:global(.dark .stock-chip) { background: #1E293B; }
+:global(.dark .stock-chip--low) { background: #2D1A1A; }
+:global(.dark .stock-chip__type) { color: #34D399; }
+:global(.dark .stock-chip__type--low) { color: #F87171; }
+:global(.dark .stock-chip__count) { color: #34D399; }
+:global(.dark .stock-chip__count--low) { color: #F87171; }
+
+:global(.dark .empty-state) { color: #94A3B8; }
+:global(.dark .empty-state p) { color: #94A3B8; }
+
+:global(.dark .bell-btn:hover) { background: #263449; }
+:global(.dark .bell-dot) { background: #F87171; }
+
+:global(.dark .page-title) { color: #F1F5F9; }
+:global(.dark .page-subtitle) { color: #94A3B8; }
 </style>
