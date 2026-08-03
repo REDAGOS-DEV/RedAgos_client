@@ -4,9 +4,9 @@
 
     <div class="lg:pl-64">
       <header
-        class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
-        style="border-color: #eef1f5; box-shadow: 0 1px 2px rgba(15,23,42,0.05)"
-      >
+        class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
+        :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
+        
         <div class="hidden lg:flex flex-col justify-center min-w-[180px] flex-shrink-0">
           <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
           <span class="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{{ greeting }}</span>
@@ -231,7 +231,7 @@ const pageLabels = {
   '/blood-center/inventory': 'Inventory',
   '/blood-center/notifications': 'Notifications',
   '/blood-center/profile': 'My Profile',
-  '/blood-center/requests': 'Blood Requests',
+  '/blood-center/bloodrequests': 'Blood Requests',
   '/blood-center/reports': 'Demand Forecasting',
   '/blood-center/settings': 'Settings',
   '/blood-center/help': 'Help',
@@ -250,7 +250,7 @@ const unreadCount = ref(0)
 const showUserMenu = ref(false)
 const userMenuItems = [
   { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle' },
-  { label: 'Blood Requests', path: '/blood-center/requests', icon: 'clipboard-check' },
+  { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check' },
   { label: 'Billing', path: '/blood-center/billing', icon: 'credit-card' },
   { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell' }
 ]
@@ -280,7 +280,7 @@ function handleEscSearch() {
 
 const searchablePages = [
   { label: 'Dashboard', path: '/blood-center/dashboard', icon: 'home', keywords: 'dashboard home overview' },
-  { label: 'Blood Requests', path: '/blood-center/requests', icon: 'clipboard-check', keywords: 'blood requests urgent supply' },
+  { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', keywords: 'blood requests urgent supply' },
   { label: 'Inventory', path: '/blood-center/inventory', icon: 'archive', keywords: 'inventory stock units blood bags' },
   { label: 'Donors', path: '/blood-center/donors', icon: 'users', keywords: 'donors records donor management' },
   { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', keywords: 'appointments schedule booking' },
