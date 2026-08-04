@@ -219,8 +219,8 @@
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
-                  <AssetIcon v-if="!showPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
+                  <AssetIcon v-if="!showPassword" name="eye-off" :size="16" />
+                  <AssetIcon v-else name="eye" :size="16" />
                 </button>
               </div>
             </div>
@@ -244,8 +244,8 @@
                   :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
                   @click="showConfirmPassword = !showConfirmPassword"
                 >
-                  <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
+                  <AssetIcon v-if="!showConfirmPassword" name="eye-off" :size="16" />
+                  <AssetIcon v-else name="eye" :size="16" />
                 </button>
               </div>
             </div>
@@ -260,7 +260,7 @@
 
           <p class="signin-row">
             Already have an account?
-            <NuxtLink to="/login">Sign In</NuxtLink>
+            <NuxtLink to="/auth/blood-center/login">Sign In</NuxtLink>
           </p>
         </form>
       </div>
@@ -324,7 +324,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/login/blood-center')
+      navigateTo('/auth/blood-center/login')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'

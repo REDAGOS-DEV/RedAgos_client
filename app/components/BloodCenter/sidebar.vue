@@ -148,7 +148,7 @@ const badgeCounts = ref({ pending: 0, urgent: 0, notifications: 0 })
 
 const navGroups = [
   {
-    label: null,
+    label: 'Main',
     items: [
       { label: 'Dashboard', path: '/blood-center/dashboard', icon: 'layout-dashboard' }
     ]
@@ -157,25 +157,35 @@ const navGroups = [
     label: 'Blood Management',
     items: [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets' },
-      { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending' },
-      { label: 'Hospital Requests', path: '/blood-center/hospital-requests', icon: 'building-2' }
+      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending' },
+      { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent' }
     ]
   },
   {
     label: 'Operations',
     items: [
-      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users' },
       { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart' },
       { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar' },
+      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users' }
+    ]
+  },
+  {
+    label: 'Finance',
+    items: [
       { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card' }
     ]
   },
   {
     label: 'Reports',
     items: [
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart' },
-      { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', badge: 'notifications' },
-      { label: 'Settings', path: '/blood-center/settings', icon: 'settings' }
+      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart' }
+    ]
+  },
+  {
+    label: 'System',
+    items: [
+      { label: 'Settings', path: '/blood-center/settings', icon: 'settings' },
+      { label: 'Help & Support', path: '/blood-center/support', icon: 'life-buoy' }
     ]
   }
 ]
@@ -203,7 +213,9 @@ const showUserMenu = ref(false)
 
 const userMenuItems = [
   { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle' },
-  { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check' },
+  { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', badge: 'notifications' },
+  { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending' },
+  { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent' },
   { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card' }
 ]
 
