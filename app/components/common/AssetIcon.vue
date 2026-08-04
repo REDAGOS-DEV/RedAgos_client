@@ -48,6 +48,7 @@ import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
 import cloudUpload from '~/assets/icons/cloud-upload.svg?raw'
 import creditCard from '~/assets/icons/credit-card.svg?raw'
+import database from '~/assets/icons/database.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
 import drawerSlide from '~/assets/icons/drawer-slide.svg?raw'
 import dropletOff from '~/assets/icons/droplet-off.svg?raw'
@@ -66,8 +67,10 @@ import history from '~/assets/icons/history.svg?raw'
 import hospital from '~/assets/icons/hospital.svg?raw'
 import house from '~/assets/icons/house.svg?raw'
 import idCard from '~/assets/icons/id-card.svg?raw'
+import inbox from '~/assets/icons/inbox.svg?raw'
 import info from '~/assets/icons/info.svg?raw'
 import layoutDashboard from '~/assets/icons/layout-dashboard.svg?raw'
+import lifeBuoy from '~/assets/icons/life-buoy.svg?raw'
 import link from '~/assets/icons/link.svg?raw'
 import list from '~/assets/icons/list.svg?raw'
 import loader from '~/assets/icons/loader.svg?raw'
@@ -94,6 +97,7 @@ import quote from '~/assets/icons/quote.svg?raw'
 import receipt from '~/assets/icons/receipt.svg?raw'
 import refreshCw from '~/assets/icons/refresh-cw.svg?raw'
 import route from '~/assets/icons/route.svg?raw'
+import scanLine from '~/assets/icons/scan-line.svg?raw'
 import search from '~/assets/icons/search.svg?raw'
 import send from '~/assets/icons/send.svg?raw'
 import settings from '~/assets/icons/settings.svg?raw'
@@ -112,12 +116,14 @@ import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
+import unlock from '~/assets/icons/unlock.svg?raw'
 import upload from '~/assets/icons/upload.svg?raw'
 import user from '~/assets/icons/user.svg?raw'
 import users from '~/assets/icons/users.svg?raw'
 import userCheck from '~/assets/icons/user-check.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
 import userX from '~/assets/icons/user-x.svg?raw'
+import warehouse from '~/assets/icons/warehouse.svg?raw'
 import x from '~/assets/icons/x.svg?raw'
 const icons = {
   activity,
@@ -158,6 +164,7 @@ const icons = {
   clock,
   'cloud-upload': cloudUpload,
   'credit-card': creditCard,
+  database,
   'dollar-sign': dollarSign,
   'drawer-slide': drawerSlide,
   'droplet-off': dropletOff,
@@ -176,9 +183,11 @@ const icons = {
   hospital,
   house,
   'id-card': idCard,
+  inbox,
   info,
   lock,
   'layout-dashboard': layoutDashboard,
+  'life-buoy': lifeBuoy,
   loader,
   link,
   list,
@@ -204,6 +213,7 @@ const icons = {
   receipt,
   'refresh-cw': refreshCw,
   route,
+  'scan-line': scanLine,
   search,
   send,
   settings,
@@ -222,11 +232,13 @@ const icons = {
   truck,
   sun,
   'trash-2': trash,
+  unlock,
   upload,
   user,
   users,
   'user-check' : userCheck,
   'user-circle': userCircle,
+  warehouse,
   'user-x' : userX,
   x
 }
