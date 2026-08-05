@@ -60,9 +60,9 @@
 
           <!-- Ring -->
           <div class="ring-wrap">
-            <div class="ring ring-1 spin-cw"></div>
-            <div class="ring ring-2 spin-ccw"></div>
-            <div class="ring ring-3"></div>
+            <div class="rings ring-1 spin-cw"></div>
+            <div class="rings ring-2 spin-ccw"></div>
+            <div class="rings ring-3"></div>
             <div class="heart-center pulse-heart">
               <AssetIcon name="heart-fill" :size="44" />
             </div>
@@ -293,6 +293,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
 }
 .ring-scene {
   position: relative;
@@ -316,7 +317,7 @@ onMounted(() => {
   pointer-events: none;
   z-index: 0;
 }
-.ring { position: absolute; border-radius: 50%; }
+.rings { position: absolute; border-radius: 50%; }
 .ring-1 { width: 360px; height: 360px; top: 0;    left: 0;    transform-origin: 180px 180px; border: 1px solid rgba(37, 99, 235, 0.09); }
 .ring-2 { width: 270px; height: 270px; top: 45px; left: 45px; transform-origin: 135px 135px; border: 1.5px solid rgba(37, 99, 235, 0.20); }
 .ring-3 { width: 170px; height: 170px; top: 95px; left: 95px; border: 2px solid rgba(37, 99, 235, 0.30); background: radial-gradient(circle, rgba(200,210,255,0.15) 0%, rgba(255,200,210,0.15) 100%); }
@@ -428,9 +429,9 @@ onMounted(() => {
 .stat-label { font-size: 13px; color: #9ca3af; margin-top: 4px; }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 900px) {
+@media (max-width: 1150px) {
   .hero-content { flex-direction: column; padding: 60px 1.5rem 20px; }
-  .hero-left    { max-width: 100%; }
+  .hero-left { max-width: 100%; }
   .hero-title   { font-size: 38px; }
   .hero-right   { width: 100%; }
   .ring-scene   { width: 340px; height: 340px; }
@@ -447,4 +448,5 @@ onMounted(() => {
   .hero-left, .hero-right, .stats-bar { opacity: 1; animation: none; }
   .accent::after { animation: none; }
 }
+
 </style>

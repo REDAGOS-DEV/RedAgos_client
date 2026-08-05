@@ -7,9 +7,7 @@
       <div v-if="uploading" class="avatar-upload__overlay">
         <div class="avatar-upload__spinner" />
       </div>
-    </div>
 
-    <div class="avatar-upload__actions">
       <input
         ref="fileInput"
         type="file"
@@ -17,12 +15,18 @@
         hidden
         @change="handleFileChange"
       >
-      <button class="avatar-upload__btn" :disabled="uploading" @click="fileInput.click()">
+      <button
+        type="button"
+        class="avatar-upload__badge"
+        :disabled="uploading"
+        aria-label="Change photo"
+        @click="fileInput.click()"
+      >
         <AssetIcon name="camera" :size="14" />
-        {{ uploading ? 'Uploading...' : 'Change Photo' }}
       </button>
-      <p v-if="error" class="avatar-upload__error">{{ error }}</p>
     </div>
+
+    <p v-if="error" class="avatar-upload__error">{{ error }}</p>
   </div>
 </template>
 
@@ -69,14 +73,17 @@ async function handleFileChange(e) {
 <style scoped>
 .avatar-upload {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .avatar-upload__preview {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 96px;
+  height: 96px;
   border-radius: 999px;
   overflow: hidden;
   background: #1565C0;
@@ -84,18 +91,21 @@ async function handleFileChange(e) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  line-height: 0;
 }
 
 .avatar-upload__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .avatar-upload__initial {
   color: white;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .avatar-upload__overlay {
@@ -120,35 +130,38 @@ async function handleFileChange(e) {
   to { transform: rotate(360deg); }
 }
 
-.avatar-upload__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.avatar-upload__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
+/* Camera badge attached to bottom-right of the circle */
+.avatar-upload__badge {
+  position: absolute;
+  bottom: -2px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: white;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
   color: #1565C0;
-  background: #E3F2FD;
-  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  padding: 0;
   transition: background 0.15s ease;
-  width: fit-content;
 }
 
-.avatar-upload__btn:hover:not(:disabled) {
-  background: #d3e9fb;
+.avatar-upload__badge:hover:not(:disabled) {
+  background: #E3F2FD;
 }
 
-.avatar-upload__btn:disabled {
+.avatar-upload__badge:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.avatar-upload__badge :deep(svg) {
+  display: block;
+  flex-shrink: 0;
 }
 
 .avatar-upload__error {

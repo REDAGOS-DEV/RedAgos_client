@@ -57,10 +57,10 @@
         </p>
 
         <div class="cta-buttons">
-          <NuxtLink to="/register" class="btn-primary">
+          <NuxtLink to="/auth/role-selection" class="btn-primary">
             Register Now <AssetIcon name="arrow-right" :size="16" />
           </NuxtLink>
-          <NuxtLink to="/login" class="btn-outline">
+          <NuxtLink to="/auth/donor/login" class="btn-outline">
             Sign In
           </NuxtLink>
         </div>

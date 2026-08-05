@@ -27,39 +27,64 @@ RedAgos Client is the frontend application for the **RedAgos Blood Request and I
 
 ```text
 RedAgos_client/
+│
 ├── app/
 │   ├── app.vue
+│   │
 │   ├── assets/
 │   │   ├── css/
-│   │   ├── images/
-│   │   └── icons/
+│   │   ├── icons/
+│   │   └── images/
+│   │
 │   ├── components/
 │   │   ├── common/
+│   │   ├── donor/
+│   │   ├── inventory/
 │   │   ├── layout/
 │   │   ├── request/
-│   │   ├── inventory/
-│   │   ├── donor/
 │   │   └── user/
+│   │
 │   ├── composables/
 │   ├── layouts/
 │   ├── middleware/
-│   ├── pages/
-│   │   ├── index.vue
-│   │   ├── login.vue
-│   │   ├── dashboard/
-│   │   ├── blood-requests/
-│   │   ├── inventory/
-│   │   ├── donors/
-│   │   ├── recipients/
-│   │   ├── users/
-│   │   ├── reports/
-│   │   └── settings/
 │   ├── plugins/
+│   │
+│   ├── pages/
+│   │   ├── auth/
+│   │   │   ├── login.vue
+│   │   │   ├── register.vue
+│   │   │   └── forgot-password.vue
+│   │   │
+│   │   ├── signup/
+│   │   │   ├── donor/
+│   │   │   │   ├── PersonalInformation.vue
+│   │   │   │   ├── Eligibility.vue
+│   │   │   │   ├── Appointment.vue
+│   │   │   │   └── Success.vue
+│   │   │   │
+│   │   │   └── blood-center/
+│   │   │
+│   │   ├── donor/
+│   │   │   ├── Dashboard.vue
+│   │   │   ├── Appointments.vue
+│   │   │   ├── History.vue
+│   │   │   ├── Profile.vue
+│   │   │   ├── Settings.vue
+│   │   │   ├── Notifications.vue
+│   │   │   ├── Help.vue
+│   │   │   └── MyQRCode.vue
+│   │   │
+│   │   ├── blood-center/
+│   │   ├── legal/
+│   │   └── index.vue
+│   │
 │   ├── stores/
 │   ├── types/
 │   └── utils/
+│
 ├── public/
 ├── server/
+│
 ├── nuxt.config.ts
 ├── package.json
 ├── tsconfig.json
@@ -67,6 +92,10 @@ RedAgos_client/
 ```
 
 ## Installation
+
+### Node Version
+
+Use Node.js `22.12.0` or newer within the supported LTS ranges. This project follows Nuxt's supported engines: `^22.12.0 || ^24.11.0 || >=26.0.0`.
 
 ### Clone the Repository
 
