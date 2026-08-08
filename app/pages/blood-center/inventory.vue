@@ -16,9 +16,8 @@
         <div class="skeleton skeleton--panel" style="height:280px" />
       </div>
     </div>
-
+    <!-- ============ HEADER ============ -->
     <div v-else class="inv-inner">
-      <!-- ============ HEADER ============ -->
       <div class="fade-in" style="--delay: 0ms">
         <div class="header-row">
           <div>
@@ -192,7 +191,7 @@
       </div>
 
       <!-- ============ MAIN INVENTORY TABLE ============ -->
-      <div class="panel fade-in" style="--delay: 180ms">
+      <div ref="inventoryTableSection" class="panel fade-in" style="--delay: 180ms">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Inventory Records</h2>
@@ -556,13 +555,45 @@
         <div class="panel-header">
           <h2 class="panel-title">Quick Actions</h2>
         </div>
-        <div class="quick-actions-grid quick-actions-grid--six">
-          <button v-for="action in quickActions" :key="action.label" type="button" class="quick-action-card" @click="handleQuickAction(action)">
-            <div class="quick-action-card__icon">
-              <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary)" />
+
+        <div class="quick-actions-body">
+          <div class="quick-actions-group">
+            <p class="quick-actions-group__label">Primary Operations</p>
+            <div class="quick-actions-grid quick-actions-grid--primary">
+              <button
+                v-for="action in primaryQuickActions"
+                :key="action.label"
+                type="button"
+                class="quick-action-card quick-action-card--primary"
+                @click="handleQuickAction(action)"
+              >
+                <div class="quick-action-card__icon quick-action-card__icon--primary">
+                  <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary)" />
+                </div>
+                <p class="quick-action-card__label">{{ action.label }}</p>
+                <p class="quick-action-card__desc">{{ action.description }}</p>
+              </button>
             </div>
-            <p class="quick-action-card__label">{{ action.label }}</p>
-          </button>
+          </div>
+
+          <div class="quick-actions-group">
+            <p class="quick-actions-group__label">Secondary Operations</p>
+            <div class="quick-actions-grid quick-actions-grid--secondary">
+              <button
+                v-for="action in secondaryQuickActions"
+                :key="action.label"
+                type="button"
+                class="quick-action-card"
+                @click="handleQuickAction(action)"
+              >
+                <div class="quick-action-card__icon">
+                  <AssetIcon :name="action.icon" :size="18" style="color: var(--rb-text-secondary)" />
+                </div>
+                <p class="quick-action-card__label">{{ action.label }}</p>
+                <p class="quick-action-card__desc">{{ action.description }}</p>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -693,6 +724,163 @@
               </button>
             </div>
           </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ============ PRINT LABELS MODAL ============ -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="printModalOpen" class="modal-overlay" @click.self="closePrintLabelsModal">
+          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true">
+            <button type="button" class="modal-close" @click="closePrintLabelsModal">
+              <AssetIcon name="x" :size="16" />
+            </button>
+
+            <h3 class="modal-title modal-title--left">Print Labels</h3>
+            <p class="modal-subtitle modal-subtitle--left">Select batches, set quantity, and preview before printing.</p>
+
+            <div v-if="!printableBatches.length" class="empty-state">
+              <AssetIcon name="printer" :size="32" style="color: var(--rb-border-strong)" />
+              <p>No available batches to print labels for.</p>
+            </div>
+
+            <template v-else>
+              <div class="print-batch-list">
+                <label v-for="b in printableBatches" :key="b.id" class="print-batch-row">
+                  <input type="checkbox" :checked="printSelectedIds.includes(b.id)" @change="togglePrintSelection(b)" />
+                  <div class="print-batch-row__info">
+                    <p class="print-batch-row__title">{{ b.batch_id }} &middot; {{ b.blood_type }} {{ b.component }}</p>
+                    <p class="print-batch-row__meta">Collected {{ formatDate(b.collection_date) }} &middot; Expires {{ formatDate(b.expiry_date) }}</p>
+                  </div>
+                  <input
+                    v-if="printSelectedIds.includes(b.id)"
+                    type="number"
+                    min="1"
+                    :max="b.available_units"
+                    v-model.number="printQuantities[b.id]"
+                    class="print-batch-row__qty"
+                    @click.stop
+                  />
+                </label>
+              </div>
+
+              <div v-if="printSelectedIds.length" class="print-preview">
+                <p class="expanded-col__title">Label Preview</p>
+                <div class="print-preview__grid">
+                  <div v-for="id in printSelectedIds" :key="id" class="print-label-card">
+                    <p class="print-label-card__type">{{ inventoryBatches.find(b => b.id === id)?.blood_type }}</p>
+                    <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.component }}</p>
+                    <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.batch_id }}</p>
+                    <p class="print-label-card__meta">Exp {{ formatDate(inventoryBatches.find(b => b.id === id)?.expiry_date) }}</p>
+                    <div class="print-label-card__barcode" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button
+                  type="button"
+                  class="btn-primary modal-actions__btn"
+                  :disabled="!printSelectedIds.length || printSubmitting"
+                  @click="submitPrintLabels"
+                >
+                  <AssetIcon name="printer" :size="15" />
+                  {{ printSubmitting ? 'Preparing…' : 'Generate & Print' }}
+                </button>
+                <button type="button" class="btn-outline modal-actions__btn" @click="closePrintLabelsModal" :disabled="printSubmitting">Cancel</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ============ INVENTORY DETAIL DRAWER (View Details) ============ -->
+    <Teleport to="body">
+      <Transition name="drawer-fade">
+        <div v-if="drawerOpen" class="drawer-overlay" @click.self="closeDetailsDrawer">
+          <aside class="detail-drawer" role="dialog" aria-modal="true" aria-label="Inventory batch details">
+            <header class="detail-drawer__header">
+              <div>
+                <p class="detail-drawer__eyebrow">{{ drawerBatch?.batch_id }}</p>
+                <h2 class="detail-drawer__title">{{ drawerBatch?.blood_type }} &middot; {{ drawerBatch?.component }}</h2>
+              </div>
+              <button type="button" class="modal-close" @click="closeDetailsDrawer">
+                <AssetIcon name="x" :size="16" />
+              </button>
+            </header>
+
+            <div v-if="drawerBatch" class="detail-drawer__body">
+              <section class="detail-drawer__section">
+                <p class="expanded-col__title">Inventory Overview</p>
+                <dl class="drawer-info-grid">
+                  <div><dt>Blood Type</dt><dd>{{ drawerBatch.blood_type }}</dd></div>
+                  <div><dt>Component</dt><dd>{{ drawerBatch.component }}</dd></div>
+                  <div><dt>Available Units</dt><dd>{{ drawerBatch.available_units }}</dd></div>
+                  <div><dt>Reserved Units</dt><dd>{{ drawerBatch.reserved_units }}</dd></div>
+                  <div><dt>Batch Number</dt><dd>{{ drawerBatch.batch_number || drawerBatch.batch_id }}</dd></div>
+                  <div><dt>Collection Source</dt><dd>{{ drawerBatch.donation_source || '—' }}</dd></div>
+                  <div><dt>Storage Location</dt><dd>{{ drawerBatch.storage_location || '—' }}</dd></div>
+                  <div><dt>Collection Date</dt><dd>{{ formatDate(drawerBatch.collection_date) }}</dd></div>
+                  <div><dt>Expiry Date</dt><dd>{{ formatDate(drawerBatch.expiry_date) }}</dd></div>
+                  <div>
+                    <dt>Inventory Status</dt>
+                    <dd>
+                      <span class="status-pill" :class="`status-pill--${drawerBatch.status}`">
+                        <span class="status-pill__dot" />{{ statusLabel(drawerBatch.status) }}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section class="detail-drawer__section">
+                <p class="expanded-col__title">Reserved History</p>
+                <div v-if="drawerBatch.reserved_history?.length" class="expanded-list">
+                  <p v-for="(h, i) in drawerBatch.reserved_history" :key="i" class="expanded-list__row">
+                    {{ h.hospital }} &middot; {{ h.units }} units &middot; {{ h.date }}
+                  </p>
+                </div>
+                <p v-else class="expanded-col__note">No reservation history</p>
+              </section>
+
+              <section class="detail-drawer__section">
+                <p class="expanded-col__title">Hospital Allocation</p>
+                <div v-if="drawerBatch.hospital_allocation?.length" class="expanded-list">
+                  <p v-for="(a, i) in drawerBatch.hospital_allocation" :key="i" class="expanded-list__row">
+                    {{ a.hospital }} &middot; {{ a.units }} units
+                  </p>
+                </div>
+                <p v-else class="expanded-col__note">No current allocations</p>
+              </section>
+
+              <section class="detail-drawer__section">
+                <p class="expanded-col__title">Movement Timeline</p>
+                <div v-if="drawerBatch.movement_history?.length" class="expanded-list">
+                  <p v-for="(m, i) in drawerBatch.movement_history" :key="i" class="expanded-list__row">
+                    {{ m.action }} &middot; {{ m.date }}
+                  </p>
+                </div>
+                <p v-else class="expanded-col__note">No recorded movement yet</p>
+              </section>
+            </div>
+
+            <footer v-if="drawerBatch" class="detail-drawer__footer">
+              <button type="button" class="btn-outline" @click="editFromDrawer">
+                <AssetIcon name="pencil" :size="14" /> Edit Inventory
+              </button>
+              <button type="button" class="btn-outline" @click="reserveFromDrawer">
+                <AssetIcon name="lock" :size="14" /> Reserve Units
+              </button>
+              <button type="button" class="btn-outline" @click="transferFromDrawer">
+                <AssetIcon name="send" :size="14" /> Transfer Units
+              </button>
+              <button type="button" class="btn-primary" @click="printFromDrawer">
+                <AssetIcon name="printer" :size="14" /> Print Label
+              </button>
+            </footer>
+          </aside>
         </div>
       </Transition>
     </Teleport>
@@ -921,7 +1109,7 @@ const nearExpiryBatches = computed(() =>
     .sort((a, b) => a.days_remaining - b.days_remaining)
 )
 
-// --- Row expansion ---
+// --- Row expansion (inline "Inventory Detail Expansion") ---
 const expandedRowId = ref(null)
 function toggleExpand(id) {
   expandedRowId.value = expandedRowId.value === id ? null : id
@@ -935,21 +1123,59 @@ function toggleRowMenu(id) {
 
 function handleRowAction(action, row) {
   openMenuId.value = null
-  if (action === 'view') { expandedRowId.value = row.id; return }
+  if (action === 'view' || action === 'history') { openDetailsDrawer(row); return }
   if (action === 'edit') { openEditBatchModal(row); return }
-  if (['reserve', 'release', 'transfer', 'print', 'archive', 'discard'].includes(action)) {
+  if (action === 'print') { openPrintLabelsModal(row); return }
+  if (['reserve', 'release', 'transfer', 'archive', 'discard'].includes(action)) {
     openManageModal(row, action)
     return
   }
-  if (action === 'history') { expandedRowId.value = row.id; return }
   if (action === 'mark-expiring') {
     // i-connect sa /blood-center/inventory/:id/mark-expiring endpoint
     bloodCenterService.markAsExpiring?.(row.id)
   }
 }
 
+const inventoryTableSection = ref(null)
 function openBatchDetail(row) {
-  expandedRowId.value = row.id
+  if (row.days_remaining <= 0) filters.expiryStatus = 'today'
+  else if (row.days_remaining <= 3) filters.expiryStatus = '3days'
+  else filters.expiryStatus = '7days'
+  page.value = 1
+  inventoryTableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// --- Inventory detail drawer (View Details) ---
+const drawerOpen = ref(false)
+const drawerBatch = ref(null)
+function openDetailsDrawer(row) {
+  drawerBatch.value = row
+  drawerOpen.value = true
+  openMenuId.value = null
+}
+function closeDetailsDrawer() {
+  drawerOpen.value = false
+  drawerBatch.value = null
+}
+function editFromDrawer() {
+  const row = drawerBatch.value
+  closeDetailsDrawer()
+  if (row) openEditBatchModal(row)
+}
+function reserveFromDrawer() {
+  const row = drawerBatch.value
+  closeDetailsDrawer()
+  if (row) openManageModal(row, 'reserve')
+}
+function transferFromDrawer() {
+  const row = drawerBatch.value
+  closeDetailsDrawer()
+  if (row) openManageModal(row, 'transfer')
+}
+function printFromDrawer() {
+  const row = drawerBatch.value
+  closeDetailsDrawer()
+  if (row) openPrintLabelsModal(row)
 }
 
 // --- Inventory trend chart ---
@@ -1051,32 +1277,54 @@ const activityLog = ref([])
 
 // --- Quick actions ---
 const quickActions = [
-  { label: 'Record Donation', icon: 'droplets', kind: 'link', to: '/blood-center/dashboard' },
-  { label: 'Add Inventory Batch', icon: 'plus', kind: 'modal' },
-  { label: 'Transfer Inventory', icon: 'send', kind: 'manage' },
-  { label: 'Print Inventory Report', icon: 'printer', kind: 'export' },
-  { label: 'Generate Barcode', icon: 'scan-line', kind: 'barcode' },
-  { label: 'Manage Storage', icon: 'warehouse', kind: 'link', to: '/blood-center/inventory/storage' },
+  {
+    label: 'Record Donation',
+    description: 'Register newly collected blood.',
+    icon: 'droplets',
+    kind: 'link',
+    to: '/blood-center/dashboard',
+    tier: 'primary',
+  },
+  {
+    label: 'Add Inventory Batch',
+    description: 'Add collected units to inventory.',
+    icon: 'plus',
+    kind: 'modal',
+    tier: 'primary',
+  },
+  {
+    label: 'Transfer Units',
+    description: 'Move units between supported facilities.',
+    icon: 'send',
+    kind: 'manage',
+    tier: 'secondary',
+  },
+  {
+    label: 'Print Labels',
+    description: 'Generate and print blood unit labels.',
+    icon: 'printer',
+    kind: 'print',
+    tier: 'secondary',
+  },
+  {
+    label: 'Inventory Report',
+    description: 'View or export inventory reports.',
+    icon: 'file-text',
+    kind: 'report',
+    tier: 'secondary',
+  },
 ]
+const primaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'primary'))
+const secondaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'secondary'))
+
 function handleQuickAction(action) {
   if (action.kind === 'modal') return openAddBatchModal()
   if (action.kind === 'manage') return openManageModal(null, 'transfer')
-  if (action.kind === 'export') return exportReport()
-  if (action.kind === 'barcode') {
-    // i-connect sa /blood-center/inventory/generate-barcode endpoint
-    bloodCenterService.generateBarcode?.()
-    return
+  if (action.kind === 'print') return openPrintLabelsModal()
+  if (action.kind === 'report') {
+    return navigateTo('/blood-center/reports')
   }
   if (action.kind === 'link' && action.to) return navigateTo(action.to)
-}
-
-async function exportReport() {
-  try {
-    // i-connect sa /blood-center/inventory/reports/export endpoint
-    await bloodCenterService.exportInventoryReport?.()
-  } catch (err) {
-    console.error('Failed to export inventory report:', err)
-  }
 }
 
 async function syncInventory() {
@@ -1152,7 +1400,7 @@ async function submitBatchForm() {
       // i-connect sa /blood-center/inventory/:id endpoint (PUT/PATCH)
       await bloodCenterService.updateInventoryBatch?.(editingBatchId.value, { ...batchForm })
     } else {
-      // Dev note: i-connect sa /blood-center/inventory endpoint (POST)
+      // i-connect sa /blood-center/inventory endpoint (POST)
       await bloodCenterService.createInventoryBatch?.({ ...batchForm })
     }
     batchModalOpen.value = false
@@ -1165,13 +1413,13 @@ async function submitBatchForm() {
   }
 }
 
-// --- Manage inventory modal (reserve/release/transfer/print/archive/discard) ---
+// --- Manage inventory modal (reserve/release/transfer/archive/discard) ---
 const manageModalOpen = ref(false)
 const manageTargetBatch = ref(null)
 function openManageModal(row, presetAction) {
   manageTargetBatch.value = row
   manageModalOpen.value = true
-  if (presetAction && row) runManageAction(presetAction, { silent: true })
+  if (presetAction && row) runManageAction(presetAction)
 }
 function closeManageModal() {
   manageModalOpen.value = false
@@ -1180,7 +1428,7 @@ function closeManageModal() {
 async function runManageAction(action) {
   const row = manageTargetBatch.value
   try {
-    // Dev note: i-connect sa /blood-center/inventory/:id/{action} endpoints
+    // i-connect sa /blood-center/inventory/:id/{action} endpoints
     await bloodCenterService.manageInventoryAction?.(row?.id, action)
     if (['reserve', 'release', 'archive', 'discard'].includes(action)) {
       await loadDashboard()
@@ -1192,9 +1440,54 @@ async function runManageAction(action) {
   }
 }
 
+// --- Print Labels modal  ---
+const printModalOpen = ref(false)
+const printSelectedIds = ref([])
+const printQuantities = reactive({})
+const printSubmitting = ref(false)
+const printableBatches = computed(() => inventoryBatches.value.filter(b => (b.available_units || 0) > 0))
+
+function openPrintLabelsModal(presetBatch = null) {
+  printSelectedIds.value = presetBatch ? [presetBatch.id] : []
+  Object.keys(printQuantities).forEach(k => delete printQuantities[k])
+  if (presetBatch) printQuantities[presetBatch.id] = 1
+  printModalOpen.value = true
+}
+function closePrintLabelsModal() {
+  if (printSubmitting.value) return
+  printModalOpen.value = false
+}
+function togglePrintSelection(row) {
+  const idx = printSelectedIds.value.indexOf(row.id)
+  if (idx === -1) {
+    printSelectedIds.value.push(row.id)
+    printQuantities[row.id] = 1
+  } else {
+    printSelectedIds.value.splice(idx, 1)
+    delete printQuantities[row.id]
+  }
+}
+async function submitPrintLabels() {
+  if (!printSelectedIds.value.length) return
+  printSubmitting.value = true
+  try {
+    // i-connect sa /blood-center/inventory/print-labels endpoint (POST).
+    // Payload: [{ batchId, quantity }]. Backend should return a barcode/PDF per
+    // batch. Per spec, labels expose only batch/type/component/dates — no
+    // patient or donor identifying information.
+    const payload = printSelectedIds.value.map(id => ({ batchId: id, quantity: printQuantities[id] || 1 }))
+    await bloodCenterService.printInventoryLabels?.(payload)
+    printModalOpen.value = false
+  } catch (err) {
+    console.error('Failed to print labels:', err)
+  } finally {
+    printSubmitting.value = false
+  }
+}
+
 async function loadDashboard() {
   try {
-    // Dev note: gikan sa /blood-center/inventory-overview endpoint — nag-uli sa tanan
+    // gikan sa /blood-center/inventory-overview endpoint — nag-uli sa tanan
     // (batches, reference data, trends, distribution, activity log). Walay hardcoded/mock
     // values diri; kung wala'y balik gikan sa API, mag-empty state na lang ang UI.
     const data = await bloodCenterService.inventoryOverview?.()
@@ -1226,10 +1519,6 @@ onMounted(loadDashboard)
 </script>
 
 <style scoped>
-/*
- * Dev note: gibutang sa :global(:root)/:global(.dark) para ma-inherit sa teleported modals
- * (naa sila outside sa .inv-page DOM subtree tungod sa <Teleport to="body">).
- */
 :global(:root) {
   --rb-primary: #1565C0;
   --rb-primary-rgb: 21, 101, 192;
@@ -1304,15 +1593,8 @@ onMounted(loadDashboard)
 .fade-in { animation: fadeInUp 0.45s ease both; animation-delay: var(--delay, 0ms); }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton, .stat-card, .quick-action-card, .type-card, .health-card, .spin-icon { animation: none !important; transition: none !important; }
+  .fade-in, .skeleton, .stat-card, .quick-action-card, .type-card, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
 }
-
-/* Breadcrumb + header */
-.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); margin-bottom: 10px; }
-.breadcrumb__link { color: var(--rb-text-secondary); text-decoration: none; }
-.breadcrumb__link:hover { color: var(--rb-primary); }
-.breadcrumb__sep { flex-shrink: 0; }
-.breadcrumb__current { color: var(--rb-text-primary); font-weight: 600; }
 
 .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
@@ -1560,17 +1842,24 @@ onMounted(loadDashboard)
 .activity-feed__time { font-size: 11px; color: var(--rb-text-secondary); margin: 0; white-space: nowrap; }
 
 /* Quick actions */
-.quick-actions-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 18px; }
-.quick-actions-grid--six { grid-template-columns: repeat(6, 1fr); }
+.quick-actions-body { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
+.quick-actions-group__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); margin: 0 0 10px; }
+.quick-actions-grid { display: grid; gap: 12px; }
+.quick-actions-grid--primary { grid-template-columns: repeat(2, 1fr); }
+.quick-actions-grid--secondary { grid-template-columns: repeat(3, 1fr); }
 .quick-action-card {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; border-radius: 12px;
   border: 1px solid var(--rb-border); background: var(--rb-surface-alt); cursor: pointer; text-align: left; font-family: inherit;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .quick-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(var(--rb-shadow-rgb), 0.08); border-color: var(--rb-border-hover); background: var(--rb-surface); }
 .quick-action-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.quick-action-card__icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(var(--rb-primary-rgb), 0.08); display: flex; align-items: center; justify-content: center; }
-.quick-action-card__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.quick-action-card--primary { background: rgba(var(--rb-primary-rgb), 0.04); border-color: rgba(var(--rb-primary-rgb), 0.18); }
+.quick-action-card--primary:hover { background: rgba(var(--rb-primary-rgb), 0.07); border-color: var(--rb-primary); }
+.quick-action-card__icon { width: 38px; height: 38px; border-radius: 10px; background: var(--rb-surface); border: 1px solid var(--rb-border); display: flex; align-items: center; justify-content: center; }
+.quick-action-card__icon--primary { background: rgba(var(--rb-primary-rgb), 0.08); border-color: transparent; }
+.quick-action-card__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 2px 0 0; }
+.quick-action-card__desc { font-size: 11px; color: var(--rb-text-secondary); margin: 0; line-height: 1.35; }
 
 /* Empty state */
 .empty-state { padding: 40px 24px; text-align: center; color: var(--rb-text-secondary); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -1614,8 +1903,43 @@ onMounted(loadDashboard)
 .manage-action-card--danger { color: var(--rb-accent); }
 .manage-action-card--danger:hover { background: rgba(var(--rb-accent-rgb), 0.06); }
 
+/* Print labels modal */
+.print-batch-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 16px; }
+.print-batch-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rb-border); cursor: pointer; }
+.print-batch-row:hover { background: var(--rb-surface-hover); }
+.print-batch-row__info { flex: 1; min-width: 0; }
+.print-batch-row__title { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); margin: 0; }
+.print-batch-row__meta { font-size: 11px; color: var(--rb-text-secondary); margin: 2px 0 0; }
+.print-batch-row__qty { width: 56px; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--rb-border-strong); font-size: 12px; text-align: center; }
+.print-preview { margin-bottom: 16px; }
+.print-preview__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
+.print-label-card { border: 1px dashed var(--rb-border-strong); border-radius: 10px; padding: 10px; font-size: 10.5px; }
+.print-label-card__type { font-weight: 800; color: var(--rb-accent); margin: 0; font-size: 13px; }
+.print-label-card__meta { color: var(--rb-text-secondary); margin: 2px 0 0; }
+.print-label-card__barcode { margin-top: 6px; height: 20px; background: repeating-linear-gradient(90deg, var(--rb-text-primary) 0 2px, transparent 2px 4px); }
+
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+
+/* Inventory detail drawer (View Details) */
+.drawer-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; justify-content: flex-end; z-index: 1000; }
+.detail-drawer {
+  width: clamp(420px, 32vw, 520px); max-width: 100%; height: 100%; background: var(--rb-surface);
+  display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(var(--rb-shadow-rgb), 0.18);
+  animation: drawer-slide-in 0.25s ease;
+}
+@keyframes drawer-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.detail-drawer__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 22px; border-bottom: 1px solid var(--rb-border); position: relative; }
+.detail-drawer__eyebrow { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11.5px; color: var(--rb-text-secondary); margin: 0 0 3px; }
+.detail-drawer__title { font-size: 16px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.detail-drawer__body { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 22px; }
+.detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--rb-border); }
+.detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 45%; justify-content: center; }
+.drawer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+.drawer-info-grid dt { font-size: 11px; color: var(--rb-text-secondary); margin-bottom: 3px; }
+.drawer-info-grid dd { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); margin: 0; }
+.drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.2s ease; }
+.drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
 @media (max-width: 1200px) {
@@ -1624,7 +1948,8 @@ onMounted(loadDashboard)
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .insights-grid { grid-template-columns: 1fr; }
-  .quick-actions-grid, .quick-actions-grid--six { grid-template-columns: repeat(3, 1fr); }
+  .quick-actions-grid--primary { grid-template-columns: repeat(2, 1fr); }
+  .quick-actions-grid--secondary { grid-template-columns: repeat(3, 1fr); }
   .expanded-panel { grid-template-columns: 1fr; }
   .manage-actions-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -1639,7 +1964,9 @@ onMounted(loadDashboard)
   .toolbar__row--end .btn-outline, .toolbar__row--end .btn-primary { flex: 1; }
   .form-row { grid-template-columns: 1fr; }
   .donut-body { flex-direction: column; }
-  .quick-actions-grid, .quick-actions-grid--six { grid-template-columns: repeat(2, 1fr); }
+  .quick-actions-grid--primary, .quick-actions-grid--secondary { grid-template-columns: repeat(2, 1fr); }
   .manage-actions-grid { grid-template-columns: 1fr; }
+  .detail-drawer { width: 100%; }
+  .detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 100%; }
 }
 </style>
