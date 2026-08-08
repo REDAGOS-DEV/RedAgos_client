@@ -30,6 +30,7 @@ import calendar from '~/assets/icons/calendar.svg?raw'
 import calendarCheck from '~/assets/icons/calendar-check.svg?raw'
 import camera from '~/assets/icons/camera.svg?raw'
 import chart from '~/assets/icons/chart.svg?raw'
+import checkCheck from '~/assets/icons/check-check.svg?raw'
 import checkCircle from '~/assets/icons/check-circle.svg?raw'
 import check from '~/assets/icons/check.svg?raw'
 import chevronLeft from '~/assets/icons/chevron-left.svg?raw'
@@ -60,6 +61,7 @@ import fileDown from '~/assets/icons/file-down.svg?raw'
 import filePlus from '~/assets/icons/file-plus.svg?raw'
 import fileText from '~/assets/icons/file-text.svg?raw'
 import flag from '~/assets/icons/flag.svg?raw'
+import flaskConical from '~/assets/icons/flask-conical.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
 import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import helpCircle from '~/assets/icons/help-circle.svg?raw'
@@ -99,6 +101,7 @@ import refreshCw from '~/assets/icons/refresh-cw.svg?raw'
 import route from '~/assets/icons/route.svg?raw'
 import scanLine from '~/assets/icons/scan-line.svg?raw'
 import search from '~/assets/icons/search.svg?raw'
+import searchX from '~/assets/icons/search-x.svg?raw'
 import send from '~/assets/icons/send.svg?raw'
 import settings from '~/assets/icons/settings.svg?raw'
 import share from '~/assets/icons/share.svg?raw'
@@ -147,6 +150,7 @@ const icons = {
   camera,
   chart,
   'check-circle': checkCircle,
+  'check-check': checkCheck,
   check,
   'chevron-left': chevronLeft,
   'chevron-right': chevronRight,
@@ -176,6 +180,7 @@ const icons = {
   'file-plus': filePlus,
   'file-text': fileText,
   flag,
+  'flask-conical': flaskConical,
   heart,
   'heart-fill': heartFill,
   'help-circle': helpCircle,
@@ -215,6 +220,7 @@ const icons = {
   route,
   'scan-line': scanLine,
   search,
+  'search-x': searchX,
   send,
   settings,
   share,
