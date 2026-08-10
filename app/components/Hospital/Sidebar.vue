@@ -146,7 +146,7 @@ const navGroups = [
     label: 'Requests',
     items: [
       { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending' },
-      { label: 'Blood Availability', path: '/hospital/availability', icon: 'droplets' },
+      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'droplets' },
       { label: 'Track Requests', path: '/hospital/trackrequests', icon: 'route' }
     ]
   },

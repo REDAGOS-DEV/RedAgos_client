@@ -140,7 +140,7 @@
               <button
                 type="button"
                 class="role-button hospital"
-                @click="navigateTo('/auth/login/donor')"
+                @click="navigateTo('/auth/donor/login')"
               >
                 <AssetIcon name="users" :size="20" />
                 Donor
@@ -214,7 +214,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/blood-center/Dashboard')
+    await navigateTo('/blood-center/dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

@@ -21,8 +21,8 @@
 
       <!-- Logo -->
       <div
-        class="h-16 px-4 flex items-center gap-3 border-b dark:border-slate-700 flex-shrink-0 transition-colors duration-150"
-        style="border-color:#EEF1F5">
+        class="px-5 pt-3 pb-3 flex items-center gap-3 border-b dark:border-slate-700 flex-shrink-0 transition-colors duration-150"
+        :style="{ borderColor: SIDEBAR_BORDER }">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
           style="background: linear-gradient(135deg, #1565C0, #42A5F5); box-shadow: 0 4px 12px rgba(21,101,192,0.25)">
           <img :src="logo" alt="RedAgos Logo" class="logo-image">

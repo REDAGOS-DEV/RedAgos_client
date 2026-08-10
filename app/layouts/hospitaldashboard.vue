@@ -156,7 +156,7 @@
         </button>
       </header>
 
-      <main class="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-150 pt-16">
+      <main class="min-h-screen bg-[#F7F9FC] dark:bg-slate-900 transition-colors duration-150 pt-16">
         <slot />
       </main>
     </div>
@@ -189,7 +189,7 @@ const pageLabels = {
   '/hospital/bloodrequests/newrequest/[id]' : 'Blood Requests / New Request / ',
   '/hospital/bloodrequests/edit' : 'Blood Requests / Edit / ',
   '/hospital/trackrequests': 'Track Requests',
-  '/hospital/availability': 'Search Availability',
+  '/hospital/bloodavailability': 'Search Availability',
   '/hospital/billing': 'Billing & Payments',
   '/hospital/transactions': 'Transaction History',
   '/hospital/notifications': 'Notifications',
@@ -243,7 +243,7 @@ const searchablePages = [
   { label: 'Dashboard', path: '/hospital/dashboard', icon: 'home', keywords: 'dashboard home overview' },
   { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
-  { label: 'Search Availability', path: '/hospital/availability', icon: 'search', keywords: 'availability search blood units' },
+  { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
   { label: 'Billing & Payments', path: '/hospital/billing', icon: 'receipt', keywords: 'billing payment gcash cash' },
   { label: 'Transaction History', path: '/hospital/transactions', icon: 'history', keywords: 'transaction history records' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
@@ -332,6 +332,7 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+
 .popup-enter-active,
 .popup-leave-active {
   transition: opacity 0.15s ease, transform 0.15s ease;
