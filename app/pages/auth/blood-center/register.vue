@@ -219,8 +219,8 @@
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
-                  <AssetIcon v-if="!showPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
+                  <AssetIcon v-if="!showPassword" name="eye-off" :size="16" />
+                  <AssetIcon v-else name="eye" :size="16" />
                 </button>
               </div>
             </div>
@@ -244,8 +244,8 @@
                   :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
                   @click="showConfirmPassword = !showConfirmPassword"
                 >
-                  <AssetIcon v-if="!showConfirmPassword" name="eye" :size="16" />
-                  <AssetIcon v-else name="eye-off" :size="16" />
+                  <AssetIcon v-if="!showConfirmPassword" name="eye-off" :size="16" />
+                  <AssetIcon v-else name="eye" :size="16" />
                 </button>
               </div>
             </div>
@@ -260,7 +260,7 @@
 
           <p class="signin-row">
             Already have an account?
-            <NuxtLink to="/login">Sign In</NuxtLink>
+            <NuxtLink to="/auth/blood-center/login">Sign In</NuxtLink>
           </p>
         </form>
       </div>
@@ -324,7 +324,7 @@ const submitRegistration = async () => {
     successMessage.value = 'Blood center registration submitted! Check your email for verification.'
 
     setTimeout(() => {
-      navigateTo('/login/blood-center')
+      navigateTo('/auth/blood-center/login')
     }, 2000)
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
@@ -589,7 +589,7 @@ const submitRegistration = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px; 
+  gap: 10px;
   margin-bottom: 32px;
 }
 
@@ -735,14 +735,14 @@ const submitRegistration = async () => {
 }
 
 .select-wrap select {
-  padding-right: 40px; 
+  padding-right: 40px;
 }
 
 .select-icon {
   position: absolute;
   right: 14px;
   top: 50%;
-  transform: translateY(-50%) rotate(-90deg); 
+  transform: translateY(-50%) rotate(-90deg);
   color: #64748b;
   pointer-events: none;
 }

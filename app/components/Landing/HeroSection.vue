@@ -27,8 +27,8 @@
         </p>
 
         <div class="hero-btns">
-          <NuxtLink to="/register" class="btn-primary">Register Now →</NuxtLink>
-          <button class="btn-secondary" @click="navigateTo('/login')">Sign In</button>
+          <NuxtLink to="/auth/role-selection" class="btn-primary">Register Now →</NuxtLink>
+          <button class="btn-secondary" @click="navigateTo('/auth/donor/login')">Sign In</button>
         </div>
       </div>
 
@@ -448,5 +448,4 @@ onMounted(() => {
   .hero-left, .hero-right, .stats-bar { opacity: 1; animation: none; }
   .accent::after { animation: none; }
 }
-
 </style>

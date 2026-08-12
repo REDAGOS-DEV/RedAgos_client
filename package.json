@@ -14,7 +14,7 @@
     "make:service": "node scripts/make-service.js"
   },
   "dependencies": {
-    "nuxt": "^4.4.8",
+    "nuxt": "^4.5.1",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0"
   },

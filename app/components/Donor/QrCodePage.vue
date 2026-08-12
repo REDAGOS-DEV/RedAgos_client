@@ -677,4 +677,3 @@ onMounted(async () => {
     background-size: 400% 100%;
 }
 </style>
-

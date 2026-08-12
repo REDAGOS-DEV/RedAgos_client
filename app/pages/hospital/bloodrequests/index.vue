@@ -30,14 +30,14 @@
             <div class="stat-card__icon" style="background:#F59E0B14">
               <AssetIcon name="clock" :size="18" style="color:#F59E0B" />
             </div>
-            <span v-if="trends.pending.hasData" class="stat-card__trend" :class="trends.pending.up ? 'up' : 'down'">
-              <AssetIcon :name="trends.pending.up ? 'trending-up' : 'trending-down'" :size="12" />
-              {{ trends.pending.label }}
-            </span>
+            <span class="stat-card__title">Pending Requests</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.pending }}</p>
-          <p class="stat-card__label">Pending Requests</p>
           <p class="stat-card__helper">Awaiting Blood Center review</p>
+          <span v-if="trends.pending.hasData" class="stat-card__trend" :class="trends.pending.up ? 'up' : 'down'">
+            <AssetIcon :name="trends.pending.up ? 'trending-up' : 'trending-down'" :size="12" />
+            {{ trends.pending.label }}
+          </span>
         </div>
 
         <div class="stat-card">
@@ -45,14 +45,14 @@
             <div class="stat-card__icon" style="background:#2E7D3214">
               <AssetIcon name="check-circle" :size="18" style="color:#2E7D32" />
             </div>
-            <span v-if="trends.approved.hasData" class="stat-card__trend" :class="trends.approved.up ? 'up' : 'down'">
-              <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="12" />
-              {{ trends.approved.label }}
-            </span>
+            <span class="stat-card__title">Approved Requests</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.approved }}</p>
-          <p class="stat-card__label">Approved Requests</p>
           <p class="stat-card__helper">Cleared for processing</p>
+          <span v-if="trends.approved.hasData" class="stat-card__trend" :class="trends.approved.up ? 'up' : 'down'">
+            <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="12" />
+            {{ trends.approved.label }}
+          </span>
         </div>
 
         <div class="stat-card">
@@ -60,14 +60,14 @@
             <div class="stat-card__icon" style="background:#7C3AED14">
               <AssetIcon name="package-check" :size="18" style="color:#7C3AED" />
             </div>
-            <span v-if="trends.ready.hasData" class="stat-card__trend" :class="trends.ready.up ? 'up' : 'down'">
-              <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="12" />
-              {{ trends.ready.label }}
-            </span>
+            <span class="stat-card__title">Ready for Pickup</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.ready }}</p>
-          <p class="stat-card__label">Ready for Pickup</p>
           <p class="stat-card__helper">Units prepared and waiting</p>
+          <span v-if="trends.ready.hasData" class="stat-card__trend" :class="trends.ready.up ? 'up' : 'down'">
+            <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="12" />
+            {{ trends.ready.label }}
+          </span>
         </div>
 
         <div class="stat-card">
@@ -75,14 +75,14 @@
             <div class="stat-card__icon" style="background:#1565C014">
               <AssetIcon name="clipboard-check" :size="18" style="color:#1565C0" />
             </div>
-            <span v-if="trends.completed.hasData" class="stat-card__trend" :class="trends.completed.up ? 'up' : 'down'">
-              <AssetIcon :name="trends.completed.up ? 'trending-up' : 'trending-down'" :size="12" />
-              {{ trends.completed.label }}
-            </span>
+            <span class="stat-card__title">Completed Requests</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.completed }}</p>
-          <p class="stat-card__label">Completed Requests</p>
           <p class="stat-card__helper">Fulfilled this month</p>
+          <span v-if="trends.completed.hasData" class="stat-card__trend" :class="trends.completed.up ? 'up' : 'down'">
+            <AssetIcon :name="trends.completed.up ? 'trending-up' : 'trending-down'" :size="12" />
+            {{ trends.completed.label }}
+          </span>
         </div>
       </div>
 
@@ -825,17 +825,18 @@ onUnmounted(() => {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(15,23,42,0.08); }
-.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
-.stat-card__icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.stat-card__top { display: flex; align-items: center; gap: 10px; }
+.stat-card__icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-card__title { font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
+.stat-card__value { font-size: 40px; font-weight: 800; color: var(--text-primary); margin: 14px 0 0; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat-card__helper { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 0; }
 .stat-card__trend {
-  display: inline-flex; align-items: center; gap: 3px;
+  display: inline-flex; align-items: center; gap: 3px; align-self: flex-start;
   font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  margin-top: 12px;
 }
 .stat-card__trend.up { color: var(--success); background: #2e7d3214; }
 .stat-card__trend.down { color: var(--danger); background: #d32f2f14; }
-.stat-card__value { font-size: 40px; font-weight: 800; color: var(--text-primary); margin: 8px 0 0; line-height: 1; font-variant-numeric: tabular-nums; }
-.stat-card__label { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 8px 0 0; }
-.stat-card__helper { font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0; }
 
 /* Toolbar: search + filters */
 .toolbar { display: flex; flex-direction: column; gap: 12px; }

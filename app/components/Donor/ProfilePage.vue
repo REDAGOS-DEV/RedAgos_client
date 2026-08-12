@@ -599,5 +599,3 @@ async function handleLogout() {
     background-size: 400% 100%;
 }
 </style>
-
-

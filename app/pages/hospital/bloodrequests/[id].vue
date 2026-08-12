@@ -1,109 +1,3 @@
-<script setup>
-
-definePageMeta({
-  layout: 'hospitaldashboard',
-})
-
-const route = useRoute()
-const requestId = route.params.id
-
-const {
-  request,
-  history,
-  bloodAvailability,
-  timeline,
-  progressPercent,
-  isLoadingRequest,
-  isLoadingAvailability,
-  requestError,
-  fetchRequest,
-  fetchAvailability,
-} = useBloodRequestDetails(requestId)
-
-onMounted(() => {
-  fetchRequest()
-  fetchAvailability()
-})
-
-const statusColorMap = {
-  Pending: 'warning',
-  Approved: 'success',
-  Processing: 'warning',
-  'Ready for Pickup': 'info',
-  Completed: 'success',
-  Rejected: 'danger',
-  Cancelled: 'danger',
-}
-
-const statusColorClass = computed(() => {
-  const s = request.value?.status
-  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
-})
-
-const priorityColorClass = computed(() => {
-  const p = request.value?.priority
-  if (!p) return 'badge--neutral'
-  if (p.toLowerCase() === 'urgent' || p.toLowerCase() === 'critical') return 'badge--danger'
-  if (p.toLowerCase() === 'high') return 'badge--warning'
-  return 'badge--neutral'
-})
-
-const canEdit = computed(() => request.value?.status === 'Pending')
-
-function formatDate(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString('en-PH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function goBack() {
-  navigateTo('/hospital/blood-requests')
-}
-
-function handlePrint() {
-  window.print()
-}
-
-async function handleDownloadPdf() {
-  if (!request.value) return
-  try {
-    const { data, error } = await useApi().get(
-      `/hospital/blood-requests/${requestId}/download`,
-      { responseType: 'blob' }
-    )
-    if (error?.value) throw error.value
-    const blob = data?.value
-    if (!blob) return
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `blood-request-${request.value.reference_number || requestId}.pdf`
-    link.click()
-    window.URL.revokeObjectURL(url)
-  } catch (err) {
-    console.error('Failed to download PDF', err)
-  }
-}
-
-function scrollToTimeline() {
-  document.getElementById('request-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-</script>
-
 <template>
   <div class="request-details-page">
     <!-- ============== PAGE HEADER ============== -->
@@ -112,14 +6,14 @@ function scrollToTimeline() {
         <AssetIcon name="arrow-left" />
         <span>Back to Blood Requests</span>
       </button>
-
-      <nav class="breadcrumb" aria-label="Breadcrumb">
+<!--
+    <nav class="breadcrumb" aria-label="Breadcrumb">
         <span>Hospital Portal</span>
         <span class="crumb-sep">/</span>
         <span>Blood Requests</span>
         <span class="crumb-sep">/</span>
         <span class="crumb-current">Request Details</span>
-      </nav>
+      </nav> -->
 
       <div class="page-header__row">
         <div class="page-header__titles">
@@ -422,6 +316,113 @@ function scrollToTimeline() {
     </template>
   </div>
 </template>
+
+<script setup>
+import AssetIcon from '~/components/common/AssetIcon.vue'
+
+definePageMeta({
+  layout: 'hospitaldashboard',
+})
+
+const route = useRoute()
+const requestId = route.params.id
+
+const {
+  request,
+  history,
+  bloodAvailability,
+  timeline,
+  progressPercent,
+  isLoadingRequest,
+  isLoadingAvailability,
+  requestError,
+  fetchRequest,
+  fetchAvailability,
+} = useBloodRequestDetails(requestId)
+
+onMounted(() => {
+  fetchRequest()
+  fetchAvailability()
+})
+
+const statusColorMap = {
+  Pending: 'warning',
+  Approved: 'success',
+  Processing: 'warning',
+  'Ready for Pickup': 'info',
+  Completed: 'success',
+  Rejected: 'danger',
+  Cancelled: 'danger',
+}
+
+const statusColorClass = computed(() => {
+  const s = request.value?.status
+  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
+})
+
+const priorityColorClass = computed(() => {
+  const p = request.value?.priority
+  if (!p) return 'badge--neutral'
+  if (p.toLowerCase() === 'urgent' || p.toLowerCase() === 'critical') return 'badge--danger'
+  if (p.toLowerCase() === 'high') return 'badge--warning'
+  return 'badge--neutral'
+})
+
+const canEdit = computed(() => request.value?.status === 'Pending')
+
+function formatDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatDateTime(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function goBack() {
+  navigateTo('/hospital/blood-requests')
+}
+
+function handlePrint() {
+  window.print()
+}
+
+async function handleDownloadPdf() {
+  if (!request.value) return
+  try {
+    const { data, error } = await useApi().get(
+      `/hospital/blood-requests/${requestId}/download`,
+      { responseType: 'blob' }
+    )
+    if (error?.value) throw error.value
+    const blob = data?.value
+    if (!blob) return
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `blood-request-${request.value.reference_number || requestId}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Failed to download PDF', err)
+  }
+}
+
+function scrollToTimeline() {
+  document.getElementById('request-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+</script>
 
 <style scoped>
 .request-details-page {
@@ -949,59 +950,59 @@ function scrollToTimeline() {
 }
 
 /* ---------- Dark mode ---------- */
-:global(.dark) .request-details-page {
+:global(.dark .request-details-page) {
   background: #0f1420;
 }
-:global(.dark) .card {
+:global(.dark .card) {
   background: #161d2e;
   border-color: #2a3447;
 }
-:global(.dark) .page-title,
-:global(.dark) .crumb-current,
-:global(.dark) .section-title,
-:global(.dark) .side-card__title,
-:global(.dark) .summary-value,
-:global(.dark) .info-value,
-:global(.dark) .timeline-label {
+:global(.dark .page-title),
+:global(.dark .crumb-current),
+:global(.dark .section-title),
+:global(.dark .side-card__title),
+:global(.dark .summary-value),
+:global(.dark .info-value),
+:global(.dark .timeline-label) {
   color: #eef1f6;
 }
-:global(.dark) .page-subtitle,
-:global(.dark) .breadcrumb,
-:global(.dark) .info-label,
-:global(.dark) .summary-label,
-:global(.dark) .documents-empty,
-:global(.dark) .timeline-timestamp,
-:global(.dark) .progress-percent {
+:global(.dark .page-subtitle),
+:global(.dark .breadcrumb),
+:global(.dark .info-label),
+:global(.dark .summary-label),
+:global(.dark .documents-empty),
+:global(.dark .timeline-timestamp),
+:global(.dark .progress-percent) {
   color: #8a93a6;
 }
-:global(.dark) .btn--outline {
+:global(.dark .btn--outline) {
   background: #161d2e;
   border-color: #2a3447;
   color: #6fa8dc;
 }
-:global(.dark) .btn--outline:hover {
+:global(.dark .btn--outline:hover) {
   background: #1c2438;
 }
-:global(.dark) .history-table th {
+:global(.dark .history-table th) {
   color: #8a93a6;
   border-color: #2a3447;
 }
-:global(.dark) .history-table td {
+:global(.dark .history-table td) {
   color: #d6dbe6;
   border-color: #232c40;
 }
-:global(.dark) .document-chip,
-:global(.dark) .availability-item {
+:global(.dark .document-chip),
+:global(.dark .availability-item) {
   background: #1c2438;
   border-color: #2a3447;
 }
 :global(.dark) .timeline-step::before {
   background: #2a3447;
 }
-:global(.dark) .timeline-marker {
+:global(.dark .timeline-marker) {
   background: #232c40;
 }
-:global(.dark) .skeleton {
+:global(.dark .skeleton) {
   background: linear-gradient(90deg, #1c2438 25%, #232c40 37%, #1c2438 63%);
   background-size: 400% 100%;
 }

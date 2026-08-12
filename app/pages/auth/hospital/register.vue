@@ -589,7 +589,7 @@ const submitRegistration = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px; 
+  gap: 10px;
   margin-bottom: 32px;
 }
 
@@ -738,14 +738,14 @@ const submitRegistration = async () => {
 }
 
 .select-wrap select {
-  padding-right: 40px; 
+  padding-right: 40px;
 }
 
 .select-icon {
   position: absolute;
   right: 14px;
   top: 50%;
-  transform: translateY(-50%) rotate(-90deg); 
+  transform: translateY(-50%) rotate(-90deg);
   color: #64748b;
   pointer-events: none;
 }

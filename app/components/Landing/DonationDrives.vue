@@ -167,9 +167,9 @@ onUnmounted(() => observer?.disconnect())
 }
 
 .donation-drives {
-  padding: 50px 0 80px;       
+  padding: 50px 0 80px;
   background: #f9fafb;
-  border-radius:60px;               
+  border-radius:60px;
   font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
@@ -190,7 +190,7 @@ onUnmounted(() => observer?.disconnect())
   gap: 8px;
   padding: 6px 16px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.08); 
+  background: rgba(37, 99, 235, 0.08);
   color: #2563eb;
   font-size: 11px;
   font-weight: 700;
@@ -211,22 +211,22 @@ onUnmounted(() => observer?.disconnect())
 /* ── Heading ── */
 .heading-wrap {
   text-align: center;
-  margin-top: 28px;   
-  margin-bottom: 70px;               
+  margin-top: 28px;
+  margin-bottom: 70px;
   opacity: 0;
 }
 .heading-wrap.animate-in {
   animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s forwards;
 }
 .heading-top {
-  font-size: 44px;                    
+  font-size: 44px;
   font-weight: 800;
-  color: #111827;                   
+  color: #111827;
   line-height: 1.2;
 }
 .subheading {
-  margin-top: 12px;                   
-  color: #6b7280;                      
+  margin-top: 12px;
+  color: #6b7280;
   font-size: 17px;
   max-width: 680px;
 }
@@ -247,17 +247,17 @@ onUnmounted(() => observer?.disconnect())
 .drive-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); 
-  gap: 24px;                          
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
   margin-top: 50px;
 }
 
 /* ── Card ── */
 .drive-card {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);  
-  border-radius: 16px;                    
-  padding: 24px;                         
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   opacity: 0;
@@ -267,7 +267,7 @@ onUnmounted(() => observer?.disconnect())
   animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--drive-delay) forwards;
 }
 .drive-card:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);  
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 /* ── Card top row ── */
@@ -275,7 +275,7 @@ onUnmounted(() => observer?.disconnect())
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;                  
+  margin-bottom: 16px;
 }
 
 .status-pill {
@@ -301,16 +301,16 @@ onUnmounted(() => observer?.disconnect())
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #9ca3af;                      
-  font-size: 12px;                     
+  color: #9ca3af;
+  font-size: 12px;
 }
 
 /* ── Card body ── */
 .card-body h3 {
-  font-size: 17px;                      
+  font-size: 17px;
   font-weight: 600;
-  color: #111827;                       
-  margin-bottom: 14px;                  
+  color: #111827;
+  margin-bottom: 14px;
   line-height: 1.35;
 }
 
@@ -318,26 +318,26 @@ onUnmounted(() => observer?.disconnect())
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;                            
+  gap: 10px;
 }
 
 .drive-details li {
   display: flex;
   align-items: center;
-  gap: 10px;                            
-  font-size: 13px;                    
-  color: #6b7280;                       
+  gap: 10px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .drive-details svg {
-  color: #2563eb;                      
+  color: #2563eb;
   flex-shrink: 0;
 }
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .drive-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));  
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

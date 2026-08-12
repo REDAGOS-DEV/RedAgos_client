@@ -1253,4 +1253,3 @@ function goDashboard() {
   background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>
-

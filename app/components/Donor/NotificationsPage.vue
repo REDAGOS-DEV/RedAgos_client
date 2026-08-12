@@ -590,7 +590,7 @@ onMounted(async () => {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; 
+:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155;
 }
 
 :global(.dark .skeleton) {
@@ -598,4 +598,3 @@ onMounted(async () => {
     background-size: 400% 100%;
 }
 </style>
-
