@@ -21,7 +21,7 @@ const folderName = kebabCase(name);
 const endpointName = kebabCase(name) + 's'; 
 const variableName = camelCase(name); 
  
-const targetDir = path.join(__dirname, '..', 'api', folderName);
+const targetDir = path.join(__dirname, '..', 'app', 'api', folderName);
 const targetFile = path.join(targetDir, `${resourceName}Service.ts`);
  
 const fileContent = `import BaseService from '../BaseService';
@@ -74,6 +74,5 @@ if (fs.existsSync(targetFile)) {
     console.error(`❌ File already exists: ${targetFile}`);
 } else {
     fs.writeFileSync(targetFile, fileContent);
-    console.log(`✅ Created Service: api/${folderName}/${resourceName}Service.ts`);
+    console.log(`✅ Created Service: app/api/${folderName}/${resourceName}Service.ts`);
 }
-Advertisement
