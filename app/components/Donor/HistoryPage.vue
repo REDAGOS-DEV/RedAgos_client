@@ -90,6 +90,7 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { donorService } from '~/api/donor/DonorService'
 
 
 const loading = ref(true)
@@ -103,9 +104,15 @@ const stats = reactive({
     livesImpacted: null,
 })
 
+// Ang tinuod nga enum sa server: registered|screening|collected|tested|
+// completed|rejected. Ang 'deferred' kay wala gyud gi-return sa backend.
 const statusLabels = {
+    registered: 'Registered',
+    screening: 'Screening',
+    collected: 'Collected',
+    tested: 'Tested',
     completed: 'Completed',
-    deferred: 'Deferred',
+    rejected: 'Rejected',
 }
 
 function statusLabel(status) {
@@ -124,14 +131,21 @@ const formattedLastDonation = computed(() => {
     return formatDate(donations.value[0]?.donatedOn)
 })
 
-onMounted(async () => {
+// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
+// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
+// loadedOnce kay mo-fire sad siya human sa unang onMounted.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
-        // Backend contract: GET /api/donor/donations
+        // GET /api/donors/donations
         // Response: { donations: [{ id, center_name, address, donated_on, time,
-        //   blood_type, volume_ml, status: 'completed' | 'deferred' }],
-        //   stats: { total_donations, lives_impacted } }
-        // Ordered most-recent-first by the backend.
-        const data = await $fetch('/api/donor/donations')
+        //   blood_type, volume_ml, status }], stats: { total_donations,
+        //   lives_impacted }, meta: { page, per_page, total, last_page } }
+        // Paginated (15 kada page). Ang unang page ra ang gipakita — walay
+        // pagination UI ang page karon.
+        const data = await donorService.donations()
         donations.value = (data?.donations ?? []).map(d => ({
             id: d.id,
             centerName: d.center_name,
@@ -145,17 +159,20 @@ onMounted(async () => {
         stats.totalDonations = data?.stats?.total_donations ?? donations.value.length
         stats.livesImpacted = data?.stats?.lives_impacted ?? null
     } catch (err) {
-        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/donor/donations
-        // endpoint, so mag-fail gyud ni nga call. Mag-fallback sa empty state
-        // (walay laray) â€” dili ni sample/dummy data, kay ang tinuod nga page
-        // kay mag-populate ra gyud kung naa nay actual record sa database.
-        console.error('Failed to load donation history (expected while backend is not yet wired up):', err)
+        // Mag-fallback ra sa empty state — dili ni sample o dummy data.
+        console.error('Failed to load donation history:', err)
         donations.value = []
         stats.totalDonations = 0
         stats.livesImpacted = null
     } finally {
         loading.value = false
+        loadedOnce = true
     }
+}
+
+onMounted(() => load())
+onActivated(() => {
+    if (loadedOnce) load({ silent: true })
 })
 </script>
 
@@ -447,6 +464,21 @@ onMounted(async () => {
     color: var(--accent);
 }
 
+.history-status--rejected {
+    background: #fbeaea;
+    color: var(--accent);
+}
+
+/* Ang registered/screening/collected/tested kay in-progress pa — usa ra ka
+   neutral nga style para sa upat, dili tag-usa ka kolor. */
+.history-status--registered,
+.history-status--screening,
+.history-status--collected,
+.history-status--tested {
+    background: #fff4e5;
+    color: #a65b00;
+}
+
 /* Buttons */
 .btn-primary {
     display: inline-flex;
@@ -545,6 +577,18 @@ onMounted(async () => {
 
 :global(.dark .history-status--deferred) {
     background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .history-status--rejected) {
+    background: rgba(239, 83, 80, 0.16);
+}
+
+:global(.dark .history-status--registered),
+:global(.dark .history-status--screening),
+:global(.dark .history-status--collected),
+:global(.dark .history-status--tested) {
+    background: rgba(245, 124, 0, 0.16);
+    color: #FFCC80;
 }
 
 :global(.dark .state-title) {

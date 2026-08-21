@@ -68,68 +68,78 @@ Output:
             <p class="qr-panel__subtitle">Present this to blood center staff upon arrival.</p>
 
             <div class="qr-image-wrap">
-              <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="Donor eligibility QR code" class="qr-image">
-              <div v-else class="qr-image qr-image--placeholder">
-                <div class="spinner spinner--sm" />
-              </div>
-            </div>
-
-            <div class="qr-details">
-              <div class="qr-details__row">
-                <span class="qr-details__label">Donor name</span>
-                <span class="qr-details__value">{{ profile?.full_name || 'â€”' }}</span>
-              </div>
-              <div class="qr-details__row">
-                <span class="qr-details__label">Donor ID</span>
-                <span class="qr-details__value">{{ profile?.donor_id || 'â€”' }}</span>
-              </div>
-              <div class="qr-details__row">
-                <span class="qr-details__label">Blood type</span>
-                <span class="qr-details__value">{{ profile?.blood_type || 'â€”' }}</span>
-              </div>
-              <div class="qr-details__row">
-                <span class="qr-details__label">Screening date</span>
-                <span class="qr-details__value">{{ formatDate(profile?.screening_date) }}</span>
-              </div>
-              <div class="qr-details__row">
-                <span class="qr-details__label">Valid until</span>
-                <span class="qr-details__value qr-details__value--success">{{ formatDate(profile?.screening_valid_until) }}</span>
-              </div>
-              <div class="qr-details__row">
-                <span class="qr-details__label">QR status</span>
-                <span class="qr-details__value qr-details__value--success">Valid</span>
-              </div>
-            </div>
-
-            <div class="qr-actions">
-              <button type="button" class="btn-primary" :disabled="!qrCodeDataUrl" @click="downloadQr">
-                <AssetIcon name="download" :size="16" />
-                Download
-              </button>
-              <button type="button" class="btn-outline" :disabled="!qrCodeDataUrl" @click="shareQr">
-                <AssetIcon name="share" :size="16" />
-                Share
-              </button>
+              <img :src="qrCodeDataUrl" alt="Donor eligibility QR code" class="qr-image">
             </div>
           </template>
 
-          <template v-else>
-            <div class="qr-empty">
-              <AssetIcon name="qr-code" :size="40" style="color:#e5e7eb" />
-              <p class="qr-empty__title">
-                {{ eligibilityStatus === 'deferred' ? 'Your screening was deferred' : 'No QR code yet' }}
-              </p>
-              <p class="qr-empty__sub">
-                {{ eligibilityStatus === 'deferred'
-                  ? "Please contact the blood center for more information, then retake the screening once you're cleared."
-                  : 'Take the eligibility screening first. Your QR code is generated automatically once you pass.' }}
-              </p>
-              <NuxtLink to="/donor/eligibility" class="btn-primary">
-                {{ eligibilityStatus === 'deferred' ? 'Retake Screening' : 'Take Screening' }}
-              </NuxtLink>
+          <div v-else class="qr-empty">
+            <AssetIcon name="qr-code" :size="40" style="color:#e5e7eb" />
+            <p class="qr-empty__title">{{ qrEmptyCopy.title }}</p>
+            <p class="qr-empty__sub">{{ qrEmptyCopy.sub }}</p>
+            <button v-if="qrState === 'ready'" type="button" class="btn-primary" :disabled="minting"
+              @click="mintQrCode">
+              {{ minting ? 'Generating…' : (hasActiveToken ? 'Generate new code' : 'Generate QR code') }}
+            </button>
+
+            <button v-else-if="qrState === 'unverified'" type="button" class="btn-primary"
+              :disabled="resending" @click="resendVerification">
+              {{ resending ? 'Sending...' : 'Resend verification email' }}
+            </button>
+
+            <NuxtLink v-else-if="qrEmptyCopy.action" :to="qrEmptyCopy.action.to" class="btn-primary">
+              {{ qrEmptyCopy.action.label }}
+            </NuxtLink>
+
+            <p v-if="resendMessage" class="qr-resend-note">{{ resendMessage }}</p>
+          </div>
+
+          <p v-if="qrError" class="qr-error">{{ qrError }}</p>
+
+
+          <!-- Ipakita basta naa nay screening, bisan walay QR image nga na-mint -->
+          <div v-if="profile?.screening_date" class="qr-details">
+            <div class="qr-details__row">
+              <span class="qr-details__label">Donor name</span>
+              <span class="qr-details__value">{{ profile?.full_name || '—' }}</span>
             </div>
-          </template>
+            <div class="qr-details__row">
+              <span class="qr-details__label">Donor ID</span>
+              <span class="qr-details__value">{{ profile?.donor_id || '—' }}</span>
+            </div>
+            <div class="qr-details__row">
+              <span class="qr-details__label">Blood type</span>
+              <span class="qr-details__value">{{ profile?.blood_type || '—' }}</span>
+            </div>
+            <div class="qr-details__row">
+              <span class="qr-details__label">Screening date</span>
+              <span class="qr-details__value">{{ formatDate(profile?.screening_date) }}</span>
+            </div>
+            <div class="qr-details__row">
+              <span class="qr-details__label">Screening valid until</span>
+              <span class="qr-details__value" :class="statusValueClass">{{ formatDate(profile?.screening_valid_until) }}</span>
+            </div>
+            <div class="qr-details__row">
+              <span class="qr-details__label">QR status</span>
+              <span class="qr-details__value" :class="statusValueClass">{{ qrStatusLabel }}</span>
+            </div>
+          </div>
+
+          <div v-if="canShowQr" class="qr-actions">
+            <button type="button" class="btn-primary" :disabled="!qrCodeDataUrl" @click="downloadQr">
+              <AssetIcon name="download" :size="16" />
+              Download
+            </button>
+            <button type="button" class="btn-outline" :disabled="!qrCodeDataUrl" @click="shareQr">
+              <AssetIcon name="share" :size="16" />
+              Share
+            </button>
+            <button type="button" class="btn-outline" :disabled="minting" @click="mintQrCode">
+              <AssetIcon name="refresh-cw" :size="16" />
+              {{ minting ? 'Generating…' : 'New code' }}
+            </button>
+          </div>
         </div>
+
 
         <!-- Right: how to use -->
         <div class="panel steps-panel fade-in" style="--delay: 100ms">
@@ -152,8 +162,11 @@ Output:
             <AssetIcon name="alert" :size="16" class="warning-banner__icon" />
             <p class="warning-banner__text">
               This QR code is personal and tied to your eligibility screening result. Do not share your QR code with others.
-              <template v-if="profile?.screening_valid_until">
-                It expires on {{ formatDate(profile.screening_valid_until) }} - retake the screening to generate a new one.
+              <template v-if="hasActiveToken">
+                Your current code expires on {{ formatDate(qrValidUntil) }} — refresh it from this page to get a new one.
+              </template>
+              <template v-else-if="profile?.screening_valid_until">
+                Once issued, a code stays valid for {{ qrValidDays }} days, separate from your screening, which is valid until {{ formatDate(profile.screening_valid_until) }}.
               </template>
             </p>
           </div>
@@ -165,18 +178,106 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, computed, onMounted } from 'vue'
+import { donorService } from '~/api/donor/DonorService'
+import { authService } from '~/api/auth/AuthService'
+import QRCode from 'qrcode'
+import { ref, computed, onMounted, onActivated } from 'vue'
 
 
 const loading = ref(true)
 const profile = ref(null)
-const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'pending'
+const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'expired' | 'pending'
 const upcomingAppointment = ref(null)
 const qrCodeDataUrl = ref('')
+const qrValidUntil = ref(null)
+const qrValidDays = ref(14)
+const hasActiveToken = ref(false)
+const emailVerified = ref(false)
+const minting = ref(false)
+const qrError = ref('')
+const resending = ref(false)
+const resendMessage = ref('')
 
-// The QR only exists once the donor has taken the eligibility screening AND
-// passed it (eligible) â€” pending/deferred donors get the empty state instead.
-const canShowQr = computed(() => eligibilityStatus.value === 'eligible' && !!profile.value?.qr_token)
+async function resendVerification() {
+  resending.value = true
+  resendMessage.value = ''
+
+  try {
+    // POST /api/email/verification-notification (throttle:3,10)
+    // 204 ang balik — walay body. Ang link sa email padulong sa
+    // /auth/verify-email sa frontend, dala ang signed nga query string.
+    await authService.resendVerificationEmail()
+    resendMessage.value = 'Verification email sent. Check your inbox, then reload this page.'
+  } catch (err) {
+    console.error('Failed to resend verification email:', err)
+    resendMessage.value = err?.status === 429
+      ? 'Too many requests. Please wait a few minutes before trying again.'
+      : err?.message || 'Could not send the verification email. Please try again.'
+  } finally {
+    resending.value = false
+  }
+}
+
+const QR_STORAGE_KEY = 'donor-qr-code'
+
+
+// Ang plaintext token kay dili ma-return sa GET /donors/qr-code — gi-hash ra
+// siya sa server. Naa ra siya sa screening submission ug sa qr-code/refresh,
+// so naa lang QR image kung na-mint na sa maong step.
+const canShowQr = computed(() => !!qrCodeDataUrl.value)
+
+const qrState = computed(() => {
+  if (eligibilityStatus.value === 'deferred') return 'deferred'
+  if (eligibilityStatus.value === 'expired') return 'expired'
+  if (eligibilityStatus.value !== 'eligible') return 'pending'
+  return emailVerified.value ? 'ready' : 'unverified'
+})
+
+const qrEmptyCopy = computed(() => {
+  switch (qrState.value) {
+    case 'ready':
+      return {
+        title: 'Your screening passed',
+        sub: hasActiveToken.value
+          ? `You have an active check-in code, valid until ${formatDate(qrValidUntil.value)}.`
+          : 'Generate your check-in QR code to present at the blood center.',
+        action: null,
+      }
+    case 'unverified':
+      return {
+        title: 'Verify your email address',
+        sub: 'Your screening passed. Confirm your email address to receive your check-in QR code.',
+        action: null,
+      }
+    case 'deferred':
+      return {
+        title: 'Your screening was deferred',
+        sub: "Please contact the blood center for more information, then retake the screening once you're cleared.",
+        action: { label: 'Retake Screening', to: '/donor/eligibility' },
+      }
+    case 'expired':
+      return {
+        title: 'Your screening has expired',
+        sub: 'Complete the eligibility questionnaire again to restore your check-in code.',
+        action: { label: 'Retake Screening', to: '/donor/eligibility' },
+      }
+    default:
+      return {
+        title: 'No QR code yet',
+        sub: 'Take the eligibility screening first. Your QR code is generated automatically once you pass.',
+        action: { label: 'Take Screening', to: '/donor/eligibility' },
+      }
+  }
+})
+
+const qrStatusLabel = computed(() =>
+  hasActiveToken.value ? `Active until ${formatDate(qrValidUntil.value)}` : 'Not issued'
+)
+
+const statusValueClass = computed(() =>
+  eligibilityStatus.value === 'eligible' ? 'qr-details__value--success' : ''
+)
+
 
 const steps = computed(() => [
   {
@@ -213,18 +314,94 @@ function formatDate(value) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-async function generateQrImage() {
-  if (!profile.value?.qr_token) return
+function readStoredQr(donorId) {
+  if (!import.meta.client || !donorId) return null
+
   try {
-    // Encode the backend-issued token, not raw donor data â€” the blood center
-    // scans this and looks the token up server-side to verify eligibility.
-    qrCodeDataUrl.value = await QRCode.toDataURL(profile.value.qr_token, {
+    const raw = sessionStorage.getItem(QR_STORAGE_KEY)
+    if (!raw) return null
+
+    const stored = JSON.parse(raw)
+
+    // Gi-check ang donor_id aron dili makita sa laing account ang QR sa nauna
+    // nga naka-login sa parehas nga browser.
+    return stored?.donorId === donorId ? stored : null
+  } catch {
+    return null
+  }
+}
+
+function storeQr(donorId, data) {
+  if (!import.meta.client || !donorId) return
+
+  try {
+    sessionStorage.setItem(QR_STORAGE_KEY, JSON.stringify({
+      donorId,
+      token: data?.qr_token,
+      validUntil: data?.qr_valid_until,
+    }))
+  } catch (err) {
+    console.error('Failed to cache QR code:', err)
+  }
+}
+
+async function renderQr(token) {
+  if (!token) return
+
+  try {
+    // Ang gi-encode kay ang opaque token ra — dili gyud ang vitals o answers.
+    // I-scan ni sa blood center ug i-look up sa server para ma-verify.
+    qrCodeDataUrl.value = await QRCode.toDataURL(token, {
       width: 220,
       margin: 1,
       color: { dark: '#1f2937', light: '#ffffff' },
     })
   } catch (err) {
     console.error('Failed to render QR code image:', err)
+    qrError.value = 'Could not render the QR image. Please try again.'
+  }
+}
+
+async function mintQrCode() {
+  // Ang pag-mint kay mo-revoke sa daan nga token, so pahibaw-on sa donor.
+  if (hasActiveToken.value) {
+    const confirmed = window.confirm(
+      'This replaces your current check-in code. Any copy you have saved or downloaded will stop working.'
+    )
+    if (!confirmed) return
+  }
+
+  minting.value = true
+  qrError.value = ''
+
+  try {
+    // POST /api/donors/qr-code/refresh
+    // Response: { qr_token, qr_valid_until, qr_valid_days }
+    // Kausa ra ma-return ang plaintext token — hash ra ang gi-store sa server.
+    const data = await donorService.refreshQrCode()
+
+    qrValidUntil.value = data?.qr_valid_until ?? null
+    qrValidDays.value = data?.qr_valid_days ?? qrValidDays.value
+    hasActiveToken.value = true
+
+    await renderQr(data?.qr_token)
+    storeQr(profile.value?.donor_id, data)
+  } catch (err) {
+    const code = err?.data?.code
+
+    if (code === 'email_unverified') {
+      qrError.value = 'Please verify your email address before requesting a QR code.'
+    } else if (code === 'screening_required') {
+      qrError.value = 'You need a valid eligibility screening before a QR code can be issued.'
+    } else if (err?.status === 429) {
+      qrError.value = 'Too many QR code requests. Please wait a while before trying again.'
+    } else {
+      qrError.value = err?.message || 'Could not generate your QR code. Please try again.'
+    }
+
+    console.error('Failed to refresh QR code:', err)
+  } finally {
+    minting.value = false
   }
 }
 
@@ -251,26 +428,52 @@ async function shareQr() {
   }
 }
 
-onMounted(async () => {
+// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
+// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
+// loadedOnce kay mo-fire sad siya human sa unang onMounted.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
-    // Backend contract: GET /api/donor/qr-code
+    // GET /api/donors/qr-code
     // Response: { profile: { full_name, donor_id, blood_type, screening_date,
-    //   screening_valid_until, qr_token }, eligibility_status, upcoming_appointment }
-    // qr_token is only present/non-null when eligibility_status === 'eligible'.
-    const data = await $fetch('/api/donor/qr-code')
-    profile.value = data.profile ?? null
-    eligibilityStatus.value = data.eligibility_status ?? 'pending'
-    upcomingAppointment.value = data.upcoming_appointment ?? null
+    //   screening_valid_until, qr_token }, eligibility_status, qr_valid_until,
+    //   qr_valid_days, has_active_token, email_verified }
+    // NOTE: kanunay null ang profile.qr_token — tinuyo na sa server.
+    const data = await donorService.qrCode()
+
+    profile.value = data?.profile ?? null
+    eligibilityStatus.value = data?.eligibility_status ?? 'pending'
+    qrValidUntil.value = data?.qr_valid_until ?? null
+    qrValidDays.value = data?.qr_valid_days ?? qrValidDays.value
+    hasActiveToken.value = !!data?.has_active_token
+    emailVerified.value = !!data?.email_verified
+
+    // I-restore ang na-mint na nga code para dili ma-invalidate ang na-download
+    // na nga PNG matag balik sa page. Ang server gihapon ang authority kung
+    // naa pa bay buhi nga token.
+    const stored = readStoredQr(profile.value?.donor_id)
+    if (stored && hasActiveToken.value && stored.validUntil === qrValidUntil.value) {
+      await renderQr(stored.token)
+    }
+
+
+    // Ang upcoming_appointment kay wala gi-serve ani nga endpoint — gikan na
+    // siya sa appointments API, so null sa karon.
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/donor/qr-code endpoint,
-    // so mag-fail gyud ni nga call. Mag-fallback ra sa 'pending' (empty state)
-    // aron dili mag-crash ang template samtang wala pa naka-connect ang backend.
-    console.error('Failed to load QR code data (expected while backend is not yet wired up):', err)
+    console.error('Failed to load QR code data:', err)
   } finally {
     loading.value = false
-    if (canShowQr.value) await generateQrImage()
+    loadedOnce = true
   }
+}
+
+onMounted(() => load())
+onActivated(() => {
+  if (loadedOnce) load({ silent: true })
 })
+
 </script>
 
 <style scoped>
@@ -285,6 +488,22 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 24px 32px 60px;
   background: #F5F7FA;
+}
+
+.qr-error {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--accent);
+  text-align: center;
+}
+
+.qr-resend-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .fade-in {

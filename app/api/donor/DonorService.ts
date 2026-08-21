@@ -35,8 +35,77 @@ class DonorService extends BaseService {
     async updateNotificationPreferences(payload: object): Promise<any> {
         return await this.request(`${this.resource}/notification-preferences`, 'PATCH', payload);
     }
- 
+
+    async eligibilityQuestions(): Promise<any> {
+        return await this.request(`${this.resource}/eligibility/questions`, 'GET');
+    }
+
+    async eligibilityPrefill(): Promise<any> {
+        return await this.request(`${this.resource}/eligibility/prefill`, 'GET');
+    }
+
+    async eligibilityStatus(): Promise<any> {
+        return await this.request(`${this.resource}/eligibility`, 'GET');
+    }
+
+    async submitEligibilityScreening(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/eligibility/screening`, 'POST', payload);
+    }
+
+    async qrCode(): Promise<any> {
+        return await this.request(`${this.resource}/qr-code`, 'GET');
+    }
+
+    async refreshQrCode(): Promise<any> {
+        return await this.request(`${this.resource}/qr-code/refresh`, 'POST');
+    }
+
+    async appointments(): Promise<any> {
+        return await this.request(`${this.resource}/appointments`, 'GET');
+    }
+
+    async bookAppointment(payload: object): Promise<any> {
+        return await this.request(`${this.resource}/appointments`, 'POST', payload);
+    }
+
+    async rescheduleAppointment(id: number, payload: object): Promise<any> {
+        return await this.request(`${this.resource}/appointments/${id}`, 'PATCH', payload);
+    }
+
+    async cancelAppointment(id: number): Promise<any> {
+        return await this.request(`${this.resource}/appointments/${id}`, 'DELETE');
+    }
+
+    async donations(params: object = {}): Promise<any> {
+        return await this.request(`${this.resource}/donations`, 'GET', params);
+    }
+
+    async notifications(params: object = {}): Promise<any> {
+        return await this.request(`${this.resource}/notifications`, 'GET', params);
+    }
+
+    async notificationsUnreadCount(): Promise<any> {
+        return await this.request(`${this.resource}/notifications/unread-count`, 'GET');
+    }
+
+    async markNotificationAsRead(uuid: string): Promise<any> {
+        return await this.request(`${this.resource}/notifications/${uuid}`, 'PATCH');
+    }
+
+    async markAllNotificationsAsRead(): Promise<any> {
+        return await this.request(`${this.resource}/notifications/mark-all-read`, 'POST');
+    }
+
+    async updateAvatar(formData: FormData): Promise<any> {
+        return await this.request(`${this.resource}/avatar`, 'POST', formData);
+    }
+
+    async deleteAccount(payload: { password: string }): Promise<any> {
+        return await this.request(`${this.resource}/account`, 'DELETE', payload);
+    }
+
     async list(params: object = {}): Promise<any> {
+
         return await this.request(this.resource, 'GET', params);
     }
  

@@ -131,7 +131,7 @@ const sidebarShadow = computed(() =>
 const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
-const { user, fetchUser, clearUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 
 const activePath = ref(route.path || '/')
 watch(
@@ -282,13 +282,8 @@ const navStyle = (path) => {
 }
 
 const handleLogout = async () => {
-  try {
-    showUserMenu.value = false
-    clearUser()
-    router.push('/auth/blood-center/login')
-  } catch (err) {
-    console.error(err)
-  }
+  showUserMenu.value = false
+  await logout('/auth/blood-center/login')
 }
 </script>
 

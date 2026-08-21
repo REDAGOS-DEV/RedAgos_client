@@ -7,6 +7,7 @@ import DonorQrCodePage from '~/components/Donor/QrCodePage.vue'
 
 definePageMeta({
   middleware: 'auth',
-  layout: 'donordashboard'
+  layout: 'donordashboard',
+  keepalive: true
 })
 </script>

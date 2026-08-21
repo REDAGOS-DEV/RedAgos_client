@@ -263,6 +263,13 @@ Output:
                         <p class="modal-subtitle">
                             This can't be undone. Your profile, screening history, and QR code will be permanently removed.
                         </p>
+                        <div class="delete-confirm">
+                            <label class="form-label" for="delete-password">Confirm your password</label>
+                            <input id="delete-password" v-model="deletePassword" type="password"
+                                class="form-input" autocomplete="current-password"
+                                placeholder="Enter your password">
+                            <p v-if="deleteError" class="delete-confirm__error">{{ deleteError }}</p>
+                        </div>
                         <div class="modal-actions">
                             <button type="button" class="btn-outline" @click="confirmDeleteOpen = false">
                                 Cancel
@@ -274,6 +281,7 @@ Output:
                     </div>
                 </div>
             </Transition>
+import { authService } from '~/api/auth/AuthService'
         </Teleport>
     </div>
 </template>
@@ -285,7 +293,8 @@ import { useUser } from '~/composables/useUser'
 
 
 const router = useRouter()
-const { fetchUser, clearUser } = useUser()
+const { fetchUser, clearUser, logout } = useUser()
+
 const loading = ref(true)
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -313,6 +322,8 @@ const notificationPrefs = reactive([
     { key: 'nearby_drives', label: 'Nearby donation drives', desc: 'Alerts for mobile blood drives near you.', enabled: false },
     { key: 'email_updates', label: 'Email updates', desc: 'News and updates from the blood center.', enabled: false },
 ])
+const deletePassword = ref('')
+const deleteError = ref('')
 
 const avatarInput = ref(null)
 const savingProfile = ref(false)
@@ -379,6 +390,8 @@ async function saveProfile() {
         applyProfile(response?.data || {})
         await fetchUser()
         profileSaved.value = true
+        // Ang na-save na nga values mao nay bag-ong baseline sa dirty check.
+        formSnapshot = snapshotForm()
     } catch (err) {
         console.error('Failed to save profile:', err)
     } finally {
@@ -415,6 +428,7 @@ async function saveNotifications() {
         // Body: { appointment_reminders, eligibility_renewal, nearby_drives, email_updates }
         await donorService.updateNotificationPreferences(Object.fromEntries(notificationPrefs.map(p => [p.key, p.enabled])))
         notifsSaved.value = true
+        formSnapshot = snapshotForm()
     } catch (err) {
         console.error('Failed to save notification preferences:', err)
     } finally {
@@ -423,36 +437,62 @@ async function saveNotifications() {
 }
 
 async function handleLogout() {
-    try {
-        localStorage.removeItem('_token')
-        clearUser()
-    } catch (err) {
-        console.error('Failed to log out cleanly:', err)
-    } finally {
-        router.push('/login')
-    }
+    await logout('/auth/donor/login')
 }
+
 
 async function handleDeleteAccount() {
+    if (!deletePassword.value) {
+        deleteError.value = 'Please enter your password to confirm.'
+        return
+    }
+
     deleting.value = true
+    deleteError.value = ''
+
     try {
+        // DELETE /api/donors/account
+        // Body: { password } — gipangayo sa server ang password isip
+        // re-authentication sa dili pa i-close ang account.
+        await donorService.deleteAccount({ password: deletePassword.value })
+
         localStorage.removeItem('_token')
         clearUser()
-        router.push('/login')
+        confirmDeleteOpen.value = false
+        router.push('/auth/donor/login')
     } catch (err) {
         console.error('Failed to delete account:', err)
+        deleteError.value = err?.errors?.password?.[0]
+            || err?.message
+            || 'Could not delete your account. Please try again.'
     } finally {
         deleting.value = false
-        confirmDeleteOpen.value = false
+        deletePassword.value = ''
     }
 }
 
-onMounted(async () => {
+// Gi-keepalive ni nga page, so mabuhi ang form ug ang toggles kung mo-navigate
+// palayo ang donor. Explicit man ang pag-save ani (saveProfile /
+// saveNotifications), so ang background refresh dili gyud angay mo-overwrite sa
+// wala pa ma-save nga edits — gi-snapshot nato ug gi-skip kung dirty na.
+let loadedOnce = false
+let formSnapshot = ''
+
+const snapshotForm = () => JSON.stringify({
+    profile: { ...profile },
+    prefs: notificationPrefs.map(pref => pref.enabled),
+})
+
+async function load({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
         // Backend contract: GET /api/donor/profile
         // Response: { full_name, email, phone, birth_date, blood_type, address,
         //   donor_id, avatar_url, notification_preferences }
         const data = await donorService.profile()
+
+        if (silent && snapshotForm() !== formSnapshot) return
+
         applyProfile(data)
 
         if (data?.notification_preferences) {
@@ -462,11 +502,19 @@ onMounted(async () => {
                 }
             })
         }
+
+        formSnapshot = snapshotForm()
     } catch (err) {
         console.error('Failed to load donor settings profile:', err)
     } finally {
         loading.value = false
+        loadedOnce = true
     }
+}
+
+onMounted(() => load())
+onActivated(() => {
+    if (loadedOnce) load({ silent: true })
 })
 
 function applyProfile(data) {
@@ -1002,6 +1050,19 @@ function splitFullName(fullName) {
     width: 100%;
 }
 
+
+.delete-confirm {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 18px;
+}
+
+.delete-confirm__error {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--accent);
+}
 /* Delete confirmation modal */
 .modal-backdrop {
     position: fixed;

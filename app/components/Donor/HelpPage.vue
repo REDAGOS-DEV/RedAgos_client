@@ -136,6 +136,7 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { supportService } from '~/api/support/SupportService'
 
 
 // Page-load skeleton same pattern as the rest of the dashboard. The FAQ
@@ -225,24 +226,35 @@ function toggleFaq(id) {
     openFaqId.value = openFaqId.value === id ? null : id
 }
 
-onMounted(async () => {
+// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
+// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
+// loadedOnce kay mo-fire sad siya human sa unang onMounted.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
-        // Backend contract: GET /api/support/contact-info
-        // Lets a blood center admin change the hotline/email/hours without a
-        // redeploy. Response: { hotline, hotline_label, email, hours }
-        const data = await $fetch('/api/support/contact-info')
+        // GET /api/support/contact-info
+        // Public ni nga endpoint (walay auth middleware). Gitugotan ani ang
+        // blood center nga mo-usab sa hotline/email/hours nga walay redeploy.
+        // Response: { hotline, hotline_label, email, hours }
+        const data = await supportService.contactInfo()
         if (data?.hotline) contactInfo.hotline = data.hotline
         if (data?.hotline_label) contactInfo.hotlineLabel = data.hotline_label
         if (data?.email) contactInfo.email = data.email
         if (data?.hours) contactInfo.hours = data.hours
     } catch (err) {
-        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/support/contact-info
-        // endpoint, so mag-fail gyud ni nga call. Mag-fallback ra sa hardcoded
-        // contact details sa taas â€” dili ni problema.
-        console.error('Failed to load support contact info (expected while backend is not yet wired up):', err)
+        // Kung mapakyas, mag-fallback ra sa hardcoded nga contact details.
+        console.error('Failed to load support contact info:', err)
     } finally {
         loading.value = false
+        loadedOnce = true
     }
+}
+
+onMounted(() => load())
+onActivated(() => {
+    if (loadedOnce) load({ silent: true })
 })
 </script>
 

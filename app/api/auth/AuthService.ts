@@ -15,6 +15,27 @@ class AuthService extends BaseService {
     async login(payload: { email: string; password: string }): Promise<any> {
         return await this.request('/login', 'POST', payload);
     }
+
+    async logout(): Promise<any> {
+        return await this.request('/logout', 'POST');
+    }
+
+    async logoutFromAllDevices(): Promise<any> {
+        return await this.request('/logout-all', 'POST');
+    }
+
+    /**
+     * Ang query string kay gi-forward nga verbatim: gi-validate sa Laravel ang
+     * signature batok sa raw, order-sensitive nga query string. Kung i-rebuild
+     * nato ang params isip object, mausab ang order ug mapakyas ang signature.
+     */
+    async verifyEmail(rawQuery: string): Promise<any> {
+        return await this.request(`/email/verify?${rawQuery}`, 'POST');
+    }
+
+    async resendVerificationEmail(): Promise<any> {
+        return await this.request('/email/verification-notification', 'POST');
+    }
  
     async list(params: object = {}): Promise<any> {
         return await this.request(this.resource, 'GET', params);

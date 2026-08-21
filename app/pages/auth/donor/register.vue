@@ -267,7 +267,7 @@ async function handleSubmit() {
     })
 
     submitSuccess.value = response?.message || 'Registration submitted successfully.'
-    setTimeout(() => navigateTo('/auth/login/donor'), 900)
+    setTimeout(() => navigateTo('/auth/donor/login'), 900)
   } catch (err) {
     applyValidationErrors(err)
     submitError.value = err?.message || 'Something went wrong while creating your account. Please try again.'

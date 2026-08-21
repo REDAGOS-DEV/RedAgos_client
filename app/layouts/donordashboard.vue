@@ -168,10 +168,11 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { donorService } from '~/api/donor/DonorService'
 
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, clearUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
@@ -201,8 +202,22 @@ const greeting = computed(() => {
 })
 
 // --- Notifications ---
-// Replace with real count from your notifications composable/API
 const unreadCount = ref(0)
+
+async function loadUnreadCount() {
+  try {
+    // GET /api/donors/notifications/unread-count
+    // Response: { unread_count }
+    const data = await donorService.notificationsUnreadCount()
+    unreadCount.value = data?.unread_count ?? 0
+  } catch (err) {
+    // Badge ra ni — kung mapakyas, i-hide na lang, dili angay mo-guba sa layout.
+    console.error('Failed to load unread notification count:', err)
+    unreadCount.value = 0
+  }
+}
+
+onMounted(loadUnreadCount)
 
 // --- Profile dropdown ---
 const showUserMenu = ref(false)
@@ -319,14 +334,10 @@ const vClickOutside = {
 }
 
 const handleLogout = async () => {
-  try {
-    showUserMenu.value = false
-    clearUser()
-    router.push('/auth/donor/login')
-  } catch (err) {
-    console.error(err)
-  }
+  showUserMenu.value = false
+  await logout('/auth/donor/login')
 }
+
 </script>
 
 <style scoped>

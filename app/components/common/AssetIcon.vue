@@ -86,6 +86,7 @@ import menu from '~/assets/icons/menu.svg?raw'
 import monitor from '~/assets/icons/monitor.svg?raw'
 import moon from '~/assets/icons/moon.svg?raw'
 import moveVertical from '~/assets/icons/move-vertical.svg?raw'
+import octagonAlert from '~/assets/icons/octagon-alert.svg?raw'
 import Package from '~/assets/icons/package.svg?raw'
 import packageCheck from '~/assets/icons/package-check.svg?raw'
 import packageSearch from '~/assets/icons/package-search.svg?raw'
@@ -205,6 +206,7 @@ const icons = {
   monitor,
   moon,
   'move-vertical': moveVertical,
+  'octagon-alert': octagonAlert,
   'package': Package,
   'package-check': packageCheck,
   'package-search': packageSearch,

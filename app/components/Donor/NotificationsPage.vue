@@ -105,6 +105,7 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { donorService } from '~/api/donor/DonorService'
 
 
 const loading = ref(true)
@@ -169,14 +170,13 @@ const emptyStateMessage = computed(() => {
 async function markAsRead(notif) {
     notif.read = true
     try {
-        // Backend contract: PATCH /api/donor/notifications/:id
-        // Body: { read: true }
-        await $fetch(`/api/donor/notifications/${notif.id}`, {
-            method: 'PATCH',
-            body: { read: true },
-        })
+        // PATCH /api/donors/notifications/{uuid}
+        // Walay body ni: ang server mo-mark ra as read, dili siya mo-set og
+        // arbitrary nga read value.
+        await donorService.markNotificationAsRead(notif.id)
     } catch (err) {
         console.error('Failed to mark notification as read:', err)
+        notif.read = false
     }
 }
 
@@ -184,8 +184,8 @@ async function markAllAsRead() {
     const previouslyUnread = notifications.value.filter(n => !n.read).map(n => n.id)
     notifications.value.forEach(n => { n.read = true })
     try {
-        // Backend contract: POST /api/donor/notifications/mark-all-read
-        await $fetch('/api/donor/notifications/mark-all-read', { method: 'POST' })
+        // POST /api/donors/notifications/mark-all-read
+        await donorService.markAllNotificationsAsRead()
     } catch (err) {
         console.error('Failed to mark all notifications as read:', err)
         // Roll back optimistic update on failure
@@ -195,12 +195,20 @@ async function markAllAsRead() {
     }
 }
 
-onMounted(async () => {
+// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
+// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
+// loadedOnce kay mo-fire sad siya human sa unang onMounted.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
-        // Backend contract: GET /api/donor/notifications
-        // Response: { notifications: [{ id, category: 'reminder'|'donation'|'screening'|'system',
-        //   title, desc, meta, icon, tone, read, action_label, action_route }] }
-        const data = await $fetch('/api/donor/notifications')
+        // GET /api/donors/notifications
+        // Response: { notifications: [{ id (uuid), category, title, desc, meta,
+        //   icon, tone, read, action_label, action_route, created_at }],
+        //   unread_count, meta: { page, per_page, total, last_page } }
+        // Paginated (20 kada page); ang unang page ra ang gipakita karon.
+        const data = await donorService.notifications()
         notifications.value = (data?.notifications ?? []).map(n => ({
             id: n.id,
             category: n.category,
@@ -214,11 +222,17 @@ onMounted(async () => {
             actionRoute: n.action_route,
         }))
     } catch (err) {
-        console.error('Failed to load notifications (expected while backend is not yet wired up):', err)
+        console.error('Failed to load notifications:', err)
         notifications.value = []
     } finally {
         loading.value = false
+        loadedOnce = true
     }
+}
+
+onMounted(() => load())
+onActivated(() => {
+    if (loadedOnce) load({ silent: true })
 })
 </script>
 

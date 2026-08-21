@@ -215,7 +215,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, clearUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
 onMounted(() => {
@@ -361,14 +361,10 @@ const vClickOutside = {
 }
 
 const handleLogout = async () => {
-  try {
-    showUserMenu.value = false
-    clearUser()
-    router.push('/auth/blood-center/login')
-  } catch (err) {
-    console.error(err)
-  }
+  showUserMenu.value = false
+  await logout('/auth/blood-center/login')
 }
+
 </script>
 
 <style scoped>
