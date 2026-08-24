@@ -17,10 +17,10 @@
              Back to Home
           </NuxtLink>
 
-          <h1>Welcome, Blood Steward!</h1>
+          <h1>Administrator Sign In</h1>
 
           <p class="form-subtitle">
-            Sign in to your blood center account
+            Review facility registrations and manage the system
           </p>
 
           <form
@@ -78,26 +78,6 @@
               </div>
             </div>
 
-            <div class="field-group license-group">
-              <label for="license-number">DOH License Number</label>
-
-              <div class="input-shell">
-                <span class="field-icon">
-                  <AssetIcon name="id-card" :size="18" />
-                </span>
-
-                <input
-                  id="license-number"
-                  v-model="licenseNumber"
-                  type="text"
-                  class="typed-input"
-                  :class="{ typed: typed.licenseNumber }"
-                  placeholder="e.g. DOH-BC-00123"
-                  required
-                >
-              </div>
-            </div>
-
             <div class="forgot-row">
               <button
                 type="button"
@@ -123,11 +103,10 @@
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
+            <!-- Walay self-registration ang admin. Ang bag-ong admin account
+                 kay gihimo ra sa naa nang admin pinaagi sa POST /users. -->
             <p class="signup-text">
-              Need an account?
-              <NuxtLink to="/register/blood-center">
-                Register Now
-              </NuxtLink>
+              Administrator accounts are created by an existing administrator.
             </p>
 
             <div class="divider">
@@ -140,7 +119,7 @@
               <button
                 type="button"
                 class="role-button hospital"
-                @click="navigateTo('/login')"
+                @click="navigateTo('/auth/donor/login')"
               >
                 <AssetIcon name="users" :size="20" />
                 Donor
@@ -149,7 +128,7 @@
               <button
                 type="button"
                 class="role-button blood-center"
-                @click="navigateTo('/login/hospital')"
+                @click="navigateTo('/auth/hospital/login')"
               >
                 <AssetIcon name="hospital" :size="20" />
                 Hospital
@@ -169,16 +148,15 @@ import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 useHead({
-  title: 'Blood Center Sign In · RedAgos'
+  title: 'Administrator Sign In · RedAgos'
 })
 
 const email = ref('')
 const password = ref('')
-const licenseNumber = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-const typed = reactive({ email: false, password: false, licenseNumber: false })
+const typed = reactive({ email: false, password: false })
 
 watch(email, (value) => {
   typed.email = value.trim().length > 0
@@ -186,10 +164,6 @@ watch(email, (value) => {
 
 watch(password, (value) => {
   typed.password = value.trim().length > 0
-})
-
-watch(licenseNumber, (value) => {
-  typed.licenseNumber = value.trim().length > 0
 })
 
 const goToForgotPassword = () => {
@@ -201,11 +175,12 @@ const login = async () => {
   errorMessage.value = ''
 
   try {
+    // Kaniadto 'blood-center' ang gipadala diri, mao nga wala gyud gyud
+    // makasulod ang admin — 403 role_mismatch ang balik kanunay.
     const response = await authService.login({
       email: email.value,
       password: password.value,
-      role: 'blood-center',
-      licenseNumber: licenseNumber.value,
+      role: 'admin',
     })
 
     const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
@@ -214,7 +189,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/admin/Dashboard')
+    await navigateTo('/admin/registrations')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

@@ -2,6 +2,7 @@ const LOGIN_ROUTES: Record<string, string> = {
   '/donor': '/auth/donor/login',
   '/hospital': '/auth/hospital/login',
   '/blood-center': '/auth/blood-center/login',
+  '/admin': '/auth/admin/login',
 }
 
 export default defineNuxtRouteMiddleware((to) => {

@@ -162,6 +162,14 @@ const selectRole = (roleId) => {
 const continueWithRole = async () => {
   if (!selectedRole.value) return
 
+  // Walay self-registration ang admin — ang mga admin account kay gihimo ra sa
+  // laing admin pinaagi sa POST /users. So diretso ta sa login page imbes sa
+  // register page nga wala nay sulod.
+  if (selectedRole.value === 'admin') {
+    await navigateTo('/auth/admin/login')
+    return
+  }
+
   await navigateTo(`/register/${selectedRole.value}`)
 }
 </script>

@@ -214,7 +214,18 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
+    // Ang aplikante nga wala pa ma-approve kay naay token pero walay
+    // blood_center nga role, so ang dashboard mo-403 ra. Ipadala nato sila sa
+    // status page diin makita nila ang rason ug maka-resubmit.
+    const facilityStatus = response?.user?.facility?.status
+
+    if (facilityStatus === 'pending_approval' || facilityStatus === 'rejected') {
+      await navigateTo('/auth/blood-center/registration-status')
+      return
+    }
+
     await navigateTo('/blood-center/dashboard')
+
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

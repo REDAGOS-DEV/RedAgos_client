@@ -20,6 +20,18 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/register`, 'POST', payload)
   }
 
+  async referenceData(): Promise<any> {
+    return this.request(`${this.resource}/reference-data`, 'GET')
+  }
+
+  async registrationStatus(): Promise<any> {
+    return this.request(`${this.resource}/registration-status`, 'GET')
+  }
+
+  async resubmitRegistration(payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/registration/resubmit`, 'POST', payload)
+  }
+
   async dashboard(): Promise<any> {
     return this.request(`${this.resource}/dashboard`, 'GET')
   }
