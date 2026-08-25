@@ -108,32 +108,6 @@
             <p class="signup-text">
               Administrator accounts are created by an existing administrator.
             </p>
-
-            <div class="divider">
-              <span></span>
-              <p>or sign in as</p>
-              <span></span>
-            </div>
-
-            <div class="role-grid">
-              <button
-                type="button"
-                class="role-button hospital"
-                @click="navigateTo('/auth/donor/login')"
-              >
-                <AssetIcon name="users" :size="20" />
-                Donor
-              </button>
-
-              <button
-                type="button"
-                class="role-button blood-center"
-                @click="navigateTo('/auth/hospital/login')"
-              >
-                <AssetIcon name="hospital" :size="20" />
-                Hospital
-              </button>
-            </div>
           </form>
         </div>
       </section>
@@ -441,71 +415,6 @@ input::placeholder {
   text-align: center;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 44px;
-}
-
-.divider span {
-  height: 1px;
-  flex: 1;
-  background: #d5dde7;
-}
-
-.divider p {
-  margin: 0;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 44px;
-}
-
-.role-button {
-  display: flex;
-  height: 46px;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.role-button svg {
-  width: 20px;
-  height: 20px;
-}
-
-.hospital {
-  color: #1266c3;
-}
-
-.hospital:hover {
-  border-color: #1266c3;
-}
-
-.blood-center {
-  color: #2da1ff;
-}
-
-.blood-center:hover {
-  border-color: #2da1ff;
-}
-
-@keyframes logoFloat{ 0%,100%{ transform:translateY(0);} 50% { transform:translateY(-8px);} }
-@keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-18px);} }
-@keyframes floatParticle { 0%, 100% { transform:translateY(0);} 50% { transform:translateY(-20px);} }
-
 @media (max-width: 1023px) {
   .login-shell {
     display: block;
@@ -537,10 +446,6 @@ input::placeholder {
 
   h1 {
     font-size: 34px;
-  }
-
-  .role-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

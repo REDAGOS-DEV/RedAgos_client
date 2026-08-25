@@ -16,6 +16,10 @@ class AuthService extends BaseService {
         return await this.request('/login', 'POST', payload);
     }
 
+    async forgotPassword(payload: { email: string }): Promise<any> {
+        return await this.request('/forgot-password', 'POST', payload);
+    }
+
     async logout(): Promise<any> {
         return await this.request('/logout', 'POST');
     }

@@ -8,10 +8,19 @@
         </p>
       </div>
 
-      <button type="button" class="ghost-btn" :disabled="loading" @click="load">
-        <AssetIcon name="refresh-cw" :size="16" />
-        {{ loading ? 'Loading…' : 'Refresh' }}
-      </button>
+      <div class="header-actions">
+        <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
+
+        <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+          <AssetIcon name="refresh-cw" :size="16" />
+          {{ loading ? 'Loading…' : 'Refresh' }}
+        </button>
+
+        <button type="button" class="ghost-btn" :disabled="loggingOut" @click="handleLogout">
+          <AssetIcon name="log-out" :size="16" />
+          {{ loggingOut ? 'Logging out…' : 'Log Out' }}
+        </button>
+      </div>
     </header>
 
     <nav class="tabs">
@@ -172,7 +181,7 @@ definePageMeta({
 
 useHead({ title: 'Facility Registrations · RedAgos' })
 
-const { user, fetchUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 
 const TABS = [
   { value: 'pending_approval', label: 'Pending Approval' },
@@ -187,6 +196,8 @@ const STATUS_LABELS = {
   rejected: 'Rejected',
   suspended: 'Suspended',
 }
+
+const loggingOut = ref(false)
 
 const activeStatus = ref('pending_approval')
 const rows = ref([])
@@ -361,6 +372,15 @@ function showBanner(message, kind) {
   bannerKind.value = kind
 }
 
+/**
+ * Ang `logout()` mao nay mo-revoke sa token sa server, mo-clear sa localStorage,
+ * ug mo-redirect — walay laing lakang nga kinahanglan dinhi.
+ */
+async function handleLogout() {
+  loggingOut.value = true
+  await logout('/auth/admin/login')
+}
+
 function changeStatus(status) {
   if (activeStatus.value === status) return
 
@@ -489,6 +509,20 @@ onMounted(async () => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.24);
   font-size: 11px;
+}
+
+.header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.signed-in-as {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
 }
 
 .banner {

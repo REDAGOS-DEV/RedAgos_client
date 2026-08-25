@@ -63,6 +63,7 @@
 </template>
 
 <script setup>
+import { authService } from '~/api/auth/AuthService'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
@@ -83,10 +84,17 @@ const submitReset = async () => {
   loading.value = true
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await authService.forgotPassword({ email: email.value.trim() })
+
+    // Parehas ra ang mensahe bisan wala ang email sa database — dili ta
+    // mo-confirm kung kinsa ang rehistrado.
     successMessage.value = 'If this email is registered, a reset link has been sent.'
-  } catch {
-    errorMessage.value = 'Unable to send reset link at this time. Please try again later.'
+  } catch (error) {
+    // Ang server naay throttle:3,10, so lahi og kahulogan ang 429: sakto ang
+    // email, kinahanglan lang mohulat.
+    errorMessage.value = error?.status === 429
+      ? 'Too many reset requests. Please wait a few minutes and try again.'
+      : error?.message || 'Unable to send reset link at this time. Please try again later.'
   } finally {
     loading.value = false
   }
