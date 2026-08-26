@@ -611,11 +611,12 @@ import { useUser } from '~/composables/useUser.js'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
-  middleware: 'auth',
+  middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
+  requires: 'reports.view_all',
 })
 
-const { user } = useUser()
+const { user, can } = useUser()
 const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'Blood Center')
 
 const loading = ref(true)
@@ -817,13 +818,19 @@ const donationActivity = ref([])
 const systemActivity = ref([])
 
 // --- Quick actions ---
-const quickActions = [
-  { label: 'Record Donation', description: 'Log a new donation entry', icon: 'droplets', kind: 'modal' },
-  { label: 'Manage Inventory', description: 'Update stock levels and units', icon: 'package', kind: 'link', to: '/blood-center/inventory' },
-  { label: 'Process Requests', description: 'Review and fulfill hospital requests', icon: 'clipboard-list', kind: 'link', to: '/blood-center/bloodrequests' },
-  { label: 'Generate Reports', description: 'Export operational summaries', icon: 'file-text', kind: 'export' },
-  { label: 'Manage Donors', description: 'View and update donor records', icon: 'users', kind: 'link', to: '/blood-center/donors' },
+// Gi-filter sa parehas nga permissions sa sidebar. Bisan tuod supervisor ra
+// ang makaabot ani nga page karon, ang shortcut dili gyud mo-offer og aksyon
+// nga i-refuse ra sa server.
+const ALL_QUICK_ACTIONS = [
+  { label: 'Record Donation', description: 'Log a new donation entry', icon: 'droplets', kind: 'modal', requires: 'donations.record' },
+  { label: 'Manage Inventory', description: 'Update stock levels and units', icon: 'package', kind: 'link', to: '/blood-center/inventory', requires: 'inventory.view' },
+  { label: 'Process Requests', description: 'Review and fulfill hospital requests', icon: 'clipboard-list', kind: 'link', to: '/blood-center/bloodrequests', requires: 'requests.view' },
+  { label: 'Generate Reports', description: 'Export operational summaries', icon: 'file-text', kind: 'export', requires: 'reports.view_own' },
+  { label: 'Manage Donors', description: 'View and update donor records', icon: 'users', kind: 'link', to: '/blood-center/donors', requires: 'donors.view' },
+  { label: 'Manage Staff', description: 'Add colleagues and assign departments', icon: 'user-check', kind: 'link', to: '/blood-center/staff', requires: 'staff.manage' },
 ]
+
+const quickActions = computed(() => ALL_QUICK_ACTIONS.filter((action) => can(action.requires)))
 
 function handleQuickAction(action) {
   if (action.kind === 'modal') return openRecordDonation()
@@ -989,51 +996,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-
-:global(:root) {
-  --rb-primary: #1565C0;
-  --rb-primary-rgb: 21, 101, 192;
-  --rb-secondary: #42A5F5;
-  --rb-accent: #D32F2F;
-  --rb-accent-rgb: 211, 47, 47;
-  --rb-success: #2E7D32;
-  --rb-success-rgb: 46, 125, 50;
-  --rb-warning: #F57C00;
-  --rb-warning-rgb: 245, 124, 0;
-  --rb-purple: #7C3AED;
-  --rb-purple-rgb: 124, 58, 237;
-  --rb-teal: #0F766E;
-  --rb-teal-rgb: 15, 118, 110;
-
-  --rb-text-primary: #1F2937;
-  --rb-text-secondary: #94A3B8;
-  --rb-border: #EEF1F5;
-  --rb-border-strong: #E2E8F0;
-  --rb-border-hover: #E2E8F0;
-  --rb-surface: #FFFFFF;
-  --rb-surface-alt: #FAFBFC;
-  --rb-surface-hover: #F8FAFC;
-  --rb-page-bg: #F7F8FA;
-  --rb-placeholder: #B0BAC5;
-  --rb-skeleton-a: #EEF1F5;
-  --rb-skeleton-b: #F6F8FA;
-  --rb-overlay: rgba(15, 23, 42, 0.45);
-  --rb-shadow-rgb: 15, 23, 42;
-}
-
-:global(.dark) {
-  --rb-text-primary: #F1F5F9;
-  --rb-text-secondary: #94A3B8;
-  --rb-border: #334155;
-  --rb-border-strong: #334155;
-  --rb-border-hover: #475569;
-  --rb-surface: #1E293B;
-  --rb-surface-alt: #182234;
-  --rb-surface-hover: #263449;
-  --rb-page-bg: #0F172A;
-  --rb-skeleton-a: #1E293B;
-  --rb-skeleton-b: #263449;
-}
 
 .dashboard {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

@@ -630,8 +630,9 @@ import { useDarkMode } from '~/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
-  middleware: 'auth',
+  middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
+  requires: 'requests.process',
 })
 
 const { isDark } = useDarkMode()

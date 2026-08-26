@@ -215,45 +215,28 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, logout } = useUser()
+const { user, ensureUser, logout } = useUser()
+// Ang nav kay usa ra ka source — parehas sa sidebar, sa ⌘F search ug sa
+// profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
+// ra sa server.
+const { searchablePages, userMenuItems, labelForPath } = useBloodCenterNav()
 const { isDark, toggleTheme } = useDarkMode()
 
 onMounted(() => {
-  if (!user.value) fetchUser()
+  ensureUser()
 })
 
-const pageLabels = {
-  '/blood-center/dashboard': 'Dashboard',
-  '/blood-center/appointments': 'Appointments',
-  '/blood-center/billing': 'Billing',
-  '/blood-center/donors': 'Donors',
-  '/blood-center/drives': 'Mobile Drives',
-  '/blood-center/inventory': 'Inventory',
-  '/blood-center/notifications': 'Notifications',
-  '/blood-center/profile': 'My Profile',
-  '/blood-center/bloodrequests': 'Blood Requests',
-  '/blood-center/reports': 'Demand Forecasting',
-  '/blood-center/settings': 'Settings',
-  '/blood-center/help': 'Help',
-}
-const breadcrumb = computed(() => `Blood Center Portal / ${pageLabels[route.path] || ''}`)
+const breadcrumb = computed(() => `Blood Center Portal / ${labelForPath(route.path)}`)
 
-function getGreeting() {
+const greeting = computed(() => {
   const h = new Date().getHours()
   const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
   const first = user.value?.full_name?.split(' ')[0] || 'Blood Center'
   return `${time}, ${first}`
-}
-const greeting = ref(getGreeting())
+})
 
 const unreadCount = ref(0)
 const showUserMenu = ref(false)
-const userMenuItems = [
-  { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle' },
-  { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check' },
-  { label: 'Billing', path: '/blood-center/billing', icon: 'credit-card' },
-  { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell' }
-]
 const closeUserMenu = () => {
   showUserMenu.value = false
 }
@@ -278,20 +261,6 @@ function handleEscSearch() {
   }
 }
 
-const searchablePages = [
-  { label: 'Dashboard', path: '/blood-center/dashboard', icon: 'home', keywords: 'dashboard home overview' },
-  { label: 'Blood Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', keywords: 'blood requests urgent supply' },
-  { label: 'Inventory', path: '/blood-center/inventory', icon: 'archive', keywords: 'inventory stock units blood bags' },
-  { label: 'Donors', path: '/blood-center/donors', icon: 'users', keywords: 'donors records donor management' },
-  { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', keywords: 'appointments schedule booking' },
-  { label: 'Mobile Drives', path: '/blood-center/drives', icon: 'truck', keywords: 'mobile drives campaigns' },
-  { label: 'Billing', path: '/blood-center/billing', icon: 'credit-card', keywords: 'billing payments invoices' },
-  { label: 'Demand Forecasting', path: '/blood-center/reports', icon: 'bar-chart', keywords: 'reports forecasting analytics' },
-  { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
-  { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle', keywords: 'profile account personal info' },
-  { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'settings preferences' },
-]
-
 const searchQuery = ref('')
 const showSearchResults = ref(false)
 const highlightIndex = ref(0)
@@ -300,8 +269,10 @@ const searchInput = ref(null)
 const filteredResults = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return []
-  return searchablePages.filter(p =>
-    p.label.toLowerCase().includes(q) || p.keywords.includes(q)
+  // searchablePages kay gi-filter na daan sa permissions, so dili gyud
+  // makasulod sa results ang page nga dili niya maabot.
+  return searchablePages.value.filter(p =>
+    p.label.toLowerCase().includes(q) || (p.keywords ?? '').includes(q)
   )
 })
 

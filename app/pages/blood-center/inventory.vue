@@ -894,8 +894,9 @@ import { useUser } from '~/composables/useUser.js'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
-  middleware: 'auth',
+  middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
+  requires: 'inventory.view',
 })
 
 const { user } = useUser()
@@ -1519,51 +1520,6 @@ onMounted(loadDashboard)
 </script>
 
 <style scoped>
-:global(:root) {
-  --rb-primary: #1565C0;
-  --rb-primary-rgb: 21, 101, 192;
-  --rb-primary-hover: #0D47A1;
-  --rb-accent: #D32F2F;
-  --rb-accent-rgb: 211, 47, 47;
-  --rb-success: #2E7D32;
-  --rb-success-rgb: 46, 125, 50;
-  --rb-warning: #F59E0B;
-  --rb-warning-rgb: 245, 158, 11;
-  --rb-purple: #7C3AED;
-  --rb-purple-rgb: 124, 58, 237;
-  --rb-teal: #0F766E;
-  --rb-teal-rgb: 15, 118, 110;
-
-  --rb-text-primary: #1E293B;
-  --rb-text-secondary: #64748B;
-  --rb-border: #EEF1F5;
-  --rb-border-strong: #E5EAF0;
-  --rb-border-hover: #D8E0EA;
-  --rb-surface: #FFFFFF;
-  --rb-surface-alt: #FAFBFC;
-  --rb-surface-hover: #F3F6FA;
-  --rb-page-bg: #F7F9FC;
-  --rb-placeholder: #B0BAC5;
-  --rb-skeleton-a: #EEF1F5;
-  --rb-skeleton-b: #F6F8FA;
-  --rb-overlay: rgba(15, 23, 42, 0.45);
-  --rb-shadow-rgb: 15, 23, 42;
-}
-
-:global(.dark) {
-  --rb-text-primary: #F1F5F9;
-  --rb-text-secondary: #94A3B8;
-  --rb-border: #2A3447;
-  --rb-border-strong: #2A3447;
-  --rb-border-hover: #3B4863;
-  --rb-surface: #1E293B;
-  --rb-surface-alt: #182234;
-  --rb-surface-hover: #263449;
-  --rb-page-bg: #0F172A;
-  --rb-skeleton-a: #1E293B;
-  --rb-skeleton-b: #263449;
-}
-
 .inv-page {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   max-width: 1280px;

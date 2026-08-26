@@ -1,5 +1,9 @@
 import { authService } from '~/api/auth/AuthService'
 
+// Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
+// sa composable aron usa ra ka request bisan pila ka caller ang mo-dungan.
+let inFlight = null
+
 export function useUser() {
   const user = useState('app-user', () => null)
   const loading = useState('app-user-loading', () => true)
@@ -32,6 +36,15 @@ export function useUser() {
         blood_type: payload.blood_type ?? null,
         account_status: payload.account_status,
         roles: Array.isArray(payload.roles) ? payload.roles.map((role) => role?.name ?? role) : [],
+        // Ang facility kay gi-eager-load na sa /user, so ang portal header
+        // makakuha na sa ngalan sa center.
+        facility: payload.facility ?? null,
+        // Blood center department + permissions. Ang server gihapon ang tinuod
+        // nga gate — presentation ra ni.
+        department: payload.department ?? null,
+        department_label: payload.department_label ?? null,
+        is_supervisor: Boolean(payload.is_supervisor),
+        permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
         // avatar: payload.avatar_url, // i-uncomment rani if naa nay 'avatar_url' column sa backend
       }
 
@@ -41,6 +54,38 @@ export function useUser() {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * Kuhaon ang user kung wala pa, kung naa na i-reuse. Gamiton ni sa route
+   * middleware nga kinahanglan sa permissions sa dili pa mo-render ang page.
+   *
+   * Ang in-flight promise gi-share aron ang duha ka middleware nga mo-dungan
+   * dili mo-fire og duha ka request.
+   */
+  async function ensureUser() {
+    if (user.value) return user.value
+    if (!import.meta.client) return null
+
+    if (!inFlight) {
+      inFlight = fetchUser().finally(() => { inFlight = null })
+    }
+
+    await inFlight
+
+    return user.value
+  }
+
+  /**
+   * Naa bay ability ang user karon.
+   *
+   * Fail-closed: kung wala pa ma-load ang user o walay permissions, `false`
+   * ang balik. Ang mga item nga walay gikinahanglan nga ability kay dayag ra.
+   */
+  function can(ability) {
+    if (!ability) return true
+
+    return user.value?.permissions?.includes(ability) ?? false
   }
 
   function updateAvatar(newUrl) {
@@ -68,12 +113,13 @@ export function useUser() {
     } finally {
       if (import.meta.client) {
         localStorage.removeItem('_token')
+        inFlight = null
         clearUser()
         window.location.replace(redirectTo)
       }
     }
   }
 
-  return { user, loading, fetchUser, updateAvatar, clearUser, logout }
-  
+  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, logout, can }
+
 }

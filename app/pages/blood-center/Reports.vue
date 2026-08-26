@@ -521,8 +521,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 definePageMeta({
-    middleware: 'auth',
+    middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
+  requires: 'reports.view_own',
 })
 
 /**

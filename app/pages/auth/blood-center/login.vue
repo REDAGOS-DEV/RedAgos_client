@@ -168,6 +168,9 @@ import { reactive, ref, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
+// departmentHome() ug ensureUser() kay auto-imported gikan sa app/composables.
+const { ensureUser } = useUser()
+
 useHead({
   title: 'Blood Center Sign In · RedAgos'
 })
@@ -224,7 +227,12 @@ const login = async () => {
       return
     }
 
-    await navigateTo('/blood-center/dashboard')
+    // Ang login response wala pa maglakip sa department/permissions, mao nga
+    // i-load usa ang /user aron mahibaw-an asa nga department dashboard siya
+    // ipadala. Ang ensureUser() ra usab ang gamiton sa middleware human.
+    const profile = await ensureUser()
+
+    await navigateTo(departmentHome(profile))
 
   } catch (error) {
     errorMessage.value = error instanceof Error
