@@ -126,30 +126,43 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="contactPerson">Contact Person (Full Name)</label>
+              <label for="contactFirstName">Contact First Name</label>
               <input
-                id="contactPerson"
-                v-model="form.contactPerson"
+                id="contactFirstName"
+                v-model="form.contactFirstName"
                 type="text"
-                name="contactPerson"
-                autocomplete="name"
-                placeholder="Name of authorized representative"/>
+                name="contactFirstName"
+                autocomplete="given-name"
+                placeholder="First name"/>
             </div>
-          
 
             <div class="form-group">
-              <label for="role">Role/Position</label>
-              <div class="input-icon-wrap">
-              <select id="role" v-model="form.role" name="role">
-                <option value="" disabled selected>Select role</option>
-                <option value="admin">Blood Bank Administrator</option>
-                <option value="staff">Medical Staff</option>
-                <option value="coordinator">Donor Coordinator</option>
-              </select>
-              <AssetIcon class="select-icon" name="chevron-left" :size="16" />
+              <label for="contactLastName">Contact Last Name</label>
+              <input
+                id="contactLastName"
+                v-model="form.contactLastName"
+                type="text"
+                name="contactLastName"
+                autocomplete="family-name"
+                placeholder="Last name"/>
             </div>
           </div>
-        </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="position">Role/Position</label>
+              <div class="input-icon-wrap">
+                <select id="position" v-model="form.position" name="position">
+                  <option value="" disabled selected>Select position</option>
+                  <option value="Administrator">Blood Bank Administrator</option>
+                  <option value="Medical Technologist">Medical Technologist</option>
+                  <option value="Registered Nurse">Registered Nurse</option>
+                  <option value="Donor Coordinator">Donor Coordinator</option>
+                </select>
+                <AssetIcon class="select-icon" name="chevron-left" :size="16" />
+              </div>
+            </div>
+          </div>
 
           <div class="form-row">
             <div class="form-group">
@@ -252,7 +265,11 @@
           </div>
 
           <p v-if="errorMessage" class="form-message error">{{ errorMessage }}</p>
+          <ul v-if="fieldErrors.length" class="form-message error">
+            <li v-for="(message, index) in fieldErrors" :key="index">{{ message }}</li>
+          </ul>
           <p v-if="successMessage" class="form-message success">{{ successMessage }}</p>
+
 
           <button type="submit" class="submit-btn" :disabled="loading">
             {{ loading ? 'Submitting...' : 'Submit Registration' }}
@@ -273,6 +290,7 @@
 import { reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
   alias: ['/register/blood-center'],
@@ -281,8 +299,9 @@ definePageMeta({
 const form = reactive({
   centerName: '',
   dohLicense: '',
-  contactPerson: '',
-  role: '',
+  contactFirstName: '',
+  contactLastName: '',
+  position: '',
   email: '',
   phone: '',
   address: '',
@@ -293,15 +312,21 @@ const form = reactive({
 
 const loading = ref(false)
 const errorMessage = ref('')
+const fieldErrors = ref([])
 const successMessage = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
 const submitRegistration = async () => {
   errorMessage.value = ''
+  fieldErrors.value = []
   successMessage.value = ''
 
-  if (!form.centerName || !form.dohLicense || !form.contactPerson || !form.role) {
+  // Ang server na gyud ang tinuod nga validator. Kini nga mga check kay para
+  // lang dili mo-round-trip kung klaro nga kulang ang porma — ang password
+  // strength, phone format ug uniqueness kay server-side gyud gi-enforce.
+  if (!form.centerName || !form.dohLicense || !form.contactFirstName
+    || !form.contactLastName || !form.position) {
     errorMessage.value = 'Please fill out all required fields.'
     return
   }
@@ -311,23 +336,43 @@ const submitRegistration = async () => {
     return
   }
 
-  if (form.password.length < 8) {
-    errorMessage.value = 'Password must be at least 8 characters.'
-    return
-  }
-
   loading.value = true
 
   try {
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    await bloodCenterService.register({
+      center_name: form.centerName,
+      doh_license_number: form.dohLicense,
+      contact_first_name: form.contactFirstName,
+      contact_last_name: form.contactLastName,
+      position: form.position,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      description: form.description || null,
+      password: form.password,
+      // Ang Laravel `confirmed` rule nangita og `password_confirmation`.
+      password_confirmation: form.confirmPassword,
+    })
 
-    successMessage.value = 'Blood center registration submitted! Check your email for verification.'
+    // Dili ra email verification ang gihulat — naa pay admin nga mo-review sa
+    // DOH licence, so mao ni ang gipakita nga mensahe.
+    successMessage.value = 'Registration submitted. We will email you once an administrator has reviewed your DOH licence.'
 
     setTimeout(() => {
       navigateTo('/auth/blood-center/login')
-    }, 2000)
+    }, 3000)
   } catch (error) {
-    errorMessage.value = 'Registration failed. Please try again.'
+    // Gi-attach na sa BaseService ang 422 `errors` bag, so ipakita nato ang
+    // tinuod nga mensahe sa server imbes generic nga "failed".
+    const errors = error?.errors
+
+    if (errors) {
+      fieldErrors.value = Object.values(errors).flat()
+    }
+
+    errorMessage.value = errors
+      ? 'Please correct the highlighted details.'
+      : (error?.message || 'Registration failed. Please try again.')
   } finally {
     loading.value = false
   }

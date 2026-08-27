@@ -173,7 +173,7 @@ import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, clearUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 
@@ -323,8 +323,7 @@ const vClickOutside = {
 const handleLogout = async () => {
   try {
     showUserMenu.value = false
-    clearUser()
-    router.push('/auth/hospital/login')
+    await logout('/auth/hospital/login')
   } catch (err) {
     console.error(err)
   }

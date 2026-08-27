@@ -118,7 +118,7 @@ const sidebarShadow = computed(() =>
 const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
-const { user, fetchUser, clearUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 
 const activePath = ref(route.path || '/')
 watch(
@@ -190,10 +190,10 @@ const closeSidebar = () => {
   mobileOpen.value = false
 }
 
-const logout = () => {
-  clearUser()
-  router.push('/auth/hospital/login')
+const handleLogout = async () => {
+  await logout('/auth/hospital/login')
 }
+
 
 const hoveredPath = ref(null)
 

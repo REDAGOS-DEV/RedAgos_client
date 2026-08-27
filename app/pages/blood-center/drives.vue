@@ -193,8 +193,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, onMounted } from 'vue'
 
 definePageMeta({
-  middleware: 'auth',
-  layout: 'blood-centerdashboard'
+  middleware: ['auth', 'department'],
+  layout: 'blood-centerdashboard',
+  requires: 'drives.manage',
 })
 
 const loading = ref(true)

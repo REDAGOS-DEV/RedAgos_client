@@ -38,8 +38,25 @@ Output:
                 </p>
             </div>
 
+
+            <!-- Current eligibility state -->
+            <div v-if="statusBanner" class="status-banner fade-in" :class="`status-banner--${statusBanner.tone}`"
+                style="--delay: 60ms">
+                <span class="status-banner__icon">
+                    <AssetIcon :name="statusBanner.icon" :size="16" />
+                </span>
+                <div class="status-banner__body">
+                    <p class="status-banner__title">{{ statusBanner.title }}</p>
+                    <p v-if="statusBanner.detail" class="status-banner__detail">{{ statusBanner.detail }}</p>
+                    <ul v-if="statusBanner.reasons.length" class="status-banner__reasons">
+                        <li v-for="reason in statusBanner.reasons" :key="reason.code">{{ reason.message }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            
             <!-- Step indicator -->
-            <div class="step-indicator fade-in" style="--delay: 100ms">
+            <div v-if="sections.length" class="step-indicator fade-in" style="--delay: 100ms">
                 <template v-for="(step, idx) in steps" :key="step.number">
                     <span class="step__circle" :class="{ 'step__circle--filled': step.number <= currentStep }">{{
                         step.number }}</span>
@@ -49,46 +66,41 @@ Output:
             </div>
 
             <div class="main-grid">
-                <!-- Left column: questions -->
+              <!-- Left column: questions -->
                 <div class="col-left">
-                    <div class="panel fade-in" style="--delay: 150ms">
+                    <div v-if="loadError" class="panel fade-in" style="--delay: 150ms">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Section 1 - General Health</h2>
+                            <h2 class="panel-title">Questionnaire unavailable</h2>
                         </div>
-                        <div class="question-list">
-                            <div v-for="q in section1" :key="q.id" class="question-card">
-                                <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
-                                <div class="answer-toggle">
-                                    <button type="button" class="answer-btn answer-btn--yes"
-                                        :class="{ 'answer-btn--active': q.answer === true }"
-                                        @click="q.answer = true">Yes</button>
-                                    <button type="button" class="answer-btn answer-btn--no"
-                                        :class="{ 'answer-btn--active': q.answer === false }"
-                                        @click="q.answer = false">No</button>
-                                </div>
-                            </div>
+                        <div class="form-body">
+                            <p class="load-error__text">{{ loadError }}</p>
+                            <button type="button" class="btn-primary btn-block load-error__retry" @click="load">
+                                Try again
+                            </button>
                         </div>
                     </div>
 
-                    <div class="panel fade-in" style="--delay: 200ms">
+                    <div v-for="(section, idx) in sections" :key="section.key" class="panel fade-in"
+                        :style="{ '--delay': `${150 + idx * 50}ms` }">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Section 2 - Medical History</h2>
+                            <h2 class="panel-title">Section {{ idx + 1 }} - {{ section.title }}</h2>
                         </div>
                         <div class="question-list">
-                            <div v-for="q in section2" :key="q.id" class="question-card">
+                            <div v-for="q in section.questions" :key="q.code" class="question-card">
                                 <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
                                 <div class="answer-toggle">
                                     <button type="button" class="answer-btn answer-btn--yes"
-                                        :class="{ 'answer-btn--active': q.answer === true }"
-                                        @click="q.answer = true">Yes</button>
+                                        :class="{ 'answer-btn--active': answers[q.code] === true }"
+                                        @click="answers[q.code] = true">Yes</button>
                                     <button type="button" class="answer-btn answer-btn--no"
-                                        :class="{ 'answer-btn--active': q.answer === false }"
-                                        @click="q.answer = false">No</button>
+                                        :class="{ 'answer-btn--active': answers[q.code] === false }"
+                                        @click="answers[q.code] = false">No</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
 
                 <!-- Right column: vitals + result -->
                 <div class="col-right">
@@ -101,8 +113,13 @@ Output:
                                 <div class="form-field">
                                     <label class="form-label">Age</label>
                                     <input v-model.number="vitals.age" type="number" min="0" class="form-input"
+                                        :class="{ 'form-input--locked': prefilled.age }" :readonly="prefilled.age"
                                         placeholder="29">
+                                    <p v-if="prefilled.age" class="form-hint">
+                                        From your profile, computed from your birth date.
+                                    </p>
                                 </div>
+
                                 <div class="form-field">
                                     <label class="form-label">Weight (kg)</label>
                                     <input v-model.number="vitals.weight" type="number" min="0" class="form-input"
@@ -111,13 +128,19 @@ Output:
                                 <div class="form-field">
                                     <label class="form-label">Blood type (if known)</label>
                                     <div class="select-wrap">
-                                        <select v-model="vitals.bloodType" class="form-input form-input--select">
+                                        <select v-model="vitals.bloodType" class="form-input form-input--select"
+                                            :class="{ 'form-input--locked': prefilled.bloodType }"
+                                            :disabled="prefilled.bloodType">
                                             <option value="">Select</option>
                                             <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
                                         </select>
                                         <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
                                     </div>
+                                    <p v-if="prefilled.bloodType" class="form-hint">
+                                        From your profile. Change it in Profile settings.
+                                    </p>
                                 </div>
+
                                 <div class="form-field">
                                     <label class="form-label">Last blood donation date</label>
                                     <input v-model="vitals.lastDonationDate" type="date" class="form-input">
@@ -132,10 +155,11 @@ Output:
                             <h2 class="panel-title">Screening result preview</h2>
                         </div>
                         <div class="result-body">
-                            <div class="result-box" :class="resultPanelClass">
+                            <div class="result-box result-box--pending">
                                 <p class="result-box__label">Based on your answers</p>
-                                <p class="result-box__value" :class="resultTextClass">{{ resultLabel }}</p>
+                                <p class="result-box__value result-box__value--pending">{{ resultLabel }}</p>
                             </div>
+
                             <p class="result-body__note">
                                 Final eligibility is confirmed upon submission. If you pass, a QR code will be generated
                                 automatically for your next donation.
@@ -144,10 +168,19 @@ Output:
                     </div>
 
                     <button type="button" class="btn-primary btn-block btn-submit fade-in" style="--delay: 250ms"
-                        :disabled="submitting || !allAnswered" @click="handleSubmit">
+                        :disabled="submitting || !allAnswered" @click="handleSubmit()">
                         <span>{{ submitting ? 'Submitting...' : 'Submit screening' }}</span>
                         <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
                     </button>
+
+                    <div v-if="submitError" class="submit-error fade-in">
+                        <p class="submit-error__text">{{ submitError }}</p>
+                        <button v-if="canForceResubmit" type="button" class="btn-outline btn-block"
+                            :disabled="submitting" @click="handleSubmit(true)">
+                            Re-screen anyway
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </template>
@@ -163,25 +196,23 @@ Output:
 
                         <h2 id="epm-title" class="modal-title">Eligibility screening passed!</h2>
                         <p class="modal-subtitle">
-                            Your QR code has been generated. Present it at the blood center
-                            to proceed with your next test.
+                            {{ qrCodeDataUrl
+                                ? 'Your QR code has been generated. Present it at the blood center to proceed with your next test.'
+                                : 'Verify your email address to receive your check-in QR code.' }}
                         </p>
 
-                        <div class="modal-qr-wrap">
+                        <div v-if="qrCodeDataUrl" class="modal-qr-wrap">
                             <img
-                                v-if="qrCodeDataUrl"
                                 :src="qrCodeDataUrl"
                                 alt="Donor eligibility QR code"
                                 class="modal-qr-image"
                             >
-                            <div v-else class="modal-qr-image modal-qr-image--placeholder">
-                                <div class="modal-spinner" />
-                            </div>
                         </div>
 
-                        <p class="modal-validity">
-                            Valid for {{ qrValidityDays }} days Â· Expires {{ formattedQrExpiry }}
+                        <p v-if="qrCodeDataUrl" class="modal-validity">
+                            Valid for {{ qrValidityDays }} days · Expires {{ formattedQrExpiry }}
                         </p>
+
 
                         <div class="modal-actions">
                             <button type="button" class="btn-outline" @click="goToFullQr">
@@ -201,11 +232,14 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { donorService } from '~/api/donor/DonorService'
+import QRCode from 'qrcode'
 
 
 const router = useRouter()
 const submitting = ref(false)
 const loading = ref(true)
+const loadError = ref('')
 
 // Modal + QR state shown after an eligible result
 const showPassedModal = ref(false)
@@ -213,24 +247,11 @@ const qrCodeDataUrl = ref('')
 const qrExpiresOn = ref(null)
 const qrValidityDays = ref(14)
 
-// Step indicator: 1 = General Health, 2 = Medical History, 3 = Vital Information,
-// 4 = Ready to submit. Auto-advances as the user finishes each card dili na
-// static, mo-progress base sa gi-answeran na sa user.
-const steps = [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }]
-
-const section1 = reactive([
-    { id: 'gh_1', number: 1, text: 'Are you currently feeling well and in good health today?', answer: null, disqualifyIfAnswer: false },
-    { id: 'gh_2', number: 2, text: 'Do you have a fever, cold, or flu symptoms in the last 7 days?', answer: null, disqualifyIfAnswer: true },
-    { id: 'gh_3', number: 3, text: 'Are you taking any prescription medications currently?', answer: null, disqualifyIfAnswer: null },
-    { id: 'gh_4', number: 4, text: 'Have you donated blood in the last 90 days?', answer: null, disqualifyIfAnswer: true },
-])
-
-const section2 = reactive([
-    { id: 'mh_1', number: 5, text: 'Have you ever been diagnosed with HIV, Hepatitis B, or Hepatitis C?', answer: null, disqualifyIfAnswer: true },
-    { id: 'mh_2', number: 6, text: 'Have you had surgery or a blood transfusion in the last 12 months?', answer: null, disqualifyIfAnswer: true },
-    { id: 'mh_3', number: 7, text: 'Have you traveled outside the country in the last 6 months?', answer: null, disqualifyIfAnswer: null },
-    { id: 'mh_4', number: 8, text: 'Do you weigh at least 50 kilograms?', answer: null, disqualifyIfAnswer: false },
-])
+// Questionnaire served by the backend. Ang wording ug ang scoring flags kay
+// naa na sa server, so ang client dili na mag-hardcode og questions.
+const sections = ref([])
+const questionVersion = ref(null)
+const answers = reactive({})
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
@@ -241,131 +262,282 @@ const vitals = reactive({
     lastDonationDate: '',
 })
 
-const allQuestions = computed(() => [...section1, ...section2])
+// Gi-track kung asa nga fields gikan sa profile, kay kato ra ang i-lock. Kung
+// wala nag-return og value ang server, editable gihapon para sa donor.
+const prefilled = reactive({
+    age: false,
+    bloodType: false,
+})
 
-const allAnswered = computed(() => allQuestions.value.every(q => q.answer !== null))
+// current eligibility state sa donor gikan sa server.
+const eligibility = ref(null)
+
+const submitError = ref('')
+const canForceResubmit = ref(false)
+
+
+// Step indicator: one step per served section, then Vital Information, then
+// Ready to submit. Auto-advances as the user finishes each card.
+const steps = computed(() =>
+    Array.from({ length: sections.value.length + 2 }, (_, i) => ({ number: i + 1 }))
+)
+
+const allQuestions = computed(() => sections.value.flatMap(section => section.questions))
+
+const allAnswered = computed(() =>
+    allQuestions.value.length > 0 && allQuestions.value.every(q => answers[q.code] !== undefined)
+)
 
 const currentStep = computed(() => {
-    const section1Done = section1.every(q => q.answer !== null)
-    const section2Done = section2.every(q => q.answer !== null)
-    const vitalsDone = vitals.age && vitals.weight && vitals.bloodType && vitals.lastDonationDate
-    if (!section1Done) return 1
-    if (!section2Done) return 2
-    if (!vitalsDone) return 3
-    return 4
-})
-
-const isFlagged = computed(() => {
-    const questionFlag = allQuestions.value.some(
-        q => q.disqualifyIfAnswer !== null && q.answer === q.disqualifyIfAnswer
+    const unfinished = sections.value.findIndex(
+        section => section.questions.some(q => answers[q.code] === undefined)
     )
-    const weightFlag = vitals.weight !== null && vitals.weight !== '' && Number(vitals.weight) < 50
-    const ageFlag = vitals.age !== null && vitals.age !== '' && Number(vitals.age) < 18
-    let recentDonationFlag = false
-    if (vitals.lastDonationDate) {
-        const daysSince = (Date.now() - new Date(vitals.lastDonationDate).getTime()) / (1000 * 60 * 60 * 24)
-        recentDonationFlag = daysSince < 90
-    }
-    return questionFlag || weightFlag || ageFlag || recentDonationFlag
+    if (unfinished !== -1) return unfinished + 1
+
+    const vitalsDone = vitals.age && vitals.weight && vitals.bloodType && vitals.lastDonationDate
+    if (!vitalsDone) return sections.value.length + 1
+
+    return sections.value.length + 2
 })
 
-const resultLabel = computed(() => {
-    if (!allAnswered.value) return 'Answer all questions to see your result'
-    return isFlagged.value ? 'Not eligible' : 'Likely eligible'
-})
+// Ang disqualification flags kay wala gi-serve sa /eligibility/questions, tinuyo
+// gyud, kay ang server ra ang mo-score. So walay verdict nga ma-compute diri.
+const resultLabel = computed(() =>
+    allAnswered.value ? 'Ready to submit' : 'Answer all questions to see your result'
+)
 
-const resultPanelClass = computed(() => {
-    if (!allAnswered.value) return 'result-box--pending'
-    return isFlagged.value ? 'result-box--danger' : 'result-box--success'
-})
-
-const resultTextClass = computed(() => {
-    if (!allAnswered.value) return 'result-box__value--pending'
-    return isFlagged.value ? 'result-box__value--danger' : 'result-box__value--success'
-})
-
-const formattedQrExpiry = computed(() => {
-    if (!qrExpiresOn.value) return '-'
-    const d = new Date(qrExpiresOn.value)
+function formatDate(value) {
+    if (!value) return '-'
+    const d = new Date(value)
     if (Number.isNaN(d.getTime())) return '-'
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const formattedQrExpiry = computed(() => formatDate(qrExpiresOn.value))
+
+// Ang tanan nga branching kay diri ra, dili sa template. Ang `null` return it
+// means nga walay banner nga i-render.
+const statusBanner = computed(() => {
+    const current = eligibility.value
+    if (!current) return null
+
+    const reasons = current.deferral_reasons || []
+
+    switch (current.eligibility_status) {
+        case 'eligible':
+            return {
+                tone: 'success',
+                icon: 'circle-check-big',
+                title: `You already have a valid screening, good until ${formatDate(current.screening_valid_until)}.`,
+                detail: 'Re-screen only if your health details have changed since then.',
+                reasons: [],
+            }
+        case 'deferred':
+            return {
+                tone: 'danger',
+                icon: 'octagon-alert',
+                title: 'Your last screening was deferred.',
+                detail: current.next_eligible_date
+                    ? `You may be eligible again on ${formatDate(current.next_eligible_date)}.`
+                    : '',
+                reasons,
+            }
+        case 'expired':
+            return {
+                tone: 'warning',
+                icon: 'clock',
+                title: `Your previous screening expired on ${formatDate(current.screening_valid_until)}.`,
+                detail: 'Complete the questionnaire again to refresh your eligibility.',
+                reasons: [],
+            }
+        default:
+            // 'pending' — igo na ang static info banner para sa wala pa na-screen.
+            return null
+    }
 })
+
 
 function goToFullQr() {
     showPassedModal.value = false
-    router.push('/signup/donor/MyQRCode')
+    router.push('/donor/qrcode')
 }
 
 function goToBookAppointment() {
     showPassedModal.value = false
-    router.push('/signup/donor/Appointments')
+    router.push('/donor/appointments')
 }
 
-async function handleSubmit() {
+
+function handleSubmitError(err) {
+    const code = err?.data?.code
+
+    // Parehas 409 ang duha, so ang `code` ra ang balo kung unsa.
+    if (code === 'screening_already_valid') {
+        const until = formatDate(err?.data?.screening_valid_until)
+        submitError.value = `${err.message} Your current screening is valid until ${until}.`
+        canForceResubmit.value = true
+        return
+    }
+
+    if (code === 'questionnaire_version_stale') {
+        submitError.value = err.message
+        // Kuhaon ang bag-ong version aron mo-trabaho ang sunod nga submit.
+        load()
+        return
+    }
+
+    if (err?.status === 429) {
+        submitError.value = 'Too many screening attempts. Please wait a while before trying again.'
+        return
+    }
+
+    submitError.value = err?.message || 'Failed to submit your screening. Please try again.'
+    console.error('Failed to submit screening:', err)
+}
+
+async function handleSubmit(force = false) {
     submitting.value = true
+    submitError.value = ''
+    canForceResubmit.value = false
+
     try {
-        const result = isFlagged.value ? 'not_eligible' : 'eligible'
+        const payload = {
+            question_version: questionVersion.value,
+            answers: allQuestions.value.map(q => ({ code: q.code, answer: answers[q.code] })),
+        }
 
-        // Backend contract: POST /api/eligibility/screening
-        // Body: { answers: [{ id, answer }], vitals, result: 'eligible' | 'not_eligible' }
-        // Response when result === 'eligible':
-        //   { qr_token, screening_valid_until, qr_valid_days }
-        // qr_token is the opaque value to encode in the QR â€” never encode raw vitals/answers.
-        const data = await $fetch('/api/eligibility/screening', {
-            method: 'POST',
-            body: {
-                answers: allQuestions.value.map(q => ({ id: q.id, answer: q.answer })),
-                vitals: { ...vitals },
-                result,
-            },
-        })
+        // `vitals.weight` kay required_with:vitals, so kung walay weight, i-omit
+        // gyud ang tibuok `vitals` object imbes mo-send og null — 422 na kadto.
+        if (vitals.weight !== null && vitals.weight !== '') {
+            payload.vitals = { weight: Number(vitals.weight) }
 
-        if (result === 'not_eligible') {
-            // Deferred donors just land on MyQRCode, which already renders the
-            // "screening was deferred" empty state for them.
-            router.push('/signup/donor/MyQRCode')
+            if (vitals.lastDonationDate) {
+                payload.vitals.last_donation_date = vitals.lastDonationDate
+            }
+        }
+
+        if (force) {
+            payload.force = true
+        }
+
+        const data = await donorService.submitEligibilityScreening(payload)
+
+        // I-refresh ang status banner aron mo-reflect na sa bag-ong screening.
+        await loadStatus()
+
+        if (data?.result === 'eligible') {
+            qrExpiresOn.value = data?.qr_valid_until ?? null
+            qrValidityDays.value = data?.qr_valid_days ?? qrValidityDays.value
+            qrCodeDataUrl.value = ''
+
+            // Walay qr_token kung wala pa ma-verify ang email sa donor.
+            if (data?.qr_token) {
+                qrCodeDataUrl.value = await QRCode.toDataURL(data.qr_token, {
+                    width: 220,
+                    margin: 1,
+                    color: { dark: '#1f2937', light: '#ffffff' },
+                })
+            }
+
+            showPassedModal.value = true
             return
         }
 
-        qrExpiresOn.value = data?.screening_valid_until ?? null
-        qrValidityDays.value = data?.qr_valid_days ?? 14
-
-        if (data?.qr_token) {
-            // QRCode is assumed globally available, same as on the MyQRCode page
-            qrCodeDataUrl.value = await QRCode.toDataURL(data.qr_token, {
-                width: 220,
-                margin: 1,
-                color: { dark: '#1f2937', light: '#ffffff' },
-            })
+        // Deferred: ang status banner sa taas mao nay mo-explain sa mga reasons.
+        if (import.meta.client) {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
         }
-
-        showPassedModal.value = true
     } catch (err) {
-        console.error('Failed to submit screening:', err)
+        handleSubmitError(err)
     } finally {
         submitting.value = false
     }
 }
 
-onMounted(async () => {
+
+async function load() {
+    loading.value = true
+    loadError.value = ''
     try {
-        // Backend contract: GET /api/eligibility/prefill
-        // Optional convenience for returning donors â€” pre-fills whatever the
-        // system already has on file (currently just blood type) so they
-        // don't have to retype it every screening.
-        // Response: { blood_type }
-        const data = await $fetch('/api/eligibility/prefill')
-        if (data?.blood_type) vitals.bloodType = data.blood_type
+        // GET /api/donors/eligibility/questions
+        // Response: { version, sections: [{ key, title, questions: [{ code, number, text }] }] }
+        const data = await donorService.eligibilityQuestions()
+
+        questionVersion.value = data?.version ?? null
+        sections.value = (data?.sections || []).map(section => ({
+            key: section.key,
+            title: section.title,
+            questions: section.questions || [],
+        }))
+
+        // Limpyohan ang answers aron walay stale nga code nga mabilin after reload
+        Object.keys(answers).forEach(code => delete answers[code])
     } catch (err) {
-        // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/eligibility/prefill
-        // endpoint, so mag-fail gyud ni nga call. Dili ni problema â€” mag-start ra
-        // gihapon ang form nga blangko, sama sa una nga behavior.
-        console.error('Failed to load eligibility prefill data (expected while backend is not yet wired up):', err)
+        console.error('Failed to load eligibility questions:', err)
+        loadError.value = err?.message || 'Unable to load the screening questionnaire.'
     } finally {
         loading.value = false
     }
+}
+
+async function loadPrefill() {
+    try {
+        // GET /api/donors/eligibility/prefill
+        // Response: { blood_type, age, last_donation_date } — tanan pwede null
+        const data = await donorService.eligibilityPrefill()
+
+        if (data?.age != null && vitals.age === null) {
+            vitals.age = data.age
+            prefilled.age = true
+        }
+
+        if (data?.blood_type && !vitals.bloodType) {
+            vitals.bloodType = data.blood_type
+            prefilled.bloodType = true
+        }
+
+        // Editable ni gihapon: ang gi-submit kay declared_last_donation_date,
+        // lahi sa record sa server, so pwede i-correct sa donor.
+        if (data?.last_donation_date && !vitals.lastDonationDate) {
+            vitals.lastDonationDate = data.last_donation_date
+        }
+    } catch (err) {
+        // Convenience ra ni. Kung mapakyas, manual gihapon ma-fill sa donor,
+        // so dili ni angay mo-block sa screening.
+        console.error('Failed to load eligibility prefill:', err)
+    }
+}
+
+
+async function loadStatus() {
+    try {
+        // GET /api/donors/eligibility
+        // Response: { eligibility_status, screening_date, screening_valid_until,
+        //             deferral_reasons: [{ code, message }], last_donation_date,
+        //             next_eligible_date, questionnaire_version }
+        eligibility.value = await donorService.eligibilityStatus()
+    } catch (err) {
+        // Informational ra ang banner, so dili ni angay mo-block sa form.
+        console.error('Failed to load eligibility status:', err)
+    }
+}
+
+// Gi-keepalive ni nga page, so mabuhi ang mga tubag sa donor sa questionnaire
+// kung mo-navigate siya palayo. Ang load() mo-wipe sa `answers` ug ang
+// loadPrefill() mo-touch sa vitals, so ang status banner ra ang i-refresh matag
+// balik — dili nato guboon ang wala pa ma-submit nga screening.
+let loadedOnce = false
+
+onMounted(async () => {
+    await Promise.all([load(), loadPrefill(), loadStatus()])
+    loadedOnce = true
+})
+
+onActivated(() => {
+    if (loadedOnce) loadStatus()
 })
 </script>
+
 
 <style scoped>
 .eligibility-page {
@@ -497,6 +669,67 @@ onMounted(async () => {
     border-radius: 10px;
     padding: 12px 16px;
 }
+
+/* Current eligibility state */
+.status-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border-radius: 10px;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+}
+
+.status-banner__icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.status-banner__body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.status-banner__title {
+    font-size: 12.5px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.status-banner__detail {
+    font-size: 12.5px;
+    margin: 0;
+    line-height: 1.5;
+    opacity: 0.9;
+}
+
+.status-banner__reasons {
+    margin: 2px 0 0;
+    padding-left: 18px;
+    font-size: 12.5px;
+    line-height: 1.6;
+}
+
+.status-banner--success {
+    background: #eaf6ea;
+    border-color: #cfe8cf;
+    color: var(--success);
+}
+
+.status-banner--warning {
+    background: #fff4e5;
+    border-color: #ffe0b2;
+    color: #a65b00;
+}
+
+.status-banner--danger {
+    background: #fbeaea;
+    border-color: #f5cccc;
+    color: var(--accent);
+}
+
 
 .info-banner__icon {
     flex-shrink: 0;
@@ -652,6 +885,18 @@ onMounted(async () => {
     padding: 20px;
 }
 
+.load-error__text {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.6;
+}
+
+.load-error__retry {
+    margin-top: 16px;
+}
+
+
 .form-stack {
     display: flex;
     flex-direction: column;
@@ -681,6 +926,20 @@ onMounted(async () => {
     outline: none;
     border-color: var(--primary);
 }
+
+.form-input--locked {
+    background: #f3f4f6;
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+.form-hint {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    margin: 6px 0 0;
+    line-height: 1.5;
+}
+
 
 .select-wrap {
     position: relative;
@@ -791,6 +1050,24 @@ onMounted(async () => {
 .btn-submit__icon {
     flex-shrink: 0;
 }
+
+.submit-error {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fbeaea;
+    border: 1px solid #f5cccc;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.submit-error__text {
+    font-size: 12.5px;
+    color: var(--accent);
+    margin: 0;
+    line-height: 1.5;
+}
+
 
 @media (max-width: 900px) {
     .main-grid {
@@ -966,6 +1243,35 @@ onMounted(async () => {
     border-color: #334155;
 }
 
+:global(.dark .submit-error) {
+    background: rgba(239, 83, 80, 0.14);
+    border-color: rgba(239, 83, 80, 0.3);
+}
+
+:global(.dark .submit-error__text) {
+    color: #EF9A9A;
+}
+
+
+:global(.dark .status-banner--success) {
+    background: rgba(102, 187, 106, 0.14);
+    border-color: rgba(102, 187, 106, 0.3);
+    color: #A5D6A7;
+}
+
+:global(.dark .status-banner--warning) {
+    background: rgba(245, 124, 0, 0.14);
+    border-color: rgba(245, 124, 0, 0.3);
+    color: #FFCC80;
+}
+
+:global(.dark .status-banner--danger) {
+    background: rgba(239, 83, 80, 0.14);
+    border-color: rgba(239, 83, 80, 0.3);
+    color: #EF9A9A;
+}
+
+
 :global(.dark .panel-header--simple) { border-color: #334155; }
 
 :global(.dark .info-banner) {
@@ -994,6 +1300,12 @@ onMounted(async () => {
     border-color: #334155;
     color: #F1F5F9;
 }
+
+:global(.dark .form-input--locked) {
+    background: #172033;
+    color: #94A3B8;
+}
+
 
 :global(.dark .result-box--pending) { background: #263449; }
 :global(.dark .result-box--success) { background: rgba(102,187,106,0.16); }

@@ -1,3 +1,5 @@
+import { donorService } from '~/api/donor/DonorService'
+
 export function useAvatar() {
   const uploading = ref(false)
   const error = ref(null)
@@ -30,17 +32,14 @@ export function useAvatar() {
     formData.append('avatar', file)
 
     try {
-      // Backend contract:
-      // POST /api/profile/avatar
-      // multipart/form-data, field name: "avatar"
-      // Response: { avatar_url: string }
-      const res = await $fetch('/api/profile/avatar', {
-        method: 'POST',
-        body: formData,
-      })
-      return res.avatar_url
+      // POST /api/donors/avatar — multipart, field name "avatar".
+      // Response: { message, avatar_url } — ang avatar_url kay temporary signed
+      // URL (30 minutos) padulong sa donors.avatar.show, so dili na kinahanglan
+      // og separate nga call para makita ang litrato.
+      const res = await donorService.updateAvatar(formData)
+      return res?.avatar_url
     } catch (err) {
-      error.value = err?.data?.message || 'Upload failed. Please try again.'
+      error.value = err?.message || 'Upload failed. Please try again.'
       throw err
     } finally {
       uploading.value = false

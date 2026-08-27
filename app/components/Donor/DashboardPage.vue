@@ -44,7 +44,7 @@ Output:
         <p class="banner-text">
           Eligibility screening is valid. Present your QR code at the blood center on arrival.
         </p>
-        <NuxtLink to="/donor/eligibility" class="banner-link">View QR</NuxtLink>
+        <NuxtLink to="/donor/qrcode" class="banner-link">View QR</NuxtLink>
       </div>
       <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning fade-in" style="--delay: 60ms">
         <AssetIcon name="alert" :size="16" class="banner-icon" />
@@ -358,7 +358,7 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated } from 'vue'
 import { donorService } from '~/api/donor/DonorService'
 
 
@@ -469,7 +469,13 @@ function formatDate(value, fmt) {
   }
 }
 
-onMounted(async () => {
+// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
+// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
+// loadedOnce kay mo-fire sad siya human sa unang onMounted.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
     const data = await donorService.dashboard()
     profile.value = data.profile ?? null
@@ -483,7 +489,13 @@ onMounted(async () => {
     console.error('Failed to load donor dashboard data:', err)
   } finally {
     loading.value = false
+    loadedOnce = true
   }
+}
+
+onMounted(() => load())
+onActivated(() => {
+  if (loadedOnce) load({ silent: true })
 })
 </script>
 

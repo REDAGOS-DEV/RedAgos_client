@@ -131,7 +131,7 @@ const sidebarShadow = computed(() =>
 const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
-const { user, fetchUser, clearUser } = useUser()
+const { user, ensureUser, logout } = useUser()
 
 const activePath = ref(route.path || '/')
 watch(
@@ -141,54 +141,21 @@ watch(
 
 const facilityName = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || '')
 const userInitial = computed(() => facilityName.value?.charAt(0) || user.value?.full_name?.charAt(0) || 'B')
-const userRole = computed(() => user.value?.role_label || user.value?.role || 'Blood Center Staff')
+// Ang department mao nay gipakita nga posisyon. Ang supervisor nga naay
+// department kay "Supervisor" gihapon ang unahon — mao nay level nila.
+const userRole = computed(() => {
+  if (user.value?.is_supervisor) return 'Supervisor'
+
+  return user.value?.department_label || 'Blood Center Staff'
+})
 
 // // Dev note: pending/urgent counts naka-fetch sa blood center dashboard summary endpoint
 const badgeCounts = ref({ pending: 0, urgent: 0, notifications: 0 })
 
-const navGroups = [
-  {
-    label: 'Main',
-    items: [
-      { label: 'Dashboard', path: '/blood-center/dashboard', icon: 'layout-dashboard' }
-    ]
-  },
-  {
-    label: 'Blood Management',
-    items: [
-      { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets' },
-      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending' },
-      { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent' }
-    ]
-  },
-  {
-    label: 'Operations',
-    items: [
-      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart' },
-      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar' },
-      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users' }
-    ]
-  },
-  {
-    label: 'Finance',
-    items: [
-      { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card' }
-    ]
-  },
-  {
-    label: 'Reports',
-    items: [
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart' }
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      { label: 'Settings', path: '/blood-center/settings', icon: 'settings' },
-      { label: 'Help & Support', path: '/blood-center/support', icon: 'life-buoy' }
-    ]
-  }
-]
+// Ang nav definition kay usa ra ka lugar na — tan-awa ang
+// useBloodCenterNav(). Gi-filter na daan sumala sa department permissions sa
+// naka-login, so ang sidebar dili na mo-decide og kinsa makakita og unsa.
+const { navGroups } = useBloodCenterNav()
 
 // --- Collapsible groups ---
 // Naka-default open tanan group; i-toggle per label pag naay click sa header
@@ -211,14 +178,6 @@ const groupHasBadge = (group) => {
 
 const showUserMenu = ref(false)
 
-const userMenuItems = [
-  { label: 'My Profile', path: '/blood-center/profile', icon: 'user-circle' },
-  { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', badge: 'notifications' },
-  { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending' },
-  { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent' },
-  { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card' }
-]
-
 const closeUserMenu = () => {
   showUserMenu.value = false
 }
@@ -239,9 +198,9 @@ const vClickOutside = {
 
 const loadUser = async () => {
   try {
-    if (!user.value) {
-      await fetchUser()
-    }
+    // ensureUser() mo-reuse sa fetch nga gi-sugdan sa department middleware
+    // imbes mo-fire og bag-o.
+    await ensureUser()
     // // Dev note: i-connect ni sa /blood-center/dashboard-summary endpoint para sa pending/urgent/notifications badge count
     const summary = await bloodCenterService.dashboardSummary?.()
     if (summary) {
@@ -264,7 +223,10 @@ const closeSidebar = () => {
 
 const hoveredPath = ref(null)
 
-const isActive = (path) => route.path === path
+// Case-insensitive kay ang uban ka page file kay naka-capital (Dashboard.vue →
+// /blood-center/Dashboard) samtang lowercase ang tanan link. Ang vue-router
+// mo-match gihapon, pero ang exact string comparison dili.
+const isActive = (path) => route.path.toLowerCase() === path.toLowerCase()
 
 const navStyle = (path) => {
   const active = isActive(path)
@@ -282,13 +244,8 @@ const navStyle = (path) => {
 }
 
 const handleLogout = async () => {
-  try {
-    showUserMenu.value = false
-    clearUser()
-    router.push('/auth/blood-center/login')
-  } catch (err) {
-    console.error(err)
-  }
+  showUserMenu.value = false
+  await logout('/auth/blood-center/login')
 }
 </script>
 

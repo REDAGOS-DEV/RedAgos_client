@@ -229,6 +229,18 @@ Output:
               <button class="btn-primary" :disabled="savingProfile" @click="handleProfileSave">
                 {{ savingProfile ? 'Saving...' : 'Save changes' }}
               </button>
+              <!--
+                Kung mausab ang email, i-revoke sa server ang verification ug
+                mo-send og bag-ong link. Kinahanglan makita ni sa donor, kay
+                mo-undang ang QR ug booking hangtod dili pa siya ma-verify.
+              -->
+              <p
+                v-if="profileMessage"
+                class="form-status"
+                :class="{ 'form-status--error': profileFailed }"
+              >
+                {{ profileMessage }}
+              </p>
             </div>
           </div>
         </div>
@@ -265,11 +277,13 @@ import { donorService } from '~/api/donor/DonorService'
 
 
 const router = useRouter()
-const { user, fetchUser, updateAvatar, clearUser } = useUser()
+const { user, fetchUser, updateAvatar, logout } = useUser()
 
 const profile = ref(null)
 const loading = ref(true)
 const savingProfile = ref(false)
+const profileMessage = ref('')
+const profileFailed = ref(false)
 const savingPassword = ref(false)
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -296,13 +310,24 @@ const notificationPrefs = reactive([
   { key: 'blood_drive_announcements', label: 'Blood drive announcements', description: 'Notify about nearby upcoming drives', value: true },
 ])
 
-async function load() {
-  loading.value = true
+// Gi-keepalive ni nga page, so mabuhi ang gi-fill na nga form kung mo-navigate
+// palayo ang donor. Busa ang background refresh dili gyud angay mo-overwrite sa
+// wala pa ma-save nga edits: gi-snapshot nato ang form matag load, ug kung lahi
+// na siya karon, ang read-only nga cards ra ang i-update.
+let loadedOnce = false
+let formSnapshot = ''
+
+const snapshotForm = () => JSON.stringify({ ...profileForm })
+
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
     if (!user.value) await fetchUser()
 
     const res = await donorService.profile()
     profile.value = res
+
+    if (silent && snapshotForm() !== formSnapshot) return
 
     // Ang matag field diri kay direkta gikan sa registration data sa user
     profileForm.first_name = res.first_name || ''
@@ -312,14 +337,19 @@ async function load() {
     profileForm.contact_number = res.contact_number || ''
     profileForm.email = user.value?.email || ''
     profileForm.address = res.address || ''
+    formSnapshot = snapshotForm()
   } catch (err) {
     console.error('Failed to load profile:', err)
   } finally {
     loading.value = false
+    loadedOnce = true
   }
 }
 
-onMounted(load)
+onMounted(() => load())
+onActivated(() => {
+  if (loadedOnce) load({ silent: true })
+})
 
 const donorCode = computed(() => profile.value?.donor_code || '-')
 const bloodType = computed(() => profile.value?.blood_type || '-')
@@ -360,9 +390,16 @@ async function handleProfileSave() {
       address: profileForm.address,
     })
     profile.value = response?.data || profile.value
+    profileFailed.value = false
+    profileMessage.value = response?.message || 'Profile updated.'
+    // Ang bag-o nga na-save nga values na ang baseline — kung dili, mag-tuo ang
+    // refresh nga dirty pa gihapon ang form ug dili na siya mo-update.
+    formSnapshot = snapshotForm()
     await fetchUser()
   } catch (err) {
     console.error('Failed to save profile:', err)
+    profileFailed.value = true
+    profileMessage.value = err?.message || 'Could not save your profile. Please try again.'
   } finally {
     savingProfile.value = false
   }
@@ -394,14 +431,9 @@ async function handlePasswordUpdate() {
 }
 
 async function handleLogout() {
-  try {
-    // await $fetch('/api/logout', { method: 'POST' })
-    clearUser()
-    router.push('/auth/donor/login')
-  } catch (err) {
-    console.error(err)
-  }
+  await logout('/auth/donor/login')
 }
+
 </script>
 
 <style scoped>
@@ -511,8 +543,10 @@ async function handleLogout() {
   background: white; transition: border-color 0.15s ease;
 }
 .form-input:focus { outline: none; border-color: var(--primary); }
-.form-actions { display: flex; gap: 10px; margin-top: 18px; }
+.form-actions { display: flex; gap: 10px; margin-top: 18px; align-items: center; flex-wrap: wrap; }
 .form-actions .btn-primary { padding: 10px 20px; }
+.form-status { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--success); }
+.form-status--error { color: var(--accent); }
 
 /* Toggle switches */
 .toggle-list { padding: 6px 20px 20px; display: flex; flex-direction: column; }

@@ -19,6 +19,64 @@ Output:
         <p class="page-subtitle">Schedule your next blood donation by choosing your preferred date, time, and donation center.</p>
       </div>
 
+      <!-- Your upcoming appointment -->
+      <div v-if="appointmentsLoading || appointmentsError || activeAppointments.length"
+        class="step-section fade-in" style="--delay: 20ms">
+        <h2 class="step-label">Your upcoming appointment</h2>
+
+        <div v-if="appointmentsLoading" class="drive-state">
+          <div class="spinner" />
+          <p>Loading your appointments...</p>
+        </div>
+
+        <div v-else-if="appointmentsError" class="drive-state">
+          <p>{{ appointmentsError }}</p>
+        </div>
+
+        <div v-else class="my-appointment-list">
+          <div v-for="appointment in activeAppointments" :key="appointment.id" class="panel my-appointment-card">
+            <div class="my-appointment-card__top">
+              <div>
+                <p class="my-appointment-card__name">
+                  {{ appointment.drive_name || appointment.facility_name || 'Blood center' }}
+                </p>
+                <p class="my-appointment-card__meta">
+                  {{ formatDate(appointment.date) }} · {{ appointment.time }} ·
+                  {{ appointment.appointment_type === 'mobile' ? 'Mobile drive' : 'Walk-in' }}
+                </p>
+              </div>
+              <span class="badge" :class="appointmentStatusClass(appointment.status)">{{ appointment.status }}</span>
+            </div>
+            <p class="my-appointment-card__note">
+              {{ appointment.can_cancel
+                ? 'You can still cancel or reschedule this appointment.'
+                : 'The 24-hour window for changing this appointment has passed.' }}
+            </p>
+
+            <div v-if="appointment.can_cancel" class="my-appointment-card__actions">
+              <button type="button" class="btn-outline" :disabled="appointmentActionId === appointment.id"
+                @click="startReschedule(appointment)">
+                Reschedule
+              </button>
+              <button type="button" class="my-appointment-card__cancel"
+                :disabled="appointmentActionId === appointment.id" @click="handleCancel(appointment)">
+                {{ appointmentActionId === appointment.id ? 'Cancelling...' : 'Cancel appointment' }}
+              </button>
+            </div>
+          </div>
+        </div>
+          <p v-if="appointmentActionError" class="my-appointment-error">{{ appointmentActionError }}</p>
+      </div>
+
+      <!-- Reschedule mode: ang wizard sa ubos mao gihapon ang gamiton, PATCH ra
+           imbes POST ang i-send sa Confirm. -->
+      <div v-if="reschedulingId" class="reschedule-banner fade-in">
+        <p class="reschedule-banner__text">
+          Pick a new slot below, then confirm to move your appointment.
+        </p>
+        <button type="button" class="btn-outline" @click="cancelReschedule">Keep current</button>
+      </div>
+
       <!-- Step indicator -->
       <div class="step-indicator fade-in" style="--delay: 40ms">
         <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 1 }">
@@ -79,7 +137,16 @@ Output:
           <span class="step-label__num">2</span>
           Choose blood center
         </h2>
-        <div class="center-grid">
+        <div v-if="centersLoading" class="drive-state">
+          <div class="spinner" />
+          <p>Loading blood centers...</p>
+        </div>
+
+        <div v-else-if="centersError" class="drive-state">
+          <p>{{ centersError }}</p>
+        </div>
+
+        <div v-else-if="bloodCenters.length" class="center-grid">
           <button v-for="center in bloodCenters" :key="center.id" type="button" class="center-card"
             :class="{ 'center-card--active': selectedCenterId === center.id }" @click="selectedCenterId = center.id">
             <span class="center-card__top">
@@ -89,6 +156,11 @@ Output:
             <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
             <span class="badge badge--success">{{ center.status }}</span>
           </button>
+        </div>
+
+        <div v-else class="drive-state">
+          <p>No blood centers available</p>
+          <p class="drive-state__sub">No centers are accepting donations right now. Please check back later.</p>
         </div>
       </div>
 
@@ -111,9 +183,9 @@ Output:
             <div class="drive-card__top">
               <div>
                 <p class="drive-card__name">{{ drive.name }}</p>
-                <p class="drive-card__meta">{{ drive.date }} Â· {{ drive.time }}</p>
+                <p class="drive-card__meta">{{ formatDate(drive.date) }} · {{ drive.location }}</p>
               </div>
-              <span class="badge" :class="driveStatusClass(drive)">{{ driveStatusLabel(drive) }}</span>
+              <span class="badge" :class="driveStatusClass(drive)">{{ drive.status }}</span>
             </div>
             <div class="progress-track">
               <div class="progress-fill" :class="driveProgressClass(drive)"
@@ -142,7 +214,7 @@ Output:
         <div class="panel">
           <div class="form-body">
             <label class="form-label">Date</label>
-            <input v-model="selectedDate" type="date" class="form-input form-input--lg">
+            <input v-model="selectedDate" :min="todayValue" type="date" class="form-input form-input--lg">
 
             <p class="slots-heading">Available time slots: {{ formattedSelectedDate }}</p>
 
@@ -175,7 +247,7 @@ Output:
       </div>
 
       <div class="continue-row fade-in" style="--delay: 200ms">
-        <button type="button" class="btn-primary" :disabled="!canContinue" @click="showSummary = true">
+        <button type="button" class="btn-primary" :disabled="!canContinue" @click="openSummary">
           Continue
           <AssetIcon name="arrow-right" :size="15" />
         </button>
@@ -185,7 +257,7 @@ Output:
     <!-- Booking summary modal -->
     <div v-if="showSummary" class="modal-overlay" @click.self="showSummary = false">
       <div class="modal-card">
-        <h3 class="modal-title">Booking Summary</h3>
+        <h3 class="modal-title">{{ reschedulingId ? "Reschedule Summary" : "Booking Summary" }}</h3>
         <div class="summary-list">
           <div class="summary-row"><span>Type</span><span>{{ typeLabel }}</span></div>
           <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
@@ -193,8 +265,9 @@ Output:
           <div v-if="appointmentType === 'walkin'" class="summary-row"><span>Time slot</span><span>{{ selectedTimeSlot
               }}</span></div>
         </div>
+        <p v-if="confirmError" class="confirm-error">{{ confirmError }}</p>
         <button type="button" class="btn-primary btn-block" :disabled="confirming" @click="handleConfirm">
-          <span>{{ confirming ? 'Confirming...' : 'Confirm Appointment' }}</span>
+          <span>{{ confirming ? 'Confirming...' : (reschedulingId ? 'Reschedule Appointment' : 'Confirm Appointment') }}</span>
           <AssetIcon name="arrow-right" :size="16" />
         </button>
         <p class="modal-note">You can cancel or reschedule up to 24 hours before your appointment.</p>
@@ -207,7 +280,7 @@ Output:
         <div class="confirm-icon">
           <AssetIcon name="check" :size="22" class="confirm-icon__svg" />
         </div>
-        <h3 class="modal-title modal-title--center">Appointment Confirmed!</h3>
+        <h3 class="modal-title modal-title--center">{{ wasRescheduled ? "Appointment Updated!" : "Appointment Confirmed!" }}</h3>
         <p class="modal-sub">Your appointment has been booked. Remember to bring your QR code when you arrive.</p>
         <div class="summary-list">
           <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
@@ -225,6 +298,8 @@ Output:
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
+import { donorService } from '~/api/donor/DonorService'
 
 
 const router = useRouter()
@@ -234,14 +309,38 @@ const router = useRouter()
 const loading = ref(true)
 
 const appointmentType = ref('walkin')
-const selectedCenterId = ref('subnational')
+const selectedCenterId = ref(null)
 const selectedDriveId = ref(null)
-const selectedDate = ref('2026-04-20')
+// Ang date input kailangan og YYYY-MM-DD base sa LOCAL na oras. Dili
+// pwde ang toISOString() — UTC man to, so sa UTC+8 mag-off og isa ka
+// adlaw kung sayo pa sa buntag.
+function toDateInputValue(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const todayValue = toDateInputValue(new Date())
+const selectedDate = ref(todayValue)
+
 const selectedTimeSlot = ref(null)
 
 const showSummary = ref(false)
 const showConfirmation = ref(false)
 const confirming = ref(false)
+const confirmError = ref('')
+const bookedAppointment = ref(null)
+const reschedulingId = ref(null)
+const wasRescheduled = ref(false)
+const appointmentActionId = ref(null)
+const appointmentActionError = ref('')
+
+// Walay oras ang mobile drives sa database — date-only ang event_date. Pero
+// required ang time_slot para sa duha ka type, so gamiton ni: mao ra gyud sad
+// ang default sa server sa resolveSlot().
+const MOBILE_DRIVE_TIME = '09:00'
+
 
 function selectType(type) {
   appointmentType.value = type
@@ -259,11 +358,29 @@ const activeStepNum = computed(() => {
   return 1
 })
 
-const bloodCenters = reactive([
-  { id: 'subnational', name: 'Sub-National Blood Center', location: 'Davao City', hours: 'Mon - Fri 8 AM - 3 PM', status: 'Open today' },
-  { id: 'prc', name: 'PRC Davao Blood Services', location: 'Davao City', hours: 'Mon - Sat 7 AM - 4 PM', status: 'Open today' },
-  { id: 'spmc', name: 'SPMC Blood Bank', location: 'Davao City', hours: '24/7', status: 'Open today' },
-])
+const bloodCenters = ref([])
+const centersLoading = ref(false)
+const centersError = ref('')
+
+async function fetchBloodCenters() {
+  centersLoading.value = true
+  centersError.value = ''
+  try {
+    // GET /api/blood-centers
+    // Response: [{ id, name, location, hours, status }]
+    // Ang server mo-filter na sa accepting-donations nga centers, so ang
+    // status kanunay "Open today".
+    const data = await bookingCatalogService.bloodCenters()
+    bloodCenters.value = data ?? []
+  } catch (err) {
+    console.error('Failed to load blood centers:', err)
+    centersError.value = 'Could not load blood centers. Please try again.'
+    bloodCenters.value = []
+  } finally {
+    centersLoading.value = false
+  }
+}
+
 
 // Backend contract: GET /api/time-slots?center_id=&date=
 // The blood center configures its own slot schedule and capacity per day
@@ -281,14 +398,20 @@ async function fetchTimeSlots() {
   slotsLoading.value = true
   slotsError.value = ''
   try {
-    const data = await $fetch('/api/time-slots', {
-      query: { center_id: selectedCenterId.value, date: selectedDate.value },
+    // GET /api/time-slots?center_id=&date=
+    // Response: [{ time, available, total }]. Ang `available` kay slot_capacity
+    // sa center minus ang na-book na; ang mga past nga oras kay 0 dayon, ang
+    // server na ang mo-compute — dili ni angay sundogon sa client.
+    const data = await bookingCatalogService.timeSlots({
+      center_id: selectedCenterId.value,
+      date: selectedDate.value,
     })
     timeSlots.value = data ?? []
   } catch (err) {
     console.error('Failed to load time slots:', err)
-    slotsError.value = 'Could not load time slots. Please try again.'
+    slotsError.value = err?.message || 'Could not load time slots. Please try again.'
     timeSlots.value = []
+
   } finally {
     slotsLoading.value = false
   }
@@ -305,15 +428,37 @@ watch(appointmentType, (type) => {
   if (type === 'walkin') fetchTimeSlots()
 })
 
-onMounted(async () => {
-  if (appointmentType.value === 'walkin') await fetchTimeSlots()
-  loading.value = false
+// Gi-keepalive ni nga page, so dili ma-unmount ang component kung mo-navigate
+// ang donor palayo — mabuhi ang state ug ang gi-fill na nga form. Ang bayad
+// ana kay mahimong stale ang data, maong mo-refresh ta sa background matag
+// balik: walay skeleton, kay naa na may sulod nga makita.
+//
+// Mo-fire sad ang onActivated dayon human sa unang onMounted, maong gi-guard
+// ni sa loadedOnce aron dili doble ang unang fetch.
+let loadedOnce = false
+
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
+  try {
+    await Promise.all([fetchBloodCenters(), fetchAppointments()])
+    if (appointmentType.value === 'walkin') await fetchTimeSlots()
+    loadedOnce = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => load())
+onActivated(() => {
+  if (loadedOnce) load({ silent: true })
 })
 
-// Only returns drives that a blood center has actually posted/scheduled â€”
-// donors should only ever see events that exist in the backend, never mock/placeholder ones.
-// Response fields: [{ id, name, date, time, registered, total_slots, status }]
-// status: 'upcoming' | 'open' | 'closed' (closed = past cutoff, before slots run out)
+
+// Ang mo-return ra kay ang mga drive nga gi-post gyud sa blood center, ug
+// upcoming pa (event_date >= today), na-order by date.
+// Response: [{ id, name, location, date, registered, total_slots, status }]
+// status: 'Full' | 'Open' | 'Upcoming' — capitalized, ug walay 'closed'.
+// Walay `time` field: ang event_date kay date-only sa database.
 const bloodDrives = ref([])
 const drivesLoading = ref(false)
 const drivesError = ref('')
@@ -322,16 +467,19 @@ async function fetchBloodDrives() {
   drivesLoading.value = true
   drivesError.value = ''
   try {
-    const data = await $fetch('/api/blood-drives')
+    // GET /api/blood-drives
+    // Ang `registered` kay live count sa active nga appointments.
+    const data = await bookingCatalogService.bloodDrives()
     bloodDrives.value = data ?? []
   } catch (err) {
     console.error('Failed to load blood drives:', err)
-    drivesError.value = 'Could not load blood drives. Please try again.'
+    drivesError.value = err?.message || 'Could not load blood drives. Please try again.'
     bloodDrives.value = []
   } finally {
     drivesLoading.value = false
   }
 }
+
 
 function driveSlotsLeft(drive) {
   return Math.max((drive.total_slots ?? 0) - (drive.registered ?? 0), 0)
@@ -342,20 +490,27 @@ function driveProgressPct(drive) {
   return Math.round(((drive.registered ?? 0) / drive.total_slots) * 100)
 }
 
-function driveProgressClass(drive) {
-  return driveSlotsLeft(drive) === 0 ? 'progress-fill--full' : drive.status === 'upcoming' ? 'progress-fill--blue' : 'progress-fill--green'
+// Ang server na ang mo-compute sa status ('Full' | 'Open' | 'Upcoming'), so
+// mapping ra ni sa CSS class. Ang pag-recompute diri kay mao gyud ang hinungdan
+// nga nag-drift ang duha ka logic — capitalized diay ang gipadala sa server.
+const DRIVE_STATUS_CLASS = {
+  Full: 'badge--full',
+  Upcoming: 'badge--info',
+  Open: 'badge--success',
 }
 
-function driveStatusLabel(drive) {
-  if (driveSlotsLeft(drive) === 0) return 'Full'
-  if (drive.status === 'upcoming') return 'Upcoming'
-  return 'Open'
+const DRIVE_PROGRESS_CLASS = {
+  Full: 'progress-fill--full',
+  Upcoming: 'progress-fill--blue',
+  Open: 'progress-fill--green',
 }
 
 function driveStatusClass(drive) {
-  if (driveSlotsLeft(drive) === 0) return 'badge--full'
-  if (drive.status === 'upcoming') return 'badge--info'
-  return 'badge--success'
+  return DRIVE_STATUS_CLASS[drive.status] || 'badge--info'
+}
+
+function driveProgressClass(drive) {
+  return DRIVE_PROGRESS_CLASS[drive.status] || 'progress-fill--blue'
 }
 
 // Fetch drives as soon as the donor switches to the "mobile drive" flow,
@@ -374,10 +529,57 @@ function formatDate(value) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+const myAppointments = ref([])
+const appointmentsLoading = ref(false)
+const appointmentsError = ref('')
+
+const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed']
+
+const APPOINTMENT_STATUS_CLASS = {
+  scheduled: 'badge--info',
+  confirmed: 'badge--success',
+}
+
+function appointmentStatusClass(status) {
+  return APPOINTMENT_STATUS_CLASS[status] || 'badge--info'
+}
+
+async function fetchAppointments() {
+  appointmentsLoading.value = true
+  appointmentsError.value = ''
+  try {
+    // GET /api/donors/appointments
+    // Response: [{ id, appointment_datetime, date, time, status, appointment_type,
+    //              facility_name, drive_name, can_cancel }]
+    // Tanan appointment ang mo-return — bisan cancelled ug completed — newest
+    // first. Walay filter param, so client na ang mo-pili.
+    const data = await donorService.appointments()
+    myAppointments.value = data ?? []
+  } catch (err) {
+    console.error('Failed to load appointments:', err)
+    appointmentsError.value = err?.message || 'Could not load your appointments. Please try again.'
+    myAppointments.value = []
+  } finally {
+    appointmentsLoading.value = false
+  }
+}
+
+// Booking page ni, so ang aktibo ug umaabot ra ang gipakita — ang past ug
+// cancelled kay para sa history, dili diri. Soonest first, dili newest.
+const activeAppointments = computed(() =>
+  myAppointments.value
+    .filter(appointment =>
+      ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status)
+      && new Date(appointment.appointment_datetime) >= new Date()
+    )
+    .sort((a, b) => new Date(a.appointment_datetime) - new Date(b.appointment_datetime))
+)
+
+
 const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
 
 const selectedDrive = computed(() => bloodDrives.value.find(d => d.id === selectedDriveId.value) || null)
-const selectedCenter = computed(() => bloodCenters.find(c => c.id === selectedCenterId.value) || null)
+const selectedCenter = computed(() => bloodCenters.value.find(c => c.id === selectedCenterId.value) || null)
 
 const canContinue = computed(() => {
   if (appointmentType.value === 'walkin') {
@@ -398,34 +600,156 @@ const locationLabel = computed(() => {
 
 const summaryDateLabel = computed(() => {
   if (appointmentType.value === 'walkin') return formattedSelectedDate.value
-  return selectedDrive.value?.date || '-'
+  return formatDate(selectedDrive.value?.date)
 })
 
 const confirmDateTimeLabel = computed(() => {
   if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${selectedTimeSlot.value}`
-  return `${selectedDrive.value?.date || '—'} - ${selectedDrive.value?.time || '—'}`
+  // Walay oras ang mobile drives — date ra ang naa sa event_date, so ang
+  // dangling "- —" gikuha na.
+  return formatDate(selectedDrive.value?.date)
 })
+
+// Ang gipakita sa confirmation modal kay gikan sa 201 response, dili sa local
+// nga pinili — para sa mobile, ang server na ang mo-resolve sa oras.
+const bookedLocationLabel = computed(() =>
+  bookedAppointment.value?.drive_name
+    || bookedAppointment.value?.facility_name
+    || locationLabel.value
+)
+
+const bookedDateTimeLabel = computed(() => {
+  const booked = bookedAppointment.value
+  if (!booked) return confirmDateTimeLabel.value
+  return `${formatDate(booked.date)} - ${booked.time}`
+})
+
+
+function bookingErrorMessage(err) {
+  const code = err?.data?.code
+
+  switch (code) {
+    case 'email_unverified':
+      return 'Please verify your email address before booking an appointment.'
+    case 'screening_expired':
+      return 'Your eligibility screening has expired. Please complete a new screening first.'
+    case 'screening_required':
+      return err?.message || 'Please complete an eligibility screening before booking.'
+    case 'below_min_interval':
+      return err?.data?.next_eligible_date
+        ? `You cannot donate again until ${formatDate(err.data.next_eligible_date)}.`
+        : err?.message
+    case 'duplicate_appointment':
+      return 'You already have an upcoming appointment. Cancel or reschedule it first.'
+    case 'slot_unavailable':
+      return 'That time slot has just been taken. Please choose another.'
+    case 'drive_full':
+      return 'This blood drive is fully booked. Please choose another.'
+    case 'appointment_not_active':
+      return 'This appointment can no longer be changed.'
+    case 'cancellation_window_passed':
+      return err?.message || 'This appointment is too close to its start time to change.'
+    default:
+      return err?.message || 'Could not confirm your appointment. Please try again.'
+  }
+}
 
 async function handleConfirm() {
   confirming.value = true
+  confirmError.value = ''
+
   try {
-    await $fetch('/api/appointments', {
-      method: 'POST',
-      body: {
-        type: appointmentType.value,
-        center_id: appointmentType.value === 'walkin' ? selectedCenterId.value : null,
-        drive_id: appointmentType.value === 'mobile' ? selectedDriveId.value : null,
-        date: appointmentType.value === 'walkin' ? selectedDate.value : selectedDrive.value?.date,
-        time_slot: appointmentType.value === 'walkin' ? selectedTimeSlot.value : selectedDrive.value?.time,
-      },
-    })
+    // POST /api/donors/appointments
+    // Body: { type, center_id?, drive_id?, date?, time_slot }
+    // Response 201: { id, appointment_datetime, date, time, status,
+    //                 appointment_type, facility_name, drive_name, can_cancel }
+    const payload = {
+      type: appointmentType.value,
+      time_slot: appointmentType.value === 'walkin' ? selectedTimeSlot.value : MOBILE_DRIVE_TIME,
+    }
+
+    if (appointmentType.value === 'walkin') {
+      payload.center_id = selectedCenterId.value
+      payload.date = selectedDate.value
+    } else {
+      payload.drive_id = selectedDriveId.value
+    }
+
+    // Parehas ra ang payload sa book ug sa reschedule — parehas sila og
+    // StoreAppointmentRequest sa server.
+    bookedAppointment.value = reschedulingId.value
+      ? await donorService.rescheduleAppointment(reschedulingId.value, payload)
+      : await donorService.bookAppointment(payload)
+
+    // I-refresh aron makita dayon ang bag-ong appointment sa listahan sa luyo.
+    await fetchAppointments()
+
+    // Sulod ra sa success path — dili na sama sa una nga mo-show ang confirmation
+    // bisan na-reject ang booking.
+    wasRescheduled.value = reschedulingId.value !== null
+    reschedulingId.value = null
+    showSummary.value = false
+    showConfirmation.value = true
+
   } catch (err) {
-    console.error('Failed to confirm appointment (expected while backend is not yet wired up):', err)
+    console.error('Failed to confirm appointment:', err)
+    confirmError.value = bookingErrorMessage(err)
   } finally {
     confirming.value = false
   }
-  showSummary.value = false
-  showConfirmation.value = true
+}
+
+function openSummary() {
+  confirmError.value = ''
+  showSummary.value = true
+}
+
+function startReschedule(appointment) {
+  appointmentActionError.value = ''
+  reschedulingId.value = appointment.id
+
+  // I-preset ang wizard sa type sa existing nga appointment aron dili magsugod
+  // ang donor og blangko.
+  appointmentType.value = appointment.appointment_type === 'mobile' ? 'mobile' : 'walkin'
+  selectedTimeSlot.value = null
+
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+function cancelReschedule() {
+  reschedulingId.value = null
+  confirmError.value = ''
+}
+
+async function handleCancel(appointment) {
+  const confirmed = window.confirm(
+    'Cancel this appointment? You will need to book again if you change your mind.'
+  )
+  if (!confirmed) return
+
+  appointmentActionId.value = appointment.id
+  appointmentActionError.value = ''
+
+  try {
+    // DELETE /api/donors/appointments/{id}
+    // Dili ni mo-delete sa row — mo-set ra og status = 'cancelled', ug mo-return
+    // sa updated nga appointment.
+    await donorService.cancelAppointment(appointment.id)
+
+    // Kung gi-reschedule pa diay ni, i-undo ang mode.
+    if (reschedulingId.value === appointment.id) {
+      reschedulingId.value = null
+    }
+
+    await fetchAppointments()
+  } catch (err) {
+    console.error('Failed to cancel appointment:', err)
+    appointmentActionError.value = bookingErrorMessage(err)
+  } finally {
+    appointmentActionId.value = null
+  }
 }
 
 function viewQr() {
@@ -452,6 +776,106 @@ function goDashboard() {
   padding: 24px 32px 60px;
   background: #F5F7FA;
   transition: background-color 0.2s ease;
+}
+
+.confirm-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fbeaea;
+  border: 1px solid #f5cccc;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #d32f2f;
+}
+
+.my-appointment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-appointment-card {
+  padding: 16px;
+}
+
+.my-appointment-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.my-appointment-card__name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.my-appointment-card__meta {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.my-appointment-card__note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.my-appointment-card__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.my-appointment-card__cancel {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.my-appointment-card__cancel:hover:not(:disabled) {
+  background: rgba(211, 47, 47, 0.08);
+}
+
+.my-appointment-card__cancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.my-appointment-error {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+.reschedule-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #eaf3fc;
+  border: 1px solid #d3e6fa;
+}
+
+.reschedule-banner__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1f4e79;
 }
 
 .appointment-page-inner {
@@ -1210,6 +1634,12 @@ function goDashboard() {
   border-color: #334155;
 }
 
+:global(.dark .confirm-error) {
+  background: rgba(239, 83, 80, 0.14);
+  border-color: rgba(239, 83, 80, 0.3);
+  color: #EF9A9A;
+}
+
 :global(.dark .type-card--active),
 :global(.dark .center-card--active),
 :global(.dark .drive-card--active),
@@ -1237,6 +1667,17 @@ function goDashboard() {
 :global(.dark .badge--success) { background: rgba(102,187,106,0.16); }
 :global(.dark .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
 :global(.dark .badge--full) { background: #263449; }
+
+:global(.dark .reschedule-banner) {
+  background: rgba(66, 165, 245, 0.14);
+  border-color: rgba(66, 165, 245, 0.3);
+}
+
+:global(.dark .reschedule-banner__text) { color: #90CAF9; }
+
+:global(.dark .my-appointment-card__cancel:hover:not(:disabled)) {
+  background: rgba(239, 83, 80, 0.16);
+}
 
 :global(.dark .progress-track) { background: #334155; }
 :global(.dark .progress-fill--full) { background: #475569; }

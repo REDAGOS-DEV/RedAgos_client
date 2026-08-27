@@ -168,6 +168,9 @@ import { reactive, ref, watch } from 'vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
+// departmentHome() ug ensureUser() kay auto-imported gikan sa app/composables.
+const { ensureUser } = useUser()
+
 useHead({
   title: 'Blood Center Sign In · RedAgos'
 })
@@ -214,7 +217,23 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/blood-center/dashboard')
+    // Ang aplikante nga wala pa ma-approve kay naay token pero walay
+    // blood_center nga role, so ang dashboard mo-403 ra. Ipadala nato sila sa
+    // status page diin makita nila ang rason ug maka-resubmit.
+    const facilityStatus = response?.user?.facility?.status
+
+    if (facilityStatus === 'pending_approval' || facilityStatus === 'rejected') {
+      await navigateTo('/auth/blood-center/registration-status')
+      return
+    }
+
+    // Ang login response wala pa maglakip sa department/permissions, mao nga
+    // i-load usa ang /user aron mahibaw-an asa nga department dashboard siya
+    // ipadala. Ang ensureUser() ra usab ang gamiton sa middleware human.
+    const profile = await ensureUser()
+
+    await navigateTo(departmentHome(profile))
+
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message

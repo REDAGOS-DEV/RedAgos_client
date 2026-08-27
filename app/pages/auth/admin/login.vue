@@ -17,10 +17,10 @@
              Back to Home
           </NuxtLink>
 
-          <h1>Welcome, Blood Steward!</h1>
+          <h1>Administrator Sign In</h1>
 
           <p class="form-subtitle">
-            Sign in to your blood center account
+            Review facility registrations and manage the system
           </p>
 
           <form
@@ -78,26 +78,6 @@
               </div>
             </div>
 
-            <div class="field-group license-group">
-              <label for="license-number">DOH License Number</label>
-
-              <div class="input-shell">
-                <span class="field-icon">
-                  <AssetIcon name="id-card" :size="18" />
-                </span>
-
-                <input
-                  id="license-number"
-                  v-model="licenseNumber"
-                  type="text"
-                  class="typed-input"
-                  :class="{ typed: typed.licenseNumber }"
-                  placeholder="e.g. DOH-BC-00123"
-                  required
-                >
-              </div>
-            </div>
-
             <div class="forgot-row">
               <button
                 type="button"
@@ -123,38 +103,11 @@
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
+            <!-- Walay self-registration ang admin. Ang bag-ong admin account
+                 kay gihimo ra sa naa nang admin pinaagi sa POST /users. -->
             <p class="signup-text">
-              Need an account?
-              <NuxtLink to="/register/blood-center">
-                Register Now
-              </NuxtLink>
+              Administrator accounts are created by an existing administrator.
             </p>
-
-            <div class="divider">
-              <span></span>
-              <p>or sign in as</p>
-              <span></span>
-            </div>
-
-            <div class="role-grid">
-              <button
-                type="button"
-                class="role-button hospital"
-                @click="navigateTo('/login')"
-              >
-                <AssetIcon name="users" :size="20" />
-                Donor
-              </button>
-
-              <button
-                type="button"
-                class="role-button blood-center"
-                @click="navigateTo('/login/hospital')"
-              >
-                <AssetIcon name="hospital" :size="20" />
-                Hospital
-              </button>
-            </div>
           </form>
         </div>
       </section>
@@ -169,16 +122,15 @@ import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 useHead({
-  title: 'Blood Center Sign In · RedAgos'
+  title: 'Administrator Sign In · RedAgos'
 })
 
 const email = ref('')
 const password = ref('')
-const licenseNumber = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-const typed = reactive({ email: false, password: false, licenseNumber: false })
+const typed = reactive({ email: false, password: false })
 
 watch(email, (value) => {
   typed.email = value.trim().length > 0
@@ -186,10 +138,6 @@ watch(email, (value) => {
 
 watch(password, (value) => {
   typed.password = value.trim().length > 0
-})
-
-watch(licenseNumber, (value) => {
-  typed.licenseNumber = value.trim().length > 0
 })
 
 const goToForgotPassword = () => {
@@ -201,11 +149,12 @@ const login = async () => {
   errorMessage.value = ''
 
   try {
+    // Kaniadto 'blood-center' ang gipadala diri, mao nga wala gyud gyud
+    // makasulod ang admin — 403 role_mismatch ang balik kanunay.
     const response = await authService.login({
       email: email.value,
       password: password.value,
-      role: 'blood-center',
-      licenseNumber: licenseNumber.value,
+      role: 'admin',
     })
 
     const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
@@ -214,7 +163,7 @@ const login = async () => {
       localStorage.setItem('_token', token)
     }
 
-    await navigateTo('/admin/Dashboard')
+    await navigateTo('/admin/registrations')
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
@@ -466,71 +415,6 @@ input::placeholder {
   text-align: center;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 44px;
-}
-
-.divider span {
-  height: 1px;
-  flex: 1;
-  background: #d5dde7;
-}
-
-.divider p {
-  margin: 0;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 44px;
-}
-
-.role-button {
-  display: flex;
-  height: 46px;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.role-button svg {
-  width: 20px;
-  height: 20px;
-}
-
-.hospital {
-  color: #1266c3;
-}
-
-.hospital:hover {
-  border-color: #1266c3;
-}
-
-.blood-center {
-  color: #2da1ff;
-}
-
-.blood-center:hover {
-  border-color: #2da1ff;
-}
-
-@keyframes logoFloat{ 0%,100%{ transform:translateY(0);} 50% { transform:translateY(-8px);} }
-@keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-18px);} }
-@keyframes floatParticle { 0%, 100% { transform:translateY(0);} 50% { transform:translateY(-20px);} }
-
 @media (max-width: 1023px) {
   .login-shell {
     display: block;
@@ -562,10 +446,6 @@ input::placeholder {
 
   h1 {
     font-size: 34px;
-  }
-
-  .role-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

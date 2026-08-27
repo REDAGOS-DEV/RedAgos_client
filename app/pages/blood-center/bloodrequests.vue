@@ -570,7 +570,9 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
 
-definePageMeta({ layout: 'blood-centerdashboard' })
+definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
+  requires: 'requests.view',
+})
 
 const { isDark } = useDarkMode()
 
