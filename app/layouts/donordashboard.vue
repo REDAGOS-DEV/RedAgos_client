@@ -2,12 +2,20 @@
   <div>
     <DonorSidebar :donor="user" />
 
-    <div class="lg:pl-64">
+    <div :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'" class="transition-[padding-left] duration-200">
       <!-- Top bar -->
       <header
-        class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
+        class="fixed top-0 left-0 right-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
+        :class="collapsed ? 'lg:left-20' : 'lg:left-64'"
         :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
-        
+
+        <!-- Mobile menu toggle -->
+        <button @click="openMobile"
+          class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+          aria-label="Open menu">
+          <AssetIcon name="menu" :size="18" class="text-[#64748b] dark:text-slate-300" />
+        </button>
+
         <!-- Breadcrumb + greeting (desktop only) -->
         <div class="hidden lg:flex flex-col justify-center min-w-[160px] flex-shrink-0">
           <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
@@ -21,12 +29,24 @@
           <AssetIcon name="search" :size="17" class="text-[#64748b] dark:text-slate-300" />
         </button>
 
-        <!-- Search bar -->
+        <!--
+          Search bar
+          NOTE: on mobile, this used to be pulled OUT of the header's normal flex flow via
+          `absolute` + `top-1/2 -translate-y-1/2`, centered independently of its siblings
+          (the hamburger and close buttons, which are centered by the header's own
+          `items-center`). Two different centering mechanisms rarely land on the exact same
+          pixel, which is why it visually drifted down toward the border instead of lining up
+          with the buttons beside it. Fix: on mobile it's now a plain flex item (`flex flex-1`)
+          inside the header row, so it's centered by the same `items-center` as everything
+          else — no independent math, no drift. `relative` (unprefixed, always on) just gives
+          the results dropdown a positioning context; it's safely overridden by `lg:absolute`
+          at the desktop breakpoint where the floating centered search bar is intentional.
+        -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
-          class="relative items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-4 py-2.5"
+          class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-4 py-2.5 relative"
           :class="[
             searchOpenMobile
-              ? 'flex absolute left-3 right-3 top-1/2 -translate-y-1/2 z-20 sm:static sm:translate-y-0 sm:flex-1 sm:left-auto sm:right-auto'
+              ? 'flex flex-1'
               : 'hidden sm:flex sm:flex-1',
             'lg:flex-none lg:absolute lg:left-[48%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]">
@@ -155,7 +175,7 @@
         </button>
       </header>
 
-      <main class="min-h-screen bg-[#F7F9FC] dark:bg-slate-900 transition-colors duration-150 pt-16">
+      <main class="min-h-screen bg-[#F7F8FA] dark:bg-slate-900 transition-colors duration-150 pt-16">
         <slot />
       </main>
     </div>
@@ -169,10 +189,12 @@ import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
+import { useSidebar } from '~/composables/useSidebar.js'
 
+const { collapsed, openMobile } = useSidebar()
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
