@@ -91,7 +91,7 @@ const quickLinks = [
 .footer {
   background: #0d1117;
   padding: 56px 2.5rem 0;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .footer-inner {

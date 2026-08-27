@@ -159,7 +159,7 @@ const stats = [
 
 /* ── Single unified page background ── */
 .contact-page {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
   position: relative;
   overflow: hidden;
   /* ONE background for both sections */

@@ -382,7 +382,7 @@ onMounted(() => {
   --np-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --np-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   color: var(--np-text);
   background: var(--np-bg);
   max-width: 1400px;
@@ -445,7 +445,7 @@ onMounted(() => {
 
 .btn-primary {
   height: 46px; padding: 0 20px; background: var(--np-primary); color: #fff;
-  border: none; border-radius: 14px; font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 600;
+  border: none; border-radius: 14px; font-family: var(--rb-font-sans); font-size: 14.5px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-decoration: none; flex-shrink: 0;
   transition: background 0.2s ease, transform 0.15s ease;
 }
@@ -474,7 +474,7 @@ onMounted(() => {
 .notif-search-icon { position: absolute; left: 16px; color: var(--np-text-secondary); pointer-events: none; }
 .notif-search-input {
   width: 100%; height: 100%; padding: 0 40px 0 44px; border: none; background: transparent;
-  outline: none; color: var(--np-text); font-size: 14px; font-family: 'Inter', sans-serif; border-radius: 14px;
+  outline: none; color: var(--np-text); font-size: 14px; font-family: var(--rb-font-sans); border-radius: 14px;
 }
 .notif-search-input::placeholder { color: var(--np-text-muted); }
 .notif-search-clear {

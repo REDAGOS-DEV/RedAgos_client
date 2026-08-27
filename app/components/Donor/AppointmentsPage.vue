@@ -774,7 +774,7 @@ function goDashboard() {
   max-width: 1152px;
   margin: 0 auto;
   padding: 24px 32px 60px;
-  background: #F5F7FA;
+  background: #F7F8FA;
   transition: background-color 0.2s ease;
 }
 

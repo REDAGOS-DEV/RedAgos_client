@@ -672,7 +672,7 @@ onMounted(async () => {
   background: #f5f7fa;
   margin: 0 auto;
   padding: 28px 36px 48px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--rb-font-sans);
   color: var(--text-primary);
 }
 

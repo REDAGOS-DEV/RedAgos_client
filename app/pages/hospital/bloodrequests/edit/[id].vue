@@ -615,7 +615,7 @@ function formatDateTime(iso) {
   --eb-text: #1a2233;
   --eb-text-muted: #6b7789;
 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--rb-font-sans);
   background: var(--eb-bg);
   min-height: 100%;
   padding: 24px 28px 110px;

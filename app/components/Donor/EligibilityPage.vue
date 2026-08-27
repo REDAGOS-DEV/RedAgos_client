@@ -551,7 +551,7 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F5F7FA;
+    background: #F7F8FA;
     flex-direction: column;
     gap: 20px;
     transition: background-color 0.2s ease;
@@ -1241,6 +1241,26 @@ onActivated(() => {
 :global(.dark .modal-qr-wrap) {
     background: #1E293B;
     border-color: #334155;
+}
+:global(.dark .modal-title) {
+    color: #F1F5F9;
+}
+
+:global(.dark .modal-subtitle) {
+    color: #94A3B8;
+}
+
+:global(.dark .modal-validity) {
+    color: #F1F5F9;
+}
+
+:global(.dark .modal-check) {
+    background: rgba(102, 187, 106, 0.16);
+    color: #66BB6A;
+}
+
+:global(.dark .modal-actions .btn-primary) {
+    background: #1565C0;
 }
 
 :global(.dark .submit-error) {

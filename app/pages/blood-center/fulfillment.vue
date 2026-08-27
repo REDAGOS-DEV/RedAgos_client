@@ -1292,7 +1292,7 @@ function openPrintWindow(title, bodyHtml) {
       <head>
         <title>${title}</title>
         <style>
-          body { font-family: Inter, system-ui, sans-serif; padding: 32px; color: #1E293B; }
+          body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding: 32px; color: #1E293B; }
           h1 { font-size: 18px; margin-bottom: 4px; }
           .rf-print-sub { color: #64748B; font-size: 12.5px; margin-bottom: 20px; }
           table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -1634,7 +1634,7 @@ if (typeof window !== 'undefined') {
 
   background: var(--rf-bg);
   color: var(--rf-text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--rb-font-sans);
   padding: 28px clamp(16px, 3vw, 40px) 60px;
   min-height: 100vh;
 }
@@ -1676,7 +1676,7 @@ if (typeof window !== 'undefined') {
   --rf-teal: #0F766E;
   --rf-radius: 18px;
   --rf-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--rb-font-sans);
   color: var(--rf-text);
 }
 .rf-drawer-overlay *,

@@ -571,7 +571,7 @@ onMounted(async () => {
   --success: #2e7d32;
   --info: #0288d1;
   --purple: #5e35b1;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
   margin: 0 auto;

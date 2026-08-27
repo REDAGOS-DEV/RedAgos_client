@@ -674,7 +674,7 @@ onMounted(() => {
   --sp-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --sp-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   color: var(--sp-text);
   background: var(--sp-bg);
   max-width: 1400px;
@@ -725,7 +725,7 @@ onMounted(() => {
 /* ---------- BUTTONS ---------- */
 .btn-primary {
   height: 44px; padding: 0 20px; background: var(--sp-primary); color: #fff;
-  border: none; border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  border: none; border-radius: 12px; font-family: var(--rb-font-sans); font-size: 14px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease;
 }
@@ -807,7 +807,7 @@ onMounted(() => {
 .field-label { font-size: 14px; font-weight: 600; color: var(--sp-text); }
 .field-input {
   height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--sp-border);
-  background: var(--sp-bg); color: var(--sp-text); font-size: 14px; font-family: 'Inter', sans-serif;
+  background: var(--sp-bg); color: var(--sp-text); font-size: 14px; font-family: var(--rb-font-sans);
   outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .field-input:focus { border-color: var(--sp-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-primary) 15%, transparent); }
