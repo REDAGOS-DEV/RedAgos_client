@@ -1187,7 +1187,7 @@ onMounted(async () => {
     background: var(--rf-bg);
     margin: 0 auto;
     padding: 28px 36px 48px;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--rb-font-sans);
     color: var(--rf-text);
 }
 

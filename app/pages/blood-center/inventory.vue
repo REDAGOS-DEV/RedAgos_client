@@ -1521,7 +1521,7 @@ onMounted(loadDashboard)
 
 <style scoped>
 .inv-page {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1280px;
   background: var(--rb-page-bg);
   margin: 0 auto;

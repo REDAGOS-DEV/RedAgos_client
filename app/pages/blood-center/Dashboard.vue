@@ -998,7 +998,7 @@ onMounted(async () => {
 <style scoped>
 
 .dashboard {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1200px;
   background: var(--rb-page-bg);
   margin: 0 auto;

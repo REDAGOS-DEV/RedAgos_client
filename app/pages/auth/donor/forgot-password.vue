@@ -102,7 +102,7 @@ const submitReset = async () => {
   min-height: 100vh;
   background: #eef4fb;
   color: #1f2937;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .login-shell {

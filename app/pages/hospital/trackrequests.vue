@@ -575,7 +575,7 @@ function contactBloodCenter() {
   margin-bottom: 20px;
 }
 .page-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   font-size: 30px;
   font-weight: 700;
   color: #1e293b;

@@ -509,7 +509,7 @@ onActivated(() => {
   --text-primary: #1f2937;
   --text-secondary: #94a3b8;
   --border: #eef1f5;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1200px;
   background: #F7F8FA;
   margin: 0 auto;

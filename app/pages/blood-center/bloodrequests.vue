@@ -954,7 +954,7 @@ onMounted(() => {
 
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   padding: 32px;
   display: flex;
   flex-direction: column;

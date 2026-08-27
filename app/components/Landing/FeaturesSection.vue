@@ -208,7 +208,7 @@ onUnmounted(() => observer?.disconnect())
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
   scroll-margin-top: 76px;
 }
 

@@ -740,7 +740,7 @@ onUnmounted(() => {
   --warning: #f59e0b;
   --success: #2e7d32;
   --purple: #7c3aed;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
   margin: 0 auto;

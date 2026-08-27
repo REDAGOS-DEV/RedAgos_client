@@ -270,7 +270,7 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F5F7FA;
+    background: #F7F8FA;
     flex-direction: column;
     gap: 20px;
     transition: background-color 0.2s ease;

@@ -170,7 +170,7 @@ onUnmounted(() => observer?.disconnect())
   padding: 50px 0 80px;
   background: #f9fafb;
   border-radius:60px;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .section-inner{

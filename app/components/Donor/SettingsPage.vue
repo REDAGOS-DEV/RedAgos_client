@@ -281,12 +281,12 @@ Output:
                     </div>
                 </div>
             </Transition>
-import { authService } from '~/api/auth/AuthService'
         </Teleport>
     </div>
 </template>
 
 <script setup>
+import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
@@ -549,7 +549,7 @@ function splitFullName(fullName) {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F5F7FA;
+    background: #F7F8FA;
     flex-direction: column;
     gap: 20px;
 }
