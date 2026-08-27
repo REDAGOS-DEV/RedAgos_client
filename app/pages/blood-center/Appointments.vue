@@ -16,10 +16,9 @@
             <input type="date" v-model="datePickerValue" class="date-filter" @change="onDateFilterChange" />
             <AssetIcon name="calendar" :size="16" class="form-input-icon__icon" />
           </div>
-          <button v-if="selectedDateFilter !== 'all'" type="button" class="btn-clear-date"
-            @click="clearDateFilter">
+          <button v-if="!isToday" type="button" class="btn-clear-date" @click="resetToToday">
             <AssetIcon name="x" :size="12" />
-            All dates
+            Today
           </button>
           <button type="button" class="btn-primary" @click="openManageSlots">
             <AssetIcon name="clock" :size="16" />
@@ -105,26 +104,28 @@
             <div v-if="loadingSlots" v-for="n in 4" :key="'sk-' + n"
               class="time-slot-card skeleton-block" />
             <button v-for="slot in timeSlots" v-else :key="slot.id" type="button" class="time-slot-card"
-              :class="{ 'time-slot-card--full': slot.booked >= slot.capacity, 'time-slot-card--selected': selectedSlotId === slot.id }"
+              :class="{ 'time-slot-card--full': (slotBookings[slot.time] || 0) >= slot.capacity, 'time-slot-card--selected': selectedSlotId === slot.id }"
               @click="selectedSlotId = slot.id">
               <span class="slot-time">{{ slot.time }}</span>
-              <span class="slot-count" :class="{ 'slot-count--full': slot.booked >= slot.capacity }">
-                {{ slot.booked }}/{{ slot.capacity }} {{ slot.booked >= slot.capacity ? 'Full' :
-                  'booked' }}
+              <span class="slot-count"
+                :class="{ 'slot-count--full': (slotBookings[slot.time] || 0) >= slot.capacity }">
+                {{ slotBookings[slot.time] || 0 }}/{{ slot.capacity }}
+                {{ (slotBookings[slot.time] || 0) >= slot.capacity ? 'Full' : 'booked' }}
               </span>
             </button>
             <p v-if="!loadingSlots && timeSlots.length === 0" class="empty-state empty-state--inline">
-              Pick a specific date to see time slots.
+              This centre has no bookable time slots configured.
             </p>
           </div>
 
           <div class="filters-row">
             <select v-model="statusFilter" class="form-input filter-select">
               <option value="all">All Status</option>
+              <option value="scheduled">Scheduled</option>
               <option value="arrived">Arrived</option>
-              <option value="confirmed">Confirmed</option>
               <option value="donated">Donated</option>
               <option value="no-show">No-show</option>
+              <option value="cancelled">Cancelled</option>
             </select>
             <select v-model="bloodTypeFilter" class="form-input filter-select">
               <option value="all">All Blood Types</option>
@@ -136,8 +137,12 @@
             <div v-if="loadingAppointments" v-for="n in 4" :key="'skap-' + n"
               class="appointment-card skeleton-block" />
 
+            <p v-else-if="walkInAppointments.length === 0" class="empty-state">
+              No appointments booked at this centre on {{ selectedDateLabel }}.
+            </p>
+
             <p v-else-if="filteredAppointments.length === 0" class="empty-state">
-              No walk-in appointments match the current filters.
+              No appointments match the current filters.
             </p>
 
             <div v-else v-for="(appt, i) in filteredAppointments" :key="appt.id"
@@ -152,15 +157,9 @@
                   <span class="appt-name">{{ appt.donorName }}</span>
                   <span class="pill pill--blood">{{ appt.bloodType }}</span>
                 </div>
-                <p class="appt-meta">{{ appt.donorCode }} &middot; Walk-in &middot; {{ appt.slotTime }}
-                  slot &middot; Booked via {{ appt.bookedVia }}</p>
-                <p class="appt-screening">
-                  Eligibility screening:
-                  <span class="screening-status"
-                    :class="'screening-status--' + appt.screeningStatus.toLowerCase()">{{
-                      appt.screeningStatus }}</span>
-                  &middot; Screened {{ appt.screenedDate }}
-                </p>
+                <p class="appt-meta">{{ appt.donorCode }} &middot; {{ appt.kind }} &middot; {{
+                  appt.slotTime }} slot</p>
+                <p v-if="appt.phone" class="appt-screening">{{ appt.phone }}</p>
               </div>
 
               <div class="appt-status-col">
@@ -213,7 +212,7 @@
             <p v-if="drive.status === 'Open'" class="drive-note">Registration still open &mdash; donors can
               book via the portal.</p>
 
-            <template v-else>
+            <template v-if="drive.previewDonors.length">
               <p class="preview-label">Registered Donors (Preview)</p>
               <div class="donor-preview-list">
                 <div v-for="(donor, di) in drive.previewDonors" :key="donor.id" class="donor-row">
@@ -230,13 +229,16 @@
               </div>
             </template>
 
+            <p v-if="!drive.previewDonors.length" class="drive-note">Per-drive donor lists need a
+              backend endpoint that does not exist yet.</p>
+
             <div class="drive-card__actions">
-              <button type="button" class="btn-outline" @click="openViewDonors(drive)">View all {{
-                drive.registered }}
-                donors</button>
-              <button type="button" class="btn-outline-blue" @click="openManageDrive(drive)">Manage Drive
-                &amp;
-                Attendance</button>
+              <button type="button" class="btn-outline" disabled
+                title="Listing the donors on one drive needs a backend endpoint that does not exist yet."
+                @click="openViewDonors(drive)">View all {{ drive.registered }} donors</button>
+              <button type="button" class="btn-outline-blue" disabled
+                title="Drive management has no backend yet."
+                @click="openManageDrive(drive)">Manage Drive &amp; Attendance</button>
             </div>
           </div>
         </section>
@@ -255,9 +257,9 @@
           </div>
 
           <div class="modal-form">
-            <p class="modal-subtitle">Set the available donation slots per time slot. Donors choose from
-              these slots
-              when booking via the portal.</p>
+            <p class="modal-subtitle">The slots donors choose from when booking via the portal.
+              Read-only for now &mdash; capacity is configured on the facility record, and there is no
+              endpoint yet to change it from here.</p>
 
             <div class="form-group">
               <label class="form-label">Date</label>
@@ -277,27 +279,14 @@
               <div v-for="slot in slotsForm.slots" :key="slot.id" class="slot-input">
                 <label class="form-label form-label--muted">{{ slot.time }} - max donors</label>
                 <div class="stepper">
-                  <input v-model.number="slot.capacity" type="number" min="0"
+                  <input v-model.number="slot.capacity" type="number" min="0" disabled
                     class="form-input stepper__input" />
-                  <div class="stepper__controls">
-                    <button type="button" class="stepper__btn" @click="slot.capacity++">
-                      <AssetIcon name="chevron-up" :size="10" />
-                    </button>
-                    <button type="button" class="stepper__btn"
-                      @click="slot.capacity = Math.max(0, slot.capacity - 1)">
-                      <AssetIcon name="chevron-down" :size="10" />
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
 
             <div class="modal-actions">
-              <button type="button" class="btn-cancel" @click="closeManageSlots">Cancel</button>
-              <button type="button" class="btn-primary" :disabled="savingSlots || !canSaveSlots"
-                @click="saveSlots">
-                {{ savingSlots ? 'Saving...' : 'Save Slots' }}
-              </button>
+              <button type="button" class="btn-cancel" @click="closeManageSlots">Close</button>
             </div>
             <p v-if="saveSlotsError" class="modal-error">{{ saveSlotsError }}</p>
           </div>
@@ -321,7 +310,8 @@
               <div v-for="n in 5" :key="'skdd-' + n" class="donor-row skeleton-block" />
             </div>
             <div v-else class="donor-list">
-              <p v-if="driveDonors.length === 0" class="empty-state">No donors registered yet.</p>
+              <p v-if="driveDonors.length === 0" class="empty-state">Listing the donors registered to
+                one drive needs a backend endpoint that does not exist yet.</p>
               <div v-for="(donor, di) in driveDonors" :key="donor.id" class="donor-row">
                 <span class="donor-row__avatar" :style="{ background: avatarColor(di) }">{{
                   initials(donor.name)
@@ -350,6 +340,8 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -358,44 +350,99 @@ definePageMeta({
 })
 
 /**
- * NOTE ON API SHAPE
+ * API SHAPE
  * -------------------------------------------------------------------------
- * Mirrors the contract used in MobileDrives.vue ($fetch against Nuxt server
- * routes / your backend proxy). Adjust the paths below to match your actual
- * routes if they differ.
+ * Tinuod na nga mga ruta karon — dili na ang `/api/bloodcenter/*` nga wala
+ * gyud gitutok sa server.
  *
- *  GET  /api/bloodcenter/appointments/stats?date=YYYY-MM-DD|all
- *    -> { todayWalkIns, confirmedArrived, donatedToday, noShows }
+ *  GET /api/blood-center/collection/queue?date=YYYY-MM-DD
+ *    -> { date,
+ *         appointments: [{ id, appointment_datetime, status, event_id,
+ *                          donor: { uuid, donor_code, full_name, blood_type, phone } }],
+ *         in_progress: [...] }
+ *    Facility-scoped gikan sa token: ang staff makakita ra sa kaugalingon
+ *    nilang center, so walay center_id nga i-pasa diri.
  *
- *  GET  /api/bloodcenter/appointments/time-slots?date=YYYY-MM-DD|default
- *    -> [{ id, time, capacity, booked }]
+ *  GET /api/time-slots?center_id=&date=YYYY-MM-DD
+ *    -> [{ time, available, total }]
  *
- *  GET  /api/bloodcenter/appointments/walk-ins?date=YYYY-MM-DD|all&status=&bloodType=
- *    -> [{
- *         id, donorCode, donorName, bloodType, date, slotTime, bookedVia,
- *         screeningStatus, screenedDate, status, arrivedBadge
- *       }]
+ *  GET /api/blood-drives
+ *    -> [{ id, name, location, date, registered, total_slots, status }]
  *
- *  GET  /api/bloodcenter/blood-drives
- *    -> [{ id, name, location, dateLabel, status, registered, capacity,
- *          previewDonors: [{ id, name, bloodType, registeredDate, screeningStatus, status }] }]
- *
- *  GET  /api/bloodcenter/blood-drives/:id/donors
- *    -> [{ id, name, bloodType, registeredDate, screeningStatus, status }]
- *
- *  PUT  /api/bloodcenter/appointments/time-slots  { date, slots: [{ id, capacity }] }
- *    -> { success: true }
+ * WALA PAY BACKEND: pag-save sa per-slot capacity, ug ang listahan sa mga
+ * donor kada drive. Gi-disable ang maong mga control imbis mo-call og ruta
+ * nga mo-404.
  * -------------------------------------------------------------------------
  */
 
-const api = {
-  getStats: (date) => $fetch('/api/bloodcenter/appointments/stats', { params: { date } }),
-  getTimeSlots: (date) => $fetch('/api/bloodcenter/appointments/time-slots', { params: { date } }),
-  getWalkIns: (params) => $fetch('/api/bloodcenter/appointments/walk-ins', { params }),
-  getBloodDrives: () => $fetch('/api/bloodcenter/blood-drives'),
-  getDriveDonors: (driveId) => $fetch(`/api/bloodcenter/blood-drives/${driveId}/donors`),
-  saveTimeSlots: (date, slots) =>
-    $fetch('/api/bloodcenter/appointments/time-slots', { method: 'PUT', body: { date, slots } }),
+const { user } = useUser()
+
+// Ang /time-slots kay donor-facing, so kinahanglan gyud og center_id. Ang
+// queue dili — gikuha na niya ang facility gikan sa token.
+const facilityId = computed(() => user.value?.facility?.id ?? null)
+
+// Lima ka status ang gi-store sa server. Ang counter naay kaugalingon nga
+// pinulongan, so usa ra ka lugar ang mo-translate.
+const STATUS_LABELS = {
+  scheduled: 'Scheduled',
+  confirmed: 'Arrived',
+  completed: 'Donated',
+  no_show: 'No-show',
+  cancelled: 'Cancelled',
+}
+
+// Parehas sa `bookedCountsByTime()` sa server: ang scheduled ug confirmed ra
+// ang mo-hawid og slot. Ang cancelled ug no_show mo-libre pagbalik sa lugar.
+const HOLDS_A_SLOT = ['scheduled', 'confirmed']
+
+function todayIso() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function slotKeyOf(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/**
+ * Ang queue mo-return og server field names; lahi ang gidahom sa template.
+ * Usa ra ka lugar ang mo-tabok aron dili magkatag ang mapping.
+ */
+function mapAppointment(row) {
+  const at = new Date(row.appointment_datetime)
+
+  return {
+    id: row.id,
+    rawStatus: row.status,
+    donorName: row.donor?.full_name || 'Unknown donor',
+    donorCode: row.donor?.donor_code || '—',
+    bloodType: row.donor?.blood_type || '—',
+    phone: row.donor?.phone || '',
+    kind: row.event_id === null ? 'Walk-in' : 'Mobile drive',
+    slotKey: slotKeyOf(at),
+    slotTime: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    dateDay: at.getDate(),
+    dateMonth: at.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
+    status: STATUS_LABELS[row.status] ?? row.status,
+    arrivedBadge: row.status === 'confirmed',
+  }
+}
+
+/**
+ * Ang stats gikan ra sa parehas nga queue payload — walay separate nga
+ * endpoint, ug wala man kinahanglana: naa na ang tanan nga row diri.
+ */
+function deriveStats(rows) {
+  const count = (status) => rows.filter((r) => r.rawStatus === status).length
+
+  return {
+    todayWalkIns: rows.filter((r) => r.kind === 'Walk-in').length,
+    confirmedArrived: count('confirmed'),
+    donatedToday: count('completed'),
+    noShows: count('no_show'),
+  }
 }
 
 const initialLoading = ref(true)
@@ -422,12 +469,8 @@ const loadingDrives = ref(false)
 // Manage Time Slots modal
 const showManageSlotsModal = ref(false)
 const loadingSlotForm = ref(false)
-const savingSlots = ref(false)
 const saveSlotsError = ref('')
 const slotsForm = reactive({ date: '', slots: [] })
-
-// Save is only allowed once slots have loaded (date is validated at save-time)
-const canSaveSlots = computed(() => !loadingSlotForm.value && slotsForm.slots.length > 0)
 
 // View Donors modal (blood drive)
 const showDonorsModal = ref(false)
@@ -437,27 +480,45 @@ const driveDonors = ref([])
 
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
 
-const selectedDateFilter = ref('all')
+// Ang queue kay usa ka adlaw ra ang gi-serve niya, so wala nay 'all dates'
+// diri — mo-default ta karong adlawa, sama sa server pag walay `date`.
+const selectedDateFilter = ref(todayIso())
 
-// Two-way bridge: native <input type="date"> gusto ug 'YYYY-MM-DD' o blangko;
-// ang atong internal state gusto ug 'all' pag wala pay date napili.
+const isToday = computed(() => selectedDateFilter.value === todayIso())
+
 const datePickerValue = computed({
-  get: () => (selectedDateFilter.value === 'all' ? '' : selectedDateFilter.value),
+  get: () => selectedDateFilter.value,
   set: (val) => {
-    selectedDateFilter.value = val || 'all'
+    selectedDateFilter.value = val || todayIso()
   },
 })
 
-function clearDateFilter() {
-  selectedDateFilter.value = 'all'
+function resetToToday() {
+  selectedDateFilter.value = todayIso()
   onDateFilterChange()
 }
 
 const selectedDateLabel = computed(() => {
-  if (selectedDateFilter.value === 'all') return 'All dates'
   const d = new Date(selectedDateFilter.value)
   if (isNaN(d.getTime())) return selectedDateFilter.value
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+})
+
+/**
+ * Pila ka booking kada oras. Gikuha sa queue imbis sa /time-slots kay ang
+ * `available` didto mo-report og 0 sa mga oras nga milabay na — sakto na sa
+ * donor nga mo-book, apan sa counter mo-basa unta nga "Full" ang usa ka slot
+ * nga walay bisan usa ka tawo.
+ */
+const slotBookings = computed(() => {
+  const counts = {}
+
+  for (const appt of walkInAppointments.value) {
+    if (!HOLDS_A_SLOT.includes(appt.rawStatus)) continue
+    counts[appt.slotKey] = (counts[appt.slotKey] || 0) + 1
+  }
+
+  return counts
 })
 
 const filteredAppointments = computed(() => {
@@ -488,66 +549,87 @@ function avatarColor(index) {
   return AVATAR_COLORS[index % AVATAR_COLORS.length]
 }
 
-async function loadStats() {
+/**
+ * Usa ra ka call ang mo-hatag sa listahan ug sa stat cards. Ang stats gi-derive
+ * gikan sa parehas nga rows aron dili gyud sila magkalahi ang gi-ihap.
+ */
+async function loadQueue() {
+  loadingAppointments.value = true
   loadingStats.value = true
+
   try {
-    const data = await api.getStats(selectedDateFilter.value)
-    Object.assign(stats, data)
+    const data = await bloodCenterService.collectionQueue({ date: selectedDateFilter.value })
+    const rows = (data?.appointments ?? []).map(mapAppointment)
+
+    walkInAppointments.value = rows
+    Object.assign(stats, deriveStats(rows))
   } catch (err) {
-    loadError.value = 'Could not load donor stats.'
-    console.error(err)
+    walkInAppointments.value = []
+    Object.assign(stats, { todayWalkIns: 0, confirmedArrived: 0, donatedToday: 0, noShows: 0 })
+    loadError.value = err?.message || 'Could not load the appointment queue.'
+    console.error('Failed to load collection queue:', err)
   } finally {
+    loadingAppointments.value = false
     loadingStats.value = false
   }
 }
 
 async function loadTimeSlots() {
-  if (selectedDateFilter.value === 'all') {
+  if (!facilityId.value) {
     timeSlots.value = []
     return
   }
+
   loadingSlots.value = true
+
   try {
-    timeSlots.value = await api.getTimeSlots(selectedDateFilter.value)
+    const rows = await bookingCatalogService.timeSlots({
+      center_id: facilityId.value,
+      date: selectedDateFilter.value,
+    })
+
+    // Ang `total` ra ang gikuha diri — ang `booked` gikan sa queue, tan-awa
+    // ang komento sa `slotBookings`.
+    timeSlots.value = (rows ?? []).map((slot) => ({
+      id: slot.time,
+      time: slot.time,
+      capacity: slot.total,
+    }))
   } catch (err) {
-    loadError.value = 'Could not load time slots.'
-    console.error(err)
+    timeSlots.value = []
+    loadError.value = err?.message || 'Could not load time slots.'
+    console.error('Failed to load time slots:', err)
   } finally {
     loadingSlots.value = false
   }
 }
 
-async function loadAppointments() {
-  loadingAppointments.value = true
-  try {
-    const rows = await api.getWalkIns({
-      date: selectedDateFilter.value,
-      status: statusFilter.value,
-      bloodType: bloodTypeFilter.value,
-    })
-    walkInAppointments.value = rows.map((r) => {
-      const d = new Date(r.date)
-      return {
-        ...r,
-        dateDay: d.getDate(),
-        dateMonth: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-      }
-    })
-  } catch (err) {
-    loadError.value = 'Could not load walk-in appointments.'
-    console.error(err)
-  } finally {
-    loadingAppointments.value = false
-  }
-}
-
 async function loadBloodDrives() {
   loadingDrives.value = true
+
   try {
-    bloodDrives.value = await api.getBloodDrives()
+    const rows = await bookingCatalogService.bloodDrives()
+
+    bloodDrives.value = (rows ?? []).map((drive) => ({
+      id: drive.id,
+      name: drive.name,
+      location: drive.location,
+      dateLabel: [
+        drive.date
+          ? new Date(drive.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : null,
+        drive.location,
+      ].filter(Boolean).join(' · '),
+      status: drive.status,
+      registered: drive.registered,
+      capacity: drive.total_slots,
+      // Walay endpoint pa nga mo-list sa mga donor kada drive.
+      previewDonors: [],
+    }))
   } catch (err) {
-    loadError.value = 'Could not load blood drive registrations.'
-    console.error(err)
+    bloodDrives.value = []
+    loadError.value = err?.message || 'Could not load blood drive registrations.'
+    console.error('Failed to load blood drives:', err)
   } finally {
     loadingDrives.value = false
   }
@@ -555,14 +637,14 @@ async function loadBloodDrives() {
 
 async function loadAll() {
   loadError.value = ''
-  await Promise.all([loadStats(), loadTimeSlots(), loadAppointments(), loadBloodDrives()])
+  await Promise.all([loadQueue(), loadTimeSlots(), loadBloodDrives()])
 }
 
 function onDateFilterChange() {
   selectedSlotId.value = null
-  loadStats()
+  loadError.value = ''
+  loadQueue()
   loadTimeSlots()
-  loadAppointments()
 }
 
 function viewAppointment(appt) {
@@ -576,21 +658,34 @@ async function openManageSlots() {
   // Pre-fill with the currently selected date filter, when it's a real date
   // (the filter dropdown's values are already YYYY-MM-DD strings, matching
   // what <input type="date"> expects, so this binds correctly).
-  slotsForm.date = selectedDateFilter.value !== 'all' ? selectedDateFilter.value : ''
+  slotsForm.date = selectedDateFilter.value
   await fetchSlotsForForm()
 }
 
 async function fetchSlotsForForm() {
+  if (!facilityId.value || !slotsForm.date) {
+    slotsForm.slots = []
+    return
+  }
+
   loadingSlotForm.value = true
   saveSlotsError.value = ''
+
   try {
-    // Pass 'default' sa backend kung wala pay date napili, aron mo-return
-    // kini sa iyang default/template capacity per slot (per design: ang
-    // grid dapat naay values dayon pag-abli sa modal, bisan wala pay date).
-    slotsForm.slots = await api.getTimeSlots(slotsForm.date || 'default')
+    const rows = await bookingCatalogService.timeSlots({
+      center_id: facilityId.value,
+      date: slotsForm.date,
+    })
+
+    slotsForm.slots = (rows ?? []).map((slot) => ({
+      id: slot.time,
+      time: slot.time,
+      capacity: slot.total,
+    }))
   } catch (err) {
-    saveSlotsError.value = 'Could not load slots for this date.'
-    console.error(err)
+    slotsForm.slots = []
+    saveSlotsError.value = err?.message || 'Could not load slots for this date.'
+    console.error('Failed to load slots for the form:', err)
   } finally {
     loadingSlotForm.value = false
   }
@@ -600,47 +695,13 @@ function closeManageSlots() {
   showManageSlotsModal.value = false
 }
 
-async function saveSlots() {
-  if (!slotsForm.slots.length) {
-    saveSlotsError.value = 'No slots loaded to save.'
-    return
-  }
-  if (!slotsForm.date) {
-    saveSlotsError.value = 'Please select a date first.'
-    return
-  }
-
-  savingSlots.value = true
-  saveSlotsError.value = ''
-  try {
-    await api.saveTimeSlots(
-      slotsForm.date,
-      slotsForm.slots.map((s) => ({ id: s.id, capacity: s.capacity }))
-    )
-    closeManageSlots()
-    if (slotsForm.date === selectedDateFilter.value) {
-      await loadTimeSlots()
-    }
-  } catch (err) {
-    saveSlotsError.value = 'Could not save time slots. Please try again.'
-    console.error(err)
-  } finally {
-    savingSlots.value = false
-  }
-}
-
-async function openViewDonors(drive) {
+// Ang per-drive nga listahan sa donor walay ruta sa server, so ang modal
+// mo-abli nga blangko imbis mo-call og endpoint nga mo-404.
+function openViewDonors(drive) {
   selectedDrive.value = drive
   showDonorsModal.value = true
-  loadingDriveDonors.value = true
-  try {
-    driveDonors.value = await api.getDriveDonors(drive.id)
-  } catch (err) {
-    driveDonors.value = []
-    console.error(err)
-  } finally {
-    loadingDriveDonors.value = false
-  }
+  loadingDriveDonors.value = false
+  driveDonors.value = []
 }
 
 function closeViewDonors() {
@@ -1349,9 +1410,15 @@ onMounted(async () => {
   color: var(--accent);
 }
 
-.pill--pending {
+.pill--pending,
+.pill--scheduled {
   background: #fff3e0;
   color: var(--warning);
+}
+
+.pill--cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .pill--attended {
@@ -1415,6 +1482,11 @@ onMounted(async () => {
 .status-badge--closed {
   background: #f3f4f6;
   color: #6b7280;
+}
+
+.status-badge--full {
+  background: #fdeaea;
+  color: var(--accent);
 }
 
 .drive-progress-label {
@@ -1907,7 +1979,13 @@ onMounted(async () => {
   background: #2D1A1A;
   color: #F87171;
 }
-:global(.dark .pill--pending) {
+:global(.dark .pill--cancelled) {
+  background: rgba(156, 163, 175, 0.16);
+  color: #d1d5db;
+}
+
+:global(.dark .pill--pending),
+:global(.dark .pill--scheduled) {
   background: #3E2C1A;
   color: #FBBF24;
 }

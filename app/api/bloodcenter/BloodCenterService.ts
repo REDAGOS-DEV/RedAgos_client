@@ -52,6 +52,20 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/password`, 'POST', payload)
   }
 
+  // --- Collection (Donor / Collection department) ---
+
+  async collectionQueue(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/collection/queue`, 'GET', params)
+  }
+
+  async checkInAppointment(appointmentId: number): Promise<any> {
+    return this.request(`${this.resource}/appointments/${appointmentId}/check-in`, 'POST')
+  }
+
+  async markAppointmentNoShow(appointmentId: number): Promise<any> {
+    return this.request(`${this.resource}/appointments/${appointmentId}/no-show`, 'POST')
+  }
+
   // --- Inventory (Inventory / Storage department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
