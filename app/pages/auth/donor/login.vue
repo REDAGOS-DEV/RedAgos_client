@@ -6,10 +6,13 @@
       <section class="form-panel">
         <div class="form-card">
           <div class="mobile-brand">
-            <p class="brand-name">
-              Red<span>Agos</span>
-            </p>
-            <p class="brand-subtitle">Blood Bank System</p>
+            <div class="mobile-brand-curve">
+              <img :src="logo" alt="RedAgos Logo" class="mobile-logo" />
+              <p class="brand-name">
+                Red<span>Agos</span>
+              </p>
+              <p class="brand-subtitle">Blood Bank System</p>
+            </div>
           </div>
 
           <NuxtLink to="/" class="back-link">
@@ -73,7 +76,7 @@
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
-                  <AssetIcon :name="showPassword ? 'eye-off' : 'eye'" :size="18" />
+                  <AssetIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18" />
                 </button>
               </div>
             </div>
@@ -145,6 +148,7 @@
 <script setup>
 import { authService } from '~/api/auth/AuthService'
 import { reactive, watch } from 'vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
@@ -212,7 +216,7 @@ const login = async () => {
   min-height: 100vh;
   background: #eef4fb;
   color: #1f2937;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
  .login-shell {
@@ -235,16 +239,50 @@ const login = async () => {
   margin-left: 140px;
 }
 
+/* ── MOBILE BRAND ── */
 .mobile-brand {
   display: none;
 }
 
+.mobile-brand-curve {
+  position: relative;
+  width: calc(100% + 48px);
+  margin: -36px -24px 20px;
+  padding: 44px 24px 56px;
+  background: linear-gradient(135deg, #1A237E 0%, #1565C0 55%, #2563EB 100%);
+  border-radius: 0 0 50% 50% / 0 0 46px 46px;
+  text-align: center;
+  box-shadow: 0 12px 28px rgba(21, 101, 192, 0.25);
+}
+
+.mobile-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
+}
+
 .mobile-brand .brand-name {
-  color: #1769c9;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mobile-brand .brand-name span {
+  color: #eb3535;
 }
 
 .mobile-brand .brand-subtitle {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 4px 0 0;
 }
 
 .back-link {
@@ -301,10 +339,17 @@ label {
   height: 52px;
   align-items: center;
   margin-top: 12px;
-  padding: 0 14px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
+  padding: 0 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.input-shell:focus-within {
+  border-color: #2563EB;
   background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 .field-icon {
@@ -406,21 +451,30 @@ input::placeholder {
   gap: 16px;
   margin-top: 12px;
   border: 0;
-  border-radius: 8px;
-  background: #1e6fc8;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1565C0 0%, #2563EB 100%);
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+  transition: box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
 }
 
 .sign-in-button:hover {
-  background: #185dac;
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.38);
+}
+
+.sign-in-button:active {
+  transform: translateY(0);
 }
 
 .sign-in-button:disabled {
   cursor: not-allowed;
   opacity: 0.72;
+  transform: none;
 }
 
 .sign-in-button svg {
@@ -476,11 +530,16 @@ input::placeholder {
   justify-content: center;
   gap: 12px;
   border: 1px solid #d6e0eb;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.role-button:hover {
+  transform: translateY(-1px);
 }
 
 .role-button svg {
@@ -518,27 +577,76 @@ input::placeholder {
   }
 
   .form-panel {
+    position: relative;
     justify-content: center;
-    padding: 56px 24px;
+    padding: 0 24px 56px;
   }
 
   .form-card {
     margin: 0;
+    text-align: center;
   }
 
   .mobile-brand {
     display: block;
-    margin-bottom: 48px;
+  }
+
+  .back-link {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    z-index: 5;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    padding: 6px 12px 6px 8px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    font-size: 13px;
+  }
+
+  .back-link:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .mobile-brand-curve {
+    padding-top: 56px;
+  }
+
+  h1 {
+    margin-top: 22px;
+    font-size: 24px;
+    line-height: 1.25;
+  }
+
+  .form-subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .login-form {
+    text-align: left;
+    margin-top: 32px;
+  }
+
+  .forgot-row {
+    justify-content: right;
   }
 }
 
 @media (max-width: 520px) {
   .form-panel {
-    padding: 36px 18px;
+    padding: 0 18px 40px;
+  }
+
+  .mobile-brand-curve {
+    width: calc(100% + 36px);
+    margin: -20px -18px 18px;
+    padding: 52px 18px 48px;
   }
 
   h1 {
-    font-size: 34px;
+    font-size: 22px;
   }
 
   .role-grid {
