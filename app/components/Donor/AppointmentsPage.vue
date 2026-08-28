@@ -440,9 +440,13 @@ let loadedOnce = false
 async function load({ silent = false } = {}) {
   if (!silent) loading.value = true
   try {
-    await Promise.all([fetchBloodCenters(), fetchAppointments()])
-    if (appointmentType.value === 'walkin') await fetchTimeSlots()
+    await Promise.allSettled([fetchBloodCenters(), fetchAppointments()])
+    if (appointmentType.value === 'walkin') {
+      await fetchTimeSlots().catch(err => console.error(err))
+    }
     loadedOnce = true
+  } catch (err) {
+    console.error('Unexpected error during load:', err)
   } finally {
     loading.value = false
   }
