@@ -357,12 +357,79 @@ const handleLogout = async () => {
 <style scoped>
 .popup-enter-active,
 .popup-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .popup-enter-from,
 .popup-leave-to {
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(6px) scale(0.98);
+}
+
+header {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  will-change: padding-left, left;
+}
+
+input:focus {
+  outline: none;
+}
+
+input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.search-results-dropdown {
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.search-results-dropdown::-webkit-scrollbar {
+  width: 5px;
+}
+
+.search-results-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.search-results-dropdown::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 999px;
+}
+
+a, button {
+  touch-action: manipulation;
+}
+
+/* Dark mode search input & placeholder fixes */
+:global(.dark) input::placeholder {
+  color: #94a3b8;
+}
+
+:global(.dark) input {
+  color: #f8fafc;
+}
+
+:global(.dark) .search-results-dropdown::-webkit-scrollbar-thumb {
+  background-color: #475569;
+}
+
+:global(.dark) header {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 639px) {
+  header {
+    height: 3.75rem;
+  }
+  
+  main {
+    padding-top: 3.75rem;
+  }
 }
 </style>

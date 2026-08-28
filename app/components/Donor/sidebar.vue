@@ -271,13 +271,14 @@ const goToDashboard = async () => {
   }
 }
 
+/* Sidebar Navigation Scrollbar */
 nav {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
 
 nav::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 nav::-webkit-scrollbar-thumb {
@@ -297,6 +298,32 @@ nav::-webkit-scrollbar-track {
   scrollbar-color: #334155 transparent;
 }
 
+/* Fix for Sidebar Collapse Toggle Positioning & Alignment */
+aside {
+  position: fixed;
+  will-change: width, transform;
+}
+
+/* Centered collapse toggle with breathing room relative to top bar */
+aside > button.hidden.lg\:flex {
+  top: 18px; /* Slightly lowered to clear top bar border line */
+  right: -12px;
+  width: 24px;
+  height: 24px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 30;
+}
+
+aside > button.hidden.lg\:flex:hover {
+  transform: scale(1.1);
+}
+
+aside > button.hidden.lg\:flex:active {
+  transform: scale(0.95);
+}
+
+/* Popups and Dropdowns Animation */
 .popup-enter-active,
 .popup-leave-active {
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -308,14 +335,20 @@ nav::-webkit-scrollbar-track {
   transform: translateY(4px);
 }
 
+/* Touch & Mobile Active States */
 @media (hover: none) {
   nav a {
     transition: background 0.1s ease, color 0.1s ease;
   }
 
   nav a:active {
-    background: #1565C014 !important;
-    color: #1565C0 !important;
+    background: rgba(21, 101, 192, 0.08) !important;
+    color: #1565c0 !important;
   }
+}
+
+/* Dark Mode Fine-Tuning */
+:global(.dark) aside > button.hidden.lg\:flex {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 </style>
