@@ -37,7 +37,7 @@
               <!-- Verification Badge -->
               <NuxtLink
                 v-if="!user?.email_verified_at"
-                to="/donor/verify-email"
+                to="/auth/verify-email"
                 class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
                 title="Click to verify your email">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
