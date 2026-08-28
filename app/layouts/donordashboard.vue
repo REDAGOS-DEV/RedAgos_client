@@ -5,40 +5,65 @@
     <div :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'" class="transition-[padding-left] duration-200">
       <!-- Top bar -->
       <header
-        class="fixed top-0 left-0 right-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
+        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-14 sm:h-16 bg-[#F7F8FA] dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
         :class="collapsed ? 'lg:left-20' : 'lg:left-64'"
         :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
 
-        <!-- Mobile menu toggle -->
-        <button @click="openMobile"
-          class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
-          aria-label="Open menu">
-          <AssetIcon name="menu" :size="18" class="text-[#64748b] dark:text-slate-300" />
-        </button>
+        <!-- Left Cluster: Mobile Menu Toggle + Titles -->
+        <div class="flex items-center gap-2 min-w-0">
+          <!-- Mobile menu toggle -->
+          <button @click="openMobile"
+            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            aria-label="Open menu">
+            <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
+          </button>
 
-        <!-- Breadcrumb + greeting (desktop only) -->
-        <div class="hidden lg:flex flex-col justify-center min-w-[160px] flex-shrink-0">
-          <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
-          <span class="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{{ greeting }}</span>
+          <!-- Dynamic Page Title (Mobile view ra - ex: Dashboard, Profile, etc.) -->
+          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
+            {{ pageLabels[route.path] || 'Dashboard' }}
+          </span>
+
+          <!-- Breadcrumb + Greeting (Desktop & Tablet view) -->
+          <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
+            <span class="hidden lg:block text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">
+              {{ breadcrumb }}
+            </span>
+
+            <div class="flex items-center gap-2 leading-tight truncate">
+              <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">
+                {{ greeting }}
+              </span>
+
+              <!-- Verification Badge -->
+              <NuxtLink
+                v-if="!user?.email_verified_at"
+                to="/donor/verify-email"
+                class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
+                title="Click to verify your email">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                Verify Email
+              </NuxtLink>
+
+              <span
+                v-else
+                class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 flex-shrink-0"
+                title="Email verified">
+                ✓ Verified
+              </span>
+            </div>
+          </div>
         </div>
 
-        <!-- Mobile -->
-        <button v-if="!searchOpenMobile" @click="openMobileSearch"
-          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
-          aria-label="Open search">
-          <AssetIcon name="search" :size="17" class="text-[#64748b] dark:text-slate-300" />
-        </button>
-
-        <!-- Search bar -->
+        <!-- Search Bar (Desktop / Centered Overlay) -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-4 py-2.5 relative"
+          class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-3 py-2 relative"
           :class="[
             searchOpenMobile
-              ? 'flex flex-1'
+              ? 'flex flex-1 z-40'
               : 'hidden sm:flex sm:flex-1',
             'lg:flex-none lg:absolute lg:left-[48%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]">
-          <AssetIcon name="search" :size="15" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
+          <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
           <input ref="searchInput" v-model="searchQuery" type="text" placeholder="Search pages, records..."
             class="text-sm flex-1 min-w-0 bg-transparent outline-none placeholder:text-[#94a3b8] dark:placeholder:text-slate-500 text-gray-800 dark:text-slate-100"
             @focus="showSearchResults = true" @keydown.enter="goToTopResult" @keydown.esc="handleEscSearch"
@@ -76,17 +101,26 @@
           </Transition>
         </div>
 
-        <!-- Right cluster -->
-        <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ml-auto">
+        <!-- Right Cluster (Actions & Profile Avatar) -->
+        <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <!-- Mobile Search Trigger -->
+          <button @click="openMobileSearch"
+            class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            aria-label="Open search">
+            <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
+          </button>
+
+          <!-- Dark/Light Theme Switcher -->
           <button @click="toggleTheme"
             class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
             :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="16" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
+          <!-- Notifications -->
           <NuxtLink to="/donor/notifications"
             class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
-            <AssetIcon name="bell" :size="16" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon name="bell" :size="18" class="text-[#64748b] dark:text-slate-300" />
             <span v-if="unreadCount > 0"
               class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-white dark:ring-slate-900"
               style="background:#D32F2F">
@@ -95,16 +129,19 @@
           </NuxtLink>
 
           <!-- Divider -->
-          <div class="hidden xs:block w-px h-6 mx-1 bg-[#EEF1F5] dark:bg-slate-700" />
+          <div class="hidden xs:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
 
+          <!-- Profile Menu Dropdown -->
           <div class="relative">
             <button @click="showUserMenu = !showUserMenu"
-              class="flex items-center gap-1.5 pl-1 pr-1.5 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
+              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
               <div
-                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
-                style="background:#1565C0">
+                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900 relative"
+                style="background:#1565C0; border-radius: 9999px;">
                 <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                 <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
+                
+                <span v-if="!user?.email_verified_at" class="sm:hidden absolute top-0 right-0 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
               </div>
               <AssetIcon name="chevron-down" :size="14"
                 class="text-[#94a3b8] dark:text-slate-500 hidden sm:block transition-transform duration-150"
@@ -124,9 +161,22 @@
                     <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">{{ user?.full_name ||
-                      'Donor' }}</p>
+                    <div class="flex items-center gap-1.5">
+                      <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">
+                        {{ user?.full_name || 'Donor' }}
+                      </p>
+                      <span v-if="user?.email_verified_at" class="text-emerald-600 dark:text-emerald-400 text-xs" title="Verified">✓</span>
+                    </div>
                     <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
+
+                    <NuxtLink 
+                      v-if="!user?.email_verified_at" 
+                      to="/donor/verify-email" 
+                      @click="closeUserMenu"
+                      class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline mt-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      Verify Email Address
+                    </NuxtLink>
                   </div>
                 </div>
 
@@ -157,13 +207,13 @@
 
         <!-- Mobile search close button -->
         <button v-if="searchOpenMobile" @click="closeMobileSearch"
-          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-auto transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
           aria-label="Close search">
-          <AssetIcon name="x" :size="17" class="text-[#64748b] dark:text-slate-300" />
+          <AssetIcon name="x" :size="18" class="text-[#64748b] dark:text-slate-300" />
         </button>
       </header>
 
-      <main class="min-h-screen bg-[#F7F8FA] dark:bg-slate-900 transition-colors duration-150 pt-16">
+      <main class="min-h-screen bg-[#F7F8FA] dark:bg-slate-900 transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
     </div>
@@ -191,7 +241,6 @@ onMounted(() => {
   if (!user.value) fetchUser()
 })
 
-// I-define kini sa dili pa gamiton o i-register
 const vClickOutside = {
   mounted(el, binding) {
     el._clickOutside = (event) => {
@@ -345,7 +394,6 @@ const handleLogout = async () => {
     if (typeof logout === 'function') {
       await logout('/auth/donor/login')
     } else {
-      // Backup just in case logout isn't in useUser
       router.push('/auth/donor/login')
     }
   } catch (error) {
@@ -405,7 +453,6 @@ a, button {
   touch-action: manipulation;
 }
 
-/* Dark mode search input & placeholder fixes */
 :global(.dark) input::placeholder {
   color: #94a3b8;
 }
@@ -422,7 +469,6 @@ a, button {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Responsive adjustments */
 @media (max-width: 639px) {
   header {
     height: 3.75rem;
