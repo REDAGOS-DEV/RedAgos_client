@@ -18,7 +18,7 @@
             <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
-          <!-- Dynamic Page Title (Mobile view ra - ex: Dashboard, Profile, etc.) -->
+          <!-- Dynamic Page Title (Mobile view) -->
           <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
             {{ pageLabels[route.path] || 'Dashboard' }}
           </span>
@@ -34,27 +34,28 @@
                 {{ greeting }}
               </span>
 
-              <!-- Verification Badge -->
-              <NuxtLink
-                v-if="!user?.email_verified_at"
-                to="/auth/verify-email"
-                class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
-                title="Click to verify your email">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                Verify Email
-              </NuxtLink>
+              <!-- Email Verification Status (Desktop) -->
+              <div v-if="user?.email_verified_at" class="inline-flex items-center gap-1 flex-shrink-0">
+                <AssetIcon name="badge-check" :size="16" class="text-[#0052FF] dark:text-[#3B82F6]" />
+                <span class="text-xs font-bold text-gray-800 dark:text-slate-100">
+                  Fully Verified
+                </span>
+              </div>
 
-              <span
+              <!-- Desktop View -->
+              <NuxtLink
                 v-else
-                class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 flex-shrink-0"
-                title="Email verified">
-                ✓ Verified
-              </span>
+                to="/auth/verify-email"
+                class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
+                title="Click to verify your email">
+                <AssetIcon name="circle-alert" :size="13" class="text-amber-500 flex-shrink-0" />
+                <span>Verify Email</span>
+              </NuxtLink>
             </div>
           </div>
         </div>
 
-        <!-- Search Bar (Desktop / Centered Overlay) -->
+        <!-- Search Bar (Desktop) -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
           class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-3 py-2 relative"
           :class="[
@@ -135,19 +136,35 @@
           <div class="relative">
             <button @click="showUserMenu = !showUserMenu"
               class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
-              <div
-                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900 relative"
-                style="background:#1565C0; border-radius: 9999px;">
-                <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
+              
+              <!-- Outer Avatar Container -->
+              <div class="relative flex-shrink-0">
+                <div
+                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-white dark:ring-slate-900"
+                  style="background:#1565C0;">
+                  <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
+                  <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
+                </div>
                 
-                <span v-if="!user?.email_verified_at" class="sm:hidden absolute top-0 right-0 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                <!-- Verified Badge Icon (Mobile) -->
+                <div v-if="user?.email_verified_at" class="sm:hidden absolute -top-0.5 -right-0.5 bg-white dark:bg-slate-900 rounded-full p-0.5 shadow z-10">
+                  <AssetIcon name="badge-check" :size="12" class="text-[#0052FF]" />
+                </div>
+
+                <!-- Unverified Mobile Orange Dot Badge -->
+                <span 
+                  v-else 
+                  class="sm:hidden absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse z-10"
+                  title="Unverified Email">
+                </span>
               </div>
+
               <AssetIcon name="chevron-down" :size="14"
                 class="text-[#94a3b8] dark:text-slate-500 hidden sm:block transition-transform duration-150"
                 :class="{ 'rotate-180': showUserMenu }" />
             </button>
 
+            <!-- Profile Dropdown Card -->
             <Transition name="popup">
               <div v-if="showUserMenu" v-click-outside="closeUserMenu"
                 class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 z-40 shadow-lg"
@@ -161,22 +178,29 @@
                     <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">
-                        {{ user?.full_name || 'Donor' }}
-                      </p>
-                      <span v-if="user?.email_verified_at" class="text-emerald-600 dark:text-emerald-400 text-xs" title="Verified">✓</span>
-                    </div>
+                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">
+                      {{ user?.full_name || 'Donor' }}
+                    </p>
                     <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
 
-                    <NuxtLink 
-                      v-if="!user?.email_verified_at" 
-                      to="/donor/verify-email" 
-                      @click="closeUserMenu"
-                      class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline mt-1.5">
-                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      Verify Email Address
-                    </NuxtLink>
+                    <!-- Verification Status inside Dropdown -->
+                    <div class="flex items-center gap-1.5 mt-1.5">
+                      <template v-if="user?.email_verified_at">
+                        <AssetIcon name="badge-check" :size="16" class="text-[#0052FF] dark:text-[#3B82F6]" />
+                        <span class="text-xs font-bold text-gray-900 dark:text-slate-100">
+                          Fully Verified
+                        </span>
+                      </template>
+
+                      <NuxtLink 
+                        v-else 
+                        to="/auth/verify-email" 
+                        @click="closeUserMenu"
+                        class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline">
+                        <AssetIcon name="circle-alert" :size="14" class="text-amber-500" />
+                        <span>Verify Email Address</span>
+                      </NuxtLink>
+                    </div>
                   </div>
                 </div>
 
