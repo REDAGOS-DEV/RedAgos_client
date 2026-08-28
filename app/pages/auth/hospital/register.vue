@@ -81,7 +81,6 @@
         <div class="top-row">
           <NuxtLink to="/auth/role-selection" class="back-link">
             <AssetIcon name="chevron-left" :size="16" />
-             Back to Role Selection
           </NuxtLink>
 
           <span class="role-badge">

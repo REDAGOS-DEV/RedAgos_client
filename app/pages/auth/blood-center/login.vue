@@ -17,7 +17,6 @@
 
           <NuxtLink to="/" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
-             Back to Home
           </NuxtLink>
 
           <h1>Welcome, Blood Steward!</h1>
