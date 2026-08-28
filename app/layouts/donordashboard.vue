@@ -29,19 +29,7 @@
           <AssetIcon name="search" :size="17" class="text-[#64748b] dark:text-slate-300" />
         </button>
 
-        <!--
-          Search bar
-          NOTE: on mobile, this used to be pulled OUT of the header's normal flex flow via
-          `absolute` + `top-1/2 -translate-y-1/2`, centered independently of its siblings
-          (the hamburger and close buttons, which are centered by the header's own
-          `items-center`). Two different centering mechanisms rarely land on the exact same
-          pixel, which is why it visually drifted down toward the border instead of lining up
-          with the buttons beside it. Fix: on mobile it's now a plain flex item (`flex flex-1`)
-          inside the header row, so it's centered by the same `items-center` as everything
-          else — no independent math, no drift. `relative` (unprefixed, always on) just gives
-          the results dropdown a positioning context; it's safely overridden by `lg:absolute`
-          at the desktop breakpoint where the floating centered search bar is intentional.
-        -->
+        <!-- Search bar -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
           class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-4 py-2.5 relative"
           :class="[
@@ -194,7 +182,7 @@ import { useSidebar } from '~/composables/useSidebar.js'
 const { collapsed, openMobile } = useSidebar()
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser } = useUser()
+const { user, fetchUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
@@ -202,6 +190,21 @@ const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 onMounted(() => {
   if (!user.value) fetchUser()
 })
+
+// I-define kini sa dili pa gamiton o i-register
+const vClickOutside = {
+  mounted(el, binding) {
+    el._clickOutside = (event) => {
+      if (!(el === event.target || el.contains(event.target))) {
+        binding.value(event)
+      }
+    }
+    document.addEventListener('click', el._clickOutside, true)
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el._clickOutside, true)
+  }
+}
 
 // --- Breadcrumb + greeting ---
 const pageLabels = {
@@ -228,12 +231,9 @@ const unreadCount = ref(0)
 
 async function loadUnreadCount() {
   try {
-    // GET /api/donors/notifications/unread-count
-    // Response: { unread_count }
     const data = await donorService.notificationsUnreadCount()
     unreadCount.value = data?.unread_count ?? 0
   } catch (err) {
-    // Badge ra ni — kung mapakyas, i-hide na lang, dili angay mo-guba sa layout.
     console.error('Failed to load unread notification count:', err)
     unreadCount.value = 0
   }
@@ -256,7 +256,6 @@ const searchOpenMobile = ref(false)
 
 function openMobileSearch() {
   searchOpenMobile.value = true
-  // Wait for the DOM to render the input before focusing
   nextTick(() => searchInput.value?.focus())
 }
 
@@ -323,7 +322,6 @@ function goToTopResult() {
   searchOpenMobile.value = false
 }
 
-// ⌘F / Ctrl+F focuses the search box instead of opening browser find
 function handleGlobalKeydown(e) {
   const isCmdF = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f'
   if (isCmdF) {
@@ -340,26 +338,20 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
 
-// --- Click-outside directive ---
-const vClickOutside = {
-  mounted(el, binding) {
-    el._clickOutside = (event) => {
-      if (!(el === event.target || el.contains(event.target))) {
-        binding.value(event)
-      }
-    }
-    document.addEventListener('click', el._clickOutside, true)
-  },
-  unmounted(el) {
-    document.removeEventListener('click', el._clickOutside, true)
-  }
-}
-
+// --- LOGOUT HANDLER ---
 const handleLogout = async () => {
   showUserMenu.value = false
-  await logout('/auth/donor/login')
+  try {
+    if (typeof logout === 'function') {
+      await logout('/auth/donor/login')
+    } else {
+      // Backup just in case logout isn't in useUser
+      router.push('/auth/donor/login')
+    }
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
 }
-
 </script>
 
 <style scoped>
