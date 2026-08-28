@@ -111,14 +111,10 @@ const isDark = ref(false)
 let themeObserver = null
 
 // --- Mobile viewport awareness ---
-// The `collapsed` state only controls the DESKTOP rail width (lg:w-20 / lg:w-64).
-// On mobile the sidebar is always shown as a full-width overlay, so labels must
-// stay visible there regardless of the desktop collapsed toggle.
 const isMobile = ref(false)
 let mobileMql = null
 const updateIsMobile = (e) => {
   isMobile.value = e ? e.matches : !mobileMql.matches
-  // mobileMql.matches is true when viewport is BELOW the lg breakpoint (see mql query below)
 }
 
 // Whether labels/text should render at all
@@ -131,7 +127,6 @@ onMounted(() => {
   })
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
-  // Tailwind's `lg` breakpoint is 1024px by default
   mobileMql = window.matchMedia('(max-width: 1023px)')
   isMobile.value = mobileMql.matches
   mobileMql.addEventListener('change', updateIsMobile)
@@ -142,9 +137,9 @@ onUnmounted(() => {
   mobileMql?.removeEventListener('change', updateIsMobile)
 })
 
-// Light/dark theme tokens — matched to the redesigned dashboard's palette
-const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#FFFFFF'))
-const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#EEF1F5'))
+// Light/dark theme tokens
+const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
+const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? '#42A5F529' : '#1565C014'))
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
 const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
@@ -160,14 +155,6 @@ const router = useRouter()
 const eligibilityStatus = ref(null)
 const { user, fetchUser } = useUser()
 
-const activePath = ref(route.path || '/')
-
-watch(
-  () => route.path,
-  (newPath) => {
-    activePath.value = newPath
-  }
-)
 const navGroups = [
   {
     label: 'Main',
@@ -196,6 +183,7 @@ const bottomItems = [
   { label: 'Settings', path: '/donor/settings', icon: 'settings' },
   { label: 'Help', path: '/donor/help', icon: 'help-circle' }
 ]
+
 const loadUser = async () => {
   try {
     if (!user.value) {
@@ -219,7 +207,17 @@ const closeSidebar = () => {
 
 const hoveredPath = ref(null)
 
-const isActive = (path) => route.path === path
+// Exact Active Path Matcher (Ig-login, matic dynamic subay sa route)
+const isActive = (path) => {
+  const currentPath = route.path.replace(/\/$/, '')
+  const targetPath = path.replace(/\/$/, '')
+  
+  if (targetPath === '/donor/dashboard') {
+    return currentPath === '/donor/dashboard' || currentPath === '/donor'
+  }
+  
+  return currentPath === targetPath
+}
 
 const navStyle = (path) => {
   const active = isActive(path)
@@ -233,7 +231,7 @@ const navStyle = (path) => {
   }
 }
 
-// --- Clickable logo ---
+// Clickable logo
 const logoLoading = ref(false)
 
 const goToDashboard = async () => {
@@ -304,9 +302,8 @@ aside {
   will-change: width, transform;
 }
 
-/* Centered collapse toggle with breathing room relative to top bar */
 aside > button.hidden.lg\:flex {
-  top: 18px; /* Slightly lowered to clear top bar border line */
+  top: 18px;
   right: -12px;
   width: 24px;
   height: 24px;
@@ -347,7 +344,6 @@ aside > button.hidden.lg\:flex:active {
   }
 }
 
-/* Dark Mode Fine-Tuning */
 :global(.dark) aside > button.hidden.lg\:flex {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
