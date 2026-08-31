@@ -17,7 +17,6 @@
 
           <NuxtLink to="/" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
-             Back to Home
           </NuxtLink>
 
           <h1>Welcome, Lifesaver!</h1>
@@ -194,7 +193,7 @@ const login = async () => {
 
     const redirectPath = typeof useRoute().query.redirect === 'string'
       ? useRoute().query.redirect
-      : '/donor/Dashboard'
+      : '/donor/dashboard'
 
     await navigateTo(redirectPath)
   } catch (error) {

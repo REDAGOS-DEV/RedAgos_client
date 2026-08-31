@@ -15,35 +15,68 @@
             </div>
           </div>
 
-          <NuxtLink to="/auth/blood-center/login" class="back-link">
+          <NuxtLink to="/auth/admin/login" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
           </NuxtLink>
 
-          <h1>Forgot Password</h1>
+          <h1>Set a new password</h1>
 
           <p class="form-subtitle">
-            Enter your email and we'll send you a reset link
+            Your new password must be different from previously used passwords
           </p>
 
           <form class="login-form" @submit.prevent="submitReset">
             <div class="field-group">
-              <label for="reset-email">Email Address</label>
+              <label for="new-password">New Password*</label>
 
               <div class="input-shell">
-                <span class="field-icon">
-                  <AssetIcon name="mail" :size="18" />
-                </span>
-
                 <input
-                  id="reset-email"
-                  v-model="email"
-                  type="email"
-                  placeholder="you@example.com"
+                  id="new-password"
+                  v-model="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="Enter new password"
                   required
-                  autocomplete="email"
+                  autocomplete="new-password"
                 />
+                <button
+                  type="button"
+                  class="toggle-visibility"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  @click="showPassword = !showPassword"
+                >
+                  <AssetIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18" />
+                </button>
               </div>
             </div>
+
+            <div class="field-group">
+              <label for="confirm-password">Confirm Password*</label>
+
+              <div class="input-shell">
+                <input
+                  id="confirm-password"
+                  v-model="confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  placeholder="Re-enter new password"
+                  required
+                  autocomplete="new-password"
+                />
+                <button
+                  type="button"
+                  class="toggle-visibility"
+                  :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                >
+                  <AssetIcon :name="showConfirmPassword ? 'eye' : 'eye-off'" :size="18" />
+                </button>
+              </div>
+            </div>
+
+            <ul v-if="password" class="password-hints">
+              <li :class="{ met: hints.length }">At least 8 characters</li>
+              <li :class="{ met: hints.upperLower }">Upper &amp; lowercase letters</li>
+              <li :class="{ met: hints.number }">At least one number</li>
+            </ul>
 
             <p v-if="errorMessage" class="error-message">
               {{ errorMessage }}
@@ -54,10 +87,14 @@
             </p>
 
             <button class="sign-in-button" :disabled="loading">
-              <AssetIcon name="log-in" :size="24" />
-              {{ loading ? 'Sending...' : 'Send Reset Link' }}
+              {{ loading ? 'Resetting...' : 'Reset password' }}
             </button>
           </form>
+
+          <NuxtLink to="/auth/admin/login" class="back-to-login">
+            <AssetIcon name="chevron-left" :size="14" />
+            Back to log in
+          </NuxtLink>
         </div>
       </section>
     </div>
@@ -70,34 +107,68 @@ import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
-const email = ref('')
+const route = useRoute()
+const router = useRouter()
+
+// Gikan ni sa verify-otp step; kung wala'y token, dili dayon tugutan ni-abot
+// diri ang user aron dili ma-bypass ang OTP verification.
+const email = ref(route.query.email ? String(route.query.email) : '')
+const resetToken = ref(route.query.token ? String(route.query.token) : '')
+
+if (!email.value || !resetToken.value) {
+  router.replace('/auth/admin/forgot-password')
+}
+
+const password = ref('')
+const confirmPassword = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+const hints = computed(() => ({
+  length: password.value.length >= 8,
+  upperLower: /[a-z]/.test(password.value) && /[A-Z]/.test(password.value),
+  number: /[0-9]/.test(password.value),
+}))
+
+const isValidPassword = computed(
+  () => hints.value.length && hints.value.upperLower && hints.value.number,
+)
 
 const submitReset = async () => {
   errorMessage.value = ''
   successMessage.value = ''
 
-  if (!email.value.trim()) {
-    errorMessage.value = 'Please enter your email address.'
+  if (!isValidPassword.value) {
+    errorMessage.value = 'Password does not meet the requirements above.'
+    return
+  }
+
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Passwords do not match.'
     return
   }
 
   loading.value = true
 
   try {
-    await authService.forgotPassword({ email: email.value.trim() })
+    await authService.resetPassword({
+      email: email.value,
+      resetToken: resetToken.value,
+      password: password.value,
+    })
 
-    // Parehas ra ang mensahe bisan wala ang email sa database — dili ta
-    // mo-confirm kung kinsa ang rehistrado.
-    successMessage.value = 'If this email is registered, a reset link has been sent.'
+    successMessage.value = 'Password reset successfully. Redirecting to log in...'
+    setTimeout(() => {
+      router.push('/auth/admin/login')
+    }, 1500)
   } catch (error) {
-    // Ang server naay throttle:3,10, so lahi og kahulogan ang 429: sakto ang
-    // email, kinahanglan lang mohulat.
-    errorMessage.value = error?.status === 429
-      ? 'Too many reset requests. Please wait a few minutes and try again.'
-      : error?.message || 'Unable to send reset link at this time. Please try again later.'
+    errorMessage.value = error?.status === 410
+      ? 'This reset link has expired. Please request a new one.'
+      : error?.message || 'Unable to reset password at this time. Please try again.'
   } finally {
     loading.value = false
   }
@@ -136,7 +207,7 @@ const submitReset = async () => {
   margin-left: 140px;
 }
 
-/* ── MOBILE BRAND — curved gradient header, hidden on desktop ── */
+/* ── MOBILE BRAND ── */
 .mobile-brand {
   display: none;
 }
@@ -212,11 +283,11 @@ h1 {
 }
 
 .login-form {
-  margin-top: 54px;
+  margin-top: 40px;
 }
 
 .field-group {
-  margin: 0;
+  margin: 0 0 24px;
 }
 
 label {
@@ -245,22 +316,6 @@ label {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
-.field-icon {
-  display: flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  color: #64748b;
-}
-
-svg {
-  width: 100%;
-  height: 100%;
-}
-
 input {
   width: 100%;
   min-width: 0;
@@ -277,6 +332,67 @@ input::placeholder {
   color: #64748b;
 }
 
+.toggle-visibility {
+  display: flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 12px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.toggle-visibility:hover {
+  color: #334155;
+}
+
+.toggle-visibility svg {
+  width: 100%;
+  height: 100%;
+}
+
+.password-hints {
+  margin: -8px 0 20px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.password-hints li {
+  position: relative;
+  padding-left: 20px;
+  color: #94a3b8;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.password-hints li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+}
+
+.password-hints li.met {
+  color: #059669;
+}
+
+.password-hints li.met::before {
+  border-color: #059669;
+  background: #059669;
+}
+
 .sign-in-button {
   display: flex;
   width: 100%;
@@ -284,7 +400,7 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 12px;
+  margin-top: 4px;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, #1565C0 0%, #2563EB 100%);
@@ -296,13 +412,13 @@ input::placeholder {
   transition: box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
 }
 
-.sign-in-button:hover {
+.sign-in-button:hover:not(:disabled) {
   filter: brightness(1.05);
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.38);
 }
 
-.sign-in-button:active {
+.sign-in-button:active:not(:disabled) {
   transform: translateY(0);
 }
 
@@ -312,9 +428,20 @@ input::placeholder {
   transform: none;
 }
 
-.sign-in-button svg {
-  width: 24px;
-  height: 24px;
+.back-to-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 16px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back-to-login:hover {
+  color: #334155;
 }
 
 .error-message,

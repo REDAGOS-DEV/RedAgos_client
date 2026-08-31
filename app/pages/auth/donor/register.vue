@@ -73,7 +73,6 @@
       <div class="form-topbar">
         <NuxtLink to="/auth/role-selection" class="back-link">
           <AssetIcon name="chevron-left" :size="16" />
-          Back to Role Selection
         </NuxtLink>
 
         <span class="role-badge">
@@ -304,7 +303,7 @@ function applyValidationErrors(error) {
   }
 }
 
-/* ===== LEFT SIDE ===== */
+/* ===== LEFT PANEL (BRANDING) ===== */
 .brand-panel {
   position: relative;
   display: block;
@@ -342,29 +341,10 @@ function applyValidationErrors(error) {
   background: #ff5a74;
 }
 
-.particle1 {
-  left: 60px;
-  bottom: 260px;
-  animation: float 6s infinite ease-in-out;
-}
-
-.particle2 {
-  left: 200px;
-  bottom: 340px;
-  animation: float 8s infinite ease-in-out;
-}
-
-.particle3 {
-  left: 500px;
-  bottom: 220px;
-  animation: float 7s infinite ease-in-out;
-}
-
-.particle4 {
-  left: 420px;
-  bottom: 160px;
-  animation: float 9s infinite ease-in-out;
-}
+.particle1 { left: 60px; bottom: 260px; animation: float 6s infinite ease-in-out; }
+.particle2 { left: 200px; bottom: 340px; animation: float 8s infinite ease-in-out; }
+.particle3 { left: 500px; bottom: 220px; animation: float 7s infinite ease-in-out; }
+.particle4 { left: 420px; bottom: 160px; animation: float 9s infinite ease-in-out; }
 
 .circle {
   position: absolute;
@@ -373,23 +353,10 @@ function applyValidationErrors(error) {
   background: rgba(255, 255, 255, 0.055);
 }
 
-.circle-top {
-  top: -96px;
-  right: -128px;
-  width: 320px;
-  height: 320px;
-}
+.circle-top { top: -96px; right: -128px; width: 320px; height: 320px; }
+.circle-bottom { left: -96px; bottom: -96px; width: 384px; height: 384px; }
 
-.circle-bottom {
-  left: -96px;
-  bottom: -96px;
-  width: 384px;
-  height: 384px;
-}
-
-.brand-lockup {
-  animation: logoFloat 5s infinite ease-in-out;
-}
+.brand-lockup { animation: logoFloat 5s infinite ease-in-out; }
 
 .brand-mark {
   display: flex;
@@ -410,9 +377,7 @@ function applyValidationErrors(error) {
   letter-spacing: -0.02em;
 }
 
-.brand-name span {
-  color: #ff2f55;
-}
+.brand-name span { color: #ff2f55; }
 
 .brand-subtitle {
   margin: 8px 0 0;
@@ -505,48 +470,21 @@ function applyValidationErrors(error) {
   color: #ffffff;
 }
 
-.red-glow {
-  position: absolute;
-  left: -120px;
-  bottom: -250px;
-  width: 650px;
-  height: 650px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ff4d6d 0%, #ff2f55 20%, rgba(255, 47, 85, 0.4) 60%, transparent 85%);
-  filter: blur(100px);
-}
-
 @keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-8px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 @keyframes logoFloat {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-6px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 @media (max-width: 1023px) {
-  .brand-panel {
-    display: none;
-  }
+  .brand-panel { display: none; }
 }
 
-/* ===== RIGHT SIDE ===== */
+/* ===== RIGHT PANEL (FORM) ===== */
 .form-panel {
   padding: 48px 64px;
   background: #eef2f6;
@@ -557,6 +495,8 @@ function applyValidationErrors(error) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 32px;
 }
 
@@ -570,87 +510,84 @@ function applyValidationErrors(error) {
   text-decoration: none;
 }
 
-.back-link:hover {
-  color: #374151;
-}
+.back-link:hover { color: #374151; }
 
 .role-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: 999px;
   background: #fff5f5;
   color: #ff2f55;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(255, 47, 85, 0.18);
+  box-shadow: 0 4px 16px rgba(255, 47, 85, 0.12);
 }
 
-.role-badge svg {
-  color: #ff2f55;
-}
+.role-badge svg { color: #ff2f55; }
 
-.form-header {
-  margin-bottom: 32px;
-}
+.form-header { margin-bottom: 28px; }
 
 .form-header h1 {
   margin: 0;
   color: #111827;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .form-header p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #6b7280;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .donor-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
   max-width: 720px;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-field label {
   color: #111827;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
+/* Base input & select layout */
 .form-field input,
 .form-field select {
   width: 100%;
-  padding: 14px 16px;
+  height: 48px;
+  padding: 0 16px;
   border: 1px solid #d1d5db;
   border-radius: 12px;
   background: #ffffff;
   color: #111827;
   font-size: 14px;
   font-family: inherit;
+  line-height: normal;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   box-sizing: border-box;
 }
 
-.form-field input::placeholder {
-  color: #9ca3af;
-}
+.form-field input::placeholder { color: #9ca3af; }
 
 .form-field input:focus,
 .form-field select:focus {
@@ -659,49 +596,87 @@ function applyValidationErrors(error) {
   box-shadow: 0 0 0 3px rgba(32, 111, 189, 0.12);
 }
 
+/* DROPDOWN (SELECT) FIXES */
 .select-wrap {
   position: relative;
+  width: 100%;
+}
+
+.form-field select {
+  padding-right: 38px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .select-wrap::after {
   content: '';
   position: absolute;
   top: 50%;
-  right: 16px;
-  width: 8px;
-  height: 8px;
+  right: 14px;
+  width: 7px;
+  height: 7px;
   border-right: 2px solid #6b7280;
   border-bottom: 2px solid #6b7280;
-  transform: translateY(-70%) rotate(45deg);
+  transform: translateY(-65%) rotate(45deg);
   pointer-events: none;
 }
 
+/* NATIVE DROPDOWN OPTIONS LIST CONTROL */
+.form-field select option {
+  font-size: 13px;
+  padding: 8px 10px;
+  background-color: #ffffff;
+  color: #111827;
+}
+
+/* DATE PICKER (CALENDAR) FIXES */
+.form-field input[type='date'] {
+  padding-right: 12px;
+  color: #111827;
+}
+
+.form-field input[type='date']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  margin: 0;
+  border-radius: 4px;
+}
+
+.form-field input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: #f3f4f6;
+}
+
+/* ICON INPUT WRAPPERS */
 .input-icon-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .field-icon {
   position: absolute;
-  right: 16px;
+  right: 14px;
   color: #9ca3af;
   pointer-events: none;
 }
 
 .field-icon-left {
-  left: 16px;
+  left: 14px;
   right: auto;
 }
 
 .input-icon-wrap input.has-left-icon {
-  padding-left: 44px;
-  padding-right: 44px;
+  padding-left: 42px;
+  padding-right: 42px;
 }
 
 .toggle-visibility {
   position: absolute;
-  right: 14px;
+  right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -709,24 +684,22 @@ function applyValidationErrors(error) {
   border: none;
   color: #9ca3af;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
 }
 
-.toggle-visibility:hover {
-  color: #6b7280;
-}
+.toggle-visibility:hover { color: #6b7280; }
 
 .terms-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 14px;
+  font-size: 13px;
   color: #374151;
   cursor: pointer;
 }
 
 .terms-row input[type='checkbox'] {
-  margin-top: 3px;
+  margin-top: 2px;
   width: 16px;
   height: 16px;
   accent-color: #206fbd;
@@ -739,9 +712,7 @@ function applyValidationErrors(error) {
   text-decoration: none;
 }
 
-.terms-row a:hover {
-  text-decoration: underline;
-}
+.terms-row a:hover { text-decoration: underline; }
 
 .field-error,
 .submit-error {
@@ -760,8 +731,8 @@ function applyValidationErrors(error) {
 
 .submit-btn {
   width: 100%;
-  padding: 16px;
-  margin-top: 8px;
+  height: 48px;
+  margin-top: 4px;
   border: none;
   border-radius: 12px;
   background: #206fbd;
@@ -772,9 +743,7 @@ function applyValidationErrors(error) {
   transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.submit-btn:hover:not(:disabled) {
-  background: #1a5c9c;
-}
+.submit-btn:hover:not(:disabled) { background: #1a5c9c; }
 
 .submit-btn:disabled {
   opacity: 0.5;
@@ -785,7 +754,7 @@ function applyValidationErrors(error) {
   margin: 4px 0 0;
   text-align: center;
   color: #6b7280;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .signin-row a {
@@ -794,17 +763,66 @@ function applyValidationErrors(error) {
   text-decoration: none;
 }
 
-.signin-row a:hover {
-  text-decoration: underline;
-}
+.signin-row a:hover { text-decoration: underline; }
 
-@media (max-width: 640px) {
-  .form-panel {
-    padding: 32px 20px;
-  }
-
+/* TABLET RESPONSIVE */
+@media (max-width: 860px) {
   .form-row {
     grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 640px) {
+  .form-panel {
+    padding: 24px 16px 40px;
+  }
+
+  .form-topbar {
+    margin-bottom: 24px;
+  }
+
+  .form-header {
+    margin-bottom: 24px;
+  }
+
+  .form-header h1 {
+    font-size: 24px;
+  }
+
+  .role-badge {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  /* Input & select mobile sizing */
+  .form-field input,
+  .form-field select {
+    height: 44px;
+    font-size: 14px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 10px;
+  }
+
+  .form-field select {
+    padding-right: 34px;
+  }
+
+  .form-field select option {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .input-icon-wrap input.has-left-icon {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .submit-btn {
+    height: 46px;
+    font-size: 14px;
   }
 }
 </style>

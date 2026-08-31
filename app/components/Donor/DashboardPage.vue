@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 2.1 seconds
-Output:
 <template>
   <div class="dashboard">
     <!-- Skeleton loading state -->
@@ -25,66 +22,64 @@ Output:
     <div v-else class="dashboard-inner">
       <!-- Top header row -->
       <div class="header-row fade-in" style="--delay: 0ms">
-        <div>
+        <div class="header-titles">
           <h1 class="page-title">Here's your donor overview</h1>
           <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
         </div>
         <div class="header-actions">
-              <span v-if="eligibilityStatus === 'eligible'" class="icon-btn__dot" />
-          <NuxtLink to="/donor/appointments" class="btn-primary">
-            <AssetIcon name="calendar" :size="15" />
-            Book Appointment
+          <span v-if="eligibilityStatus === 'eligible'" class="icon-btn__dot" />
+          <NuxtLink to="/donor/appointments" class="btn-primary" aria-label="Book Appointment">
+            <AssetIcon name="calendar" :size="16" />
+            <span class="btn-text">Book Appointment</span>
           </NuxtLink>
         </div>
       </div>
 
       <!-- Eligibility banner -->
-      <div v-if="eligibilityStatus === 'eligible'" class="banner fade-in" style="--delay: 60ms">
-        <AssetIcon name="check-circle" :size="16" class="banner-icon" />
+      <div v-if="eligibilityStatus === 'eligible'" class="banner banner--success fade-in" style="--delay: 60ms">
+        <div class="banner-icon-wrapper">
+          <AssetIcon name="check-circle" :size="16" class="banner-icon" />
+        </div>
         <p class="banner-text">
           Eligibility screening is valid. Present your QR code at the blood center on arrival.
         </p>
-        <NuxtLink to="/donor/qrcode" class="banner-link">View QR</NuxtLink>
+        <NuxtLink to="/donor/qrcode" class="banner-link">View QR &rarr;</NuxtLink>
       </div>
       <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning fade-in" style="--delay: 60ms">
-        <AssetIcon name="alert" :size="16" class="banner-icon" />
+        <div class="banner-icon-wrapper">
+          <AssetIcon name="alert" :size="16" class="banner-icon" />
+        </div>
         <p class="banner-text">
           Your eligibility screening is deferred. Please contact the blood center for more information.
         </p>
-        <NuxtLink to="/donor/eligibility" class="banner-link">View Details</NuxtLink>
+        <NuxtLink to="/donor/eligibility" class="banner-link">View Details &rarr;</NuxtLink>
       </div>
 
-      <!-- Onboarding checklist, only shown to new donors na wala pa na-complete ang core flow -->
+      <!-- Onboarding checklist -->
       <div v-if="showOnboarding" class="onboarding-card fade-in" style="--delay: 80ms">
+        <div class="onboarding-card__bg-glow" />
         <div class="onboarding-card__header">
           <div>
             <p class="onboarding-card__title">Get started with RedAgos</p>
-            <p class="onboarding-card__subtitle">{{ completedSteps }} of {{ onboardingSteps.length }} steps completed</p>
+            <p class="onboarding-card__subtitle">{{ completedSteps }} of {{ onboardingSteps.length }} steps completed
+            </p>
           </div>
           <div class="onboarding-card__progress-ring">
             <svg viewBox="0 0 36 36" class="progress-ring__svg">
               <circle class="progress-ring__bg" cx="18" cy="18" r="15.5" />
-              <circle
-                class="progress-ring__fill"
-                cx="18" cy="18" r="15.5"
-                :style="{ strokeDasharray: `${progressPercent}, 100` }"
-              />
+              <circle class="progress-ring__fill" cx="18" cy="18" r="15.5"
+                :style="{ strokeDasharray: `${progressPercent}, 100` }" />
             </svg>
             <span class="progress-ring__label">{{ Math.round(progressPercent) }}%</span>
           </div>
         </div>
 
         <div class="onboarding-steps">
-          <NuxtLink
-            v-for="step in onboardingSteps"
-            :key="step.key"
-            :to="step.done ? undefined : step.path"
-            class="onboarding-step"
-            :class="{ 'onboarding-step--done': step.done, 'onboarding-step--disabled': step.done }"
-          >
-            <span class="onboarding-step__check">
+          <NuxtLink v-for="step in onboardingSteps" :key="step.key" :to="step.done ? undefined : step.path"
+            class="onboarding-step" :class="{ 'onboarding-step--done': step.done }">
+            <div class="onboarding-step__check">
               <AssetIcon v-if="step.done" name="check" :size="12" />
-            </span>
+            </div>
             <span class="onboarding-step__label">{{ step.label }}</span>
             <AssetIcon v-if="!step.done" name="chevron-right" :size="14" class="onboarding-step__arrow" />
           </NuxtLink>
@@ -96,42 +91,42 @@ Output:
         <div class="stat-card fade-in" style="--delay: 100ms">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Donations</p>
-            <div class="stat-card__badge" style="background:#1565C014">
-              <AssetIcon name="blood-drop" :size="14" style="color:#1565C0" />
+            <div class="stat-card__badge stat-card__badge--primary">
+              <AssetIcon name="blood-drop" :size="14" />
             </div>
           </div>
           <p class="stat-card__value">{{ totalDonations }}</p>
           <span class="stat-chip stat-chip--neutral">Lifetime</span>
         </div>
 
-        <div class="stat-card fade-in" style="--delay: 150ms">
+        <div class="stat-card stat-card--blood-type fade-in" style="--delay: 150ms">
           <div class="stat-card__top">
             <p class="stat-card__label">Blood Type</p>
-            <div class="stat-card__badge" style="background:#D32F2F14">
-              <AssetIcon name="blood-drop" :size="14" style="color:#D32F2F" />
+            <div class="stat-card__badge stat-card__badge--accent">
+              <AssetIcon name="blood-drop" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" style="color:#D32F2F">{{ bloodType }}</p>
+          <div class="stat-card__value-group">
+            <p class="stat-card__value text-accent">{{ bloodType }}</p>
+            <span class="blood-type-tag">Donor</span>
+          </div>
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
         </div>
 
-        <div
-          class="stat-card fade-in"
-          :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }"
-          style="--delay: 200ms"
-        >
+        <div class="stat-card fade-in" :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }"
+          style="--delay: 200ms">
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
             <div class="stat-card__badge"
-              :style="{ background: eligibilityStatus === 'eligible' ? '#2E7D3214' : '#F57C0014' }">
-              <AssetIcon name="shield-check" :size="14"
-                :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }" />
+              :class="eligibilityStatus === 'eligible' ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
+              <AssetIcon name="shield-check" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }">
+          <p class="stat-card__value" :class="eligibilityStatus === 'eligible' ? 'text-success' : 'text-warning'">
             {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus === 'deferred' ? 'Deferred' : 'Pending' }}
           </p>
-          <span class="stat-chip" :class="eligibilityStatus === 'eligible' ? 'stat-chip--success' : 'stat-chip--warning'">
+          <span class="stat-chip"
+            :class="eligibilityStatus === 'eligible' ? 'stat-chip--success' : 'stat-chip--warning'">
             {{ eligibilityStatus === 'eligible' && profile?.screening_valid_until
               ? `Until ${formatDate(profile.screening_valid_until, 'MMM D, YYYY')}`
               : 'Complete screening' }}
@@ -141,11 +136,11 @@ Output:
         <div class="stat-card fade-in" style="--delay: 250ms">
           <div class="stat-card__top">
             <p class="stat-card__label">Next Appointment</p>
-            <div class="stat-card__badge" style="background:#42A5F514">
-              <AssetIcon name="calendar" :size="14" style="color:#42A5F5" />
+            <div class="stat-card__badge stat-card__badge--secondary">
+              <AssetIcon name="calendar" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" style="color:#1565C0">{{ nextApptDate }}</p>
+          <p class="stat-card__value text-primary">{{ nextApptDate }}</p>
           <span class="stat-chip stat-chip--neutral truncate-chip">
             {{ upcomingAppointment ? upcomingAppointment.facility_name : 'No appointment scheduled' }}
           </span>
@@ -175,19 +170,10 @@ Output:
 
                 <!-- Bars -->
                 <div class="chart__plot">
-                  <div
-                    v-for="(m, i) in monthlyTrend"
-                    :key="m.key"
-                    class="chart__col"
-                    tabindex="0"
-                    role="button"
+                  <div v-for="(m, i) in monthlyTrend" :key="m.key" class="chart__col" tabindex="0" role="button"
                     :aria-label="`${m.month}: ${m.count} donation${m.count !== 1 ? 's' : ''}`"
-                    @mouseenter="hoveredMonth = i"
-                    @mouseleave="hoveredMonth = null"
-                    @focus="hoveredMonth = i"
-                    @blur="hoveredMonth = null"
-                    @click="hoveredMonth = hoveredMonth === i ? null : i"
-                  >
+                    @mouseenter="hoveredMonth = i" @mouseleave="hoveredMonth = null" @focus="hoveredMonth = i"
+                    @blur="hoveredMonth = null" @click="hoveredMonth = hoveredMonth === i ? null : i">
                     <div class="chart__tooltip" v-if="hoveredMonth === i">
                       {{ m.count }} donation{{ m.count !== 1 ? 's' : '' }}
                     </div>
@@ -200,13 +186,16 @@ Output:
                       }" :style="{ height: `${barHeight(m.count)}%` }" />
                     </div>
 
-                    <span class="chart__label" :class="{ 'chart__label--current': i === monthlyTrend.length - 1 }">{{ m.month }}</span>
+                    <span class="chart__label" :class="{ 'chart__label--current': i === monthlyTrend.length - 1 }">{{
+                      m.month }}</span>
                   </div>
                 </div>
               </div>
 
               <div v-else class="trend-empty">
-                <AssetIcon name="trending-up" :size="36" style="color:#e5e7eb" />
+                <div class="trend-empty__icon">
+                  <AssetIcon name="trending-up" :size="28" />
+                </div>
                 <p>Not enough data yet to show a trend</p>
               </div>
             </div>
@@ -228,32 +217,34 @@ Output:
             <div v-if="recentDonations.length" class="donation-list">
               <div v-for="d in recentDonations" :key="d.id" class="donation-item">
                 <div class="donation-item__left">
-                  <div class="donation-icon" :style="{ background: d.status === 'completed' ? '#2E7D3214' : '#F57C0014' }">
-                    <AssetIcon name="blood-drop" :size="15"
-                      :style="{ color: d.status === 'completed' ? '#2E7D32' : '#F57C00' }" />
+                  <div class="donation-icon"
+                    :class="d.status === 'completed' ? 'donation-icon--success' : 'donation-icon--warning'">
+                    <AssetIcon name="blood-drop" :size="15" />
                   </div>
                   <div>
                     <p class="donation-title">
-                      {{ d.status === 'completed' ? 'Successful Donation' : d.status === 'deferred' ? 'Deferred' : 'Pending' }}
+                      {{ d.status === 'completed' ? 'Successful Donation' : d.status === 'deferred' ? 'Deferred' :
+                        'Pending' }}
                     </p>
                     <p class="donation-meta">
-                      {{ d.blood_type }} &middot; {{ d.facility_name }} &middot; {{ d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
+                      <strong class="text-accent">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
+                        d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
                     </p>
                   </div>
                 </div>
                 <div class="donation-item__right">
                   <p class="donation-date">{{ formatDate(d.donation_date, 'MMM D, YYYY') }}</p>
-                  <span class="badge capitalize" :style="{
-                    background: d.status === 'completed' ? '#2E7D3214' : '#F57C0014',
-                    color: d.status === 'completed' ? '#2E7D32' : '#F57C00',
-                  }">
+                  <span class="badge capitalize"
+                    :class="d.status === 'completed' ? 'badge--success' : 'badge--warning'">
                     {{ d.status === 'completed' ? 'Completed' : d.status }}
                   </span>
                 </div>
               </div>
             </div>
             <div v-else class="empty-state">
-              <AssetIcon name="history" :size="36" style="color:#e5e7eb" />
+              <div class="empty-state__icon">
+                <AssetIcon name="history" :size="28" />
+              </div>
               <p>No donations yet</p>
             </div>
           </div>
@@ -271,8 +262,10 @@ Output:
             <div v-if="upcomingAppointment" class="appt-body">
               <div class="appt-row">
                 <div class="appt-date-chip">
-                  <span class="appt-date-chip__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D') }}</span>
-                  <span class="appt-date-chip__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM') }}</span>
+                  <span class="appt-date-chip__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D')
+                  }}</span>
+                  <span class="appt-date-chip__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM')
+                  }}</span>
                 </div>
                 <div class="appt-info">
                   <p class="appt-type">
@@ -288,10 +281,15 @@ Output:
                   </div>
                 </div>
               </div>
-              <div class="appt-notice">Present QR code on arrival</div>
+              <div class="appt-notice">
+                <AssetIcon name="qr-code" :size="14" />
+                Present QR code on arrival
+              </div>
             </div>
             <div v-else class="empty-state">
-              <AssetIcon name="calendar" :size="36" style="color:#e5e7eb" />
+              <div class="empty-state__icon">
+                <AssetIcon name="calendar" :size="28" />
+              </div>
               <p class="mb-3">No upcoming appointments</p>
               <NuxtLink to="/donor/appointments" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
             </div>
@@ -303,13 +301,11 @@ Output:
               <h2 class="panel-title">Eligibility Status</h2>
             </div>
             <div class="eligibility-body">
-              <div class="eligibility-status-row" :style="{
-                background: eligibilityStatus === 'eligible' ? '#E8F5E9' : eligibilityStatus === 'deferred' ? '#FFEBEE' : '#FFF8E1'}">
-                <AssetIcon name="shield-check" :size="18"
-                  :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }" />
+              <div class="eligibility-status-row"
+                :class="eligibilityStatus === 'eligible' ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
+                <AssetIcon name="shield-check" :size="20" />
                 <div>
-                  <p class="eligibility-status capitalize"
-                    :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : eligibilityStatus === 'deferred' ? '#D32F2F' : '#F57C00' }">
+                  <p class="eligibility-status capitalize">
                     {{ eligibilityStatus }}
                   </p>
                   <p v-if="profile?.screening_valid_until" class="eligibility-until">
@@ -321,11 +317,12 @@ Output:
               <div class="eligibility-details">
                 <div v-if="profile?.screening_date" class="eligibility-details__row">
                   <span class="eligibility-details__label">Screening date</span>
-                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY') }}</span>
+                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY')
+                  }}</span>
                 </div>
                 <div class="eligibility-details__row">
                   <span class="eligibility-details__label">Blood type</span>
-                  <span class="eligibility-details__value" style="color:#D32F2F">{{ bloodType }}</span>
+                  <span class="eligibility-details__value text-accent font-extrabold">{{ bloodType }}</span>
                 </div>
               </div>
 
@@ -342,8 +339,8 @@ Output:
             </div>
             <div class="quick-actions">
               <NuxtLink v-for="item in quickActions" :key="item.path" :to="item.path" class="quick-action">
-                <div class="quick-action__icon" :style="{ background: `${item.color}14` }">
-                  <AssetIcon :name="item.icon" :size="15" :style="{ color: item.color }" />
+                <div class="quick-action__icon" :style="{ '--qa-color': item.color }">
+                  <AssetIcon :name="item.icon" :size="15" />
                 </div>
                 <span class="quick-action__label">{{ item.label }}</span>
                 <AssetIcon name="chevron-right" :size="14" class="quick-action__chevron" />
@@ -361,12 +358,11 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted, onActivated } from 'vue'
 import { donorService } from '~/api/donor/DonorService'
 
-
 const loading = ref(true)
 
 // Core donor data
 const profile = ref(null)
-const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'pending'
+const eligibilityStatus = ref('pending')
 const bloodType = ref('-')
 const totalDonations = ref(0)
 const upcomingAppointment = ref(null)
@@ -435,11 +431,8 @@ const onboardingSteps = computed(() => [
 
 const completedSteps = computed(() => onboardingSteps.value.filter(s => s.done).length)
 const progressPercent = computed(() => (completedSteps.value / onboardingSteps.value.length) * 100)
-
-// once everything is complete, mawala nani sya.
 const showOnboarding = computed(() => completedSteps.value < onboardingSteps.value.length)
 
-// 'D', 'MMM', 'MMM D', 'MMM D, YYYY', 'h:mm A'
 function formatDate(value, fmt) {
   if (!value) return '—'
   const d = new Date(value)
@@ -469,9 +462,6 @@ function formatDate(value, fmt) {
   }
 }
 
-// Gi-keepalive ni nga page. Tan-awa ang AppointmentsPage para sa detalye —
-// ang onActivated mo-refresh sa background nga walay skeleton, ug gi-guard sa
-// loadedOnce kay mo-fire sad siya human sa unang onMounted.
 let loadedOnce = false
 
 async function load({ silent = false } = {}) {
@@ -506,42 +496,47 @@ onActivated(() => {
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
-  --text-primary: #1f2937;
-  --text-secondary: #94a3b8;
-  --border: #eef1f5;
-  font-family: var(--rb-font-sans);
-  max-width: 1200px;
-  background: #F7F8FA;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --card-bg: #ffffff;
+
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  max-width: 1280px;
+  background: #f8fafc;
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 28px 32px 56px;
   transition: background-color 0.2s ease;
 }
 
-/* Skeleton loading */
+.text-primary { color: var(--primary) !important; }
+.text-accent { color: var(--accent) !important; }
+.text-success { color: var(--success) !important; }
+.text-warning { color: var(--warning) !important; }
+.font-extrabold { font-weight: 800; }
+
 .skeleton {
-  background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
   background-size: 400% 100%;
-  border-radius: 14px;
+  border-radius: 12px;
   animation: shimmer 1.4s ease infinite;
 }
-
 .skeleton--header { height: 44px; max-width: 320px; }
-.skeleton--card { height: 108px; }
-.skeleton--panel { border-radius: 14px; }
+.skeleton--card { height: 112px; }
+.skeleton--panel { border-radius: 16px; }
 
 @keyframes shimmer {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
 
-/* Entrance animation */
 .fade-in {
-  animation: fadeInUp 0.45s ease both;
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--delay, 0ms);
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -552,163 +547,193 @@ onActivated(() => {
 .dashboard-inner {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 
-/* Header */
+/* Header Section */
 .header-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  padding-bottom: 4px;
+  width: 100%;
+}
+
+.header-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
 }
 
 .page-title {
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1.15;
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  margin: 3px 0 0;
+  margin: 6px 0 0;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-
-.icon-btn:hover {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-}
-
-.icon-btn:focus-within {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.icon-btn a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  color: #64748b;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .icon-btn__dot {
   position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
   border-radius: 999px;
   background: var(--accent);
-  border: 1.5px solid white;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
 }
 
 .btn-primary {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 15px;
-  border-radius: 10px;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 12px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: white;
-  background: var(--primary);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
+  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.3);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   border: none;
   cursor: pointer;
   text-decoration: none;
 }
 
 .btn-primary:hover {
-  opacity: 0.92;
-  transform: translateY(-1px);
-}
-
-.btn-primary:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.4);
 }
 
 .btn-primary--sm {
-  padding: 8px 18px;
+  padding: 9px 18px;
   font-size: 12px;
   border-radius: 10px;
 }
 
 .btn-danger {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  text-align: center;
   font-size: 13px;
   font-weight: 700;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--accent);
+  padding: 12px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent) 0%, #b71c1c 100%);
   color: white;
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  box-shadow: 0 4px 14px rgba(211, 47, 47, 0.25);
+  transition: all 0.2s ease;
 }
 
 .btn-danger:hover {
-  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(211, 47, 47, 0.35);
 }
 
-.btn-danger:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Banner */
+/* Custom Banners */
 .banner {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
+  border-radius: 14px;
+  padding: 12px 18px;
+  position: relative;
+  overflow: hidden;
 }
 
-.banner-icon {
+.banner--success {
+  background: rgba(46, 125, 50, 0.05);
+  border: 1px solid rgba(46, 125, 50, 0.25);
   color: var(--success);
+}
+
+.banner--success::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--success);
+}
+
+.banner--warning {
+  background: rgba(245, 124, 0, 0.05);
+  border: 1px solid rgba(245, 124, 0, 0.25);
+  color: var(--warning);
+}
+
+.banner--warning::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--warning);
+}
+
+.banner-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
-.banner-text {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--success);
-  margin: 0;
-}
+.banner--success .banner-icon-wrapper { background: rgba(46, 125, 50, 0.12); }
+.banner--warning .banner-icon-wrapper { background: rgba(245, 124, 0, 0.12); }
+
+.banner-icon { color: currentColor; flex-shrink: 0; display: block; }
+.banner-text { font-size: 12.5px; font-weight: 600; margin: 0; color: var(--text-primary); }
 
 .banner-link {
   margin-left: auto;
   font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
-  color: var(--success);
+  font-weight: 800;
+  text-decoration: none;
+  color: currentColor;
   flex-shrink: 0;
+  transition: opacity 0.15s ease;
 }
 
-/* Onboarding checklist */
+.banner-link:hover { opacity: 0.8; text-decoration: underline; }
+
+/* Onboarding Hero Card */
 .onboarding-card {
-  background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
-  border-radius: 14px;
-  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 55%, #1976d2 100%);
+  border-radius: 20px;
+  padding: 24px 28px;
   color: white;
-  box-shadow: 0 4px 16px rgba(21, 101, 192, 0.18);
+  box-shadow: 0 12px 30px -4px rgba(21, 101, 192, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .onboarding-card__header {
@@ -716,46 +741,26 @@ onActivated(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
 }
 
-.onboarding-card__title {
-  font-size: 14.5px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.onboarding-card__subtitle {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  margin: 2px 0 0;
-}
+.onboarding-card__title { font-size: 18px; font-weight: 800; margin: 0; }
+.onboarding-card__subtitle { font-size: 13px; opacity: 0.85; margin: 4px 0 0; }
 
 .onboarding-card__progress-ring {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
 }
 
-.progress-ring__svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.progress-ring__bg {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.25);
-  stroke-width: 3;
-}
-
+.progress-ring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.progress-ring__bg { fill: none; stroke: rgba(255, 255, 255, 0.22); stroke-width: 3.5; }
 .progress-ring__fill {
   fill: none;
   stroke: white;
-  stroke-width: 3;
+  stroke-width: 3.5;
   stroke-linecap: round;
-  transition: stroke-dasharray 0.4s ease;
+  transition: stroke-dasharray 0.5s ease;
 }
 
 .progress-ring__label {
@@ -764,48 +769,47 @@ onActivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .onboarding-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .onboarding-step {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 999px;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.12);
-  color: white;
-  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-step:hover {
-  background: rgba(255, 255, 255, 0.2);
+.onboarding-step:not(.onboarding-step--disabled):hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .onboarding-step--done {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.onboarding-step--disabled {
-  cursor: default;
-  pointer-events: none;
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .onboarding-step__check {
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
@@ -815,76 +819,93 @@ onActivated(() => {
 
 .onboarding-step--done .onboarding-step__check {
   background: white;
-  color: #1565C0;
+  color: var(--primary);
   border-color: white;
 }
 
-.onboarding-step__arrow {
-  opacity: 0.6;
-}
+.onboarding-step__label { flex: 1; white-space: normal; word-break: break-word; }
+.onboarding-step__arrow { flex-shrink: 0; opacity: 0.8; }
 
-/* Stats */
+/* Stat Cards */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
 
 .stat-card {
-  background: white;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  background: var(--card-bg);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 6px 16px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.2s ease;
+  gap: 10px;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-  border-color: #e2e8f0;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
 }
 
-/* Emphasized stat card */
+.stat-card--blood-type {
+  border-top: 3px solid var(--accent);
+  background: linear-gradient(180deg, rgba(211, 47, 47, 0.02) 0%, var(--card-bg) 40%);
+}
+
 .stat-card--emphasized {
-  border-color: #F57C0040;
-  box-shadow: 0 0 0 1px #F57C0020, 0 4px 14px rgba(245, 124, 0, 0.08);
+  border-color: rgba(245, 124, 0, 0.5);
+  box-shadow: 0 0 0 1px rgba(245, 124, 0, 0.2), 0 8px 20px rgba(245, 124, 0, 0.1);
 }
 
-.stat-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
+.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
 .stat-card__label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin: 0;
 }
 
 .stat-card__badge {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
+.stat-card__badge--primary { background: rgba(21, 101, 192, 0.08); color: var(--primary); }
+.stat-card__badge--secondary { background: rgba(66, 165, 245, 0.1); color: #0288d1; }
+.stat-card__badge--accent { background: rgba(211, 47, 47, 0.08); color: var(--accent); }
+.stat-card__badge--success { background: rgba(46, 125, 50, 0.08); color: var(--success); }
+.stat-card__badge--warning { background: rgba(245, 124, 0, 0.08); color: var(--warning); }
+
+.stat-card__value-group { display: flex; align-items: baseline; gap: 8px; }
 .stat-card__value {
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 900;
   color: var(--text-primary);
   margin: 0;
   line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.blood-type-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(211, 47, 47, 0.1);
+  color: var(--accent);
 }
 
 .stat-chip {
@@ -893,148 +914,97 @@ onActivated(() => {
   align-self: flex-start;
   max-width: 100%;
   font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
+  font-weight: 700;
+  padding: 3px 10px;
   border-radius: 999px;
 }
 
-.stat-chip--neutral {
-  background: #f1f5f9;
-  color: #64748b;
-}
+.stat-chip--neutral { background: #f1f5f9; color: var(--text-secondary); }
+.stat-chip--success { background: rgba(46, 125, 50, 0.1); color: var(--success); }
+.stat-chip--warning { background: rgba(245, 124, 0, 0.1); color: var(--warning); }
 
-.stat-chip--success {
-  background: #2E7D3214;
-  color: var(--success);
-}
+.truncate-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.stat-chip--warning {
-  background: #F57C0014;
-  color: var(--warning);
-}
-
-.truncate-chip {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Layout */
+/* Layout Structure */
 .main-grid {
   display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 20px;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 22px;
 }
 
-.col-left,
-.col-right {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+.col-left, .col-right { display: flex; flex-direction: column; gap: 22px; }
 
 /* Panels */
 .panel {
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  background: var(--card-bg);
+  border-radius: 18px;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 6px 16px rgba(15, 23, 42, 0.03);
   border: 1px solid var(--border);
   overflow: hidden;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 18px;
+  padding: 18px 22px;
   border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff 0%, rgba(248, 250, 252, 0.6) 100%);
 }
 
-.panel-header--simple {
-  padding: 15px 18px;
-}
+.panel-header--simple { padding: 18px 22px; }
 
 .panel-title {
-  font-weight: 700;
-  font-size: 13.5px;
+  font-weight: 800;
+  font-size: 15px;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
-.panel-subtitle {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
+.panel-subtitle { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
 
 .period-pill {
   font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  background: #f1f5f9;
-  padding: 5px 10px;
+  font-weight: 800;
+  color: var(--primary);
+  background: rgba(21, 101, 192, 0.08);
+  padding: 4px 12px;
   border-radius: 999px;
-  flex-shrink: 0;
+  border: 1px solid rgba(21, 101, 192, 0.12);
 }
 
-.panel-link {
+.panel-link, .panel-link-plain {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
   color: var(--primary);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   text-decoration: none;
-  border-radius: 4px;
+  transition: color 0.15s ease;
 }
 
-.panel-link:hover { text-decoration: underline; }
+.panel-link:hover, .panel-link-plain:hover { color: #0d47a1; text-decoration: underline; }
 
-.panel-link:focus-visible,
-.panel-link-plain:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.panel-link-plain {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary);
-  text-decoration: none;
-  border-radius: 4px;
-}
-
-.panel-link-plain:hover { text-decoration: underline; }
-
-/* Trend chart */
-.trend-chart {
-  padding: 14px 18px 18px;
-}
-
-.chart {
-  display: flex;
-  gap: 8px;
-  height: 150px;
-}
+/* Chart */
+.trend-chart { padding: 22px 22px 24px; }
+.chart { display: flex; gap: 14px; height: 165px; }
 
 .chart__yaxis {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-size: 10.5px;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-secondary);
-  padding-bottom: 20px;
+  padding-bottom: 24px;
   text-align: right;
   width: 20px;
 }
 
-.chart__plot {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
+.chart__plot { flex: 1; display: flex; align-items: flex-end; gap: 8px; }
 
 .chart__col {
   position: relative;
@@ -1044,27 +1014,24 @@ onActivated(() => {
   align-items: center;
   height: 100%;
   cursor: pointer;
-  border-radius: 6px;
-}
-
-.chart__col:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: none;
+  padding: 0 2px;
 }
 
 .chart__tooltip {
   position: absolute;
-  top: -26px;
+  top: -30px;
   left: 50%;
   transform: translateX(-50%);
-  background: #1f2937;
+  background: #0f172a;
   border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 4px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
   color: white;
   white-space: nowrap;
-  z-index: 2;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .chart__track {
@@ -1073,72 +1040,225 @@ onActivated(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  background: rgba(241, 245, 249, 0.8);
+  border-radius: 8px;
+  padding: 3px;
+  transition: background 0.2s ease;
 }
 
+.chart__col:hover .chart__track { background: rgba(226, 232, 240, 0.9); }
+
 .chart__bar {
-  width: 60%;
+  width: 100%;
   max-width: 16px;
-  border-radius: 4px 4px 0 0;
-  background: #dce3ee;
-  transition: height 0.4s ease, background 0.2s ease;
+  border-radius: 6px;
+  background: #cbd5e1;
+  transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
 }
 
 .chart__bar--current {
-  background: var(--primary);
+  background: linear-gradient(180deg, var(--secondary) 0%, var(--primary) 100%);
+  box-shadow: 0 3px 10px rgba(21, 101, 192, 0.35);
 }
 
-.chart__bar--low {
-  background: var(--warning);
-}
+.chart__bar--low { background: linear-gradient(180deg, #ffb74d 0%, var(--warning) 100%); }
+.chart__bar--empty { background: transparent; }
 
-.chart__bar--empty {
-  background: #eef1f5;
-}
-
-.chart__label {
-  margin-top: 6px;
-  font-size: 10.5px;
-  color: var(--text-secondary);
-}
-
-.chart__label--current {
-  color: var(--primary);
-  font-weight: 700;
-}
+.chart__label { margin-top: 8px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); }
+.chart__label--current { color: var(--primary); font-weight: 900; }
 
 .trend-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 22px;
+  justify-content: center;
+  gap: 12px;
+  padding: 36px;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-/* Donation list */
-.donation-list {
+.trend-empty__icon, .empty-state__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f1f5f9;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
 }
+
+/* Donation Activity List */
+.donation-list { display: flex; flex-direction: column; }
 
 .donation-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
-  border-bottom: 1px solid #fafbfc;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
 }
 
 .donation-item:last-child { border-bottom: none; }
+.donation-item:hover { background: rgba(248, 250, 252, 0.85); }
 
-.donation-item__left {
+.donation-item__left { display: flex; align-items: center; gap: 14px; }
+
+.donation-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.donation-icon--success { background: rgba(46, 125, 50, 0.08); color: var(--success); }
+.donation-icon--warning { background: rgba(245, 124, 0, 0.08); color: var(--warning); }
+
+.donation-title { font-size: 13.5px; font-weight: 800; color: var(--text-primary); margin: 0; }
+.donation-meta { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
+.donation-item__right { text-align: right; flex-shrink: 0; }
+.donation-date { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); margin: 0; }
+
+.badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.badge--success { background: rgba(46, 125, 50, 0.1); color: var(--success); }
+.badge--warning { background: rgba(245, 124, 0, 0.1); color: var(--warning); }
+.capitalize { text-transform: capitalize; }
+
+.empty-state {
+  padding: 36px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Appointment Widget Details */
+.appt-body { padding: 22px; }
+.appt-row { display: flex; align-items: center; gap: 16px; }
+
+.appt-date-chip {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
+}
+
+.appt-date-chip__day { color: white; font-weight: 900; font-size: 22px; line-height: 1; }
+.appt-date-chip__month { color: rgba(255, 255, 255, 0.85); font-size: 10px; text-transform: uppercase; font-weight: 800; margin-top: 2px; }
+
+.appt-info { flex: 1; min-width: 0; }
+.appt-type { font-weight: 800; font-size: 14px; margin: 0; color: var(--text-primary); }
+
+.appt-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.appt-notice {
+  margin-top: 18px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(21, 101, 192, 0.05);
+  color: var(--primary);
+  border: 1px dashed rgba(21, 101, 192, 0.25);
+}
+
+/* Eligibility Body */
+.eligibility-body { padding: 22px; }
+
+.eligibility-status-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 18px;
 }
 
-.donation-icon {
+.eligibility-status-row--eligible {
+  background: rgba(46, 125, 50, 0.06);
+  color: var(--success);
+  border: 1px solid rgba(46, 125, 50, 0.18);
+}
+
+.eligibility-status-row--deferred {
+  background: rgba(211, 47, 47, 0.06);
+  color: var(--accent);
+  border: 1px solid rgba(211, 47, 47, 0.18);
+}
+
+.eligibility-status-row--pending {
+  background: rgba(245, 124, 0, 0.06);
+  color: var(--warning);
+  border: 1px solid rgba(245, 124, 0, 0.18);
+}
+
+.eligibility-status { font-size: 14px; font-weight: 900; margin: 0; }
+.eligibility-until { font-size: 11.5px; opacity: 0.85; margin: 2px 0 0; }
+
+.eligibility-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12.5px;
+  margin-bottom: 18px;
+  padding: 0 4px;
+}
+
+.eligibility-details__row { display: flex; justify-content: space-between; align-items: center; }
+.eligibility-details__label { color: var(--text-secondary); font-weight: 600; }
+.eligibility-details__value { font-weight: 800; color: var(--text-primary); }
+
+/* Quick Actions List */
+.quick-actions { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.quick-action:hover { background: #f1f5f9; transform: translateX(3px); }
+
+.quick-action__icon {
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -1146,281 +1266,126 @@ onActivated(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--qa-color, var(--primary));
 }
 
-.donation-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
+.quick-action__label { font-size: 13px; font-weight: 700; color: var(--text-primary); flex: 1; }
+.quick-action__chevron { color: #cbd5e1; transition: all 0.15s ease; }
+.quick-action:hover .quick-action__chevron { color: var(--primary); transform: translateX(2px); }
 
-.donation-meta {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
-
-.donation-item__right {
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.donation-date {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  display: inline-block;
-  margin-top: 4px;
-}
-
-.capitalize { text-transform: capitalize; }
-
-.empty-state {
-  padding: 28px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-/* Appointment */
-.appt-body { padding: 18px; }
-
-.appt-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.appt-date-chip {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--primary);
-}
-
-.appt-date-chip__day {
-  color: white;
-  font-weight: 800;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.appt-date-chip__month {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 9.5px;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.appt-info { flex: 1; min-width: 0; }
-
-.appt-type {
-  font-weight: 700;
-  font-size: 13.5px;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.appt-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-  font-size: 11.5px;
-  color: var(--text-secondary);
-}
-
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.appt-notice {
-  margin-top: 14px;
-  border-radius: 10px;
-  padding: 9px 14px;
-  font-size: 11.5px;
-  font-weight: 600;
-  text-align: center;
-  background: #e3f2fd;
-  color: var(--primary);
-}
-
-/* Eligibility */
-.eligibility-body { padding: 18px; }
-
-.eligibility-status-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 14px;
-}
-
-.eligibility-status {
-  font-size: 13.5px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.eligibility-until {
-  font-size: 11.5px;
-  color: #6b7280;
-  margin: 2px 0 0;
-}
-
-.eligibility-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
-  margin-bottom: 14px;
-}
-
-.eligibility-details__row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.eligibility-details__label { color: var(--text-secondary); }
-
-.eligibility-details__value {
-  font-weight: 700;
-  color: #374151;
-}
-
-/* Quick actions */
-.quick-actions {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.quick-action {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-
-.quick-action:hover { background: #f8fafc; }
-
-.quick-action:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  background: #f8fafc;
-}
-
-.quick-action__icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.quick-action__label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  flex: 1;
-}
-
-.quick-action__chevron {
-  color: #d1d5db;
-  transition: color 0.15s ease;
-}
-
-.quick-action:hover .quick-action__chevron { color: #94a3b8; }
-
-/* Responsive */
+/* Responsive Overrides */
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .main-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
-  .dashboard { padding: 16px 16px 32px; }
-  .header-row { flex-direction: column; align-items: stretch; }
-  .header-actions { justify-content: space-between; }
+  .dashboard {
+    padding: 16px 16px 36px;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .header-titles {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-actions {
+    padding-right: 4px; /* Safety distance para sa red dot */
+    margin-top: 2px;
+  }
+
+  /* Compact button icon style sa mobile */
+  .btn-primary {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  /* I-hide ang button text sa mobile */
+  .btn-primary .btn-text {
+    display: none;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 12.5px;
+  }
+
+  .onboarding-card {
+    padding: 18px 20px;
+  }
+
+.onboarding-card__header {
+    flex-direction: row; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 12px;
+  }
+
+  .onboarding-steps {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-/* ============ Dark mode ============ */
+/* High-Contrast Dark Mode Enhancements */
 :global(.dark .dashboard) {
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
   --border: #334155;
-  background: #0F172A;
+  --card-bg: #1e293b;
+  background: #0f172a;
 }
 
-:global(.dark .icon-btn),
-:global(.dark .stat-card),
-:global(.dark .panel) {
-  background: #1E293B;
-  border-color: #334155;
+:global(.dark .panel-header) {
+  background: linear-gradient(180deg, #1e293b 0%, rgba(15, 23, 42, 0.5) 100%);
 }
 
-:global(.dark .icon-btn:hover),
-:global(.dark .quick-action:hover),
-:global(.dark .quick-action:focus-visible) {
-  background: #263449;
-}
-
-:global(.dark .icon-btn a) { color: #94a3b8; }
-:global(.dark .icon-btn__dot) { border-color: #1E293B; }
-
+:global(.dark .stat-card) { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
 :global(.dark .stat-card:hover) { border-color: #475569; }
+:global(.dark .stat-card--blood-type) { background: linear-gradient(180deg, rgba(211, 47, 47, 0.08) 0%, var(--card-bg) 50%); }
 
-:global(.dark .stat-card--emphasized) {
-  border-color: #F57C0055;
-  box-shadow: 0 0 0 1px #F57C0033, 0 4px 14px rgba(245, 124, 0, 0.12);
+:global(.dark .banner--success) {
+  background: rgba(46, 125, 50, 0.15);
+  border-color: rgba(76, 175, 80, 0.4);
+  color: #81c784;
+}
+
+:global(.dark .banner--success .banner-text) { color: #f8fafc; }
+:global(.dark .banner--success .banner-link) { color: #81c784; }
+:global(.dark .text-success) { color: #4caf50 !important; }
+
+:global(.dark .stat-chip--success) {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
 }
 
 :global(.dark .stat-chip--neutral),
-:global(.dark .period-pill) {
-  background: #243247;
+:global(.dark .trend-empty__icon),
+:global(.dark .empty-state__icon) {
+  background: #334155;
   color: #94a3b8;
 }
 
-:global(.dark .panel-header) { border-color: #334155; }
-
-:global(.dark .chart__bar) { background: #334155; }
-:global(.dark .chart__bar--empty) { background: #263449; }
-:global(.dark .chart__tooltip) { background: #0F172A; border: 1px solid #334155; }
-
-:global(.dark .donation-item) { border-color: #263449; }
-:global(.dark .appt-notice) { background: rgba(66,165,245,0.14); }
-:global(.dark .eligibility-details__value) { color: #E2E8F0; }
-:global(.dark .quick-action__label) { color: #E2E8F0; }
-:global(.dark .quick-action__chevron) { color: #475569; }
-
-:global(.dark .banner) { background: rgba(102,187,106,0.14); border-color: rgba(102,187,106,0.3); }
-:global(.dark .banner--warning) { background: rgba(255,167,38,0.14); border-color: rgba(255,167,38,0.3); }
-
-:global(.dark .onboarding-step) { background: rgba(255,255,255,0.1); }
-
-:global(.dark .skeleton) {
-  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
-}
+:global(.dark .chart__track) { background: rgba(15, 23, 42, 0.6); }
+:global(.dark .chart__col:hover .chart__track) { background: rgba(51, 65, 85, 0.8); }
+:global(.dark .chart__bar) { background: #475569; }
+:global(.dark .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
+:global(.dark .quick-action:hover) { background: #334155; }
+:global(.dark .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
+:global(.dark .skeleton) { background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 </style>
