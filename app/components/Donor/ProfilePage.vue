@@ -138,6 +138,12 @@ Output:
               <span class="status-row__value" style="color:#2E7D32">{{ nextEligibleLabel }}</span>
             </div>
             <div class="status-row">
+              <span class="status-row__label">Valid ID</span>
+              <span class="status-row__value" :style="{ color: identityStatusColor }">
+                {{ identityStatusLabel }}
+              </span>
+            </div>
+            <div class="status-row">
               <span class="status-row__label">QR code</span>
               <span
                 class="status-row__value"
@@ -181,6 +187,11 @@ Output:
               <button class="btn-outline" @click="handleLogout">Log out</button>
             </div>
           </div>
+        </div>
+
+        <!-- Valid ID card -->
+        <div class="panel fade-in" style="--delay: 250ms">
+          <IdentityVerification :identity="identity" @submitted="handleIdentitySubmitted" />
         </div>
       </div>
 
@@ -273,6 +284,7 @@ Output:
 
 <script setup>
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
+import IdentityVerification from '~/components/profile/IdentityVerification.vue'
 import { donorService } from '~/api/donor/DonorService'
 
 
@@ -370,8 +382,30 @@ const nextEligibleLabel = computed(() => {
   return next <= new Date() ? 'Now' : formatDate(profile.value.next_eligible_date)
 })
 
+const identity = computed(() => profile.value?.identity || null)
+
+const identityStatusLabel = computed(() => ({
+  unsubmitted: 'Not submitted',
+  pending: 'Under review',
+  verified: 'Verified',
+  rejected: 'Not approved',
+}[identity.value?.status] || 'Not submitted'))
+
+const identityStatusColor = computed(() => ({
+  unsubmitted: '#64748B',
+  pending: '#F57C00',
+  verified: '#2E7D32',
+  rejected: '#D32F2F',
+}[identity.value?.status] || '#64748B'))
+
 function handleAvatarUpdated(newUrl) {
   updateAvatar(newUrl)
+}
+
+// Ang submit response kay ang buo nga profile payload na, so dili na kinahanglan
+// og laing fetch para ma-update ang badge ug ang status row.
+function handleIdentitySubmitted(updatedProfile) {
+  if (updatedProfile) profile.value = updatedProfile
 }
 
 async function handleProfileSave() {

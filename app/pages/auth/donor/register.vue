@@ -199,6 +199,33 @@
           <p v-if="fieldErrors.address" class="field-error">{{ fieldErrors.address }}</p>
         </div>
 
+        <!--
+          Optional gyud ni. Ang litrato sa ID kay sa profile na i-upload; diri
+          ang number ra, para makit-an dayon sa counter ang donor pinaagi sa ID
+          nga iyang dala.
+        -->
+        <div class="form-row">
+          <div class="form-field">
+            <label for="validIdType">Valid ID <span class="optional-tag">optional</span></label>
+            <div class="select-wrap">
+              <select id="validIdType" v-model="form.validIdType">
+                <option value="">Select an ID</option>
+                <option v-for="option in validIdTypes" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+            <p v-if="fieldErrors.valid_id_type" class="field-error">{{ fieldErrors.valid_id_type }}</p>
+          </div>
+
+          <div class="form-field">
+            <label for="validIdNumber">ID Number</label>
+            <input id="validIdNumber" v-model="form.validIdNumber" type="text" placeholder="As printed on the card" />
+            <p v-if="fieldErrors.valid_id_number" class="field-error">{{ fieldErrors.valid_id_number }}</p>
+          </div>
+        </div>
+        <p class="field-hint">Speeds up check-in at the donation counter. You can add this later from your profile.</p>
+
         <div class="form-row">
           <div class="form-field">
             <label for="password">Password</label>
@@ -278,10 +305,23 @@ const form = reactive({
   dob: '',
   gender: '',
   address: '',
+  validIdType: '',
+  validIdNumber: '',
   password: '',
   confirmPassword: '',
   agreedToTerms: false,
 })
+
+const validIdTypes = [
+  { value: 'philsys', label: 'PhilSys (National ID)' },
+  { value: 'umid', label: 'UMID' },
+  { value: 'drivers_license', label: "Driver's License" },
+  { value: 'passport', label: 'Passport' },
+  { value: 'postal_id', label: 'Postal ID' },
+  { value: 'prc_id', label: 'PRC ID' },
+  { value: 'voters_id', label: "Voter's ID" },
+  { value: 'sss_id', label: 'SSS ID' },
+]
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -313,6 +353,8 @@ async function handleSubmit() {
       gender: form.gender,
       birth_date: form.dob,
       address: form.address,
+      valid_id_type: form.validIdType || null,
+      valid_id_number: form.validIdNumber || null,
       password: form.password,
       password_confirmation: form.confirmPassword,
       terms_accepted: form.agreedToTerms,
@@ -635,6 +677,18 @@ function applyValidationErrors(error) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.optional-tag {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.field-hint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .form-field label {

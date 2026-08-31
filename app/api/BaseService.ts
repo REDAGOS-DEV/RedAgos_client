@@ -79,6 +79,51 @@ export class BaseService {
       }
     }
   }
+
+  /**
+   * Fetch a binary response with the caller's bearer token.
+   *
+   * request() always asks for JSON and hands back parsed data, so it cannot
+   * carry an image. Identity documents are served from an authenticated route
+   * rather than a signed link, which means the browser cannot fetch them
+   * through a plain <img src> - the page has to make the request itself and
+   * render the blob.
+   */
+  async requestBlob(url: string): Promise<Blob> {
+    const runtimeConfig = useRuntimeConfig();
+    const token = import.meta.client ? localStorage.getItem("_token") : null;
+
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const configured = runtimeConfig.public.apiBaseURL;
+    const baseURL = configured || (import.meta.client
+      ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+      : "http://127.0.0.1:8000/api");
+
+    try {
+      return await $fetch<Blob>(url, {
+        baseURL,
+        method: "GET",
+        headers,
+        responseType: "blob",
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const requestError = new Error(
+        status === 403
+          ? "You are not allowed to view this document."
+          : "Could not load the document. Please try again."
+      ) as Error & { status?: number };
+
+      requestError.status = status;
+
+      throw requestError;
+    }
+  }
 }
  
 export default BaseService;
