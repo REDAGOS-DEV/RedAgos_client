@@ -9,28 +9,44 @@
       <p class="verify-text">{{ stateText }}</p>
 
       <div v-if="state !== 'verifying'" class="verify-actions">
-        <NuxtLink v-if="state === 'success'" to="/donor/dashboard" class="btn-primary">
-          Go to dashboard
+        <!--
+          Ang naka-abot dinhi kay kasagaran bag-o pa ka-rehistro ug wala pa
+          naka-sign in — dili man gyud siya makasulod hangtod karon. Ang
+          dashboard kay para ra sa naay session (pananglitan, gi-usab niya ang
+          email samtang naka-login, nga mo-balik sa unverified).
+        -->
+        <NuxtLink
+          v-if="state === 'success'"
+          :to="hasSession ? '/donor/dashboard' : '/auth/donor/login'"
+          class="btn-primary"
+        >
+          {{ hasSession ? 'Go to dashboard' : 'Continue to sign in' }}
         </NuxtLink>
 
         <template v-else>
           <!--
-            Ang resend endpoint kay naa sa likod sa `auth:sanctum`, so ma-offer
-            ra siya kung naa'y token. Kung wala, sa login sa ta i-padulong —
-            didto ra siya maka-request og bag-ong link.
+            Walay session ang bag-ong rehistro, so ang address ang ipangayo ug
+            ang guest resend endpoint ang gamiton. Kung naay token, ang
+            authenticated nga endpoint ra — kabalo na siya kung kinsa.
           -->
+          <input
+            v-if="!hasSession"
+            v-model="resendEmail"
+            type="email"
+            class="verify-input"
+            placeholder="you@example.com"
+            autocomplete="email"
+            aria-label="Email address"
+          >
+
           <button
-            v-if="canResend"
             type="button"
             class="btn-primary"
-            :disabled="resending"
+            :disabled="resending || (!hasSession && !resendEmail.trim())"
             @click="resendVerification"
           >
             {{ resending ? 'Sending...' : 'Send a new verification email' }}
           </button>
-          <NuxtLink v-else to="/auth/donor/login" class="btn-primary">
-            Log in to get a new link
-          </NuxtLink>
 
           <p
             v-if="resendMessage"
@@ -40,7 +56,7 @@
             {{ resendMessage }}
           </p>
 
-          <NuxtLink v-if="canResend" to="/auth/donor/login" class="btn-outline">
+          <NuxtLink to="/auth/donor/login" class="btn-outline">
             Back to login
           </NuxtLink>
         </template>
@@ -59,7 +75,10 @@ definePageMeta({ layout: 'default' })
 const state = ref('verifying')
 const errorMessage = ref('')
 
-const canResend = ref(false)
+// Naay token sa browser — ibig sabon naka-sign in siya samtang gi-abli ni nga
+// link. Kasagaran dili, kay ang verification kay parte na sa registration.
+const hasSession = ref(false)
+const resendEmail = ref('')
 const resending = ref(false)
 const resendMessage = ref('')
 const resendFailed = ref(false)
@@ -120,18 +139,27 @@ async function resendVerification() {
   resendFailed.value = false
 
   try {
-    // POST /api/email/verification-notification (auth:sanctum, throttle:3,10)
-    // 204 ang balik — walay body.
-    await authService.resendVerificationEmail()
-    resendMessage.value = 'Sent. Check your inbox for a fresh link, valid for 60 minutes.'
+    if (hasSession.value) {
+      // POST /api/email/verification-notification (auth:sanctum, throttle:3,10)
+      // 204 ang balik — walay body.
+      await authService.resendVerificationEmail()
+      resendMessage.value = 'Sent. Check your inbox for a fresh link, valid for 60 minutes.'
+    } else {
+      // POST /api/email/resend-verification (public, throttle:3,10). Pareho ra
+      // ang tubag bisan unsa pa ang address, so ang server nga mensahe ang
+      // ipakita — dili nato madugangan og butang nga wala niya gisulti.
+      const response = await authService.resendVerificationEmailFor(resendEmail.value.trim())
+      resendMessage.value = response?.message
+        || 'If that address is registered and still unverified, a new verification link is on its way.'
+    }
   } catch (err) {
     console.error('Failed to resend verification email:', err)
     resendFailed.value = true
 
     if (err?.status === 401) {
-      // Wala nay bili ang token, so i-usab nato ang button padulong sa login.
-      canResend.value = false
-      resendMessage.value = 'Your session has expired. Please log in again to request a new link.'
+      // Wala nay bili ang token, so ang guest nga agianan na lang ang gamiton.
+      hasSession.value = false
+      resendMessage.value = 'Your session has expired. Enter your email address above and try again.'
     } else if (err?.status === 429) {
       resendMessage.value = 'Too many requests. Please wait a few minutes before trying again.'
     } else {
@@ -143,7 +171,7 @@ async function resendVerification() {
 }
 
 onMounted(async () => {
-  canResend.value = !!localStorage.getItem('_token')
+  hasSession.value = !!localStorage.getItem('_token')
 
   // Ang tibuok query string kay i-forward nga verbatim padulong sa API. Ang
   // `signed` middleware sa Laravel mo-validate sa signature batok sa raw nga
@@ -258,6 +286,23 @@ onMounted(async () => {
   text-decoration: none;
 }
 
+.verify-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.verify-input:focus {
+  border-color: var(--primary);
+  background: white;
+}
+
 .btn-primary { background: var(--primary); color: white; }
 .btn-outline { background: #f3f4f6; color: var(--text-primary); }
 
@@ -278,6 +323,12 @@ onMounted(async () => {
 }
 
 :global(.dark .btn-outline) {
+  background: #263449;
+  color: #E2E8F0;
+}
+
+:global(.dark .verify-input) {
+  border-color: #334155;
   background: #263449;
   color: #E2E8F0;
 }

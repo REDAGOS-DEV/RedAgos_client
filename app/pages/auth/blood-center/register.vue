@@ -353,13 +353,11 @@ const submitRegistration = async () => {
       password_confirmation: form.confirmPassword,
     })
 
-    // Dili ra email verification ang gihulat — naa pay admin nga mo-review sa
-    // DOH licence, so mao ni ang gipakita nga mensahe.
-    successMessage.value = 'Registration submitted. We will email you once an administrator has reviewed your DOH licence.'
-
-    setTimeout(() => {
-      navigateTo('/auth/blood-center/login')
-    }, 3000)
+    // Duha ka lakang ang gihulat: ang verification link nga gipadala karon, ug
+    // ang admin nga mo-review sa DOH licence. Ang una kay ilaha gyud nga
+    // buhatunon, ug dili gyud sila maka-sign in hangtod mahuman na — mao nga
+    // wala nay auto-redirect padulong sa login, kay didto walay mahitabo.
+    successMessage.value = 'Registration submitted. Open the verification link we just emailed you — you cannot sign in until your address is verified. An administrator will review your DOH licence after that.'
   } catch (error) {
     // Gi-attach na sa BaseService ang 422 `errors` bag, so ipakita nato ang
     // tinuod nga mensahe sa server imbes generic nga "failed".

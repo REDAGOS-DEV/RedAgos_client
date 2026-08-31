@@ -81,6 +81,53 @@
         </span>
       </div>
 
+      <!--
+        Ang email verification kay parte na sa registration, dili na sa ulahi.
+        Human ma-submit, dinhi ra ta mo-puyo hangtod ma-verify — walay
+        redirect padulong sa login, kay dili man gyud siya makasulod kung wala
+        pa na-verify ang address.
+      -->
+      <section v-if="registeredEmail" class="verify-step">
+        <div class="verify-step-icon">
+          <AssetIcon name="mail" :size="26" />
+        </div>
+
+        <h1>Check your email</h1>
+
+        <p class="verify-step-lead">
+          We sent a verification link to
+          <strong>{{ registeredEmail }}</strong>.
+          Open it to activate your account — you will not be able to sign in until you do.
+        </p>
+
+        <p class="verify-step-hint">
+          The link is valid for 60 minutes. No email? Check your spam folder first.
+        </p>
+
+        <button
+          type="button"
+          class="submit-btn"
+          :disabled="isResending"
+          @click="resendVerification"
+        >
+          {{ isResending ? 'Sending...' : 'Resend verification email' }}
+        </button>
+
+        <p
+          v-if="resendMessage"
+          class="verify-step-note"
+          :class="{ 'verify-step-note--error': resendFailed }"
+        >
+          {{ resendMessage }}
+        </p>
+
+        <p class="signin-row">
+          Already verified?
+          <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
+        </p>
+      </section>
+
+      <template v-else>
       <div class="form-header">
         <h1>Create Donor Account</h1>
         <p>Fill in your details to get started</p>
@@ -192,7 +239,6 @@
           </span>
         </label>
         <p v-if="fieldErrors.terms_accepted" class="field-error">{{ fieldErrors.terms_accepted }}</p>
-        <p v-if="submitSuccess" class="submit-success">{{ submitSuccess }}</p>
         <p v-if="submitError" class="submit-error">{{ submitError }}</p>
 
         <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms || isSubmitting">
@@ -204,6 +250,7 @@
           <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
         </p>
       </form>
+      </template>
     </main>
   </div>
 </template>
@@ -213,6 +260,7 @@ import { reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 import { donorService } from '~/api/donor/DonorService'
+import { authService } from '~/api/auth/AuthService'
 
 definePageMeta({
   layout: 'auth',
@@ -239,19 +287,24 @@ const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const isSubmitting = ref(false)
 const submitError = ref('')
-const submitSuccess = ref('')
 const fieldErrors = reactive({})
+
+// Kung dili blangko, na-submit na ang registration ug ang verification step na
+// ang gipakita imbes ang porma.
+const registeredEmail = ref('')
+const isResending = ref(false)
+const resendMessage = ref('')
+const resendFailed = ref(false)
 
 async function handleSubmit() {
   if (isSubmitting.value) return
 
   isSubmitting.value = true
   submitError.value = ''
-  submitSuccess.value = ''
   clearFieldErrors()
 
   try {
-    const response = await donorService.register({
+    await donorService.register({
       first_name: form.firstName,
       last_name: form.lastName,
       email: form.email,
@@ -265,13 +318,35 @@ async function handleSubmit() {
       terms_accepted: form.agreedToTerms,
     })
 
-    submitSuccess.value = response?.message || 'Registration submitted successfully.'
-    setTimeout(() => navigateTo('/auth/donor/login'), 900)
+    // Wala nay redirect padulong sa login: ang account kay dili pa maka-sign in
+    // hangtod ma-verify ang address, so dinhi ra siya magpabilin diin naa ang
+    // instruksyon ug ang resend.
+    registeredEmail.value = form.email.trim()
   } catch (err) {
     applyValidationErrors(err)
     submitError.value = err?.message || 'Something went wrong while creating your account. Please try again.'
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function resendVerification() {
+  if (isResending.value) return
+
+  isResending.value = true
+  resendMessage.value = ''
+  resendFailed.value = false
+
+  try {
+    const response = await authService.resendVerificationEmailFor(registeredEmail.value)
+    resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
+  } catch (err) {
+    resendFailed.value = true
+    resendMessage.value = err?.status === 429
+      ? 'Too many requests. Please wait a few minutes before trying again.'
+      : (err?.message || 'Could not send the verification email. Please try again.')
+  } finally {
+    isResending.value = false
   }
 }
 
@@ -722,12 +797,6 @@ function applyValidationErrors(error) {
   font-weight: 600;
 }
 
-.submit-success {
-  margin: 0;
-  color: #166534;
-  font-size: 13px;
-  font-weight: 700;
-}
 
 .submit-btn {
   width: 100%;
@@ -756,6 +825,60 @@ function applyValidationErrors(error) {
   color: #6b7280;
   font-size: 13px;
 }
+
+/* PENDING EMAIL VERIFICATION */
+.verify-step {
+  max-width: 460px;
+  margin: 24px auto 0;
+  padding: 36px 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: center;
+}
+.verify-step-icon {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  border-radius: 999px;
+  background: #e8f1fb;
+  color: #206fbd;
+}
+.verify-step h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.verify-step-lead {
+  margin: 12px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.verify-step-lead strong {
+  color: #111827;
+  word-break: break-all;
+}
+.verify-step-hint {
+  margin: 10px 0 22px;
+  color: #6b7280;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.verify-step-note {
+  margin: 14px 0 0;
+  color: #166534;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.verify-step-note--error { color: #dc2626; }
+.verify-step .signin-row { margin-top: 18px; }
 
 .signin-row a {
   color: #206fbd;

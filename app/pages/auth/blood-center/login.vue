@@ -117,6 +117,29 @@
               {{ errorMessage }}
             </p>
 
+            <!--
+              Ang 403 `email_not_verified` ra ang naay agianan padulong sa
+              lakang nga makatabang: ang resend.
+            -->
+            <div v-if="needsVerification" class="verify-prompt">
+              <button
+                type="button"
+                class="verify-resend-button"
+                :disabled="resending"
+                @click="resendVerification"
+              >
+                {{ resending ? 'Sending...' : 'Resend verification email' }}
+              </button>
+
+              <p
+                v-if="resendMessage"
+                class="verify-resend-note"
+                :class="{ 'verify-resend-note--error': resendFailed }"
+              >
+                {{ resendMessage }}
+              </p>
+            </div>
+
             <button
               class="sign-in-button"
               :disabled="loading"
@@ -186,6 +209,13 @@ const loading = ref(false)
 const errorMessage = ref('')
 const typed = reactive({ email: false, password: false, licenseNumber: false })
 
+// Gi-block ang login hangtod ma-verify ang address, so ipakita nato ang resend
+// imbes nga i-biya sila nga walay mahimo.
+const needsVerification = ref(false)
+const resending = ref(false)
+const resendMessage = ref('')
+const resendFailed = ref(false)
+
 watch(email, (value) => {
   typed.email = value.trim().length > 0
 })
@@ -202,9 +232,31 @@ const goToForgotPassword = () => {
   return navigateTo('/auth/blood-center/forgot-password')
 }
 
+const resendVerification = async () => {
+  if (resending.value) return
+
+  resending.value = true
+  resendMessage.value = ''
+  resendFailed.value = false
+
+  try {
+    const response = await authService.resendVerificationEmailFor(email.value)
+    resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
+  } catch (error) {
+    resendFailed.value = true
+    resendMessage.value = error?.status === 429
+      ? 'Too many requests. Please wait a few minutes before trying again.'
+      : (error?.message || 'Could not send the verification email. Please try again.')
+  } finally {
+    resending.value = false
+  }
+}
+
 const login = async () => {
   loading.value = true
   errorMessage.value = ''
+  needsVerification.value = false
+  resendMessage.value = ''
 
   try {
     const response = await authService.login({
@@ -238,6 +290,8 @@ const login = async () => {
     await navigateTo(departmentHome(profile))
 
   } catch (error) {
+    needsVerification.value = error?.data?.code === 'email_not_verified'
+
     errorMessage.value = error instanceof Error
       ? error.message
       : 'Unable to sign in. Please check your credentials.'
@@ -530,6 +584,43 @@ input::placeholder {
   font-weight: 700;
   line-height: 1.4;
 }
+
+.verify-prompt {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.verify-resend-button {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #1266c3;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1266c3;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.verify-resend-button:hover { background: #eef4fb; }
+
+.verify-resend-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.verify-resend-note {
+  margin: 10px 0 0;
+  color: #166534;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.verify-resend-note--error { color: #dc2626; }
 
 .signup-text {
   margin: 24px 0 0;
