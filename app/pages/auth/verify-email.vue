@@ -1,8 +1,16 @@
 <template>
   <div class="verify-page">
-    <div class="verify-card">
-      <div class="verify-icon" :class="`verify-icon--${state}`">
-        <AssetIcon :name="stateIcon" :size="26" />
+    <div class="verify-wordmark">
+      <AssetIcon name="droplet" :size="18" />
+      <span>RedAgos</span>
+    </div>
+
+    <div class="verify-card" :class="`verify-card--${state}`">
+      <div class="verify-icon-wrap">
+        <span v-if="state === 'verifying'" class="verify-ring" />
+        <div class="verify-icon" :class="`verify-icon--${state}`">
+          <AssetIcon :name="stateIcon" :size="26" />
+        </div>
       </div>
 
       <h1 class="verify-title">{{ stateTitle }}</h1>
@@ -45,6 +53,7 @@
             :disabled="resending || (!hasSession && !resendEmail.trim())"
             @click="resendVerification"
           >
+            <AssetIcon v-if="resending" name="loader" :size="15" class="btn-spinner" />
             {{ resending ? 'Sending...' : 'Send a new verification email' }}
           </button>
 
@@ -53,7 +62,8 @@
             class="verify-note"
             :class="{ 'verify-note--error': resendFailed }"
           >
-            {{ resendMessage }}
+            <AssetIcon :name="resendFailed ? 'octagon-alert' : 'circle-check-big'" :size="14" />
+            <span>{{ resendMessage }}</span>
           </p>
 
           <NuxtLink to="/auth/donor/login" class="btn-outline">
@@ -200,73 +210,138 @@ onMounted(async () => {
 <style scoped>
 .verify-page {
   --primary: #1565c0;
+  --primary-hover: #0d47a1;
   --accent: #d32f2f;
   --success: #2e7d32;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  --text-secondary: #64748b;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 28px;
   padding: 24px;
-  background: #F5F7FA;
+  background:
+    radial-gradient(560px circle at 50% 0%, rgba(21, 101, 192, 0.07), transparent 60%),
+    #F7F9FC;
+}
+
+.verify-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--primary);
 }
 
 .verify-card {
   width: 100%;
   max-width: 420px;
-  padding: 32px 28px;
-  border-radius: 16px;
+  padding: 36px 30px 32px;
+  border-radius: 18px;
   background: white;
   border: 1px solid #eef0f3;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 32px -12px rgba(21, 101, 192, 0.16), 0 1px 3px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
 
+.verify-card--error {
+  animation: shake 420ms ease-in-out;
+}
+
+.verify-icon-wrap {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.verify-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-right-color: var(--primary);
+  animation: spin 900ms linear infinite;
+}
+
 .verify-icon {
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
 }
 
-.verify-icon--verifying { background: #eaf3fc; color: var(--primary); }
-.verify-icon--success { background: #eaf6ea; color: var(--success); }
-.verify-icon--error { background: #fbeaea; color: var(--accent); }
+.verify-icon--verifying {
+  background: #eaf3fc;
+  color: var(--primary);
+}
+.verify-icon--verifying :deep(svg) {
+  animation: spin 1.1s linear infinite;
+}
+
+.verify-icon--success {
+  background: #eaf6ea;
+  color: var(--success);
+  animation: pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.verify-icon--error {
+  background: #fbeaea;
+  color: var(--accent);
+}
 
 .verify-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
 .verify-text {
   margin: 8px 0 0;
-  font-size: 13px;
+  max-width: 32ch;
+  font-size: 13.5px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
 
 .verify-actions {
-  margin-top: 24px;
+  margin-top: 26px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: fade-up 320ms ease-out;
 }
 
 .verify-note {
-  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--success);
+  text-align: left;
+}
+
+.verify-note :deep(svg) {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .verify-note--error { color: var(--accent); }
@@ -276,6 +351,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   width: 100%;
   padding: 12px 16px;
   border-radius: 10px;
@@ -284,6 +360,7 @@ onMounted(async () => {
   border: none;
   cursor: pointer;
   text-decoration: none;
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
 .verify-input {
@@ -296,30 +373,116 @@ onMounted(async () => {
   font: inherit;
   font-size: 13.5px;
   outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
 .verify-input:focus {
   border-color: var(--primary);
   background: white;
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
 }
 
-.btn-primary { background: var(--primary); color: white; }
-.btn-outline { background: #f3f4f6; color: var(--text-primary); }
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 1px 2px rgba(21, 101, 192, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px -4px rgba(21, 101, 192, 0.4);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.verify-input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn-outline {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.btn-outline:hover {
+  background: #e5e7eb;
+}
 
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-spinner {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verify-ring,
+  .verify-icon--verifying :deep(svg),
+  .btn-spinner,
+  .verify-icon--success,
+  .verify-actions,
+  .verify-card--error {
+    animation: none;
+  }
 }
 
 :global(.dark .verify-page) {
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
-  background: #0F172A;
+  background:
+    radial-gradient(560px circle at 50% 0%, rgba(21, 101, 192, 0.12), transparent 60%),
+    #0F172A;
+}
+
+:global(.dark .verify-wordmark) {
+  color: #7cb3f0;
 }
 
 :global(.dark .verify-card) {
   background: #1E293B;
   border-color: #334155;
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark .verify-input) {
+  border-color: #334155;
+  background: #263449;
+  color: #E2E8F0;
+}
+
+:global(.dark .verify-input:focus) {
+  background: #2c3e57;
 }
 
 :global(.dark .btn-outline) {
@@ -327,9 +490,7 @@ onMounted(async () => {
   color: #E2E8F0;
 }
 
-:global(.dark .verify-input) {
-  border-color: #334155;
-  background: #263449;
-  color: #E2E8F0;
+:global(.dark .btn-outline:hover) {
+  background: #2f405b;
 }
 </style>

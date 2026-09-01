@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 5.8 seconds
-Output:
 <template>
   <div class="profile-page">
     <div class="header-row fade-in" style="--delay: 0ms">
@@ -37,26 +34,21 @@ Output:
 
         <div class="panel fade-in" style="--delay: 200ms">
           <div class="panel-header panel-header--simple">
-            <div class="skeleton skeleton-line" style="width:160px;height:14px" />
+            <div class="skeleton skeleton-line" style="width:80px;height:14px" />
           </div>
           <div class="form-body">
             <div class="form-grid">
-              <div class="form-field form-field--full">
-                <div class="skeleton skeleton-line" style="width:110px;height:11px;margin-bottom:8px" />
+              <div class="form-field">
+                <div class="skeleton skeleton-line" style="width:60px;height:11px;margin-bottom:8px" />
                 <div class="skeleton skeleton-input" />
               </div>
               <div class="form-field">
-                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
-                <div class="skeleton skeleton-input" />
-              </div>
-              <div class="form-field">
-                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-line" style="width:70px;height:11px;margin-bottom:8px" />
                 <div class="skeleton skeleton-input" />
               </div>
             </div>
             <div class="form-actions">
-              <div class="skeleton skeleton-btn" style="width:140px" />
-              <div class="skeleton skeleton-btn" style="width:90px" />
+              <div class="skeleton skeleton-btn" style="width:100px" />
             </div>
           </div>
         </div>
@@ -95,6 +87,32 @@ Output:
                 <div class="skeleton skeleton-line" style="width:220px;height:11px;margin-top:8px" />
               </div>
               <div class="skeleton" style="width:40px;height:22px;border-radius:999px" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fade-in" style="--delay: 200ms">
+          <div class="panel-header panel-header--simple">
+            <div class="skeleton skeleton-line" style="width:160px;height:14px" />
+          </div>
+          <div class="form-body">
+            <div class="form-grid">
+              <div class="form-field form-field--full">
+                <div class="skeleton skeleton-line" style="width:110px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+              <div class="form-field">
+                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+              <div class="form-field">
+                <div class="skeleton skeleton-line" style="width:90px;height:11px;margin-bottom:8px" />
+                <div class="skeleton skeleton-input" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <div class="skeleton skeleton-btn" style="width:140px" />
+              <div class="skeleton skeleton-btn" style="width:90px" />
             </div>
           </div>
         </div>
@@ -160,37 +178,10 @@ Output:
           </div>
         </div>
 
-        <!-- Account & Security card -->
+        <!-- Valid ID card — bumped above Account & Security: verification is
+             the more time-sensitive of the two (gates donating), password
+             changes aren't. -->
         <div class="panel fade-in" style="--delay: 200ms">
-          <div class="panel-header panel-header--simple">
-            <h2 class="panel-title">Account &amp; Security</h2>
-          </div>
-          <div class="form-body">
-            <div class="form-grid">
-              <div class="form-field form-field--full">
-                <label class="form-label">Current Password</label>
-                <input v-model="passwordForm.currentPassword" type="password" class="form-input" placeholder="current password">
-              </div>
-              <div class="form-field">
-                <label class="form-label">New Password</label>
-                <input v-model="passwordForm.newPassword" type="password" class="form-input" placeholder="new password">
-              </div>
-              <div class="form-field">
-                <label class="form-label">Confirm Password</label>
-                <input v-model="passwordForm.confirmPassword" type="password" class="form-input" placeholder="confirm password">
-              </div>
-            </div>
-            <div class="form-actions">
-              <button class="btn-primary" :disabled="savingPassword" @click="handlePasswordUpdate">
-                {{ savingPassword ? 'Updating...' : 'Update Password' }}
-              </button>
-              <button class="btn-outline" @click="handleLogout">Log out</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Valid ID card -->
-        <div class="panel fade-in" style="--delay: 250ms">
           <IdentityVerification :identity="identity" @submitted="handleIdentitySubmitted" />
         </div>
       </div>
@@ -274,6 +265,35 @@ Output:
               >
                 <span class="toggle-switch__knob" />
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account & Security card -->
+        <div class="panel fade-in" style="--delay: 200ms">
+          <div class="panel-header panel-header--simple">
+            <h2 class="panel-title">Account &amp; Security</h2>
+          </div>
+          <div class="form-body">
+            <div class="form-grid">
+              <div class="form-field form-field--full">
+                <label class="form-label">Current Password</label>
+                <input v-model="passwordForm.currentPassword" type="password" class="form-input" placeholder="current password">
+              </div>
+              <div class="form-field">
+                <label class="form-label">New Password</label>
+                <input v-model="passwordForm.newPassword" type="password" class="form-input" placeholder="new password">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Confirm Password</label>
+                <input v-model="passwordForm.confirmPassword" type="password" class="form-input" placeholder="confirm password">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" :disabled="savingPassword" @click="handlePasswordUpdate">
+                {{ savingPassword ? 'Updating...' : 'Update Password' }}
+              </button>
+              <button class="btn-outline" @click="handleLogout">Log out</button>
             </div>
           </div>
         </div>
@@ -575,8 +595,19 @@ async function handleLogout() {
   width: 100%; padding: 9px 12px; border-radius: 8px;
   border: 1px solid #e5e7eb; font-size: 13px; color: var(--text-primary);
   background: white; transition: border-color 0.15s ease;
+  color-scheme: light;
 }
 .form-input:focus { outline: none; border-color: var(--primary); }
+select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 34px;
+}
 .form-actions { display: flex; gap: 10px; margin-top: 18px; align-items: center; flex-wrap: wrap; }
 .form-actions .btn-primary { padding: 10px 20px; }
 .form-status { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--success); }
@@ -650,7 +681,11 @@ async function handleLogout() {
 :global(.dark .form-input) {
     background: #0F172A;
     border-color: #334155;
-    color: #F1F5F9;
+    color-scheme: dark;
+}
+
+:global(.dark select.form-input) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 :global(.dark .btn-outline) {
@@ -660,7 +695,7 @@ async function handleLogout() {
 :global(.dark .btn-outline:hover) { background: #334155; }
 
 :global(.dark .toggle-row) { border-color: #263449; }
-:global(.dark .toggle-switch) { background: #334155; }
+:global(.dark .toggle-switch) { background: #1565c0; }
 
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);

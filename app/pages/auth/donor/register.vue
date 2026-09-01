@@ -96,7 +96,13 @@
 
         <p class="verify-step-lead">
           We sent a verification link to
-          <strong>{{ registeredEmail }}</strong>.
+        </p>
+
+        <div class="verify-step-chip">
+          <span class="verify-step-chip-email">{{ registeredEmail }}</span>
+        </div>
+
+        <p class="verify-step-lead">
           Open it to activate your account — you will not be able to sign in until you do.
         </p>
 
@@ -106,10 +112,11 @@
 
         <button
           type="button"
-          class="submit-btn"
+          class="resend-btn"
           :disabled="isResending"
           @click="resendVerification"
         >
+          <AssetIcon name="refresh-cw" :size="15" />
           {{ isResending ? 'Sending...' : 'Resend verification email' }}
         </button>
 
@@ -914,16 +921,62 @@ function applyValidationErrors(error) {
   font-size: 14px;
   line-height: 1.6;
 }
-.verify-step-lead strong {
-  color: #111827;
-  word-break: break-all;
+
+.verify-step-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 10px 0;
+  padding: 8px 14px;
+  border: 1px solid #dbe6f3;
+  border-radius: 999px;
+  background: #f4f8fd;
+  max-width: 100%;
 }
+
+.verify-step-chip-email {
+  color: #111827;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .verify-step-hint {
   margin: 10px 0 22px;
   color: #6b7280;
   font-size: 12.5px;
   line-height: 1.5;
 }
+
+/* Secondary/outline style: this is a recovery action, not the primary
+   next step (opening the email is), so it should read as subordinate
+   to the "Submit Registration" button's visual weight. */
+.resend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  border: 1px solid #206fbd;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #206fbd;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.resend-btn:hover:not(:disabled) { background: #f0f6fc; }
+
+.resend-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .verify-step-note {
   margin: 14px 0 0;
   color: #166534;
@@ -1000,6 +1053,18 @@ function applyValidationErrors(error) {
   .submit-btn {
     height: 46px;
     font-size: 14px;
+  }
+
+  .verify-step {
+    padding: 28px 20px;
+  }
+
+  .verify-step-chip {
+    max-width: 100%;
+  }
+
+  .verify-step-chip-email {
+    max-width: 180px;
   }
 }
 </style>
