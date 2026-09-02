@@ -66,6 +66,32 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/appointments/${appointmentId}/no-show`, 'POST')
   }
 
+  // --- Donor management (Collection department) ---
+  //
+  // Ang server nga prefix kay `/blood-center/donors` — dili `/bloodcenter/...`
+  // nga gigamit sa Donors.vue kaniadto. Ang daan nga path wala mo-match og bisan
+  // unsang route ug wala pod nagdala og bearer token.
+
+  async donors(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors`, 'GET', params)
+  }
+
+  async lookupDonor(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/lookup`, 'GET', params)
+  }
+
+  async createDonor(payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors`, 'POST', payload)
+  }
+
+  async showDonor(uuid: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}`, 'GET')
+  }
+
+  async donorHistory(uuid: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/history`, 'GET')
+  }
+
   // --- Inventory (Inventory / Storage department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {

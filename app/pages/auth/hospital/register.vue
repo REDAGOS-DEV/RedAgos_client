@@ -276,6 +276,9 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 definePageMeta({
   alias: ['/register/hospital'],
+  // Walay blood-bank registration endpoint ang backend. Ang middleware mo-redirect
+  // padulong sa /hospital/unavailable samtang naka-off ang flag.
+  middleware: 'hospital-portal',
 })
 
 const form = reactive({
@@ -316,21 +319,15 @@ const submitRegistration = async () => {
     return
   }
 
-  loading.value = true
-
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    successMessage.value = 'Blood center registration submitted! Check your email for verification.'
-
-    setTimeout(() => {
-      navigateTo('/login/hospital')
-    }, 2000)
-  } catch (error) {
-    errorMessage.value = 'Registration failed. Please try again.'
-  } finally {
-    loading.value = false
-  }
+  // Walay endpoint nga i-post-an: ang `/blood-center/register` ra ang naa sa
+  // Laravel, ug lahi siya og entity. Kaniadto ni nag-`setTimeout(1500)` unya
+  // nag-report og "submitted" bisan walay request nga na-send — nagtuo ang
+  // aplikante nga naka-rehistro sila samtang wala gyuy narekord.
+  //
+  // Ipabilin ang porma nga makita apan i-refuse ang submit hangtod naa nay
+  // endpoint. Tan-awa ang Phase P sa audit plan.
+  errorMessage.value =
+    'Hospital blood bank registration is not open yet. Please contact your partner blood center directly.'
 }
 </script>
 

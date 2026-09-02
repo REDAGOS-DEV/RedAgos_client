@@ -307,7 +307,7 @@
         <button class="btn btn--outline" type="button" @click="handlePrint">Print</button>
         <NuxtLink
           v-if="canEdit"
-          :to="`/hospital/blood-requests/${requestId}/edit`"
+          :to="`/hospital/bloodrequests/edit/${requestId}`"
           class="btn btn--primary"
         >
           Edit
@@ -321,6 +321,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
+  middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
 })
 
@@ -391,7 +392,7 @@ function formatDateTime(value) {
 }
 
 function goBack() {
-  navigateTo('/hospital/blood-requests')
+  navigateTo('/hospital/bloodrequests')
 }
 
 function handlePrint() {
@@ -402,7 +403,7 @@ async function handleDownloadPdf() {
   if (!request.value) return
   try {
     const { data, error } = await useApi().get(
-      `/hospital/blood-requests/${requestId}/download`,
+      `/hospital/bloodrequests/${requestId}/download`,
       { responseType: 'blob' }
     )
     if (error?.value) throw error.value

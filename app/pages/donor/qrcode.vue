@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import DonorQrCodePage from '~/components/Donor/QrCodePage.vue'
+import DonorQrCodePage from '~/components/donor/QrCodePage.vue'
 
 definePageMeta({
   middleware: 'auth',

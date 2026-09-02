@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import DonorNotificationsPage from '~/components/Donor/NotificationsPage.vue'
+import DonorNotificationsPage from '~/components/donor/NotificationsPage.vue'
 
 definePageMeta({
   middleware: 'auth',

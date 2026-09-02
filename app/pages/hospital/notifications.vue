@@ -158,7 +158,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
-definePageMeta({ middleware: 'auth', layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 const router = useRouter()
 const isLoading = ref(true)

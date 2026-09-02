@@ -31,7 +31,11 @@
                 v-for="role in roles"
                 :key="role.id"
                 class="role-card"
-                :class="{ selected: selectedRole === role.id, [role.colorClass]: true }"
+                :class="{
+                  selected: selectedRole === role.id,
+                  'role-card--disabled': !role.available,
+                  [role.colorClass]: true,
+                }"
                 @click="selectRole(role.id)"
               >
                 <div class="role-card-content">
@@ -77,8 +81,13 @@
                     </svg>
                   </div>
                   <div class="role-info">
-                    <div class="role-name">{{ role.name }}</div>
-                    <div class="role-desc">{{ role.description }}</div>
+                    <div class="role-name">
+                      {{ role.name }}
+                      <span v-if="!role.available" class="role-badge">Coming soon</span>
+                    </div>
+                    <div class="role-desc">
+                      {{ role.available ? role.description : role.unavailableNote }}
+                    </div>
                   </div>
                 </div>
 
@@ -87,6 +96,7 @@
                   name="role"
                   :value="role.id"
                   :checked="selectedRole === role.id"
+                  :disabled="!role.available"
                   class="role-radio"
                   @change="selectRole(role.id)"
                 />
@@ -127,11 +137,19 @@ definePageMeta({
 
 const selectedRole = ref('')
 
+// Ang hospital / blood-bank portal kay walay backend pa: walay `/hospital/*`
+// nga route ug walay registration endpoint. Gipakita gihapon nato siya —
+// disabled ug tinuod ang label — imbes tagoan, aron nahibalo ang hospital nga
+// naa sila sa plano. I-abli ni sa NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED.
+const { hospitalPortalEnabled } = useRuntimeConfig().public
+
 const roles = [
   {
     id: 'hospital',
     name: 'Hospital Blood Bank',
     description: 'Request and manage blood supply for your hospital',
+    unavailableNote: 'Not accepting registrations yet — this portal is still being built.',
+    available: Boolean(hospitalPortalEnabled),
     colorClass: 'role-hospital',
     iconClass: 'icon-hospital',
   },
@@ -139,6 +157,7 @@ const roles = [
     id: 'blood-center',
     name: 'Blood Center',
     description: 'Process requests, manage donors, and inventory.',
+    available: true,
     colorClass: 'role-blood-center',
     iconClass: 'icon-blood-center',
   },
@@ -146,6 +165,7 @@ const roles = [
     id: 'donor',
     name: 'Donor',
     description: 'Register to donate blood and book appointments.',
+    available: true,
     colorClass: 'role-donor',
     iconClass: 'icon-donor',
   },
@@ -153,12 +173,17 @@ const roles = [
     id: 'admin',
     name: 'Administrator',
     description: 'Manage the system, users, and overall operations.',
+    available: true,
     colorClass: 'role-admin',
     iconClass: 'icon-admin',
   },
 ]
 
 const selectRole = (roleId) => {
+  // Ang disabled nga role dili mapili — walay agianan padulong sa portal nga
+  // wala pay backend.
+  if (!roles.find((role) => role.id === roleId)?.available) return
+
   selectedRole.value = roleId
 }
 
@@ -374,11 +399,42 @@ h1 {
 }
 
 .role-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #1f2937;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 4px;
+}
+
+/* A role whose portal has no backend yet: visible, labelled, not selectable. */
+.role-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+.role-card--disabled:hover {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+
+.role-card--disabled .role-radio {
+  cursor: not-allowed;
+}
+
+.role-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .role-desc {

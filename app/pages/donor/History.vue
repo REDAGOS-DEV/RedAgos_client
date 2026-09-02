@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import DonorHistoryPage from '~/components/Donor/HistoryPage.vue'
+import DonorHistoryPage from '~/components/donor/HistoryPage.vue'
 
 definePageMeta({
   middleware: 'auth',

@@ -362,6 +362,8 @@
 </template>
 
 <script setup>
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
@@ -402,13 +404,29 @@ definePageMeta({
  * -------------------------------------------------------------------------
  */
 
+/**
+ * Settings API.
+ *
+ * Walay `/blood-center/settings` nga route ang Laravel. Ang naa kay
+ * `/blood-center/profile` ug `/blood-center/password` — mao nay gamiton dinhi,
+ * agi sa service aron madala ang bearer token. (Ang daan nga raw `$fetch`
+ * padulong sa `/api/...` kay nagsalig sa dev proxy nga wala sa gi-build nga app.)
+ */
 const api = {
-  getSettings: () => $fetch('/api/bloodcenter/settings'),
-  updateProfile: (body) => $fetch('/api/bloodcenter/settings/profile', { method: 'PUT', body }),
-  updatePassword: (body) => $fetch('/api/bloodcenter/settings/password', { method: 'PUT', body }),
-  updateNotificationPref: (body) => $fetch('/api/bloodcenter/settings/notifications', { method: 'PUT', body }),
-  logoutOtherDevices: () => $fetch('/api/bloodcenter/settings/sessions/logout-others', { method: 'POST' }),
-  updateTheme: (body) => $fetch('/api/bloodcenter/settings/appearance', { method: 'PUT', body }),
+  getSettings: () => bloodCenterService.profile(),
+  updateProfile: (body) => bloodCenterService.updateProfile(body),
+  updatePassword: (body) => bloodCenterService.updatePassword(body),
+
+  // `/logout-all` mo-revoke sa TANAN nga token — apil ang gigamit karon — so
+  // ma-sign-out pod ang device nga nag-klik. Mao nay tinuod nga buhat sa
+  // endpoint; ang copy sa UI kinahanglan mo-ingon niini.
+  logoutOtherDevices: () => authService.logoutFromAllDevices(),
+
+  // Wala pay route ang blood center para ani. Ang notification preferences kay
+  // para ra sa donor (`/donors/notification-preferences`), ug ang tema kay
+  // lokal na pinaagi sa useDarkMode() — walay kalabotan ang server.
+  updateNotificationPref: async () => ({ success: true, local: true }),
+  updateTheme: async () => ({ success: true, local: true }),
 }
 
 const loading = ref(true)

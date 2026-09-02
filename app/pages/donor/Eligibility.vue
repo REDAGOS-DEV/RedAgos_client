@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import DonorEligibilityPage from '~/components/Donor/EligibilityPage.vue'
+import DonorEligibilityPage from '~/components/donor/EligibilityPage.vue'
 
 definePageMeta({
   middleware: 'auth',

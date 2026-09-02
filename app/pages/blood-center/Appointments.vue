@@ -648,8 +648,12 @@ function onDateFilterChange() {
 }
 
 function viewAppointment(appt) {
-  // Hook up to a donor detail route/modal as needed.
-  console.log('View appointment', appt.id)
+  // Placeholder: walay donor detail route/modal pa. Ang buton mo-render nga
+  // daw molihok apan wala gyuy mahitabo — ipakita ni sa dev aron dili malimtan,
+  // hilom sa production.
+  if (import.meta.dev) {
+    console.warn('[Appointments] viewAppointment is not wired up yet', appt.id)
+  }
 }
 
 async function openManageSlots() {
@@ -711,8 +715,10 @@ function closeViewDonors() {
 }
 
 function openManageDrive(drive) {
-  // Hook up to a Manage Drive & Attendance route/modal as needed.
-  console.log('Manage drive & attendance', drive.id)
+  // Placeholder: tan-awa ang viewAppointment sa ibabaw.
+  if (import.meta.dev) {
+    console.warn('[Appointments] openManageDrive is not wired up yet', drive.id)
+  }
 }
 
 onMounted(async () => {
