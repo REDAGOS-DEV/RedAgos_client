@@ -65,6 +65,10 @@
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'hospital-portal',
+})
+
 import { authService } from '~/api/auth/AuthService'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

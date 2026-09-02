@@ -290,7 +290,7 @@ import { donorService } from '~/api/donor/DonorService'
 import { authService } from '~/api/auth/AuthService'
 
 definePageMeta({
-  layout: 'auth',
+  layout: 'default',
   alias: ['/register/donor'],
 })
 

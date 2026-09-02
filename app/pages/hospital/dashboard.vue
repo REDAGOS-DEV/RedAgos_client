@@ -312,7 +312,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
-definePageMeta({ middleware: 'auth', layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 const router = useRouter()
 const goTo = (path) => router.push(path)
@@ -508,13 +508,6 @@ const quickActions = [
     color: '#5E35B1',
     title: 'Track Requests',
     description: 'Follow the status of active requests',
-  },
-  {
-    path: '/hospital/billing',
-    icon: 'receipt',
-    color: '#F57C00',
-    title: 'Billing & Payments',
-    description: 'View invoices and payment history',
   },
 ]
 

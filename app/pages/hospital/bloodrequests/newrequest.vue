@@ -435,7 +435,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import AssetIcon from '~/components/common/AssetIcon.vue';
 import { hospitalService } from '~/api/hospital/HospitalService';
 
-definePageMeta({ middleware: 'auth', layout: 'hospitaldashboard' });
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' });
 
 const loadingReference = ref(true);
 const loadingAvailability = ref(true);

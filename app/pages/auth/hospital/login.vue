@@ -165,6 +165,10 @@
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'hospital-portal',
+})
+
 import { authService } from '~/api/auth/AuthService'
 import { reactive, ref, watch } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'
@@ -207,7 +211,9 @@ const login = async () => {
     const response = await authService.login({
       email: email.value,
       password: password.value,
-      role: 'blood-center',
+      // Ang backend alias para sa blood_bank kay 'hospital'. Ang 'blood-center'
+      // kay mo-normalize padulong sa laing role, so mo-403 og role_mismatch.
+      role: 'hospital',
       licenseNumber: licenseNumber.value,
     })
 

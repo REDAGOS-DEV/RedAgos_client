@@ -190,8 +190,6 @@ const pageLabels = {
   '/hospital/bloodrequests/edit' : 'Blood Requests / Edit / ',
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
-  '/hospital/billing': 'Billing & Payments',
-  '/hospital/transactions': 'Transaction History',
   '/hospital/notifications': 'Notifications',
   '/hospital/settings': 'Settings',
 }
@@ -212,7 +210,6 @@ const unreadCount = ref(0)
 const showUserMenu = ref(false)
 const userMenuItems = [
   { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list' },
-  { label: 'Billing & Payments', path: '/hospital/billing', icon: 'receipt' },
   { label: 'Notification Settings', path: '/hospital/settings', icon: 'bell' }
 ]
 const closeUserMenu = () => { showUserMenu.value = false }
@@ -244,8 +241,6 @@ const searchablePages = [
   { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
-  { label: 'Billing & Payments', path: '/hospital/billing', icon: 'receipt', keywords: 'billing payment gcash cash' },
-  { label: 'Transaction History', path: '/hospital/transactions', icon: 'history', keywords: 'transaction history records' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password' },
 ]

@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import DonorDashboardPage from '~/components/Donor/DashboardPage.vue'
+import DonorDashboardPage from '~/components/donor/DashboardPage.vue'
 
 definePageMeta({
   middleware: 'auth',

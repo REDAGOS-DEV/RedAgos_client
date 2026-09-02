@@ -449,6 +449,7 @@
 </template>
 
 <script setup>
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
@@ -493,17 +494,40 @@ definePageMeta({
  * -------------------------------------------------------------------------
  */
 
+/**
+ * Donor API.
+ *
+ * Kaniadto raw `$fetch('/api/bloodcenter/...')` ni ang tanan. Duha ka problema
+ * ang naa niadto: (1) walay Authorization header, ug (2) ang `/api` prefix kay
+ * ni-agi sa `nitro.devProxy` nga naa ra sa `nuxt dev` — sa gi-build nga app,
+ * mo-404 siya sa Nitro. Ang upat nga endpoint nga naa gyud sa Laravel kay
+ * gibalhin na sa `bloodCenterService`, nga mao nay nagdala sa token.
+ *
+ * Ang lima sa ubos WALA pay route sa server (walay stats, facilities, update,
+ * flags, o donations nga endpoint sa `/blood-center/donors`). Gibiyaan sila nga
+ * dayag nga wala pa ma-implementar imbes tagoan sa likod og call nga dili
+ * gyud molihok — tan-awa ang endpoint matrix sa audit plan.
+ */
+const notImplemented = (name) => async () => {
+    throw Object.assign(
+        new Error(`${name} has no backend endpoint yet.`),
+        { status: 501, notImplemented: true },
+    )
+}
+
 const api = {
-    getStats: () => $fetch('/api/bloodcenter/donors/stats'),
-    getDonors: (params) => $fetch('/api/bloodcenter/donors', { params }),
-    getDonor: (id) => $fetch(`/api/bloodcenter/donors/${id}`),
-    getDonorHistory: (id) => $fetch(`/api/bloodcenter/donors/${id}/history`),
-    getFacilities: () => $fetch('/api/bloodcenter/facilities'),
-    createDonor: (payload) => $fetch('/api/bloodcenter/donors', { method: 'POST', body: payload }),
-    updateDonor: (id, payload) => $fetch(`/api/bloodcenter/donors/${id}`, { method: 'PUT', body: payload }),
-    addFlag: (id, payload) => $fetch(`/api/bloodcenter/donors/${id}/flags`, { method: 'POST', body: payload }),
-    recordDonation: (id, payload) =>
-        $fetch(`/api/bloodcenter/donors/${id}/donations`, { method: 'POST', body: payload }),
+    // Naa nay server route:
+    getDonors: (params) => bloodCenterService.donors(params),
+    getDonor: (id) => bloodCenterService.showDonor(id),
+    getDonorHistory: (id) => bloodCenterService.donorHistory(id),
+    createDonor: (payload) => bloodCenterService.createDonor(payload),
+
+    // Wala pa (Phase P/0B):
+    getStats: notImplemented('Donor statistics'),
+    getFacilities: notImplemented('Facility list'),
+    updateDonor: notImplemented('Updating a donor'),
+    addFlag: notImplemented('Flagging a donor'),
+    recordDonation: notImplemented('Recording a donation'),
 }
 
 const initialLoading = ref(true)

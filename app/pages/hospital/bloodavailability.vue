@@ -494,6 +494,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
 definePageMeta({
+  middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
 })
 
