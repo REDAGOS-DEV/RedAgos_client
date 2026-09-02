@@ -98,6 +98,22 @@ export function useUser() {
     user.value = null
   }
 
+  /**
+   * I-drop ang session sa browser ra — walay server call.
+   *
+   * Gilain ni gikan sa logout() tungod sa 401 handling: kung gisalikway na sa
+   * server ang token, ang POST /logout mo-401 pod, nga mo-trigger sa handler
+   * pag-usab — walay katapusan nga liko. Sa 401, ang token patay na sa server,
+   * so ang lokal nga paglimpyo igo na.
+   */
+  function clearSession() {
+    if (!import.meta.client) return
+
+    localStorage.removeItem('_token')
+    inFlight = null
+    clearUser()
+  }
+
     /**
    * Usa ra ka lugar ang logout para sa tanan nga role. Tulo ka lakang, ug
    * kinahanglan matuman ang duha nga lokal bisan mapakyas ang server call.
@@ -112,14 +128,12 @@ export function useUser() {
       console.error('Failed to revoke session on the server:', err)
     } finally {
       if (import.meta.client) {
-        localStorage.removeItem('_token')
-        inFlight = null
-        clearUser()
+        clearSession()
         window.location.replace(redirectTo)
       }
     }
   }
 
-  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, logout, can }
+  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can }
 
 }

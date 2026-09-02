@@ -95,6 +95,8 @@
               parehas ra ni sila usa ka flow (problema, unya ang solusyon),
               so dili na sila i-split into duha ka independent block.
             -->
+            <SessionExpiredNotice />
+
             <div
               v-if="errorMessage"
               class="alert-card"
@@ -176,6 +178,7 @@
 </template>
 
 <script setup>
+import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
 import { authService } from '~/api/auth/AuthService'
 import { reactive, watch } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'

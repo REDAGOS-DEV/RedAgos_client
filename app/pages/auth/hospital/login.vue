@@ -110,6 +110,8 @@
               </button>
             </div>
 
+            <SessionExpiredNotice />
+
             <p
               v-if="errorMessage"
               class="error-message"
@@ -165,6 +167,7 @@
 </template>
 
 <script setup>
+import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
 definePageMeta({
   middleware: 'hospital-portal',
 })
