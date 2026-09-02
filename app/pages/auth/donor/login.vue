@@ -90,42 +90,49 @@
               </button>
             </div>
 
-            <p
-              v-if="errorMessage"
-              class="error-message"
-            >
-              {{ errorMessage }}
-            </p>
-
             <!--
-              Ang 403 `email_not_verified` ra ang naay agianan padulong sa
-              lakang nga makatabang: ang resend. Ang uban nga sayop kay
-              mensahe ra gyud ang angay.
+              Gi-merge ang error text ug ang resend action sa usa ka card —
+              parehas ra ni sila usa ka flow (problema, unya ang solusyon),
+              so dili na sila i-split into duha ka independent block.
             -->
-            <div v-if="needsVerification" class="verify-prompt">
-              <button
-                type="button"
-                class="verify-resend-button"
-                :disabled="resending"
-                @click="resendVerification"
-              >
-                {{ resending ? 'Sending...' : 'Resend verification email' }}
-              </button>
+            <div
+              v-if="errorMessage"
+              class="alert-card"
+              :class="{ 'alert-card--action': needsVerification }"
+            >
+              <div class="alert-message">
+                <AssetIcon name="octagon-alert" :size="16" />
+                <span>{{ errorMessage }}</span>
+              </div>
 
-              <p
-                v-if="resendMessage"
-                class="verify-resend-note"
-                :class="{ 'verify-resend-note--error': resendFailed }"
-              >
-                {{ resendMessage }}
-              </p>
+              <template v-if="needsVerification">
+                <button
+                  type="button"
+                  class="verify-resend-button"
+                  :disabled="resending"
+                  @click="resendVerification"
+                >
+                  <AssetIcon v-if="resending" name="loader" :size="15" class="btn-spinner" />
+                  <AssetIcon v-else name="mail" :size="15" />
+                  {{ resending ? 'Sending...' : 'Resend verification email' }}
+                </button>
+
+                <p
+                  v-if="resendMessage"
+                  class="verify-resend-note"
+                  :class="{ 'verify-resend-note--error': resendFailed }"
+                >
+                  <AssetIcon :name="resendFailed ? 'octagon-alert' : 'circle-check-big'" :size="14" />
+                  <span>{{ resendMessage }}</span>
+                </p>
+              </template>
             </div>
 
             <button
               class="sign-in-button"
               :disabled="loading"
             >
-              <AssetIcon name="log-in" :size="24" />
+              <AssetIcon :name="loading ? 'loader' : 'log-in'" :size="22" :class="{ 'btn-spinner': loading }" />
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
@@ -267,13 +274,21 @@ const login = async () => {
 }
 
 .login-screen {
+  --primary: #1565C0;
+  --primary-hover: #0D47A1;
+  --danger: #D32F2F;
+  --success: #2E7D32;
+  --text-primary: #1f2937;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --field-bg: #f8fafc;
   min-height: 100vh;
-  background: #eef4fb;
-  color: #1f2937;
+  background: #F7F9FC;
+  color: var(--text-primary);
   font-family: var(--rb-font-sans);
 }
 
- .login-shell {
+.login-shell {
   display: grid;
   min-height: 100vh;
   grid-template-columns: 540px 1fr;
@@ -282,15 +297,14 @@ const login = async () => {
 .form-panel {
   display: flex;
   min-height: 100vh;
+  align-items: center;
   justify-content: flex-start;
-  padding: 0;
+  padding: 40px clamp(24px, 8vw, 140px);
 }
 
 .form-card {
   width: 100%;
-  max-width: 460px;
-  margin-top: 62px;
-  margin-left: 140px;
+  max-width: 420px;
 }
 
 /* ── MOBILE BRAND ── */
@@ -327,7 +341,7 @@ const login = async () => {
 }
 
 .mobile-brand .brand-name span {
-  color: #eb3535;
+  color: var(--danger);
 }
 
 .mobile-brand .brand-subtitle {
@@ -342,19 +356,21 @@ const login = async () => {
 .back-link {
   display: inline-flex;
   align-items: center;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
+  border-radius: 8px;
+  transition: color 150ms ease;
 }
 
 .back-link:hover {
-  color: #334155;
+  color: var(--text-primary);
 }
 
 h1 {
   margin: 46px 0 0;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 38px;
   font-weight: 800;
   letter-spacing: 0;
@@ -363,7 +379,7 @@ h1 {
 
 .form-subtitle {
   margin: 16px 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -382,7 +398,7 @@ h1 {
 
 label {
   display: block;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 800;
   line-height: 1.2;
@@ -394,16 +410,16 @@ label {
   align-items: center;
   margin-top: 12px;
   padding: 0 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--field-bg);
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .input-shell:focus-within {
-  border-color: #2563EB;
+  border-color: var(--primary);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.1);
 }
 
 .field-icon {
@@ -414,7 +430,7 @@ label {
   align-items: center;
   justify-content: center;
   margin-right: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 svg {
@@ -435,7 +451,7 @@ input {
 }
 
 input::placeholder {
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .icon-button {
@@ -449,13 +465,14 @@ input::placeholder {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .icon-button:hover {
   background: #f1f5f9;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .icon-button svg {
@@ -469,31 +486,20 @@ input::placeholder {
   margin-top: 22px;
 }
 
-.forgot-row a,
-.signup-text a {
-  color: #1266c3;
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.forgot-row a:hover,
-.signup-text a:hover {
-  color: #0d4f9c;
-}
-
 .link-button {
   border: 0;
   background: transparent;
   cursor: pointer;
-  padding: 0;
-  color: #1266c3;
+  padding: 2px;
+  border-radius: 6px;
+  color: var(--primary);
   font-size: 14px;
   font-weight: 800;
+  transition: color 150ms ease;
 }
 
 .link-button:hover {
-  color: #0d4f9c;
+  color: var(--primary-hover);
 }
 
 .sign-in-button {
@@ -502,26 +508,26 @@ input::placeholder {
   height: 52px;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   margin-top: 12px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #1565C0 0%, #2563EB 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #2563EB 100%);
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 6px 18px rgba(21, 101, 192, 0.3);
   transition: box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
 }
 
-.sign-in-button:hover {
+.sign-in-button:hover:not(:disabled) {
   filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.38);
+  box-shadow: 0 10px 24px rgba(21, 101, 192, 0.38);
 }
 
-.sign-in-button:active {
+.sign-in-button:active:not(:disabled) {
   transform: translateY(0);
 }
 
@@ -532,39 +538,63 @@ input::placeholder {
 }
 
 .sign-in-button svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
-.error-message {
+.btn-spinner {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.alert-card {
   margin: 16px 0 0;
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fbeaea;
+  text-align: left;
 }
 
-.verify-prompt {
-  margin-top: 12px;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: #f8fafc;
+.alert-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #791f1f;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.alert-message svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alert-card--action .alert-message {
+  margin-bottom: 12px;
 }
 
 .verify-resend-button {
+  display: flex;
   width: 100%;
   height: 42px;
-  border: 1px solid #1266c3;
-  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
   background: #ffffff;
-  color: #1266c3;
+  color: var(--danger);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: background-color 150ms ease;
 }
 
-.verify-resend-button:hover { background: #eef4fb; }
+.verify-resend-button:hover:not(:disabled) { background: #fdf3f3; }
 
 .verify-resend-button:disabled {
   cursor: not-allowed;
@@ -572,20 +602,39 @@ input::placeholder {
 }
 
 .verify-resend-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 10px 0 0;
-  color: #166534;
+  color: var(--success);
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.5;
+  text-align: left;
 }
 
-.verify-resend-note--error { color: #dc2626; }
+.verify-resend-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.verify-resend-note--error { color: var(--danger); }
 
 .signup-text {
   margin: 24px 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
+}
+
+.signup-text a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.signup-text a:hover {
+  color: var(--primary-hover);
 }
 
 .divider {
@@ -603,7 +652,7 @@ input::placeholder {
 
 .divider p {
   margin: 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -619,14 +668,13 @@ input::placeholder {
   height: 46px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border: 1px solid #d6e0eb;
+  gap: 10px;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffff;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
-  transition: border-color 150ms ease, transform 150ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 .role-button:hover {
@@ -639,24 +687,42 @@ input::placeholder {
 }
 
 .hospital {
-  color: #1266c3;
+  background: #eaf3fc;
+  color: var(--primary);
 }
 
 .hospital:hover {
-  border-color: #1266c3;
+  border-color: var(--primary);
 }
 
 .blood-center {
-  color: #2da1ff;
+  background: #fbeaea;
+  color: var(--danger);
 }
 
 .blood-center:hover {
-  border-color: #2da1ff;
+  border-color: var(--danger);
 }
 
-@keyframes logoFloat{ 0%,100%{ transform:translateY(0);} 50% { transform:translateY(-8px);} }
-@keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-18px);} }
-@keyframes floatParticle { 0%, 100% { transform:translateY(0);} 50% { transform:translateY(-20px);} }
+.back-link:focus-visible,
+.link-button:focus-visible,
+.icon-button:focus-visible,
+.sign-in-button:focus-visible,
+.verify-resend-button:focus-visible,
+.role-button:focus-visible,
+.signup-text a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner,
+  .sign-in-button,
+  .role-button {
+    animation: none;
+    transition: none;
+  }
+}
 
 @media (max-width: 1023px) {
   .login-shell {
@@ -743,5 +809,53 @@ input::placeholder {
   .role-grid {
     grid-template-columns: 1fr;
   }
+}
+
+:global(.dark .login-screen) {
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+  --field-bg: #263449;
+  background: #0F172A;
+}
+
+:global(.dark input) {
+  color: #E2E8F0;
+}
+
+:global(.dark .input-shell:focus-within) {
+  background: #2c3e57;
+}
+
+:global(.dark .icon-button:hover) {
+  background: #334155;
+}
+
+:global(.dark .alert-card) {
+  background: rgba(211, 47, 47, 0.16);
+}
+
+:global(.dark .alert-message) {
+  color: #f2b8b8;
+}
+
+:global(.dark .verify-resend-button) {
+  background: #1E293B;
+}
+
+:global(.dark .verify-resend-button:hover:not(:disabled)) {
+  background: #263449;
+}
+
+:global(.dark .divider span) {
+  background: #334155;
+}
+
+:global(.dark .hospital) {
+  background: rgba(21, 101, 192, 0.16);
+}
+
+:global(.dark .blood-center) {
+  background: rgba(211, 47, 47, 0.16);
 }
 </style>

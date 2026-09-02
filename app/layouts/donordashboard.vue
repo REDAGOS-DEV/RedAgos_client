@@ -33,24 +33,13 @@
               <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">
                 {{ greeting }}
               </span>
-
-              <!-- Email Verification Status (Desktop) -->
-              <div v-if="user?.email_verified_at" class="inline-flex items-center gap-1 flex-shrink-0">
-                <AssetIcon name="badge-check" :size="16" class="text-[#0052FF] dark:text-[#3B82F6]" />
-                <span class="text-xs font-bold text-gray-800 dark:text-slate-100">
-                  Fully Verified
-                </span>
-              </div>
-
-              <!-- Desktop View -->
-              <NuxtLink
-                v-else
-                to="/auth/verify-email"
-                class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
-                title="Click to verify your email">
-                <AssetIcon name="circle-alert" :size="13" class="text-amber-500 flex-shrink-0" />
-                <span>Verify Email</span>
-              </NuxtLink>
+              <!--
+                Valid ID status pill intentionally removed from here.
+                Status is now surfaced consistently via the small badge/dot
+                on the avatar (both desktop and mobile) and via the full
+                CTA inside the profile dropdown, avoiding duplicate/competing
+                signals next to the greeting text.
+              -->
             </div>
           </div>
         </div>
@@ -136,7 +125,7 @@
           <div class="relative">
             <button @click="showUserMenu = !showUserMenu"
               class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
-              
+
               <!-- Outer Avatar Container -->
               <div class="relative flex-shrink-0">
                 <div
@@ -145,17 +134,27 @@
                   <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                   <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
                 </div>
-                
-                <!-- Verified Badge Icon (Mobile) -->
-                <div v-if="user?.email_verified_at" class="sm:hidden absolute -top-0.5 -right-0.5 bg-white dark:bg-slate-900 rounded-full p-0.5 shadow z-10">
+
+                <!--
+                  Valid ID status badge on avatar — now the single consistent
+                  indicator across desktop AND mobile (no more sm:hidden).
+                  verified -> checkmark badge, pending -> neutral dot,
+                  unsubmitted/rejected -> pulsing amber dot.
+                -->
+                <div v-if="identityStatus === 'verified'"
+                  class="absolute -top-0.5 -right-0.5 bg-white dark:bg-slate-900 rounded-full p-0.5 shadow z-10"
+                  title="ID Verified">
                   <AssetIcon name="badge-check" :size="12" class="text-[#0052FF]" />
                 </div>
 
-                <!-- Unverified Mobile Orange Dot Badge -->
-                <span 
-                  v-else 
-                  class="sm:hidden absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse z-10"
-                  title="Unverified Email">
+                <span v-else-if="identityStatus === 'pending'"
+                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white dark:ring-slate-900 z-10"
+                  title="ID under review">
+                </span>
+
+                <span v-else
+                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse z-10"
+                  title="Valid ID needed">
                 </span>
               </div>
 
@@ -183,22 +182,29 @@
                     </p>
                     <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
 
-                    <!-- Verification Status inside Dropdown -->
+                    <!-- Valid ID Status inside Dropdown (full context + CTA lives here) -->
                     <div class="flex items-center gap-1.5 mt-1.5">
-                      <template v-if="user?.email_verified_at">
+                      <template v-if="identityStatus === 'verified'">
                         <AssetIcon name="badge-check" :size="16" class="text-[#0052FF] dark:text-[#3B82F6]" />
                         <span class="text-xs font-bold text-gray-900 dark:text-slate-100">
-                          Fully Verified
+                          ID Verified
                         </span>
                       </template>
 
-                      <NuxtLink 
-                        v-else 
-                        to="/auth/verify-email" 
+                      <template v-else-if="identityStatus === 'pending'">
+                        <AssetIcon name="clock" :size="14" class="text-slate-400" />
+                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
+                          ID Under Review
+                        </span>
+                      </template>
+
+                      <NuxtLink
+                        v-else
+                        to="/donor/profile"
                         @click="closeUserMenu"
                         class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline">
                         <AssetIcon name="circle-alert" :size="14" class="text-amber-500" />
-                        <span>Verify Email Address</span>
+                        <span>Submit Valid ID</span>
                       </NuxtLink>
                     </div>
                   </div>
@@ -252,6 +258,7 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useSidebar } from '~/composables/useSidebar.js'
+import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
 const { collapsed, openMobile } = useSidebar()
 const router = useRouter()
@@ -313,6 +320,18 @@ async function loadUnreadCount() {
 }
 
 onMounted(loadUnreadCount)
+
+// --- Valid ID status ---
+// Drives the avatar badge/dot (consistent across desktop + mobile) and the
+// dropdown CTA: 'unsubmitted' | 'pending' | 'verified' | 'rejected'.
+// Treated as "needs action" unless it's explicitly verified or under review.
+// Shared (useState) with IdentityVerification.vue on /donor/profile, so
+// submitting an ID there flips this badge immediately — no refetch needed.
+const { identityStatus, fetchIdentityStatus } = useIdentityStatus()
+
+onMounted(() => {
+  if (identityStatus.value === null) fetchIdentityStatus()
+})
 
 // --- Profile dropdown ---
 const showUserMenu = ref(false)
@@ -497,7 +516,7 @@ a, button {
   header {
     height: 3.75rem;
   }
-  
+
   main {
     padding-top: 3.75rem;
   }
