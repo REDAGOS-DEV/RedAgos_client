@@ -602,7 +602,7 @@
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="batchModalOpen" class="modal-overlay" @click.self="closeBatchModal">
-          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true">
+          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
             <button type="button" class="modal-close" @click="closeBatchModal">
               <AssetIcon name="x" :size="16" />
             </button>
@@ -687,7 +687,7 @@
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="manageModalOpen" class="modal-overlay" @click.self="closeManageModal">
-          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true">
+          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
             <button type="button" class="modal-close" @click="closeManageModal">
               <AssetIcon name="x" :size="16" />
             </button>
@@ -732,7 +732,7 @@
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="printModalOpen" class="modal-overlay" @click.self="closePrintLabelsModal">
-          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true">
+          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
             <button type="button" class="modal-close" @click="closePrintLabelsModal">
               <AssetIcon name="x" :size="16" />
             </button>
@@ -800,7 +800,7 @@
     <Teleport to="body">
       <Transition name="drawer-fade">
         <div v-if="drawerOpen" class="drawer-overlay" @click.self="closeDetailsDrawer">
-          <aside class="detail-drawer" role="dialog" aria-modal="true" aria-label="Inventory batch details">
+          <aside class="detail-drawer" role="dialog" v-focus-trap aria-modal="true" aria-label="Inventory batch details">
             <header class="detail-drawer__header">
               <div>
                 <p class="detail-drawer__eyebrow">{{ drawerBatch?.batch_id }}</p>
@@ -890,7 +890,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({

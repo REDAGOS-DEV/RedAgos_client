@@ -169,7 +169,7 @@
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorIdentityService } from '~/api/admin/DonorIdentityService'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',

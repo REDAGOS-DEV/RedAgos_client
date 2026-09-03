@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/*
+ * Ang font gi-link na sa nuxt.config app.head, dili na @import dinhi.
+ * Ang CSS @import kay render-blocking: dili siya ma-discover sa preload
+ * scanner hangtod ma-download ug ma-parse kining file — nagdugang og usa ka
+ * round trip sa dili pa magsugod ang font.
+ */
 
 @tailwind base;
 @tailwind components;

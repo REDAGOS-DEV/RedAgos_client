@@ -44,7 +44,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const home = departmentHome(user)
 
   // A home page that is itself gated would loop, so stop if we are already there.
-  if (to.path.toLowerCase() === home.toLowerCase()) {
+  if (to.path === home) {
     return
   }
 

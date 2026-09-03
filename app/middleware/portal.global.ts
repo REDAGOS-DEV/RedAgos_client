@@ -54,7 +54,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const home = portalHomeFor(user)
 
   // A home that is itself out of reach would loop.
-  if (to.path.toLowerCase() === home.toLowerCase()) {
+  if (to.path === home) {
     return
   }
 

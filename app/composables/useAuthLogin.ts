@@ -43,7 +43,7 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     role: 'donor',
     title: 'Sign In · RedAgos',
     forgotPasswordPath: '/auth/donor/forgot-password',
-    resolveHome: () => '/donor/Dashboard',
+    resolveHome: () => '/donor/dashboard',
   },
   'blood-center': {
     role: 'blood-center',

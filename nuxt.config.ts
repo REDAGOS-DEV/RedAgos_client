@@ -16,6 +16,22 @@ export default defineNuxtConfig({
   },
   css: ['~/assets/css/main.css'],
 
+  app: {
+    head: {
+      link: [
+        // Preconnect sa duha ka origin: ang googleapis nagserve sa CSS, ang
+        // gstatic sa mismong font files. Ang crossorigin kinahanglan sa gstatic
+        // kay CORS ang font fetch — kung wala, mausik ang preconnect.
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
+        },
+      ],
+    },
+  },
+
   runtimeConfig: {
     public: {
       // Kung wala ni na-set, ang BaseService na ang mo-derive sa host gikan

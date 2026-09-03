@@ -277,7 +277,7 @@
     <!-- ================= FULFILLMENT DETAILS MODAL ================= -->
     <Teleport to="body">
       <div v-if="drawerRequestId" class="rf-drawer-overlay" :class="{ 'rf-dark': isDark }" @click.self="closeDrawer">
-        <aside class="rf-drawer" role="dialog" aria-label="Fulfillment details">
+        <aside class="rf-drawer" role="dialog" v-focus-trap aria-label="Fulfillment details">
           <div v-if="drawerPending" class="rf-drawer-loading">
             <div v-for="n in 5" :key="n" class="rf-skeleton-row" />
           </div>
@@ -426,7 +426,7 @@
     <!-- ================= CONFIRMATION MODALS ================= -->
     <Teleport to="body">
       <div v-if="confirmDialog.type" class="rf-modal-overlay" :class="{ 'rf-dark': isDark }" @click.self="closeConfirmDialog">
-        <div class="rf-modal" role="dialog" aria-modal="true">
+        <div class="rf-modal" role="dialog" v-focus-trap aria-modal="true">
           <!-- Generic status update -->
           <template v-if="confirmDialog.type === 'status'">
             <h3 class="rf-modal-title">Mark Request as {{ confirmDialog.targetStage }}?</h3>
@@ -582,7 +582,7 @@
     <!-- ================= TIMELINE MODAL ================= -->
     <Teleport to="body">
       <div v-if="timelineRequest" class="rf-modal-overlay" :class="{ 'rf-dark': isDark }" @click.self="closeTimelineModal">
-        <div class="rf-modal rf-timeline-modal" role="dialog" aria-modal="true">
+        <div class="rf-modal rf-timeline-modal" role="dialog" v-focus-trap aria-modal="true">
           <div class="rf-modal-header-row">
             <div>
               <p class="rf-drawer-eyebrow">{{ timelineRequest.id }}</p>

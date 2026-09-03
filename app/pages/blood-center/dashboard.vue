@@ -607,7 +607,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({

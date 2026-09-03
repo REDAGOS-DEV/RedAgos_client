@@ -73,7 +73,7 @@ export function portalHomeFor(user: Pick<AppUser, 'roles'> | null | undefined): 
   const roles = user?.roles ?? []
 
   if (roles.includes('admin')) return '/admin/registrations'
-  if (roles.includes('donor')) return '/donor/Dashboard'
+  if (roles.includes('donor')) return '/donor/dashboard'
   if (roles.includes('blood_center')) return departmentHome(user)
   // The hospital portal is closed until it has a backend; `hospital-portal`
   // middleware turns this into the unavailable page.

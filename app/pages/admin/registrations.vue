@@ -173,7 +173,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',

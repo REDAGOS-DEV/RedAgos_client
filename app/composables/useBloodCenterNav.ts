@@ -163,7 +163,7 @@ export function useBloodCenterNav() {
   function labelForPath(path: string): string {
     const match = NAV_GROUPS
       .flatMap((group) => group.items)
-      .find((item) => item.path.toLowerCase() === path.toLowerCase())
+      .find((item) => item.path === path)
 
     return match?.label ?? ''
   }

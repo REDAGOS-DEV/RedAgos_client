@@ -43,6 +43,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Unit tests for routing, portal access and API error mapping -- the
+      # logic where a wrong answer sends someone to the wrong portal or hides a
+      # dead session. Runs in ~1s, so it gates every PR without friction.
+      - name: Test
+        run: npm test
+
       # A production build, not `nuxt dev`. The dev server proxies `/api` to
       # localhost:8000; that proxy does not exist in a built app, so calls
       # written against it only fail here.

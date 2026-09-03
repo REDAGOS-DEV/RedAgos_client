@@ -95,7 +95,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 // --- Dark mode awareness ---
@@ -223,10 +223,9 @@ const closeSidebar = () => {
 
 const hoveredPath = ref(null)
 
-// Case-insensitive kay ang uban ka page file kay naka-capital (Dashboard.vue →
-// /blood-center/Dashboard) samtang lowercase ang tanan link. Ang vue-router
-// mo-match gihapon, pero ang exact string comparison dili.
-const isActive = (path) => route.path.toLowerCase() === path.toLowerCase()
+// Lowercase na ang tanan page file, so exact comparison na. Kaniadto
+// case-insensitive ni tungod sa Dashboard.vue → /blood-center/Dashboard.
+const isActive = (path) => route.path === path
 
 const navStyle = (path) => {
   const active = isActive(path)

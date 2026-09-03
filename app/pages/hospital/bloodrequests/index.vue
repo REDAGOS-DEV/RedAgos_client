@@ -295,7 +295,7 @@
       <div v-if="drawerOpen" class="drawer-backdrop" @click="closeDrawer" />
     </Transition>
     <Transition name="drawer-slide">
-      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" aria-label="Request details">
+      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" v-focus-trap aria-label="Request details">
         <div class="drawer__header">
           <div>
             <p class="drawer__eyebrow">Request Details</p>

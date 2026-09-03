@@ -62,7 +62,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',

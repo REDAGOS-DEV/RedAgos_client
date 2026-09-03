@@ -69,6 +69,7 @@
           id="mobile-menu"
           class="mobile-menu"
           role="dialog"
+          v-focus-trap
           aria-modal="true"
           aria-label="Navigation menu"
         >

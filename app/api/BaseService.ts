@@ -50,9 +50,13 @@ export class BaseService {
     } catch (error: any) {
       const status = error?.response?.status;
       const responseData = error?.response?._data || error?.data || {};
-      const message =
-        responseData?.message ||
-        error?.message;
+
+      // Ang message sa server ra ang ipakita. Ang `error.message` gikan sa
+      // ofetch kay morag `[GET] "http://host/api/x": 500 Internal Server Error`
+      // — nagbutyag sa API URL ug walay pulos sa user. Kaniadto ni gigamit isip
+      // fallback, mao nga ang friendly nga 500 nga teksto sa ubos wala gyud
+      // makagamit: kanunay tinuod ang `message`, so laktawan ang `||`.
+      const message = responseData?.message;
       const requestError = new Error(message || "Something went wrong. Please try again.") as Error & {
         status?: number;
         errors?: Record<string, string[]>;
@@ -76,6 +80,12 @@ export class BaseService {
 
       if (status === 500) {
         requestError.message = message || "Server error. Please try again or contact the administrator.";
+      }
+
+      // Gitipigan ang tinuod nga transport error para sa dev diagnostics, apan
+      // dili ni makita sa user.
+      if (import.meta.dev && error?.message) {
+        requestError.cause = error;
       }
 
       throw requestError;
