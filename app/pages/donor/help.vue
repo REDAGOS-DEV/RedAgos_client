@@ -119,11 +119,11 @@ Output:
                     </div>
 
                     <div class="panel fade-in legal-panel" style="--delay: 200ms">
-                        <NuxtLink to="/legal/Terms" class="legal-link">
+                        <NuxtLink to="/legal/terms" class="legal-link">
                             Terms of Service
                             <AssetIcon name="arrow-right" :size="14" />
                         </NuxtLink>
-                        <NuxtLink to="/legal/Privacy" class="legal-link">
+                        <NuxtLink to="/legal/privacy" class="legal-link">
                             Privacy Policy
                             <AssetIcon name="arrow-right" :size="14" />
                         </NuxtLink>
@@ -135,6 +135,12 @@ Output:
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { supportService } from '~/api/support/SupportService'
 

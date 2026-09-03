@@ -189,7 +189,7 @@ Output:
         <Teleport to="body">
             <Transition name="modal-fade">
                 <div v-if="showPassedModal" class="modal-backdrop" @click.self="showPassedModal = false">
-                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="epm-title">
+                    <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="epm-title">
                         <div class="modal-check">
                             <AssetIcon name="check" :size="26" />
                         </div>
@@ -231,6 +231,12 @@ Output:
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import QRCode from 'qrcode'

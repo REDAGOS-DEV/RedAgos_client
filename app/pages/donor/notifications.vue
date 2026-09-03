@@ -104,6 +104,12 @@ Output:
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 

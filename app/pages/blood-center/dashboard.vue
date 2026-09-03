@@ -509,7 +509,7 @@
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="confirmModalOpen" class="modal-overlay" @click.self="closeConfirmModal">
-          <div class="modal-card" role="dialog" aria-modal="true">
+          <div class="modal-card" role="dialog" v-focus-trap aria-modal="true">
             <button type="button" class="modal-close" @click="closeConfirmModal">
               <AssetIcon name="x" :size="16" />
             </button>
@@ -543,7 +543,7 @@
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="recordModalOpen" class="modal-overlay" @click.self="closeRecordDonation">
-          <div class="modal-card modal-card--form" role="dialog" aria-modal="true">
+          <div class="modal-card modal-card--form" role="dialog" v-focus-trap aria-modal="true">
             <button type="button" class="modal-close" @click="closeRecordDonation">
               <AssetIcon name="x" :size="16" />
             </button>

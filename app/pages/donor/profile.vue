@@ -303,6 +303,12 @@
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
 import IdentityVerification from '~/components/profile/IdentityVerification.vue'
 import { donorService } from '~/api/donor/DonorService'

@@ -255,7 +255,7 @@ Output:
         <Teleport to="body">
             <Transition name="modal-fade">
                 <div v-if="confirmDeleteOpen" class="modal-backdrop" @click.self="confirmDeleteOpen = false">
-                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+                    <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="delete-title">
                         <div class="modal-check modal-check--danger">
                             <AssetIcon name="alert" :size="24" />
                         </div>
@@ -286,6 +286,12 @@ Output:
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'

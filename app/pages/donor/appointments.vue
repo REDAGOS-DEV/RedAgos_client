@@ -297,6 +297,12 @@ Output:
 </template>
 
 <script setup>
+definePageMeta({
+  middleware: 'auth',
+  layout: 'donordashboard',
+  keepalive: true,
+})
+
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import { donorService } from '~/api/donor/DonorService'
