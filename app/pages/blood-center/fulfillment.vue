@@ -1056,7 +1056,12 @@ async function useMockFulfillmentApi(url, options = {}) {
   return {}
 }
 
-const $fetch = useMockFulfillmentApi
+// Gi-shadow ang global $fetch sa mock. Gibutang sa likod sa flag aron dayag
+// nga mock ni ug dili aksidenteng magpabilin kung naa nay tinuod nga endpoint.
+// Walay `/blood-center/fulfillment*` nga route karon (Phase P).
+const $fetch = useRuntimeConfig().public.useMocks
+  ? useMockFulfillmentApi
+  : globalThis.$fetch
 
 const statusPills = [
   { label: 'All', value: 'all' },

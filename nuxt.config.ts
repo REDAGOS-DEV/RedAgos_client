@@ -16,7 +16,16 @@ export default defineNuxtConfig({
       // endpoint para sa blood bank, so ang mga page mo-render og shell unya
       // mo-404 ang tanan nga call. I-on ra ni kung human na ang Phase P.
       // Set NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED=true para i-abli.
-      hospitalPortalEnabled: process.env.HOSPITAL_PORTAL_ENABLED === 'true'
+      hospitalPortalEnabled: process.env.HOSPITAL_PORTAL_ENABLED === 'true',
+
+      // Ang Reports, Fulfillment, Incoming Requests, Billing ug Drives kay walay
+      // backend gihapon — walay katugbang nga route sa Laravel. Nagdagan sila sa
+      // fixture data. Default `true` kay kon i-off nimo karon, blangko ang mga
+      // page; ang punto sa flag kay makita ug ma-flip ang mock, dili nga tago.
+      //
+      // I-set og false kada domain nga mahuman, ug tangtangon ni sa dihang wala
+      // nay mock. Tan-awa ang endpoint matrix para sa kinsa ang nag-utang unsa.
+      useMocks: process.env.USE_MOCKS !== 'false'
     }
   },
 

@@ -399,14 +399,11 @@ async function load() {
 watch([activeStatus, page], load)
 
 onMounted(async () => {
-  // UX ra ni nga pag-check — ang `role:admin` sa server mao gihapon ang tinuod
-  // nga gate.
+  // Tan-awa ang registrations.vue: ang role check kay sa `portal` global
+  // middleware na, sa dili pa mo-render. Ang `role:admin` sa server gihapon ang
+  // tinuod nga gate.
   if (!user.value) {
     await fetchUser()
-  }
-
-  if (user.value && !user.value.roles?.includes('admin')) {
-    return navigateTo('/auth/role-selection')
   }
 
   await load()

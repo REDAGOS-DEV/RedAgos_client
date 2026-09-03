@@ -433,14 +433,13 @@ async function load() {
 watch([activeStatus, page], load)
 
 onMounted(async () => {
-  // UX ra ni nga pag-check — ang `role:admin` sa server mao gihapon ang tinuod
-  // nga gate. Kung dili admin, ang API mo-403 gihapon bisan makaabot sila diri.
+  // Ang role check kay sa `portal` global middleware na, nga modagan sa dili pa
+  // mo-render ang page. Kaniadto dinhi ni sa onMounted — nagpasabot nga ang
+  // dili-admin makakita una sa tibuok page ayha ma-redirect.
+  //
+  // Ang `role:admin` sa server gihapon ang tinuod nga gate.
   if (!user.value) {
     await fetchUser()
-  }
-
-  if (user.value && !user.value.roles?.includes('admin')) {
-    return navigateTo('/auth/role-selection')
   }
 
   await load()

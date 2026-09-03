@@ -9,8 +9,15 @@ import { ref } from 'vue'
  * does not need any changes when the real backend is ready — just swap this
  * file back out for the one that calls useApi().
  *
- * Delete this file (or gate it behind an env flag) once
- * GET/PATCH /blood-center/bloodrequests* are live.
+ * Delete this file once GET/PATCH /blood-center/bloodrequests* are live.
+ *
+ * Kini kay dili ma-branch sa `useMocks` nga flag sama sa Reports/fulfillment:
+ * ang tinuod nga implementasyon naa sa ubos isip comment ug nag-agi sa
+ * `useApi()` nga wala pa ma-define. Imbes magpakaaron-ingnon nga mo-switch,
+ * mo-warn ta sa dev kung gi-off ang flag apan fixture data gihapon ang gipakita.
+ *
+ * Walay `/blood-center/bloodrequests` nga route ang Laravel — tan-awa ang
+ * endpoint matrix. Phase P ni.
  */
 
 function delay(ms = 450) {
@@ -317,6 +324,15 @@ function computeSummary(list) {
 
 /* COMPOSABLE */
 export function useIncomingRequests() {
+  // Ang flag nag-ingon nga naka-off ang mock, apan mock gihapon ni nga file.
+  // Ipakita sa dev aron dili hilom nga bakak ang flag.
+  if (import.meta.dev && !useRuntimeConfig().public.useMocks) {
+    console.warn(
+      '[useIncomingRequests] useMocks=false apan mock gihapon ni nga composable. ' +
+      'Walay /blood-center/bloodrequests nga endpoint (Phase P).'
+    )
+  }
+
   const requests = ref([])
   const loading = ref(false)
   const error = ref(null)

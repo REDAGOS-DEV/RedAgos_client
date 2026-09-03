@@ -535,7 +535,11 @@ definePageMeta({
  * backend teammate to wire up.
  * -------------------------------------------------------------------------
  */
-const USE_MOCK_DATA = true
+// Gikan na sa runtimeConfig imbes hardcoded `true`, aron makita sa usa ka
+// lugar kung unsa ang mock ug ma-flip nga walay edit sa code.
+// Walay `/api/bloodcenter/reports/*` nga route ang Laravel — tan-awa ang
+// endpoint matrix. Magpabilin ni nga true hangtod matuman ang Phase P.
+const USE_MOCK_DATA = useRuntimeConfig().public.useMocks
 
 /**
  * NOTE ON API SHAPE
