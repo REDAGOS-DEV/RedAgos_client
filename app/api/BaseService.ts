@@ -1,3 +1,5 @@
+import { reportUnauthorized } from "./unauthorized";
+
 export class BaseService {
   async request<T>(
     url: string,
@@ -64,19 +66,19 @@ export class BaseService {
       requestError.data = responseData;
 
  
-      switch (status) {
-        case 400:
-        case 401:
-        case 404:
-        case 422:
-        case 429:
-          throw requestError;
-        case 500:
-          requestError.message = message || "Server error. Please try again or contact the administrator.";
-          throw requestError;
-        default:
-          throw requestError;
+      // Ang 401 nagpasabot nga gisalikway na ang token — expired, gi-revoke, o
+      // nag-sign out sa laing device. Ang session-expiry plugin mao ang mo-decide
+      // asa dad-on ang user; dinhi, i-report ra. Mo-throw gihapon ta pagkahuman,
+      // so walay mausab sa mga caller nga naa nay kaugalingong catch.
+      if (status === 401) {
+        reportUnauthorized(requestError);
       }
+
+      if (status === 500) {
+        requestError.message = message || "Server error. Please try again or contact the administrator.";
+      }
+
+      throw requestError;
     }
   }
 
@@ -120,6 +122,12 @@ export class BaseService {
       ) as Error & { status?: number };
 
       requestError.status = status;
+
+      // Parehas ra sa request(): ang blob route nagdala sa samang token, so ang
+      // 401 dinhi pareho gihapon nga patay na nga session.
+      if (status === 401) {
+        reportUnauthorized(requestError);
+      }
 
       throw requestError;
     }

@@ -110,6 +110,8 @@
               </button>
             </div>
 
+            <SessionExpiredNotice />
+
             <p
               v-if="errorMessage"
               class="error-message"
@@ -188,6 +190,7 @@
 </template>
 
 <script setup>
+import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
 import { authService } from '~/api/auth/AuthService'
 import { reactive, ref, watch } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'
