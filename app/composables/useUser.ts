@@ -1,19 +1,24 @@
 import { authService } from '~/api/auth/AuthService'
+import type { AppUser } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
 // sa composable aron usa ra ka request bisan pila ka caller ang mo-dungan.
-let inFlight = null
+let inFlight: Promise<void> | null = null
 
 export function useUser() {
-  const user = useState('app-user', () => null)
-  const loading = useState('app-user-loading', () => true)
+  // Ang explicit nga type mao ang nagpalihok sa `user.roles` sa mga caller.
+  // Kaniadto `useState('app-user', () => null)` ni sa JS, so `null` ang na-infer
+  // ug ang tanan nga pag-basa sa field mo-narrow padulong sa `never` — mao nay
+  // nakit-an sa unang typecheck sa portal middleware.
+  const user = useState<AppUser | null>('app-user', () => null)
+  const loading = useState<boolean>('app-user-loading', () => true)
 
-  async function fetchUser() {
+  async function fetchUser(): Promise<void> {
     loading.value = true
     try {
       const runtimeConfig = useRuntimeConfig()
       const token = import.meta.client ? localStorage.getItem('_token') : null
-      const res = await $fetch('/user', {
+      const res = await $fetch<any>('/user', {
         baseURL: runtimeConfig.public.apiBaseURL,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
@@ -28,14 +33,15 @@ export function useUser() {
         // Naa nay full_name ang resource. Ang fallback kay gi-filter aron dili
         // mo-produce og "undefined undefined" kung wala ang name parts.
         full_name: payload.full_name || [payload.first_name, payload.last_name].filter(Boolean).join(' '),
-        first_name: payload.first_name,
-        last_name: payload.last_name,
+        first_name: payload.first_name ?? null,
+        last_name: payload.last_name ?? null,
         email: payload.email,
-        phone: payload.phone,
-        username: payload.username,
-        blood_type: payload.blood_type ?? null,
-        account_status: payload.account_status,
-        roles: Array.isArray(payload.roles) ? payload.roles.map((role) => role?.name ?? role) : [],
+        phone: payload.phone ?? null,
+        username: payload.username ?? null,
+        account_status: payload.account_status ?? null,
+        email_verified: Boolean(payload.email_verified),
+        activated_at: payload.activated_at ?? null,
+        roles: Array.isArray(payload.roles) ? payload.roles.map((role: any) => role?.name ?? role) : [],
         // Ang facility kay gi-eager-load na sa /user, so ang portal header
         // makakuha na sa ngalan sa center.
         facility: payload.facility ?? null,
@@ -45,9 +51,8 @@ export function useUser() {
         department_label: payload.department_label ?? null,
         is_supervisor: Boolean(payload.is_supervisor),
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
-        // avatar: payload.avatar_url, // i-uncomment rani if naa nay 'avatar_url' column sa backend
+        blood_type: payload.blood_type ?? null,
       }
-
     } catch (err) {
       console.error('Failed to load user:', err)
       user.value = null
@@ -63,7 +68,7 @@ export function useUser() {
    * Ang in-flight promise gi-share aron ang duha ka middleware nga mo-dungan
    * dili mo-fire og duha ka request.
    */
-  async function ensureUser() {
+  async function ensureUser(): Promise<AppUser | null> {
     if (user.value) return user.value
     if (!import.meta.client) return null
 
@@ -82,19 +87,19 @@ export function useUser() {
    * Fail-closed: kung wala pa ma-load ang user o walay permissions, `false`
    * ang balik. Ang mga item nga walay gikinahanglan nga ability kay dayag ra.
    */
-  function can(ability) {
+  function can(ability?: string): boolean {
     if (!ability) return true
 
     return user.value?.permissions?.includes(ability) ?? false
   }
 
-  function updateAvatar(newUrl) {
+  function updateAvatar(newUrl: string | null): void {
     if (user.value) {
       user.value = { ...user.value, avatar: newUrl }
     }
   }
 
-  function clearUser() {
+  function clearUser(): void {
     user.value = null
   }
 
@@ -106,7 +111,7 @@ export function useUser() {
    * pag-usab — walay katapusan nga liko. Sa 401, ang token patay na sa server,
    * so ang lokal nga paglimpyo igo na.
    */
-  function clearSession() {
+  function clearSession(): void {
     if (!import.meta.client) return
 
     localStorage.removeItem('_token')
@@ -114,11 +119,11 @@ export function useUser() {
     clearUser()
   }
 
-    /**
+  /**
    * Usa ra ka lugar ang logout para sa tanan nga role. Tulo ka lakang, ug
    * kinahanglan matuman ang duha nga lokal bisan mapakyas ang server call.
    */
-  async function logout(redirectTo = '/auth/role-selection') {
+  async function logout(redirectTo: string = ROLE_SELECTION): Promise<void> {
     try {
       // POST /api/logout — i-revoke ang Sanctum token sa server. Kung
       // localStorage ra ang i-clear, buhi gihapon ang token hangtod ma-expire.
@@ -135,5 +140,4 @@ export function useUser() {
   }
 
   return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can }
-
 }

@@ -1,0 +1,50 @@
+name: CI
+
+# Runs on Linux deliberately. The team develops on Windows, whose filesystem is
+# case-insensitive, so an import of `~/components/Donor/` resolved fine locally
+# while the directory is actually `app/components/donor/`. That mismatch would
+# only have failed at deploy time. The build step below is what catches it.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` runs `postinstall` -> `nuxt prepare`, which generates both the
+      # types the typecheck needs and the auto-import globals `no-undef` reads.
+      # Without that generation step the lint would pass by knowing nothing.
+      - name: Install
+        run: npm ci
+
+      # Fails the build on an undefined symbol. This is the check that would
+      # have caught the six calls to `useApi()` -- a function defined nowhere --
+      # before they reached develop.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # A production build, not `nuxt dev`. The dev server proxies `/api` to
+      # localhost:8000; that proxy does not exist in a built app, so calls
+      # written against it only fail here.
+      - name: Build
+        run: npm run build

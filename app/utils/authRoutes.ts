@@ -1,3 +1,5 @@
+import type { AppUser, RoleName } from '~/types/user'
+
 /**
  * Where each portal sends someone who needs to sign in.
  *
@@ -46,7 +48,7 @@ export function isAuthRoute(path: string): boolean {
  * only; they are normalised server-side by `RoleName::normalize()` and never
  * appear on a loaded user.
  */
-export const PORTAL_ROLES: Record<string, string> = {
+export const PORTAL_ROLES: Record<string, RoleName> = {
   '/donor': 'donor',
   '/hospital': 'blood_bank',
   '/blood-center': 'blood_center',
@@ -54,7 +56,7 @@ export const PORTAL_ROLES: Record<string, string> = {
 }
 
 /** The role required to be in this portal, if the path is inside one. */
-export function portalRoleFor(path: string): string | null {
+export function portalRoleFor(path: string): RoleName | null {
   const prefix = Object.keys(PORTAL_ROLES).find((p) => path.startsWith(p))
 
   return prefix ? PORTAL_ROLES[prefix]! : null
@@ -67,7 +69,7 @@ export function portalRoleFor(path: string): string | null {
  * are handed to `departmentHome()` rather than a fixed page, because their
  * landing page depends on their department.
  */
-export function portalHomeFor(user: { roles?: string[] } | null | undefined): string {
+export function portalHomeFor(user: Pick<AppUser, 'roles'> | null | undefined): string {
   const roles = user?.roles ?? []
 
   if (roles.includes('admin')) return '/admin/registrations'

@@ -2,7 +2,18 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', '@nuxt/eslint'],
+
+  eslint: {
+    config: {
+      // Ang standalone: false mao ang punto. Gi-generate niini ang globals para
+      // sa tanan nga Nuxt auto-import (useState, navigateTo, defineNuxtPlugin,
+      // ug ang tanan nga composable/util nato), so ang `no-undef` mahimong
+      // kasaligan dinhi. Kung wala ni, ang undefined nga `useApi()` morag
+      // auto-import ra pod ug dili ma-flag — mao gyud ni ang bug nga nakalusot.
+      standalone: false,
+    },
+  },
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
