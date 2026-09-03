@@ -97,38 +97,14 @@
             -->
             <SessionExpiredNotice />
 
-            <div
-              v-if="errorMessage"
-              class="alert-card"
-              :class="{ 'alert-card--action': needsVerification }"
-            >
-              <div class="alert-message">
-                <AssetIcon name="octagon-alert" :size="16" />
-                <span>{{ errorMessage }}</span>
-              </div>
-
-              <template v-if="needsVerification">
-                <button
-                  type="button"
-                  class="verify-resend-button"
-                  :disabled="resending"
-                  @click="resendVerification"
-                >
-                  <AssetIcon v-if="resending" name="loader" :size="15" class="btn-spinner" />
-                  <AssetIcon v-else name="mail" :size="15" />
-                  {{ resending ? 'Sending...' : 'Resend verification email' }}
-                </button>
-
-                <p
-                  v-if="resendMessage"
-                  class="verify-resend-note"
-                  :class="{ 'verify-resend-note--error': resendFailed }"
-                >
-                  <AssetIcon :name="resendFailed ? 'octagon-alert' : 'circle-check-big'" :size="14" />
-                  <span>{{ resendMessage }}</span>
-                </p>
-              </template>
-            </div>
+            <LoginAlert
+              :message="errorMessage"
+              :needs-verification="needsVerification"
+              :resending="resending"
+              :resend-message="resendMessage"
+              :resend-failed="resendFailed"
+              @resend="resendVerification"
+            />
 
             <button
               class="sign-in-button"
@@ -179,96 +155,29 @@
 
 <script setup>
 import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
-import { authService } from '~/api/auth/AuthService'
-import { reactive, watch } from 'vue'
-import logo from '~/assets/images/RedAgosLogo.png'
+import LoginAlert from '~/components/auth/LoginAlert.vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 
-useHead({
-  title: 'Sign In · RedAgos'
-})
-
-const email = ref('')
-const password = ref('')
-const showPassword = ref(false)
-const loading = ref(false)
-const errorMessage = ref('')
-const typed = reactive({ email: false, password: false })
-
-// Gi-block ang login hangtod ma-verify ang address, so ipakita nato ang resend
-// imbes nga i-biya sila nga walay mahimo.
-const needsVerification = ref(false)
-const resending = ref(false)
-const resendMessage = ref('')
-const resendFailed = ref(false)
-
-watch(email, (value) => {
-  typed.email = value.trim().length > 0
-})
-
-watch(password, (value) => {
-  typed.password = value.trim().length > 0
-})
-
-const goToForgotPassword = () => {
-  return navigateTo('/auth/donor/forgot-password')
-}
-
-const resendVerification = async () => {
-  if (resending.value) return
-
-  resending.value = true
-  resendMessage.value = ''
-  resendFailed.value = false
-
-  try {
-    const response = await authService.resendVerificationEmailFor(email.value)
-    resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
-  } catch (error) {
-    resendFailed.value = true
-    resendMessage.value = error?.status === 429
-      ? 'Too many requests. Please wait a few minutes before trying again.'
-      : (error?.message || 'Could not send the verification email. Please try again.')
-  } finally {
-    resending.value = false
-  }
-}
-
-const login = async () => {
-  loading.value = true
-  errorMessage.value = ''
-  needsVerification.value = false
-  resendMessage.value = ''
-
-  try {
-    const response = await authService.login({
-      email: email.value,
-      password: password.value,
-      role: 'donor',
-    })
-
-    const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
-
-    if (token) {
-      localStorage.setItem('_token', token)
-    }
-
-    const redirectPath = typeof useRoute().query.redirect === 'string'
-      ? useRoute().query.redirect
-      : '/donor/dashboard'
-
-    await navigateTo(redirectPath)
-  } catch (error) {
-    needsVerification.value = error?.data?.code === 'email_not_verified'
-
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Unable to sign in. Please check your credentials.'
-  } finally {
-    loading.value = false
-  }
-}
+// Ang tibuok sign-in flow kay sa useAuthLogin na. Ang upat ka portal
+// kaniadto nagdala og kaugalingong kopya, ug nagkalahi na sila sa mga
+// paagi nga bug — tan-awa ang composable.
+const {
+  email,
+  password,
+  showPassword,
+  loading,
+  errorMessage,
+  typed,
+  needsVerification,
+  resending,
+  resendMessage,
+  resendFailed,
+  login,
+  resendVerification,
+  goToForgotPassword,
+} = useAuthLogin('donor')
 </script>
 
 <style scoped>

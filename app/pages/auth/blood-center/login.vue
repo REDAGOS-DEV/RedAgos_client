@@ -112,35 +112,15 @@
 
             <SessionExpiredNotice />
 
-            <p
-              v-if="errorMessage"
-              class="error-message"
-            >
-              {{ errorMessage }}
-            </p>
+            <LoginAlert
+              :message="errorMessage"
+              :needs-verification="needsVerification"
+              :resending="resending"
+              :resend-message="resendMessage"
+              :resend-failed="resendFailed"
+              @resend="resendVerification"
+            />
 
-            <!--
-              Ang 403 `email_not_verified` ra ang naay agianan padulong sa
-              lakang nga makatabang: ang resend.
-            -->
-            <div v-if="needsVerification" class="verify-prompt">
-              <button
-                type="button"
-                class="verify-resend-button"
-                :disabled="resending"
-                @click="resendVerification"
-              >
-                {{ resending ? 'Sending...' : 'Resend verification email' }}
-              </button>
-
-              <p
-                v-if="resendMessage"
-                class="verify-resend-note"
-                :class="{ 'verify-resend-note--error': resendFailed }"
-              >
-                {{ resendMessage }}
-              </p>
-            </div>
 
             <button
               class="sign-in-button"
@@ -191,117 +171,30 @@
 
 <script setup>
 import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
-import { authService } from '~/api/auth/AuthService'
-import { reactive, ref, watch } from 'vue'
-import logo from '~/assets/images/RedAgosLogo.png'
+import LoginAlert from '~/components/auth/LoginAlert.vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 
-// departmentHome() ug ensureUser() kay auto-imported gikan sa app/composables.
-const { ensureUser } = useUser()
-
-useHead({
-  title: 'Blood Center Sign In · RedAgos'
-})
-
-const email = ref('')
-const password = ref('')
-const licenseNumber = ref('')
-const showPassword = ref(false)
-const loading = ref(false)
-const errorMessage = ref('')
-const typed = reactive({ email: false, password: false, licenseNumber: false })
-
-// Gi-block ang login hangtod ma-verify ang address, so ipakita nato ang resend
-// imbes nga i-biya sila nga walay mahimo.
-const needsVerification = ref(false)
-const resending = ref(false)
-const resendMessage = ref('')
-const resendFailed = ref(false)
-
-watch(email, (value) => {
-  typed.email = value.trim().length > 0
-})
-
-watch(password, (value) => {
-  typed.password = value.trim().length > 0
-})
-
-watch(licenseNumber, (value) => {
-  typed.licenseNumber = value.trim().length > 0
-})
-
-const goToForgotPassword = () => {
-  return navigateTo('/auth/blood-center/forgot-password')
-}
-
-const resendVerification = async () => {
-  if (resending.value) return
-
-  resending.value = true
-  resendMessage.value = ''
-  resendFailed.value = false
-
-  try {
-    const response = await authService.resendVerificationEmailFor(email.value)
-    resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
-  } catch (error) {
-    resendFailed.value = true
-    resendMessage.value = error?.status === 429
-      ? 'Too many requests. Please wait a few minutes before trying again.'
-      : (error?.message || 'Could not send the verification email. Please try again.')
-  } finally {
-    resending.value = false
-  }
-}
-
-const login = async () => {
-  loading.value = true
-  errorMessage.value = ''
-  needsVerification.value = false
-  resendMessage.value = ''
-
-  try {
-    const response = await authService.login({
-      email: email.value,
-      password: password.value,
-      role: 'blood-center',
-      licenseNumber: licenseNumber.value,
-    })
-
-    const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
-
-    if (token) {
-      localStorage.setItem('_token', token)
-    }
-
-    // Ang aplikante nga wala pa ma-approve kay naay token pero walay
-    // blood_center nga role, so ang dashboard mo-403 ra. Ipadala nato sila sa
-    // status page diin makita nila ang rason ug maka-resubmit.
-    const facilityStatus = response?.user?.facility?.status
-
-    if (facilityStatus === 'pending_approval' || facilityStatus === 'rejected') {
-      await navigateTo('/auth/blood-center/registration-status')
-      return
-    }
-
-    // Ang login response wala pa maglakip sa department/permissions, mao nga
-    // i-load usa ang /user aron mahibaw-an asa nga department dashboard siya
-    // ipadala. Ang ensureUser() ra usab ang gamiton sa middleware human.
-    const profile = await ensureUser()
-
-    await navigateTo(departmentHome(profile))
-
-  } catch (error) {
-    needsVerification.value = error?.data?.code === 'email_not_verified'
-
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Unable to sign in. Please check your credentials.'
-  } finally {
-    loading.value = false
-  }
-}
+// Ang tibuok sign-in flow kay sa useAuthLogin na. Ang upat ka portal
+// kaniadto nagdala og kaugalingong kopya, ug nagkalahi na sila sa mga
+// paagi nga bug — tan-awa ang composable.
+const {
+  email,
+  password,
+  licenseNumber,
+  showPassword,
+  loading,
+  errorMessage,
+  typed,
+  needsVerification,
+  resending,
+  resendMessage,
+  resendFailed,
+  login,
+  resendVerification,
+  goToForgotPassword,
+} = useAuthLogin('blood-center')
 </script>
 
 <style scoped>

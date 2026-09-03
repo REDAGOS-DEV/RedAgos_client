@@ -92,12 +92,14 @@
 
             <SessionExpiredNotice />
 
-            <p
-              v-if="errorMessage"
-              class="error-message"
-            >
-              {{ errorMessage }}
-            </p>
+            <LoginAlert
+              :message="errorMessage"
+              :needs-verification="needsVerification"
+              :resending="resending"
+              :resend-message="resendMessage"
+              :resend-failed="resendFailed"
+              @resend="resendVerification"
+            />
 
             <button
               class="sign-in-button"
@@ -121,63 +123,28 @@
 
 <script setup>
 import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
-import { authService } from '~/api/auth/AuthService'
-import { reactive, ref, watch } from 'vue'
-import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
+import LoginAlert from '~/components/auth/LoginAlert.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
-useHead({
-  title: 'Administrator Sign In · RedAgos'
-})
-
-const email = ref('')
-const password = ref('')
-const showPassword = ref(false)
-const loading = ref(false)
-const errorMessage = ref('')
-const typed = reactive({ email: false, password: false })
-
-watch(email, (value) => {
-  typed.email = value.trim().length > 0
-})
-
-watch(password, (value) => {
-  typed.password = value.trim().length > 0
-})
-
-const goToForgotPassword = () => {
-  return navigateTo('/auth/admin/forgot-password')
-}
-
-const login = async () => {
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    // Kaniadto 'blood-center' ang gipadala diri, mao nga wala gyud gyud
-    // makasulod ang admin — 403 role_mismatch ang balik kanunay.
-    const response = await authService.login({
-      email: email.value,
-      password: password.value,
-      role: 'admin',
-    })
-
-    const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
-
-    if (token) {
-      localStorage.setItem('_token', token)
-    }
-
-    await navigateTo('/admin/registrations')
-  } catch (error) {
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Unable to sign in. Please check your credentials.'
-  } finally {
-    loading.value = false
-  }
-}
+// Ang tibuok sign-in flow kay sa useAuthLogin na. Ang upat ka portal
+// kaniadto nagdala og kaugalingong kopya, ug nagkalahi na sila sa mga
+// paagi nga bug — tan-awa ang composable.
+const {
+  email,
+  password,
+  showPassword,
+  loading,
+  errorMessage,
+  typed,
+  needsVerification,
+  resending,
+  resendMessage,
+  resendFailed,
+  login,
+  resendVerification,
+  goToForgotPassword,
+} = useAuthLogin('admin')
 </script>
 
 <style scoped>
