@@ -153,7 +153,7 @@
                 </span>
 
                 <span v-else
-                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse z-10"
+                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10"
                   title="Valid ID needed">
                 </span>
               </div>

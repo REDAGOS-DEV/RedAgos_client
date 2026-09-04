@@ -559,11 +559,6 @@ onActivated(() => {
   min-width: 0;
 }
 
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-
 .page-title {
   font-size: 20px;
   font-weight: 700;
@@ -662,26 +657,10 @@ onActivated(() => {
   color: var(--success);
 }
 
-.banner--success::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-  background: var(--success);
-}
-
 .banner--warning {
   background: rgba(245, 124, 0, 0.07);
   border: 1px solid rgba(245, 124, 0, 0.22);
   color: #B45309;
-}
-
-.banner--warning::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-  background: var(--warning);
 }
 
 .banner-icon-wrapper {
@@ -835,10 +814,6 @@ onActivated(() => {
 
 .stat-card:hover {
   border-color: var(--rb-border-hover, #e2e8f0);
-}
-
-.stat-card--blood-type {
-  border-top: 3px solid var(--accent);
 }
 
 .stat-card--emphasized {
@@ -1369,7 +1344,10 @@ onActivated(() => {
 :global(.dark .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
 :global(.dark .quick-action:hover) { background: #334155; }
 :global(.dark .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
-:global(.dark .skeleton) { background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
+/* background-image, not the `background` shorthand: the shorthand resets
+   background-size to `auto`, which collapses the 400%-wide gradient to the
+   element width and leaves the shimmer keyframes with zero travel. */
+:global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 
 .btn-primary:focus-visible,
 .btn-danger:focus-visible {

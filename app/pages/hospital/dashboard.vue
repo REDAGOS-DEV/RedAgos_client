@@ -1273,7 +1273,10 @@ onMounted(async () => {
 :global(.dark .status-dot--healthy) { background: rgba(102,187,106,0.16); }
 :global(.dark .status-dot--low) { background: rgba(255,167,38,0.16); }
 :global(.dark .status-dot--critical) { background: rgba(239,83,80,0.16); }
+/* background-image, not the `background` shorthand: the shorthand resets
+   background-size to `auto`, which collapses the 400%-wide gradient to the
+   element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .skeleton) {
-  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>

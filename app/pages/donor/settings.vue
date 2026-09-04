@@ -34,9 +34,11 @@ Output:
                         </div>
                         <div class="form-body">
                             <div class="avatar-row">
-                                <div class="avatar">
-                                    <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile photo" class="avatar__img">
-                                    <span v-else class="avatar__initials">{{ initials }}</span>
+                                <div class="avatar-frame">
+                                    <div class="avatar">
+                                        <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile photo" class="avatar__img">
+                                        <span v-else class="avatar__initials">{{ initials }}</span>
+                                    </div>
                                     <button type="button" class="avatar__edit" @click="triggerAvatarPick" aria-label="Change photo">
                                         <AssetIcon name="camera" :size="14" />
                                     </button>
@@ -675,17 +677,24 @@ function splitFullName(fullName) {
     margin-bottom: 24px;
 }
 
-.avatar {
+/* Non-clipping positioning context so the edit button is not cut off by the
+   overflow:hidden that the circular crop below requires. */
+.avatar-frame {
     position: relative;
     width: 56px;
     height: 56px;
+    flex-shrink: 0;
+}
+
+.avatar {
+    width: 100%;
+    height: 100%;
     border-radius: 999px;
     background: #eaf3fc;
     color: var(--primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
     overflow: hidden;
 }
 
@@ -1213,8 +1222,11 @@ function splitFullName(fullName) {
 :global(.dark .modal-check) { background: rgba(102,187,106,0.16); }
 :global(.dark .modal-check--danger) { background: rgba(239,83,80,0.16); }
 
+/* background-image, not the `background` shorthand: the shorthand resets
+   background-size to `auto`, which collapses the 400%-wide gradient to the
+   element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .skeleton) {
-    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+    background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 
 .btn-primary:focus-visible,

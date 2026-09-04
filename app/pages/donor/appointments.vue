@@ -1671,8 +1671,11 @@ function goDashboard() {
 
 :global(.dark .summary-row) { border-color: #263449; }
 
+/* background-image, not the `background` shorthand: the shorthand resets
+   background-size to `auto`, which collapses the 400%-wide gradient to the
+   element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .skeleton) {
-  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 
 .btn-primary:focus-visible,
