@@ -792,11 +792,12 @@ function goDashboard() {
   margin: 0 0 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #fbeaea;
-  border: 1px solid #f5cccc;
-  font-size: 12.5px;
+  background: #FDF1F1;
+  border: 1px solid #F2D2D2;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.5;
-  color: #d32f2f;
+  color: #C62828;
 }
 
 .my-appointment-list {
@@ -877,15 +878,16 @@ function goDashboard() {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 10px;
-  background: #eaf3fc;
-  border: 1px solid #d3e6fa;
+  background: #EFF4FB;
+  border: 1px solid #D6E4F5;
 }
 
 .reschedule-banner__text {
   margin: 0;
   font-size: 12.5px;
-  line-height: 1.5;
-  color: #1f4e79;
+  font-weight: 400;
+  line-height: 1.55;
+  color: #475569;
 }
 
 .appointment-page-inner {
@@ -1648,11 +1650,11 @@ function goDashboard() {
 :global(.dark .badge--full) { background: #263449; }
 
 :global(.dark .reschedule-banner) {
-  background: rgba(66, 165, 245, 0.14);
-  border-color: rgba(66, 165, 245, 0.3);
+  background: rgba(66, 165, 245, 0.10);
+  border-color: rgba(66, 165, 245, 0.24);
 }
 
-:global(.dark .reschedule-banner__text) { color: #90CAF9; }
+:global(.dark .reschedule-banner__text) { color: #CBD5E1; }
 
 :global(.dark .my-appointment-card__cancel:hover:not(:disabled)) {
   background: rgba(239, 83, 80, 0.16);

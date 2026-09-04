@@ -1721,12 +1721,12 @@ if (typeof window !== 'undefined') {
 .rf-spin { animation: rf-spin 1s linear infinite; }
 
 /* ---------- Alert ---------- */
-.rf-alert { display: flex; align-items: center; gap: 14px; background: #FFF8EC; border: 1px solid #FBD9A0; color: #92400E; border-radius: var(--rf-radius); padding: 16px 20px; margin-bottom: 22px; animation: rf-fade .3s ease; }
+.rf-alert { display: flex; align-items: center; gap: 14px; background: #FDF6EC; border: 1px solid #F3DDBB; color: #B45309; border-radius: var(--rf-radius); padding: 16px 20px; margin-bottom: 22px; animation: rf-fade .3s ease; }
 .rf-page.rf-dark .rf-alert { background: #2A2210; border-color: #4A3B12; color: #F5C46C; }
 .rf-alert-icon { color: var(--rf-warning); flex-shrink: 0; }
 .rf-alert-body { flex: 1; }
-.rf-alert-title { font-weight: 700; font-size: 14.5px; margin: 0 0 2px; }
-.rf-alert-desc { font-size: 13.5px; margin: 0; opacity: .9; }
+.rf-alert-title { font-weight: 600; font-size: 14px; margin: 0 0 2px; }
+.rf-alert-desc { font-size: 13px; font-weight: 400; line-height: 1.55; margin: 0; color: var(--rf-text-secondary); }
 .rf-alert-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 /* ---------- KPI grid ---------- */

@@ -1351,10 +1351,11 @@ onMounted(async () => {
 .error-banner {
     background: var(--rf-danger-soft);
     color: var(--rf-danger);
-    border: 1px solid var(--rf-danger);
+    border: 1px solid rgba(211, 47, 47, 0.28);
     border-radius: 12px;
     padding: 12px 14px;
     font-size: 13px;
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1366,14 +1367,17 @@ onMounted(async () => {
 }
 
 .error-banner__title {
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
     margin: 0;
 }
 
 .error-banner__body {
     margin: 2px 0 0;
     font-size: 12.5px;
-    opacity: 0.9;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--rf-text-secondary);
 }
 
 /* Stat cards */
@@ -2150,7 +2154,7 @@ onMounted(async () => {
     margin-top: 4px;
 }
 
-.modal-error { color: var(--rf-danger); font-size: 12px; margin: 0; }
+.modal-error { color: var(--rf-danger); font-size: 12.5px; font-weight: 500; margin: 0; }
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }

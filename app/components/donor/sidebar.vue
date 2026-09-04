@@ -226,8 +226,7 @@ const navStyle = (path) => {
   return {
     background: active || hovered ? SIDEBAR_ACTIVE_BG.value : 'transparent',
     color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
-    fontWeight: active ? '700' : '500',
-    boxShadow: active ? `inset 3px 0 0 ${SIDEBAR_ACTIVE_TEXT.value}` : 'none'
+    fontWeight: active ? '700' : '500'
   }
 }
 

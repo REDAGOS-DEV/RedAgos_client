@@ -598,11 +598,11 @@ const submitRegistration = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #eff6ff;
-  border-left: 4px solid #2563eb;
-  color: #1e3a8a;
-  font-weight: 600;
-  font-size: 14px;
+  background: #EFF4FB;
+  border-left: 4px solid #1565C0;
+  color: #475569;
+  font-weight: 400;
+  font-size: 13.5px;
   padding: 16px 20px;
   border-radius: 8px;
   margin-bottom: 32px;
@@ -610,7 +610,7 @@ const submitRegistration = async () => {
 
 .info-banner svg {
   flex-shrink: 0;
-  color: #2563eb;
+  color: #1565C0;
 }
 
 /* ===== FORM & INPUT FIELDS ===== */
@@ -747,8 +747,8 @@ const submitRegistration = async () => {
 
 /* Messages and submit button */
 .form-message {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   text-align: center;
   padding: 12px;
   border-radius: 8px;
@@ -756,13 +756,13 @@ const submitRegistration = async () => {
 }
 
 .form-message.error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #FDF1F1;
+  color: #C62828;
 }
 
 .form-message.success {
-  background: #f0fdf4;
-  color: #15803d;
+  background: #F1F7F1;
+  color: #2E7D32;
 }
 
 .submit-btn {

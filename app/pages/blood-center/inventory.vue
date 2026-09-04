@@ -1584,15 +1584,15 @@ onMounted(loadDashboard)
 /* Alert banner */
 .alert-banner {
   display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border-radius: 14px;
-  background: rgba(var(--rb-warning-rgb), 0.06); border: 1px solid rgba(var(--rb-warning-rgb), 0.25);
+  background: rgba(var(--rb-warning-rgb), 0.07); border: 1px solid rgba(var(--rb-warning-rgb), 0.22);
 }
 .alert-banner__icon {
   width: 36px; height: 36px; border-radius: 10px; background: rgba(var(--rb-warning-rgb), 0.12);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .alert-banner__body { flex: 1; min-width: 0; }
-.alert-banner__title { font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.alert-banner__desc { font-size: 12.5px; color: var(--rb-text-secondary); margin: 3px 0 8px; }
+.alert-banner__title { font-size: 13px; font-weight: 600; color: #B45309; margin: 0; }
+.alert-banner__desc { font-size: 12.5px; font-weight: 400; line-height: 1.55; color: var(--rb-text-secondary); margin: 3px 0 8px; }
 .alert-banner__list { display: flex; flex-wrap: wrap; gap: 6px; }
 .alert-banner__chip {
   font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;

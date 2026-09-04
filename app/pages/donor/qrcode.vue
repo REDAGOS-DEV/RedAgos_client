@@ -496,9 +496,10 @@ onActivated(() => {
 
 .qr-error {
   margin: 12px 0 0;
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.5;
-  color: var(--accent);
+  color: #C62828;
   text-align: center;
 }
 
@@ -731,8 +732,8 @@ onActivated(() => {
   gap: 10px;
   padding: 14px;
   border-radius: 12px;
-  background: #fff8e1;
-  border: 1px solid #ffe0a3;
+  background: #FDF6EC;
+  border: 1px solid #F3DDBB;
   margin-top: 4px;
 }
 
@@ -743,8 +744,9 @@ onActivated(() => {
 }
 
 .warning-banner__text {
-  font-size: 12px;
-  color: #92650c;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #475569;
   margin: 0;
   line-height: 1.6;
 }
@@ -867,10 +869,10 @@ onActivated(() => {
 :global(.dark .step-line) { background: #334155; }
 
 :global(.dark .warning-banner) {
-    background: rgba(245,124,0,0.14);
-    border-color: rgba(245,124,0,0.3);
+    background: rgba(245,124,0,0.10);
+    border-color: rgba(245,124,0,0.24);
 }
-:global(.dark .warning-banner__text) { color: #FFCC80; }
+:global(.dark .warning-banner__text) { color: #CBD5E1; }
 
 :global(.dark .btn-outline) {
     background: #263449;

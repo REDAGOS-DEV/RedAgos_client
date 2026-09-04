@@ -24,12 +24,13 @@ const expired = computed(() => route.query.reason === 'session_expired')
 .session-notice {
   margin: 0 0 18px;
   padding: 10px 14px;
-  border: 1px solid #FCD34D;
+  border: 1px solid #F3DDBB;
   border-radius: 8px;
-  background: #FFFBEB;
-  color: #78350F;
-  font-size: 13.5px;
-  line-height: 1.5;
+  background: #FDF6EC;
+  color: #B45309;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
 }
 
 .dark .session-notice {

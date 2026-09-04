@@ -70,12 +70,13 @@ defineEmits(['resend'])
   gap: 10px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid #FCA5A5;
+  border: 1px solid #F2D2D2;
   border-radius: 8px;
-  background: #FEF2F2;
-  color: #991B1B;
-  font-size: 13.5px;
-  line-height: 1.5;
+  background: #FDF1F1;
+  color: #C62828;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
 }
 
 .login-alert__message {
@@ -129,17 +130,18 @@ defineEmits(['resend'])
   gap: 6px;
   margin: 0;
   font-size: 12.5px;
-  color: #166534;
+  font-weight: 400;
+  color: #2E7D32;
 }
 
 .login-alert__note--error {
-  color: #991B1B;
+  color: #C62828;
 }
 
 .dark .login-alert {
-  border-color: #7F1D1D;
-  background: #2A1414;
-  color: #FCA5A5;
+  border-color: rgba(239, 83, 80, 0.24);
+  background: rgba(239, 83, 80, 0.10);
+  color: #EF9A9A;
 }
 
 .dark .login-alert__button {

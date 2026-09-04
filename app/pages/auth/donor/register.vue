@@ -774,9 +774,9 @@ function applyValidationErrors(error) {
 .field-error,
 .submit-error {
   margin: 0;
-  color: #dc2626;
-  font-size: 12px;
-  font-weight: 600;
+  color: #C62828;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .submit-btn {

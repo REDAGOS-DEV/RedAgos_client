@@ -268,11 +268,13 @@ onMounted(load)
 .reason {
   margin-top: 16px;
   padding: 12px 14px;
-  background: #fef2f2;
-  border-left: 3px solid #d32f2f;
+  background: #FDF1F1;
+  border-left: 3px solid #C62828;
   border-radius: 6px;
-  color: #7f1d1d;
-  font-size: 14px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.55;
 }
 
 .resubmit-form {

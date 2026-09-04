@@ -517,21 +517,22 @@ onUnmounted(releasePhoto)
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
+  font-weight: 500;
 }
 
 .banner-success {
-  background: #ecfdf5;
-  color: #047857;
+  background: #F1F7F1;
+  color: #2E7D32;
 }
 
 .banner-error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #FDF1F1;
+  color: #C62828;
 }
 
 .banner-info {
-  background: #f1f5f9;
-  color: #334155;
+  background: #EFF4FB;
+  color: #1565C0;
 }
 
 .table-wrap {

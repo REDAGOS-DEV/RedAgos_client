@@ -455,7 +455,8 @@ input::placeholder {
   margin: 16px 0 0;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #fbeaea;
+  background: #FDF1F1;
+  border: 1px solid #F2D2D2;
   text-align: left;
 }
 
@@ -463,10 +464,10 @@ input::placeholder {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: #791f1f;
+  color: #C62828;
   font-size: 13px;
-  font-weight: 400;
-  line-height: 1.5;
+  font-weight: 500;
+  line-height: 1.55;
 }
 
 .alert-message svg {
@@ -728,7 +729,8 @@ input::placeholder {
 }
 
 :global(.dark .alert-card) {
-  background: rgba(211, 47, 47, 0.16);
+  background: rgba(239, 83, 80, 0.10);
+  border-color: rgba(239, 83, 80, 0.24);
 }
 
 :global(.dark .alert-message) {

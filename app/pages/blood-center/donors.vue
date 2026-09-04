@@ -1570,8 +1570,9 @@ onMounted(async () => {
 }
 
 .modal-error {
-    color: var(--accent);
-    font-size: 12px;
+    color: #C62828;
+    font-size: 12.5px;
+    font-weight: 500;
     margin: 0;
 }
 
@@ -1909,9 +1910,9 @@ onMounted(async () => {
 }
 
 :global(.dark .error-banner) {
-    background: #3A1A1A;
-    color: #F87171;
-    border-color: #F87171;
+    background: rgba(239, 83, 80, 0.10);
+    color: #EF9A9A;
+    border-color: rgba(239, 83, 80, 0.24);
 }
 
 :global(.dark .page-title) {

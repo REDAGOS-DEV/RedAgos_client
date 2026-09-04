@@ -561,10 +561,11 @@ onMounted(load)
   padding: 11px 14px;
   border-radius: 10px;
   font-size: 13px;
+  font-weight: 500;
 }
 
-.banner--success { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success); }
-.banner--error { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent); }
+.banner--success { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success); }
+.banner--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent); }
 
 .modal-backdrop {
   position: fixed;
