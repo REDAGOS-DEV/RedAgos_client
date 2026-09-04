@@ -21,13 +21,13 @@ Output:
         </div>
 
         <template v-else>
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <h1 class="page-title">We're here to help!</h1>
                 <p class="page-subtitle">Find answers to common questions or contact our support team for assistance.</p>
             </div>
 
             <!-- Quick help topics -->
-            <div class="topics-grid fade-in" style="--delay: 50ms">
+            <div class="topics-grid">
                 <NuxtLink
                     v-for="topic in quickTopics"
                     :key="topic.key"
@@ -48,7 +48,7 @@ Output:
             <div class="main-grid">
                 <!-- FAQ -->
                 <div class="col-left">
-                    <div class="panel fade-in" style="--delay: 100ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Frequently Asked Questions</h2>
                         </div>
@@ -78,7 +78,7 @@ Output:
 
                 <!-- Contact support -->
                 <div class="col-right">
-                    <div class="panel fade-in" style="--delay: 150ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Contact Support</h2>
                         </div>
@@ -118,7 +118,7 @@ Output:
                         </a>
                     </div>
 
-                    <div class="panel fade-in legal-panel" style="--delay: 200ms">
+                    <div class="panel legal-panel">
                         <NuxtLink to="/legal/terms" class="legal-link">
                             Terms of Service
                             <AssetIcon name="arrow-right" :size="14" />
@@ -276,20 +276,10 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F7F8FA;
+    background: var(--rb-page-bg);
     flex-direction: column;
     gap: 20px;
     transition: background-color 0.2s ease;
-}
-
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Skeleton loading */
@@ -344,7 +334,7 @@ onActivated(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .skeleton, .fade-in { animation: none !important; }
+    .skeleton { animation: none !important; }
 }
 
 @media (max-width: 900px) {
@@ -387,12 +377,11 @@ onActivated(() => {
     align-items: flex-start;
     gap: 12px;
     text-decoration: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease;
 }
 
 .topic-card:hover {
     border-color: #d3e6fa;
-    box-shadow: 0 4px 10px rgba(21, 101, 192, 0.08);
 }
 
 .topic-card__icon {
@@ -649,7 +638,6 @@ a.contact-row__value:hover {
 
 :global(.dark .topic-card:hover) {
     border-color: #42A5F5;
-    box-shadow: 0 4px 10px rgba(66,165,245,0.14);
 }
 
 :global(.dark .topic-card__icon--primary) { background: rgba(66,165,245,0.16); }
@@ -666,5 +654,10 @@ a.contact-row__value:hover {
 
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

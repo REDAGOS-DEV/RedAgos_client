@@ -18,7 +18,7 @@
     </div>
     <!-- ============ HEADER ============ -->
     <div v-else class="inv-inner">
-      <div class="fade-in" style="--delay: 0ms">
+      <div class="">
         <div class="header-row">
           <div>
             <h1 class="page-title">Blood Inventory</h1>
@@ -38,7 +38,7 @@
       </div>
 
       <!-- ============ EXPIRY ALERT ============ -->
-      <div v-if="expiryAlert.visible && expiringBatches.length" class="alert-banner fade-in" style="--delay: 40ms">
+      <div v-if="expiryAlert.visible && expiringBatches.length" class="alert-banner">
         <div class="alert-banner__icon">
           <AssetIcon name="alert-triangle" :size="18" style="color: var(--rb-warning)" />
         </div>
@@ -65,7 +65,7 @@
       </div>
 
       <!-- ============ INTERACTIVE BLOOD TYPE SUMMARY ============ -->
-      <div class="type-grid fade-in" style="--delay: 80ms">
+      <div class="type-grid">
         <button
           v-for="bt in bloodTypeSummary"
           :key="bt.blood_type"
@@ -87,7 +87,7 @@
       </div>
 
       <!-- ============ SEARCH & FILTER BAR ============ -->
-      <div class="panel toolbar fade-in" style="--delay: 110ms">
+      <div class="panel toolbar">
         <div class="toolbar__row">
           <div class="search-box search-box--lg">
             <AssetIcon name="search" :size="14" class="search-box__icon" />
@@ -144,7 +144,7 @@
       </div>
 
       <!-- ============ INVENTORY HEALTH SUMMARY ============ -->
-      <div class="stats-grid fade-in" style="--delay: 140ms">
+      <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Inventory</p>
@@ -191,7 +191,7 @@
       </div>
 
       <!-- ============ MAIN INVENTORY TABLE ============ -->
-      <div ref="inventoryTableSection" class="panel fade-in" style="--delay: 180ms">
+      <div ref="inventoryTableSection" class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Inventory Records</h2>
@@ -348,7 +348,7 @@
       </div>
 
       <!-- ============ INVENTORY INSIGHTS ============ -->
-      <div class="insights-grid fade-in" style="--delay: 220ms">
+      <div class="insights-grid">
         <div class="panel insight-card">
           <div class="panel-header">
             <div>
@@ -480,7 +480,7 @@
       </div>
 
       <!-- ============ NEAR EXPIRY INVENTORY ============ -->
-      <div ref="nearExpirySection" class="panel fade-in" style="--delay: 260ms">
+      <div ref="nearExpirySection" class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Expiring Soon</h2>
         </div>
@@ -523,7 +523,7 @@
       </div>
 
       <!-- ============ RECENT INVENTORY ACTIVITY ============ -->
-      <div class="panel fade-in" style="--delay: 300ms">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Recent Inventory Activity</h2>
         </div>
@@ -551,7 +551,7 @@
       </div>
 
       <!-- ============ QUICK ACTIONS ============ -->
-      <div class="panel fade-in" style="--delay: 340ms">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Quick Actions</h2>
         </div>
@@ -1522,7 +1522,7 @@ onMounted(loadDashboard)
 <style scoped>
 .inv-page {
   font-family: var(--rb-font-sans);
-  max-width: 1280px;
+  max-width: 1200px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -1546,10 +1546,8 @@ onMounted(loadDashboard)
 .skeleton--panel { border-radius: 14px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
-.fade-in { animation: fadeInUp 0.45s ease both; animation-delay: var(--delay, 0ms); }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton, .stat-card, .quick-action-card, .type-card, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
+  .skeleton, .stat-card, .quick-action-card, .type-card, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
 }
 
 .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -1564,10 +1562,10 @@ onMounted(loadDashboard)
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   padding: 9px 15px; border-radius: 10px; font-size: 13px; font-weight: 600;
   color: #ffffff; background: var(--rb-primary); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
-  transition: opacity 0.15s ease, transform 0.15s ease; border: none; cursor: pointer;
+  transition: opacity 0.15s ease; border: none; cursor: pointer;
   text-decoration: none; line-height: 1.2; font-family: inherit;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { opacity: 0.92; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .btn-primary--sm { padding: 7px 13px; font-size: 12px; }
@@ -1613,9 +1611,9 @@ onMounted(loadDashboard)
 .type-card {
   display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px;
   border-radius: 14px; background: var(--rb-surface); border: 1px solid var(--rb-border);
-  cursor: pointer; font-family: inherit; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer; font-family: inherit; transition: border-color 0.15s ease, background 0.15s ease;
 }
-.type-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.06); }
+.type-card:hover { border-color: var(--rb-border-hover); background: var(--rb-surface-hover); }
 .type-card--active { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.05); box-shadow: 0 0 0 1px var(--rb-primary); }
 .type-card__top { display: flex; align-items: center; justify-content: space-between; }
 .type-card__type { font-size: 15px; font-weight: 800; color: var(--rb-accent); }
@@ -1667,9 +1665,9 @@ onMounted(loadDashboard)
 .stat-card {
   background: var(--rb-surface); border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
   border: 1px solid var(--rb-border); display: flex; flex-direction: column; gap: 8px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.2s ease;
+  transition: border-color 0.15s ease, background-color 0.2s ease;
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.06); border-color: var(--rb-border-hover); }
+.stat-card:hover { border-color: var(--rb-border-hover); }
 .stat-card--emphasized { border-color: rgba(var(--rb-warning-rgb), 0.3); box-shadow: 0 0 0 1px rgba(var(--rb-warning-rgb), 0.15); }
 .stat-card__top { display: flex; align-items: center; justify-content: space-between; }
 .stat-card__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0; }
@@ -1719,7 +1717,7 @@ onMounted(loadDashboard)
 .row-menu__trigger:hover { background: var(--rb-surface-alt); color: var(--rb-text-primary); }
 .row-menu__dropdown {
   position: absolute; top: 34px; right: 0; z-index: 20; min-width: 210px; background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong); border-radius: 12px; box-shadow: 0 12px 28px rgba(var(--rb-shadow-rgb), 0.14);
+  border: 1px solid var(--rb-border-strong); border-radius: 12px; box-shadow: 0 4px 16px rgba(var(--rb-shadow-rgb), 0.12);
   padding: 6px; display: flex; flex-direction: column; gap: 1px;
 }
 .row-menu__item {
@@ -1806,9 +1804,9 @@ onMounted(loadDashboard)
 .quick-action-card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; border-radius: 12px;
   border: 1px solid var(--rb-border); background: var(--rb-surface-alt); cursor: pointer; text-align: left; font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.quick-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(var(--rb-shadow-rgb), 0.08); border-color: var(--rb-border-hover); background: var(--rb-surface); }
+.quick-action-card:hover { border-color: var(--rb-border-hover); background: var(--rb-surface); }
 .quick-action-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .quick-action-card--primary { background: rgba(var(--rb-primary-rgb), 0.04); border-color: rgba(var(--rb-primary-rgb), 0.18); }
 .quick-action-card--primary:hover { background: rgba(var(--rb-primary-rgb), 0.07); border-color: var(--rb-primary); }
@@ -1824,7 +1822,7 @@ onMounted(loadDashboard)
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
-.modal-card { background: var(--rb-surface); border-radius: 16px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgba(var(--rb-shadow-rgb), 0.25); position: relative; }
+.modal-card { background: var(--rb-surface); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.18); position: relative; }
 .modal-card--wide { max-width: 560px; }
 .modal-card .btn-primary { color: #ffffff; background: var(--rb-primary); }
 .modal-card .btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
@@ -1842,7 +1840,7 @@ onMounted(loadDashboard)
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-field { display: flex; flex-direction: column; gap: 6px; }
 .form-field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
-.form-field__input { padding: 9px 12px; border-radius: 9px; border: 1px solid var(--rb-border-strong); font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface); transition: border-color 0.15s ease; font-family: inherit; }
+.form-field__input { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--rb-border-strong); font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface); transition: border-color 0.15s ease; font-family: inherit; }
 .form-field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.08); }
 .form-field__input::placeholder { color: var(--rb-placeholder); }
 .form-field__select { appearance: none; background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center; }
@@ -1853,9 +1851,9 @@ onMounted(loadDashboard)
 .manage-action-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px 10px; border-radius: 12px;
   border: 1px solid var(--rb-border-strong); background: var(--rb-surface-alt); cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
-  color: var(--rb-text-primary); text-align: center; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  color: var(--rb-text-primary); text-align: center; transition: background 0.15s ease;
 }
-.manage-action-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(var(--rb-shadow-rgb), 0.08); background: var(--rb-surface); }
+.manage-action-card:hover { background: var(--rb-surface); }
 .manage-action-card--danger { color: var(--rb-accent); }
 .manage-action-card--danger:hover { background: rgba(var(--rb-accent-rgb), 0.06); }
 

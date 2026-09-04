@@ -195,7 +195,7 @@ const {
   --border: #e2e8f0;
   --field-bg: #f8fafc;
   min-height: 100vh;
-  background: #F7F9FC;
+  background: #eef4fb;
   color: var(--text-primary);
   font-family: var(--rb-font-sans);
 }
@@ -229,10 +229,8 @@ const {
   width: calc(100% + 48px);
   margin: -36px -24px 20px;
   padding: 44px 24px 56px;
-  background: linear-gradient(135deg, #1A237E 0%, #1565C0 55%, #2563EB 100%);
-  border-radius: 0 0 50% 50% / 0 0 46px 46px;
+  background: #1565C0;
   text-align: center;
-  box-shadow: 0 12px 28px rgba(21, 101, 192, 0.25);
 }
 
 .mobile-logo {
@@ -241,7 +239,6 @@ const {
   object-fit: contain;
   display: block;
   margin: 0 auto 10px;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
 }
 
 .mobile-brand .brand-name {
@@ -424,29 +421,21 @@ input::placeholder {
   margin-top: 12px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--primary) 0%, #2563EB 100%);
+  background: var(--rb-primary, #1565C0);
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
-  box-shadow: 0 6px 18px rgba(21, 101, 192, 0.3);
-  transition: box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
+  transition: background-color 150ms ease;
 }
 
 .sign-in-button:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(21, 101, 192, 0.38);
-}
-
-.sign-in-button:active:not(:disabled) {
-  transform: translateY(0);
+  background: #0D47A1;
 }
 
 .sign-in-button:disabled {
   cursor: not-allowed;
   opacity: 0.72;
-  transform: none;
 }
 
 .sign-in-button svg {
@@ -586,11 +575,7 @@ input::placeholder {
   cursor: pointer;
   font-size: 15px;
   font-weight: 800;
-  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
-}
-
-.role-button:hover {
-  transform: translateY(-1px);
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 
 .role-button svg {
@@ -669,7 +654,6 @@ input::placeholder {
     background: rgba(255, 255, 255, 0.16);
     padding: 6px 12px 6px 8px;
     border-radius: 999px;
-    backdrop-filter: blur(4px);
     font-size: 13px;
   }
 

@@ -22,13 +22,13 @@ Output:
         </div>
 
         <template v-else>
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <h1 class="page-title">Check your donation readiness</h1>
                 <p class="page-subtitle">Complete the short health assessment below to determine whether you're currently eligible to donate blood.</p>
             </div>
 
             <!-- Info banner -->
-            <div class="info-banner fade-in" style="--delay: 50ms">
+            <div class="info-banner">
                 <span class="info-banner__icon">
                     <AssetIcon name="info" :size="16" class="banner-icon" />
                 </span>
@@ -38,10 +38,8 @@ Output:
                 </p>
             </div>
 
-
             <!-- Current eligibility state -->
-            <div v-if="statusBanner" class="status-banner fade-in" :class="`status-banner--${statusBanner.tone}`"
-                style="--delay: 60ms">
+            <div v-if="statusBanner" class="status-banner" :class="`status-banner--${statusBanner.tone}`">
                 <span class="status-banner__icon">
                     <AssetIcon :name="statusBanner.icon" :size="16" />
                 </span>
@@ -54,9 +52,8 @@ Output:
                 </div>
             </div>
 
-            
             <!-- Step indicator -->
-            <div v-if="sections.length" class="step-indicator fade-in" style="--delay: 100ms">
+            <div v-if="sections.length" class="step-indicator">
                 <template v-for="(step, idx) in steps" :key="step.number">
                     <span class="step__circle" :class="{ 'step__circle--filled': step.number <= currentStep }">{{
                         step.number }}</span>
@@ -68,7 +65,7 @@ Output:
             <div class="main-grid">
               <!-- Left column: questions -->
                 <div class="col-left">
-                    <div v-if="loadError" class="panel fade-in" style="--delay: 150ms">
+                    <div v-if="loadError" class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Questionnaire unavailable</h2>
                         </div>
@@ -80,8 +77,7 @@ Output:
                         </div>
                     </div>
 
-                    <div v-for="(section, idx) in sections" :key="section.key" class="panel fade-in"
-                        :style="{ '--delay': `${150 + idx * 50}ms` }">
+                    <div v-for="(section, idx) in sections" :key="section.key" class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Section {{ idx + 1 }} - {{ section.title }}</h2>
                         </div>
@@ -101,10 +97,9 @@ Output:
                     </div>
                 </div>
 
-
                 <!-- Right column: vitals + result -->
                 <div class="col-right">
-                    <div class="panel fade-in" style="--delay: 150ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Vital Information</h2>
                         </div>
@@ -150,7 +145,7 @@ Output:
                     </div>
 
                     <!-- Result preview -->
-                    <div class="panel fade-in" style="--delay: 200ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Screening result preview</h2>
                         </div>
@@ -167,13 +162,13 @@ Output:
                         </div>
                     </div>
 
-                    <button type="button" class="btn-primary btn-block btn-submit fade-in" style="--delay: 250ms"
+                    <button type="button" class="btn-primary btn-block btn-submit"
                         :disabled="submitting || !allAnswered" @click="handleSubmit()">
                         <span>{{ submitting ? 'Submitting...' : 'Submit screening' }}</span>
                         <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
                     </button>
 
-                    <div v-if="submitError" class="submit-error fade-in">
+                    <div v-if="submitError" class="submit-error">
                         <p class="submit-error__text">{{ submitError }}</p>
                         <button v-if="canForceResubmit" type="button" class="btn-outline btn-block"
                             :disabled="submitting" @click="handleSubmit(true)">
@@ -212,7 +207,6 @@ Output:
                         <p v-if="qrCodeDataUrl" class="modal-validity">
                             Valid for {{ qrValidityDays }} days · Expires {{ formattedQrExpiry }}
                         </p>
-
 
                         <div class="modal-actions">
                             <button type="button" class="btn-outline" @click="goToFullQr">
@@ -544,7 +538,6 @@ onActivated(() => {
 })
 </script>
 
-
 <style scoped>
 .eligibility-page {
     --primary: #1565c0;
@@ -557,7 +550,7 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F7F8FA;
+    background: var(--rb-page-bg);
     flex-direction: column;
     gap: 20px;
     transition: background-color 0.2s ease;
@@ -579,23 +572,6 @@ onActivated(() => {
     font-size: 13px;
     color: var(--text-secondary);
     margin: 2px 0 0;
-}
-
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* Skeleton loading */
@@ -656,7 +632,7 @@ onActivated(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .skeleton, .fade-in { animation: none !important; }
+    .skeleton { animation: none !important; }
 }
 
 @media (max-width: 900px) {
@@ -735,7 +711,6 @@ onActivated(() => {
     border-color: #f5cccc;
     color: var(--accent);
 }
-
 
 .info-banner__icon {
     flex-shrink: 0;
@@ -902,7 +877,6 @@ onActivated(() => {
     margin-top: 16px;
 }
 
-
 .form-stack {
     display: flex;
     flex-direction: column;
@@ -945,7 +919,6 @@ onActivated(() => {
     margin: 6px 0 0;
     line-height: 1.5;
 }
-
 
 .select-wrap {
     position: relative;
@@ -1074,7 +1047,6 @@ onActivated(() => {
     line-height: 1.5;
 }
 
-
 @media (max-width: 900px) {
     .main-grid {
         grid-template-columns: 1fr;
@@ -1107,13 +1079,13 @@ onActivated(() => {
     width: 100%;
     max-width: 380px;
     background: white;
-    border-radius: 16px;
+    border-radius: 14px;
     padding: 28px 24px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
 }
 
 .modal-check {
@@ -1278,7 +1250,6 @@ onActivated(() => {
     color: #EF9A9A;
 }
 
-
 :global(.dark .status-banner--success) {
     background: rgba(102, 187, 106, 0.14);
     border-color: rgba(102, 187, 106, 0.3);
@@ -1296,7 +1267,6 @@ onActivated(() => {
     border-color: rgba(239, 83, 80, 0.3);
     color: #EF9A9A;
 }
-
 
 :global(.dark .panel-header--simple) { border-color: #334155; }
 
@@ -1332,7 +1302,6 @@ onActivated(() => {
     color: #94A3B8;
 }
 
-
 :global(.dark .result-box--pending) { background: #263449; }
 :global(.dark .result-box--success) { background: rgba(102,187,106,0.16); }
 :global(.dark .result-box--danger) { background: rgba(239,83,80,0.16); }
@@ -1347,5 +1316,12 @@ onActivated(() => {
 
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.answer-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

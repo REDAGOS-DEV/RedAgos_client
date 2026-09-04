@@ -6,17 +6,14 @@
 
     <div v-else class="settings-inner">
       <!-- Header -->
-      <div class="header-banner fade-in" style="--delay: 0ms">
-        <div class="header-banner__decor" aria-hidden="true">
-          <AssetIcon name="droplets" :size="120" />
-        </div>
+      <div class="header-banner">
         <div class="header-banner__content">
           <h1 class="page-title">Account Settings</h1>
           <p class="page-subtitle">Manage your profile, security, and preferences</p>
         </div>
       </div>
 
-      <div class="settings-layout fade-in" style="--delay: 60ms">
+      <div class="settings-layout">
         <!-- Nav -->
         <nav class="settings-nav">
           <button
@@ -39,7 +36,6 @@
         <div class="settings-content">
           <!-- MY PROFILE -->
           <section v-if="activeTab === 'profile'" class="settings-panel">
-            <span class="panel-glow panel-glow--blue" aria-hidden="true" />
             <div class="panel-header-row">
               <div class="panel-heading">
                 <span class="panel-icon-badge panel-icon-badge--blue">
@@ -137,7 +133,6 @@
 
           <!-- SECURITY -->
           <section v-if="activeTab === 'security'" class="settings-panel">
-            <span class="panel-glow panel-glow--red" aria-hidden="true" />
             <div class="panel-heading">
               <span class="panel-icon-badge panel-icon-badge--red">
                 <AssetIcon name="lock" :size="18" />
@@ -205,7 +200,6 @@
 
           <!-- NOTIFICATION PREFERENCES -->
           <section v-if="activeTab === 'notifications'" class="settings-panel">
-            <span class="panel-glow panel-glow--orange" aria-hidden="true" />
             <div class="panel-heading">
               <span class="panel-icon-badge panel-icon-badge--orange">
                 <AssetIcon name="bell" :size="18" />
@@ -234,7 +228,6 @@
 
           <!-- SESSION MANAGEMENT -->
           <section v-if="activeTab === 'sessions'" class="settings-panel">
-            <span class="panel-glow panel-glow--purple" aria-hidden="true" />
             <div class="panel-heading">
               <span class="panel-icon-badge panel-icon-badge--purple">
                 <AssetIcon name="monitor" :size="18" />
@@ -268,7 +261,6 @@
 
           <!-- ACCOUNT INFORMATION -->
           <section v-if="activeTab === 'account'" class="settings-panel">
-            <span class="panel-glow panel-glow--teal" aria-hidden="true" />
             <div class="panel-heading">
               <span class="panel-icon-badge panel-icon-badge--teal">
                 <AssetIcon name="info" :size="18" />
@@ -294,7 +286,6 @@
 
           <!-- APPEARANCE -->
           <section v-if="activeTab === 'appearance'" class="settings-panel">
-            <span class="panel-glow panel-glow--indigo" aria-hidden="true" />
             <div class="panel-heading">
               <span class="panel-icon-badge panel-icon-badge--indigo">
                 <AssetIcon name="palette" :size="18" />
@@ -683,10 +674,10 @@ onMounted(async () => {
   --indigo: #3949ab;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
-  max-width: 1152px;
-  background: #f5f7fa;
+  max-width: 1200px;
+  background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 28px 36px 48px;
+  padding: 24px 32px 40px;
   font-family: var(--rb-font-sans);
   color: var(--text-primary);
 }
@@ -714,18 +705,8 @@ onMounted(async () => {
   to { transform: rotate(360deg); }
 }
 
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .spinner { animation: none !important; }
+  .spinner { animation: none !important; }
 }
 
 .settings-inner {
@@ -738,19 +719,9 @@ onMounted(async () => {
 .header-banner {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  background: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, #3f8fdc 100%);
+  border-radius: 14px;
+  background: var(--primary);
   padding: 26px 32px;
-  box-shadow: 0 8px 24px rgba(21, 101, 192, 0.22);
-}
-
-.header-banner__decor {
-  position: absolute;
-  right: -18px;
-  top: -20px;
-  color: #fff;
-  opacity: 0.12;
-  transform: rotate(12deg);
 }
 
 .header-banner__content {
@@ -786,7 +757,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 4px;
   background: #fff;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #eef0f3;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   padding: 10px;
@@ -835,7 +806,6 @@ onMounted(async () => {
 .nav-item--active .nav-item__icon {
   background: #fff;
   color: var(--primary);
-  box-shadow: 0 1px 3px rgba(21, 101, 192, 0.25);
 }
 
 .nav-item__drop {
@@ -859,33 +829,14 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
   background: #fff;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #eef0f3;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 20px -14px rgba(21, 41, 71, 0.25);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   padding: 24px 26px;
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
-
-.panel-glow {
-  position: absolute;
-  top: -60px;
-  right: -60px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  filter: blur(6px);
-  opacity: 0.12;
-  pointer-events: none;
-}
-
-.panel-glow--blue { background: var(--primary); }
-.panel-glow--red { background: var(--accent); }
-.panel-glow--orange { background: var(--warning); }
-.panel-glow--purple { background: var(--purple); }
-.panel-glow--teal { background: var(--teal); }
-.panel-glow--indigo { background: var(--indigo); }
 
 .panel-header-row {
   display: flex;
@@ -942,7 +893,7 @@ onMounted(async () => {
   height: 80px;
   border-radius: 999px;
   padding: 4px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: var(--border-strong, #e2e8f0);
   flex-shrink: 0;
 }
 
@@ -980,7 +931,6 @@ onMounted(async () => {
   justify-content: center;
   cursor: pointer;
   border: 2.5px solid #fff;
-  box-shadow: 0 2px 6px rgba(21, 101, 192, 0.35);
 }
 
 .avatar-upload-input {
@@ -1161,15 +1111,14 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: var(--primary);
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .btn-primary:hover {
   opacity: 0.92;
-  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
 }
 
 .btn-primary:disabled {
@@ -1345,7 +1294,7 @@ onMounted(async () => {
 }
 
 .session-card--current {
-  background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+  background: #F8FAFC;
 }
 
 .session-card--current::before {
@@ -1355,7 +1304,7 @@ onMounted(async () => {
   top: 0;
   bottom: 0;
   width: 4px;
-  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+  background: var(--primary);
 }
 
 .session-card__icon {
@@ -1465,17 +1414,16 @@ onMounted(async () => {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .theme-card:hover {
   border-color: #bcd7f2;
-  transform: translateY(-1px);
 }
 
 .theme-card--active {
   border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary), 0 6px 16px -8px rgba(21, 101, 192, 0.4);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .theme-card__preview {
@@ -1552,7 +1500,6 @@ onMounted(async () => {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1562,12 +1509,12 @@ onMounted(async () => {
 
 .modal-card {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 14px;
   width: 100%;
   max-width: 440px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
 }
 
 .modal-card__header {
@@ -1590,7 +1537,7 @@ onMounted(async () => {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #FDEAEA;
   color: var(--accent);
   flex-shrink: 0;
@@ -1678,5 +1625,14 @@ onMounted(async () => {
   .settings-panel { padding: 18px; }
   .panel-header-row { flex-direction: column; align-items: stretch; }
   .avatar-row { flex-direction: column; align-items: flex-start; }
+}
+
+.btn-primary:focus-visible,
+.btn-outline-blue:focus-visible,
+.btn-outline-red:focus-visible,
+.btn-cancel:focus-visible,
+.avatar-camera-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

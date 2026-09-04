@@ -190,9 +190,9 @@ onMounted(load)
   width: 100%;
   max-width: 560px;
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 32px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .brand {
@@ -351,5 +351,11 @@ onMounted(load)
 
 .ghost-btn:hover {
   background: #f7f9fc;
+}
+
+.primary-btn:focus-visible,
+.ghost-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

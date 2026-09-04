@@ -5,7 +5,7 @@
     <div :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'" class="transition-[padding-left] duration-200">
       <!-- Top bar -->
       <header
-        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-14 sm:h-16 bg-[#F7F8FA] dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
+        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
         :class="collapsed ? 'lg:left-20' : 'lg:left-64'"
         :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
 
@@ -458,8 +458,6 @@ const handleLogout = async () => {
 }
 
 header {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   will-change: padding-left, left;
 }
 

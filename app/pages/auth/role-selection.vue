@@ -234,7 +234,7 @@ const continueWithRole = async () => {
   margin-left: 140px;
 }
 
-/* ── MOBILE BRAND — curved gradient header, hidden on desktop ── */
+/* ── MOBILE BRAND — hidden on desktop ── */
 .mobile-brand {
   display: none;
 }
@@ -244,10 +244,8 @@ const continueWithRole = async () => {
   width: calc(100% + 48px);
   margin: -36px -24px 20px;
   padding: 44px 24px 56px;
-  background: linear-gradient(135deg, #1A237E 0%, #1565C0 55%, #2563EB 100%);
-  border-radius: 0 0 50% 50% / 0 0 46px 46px;
+  background: #1565C0;
   text-align: center;
-  box-shadow: 0 12px 28px rgba(21, 101, 192, 0.25);
 }
 
 .mobile-logo {
@@ -256,7 +254,6 @@ const continueWithRole = async () => {
   object-fit: contain;
   display: block;
   margin: 0 auto 10px;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
 }
 
 .mobile-brand .brand-name {
@@ -565,7 +562,6 @@ h1 {
     background: rgba(255, 255, 255, 0.16);
     padding: 6px 12px 6px 8px;
     border-radius: 999px;
-    backdrop-filter: blur(4px);
     font-size: 13px;
   }
 
@@ -626,5 +622,10 @@ h1 {
   .role-desc {
     font-size: 12px;
   }
+}
+
+.continue-button:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

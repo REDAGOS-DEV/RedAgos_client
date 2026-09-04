@@ -3,7 +3,7 @@ Wall time: 5 seconds
 Output:
 <template>
     <div class="notifications-page">
-        <div class="header-row fade-in" style="--delay: 0ms">
+        <div class="header-row">
             <div>
                 <h1 class="page-title">Stay updated!</h1>
                 <p class="page-subtitle">Stay informed with appointment reminders, donation updates, and important announcements.</p>
@@ -19,7 +19,7 @@ Output:
         </div>
 
         <!-- Tabs -->
-        <div v-if="!loading" class="tabs-bar fade-in" style="--delay: 50ms">
+        <div v-if="!loading" class="tabs-bar">
             <button
                 v-for="tab in tabs"
                 :key="tab.key"
@@ -32,12 +32,12 @@ Output:
                 <span v-if="tab.unread > 0" class="tab-badge" :class="`tab-badge--${tab.tone}`">{{ tab.unread }}</span>
             </button>
         </div>
-        <div v-else class="tabs-bar fade-in" style="--delay: 50ms">
+        <div v-else class="tabs-bar">
             <div v-for="n in 5" :key="n" class="skeleton skeleton-tab" />
         </div>
 
         <!-- List -->
-        <div class="panel fade-in" style="--delay: 100ms">
+        <div class="panel">
             <div v-if="loading" class="notif-list">
                 <div v-for="n in 5" :key="n" class="notif-row">
                     <span class="notif-row__dot" />
@@ -254,19 +254,9 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F7F8FA;
+    background: var(--rb-page-bg);
     flex-direction: column;
     gap: 20px;
-}
-
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 .header-row {
@@ -616,5 +606,11 @@ onActivated(() => {
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
+}
+
+.btn-outline:focus-visible,
+.tab-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

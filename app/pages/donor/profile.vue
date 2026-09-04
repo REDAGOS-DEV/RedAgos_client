@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <div class="header-row fade-in" style="--delay: 0ms">
+    <div class="header-row">
       <div>
         <h1 class="page-title">Your donor profile</h1>
         <p class="page-subtitle">View and update your personal information, contact details, and donor profile.</p>
@@ -10,13 +10,13 @@
     <!-- Skeleton state -->
     <div v-if="loading" class="main-grid">
       <div class="col-left">
-        <div class="panel fade-in profile-card" style="--delay: 100ms">
+        <div class="panel profile-card">
           <div class="skeleton skeleton-avatar" />
           <div class="skeleton skeleton-line" style="width:140px;height:16px;margin-top:14px" />
           <div class="skeleton skeleton-line" style="width:100px;height:12px;margin-top:8px" />
         </div>
 
-        <div class="panel fade-in" style="--delay: 150ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <div class="skeleton skeleton-line" style="width:70px;height:14px" />
           </div>
@@ -32,7 +32,7 @@
           </div>
         </div>
 
-        <div class="panel fade-in" style="--delay: 200ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <div class="skeleton skeleton-line" style="width:80px;height:14px" />
           </div>
@@ -55,7 +55,7 @@
       </div>
 
       <div class="col-right">
-        <div class="panel fade-in" style="--delay: 100ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <div class="skeleton skeleton-line" style="width:150px;height:14px" />
           </div>
@@ -76,7 +76,7 @@
           </div>
         </div>
 
-        <div class="panel fade-in" style="--delay: 150ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <div class="skeleton skeleton-line" style="width:180px;height:14px" />
           </div>
@@ -91,7 +91,7 @@
           </div>
         </div>
 
-        <div class="panel fade-in" style="--delay: 200ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <div class="skeleton skeleton-line" style="width:160px;height:14px" />
           </div>
@@ -124,7 +124,7 @@
       <!-- Left column -->
       <div class="col-left">
         <!-- Avatar + basic info card -->
-        <div class="panel fade-in profile-card" style="--delay: 100ms">
+        <div class="panel profile-card">
           <AvatarUpload
             :current-avatar="user?.avatar"
             :fallback-initial="user?.full_name?.charAt(0) || '?'"
@@ -138,7 +138,7 @@
         </div>
 
         <!-- Status card -->
-        <div class="panel fade-in" style="--delay: 150ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <h2 class="panel-title">Status</h2>
           </div>
@@ -181,7 +181,7 @@
         <!-- Valid ID card — bumped above Account & Security: verification is
              the more time-sensitive of the two (gates donating), password
              changes aren't. -->
-        <div class="panel fade-in" style="--delay: 200ms">
+        <div class="panel">
           <IdentityVerification :identity="identity" @submitted="handleIdentitySubmitted" />
         </div>
       </div>
@@ -189,7 +189,7 @@
       <!-- Right column -->
       <div class="col-right">
         <!-- Personal Information -->
-        <div class="panel fade-in" style="--delay: 100ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <h2 class="panel-title">Personal Information</h2>
           </div>
@@ -248,7 +248,7 @@
         </div>
 
         <!-- Notification Preferences -->
-        <div class="panel fade-in" style="--delay: 150ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <h2 class="panel-title">Notification preferences</h2>
           </div>
@@ -270,7 +270,7 @@
         </div>
 
         <!-- Account & Security card -->
-        <div class="panel fade-in" style="--delay: 200ms">
+        <div class="panel">
           <div class="panel-header panel-header--simple">
             <h2 class="panel-title">Account &amp; Security</h2>
           </div>
@@ -508,7 +508,7 @@ async function handleLogout() {
   margin: 0 auto;
   padding: 24px 32px 40px;
   display: flex;
-  background: #F7F8FA;
+  background: var(--rb-page-bg);
   flex-direction: column;
   gap: 20px;
 }
@@ -516,15 +516,6 @@ async function handleLogout() {
 .header-row { display: flex; align-items: flex-start; justify-content: space-between; }
 .page-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--text-secondary); margin: 2px 0 0; }
-
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
 .col-left, .col-right { display: flex; flex-direction: column; gap: 20px; }
@@ -706,5 +697,11 @@ select.form-input {
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

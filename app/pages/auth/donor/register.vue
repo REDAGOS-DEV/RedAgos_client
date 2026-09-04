@@ -2,17 +2,6 @@
   <div class="register-page">
     <!-- LEFT SIDE -->
     <aside class="brand-panel">
-      <div class="particle particle1"></div>
-      <div class="particle particle2"></div>
-      <div class="particle particle3"></div>
-      <div class="particle particle4"></div>
-
-      <div class="circle circle-top"></div>
-      <div class="circle circle-bottom"></div>
-
-      <div class="top-ring"></div>
-      <div class="top-ring-2"></div>
-
       <div class="brand-lockup">
         <div class="brand-mark">
           <img :src="logo" alt="RedAgos Logo" class="logo-image" />
@@ -65,7 +54,6 @@
         </ul>
       </div>
 
-      <div class="red-glow"></div>
     </aside>
 
     <!-- RIGHT SIDE -->
@@ -437,51 +425,6 @@ function applyValidationErrors(error) {
   color: #ffffff;
 }
 
-.top-ring {
-  position: absolute;
-  top: -120px;
-  left: -120px;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.top-ring-2 {
-  position: absolute;
-  top: -70px;
-  left: -70px;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.particle {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #ff5a74;
-}
-
-.particle1 { left: 60px; bottom: 260px; animation: float 6s infinite ease-in-out; }
-.particle2 { left: 200px; bottom: 340px; animation: float 8s infinite ease-in-out; }
-.particle3 { left: 500px; bottom: 220px; animation: float 7s infinite ease-in-out; }
-.particle4 { left: 420px; bottom: 160px; animation: float 9s infinite ease-in-out; }
-
-.circle {
-  position: absolute;
-  pointer-events: none;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.circle-top { top: -96px; right: -128px; width: 320px; height: 320px; }
-.circle-bottom { left: -96px; bottom: -96px; width: 384px; height: 384px; }
-
-.brand-lockup { animation: logoFloat 5s infinite ease-in-out; }
-
 .brand-mark {
   display: flex;
   width: 40px;
@@ -536,17 +479,6 @@ function applyValidationErrors(error) {
   line-height: 2.15;
 }
 
-.red-glow {
-  position: absolute;
-  left: -120px;
-  bottom: -250px;
-  width: 650px;
-  height: 650px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ff4d6d 0%, #ff2f55 20%, rgba(255, 47, 85, 0.4) 60%, transparent 85%);
-  filter: blur(100px);
-}
-
 .what-you-get {
   position: absolute;
   z-index: 1;
@@ -594,16 +526,6 @@ function applyValidationErrors(error) {
   color: #ffffff;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes logoFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
 @media (max-width: 1023px) {
   .brand-panel { display: none; }
 }
@@ -611,7 +533,7 @@ function applyValidationErrors(error) {
 /* ===== RIGHT PANEL (FORM) ===== */
 .form-panel {
   padding: 48px 64px;
-  background: #eef2f6;
+  background: #eef4fb;
   min-height: 100%;
 }
 
@@ -646,7 +568,6 @@ function applyValidationErrors(error) {
   color: #ff2f55;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(255, 47, 85, 0.12);
 }
 
 .role-badge svg { color: #ff2f55; }
@@ -858,7 +779,6 @@ function applyValidationErrors(error) {
   font-weight: 600;
 }
 
-
 .submit-btn {
   width: 100%;
   height: 48px;
@@ -893,7 +813,7 @@ function applyValidationErrors(error) {
   margin: 24px auto 0;
   padding: 36px 32px;
   border: 1px solid #e5e7eb;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #ffffff;
   text-align: center;
 }
@@ -1066,5 +986,11 @@ function applyValidationErrors(error) {
   .verify-step-chip-email {
     max-width: 180px;
   }
+}
+
+.submit-btn:focus-visible,
+.resend-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

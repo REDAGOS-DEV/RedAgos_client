@@ -16,7 +16,7 @@
 
     <div v-else class="dashboard-inner">
       <!-- ============ HEADER ============ -->
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <div>
           <h1 class="page-title">Blood Center Dashboard</h1>
           <p class="page-subtitle">Monitor blood inventory, manage hospital requests, coordinate donor activities, and oversee daily operations.</p>
@@ -35,7 +35,7 @@
 
       <!-- ============ KPI CARDS ============ -->
       <div class="stats-grid">
-        <div class="stat-card fade-in" style="--delay: 60ms">
+        <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Blood Units</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
@@ -50,7 +50,7 @@
           </span>
         </div>
 
-        <div class="stat-card fade-in" style="--delay: 110ms">
+        <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Donations Today</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
@@ -65,7 +65,7 @@
           </span>
         </div>
 
-        <div class="stat-card fade-in" style="--delay: 160ms">
+        <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Pending Hospital Requests</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
@@ -76,7 +76,7 @@
           <span class="stat-chip stat-chip--neutral">Needs fulfillment</span>
         </div>
 
-        <div class="stat-card fade-in" :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }" style="--delay: 210ms">
+        <div class="stat-card" :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }">
           <div class="stat-card__top">
             <p class="stat-card__label">Critical Blood Types</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-accent-rgb), 0.08)' }">
@@ -89,7 +89,7 @@
       </div>
 
       <!-- ============ BLOOD INVENTORY OVERVIEW ============ -->
-      <div class="panel fade-in" style="--delay: 260ms">
+      <div class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Blood Inventory Overview</h2>
@@ -146,7 +146,7 @@
       </div>
 
       <!-- ============ INVENTORY INSIGHTS ============ -->
-      <div class="insights-grid fade-in" style="--delay: 300ms">
+      <div class="insights-grid">
         <!-- Inventory Trends (line chart) -->
         <div class="panel insight-card">
           <div class="panel-header">
@@ -288,7 +288,7 @@
       </div>
 
       <!-- ============ INCOMING HOSPITAL REQUESTS ============ -->
-      <div class="panel fade-in" style="--delay: 340ms">
+      <div class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Incoming Hospital Requests</h2>
@@ -333,7 +333,7 @@
       </div>
 
       <!-- ============ INVENTORY HEALTH SUMMARY ============ -->
-      <div class="health-grid fade-in" style="--delay: 380ms">
+      <div class="health-grid">
         <div class="health-card health-card--healthy">
           <div class="health-card__icon">
             <AssetIcon name="shield-check" :size="18" style="color: var(--rb-success)" />
@@ -367,7 +367,7 @@
       </div>
 
       <!-- ============ NEAR EXPIRY BLOOD UNITS ============ -->
-      <div class="panel fade-in" style="--delay: 420ms">
+      <div class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Near Expiry Blood Units</h2>
@@ -417,7 +417,7 @@
       </div>
 
       <!-- ============ RECENT DONATION ACTIVITY ============ -->
-      <div class="panel fade-in" style="--delay: 460ms">
+      <div class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Recent Donation Activity</h2>
@@ -456,7 +456,7 @@
       </div>
 
       <!-- ============ RECENT SYSTEM ACTIVITY ============ -->
-      <div class="panel fade-in" style="--delay: 500ms">
+      <div class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Recent System Activity</h2>
@@ -483,7 +483,7 @@
       </div>
 
       <!-- ============ QUICK ACTIONS ============ -->
-      <div class="panel fade-in" style="--delay: 540ms">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Quick Actions</h2>
         </div>
@@ -1022,16 +1022,8 @@ onMounted(async () => {
   100% { background-position: 0 50%; }
 }
 
-.fade-in {
-  animation: fadeInUp 0.45s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton, .stat-card, .quick-action-card { animation: none !important; transition: none !important; }
+  .skeleton, .stat-card, .quick-action-card { animation: none !important; transition: none !important; }
 }
 
 .dashboard-inner {
@@ -1078,14 +1070,14 @@ onMounted(async () => {
   color: #ffffff;
   background: var(--rb-primary);
   box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease;
   border: none;
   cursor: pointer;
   text-decoration: none;
   line-height: 1.2;
   font-family: inherit;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { opacity: 0.92; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .btn-primary--sm { padding: 7px 13px; font-size: 12px; }
@@ -1126,11 +1118,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.2s ease;
+  transition: border-color 0.15s ease, background-color 0.2s ease;
 }
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.06);
   border-color: var(--rb-border-hover);
 }
 .stat-card--emphasized {
@@ -1265,9 +1255,7 @@ onMounted(async () => {
   padding: 4px 10px;
   border-radius: 999px;
   text-transform: capitalize;
-  transition: transform 0.12s ease;
 }
-.status-pill:hover { transform: translateY(-1px); }
 .status-pill--sm { font-size: 11px; padding: 3px 9px; }
 .status-pill__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
 .status-pill--adequate { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success); }
@@ -1409,9 +1397,7 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.health-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.06); }
 .health-card__icon {
   width: 36px;
   height: 36px;
@@ -1463,7 +1449,7 @@ onMounted(async () => {
 .activity-feed { display: flex; flex-direction: column; }
 .activity-feed__item { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--rb-surface-alt); }
 .activity-feed__item:first-child { border-top: none; }
-.activity-feed__icon { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.activity-feed__icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .activity-feed__body { flex: 1; min-width: 0; }
 .activity-feed__title { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .activity-feed__desc { font-size: 11.5px; color: var(--rb-text-secondary); margin: 2px 0 0; }
@@ -1483,11 +1469,9 @@ onMounted(async () => {
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .quick-action-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(var(--rb-shadow-rgb), 0.08);
   border-color: var(--rb-border-hover);
   background: var(--rb-surface);
 }
@@ -1506,9 +1490,9 @@ onMounted(async () => {
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
-.modal-card { background: var(--rb-surface); border-radius: 16px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgba(var(--rb-shadow-rgb), 0.25); position: relative; }
+.modal-card { background: var(--rb-surface); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.18); position: relative; }
 .modal-card .btn-primary { color: #ffffff; background: var(--rb-primary); }
-.modal-card .btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+.modal-card .btn-primary:hover:not(:disabled) { opacity: 0.92; }
 .modal-card .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-card .btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
 .modal-card .btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
@@ -1546,7 +1530,7 @@ onMounted(async () => {
 .form-field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
 .form-field__input {
   padding: 9px 12px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid var(--rb-border-strong);
   font-size: 13px;
   color: var(--rb-text-primary);

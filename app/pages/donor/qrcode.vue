@@ -4,14 +4,14 @@ Output:
 <template>
   <div class="qr-page">
     <div v-if="loading" class="qr-page-inner">
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <div class="skeleton skeleton-line" style="width:120px;height:20px" />
         <div class="skeleton skeleton-line" style="width:320px;height:13px;margin-top:8px" />
       </div>
 
       <div class="main-grid">
         <!-- QR skeleton -->
-        <div class="panel qr-panel fade-in" style="--delay: 50ms">
+        <div class="panel qr-panel">
           <div class="skeleton skeleton-line" style="width:160px;height:15px" />
           <div class="skeleton skeleton-line" style="width:220px;height:12.5px;margin-top:10px;margin-bottom:20px" />
 
@@ -33,7 +33,7 @@ Output:
         </div>
 
         <!-- Steps skeleton -->
-        <div class="panel steps-panel fade-in" style="--delay: 100ms">
+        <div class="panel steps-panel">
           <div class="skeleton skeleton-line" style="width:150px;height:15px;margin-bottom:20px" />
 
           <div class="steps-list">
@@ -55,14 +55,14 @@ Output:
     </div>
 
     <div v-else class="qr-page-inner">
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <h1 class="page-title">Quick check-in</h1>
         <p class="page-subtitle">Access your personal QR Code for faster check-in during appointments and donation visits.</p>
       </div>
 
       <div class="main-grid">
         <!-- Left: QR card -->
-        <div class="panel qr-panel fade-in" style="--delay: 50ms">
+        <div class="panel qr-panel">
           <template v-if="canShowQr">
             <h2 class="qr-panel__title">Donor Eligibility QR</h2>
             <p class="qr-panel__subtitle">Present this to blood center staff upon arrival.</p>
@@ -94,7 +94,6 @@ Output:
           </div>
 
           <p v-if="qrError" class="qr-error">{{ qrError }}</p>
-
 
           <!-- Ipakita basta naa nay screening, bisan walay QR image nga na-mint -->
           <div v-if="profile?.screening_date" class="qr-details">
@@ -140,9 +139,8 @@ Output:
           </div>
         </div>
 
-
         <!-- Right: how to use -->
-        <div class="panel steps-panel fade-in" style="--delay: 100ms">
+        <div class="panel steps-panel">
           <h2 class="steps-panel__title">How to use QR code</h2>
 
           <div class="steps-list">
@@ -493,7 +491,7 @@ onActivated(() => {
   max-width: 1152px;
   margin: 0 auto;
   padding: 24px 32px 60px;
-  background: #F7F8FA;
+  background: var(--rb-page-bg);
 }
 
 .qr-error {
@@ -510,23 +508,6 @@ onActivated(() => {
   line-height: 1.5;
   color: var(--text-secondary);
   text-align: center;
-}
-
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .qr-page-inner {
@@ -563,7 +544,7 @@ onActivated(() => {
 
 .panel {
   background: white;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 24px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   border: 1px solid #f3f4f6;
@@ -900,5 +881,11 @@ onActivated(() => {
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

@@ -6,7 +6,7 @@
 
     <div v-else class="appointments-inner">
       <!-- Header -->
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <div>
           <h1 class="page-title">Donor Appointments</h1>
           <p class="page-subtitle">Manage walk-ins, booking slots, and blood drive registrations from one place.</p>
@@ -31,13 +31,13 @@
       </div>
 
       <!-- Error banner -->
-      <div v-if="loadError" class="error-banner fade-in" style="--delay: 40ms">
+      <div v-if="loadError" class="error-banner">
         {{ loadError }}
         <button type="button" class="btn-link" @click="loadAll">Retry</button>
       </div>
 
       <!-- Stat cards -->
-      <div class="stats-row fade-in" style="--delay: 60ms">
+      <div class="stats-row">
         <div class="stat-card stat-card--blue">
           <div class="stat-card__icon stat-card__icon--blue">
             <AssetIcon name="user-check" :size="18" />
@@ -81,7 +81,7 @@
       </div>
 
       <!-- Main panel -->
-      <div class="panel fade-in" style="--delay: 100ms">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Appointment Overview</h2>
         </div>
@@ -145,8 +145,8 @@
               No appointments match the current filters.
             </p>
 
-            <div v-else v-for="(appt, i) in filteredAppointments" :key="appt.id"
-              class="appointment-card fade-in" :style="{ '--delay': `${i * 30}ms` }">
+            <div v-else v-for="appt in filteredAppointments" :key="appt.id"
+              class="appointment-card">
               <div class="appt-date-badge">
                 <span class="appt-day">{{ appt.dateDay }}</span>
                 <span class="appt-month">{{ appt.dateMonth }}</span>
@@ -187,8 +187,7 @@
 
           <p v-else-if="bloodDrives.length === 0" class="empty-state">No blood drive registrations found.</p>
 
-          <div v-else v-for="(drive, i) in bloodDrives" :key="drive.id" class="drive-card fade-in"
-            :style="{ '--delay': `${i * 50}ms` }">
+          <div v-else v-for="drive in bloodDrives" :key="drive.id" class="drive-card">
             <div class="drive-card__top">
               <div>
                 <p class="drive-card__title">{{ drive.name }}</p>
@@ -735,10 +734,10 @@ onMounted(async () => {
   --warning: #f57c00;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
-  max-width: 1152px;
-  background: #f5f7fa;
+  max-width: 1200px;
+  background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 28px 36px 48px;
+  padding: 24px 32px 40px;
   font-family: var(--rb-font-sans);
   color: var(--text-primary);
 }
@@ -766,24 +765,8 @@ onMounted(async () => {
   }
 }
 
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in,
+  
   .spinner {
     animation: none !important;
   }
@@ -835,12 +818,11 @@ onMounted(async () => {
   border: 1px solid #eef0f3;
   color: var(--primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .bell-btn:hover {
   background: #f9fafb;
-  transform: translateY(-1px);
 }
 
 .date-filter-wrap {
@@ -1002,7 +984,7 @@ onMounted(async () => {
 
 .stat-card {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #eef0f3;
   border-top: 3px solid transparent;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -1010,7 +992,6 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .stat-card--blue {
@@ -1026,10 +1007,6 @@ onMounted(async () => {
   border-top-color: var(--accent);
 }
 
-.stat-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
-}
 
 .stat-card__icon {
   width: 40px;
@@ -1085,7 +1062,7 @@ onMounted(async () => {
 /* Panel */
 .panel {
   background: #fff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #eef0f3;
   padding: 8px 0 0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -1614,7 +1591,6 @@ onMounted(async () => {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1624,12 +1600,12 @@ onMounted(async () => {
 
 .modal-card {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 14px;
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
 }
 
 .modal-card--wide {
@@ -1885,9 +1861,6 @@ onMounted(async () => {
 :global(.dark .stat-card__icon--green) { background: #1A3A2A; color: #34D399; }
 :global(.dark .stat-card__icon--red) { background: #3A1A1A; color: #F87171; }
 
-:global(.dark .stat-card:hover) {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-}
 
 :global(.dark .panel) {
   border-color: #334155;
@@ -2122,5 +2095,15 @@ onMounted(async () => {
 
 :global(.dark .btn-link) {
   color: #60A5FA;
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-outline-blue:focus-visible,
+.btn-cancel:focus-visible,
+.bell-btn:focus-visible,
+.btn-link:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

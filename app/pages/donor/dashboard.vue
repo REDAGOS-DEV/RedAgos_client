@@ -21,7 +21,7 @@
 
     <div v-else class="dashboard-inner">
       <!-- Top header row -->
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <div class="header-titles">
           <h1 class="page-title">Here's your donor overview</h1>
           <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
@@ -36,7 +36,7 @@
       </div>
 
       <!-- Eligibility banner -->
-      <div v-if="eligibilityStatus === 'eligible'" class="banner banner--success fade-in" style="--delay: 60ms">
+      <div v-if="eligibilityStatus === 'eligible'" class="banner banner--success">
         <div class="banner-icon-wrapper">
           <AssetIcon name="check-circle" :size="16" class="banner-icon" />
         </div>
@@ -45,7 +45,7 @@
         </p>
         <NuxtLink to="/donor/qrcode" class="banner-link">View QR &rarr;</NuxtLink>
       </div>
-      <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning fade-in" style="--delay: 60ms">
+      <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning">
         <div class="banner-icon-wrapper">
           <AssetIcon name="alert" :size="16" class="banner-icon" />
         </div>
@@ -56,8 +56,7 @@
       </div>
 
       <!-- Onboarding checklist -->
-      <div v-if="showOnboarding" class="onboarding-card fade-in" style="--delay: 80ms">
-        <div class="onboarding-card__bg-glow" />
+      <div v-if="showOnboarding" class="onboarding-card">
         <div class="onboarding-card__header">
           <div>
             <p class="onboarding-card__title">Get started with RedAgos</p>
@@ -88,7 +87,7 @@
 
       <!-- Stat cards -->
       <div class="stats-grid">
-        <div class="stat-card fade-in" style="--delay: 100ms">
+        <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Donations</p>
             <div class="stat-card__badge stat-card__badge--primary">
@@ -99,7 +98,7 @@
           <span class="stat-chip stat-chip--neutral">Lifetime</span>
         </div>
 
-        <div class="stat-card stat-card--blood-type fade-in" style="--delay: 150ms">
+        <div class="stat-card stat-card--blood-type">
           <div class="stat-card__top">
             <p class="stat-card__label">Blood Type</p>
             <div class="stat-card__badge stat-card__badge--accent">
@@ -113,8 +112,7 @@
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
         </div>
 
-        <div class="stat-card fade-in" :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }"
-          style="--delay: 200ms">
+        <div class="stat-card" :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }">
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
             <div class="stat-card__badge"
@@ -133,7 +131,7 @@
           </span>
         </div>
 
-        <div class="stat-card fade-in" style="--delay: 250ms">
+        <div class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Next Appointment</p>
             <div class="stat-card__badge stat-card__badge--secondary">
@@ -152,7 +150,7 @@
         <!-- Left column -->
         <div class="col-left">
           <!-- Trend chart -->
-          <div class="panel fade-in" style="--delay: 300ms">
+          <div class="panel">
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Donation Trend</h2>
@@ -202,7 +200,7 @@
           </div>
 
           <!-- Recent donation history -->
-          <div class="panel fade-in" style="--delay: 350ms">
+          <div class="panel">
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Recent Donations</h2>
@@ -253,7 +251,7 @@
         <!-- Right column -->
         <div class="col-right">
           <!-- Upcoming appointment -->
-          <div class="panel fade-in" style="--delay: 300ms">
+          <div class="panel">
             <div class="panel-header panel-header--simple">
               <h2 class="panel-title">Upcoming Appointment</h2>
               <NuxtLink to="/donor/appointments" class="panel-link-plain">Manage</NuxtLink>
@@ -296,7 +294,7 @@
           </div>
 
           <!-- Eligibility card -->
-          <div class="panel fade-in" style="--delay: 350ms">
+          <div class="panel">
             <div class="panel-header panel-header--simple">
               <h2 class="panel-title">Eligibility Status</h2>
             </div>
@@ -333,7 +331,7 @@
           </div>
 
           <!-- Quick actions -->
-          <div class="panel fade-in" style="--delay: 400ms">
+          <div class="panel">
             <div class="panel-header panel-header--simple">
               <h2 class="panel-title">Quick Actions</h2>
             </div>
@@ -502,16 +500,16 @@ onActivated(() => {
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
+  --text-primary: #1f2937;
+  --text-secondary: #9ca3af;
+  --border: #eef0f3;
   --card-bg: #ffffff;
 
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  max-width: 1280px;
-  background: #f8fafc;
+  max-width: 1152px;
+  background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 28px 32px 56px;
+  padding: 24px 32px 40px;
   transition: background-color 0.2s ease;
 }
 
@@ -529,25 +527,15 @@ onActivated(() => {
 }
 .skeleton--header { height: 44px; max-width: 320px; }
 .skeleton--card { height: 112px; }
-.skeleton--panel { border-radius: 16px; }
+.skeleton--panel { border-radius: 14px; }
 
 @keyframes shimmer {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
 
-.fade-in {
-  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton { animation: none !important; }
+  .skeleton { animation: none !important; }
 }
 
 .dashboard-inner {
@@ -577,8 +565,8 @@ onActivated(() => {
 }
 
 .page-title {
-  font-size: 26px;
-  font-weight: 900;
+  font-size: 20px;
+  font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text-primary);
   margin: 0;
@@ -621,17 +609,15 @@ onActivated(() => {
   font-size: 13px;
   font-weight: 700;
   color: white;
-  background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
-  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.3);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--primary);
+  transition: background-color 0.15s ease;
   border: none;
   cursor: pointer;
   text-decoration: none;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.4);
+  background: #0d47a1;
 }
 
 .btn-primary--sm {
@@ -648,17 +634,15 @@ onActivated(() => {
   font-size: 13px;
   font-weight: 700;
   padding: 12px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent) 0%, #b71c1c 100%);
+  border-radius: 10px;
+  background: var(--accent);
   color: white;
   text-decoration: none;
-  box-shadow: 0 4px 14px rgba(211, 47, 47, 0.25);
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .btn-danger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(211, 47, 47, 0.35);
+  background: #b71c1c;
 }
 
 /* Custom Banners */
@@ -732,11 +716,10 @@ onActivated(() => {
 .onboarding-card {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 55%, #1976d2 100%);
-  border-radius: 20px;
+  background: var(--primary);
+  border-radius: 14px;
   padding: 24px 28px;
   color: white;
-  box-shadow: 0 12px 30px -4px rgba(21, 101, 192, 0.35);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -776,7 +759,7 @@ onActivated(() => {
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .onboarding-steps {
@@ -797,13 +780,11 @@ onActivated(() => {
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.15s ease;
 }
 
 .onboarding-step:not(.onboarding-step--disabled):hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .onboarding-step--done {
@@ -841,31 +822,27 @@ onActivated(() => {
 
 .stat-card {
   background: var(--card-bg);
-  border-radius: 18px;
+  border-radius: 14px;
   padding: 18px 20px;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 6px 16px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 10px;
   position: relative;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.15s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08);
-  border-color: #cbd5e1;
+  border-color: var(--rb-border-hover, #e2e8f0);
 }
 
 .stat-card--blood-type {
   border-top: 3px solid var(--accent);
-  background: linear-gradient(180deg, rgba(211, 47, 47, 0.02) 0%, var(--card-bg) 40%);
 }
 
 .stat-card--emphasized {
   border-color: rgba(245, 124, 0, 0.5);
-  box-shadow: 0 0 0 1px rgba(245, 124, 0, 0.2), 0 8px 20px rgba(245, 124, 0, 0.1);
 }
 
 .stat-card__top { display: flex; align-items: center; justify-content: space-between; }
@@ -897,7 +874,7 @@ onActivated(() => {
 .stat-card__value-group { display: flex; align-items: baseline; gap: 8px; }
 .stat-card__value {
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 800;
   color: var(--text-primary);
   margin: 0;
   line-height: 1;
@@ -943,11 +920,11 @@ onActivated(() => {
 /* Panels */
 .panel {
   background: var(--card-bg);
-  border-radius: 18px;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 6px 16px rgba(15, 23, 42, 0.03);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease;
 }
 
 .panel-header {
@@ -956,7 +933,6 @@ onActivated(() => {
   justify-content: space-between;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, #ffffff 0%, rgba(248, 250, 252, 0.6) 100%);
 }
 
 .panel-header--simple { padding: 18px 22px; }
@@ -1063,15 +1039,14 @@ onActivated(() => {
 }
 
 .chart__bar--current {
-  background: linear-gradient(180deg, var(--secondary) 0%, var(--primary) 100%);
-  box-shadow: 0 3px 10px rgba(21, 101, 192, 0.35);
+  background: var(--primary);
 }
 
-.chart__bar--low { background: linear-gradient(180deg, #ffb74d 0%, var(--warning) 100%); }
+.chart__bar--low { background: var(--warning); }
 .chart__bar--empty { background: transparent; }
 
 .chart__label { margin-top: 8px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); }
-.chart__label--current { color: var(--primary); font-weight: 900; }
+.chart__label--current { color: var(--primary); font-weight: 800; }
 
 .trend-empty {
   display: flex;
@@ -1161,17 +1136,16 @@ onActivated(() => {
 .appt-date-chip {
   width: 58px;
   height: 58px;
-  border-radius: 16px;
+  border-radius: 12px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
-  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
+  background: var(--primary);
 }
 
-.appt-date-chip__day { color: white; font-weight: 900; font-size: 22px; line-height: 1; }
+.appt-date-chip__day { color: white; font-weight: 800; font-size: 22px; line-height: 1; }
 .appt-date-chip__month { color: rgba(255, 255, 255, 0.85); font-size: 10px; text-transform: uppercase; font-weight: 800; margin-top: 2px; }
 
 .appt-info { flex: 1; min-width: 0; }
@@ -1233,7 +1207,7 @@ onActivated(() => {
   border: 1px solid rgba(245, 124, 0, 0.18);
 }
 
-.eligibility-status { font-size: 14px; font-weight: 900; margin: 0; }
+.eligibility-status { font-size: 14px; font-weight: 800; margin: 0; }
 .eligibility-until { font-size: 11.5px; opacity: 0.85; margin: 2px 0 0; }
 
 .eligibility-details {
@@ -1259,10 +1233,10 @@ onActivated(() => {
   padding: 11px 14px;
   border-radius: 12px;
   text-decoration: none;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
-.quick-action:hover { background: #f1f5f9; transform: translateX(3px); }
+.quick-action:hover { background: #f1f5f9; }
 
 .quick-action__icon {
   width: 34px;
@@ -1277,8 +1251,8 @@ onActivated(() => {
 }
 
 .quick-action__label { font-size: 13px; font-weight: 700; color: var(--text-primary); flex: 1; }
-.quick-action__chevron { color: #cbd5e1; transition: all 0.15s ease; }
-.quick-action:hover .quick-action__chevron { color: var(--primary); transform: translateX(2px); }
+.quick-action__chevron { color: #cbd5e1; transition: color 0.15s ease; }
+.quick-action:hover .quick-action__chevron { color: var(--primary); }
 
 /* Responsive Overrides */
 @media (max-width: 1024px) {
@@ -1358,12 +1332,11 @@ onActivated(() => {
 }
 
 :global(.dark .panel-header) {
-  background: linear-gradient(180deg, #1e293b 0%, rgba(15, 23, 42, 0.5) 100%);
+  background: #1e293b;
 }
 
-:global(.dark .stat-card) { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+:global(.dark .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
 :global(.dark .stat-card:hover) { border-color: #475569; }
-:global(.dark .stat-card--blood-type) { background: linear-gradient(180deg, rgba(211, 47, 47, 0.08) 0%, var(--card-bg) 50%); }
 
 :global(.dark .banner--success) {
   background: rgba(46, 125, 50, 0.15);
@@ -1394,4 +1367,10 @@ onActivated(() => {
 :global(.dark .quick-action:hover) { background: #334155; }
 :global(.dark .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
 :global(.dark .skeleton) { background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
+
+.btn-primary:focus-visible,
+.btn-danger:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
+}
 </style>

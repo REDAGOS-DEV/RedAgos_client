@@ -13,13 +13,13 @@ Output:
         </div>
 
         <template v-else>
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <h1 class="page-title">Youre donation journey</h1>
                 <p class="page-subtitle">Review your complete record of past blood donations.</p>
             </div>
 
             <!-- Summary stats -->
-            <div v-if="donations.length > 0" class="stats-grid fade-in" style="--delay: 50ms">
+            <div v-if="donations.length > 0" class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-card__icon stat-card__icon--primary">
                         <AssetIcon name="droplet" :size="18" />
@@ -50,7 +50,7 @@ Output:
             </div>
 
             <!-- List -->
-            <div class="panel fade-in" style="--delay: 100ms">
+            <div class="panel">
                 <div v-if="donations.length === 0" class="state-wrap state-wrap--empty">
                     <AssetIcon name="droplets" :size="32" style="color:#e5e7eb" />
                     <p class="state-title">No donations recorded yet</p>
@@ -194,26 +194,9 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F7F8FA;
+    background: var(--rb-page-bg);
     flex-direction: column;
     gap: 20px;
-}
-
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* Skeleton loading */
@@ -255,7 +238,7 @@ onActivated(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .skeleton, .fade-in { animation: none !important; }
+    .skeleton { animation: none !important; }
 }
 
 @media (max-width: 900px) {
@@ -603,5 +586,10 @@ onActivated(() => {
 
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

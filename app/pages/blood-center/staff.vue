@@ -581,7 +581,7 @@ onMounted(load)
 .modal {
   width: 100%;
   max-width: 560px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--rb-surface);
   padding: 22px 24px 24px;
   max-height: 90vh;
@@ -629,5 +629,11 @@ onMounted(load)
 
 @media (max-width: 640px) {
   .staff { padding: 20px 16px 32px; }
+}
+
+.btn-primary:focus-visible,
+.ghost-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

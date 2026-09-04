@@ -6,7 +6,7 @@
 
         <div v-else class="reports-inner">
             <!-- Header -->
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <div>
                     <h1 class="page-title">Demand Forecasting &amp; Analytical Reports</h1>
                     <p class="page-subtitle">Monitor blood demand trends, identify potential shortages, and generate operational forecasting reports.</p>
@@ -31,14 +31,14 @@
             </div>
 
             <!-- Global error banner (non blood-type-report errors) -->
-            <div v-if="loadError" class="error-banner fade-in" style="--delay: 40ms">
+            <div v-if="loadError" class="error-banner">
                 <AssetIcon name="alert" :size="15" />
                 <span>{{ loadError }}</span>
                 <button type="button" class="btn-link" @click="loadAll">Retry</button>
             </div>
 
             <!-- KPI cards -->
-            <div class="stats-row fade-in" style="--delay: 60ms">
+            <div class="stats-row">
                 <div v-if="loadingStats" v-for="n in 4" :key="'sks-' + n" class="stat-card stat-card--skeleton skeleton-block" />
 
                 <template v-else>
@@ -99,7 +99,7 @@
             </div>
 
             <!-- Main panel -->
-            <div class="panel fade-in" style="--delay: 100ms">
+            <div class="panel">
                 <div class="tabs">
                     <button type="button" class="tab" :class="{ 'tab--active': activeTab === 'forecast' }"
                         @click="activeTab = 'forecast'">
@@ -1141,7 +1141,7 @@ onMounted(async () => {
    inherit them correctly instead of only the .reports-page scope.
    ------------------------------------------------------------------------- */
 :global(:root) {
-    --rf-bg: #f7f9fc;
+    --rf-bg: #F7F8FA;
     --rf-card: #ffffff;
     --rf-border: #e5eaf0;
     --rf-text: #1e293b;
@@ -1187,10 +1187,10 @@ onMounted(async () => {
 }
 
 .reports-page {
-    max-width: 1152px;
+    max-width: 1200px;
     background: var(--rf-bg);
     margin: 0 auto;
-    padding: 28px 36px 48px;
+    padding: 24px 32px 40px;
     font-family: var(--rb-font-sans);
     color: var(--rf-text);
 }
@@ -1216,18 +1216,8 @@ onMounted(async () => {
     to { transform: rotate(360deg); }
 }
 
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .fade-in, .spinner { animation: none !important; }
+    .spinner { animation: none !important; }
 }
 
 .reports-inner {
@@ -1310,18 +1300,14 @@ onMounted(async () => {
     background: var(--rf-primary);
     border: none;
     cursor: pointer;
-    box-shadow: 0 1px 2px rgba(21, 101, 192, 0.15);
-    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    transition: background-color 0.15s ease;
     white-space: nowrap;
 }
 
 .btn-primary:hover:not(:disabled) {
     background: var(--rf-primary-hover);
-    box-shadow: 0 6px 16px rgba(21, 101, 192, 0.25);
-    transform: translateY(-1px);
 }
 
-.btn-primary:active:not(:disabled) { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 
 .btn-outline-blue {
@@ -1400,7 +1386,7 @@ onMounted(async () => {
 .stat-card {
     position: relative;
     background: var(--rf-card);
-    border-radius: 18px;
+    border-radius: 14px;
     border: 1px solid var(--rf-border);
     box-shadow: var(--rf-shadow);
     padding: 20px 22px;
@@ -1408,14 +1394,12 @@ onMounted(async () => {
     align-items: flex-start;
     gap: 14px;
     overflow: hidden;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .stat-card--skeleton { min-height: 96px; border: none; box-shadow: none; }
 
 .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.09);
+   
 }
 
 .stat-card__icon {
@@ -1477,7 +1461,7 @@ onMounted(async () => {
 /* Panel */
 .panel {
     background: var(--rf-card);
-    border-radius: 18px;
+    border-radius: 14px;
     border: 1px solid var(--rf-border);
     padding: 8px 0;
     box-shadow: var(--rf-shadow);
@@ -1694,7 +1678,7 @@ onMounted(async () => {
     flex-direction: column;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 0.15s ease;
     z-index: 5;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
@@ -1731,16 +1715,15 @@ onMounted(async () => {
 
 .bar {
     width: 100%;
-    border-radius: 5px 5px 2px 2px;
+    border-radius: 6px 6px 2px 2px;
     transition: height 0.4s ease, opacity 0.15s ease;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .bar-group:hover .bar { opacity: 0.85; }
 
-.bar--stock { background: linear-gradient(180deg, color-mix(in srgb, var(--rf-primary) 80%, white) 0%, var(--rf-primary) 100%); }
-.bar--demand { background: linear-gradient(180deg, color-mix(in srgb, var(--rf-warning) 75%, white) 0%, var(--rf-warning) 100%); }
-.bar--demand-over { background: linear-gradient(180deg, color-mix(in srgb, var(--rf-danger) 75%, white) 0%, var(--rf-danger) 100%); }
+.bar--stock { background: var(--rf-primary); }
+.bar--demand { background: var(--rf-warning); }
+.bar--demand-over { background: var(--rf-danger); }
 
 .bar-group__label {
     font-size: 11px;
@@ -2081,7 +2064,6 @@ onMounted(async () => {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2091,12 +2073,12 @@ onMounted(async () => {
 
 .modal-card {
     background: var(--rf-card);
-    border-radius: 16px;
+    border-radius: 14px;
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
     border: 1px solid var(--rf-border);
 }
 
@@ -2188,7 +2170,7 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     z-index: 200;
 }
 
@@ -2233,5 +2215,13 @@ onMounted(async () => {
     .chart-card { overflow-x: auto; }
     .chart-plot { min-width: 520px; }
     .bar-chart { min-width: 480px; }
+}
+
+.btn-primary:focus-visible,
+.btn-outline-blue:focus-visible,
+.btn-cancel:focus-visible,
+.btn-link:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

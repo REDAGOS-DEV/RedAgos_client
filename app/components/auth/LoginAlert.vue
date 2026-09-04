@@ -92,7 +92,7 @@ defineEmits(['resend'])
   align-self: flex-start;
   padding: 8px 14px;
   border: 1px solid #B91C1C;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: #991B1B;
   font: inherit;

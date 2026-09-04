@@ -19,7 +19,7 @@ Output:
         </div>
 
         <template v-else>
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <h1 class="page-title">Personalize your experience</h1>
                 <p class="page-subtitle">Manage your account preferences, notification settings, and privacy options.</p>
             </div>
@@ -28,7 +28,7 @@ Output:
                 <!-- Left column: profile + security -->
                 <div class="col-left">
                     <!-- Profile information -->
-                    <div class="panel fade-in" style="--delay: 50ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Profile Information</h2>
                         </div>
@@ -107,7 +107,7 @@ Output:
                     </div>
 
                     <!-- Password & security -->
-                    <div class="panel fade-in" style="--delay: 100ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Password &amp; Security</h2>
                         </div>
@@ -195,7 +195,7 @@ Output:
                 <!-- Right column: notifications + account -->
                 <div class="col-right">
                     <!-- Notification preferences -->
-                    <div class="panel fade-in" style="--delay: 50ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Notification Preferences</h2>
                         </div>
@@ -229,7 +229,7 @@ Output:
                     </div>
 
                     <!-- Account -->
-                    <div class="panel fade-in" style="--delay: 100ms">
+                    <div class="panel">
                         <div class="panel-header panel-header--simple">
                             <h2 class="panel-title">Account</h2>
                         </div>
@@ -555,7 +555,7 @@ function splitFullName(fullName) {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: #F7F8FA;
+    background: var(--rb-page-bg);
     flex-direction: column;
     gap: 20px;
 }
@@ -576,16 +576,6 @@ function splitFullName(fullName) {
     font-size: 13px;
     color: var(--text-secondary);
     margin: 2px 0 0;
-}
-
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Skeleton loading */
@@ -630,7 +620,7 @@ function splitFullName(fullName) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .skeleton, .fade-in { animation: none !important; }
+    .skeleton { animation: none !important; }
 }
 
 @media (max-width: 900px) {
@@ -1056,7 +1046,6 @@ function splitFullName(fullName) {
     width: 100%;
 }
 
-
 .delete-confirm {
     width: 100%;
     text-align: left;
@@ -1092,13 +1081,13 @@ function splitFullName(fullName) {
     width: 100%;
     max-width: 360px;
     background: white;
-    border-radius: 16px;
+    border-radius: 14px;
     padding: 28px 24px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
 }
 
 .modal-check {
@@ -1226,5 +1215,12 @@ function splitFullName(fullName) {
 
 :global(.dark .skeleton) {
     background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-danger:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

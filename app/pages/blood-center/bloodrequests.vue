@@ -938,7 +938,7 @@ onMounted(() => {
 .page {
   --primary: #1565c0;
   --primary-hover: #0d47a1;
-  --bg: #f7f9fc;
+  --bg: #F7F8FA;
   --card: #ffffff;
   --border: #e5eaf0;
   --text: #1e293b;
@@ -948,9 +948,9 @@ onMounted(() => {
   --danger: #d32f2f;
   --info: #2563eb;
   --purple: #7c3aed;
-  --radius: 18px;
+  --radius: 14px;
   --card-padding: 24px;
-  --shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 
   background: var(--bg);
   color: var(--text);
@@ -969,7 +969,7 @@ onMounted(() => {
 }
 .toast {
   padding: 12px 16px; border-radius: 12px; color: #fff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 .toast-title { font-size: 13px; font-weight: 700; }
 .toast-message { font-size: 12.5px; opacity: 0.92; margin-top: 2px; }
@@ -1044,9 +1044,7 @@ onMounted(() => {
 .summary-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: var(--card-padding); display: flex; gap: 14px; box-shadow: var(--shadow);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.summary-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
 .skeleton-card { min-height: 88px; background: linear-gradient(90deg, #eef2f7 25%, #f7f9fc 37%, #eef2f7 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; }
 .summary-icon {
   width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; background: #e8f0fc; color: var(--primary);
@@ -1216,7 +1214,7 @@ onMounted(() => {
 
 /* MODALS */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-.modal { background: var(--card); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 20px 50px rgba(15,23,42,0.2); }
+.modal { background: var(--card); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18); }
 .modal-title { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
 .modal-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
 .modal-summary { background: var(--bg); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -1261,7 +1259,7 @@ onMounted(() => {
 }
 /* DARK MODE — :global(.dark .selector), NOT :global(.dark) .selector */
 :global(.dark .page) {
-  --bg: #0f1420; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
+  --bg: #0F172A; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
 }
 :global(.dark .summary-icon) { background: #1c2a42; }
 :global(.dark .summary-icon.is-danger) { background: #3a1f22; }
@@ -1293,4 +1291,11 @@ onMounted(() => {
 :global(.dark .toolbar input[type="date"]) { background: #1c2536; }
 :global(.dark .context-menu),
 :global(.dark .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.expand-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
+}
 </style>

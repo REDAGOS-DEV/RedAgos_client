@@ -14,14 +14,14 @@ Output:
     </div>
 
     <div v-else class="appointment-page-inner">
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <h1 class="page-title">Plan your next donation!</h1>
         <p class="page-subtitle">Schedule your next blood donation by choosing your preferred date, time, and donation center.</p>
       </div>
 
       <!-- Your upcoming appointment -->
       <div v-if="appointmentsLoading || appointmentsError || activeAppointments.length"
-        class="step-section fade-in" style="--delay: 20ms">
+        class="step-section">
         <h2 class="step-label">Your upcoming appointment</h2>
 
         <div v-if="appointmentsLoading" class="drive-state">
@@ -70,7 +70,7 @@ Output:
 
       <!-- Reschedule mode: ang wizard sa ubos mao gihapon ang gamiton, PATCH ra
            imbes POST ang i-send sa Confirm. -->
-      <div v-if="reschedulingId" class="reschedule-banner fade-in">
+      <div v-if="reschedulingId" class="reschedule-banner">
         <p class="reschedule-banner__text">
           Pick a new slot below, then confirm to move your appointment.
         </p>
@@ -78,7 +78,7 @@ Output:
       </div>
 
       <!-- Step indicator -->
-      <div class="step-indicator fade-in" style="--delay: 40ms">
+      <div class="step-indicator">
         <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 1 }">
           <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 1 }">1</span>
           <span class="step-indicator__label">Type</span>
@@ -98,7 +98,7 @@ Output:
       </div>
 
       <!-- Step 1: Select type -->
-      <div class="step-section fade-in" style="--delay: 80ms">
+      <div class="step-section">
         <h2 class="step-label">
           <span class="step-label__num">1</span>
           Select type
@@ -132,7 +132,7 @@ Output:
       </div>
 
       <!-- Step 2 (walk-in): choose blood center -->
-      <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 120ms">
+      <div v-if="appointmentType === 'walkin'" class="step-section">
         <h2 class="step-label">
           <span class="step-label__num">2</span>
           Choose blood center
@@ -165,7 +165,7 @@ Output:
       </div>
 
       <!-- Step 2 (mobile): choose blood drive -->
-      <div v-else-if="appointmentType === 'mobile'" class="step-section fade-in" style="--delay: 120ms">
+      <div v-else-if="appointmentType === 'mobile'" class="step-section">
         <h2 class="step-label">
           <span class="step-label__num">2</span>
           Choose blood drive
@@ -206,7 +206,7 @@ Output:
       </div>
 
       <!-- Step 3 (walk-in only): date & time slot -->
-      <div v-if="appointmentType === 'walkin'" class="step-section fade-in" style="--delay: 160ms">
+      <div v-if="appointmentType === 'walkin'" class="step-section">
         <h2 class="step-label">
           <span class="step-label__num">3</span>
           Select date &amp; time slot
@@ -246,7 +246,7 @@ Output:
         </div>
       </div>
 
-      <div class="continue-row fade-in" style="--delay: 200ms">
+      <div class="continue-row">
         <button type="button" class="btn-primary" :disabled="!canContinue" @click="openSummary">
           Continue
           <AssetIcon name="arrow-right" :size="15" />
@@ -784,7 +784,7 @@ function goDashboard() {
   max-width: 1152px;
   margin: 0 auto;
   padding: 24px 32px 60px;
-  background: #F7F8FA;
+  background: var(--rb-page-bg);
   transition: background-color 0.2s ease;
 }
 
@@ -913,25 +913,8 @@ function goDashboard() {
   margin: 3px 0 0;
 }
 
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton { animation: none !important; }
+  .skeleton { animation: none !important; }
 }
 
 /* Skeleton loading */
@@ -1060,12 +1043,10 @@ function goDashboard() {
   cursor: pointer;
   text-align: left;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .type-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
   border-color: #d9e2ee;
 }
 
@@ -1074,14 +1055,10 @@ function goDashboard() {
   border-color: var(--primary);
 }
 
-.type-card--active:hover {
-  box-shadow: 0 6px 16px rgba(21, 101, 192, 0.12);
-}
-
 .type-card__icon {
   width: 42px;
   height: 42px;
-  border-radius: 11px;
+  border-radius: 10px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1155,12 +1132,10 @@ function goDashboard() {
   padding: 16px 18px;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .center-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
   border-color: #d9e2ee;
 }
 
@@ -1238,7 +1213,7 @@ function goDashboard() {
 .form-input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid #e5e7eb;
   font-size: 14px;
   color: var(--text-primary);
@@ -1331,12 +1306,11 @@ function goDashboard() {
   padding: 18px 20px;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .drive-card:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-color: #d9e2ee;
 }
 
 .drive-card--active {
@@ -1438,27 +1412,23 @@ function goDashboard() {
   justify-content: center;
   gap: 7px;
   padding: 13px 26px;
-  border-radius: 11px;
+  border-radius: 10px;
   font-size: 13.5px;
   font-weight: 700;
   color: white;
   background: var(--primary);
-  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25);
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.94;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(21, 101, 192, 0.3);
+  opacity: 0.92;
 }
 
 .btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .btn-block {
@@ -1470,7 +1440,7 @@ function goDashboard() {
   align-items: center;
   justify-content: center;
   padding: 12px 24px;
-  border-radius: 11px;
+  border-radius: 10px;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
@@ -1489,7 +1459,6 @@ function goDashboard() {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1499,14 +1468,14 @@ function goDashboard() {
 
 .modal-card {
   background: white;
-  border-radius: 18px;
+  border-radius: 14px;
   padding: 26px;
   width: 100%;
   max-width: 380px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
 }
 
 .modal-title {
@@ -1702,5 +1671,12 @@ function goDashboard() {
 
 :global(.dark .skeleton) {
   background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.slot-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

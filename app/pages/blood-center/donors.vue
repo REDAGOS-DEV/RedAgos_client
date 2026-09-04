@@ -6,7 +6,7 @@
 
         <!-- ============ LIST VIEW ============ -->
         <div v-else-if="!selectedDonorId" class="donors-inner">
-            <div class="header-row fade-in" style="--delay: 0ms">
+            <div class="header-row">
                 <div>
                     <h1 class="page-title">Donors</h1>
                     <p class="page-subtitle">View and manage all registered donors</p>
@@ -17,12 +17,12 @@
                 </button>
             </div>
 
-            <div v-if="loadError" class="error-banner fade-in" style="--delay: 40ms">
+            <div v-if="loadError" class="error-banner">
                 {{ loadError }}
                 <button type="button" class="btn-link" @click="loadAll">Retry</button>
             </div>
 
-            <div class="stats-row fade-in" style="--delay: 60ms">
+            <div class="stats-row">
                 <div class="stat-card">
                     <p class="stat-card__label">Total Donors</p>
                     <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
@@ -40,7 +40,7 @@
                 </div>
             </div>
 
-            <div class="panel fade-in" style="--delay: 100ms">
+            <div class="panel">
                 <div class="panel-header">
                     <p class="section-label">Donor Records</p>
                     <div class="panel-header__filters">
@@ -71,8 +71,7 @@
 
                     <p v-else-if="donors.length === 0" class="empty-state">No donors match the current filters.</p>
 
-                    <div v-else v-for="(donor, i) in donors" :key="donor.id" class="donor-row fade-in"
-                        :style="{ '--delay': `${i * 30}ms` }">
+                    <div v-else v-for="(donor, i) in donors" :key="donor.id" class="donor-row">
                         <span class="donor-cell">
                             <span class="avatar" :style="{ background: avatarColor(i) }">{{ initials(donor.name)
                                 }}</span>
@@ -97,14 +96,14 @@
 
         <!-- Detail View -->
         <div v-else class="donors-inner">
-            <div class="breadcrumb fade-in" style="--delay: 0ms">
+            <div class="breadcrumb">
                 <button type="button" class="breadcrumb__link" @click="backToList">Donors</button>
                 <span class="breadcrumb__sep">/</span>
                 <span class="breadcrumb__current">{{ selectedDonor?.name || '...' }}</span>
             </div>
 
-            <div v-if="loadingDetail" class="detail-header-card skeleton-block fade-in" style="--delay: 40ms" />
-            <div v-else class="detail-header-card fade-in" style="--delay: 40ms">
+            <div v-if="loadingDetail" class="detail-header-card skeleton-block" />
+            <div v-else class="detail-header-card">
                 <div class="detail-header-card__left">
                     <span class="avatar avatar--lg" :style="{ background: avatarColor(0) }">{{
                         initials(selectedDonor.name) }}</span>
@@ -129,7 +128,7 @@
                 </div>
             </div>
 
-            <div class="panel fade-in" style="--delay: 80ms">
+            <div class="panel">
                 <div class="tabs">
                     <button type="button" class="tab" :class="{ 'tab--active': activeDetailTab === 'info' }"
                         @click="activeDetailTab = 'info'">
@@ -812,10 +811,10 @@ onMounted(async () => {
     --purple: #5e35b1;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
-    background: #f5f7fa;
+    max-width: 1200px;
+    background: var(--rb-page-bg);
     margin: 0 auto;
-    padding: 28px 36px 48px;
+    padding: 24px 32px 40px;
     font-family: var(--rb-font-sans);
     color: var(--text-primary);
 }
@@ -842,26 +841,8 @@ onMounted(async () => {
     }
 }
 
-.fade-in {
-    animation: fadeInUp 0.5s ease both;
-    animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
 
-    .fade-in,
     .spinner {
         animation: none !important;
     }
@@ -983,7 +964,7 @@ onMounted(async () => {
 
 .stat-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 14px;
     border: 1px solid #eef0f3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     padding: 20px 22px;
@@ -1017,7 +998,7 @@ onMounted(async () => {
 /* Panel */
 .panel {
     background: #fff;
-    border-radius: 18px;
+    border-radius: 14px;
     border: 1px solid #eef0f3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     overflow: hidden;
@@ -1226,7 +1207,7 @@ onMounted(async () => {
 /* Detail header card */
 .detail-header-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 14px;
     border: 1px solid #eef0f3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     padding: 22px 24px;
@@ -1500,7 +1481,6 @@ onMounted(async () => {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1510,12 +1490,12 @@ onMounted(async () => {
 
 .modal-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 14px;
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
 }
 
 .modal-card__header {
@@ -1963,5 +1943,13 @@ onMounted(async () => {
 
 :global(.dark .avatar--lg) {
     border-width: 3px;
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-cancel:focus-visible,
+.btn-link:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

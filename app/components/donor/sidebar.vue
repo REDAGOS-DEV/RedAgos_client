@@ -31,7 +31,7 @@
         :class="collapsed ? 'lg:justify-center lg:px-0' : ''" :style="{ borderColor: SIDEBAR_BORDER }"
         @click="goToDashboard">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative"
-          style="background: linear-gradient(135deg, #1565C0, #42A5F5); box-shadow: 0 4px 12px rgba(21,101,192,0.25)">
+          style="background: #1565C0">
           <img v-if="!logoLoading" :src="logo" alt="RedAgos Logo" class="logo-image">
           <span v-else class="logo-spinner" />
         </div>
@@ -307,17 +307,18 @@ aside > button.hidden.lg\:flex {
   right: -12px;
   width: 24px;
   height: 24px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  transition: box-shadow 0.15s ease;
   z-index: 30;
 }
 
 aside > button.hidden.lg\:flex:hover {
-  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22);
 }
 
-aside > button.hidden.lg\:flex:active {
-  transform: scale(0.95);
+aside > button.hidden.lg\:flex:focus-visible {
+  outline: 2px solid #1565C0;
+  outline-offset: 2px;
 }
 
 /* Popups and Dropdowns Animation */
@@ -345,6 +346,6 @@ aside > button.hidden.lg\:flex:active {
 }
 
 :global(.dark) aside > button.hidden.lg\:flex {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 </style>

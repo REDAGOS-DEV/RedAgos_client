@@ -222,9 +222,7 @@ onMounted(async () => {
   justify-content: center;
   gap: 28px;
   padding: 24px;
-  background:
-    radial-gradient(560px circle at 50% 0%, rgba(21, 101, 192, 0.07), transparent 60%),
-    #F7F9FC;
+  background: #eef4fb;
 }
 
 .verify-wordmark {
@@ -241,10 +239,10 @@ onMounted(async () => {
   width: 100%;
   max-width: 420px;
   padding: 36px 30px 32px;
-  border-radius: 18px;
+  border-radius: 14px;
   background: white;
   border: 1px solid #eef0f3;
-  box-shadow: 0 12px 32px -12px rgba(21, 101, 192, 0.16), 0 1px 3px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -295,7 +293,6 @@ onMounted(async () => {
 .verify-icon--success {
   background: #eaf6ea;
   color: var(--success);
-  animation: pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .verify-icon--error {
@@ -325,7 +322,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  animation: fade-up 320ms ease-out;
 }
 
 .verify-note {
@@ -360,7 +356,7 @@ onMounted(async () => {
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: background-color 150ms ease;
 }
 
 .verify-input {
@@ -385,17 +381,10 @@ onMounted(async () => {
 .btn-primary {
   background: var(--primary);
   color: white;
-  box-shadow: 0 1px 2px rgba(21, 101, 192, 0.2);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px -4px rgba(21, 101, 192, 0.4);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
 }
 
 .btn-primary:focus-visible,
@@ -417,8 +406,6 @@ onMounted(async () => {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .btn-spinner {
@@ -427,16 +414,6 @@ onMounted(async () => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-@keyframes pop-in {
-  0% { transform: scale(0.6); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes shake {
@@ -460,9 +437,7 @@ onMounted(async () => {
 :global(.dark .verify-page) {
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
-  background:
-    radial-gradient(560px circle at 50% 0%, rgba(21, 101, 192, 0.12), transparent 60%),
-    #0F172A;
+  background: #0F172A;
 }
 
 :global(.dark .verify-wordmark) {
@@ -472,7 +447,7 @@ onMounted(async () => {
 :global(.dark .verify-card) {
   background: #1E293B;
   border-color: #334155;
-  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 :global(.dark .verify-input) {
