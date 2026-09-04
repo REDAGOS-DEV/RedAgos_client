@@ -54,11 +54,11 @@
       <span>© 2026 RedAgos. All rights reserved.</span>
 
       <div class="footer-bottom-links">
-        <NuxtLink to="/legal/Privacy">
+        <NuxtLink to="/legal/privacy">
           Privacy Policy
         </NuxtLink>
 
-        <NuxtLink to="/legal/Terms">
+        <NuxtLink to="/legal/terms">
           Terms of Service
         </NuxtLink>
       </div>
@@ -91,7 +91,7 @@ const quickLinks = [
 .footer {
   background: #0d1117;
   padding: 56px 2.5rem 0;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .footer-inner {

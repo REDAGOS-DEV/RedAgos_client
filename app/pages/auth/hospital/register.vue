@@ -81,7 +81,6 @@
         <div class="top-row">
           <NuxtLink to="/auth/role-selection" class="back-link">
             <AssetIcon name="chevron-left" :size="16" />
-             Back to Role Selection
           </NuxtLink>
 
           <span class="role-badge">
@@ -277,6 +276,9 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 definePageMeta({
   alias: ['/register/hospital'],
+  // Walay blood-bank registration endpoint ang backend. Ang middleware mo-redirect
+  // padulong sa /hospital/unavailable samtang naka-off ang flag.
+  middleware: 'hospital-portal',
 })
 
 const form = reactive({
@@ -317,21 +319,15 @@ const submitRegistration = async () => {
     return
   }
 
-  loading.value = true
-
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    successMessage.value = 'Blood center registration submitted! Check your email for verification.'
-
-    setTimeout(() => {
-      navigateTo('/login/hospital')
-    }, 2000)
-  } catch (error) {
-    errorMessage.value = 'Registration failed. Please try again.'
-  } finally {
-    loading.value = false
-  }
+  // Walay endpoint nga i-post-an: ang `/blood-center/register` ra ang naa sa
+  // Laravel, ug lahi siya og entity. Kaniadto ni nag-`setTimeout(1500)` unya
+  // nag-report og "submitted" bisan walay request nga na-send — nagtuo ang
+  // aplikante nga naka-rehistro sila samtang wala gyuy narekord.
+  //
+  // Ipabilin ang porma nga makita apan i-refuse ang submit hangtod naa nay
+  // endpoint. Tan-awa ang Phase P sa audit plan.
+  errorMessage.value =
+    'Hospital blood bank registration is not open yet. Please contact your partner blood center directly.'
 }
 </script>
 
@@ -347,7 +343,7 @@ const submitRegistration = async () => {
   grid-template-columns: 540px 1fr;
 }
 
-/* ===== LEFT SIDE ===== */
+/* ===== LEFT SIDE (BRAND PANEL) ===== */
 .brand-panel {
   position: relative;
   display: block;
@@ -385,29 +381,10 @@ const submitRegistration = async () => {
   background: #ff5a74;
 }
 
-.particle1 {
-  left: 60px;
-  bottom: 260px;
-  animation: float 6s infinite ease-in-out;
-}
-
-.particle2 {
-  left: 200px;
-  bottom: 340px;
-  animation: float 8s infinite ease-in-out;
-}
-
-.particle3 {
-  left: 500px;
-  bottom: 220px;
-  animation: float 7s infinite ease-in-out;
-}
-
-.particle4 {
-  left: 420px;
-  bottom: 160px;
-  animation: float 9s infinite ease-in-out;
-}
+.particle1 { left: 60px; bottom: 260px; animation: float 6s infinite ease-in-out; }
+.particle2 { left: 200px; bottom: 340px; animation: float 8s infinite ease-in-out; }
+.particle3 { left: 500px; bottom: 220px; animation: float 7s infinite ease-in-out; }
+.particle4 { left: 420px; bottom: 160px; animation: float 9s infinite ease-in-out; }
 
 .circle {
   position: absolute;
@@ -416,23 +393,10 @@ const submitRegistration = async () => {
   background: rgba(255, 255, 255, 0.055);
 }
 
-.circle-top {
-  top: -96px;
-  right: -128px;
-  width: 320px;
-  height: 320px;
-}
+.circle-top { top: -96px; right: -128px; width: 320px; height: 320px; }
+.circle-bottom { left: -96px; bottom: -96px; width: 384px; height: 384px; }
 
-.circle-bottom {
-  left: -96px;
-  bottom: -96px;
-  width: 384px;
-  height: 384px;
-}
-
-.brand-lockup {
-  animation: logoFloat 5s infinite ease-in-out;
-}
+.brand-lockup { animation: logoFloat 5s infinite ease-in-out; }
 
 .brand-mark {
   display: flex;
@@ -453,9 +417,7 @@ const submitRegistration = async () => {
   letter-spacing: -0.02em;
 }
 
-.brand-name span {
-  color: #ff2f55;
-}
+.brand-name span { color: #ff2f55; }
 
 .brand-subtitle {
   margin: 8px 0 0;
@@ -549,30 +511,26 @@ const submitRegistration = async () => {
 }
 
 @keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 @keyframes logoFloat {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
+/* Hide brand side on tablet/mobile screens */
 @media (max-width: 1023px) {
+  .blood-center-signup {
+    grid-template-columns: 1fr;
+  }
   .brand-panel {
     display: none;
   }
 }
 
-/* ===== RIGHT SIDE ===== */
+/* ===== RIGHT SIDE (FORM PANEL) ===== */
 .form-panel {
   flex: 1;
   padding: 40px 56px;
@@ -603,9 +561,7 @@ const submitRegistration = async () => {
   text-decoration: none;
 }
 
-.back-link:hover {
-  color: #374151;
-}
+.back-link:hover { color: #374151; }
 
 .header-row {
   display: block;
@@ -625,33 +581,28 @@ const submitRegistration = async () => {
   margin: 0 0 24px;
 }
 
-/* Role badge with glow, matching donor.vue */
 .role-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #dceaff 0%, #bcd9ff 100%);
-  color: #2563eb;
+  background: #ecfdf5;
+  color: #15803d;
   font-size: 14px;
   font-weight: 700;
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.1),
-    0 4px 12px rgba(37, 99, 235, 0.2),
-    0 0 40px rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 0 1px #bbf7d0, 0 0 16px rgba(21, 128, 61, 0.25);
 }
 
-/* Info banner */
 .info-banner {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #eff6ff;
-  border-left: 4px solid #2563eb;
-  color: #1e3a8a;
-  font-weight: 600;
-  font-size: 14px;
+  background: #EFF4FB;
+  border-left: 4px solid #1565C0;
+  color: #475569;
+  font-weight: 400;
+  font-size: 13.5px;
   padding: 16px 20px;
   border-radius: 8px;
   margin-bottom: 32px;
@@ -659,10 +610,10 @@ const submitRegistration = async () => {
 
 .info-banner svg {
   flex-shrink: 0;
-  color: #2563eb;
+  color: #1565C0;
 }
 
-/* Form grid */
+/* ===== FORM & INPUT FIELDS ===== */
 .signup-form {
   display: flex;
   flex-direction: column;
@@ -692,15 +643,17 @@ const submitRegistration = async () => {
   color: #0f172a;
 }
 
+/* Base input, select, & textarea sizing */
 .form-group input,
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 11px 14px;
+  height: 46px;
+  padding: 0 14px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
-  font-size: 13.5px;
+  font-size: 14px;
   color: #0f172a;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -709,8 +662,10 @@ const submitRegistration = async () => {
 }
 
 .form-group textarea {
+  height: auto;
+  padding: 12px 14px;
   resize: vertical;
-  min-height: 72px;
+  min-height: 80px;
 }
 
 .form-group input::placeholder,
@@ -725,20 +680,30 @@ const submitRegistration = async () => {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+/* Custom Select Dropdown Options Control */
 .form-group select {
-  appearance: none;
-  background-repeat: no-repeat;
-  background-position: right 14px center;
+  padding-right: 38px;
   cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.select-wrap {
+.form-group select option {
+  font-size: 13px;
+  padding: 8px 10px;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.input-icon-wrap {
   position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
-}
-
-.select-wrap select {
-  padding-right: 40px;
+  box-sizing: border-box;
 }
 
 .select-icon {
@@ -750,17 +715,9 @@ const submitRegistration = async () => {
   pointer-events: none;
 }
 
-.input-icon-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box;
-}
-
 .field-icon-left {
   position: absolute;
-  left: 16px;
+  left: 14px;
   right: auto;
   color: #9ca3af;
   pointer-events: none;
@@ -768,8 +725,8 @@ const submitRegistration = async () => {
 
 .input-icon-wrap input.has-left-icon {
   width: 100%;
-  padding-left: 40px;
-  padding-right: 40px;
+  padding-left: 42px;
+  padding-right: 42px;
   box-sizing: border-box;
 }
 
@@ -783,17 +740,15 @@ const submitRegistration = async () => {
   border: none;
   color: #9ca3af;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
 }
 
-.toggle-visibility:hover {
-  color: #6b7280;
-}
+.toggle-visibility:hover { color: #6b7280; }
 
-/* Form feedback messages */
+/* Messages and submit button */
 .form-message {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   text-align: center;
   padding: 12px;
   border-radius: 8px;
@@ -801,18 +756,18 @@ const submitRegistration = async () => {
 }
 
 .form-message.error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #FDF1F1;
+  color: #C62828;
 }
 
 .form-message.success {
-  background: #f0fdf4;
-  color: #15803d;
+  background: #F1F7F1;
+  color: #2E7D32;
 }
 
 .submit-btn {
   width: 100%;
-  padding: 16px;
+  height: 48px;
   margin-top: 8px;
   border: none;
   border-radius: 12px;
@@ -824,9 +779,7 @@ const submitRegistration = async () => {
   transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.submit-btn:hover:not(:disabled) {
-  background: #1a5c9c;
-}
+.submit-btn:hover:not(:disabled) { background: #1a5c9c; }
 
 .submit-btn:disabled {
   opacity: 0.5;
@@ -846,16 +799,75 @@ const submitRegistration = async () => {
   text-decoration: none;
 }
 
-.signin-row a:hover {
-  text-decoration: underline;
-}
+.signin-row a:hover { text-decoration: underline; }
 
-@media (max-width: 640px) {
-  .form-panel {
-    padding: 32px 20px;
-  }
+/* ===== TABLET RESPONSIVE (max-width: 860px) ===== */
+@media (max-width: 860px) {
   .form-row {
     grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+/* ===== MOBILE RESPONSIVE (max-width: 640px) ===== */
+@media (max-width: 640px) {
+  .form-panel {
+    padding: 24px 16px 40px;
+  }
+
+  .top-row {
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .header-row h1 {
+    font-size: 22px;
+  }
+
+  .form-subtitle {
+    font-size: 13.5px;
+    margin-bottom: 18px;
+  }
+
+  .role-badge {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .info-banner {
+    font-size: 12.5px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+  }
+
+  /* Fixed mobile inputs and dropdown menu popup sizes */
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    height: 44px;
+    font-size: 14px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 8px;
+  }
+
+  .form-group select {
+    padding-right: 34px;
+  }
+
+  .form-group select option {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .input-icon-wrap input.has-left-icon {
+    padding-left: 38px;
+    padding-right: 38px;
+  }
+
+  .submit-btn {
+    height: 46px;
+    font-size: 14px;
   }
 }
 </style>

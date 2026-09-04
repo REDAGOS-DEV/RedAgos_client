@@ -6,15 +6,17 @@
       <section class="form-panel">
         <div class="form-card">
           <div class="mobile-brand">
-            <p class="brand-name">
-              Red<span>Agos</span>
-            </p>
-            <p class="brand-subtitle">Blood Bank System</p>
+            <div class="mobile-brand-curve">
+              <img :src="logo" alt="RedAgos Logo" class="mobile-logo" />
+              <p class="brand-name">
+                Red<span>Agos</span>
+              </p>
+              <p class="brand-subtitle">Blood Bank System</p>
+            </div>
           </div>
 
           <NuxtLink to="/auth/donor/login" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
-             Back to Sign In
           </NuxtLink>
 
           <h1>Forgot Password</h1>
@@ -63,8 +65,10 @@
 </template>
 
 <script setup>
+import { authService } from '~/api/auth/AuthService'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 
 const email = ref('')
 const loading = ref(false)
@@ -83,10 +87,17 @@ const submitReset = async () => {
   loading.value = true
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await authService.forgotPassword({ email: email.value.trim() })
+
+    // Parehas ra ang mensahe bisan wala ang email sa database — dili ta
+    // mo-confirm kung kinsa ang rehistrado.
     successMessage.value = 'If this email is registered, a reset link has been sent.'
-  } catch {
-    errorMessage.value = 'Unable to send reset link at this time. Please try again later.'
+  } catch (error) {
+    // Ang server naay throttle:3,10, so lahi og kahulogan ang 429: sakto ang
+    // email, kinahanglan lang mohulat.
+    errorMessage.value = error?.status === 429
+      ? 'Too many reset requests. Please wait a few minutes and try again.'
+      : error?.message || 'Unable to send reset link at this time. Please try again later.'
   } finally {
     loading.value = false
   }
@@ -102,7 +113,7 @@ const submitReset = async () => {
   min-height: 100vh;
   background: #eef4fb;
   color: #1f2937;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .login-shell {
@@ -125,16 +136,47 @@ const submitReset = async () => {
   margin-left: 140px;
 }
 
+/* ── MOBILE BRAND — hidden on desktop ── */
 .mobile-brand {
   display: none;
 }
 
+.mobile-brand-curve {
+  position: relative;
+  width: calc(100% + 48px);
+  margin: -36px -24px 20px;
+  padding: 44px 24px 56px;
+  background: #1565C0;
+  text-align: center;
+}
+
+.mobile-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}
+
 .mobile-brand .brand-name {
-  color: #1769c9;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mobile-brand .brand-name span {
+  color: #eb3535;
 }
 
 .mobile-brand .brand-subtitle {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 4px 0 0;
 }
 
 .back-link {
@@ -187,10 +229,17 @@ label {
   height: 52px;
   align-items: center;
   margin-top: 12px;
-  padding: 0 14px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
+  padding: 0 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.input-shell:focus-within {
+  border-color: #2563EB;
   background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 .field-icon {
@@ -234,16 +283,21 @@ input::placeholder {
   gap: 16px;
   margin-top: 12px;
   border: 0;
-  border-radius: 8px;
-  background: #1e6fc8;
+  border-radius: 999px;
+  background: var(--rb-primary, #1565C0);
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
+  transition: background-color 150ms ease;
 }
 
 .sign-in-button:hover {
-  background: #185dac;
+  background: #0D47A1;
+}
+
+.sign-in-button:active {
+  transform: translateY(0);
 }
 
 .sign-in-button:disabled {
@@ -278,27 +332,75 @@ input::placeholder {
   }
 
   .form-panel {
+    position: relative;
     justify-content: center;
-    padding: 56px 24px;
+    padding: 0 24px 56px;
   }
 
   .form-card {
     margin: 0;
+    text-align: center;
   }
 
   .mobile-brand {
     display: block;
-    margin-bottom: 48px;
+  }
+
+  .back-link {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    z-index: 5;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    padding: 8px;
+    border-radius: 999px;
+  }
+
+  .back-link:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .mobile-brand-curve {
+    padding-top: 56px;
+  }
+
+  h1 {
+    margin-top: 22px;
+    font-size: 24px;
+    line-height: 1.25;
+  }
+
+  .form-subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .login-form {
+    text-align: left;
+    margin-top: 32px;
   }
 }
 
 @media (max-width: 520px) {
   .form-panel {
-    padding: 36px 18px;
+    padding: 0 18px 40px;
+  }
+
+  .mobile-brand-curve {
+    width: calc(100% + 36px);
+    margin: -20px -18px 18px;
+    padding: 52px 18px 48px;
   }
 
   h1 {
-    font-size: 34px;
+    font-size: 22px;
   }
+}
+
+.sign-in-button:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

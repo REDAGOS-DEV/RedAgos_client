@@ -382,6 +382,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
  */
 
 definePageMeta({
+  middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
 })
 
@@ -523,7 +524,7 @@ async function handleDownloadPdf() {
   if (!request.value) return
   try {
     const { data, error } = await useApi().get(
-      `/hospital/blood-requests/${request.value.id}/download`,
+      `/hospital/bloodrequests/${request.value.id}/download`,
       { responseType: 'blob' }
     )
     if (error?.value) throw error.value
@@ -542,7 +543,7 @@ async function handleDownloadPdf() {
 
 function viewRequestDetails() {
   if (!request.value) return
-  navigateTo(`/hospital/blood-requests/${request.value.id}`)
+  navigateTo(`/hospital/bloodrequests/${request.value.id}`)
 }
 
 function contactBloodCenter() {
@@ -575,7 +576,7 @@ function contactBloodCenter() {
   margin-bottom: 20px;
 }
 .page-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   font-size: 30px;
   font-weight: 700;
   color: #1e293b;

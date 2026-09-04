@@ -6,15 +6,17 @@
       <section class="form-panel">
         <div class="form-card">
           <div class="mobile-brand">
-            <p class="brand-name">
-              Red<span>Agos</span>
-            </p>
-            <p class="brand-subtitle">Blood Bank System</p>
+            <div class="mobile-brand-curve">
+              <img :src="logo" alt="RedAgos Logo" class="mobile-logo" />
+              <p class="brand-name">
+                Red<span>Agos</span>
+              </p>
+              <p class="brand-subtitle">Blood Bank System</p>
+            </div>
           </div>
 
           <NuxtLink to="/" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
-             Back to Home
           </NuxtLink>
 
           <h1>Welcome, Lifesaver!</h1>
@@ -73,7 +75,7 @@
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
-                  <AssetIcon :name="showPassword ? 'eye-off' : 'eye'" :size="18" />
+                  <AssetIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18" />
                 </button>
               </div>
             </div>
@@ -88,18 +90,27 @@
               </button>
             </div>
 
-            <p
-              v-if="errorMessage"
-              class="error-message"
-            >
-              {{ errorMessage }}
-            </p>
+            <!--
+              Gi-merge ang error text ug ang resend action sa usa ka card —
+              parehas ra ni sila usa ka flow (problema, unya ang solusyon),
+              so dili na sila i-split into duha ka independent block.
+            -->
+            <SessionExpiredNotice />
+
+            <LoginAlert
+              :message="errorMessage"
+              :needs-verification="needsVerification"
+              :resending="resending"
+              :resend-message="resendMessage"
+              :resend-failed="resendFailed"
+              @resend="resendVerification"
+            />
 
             <button
               class="sign-in-button"
               :disabled="loading"
             >
-              <AssetIcon name="log-in" :size="24" />
+              <AssetIcon :name="loading ? 'loader' : 'log-in'" :size="22" :class="{ 'btn-spinner': loading }" />
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
@@ -143,64 +154,30 @@
 </template>
 
 <script setup>
-import { authService } from '~/api/auth/AuthService'
-import { reactive, watch } from 'vue'
+import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
+import LoginAlert from '~/components/auth/LoginAlert.vue'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 
-useHead({
-  title: 'Sign In · RedAgos'
-})
-
-const email = ref('')
-const password = ref('')
-const showPassword = ref(false)
-const loading = ref(false)
-const errorMessage = ref('')
-const typed = reactive({ email: false, password: false })
-
-watch(email, (value) => {
-  typed.email = value.trim().length > 0
-})
-
-watch(password, (value) => {
-  typed.password = value.trim().length > 0
-})
-
-const goToForgotPassword = () => {
-  return navigateTo('/auth/donor/forgot-password')
-}
-
-const login = async () => {
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    const response = await authService.login({
-      email: email.value,
-      password: password.value,
-      role: 'donor',
-    })
-
-    const token = response?.token || response?.access_token || response?.data?.token || response?.data?.access_token
-
-    if (token) {
-      localStorage.setItem('_token', token)
-    }
-
-    const redirectPath = typeof useRoute().query.redirect === 'string'
-      ? useRoute().query.redirect
-      : '/donor/Dashboard'
-
-    await navigateTo(redirectPath)
-  } catch (error) {
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Unable to sign in. Please check your credentials.'
-  } finally {
-    loading.value = false
-  }
-}
+// Ang tibuok sign-in flow kay sa useAuthLogin na. Ang upat ka portal
+// kaniadto nagdala og kaugalingong kopya, ug nagkalahi na sila sa mga
+// paagi nga bug — tan-awa ang composable.
+const {
+  email,
+  password,
+  showPassword,
+  loading,
+  errorMessage,
+  typed,
+  needsVerification,
+  resending,
+  resendMessage,
+  resendFailed,
+  login,
+  resendVerification,
+  goToForgotPassword,
+} = useAuthLogin('donor')
 </script>
 
 <style scoped>
@@ -209,13 +186,21 @@ const login = async () => {
 }
 
 .login-screen {
+  --primary: #1565C0;
+  --primary-hover: #0D47A1;
+  --danger: #D32F2F;
+  --success: #2E7D32;
+  --text-primary: #1f2937;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --field-bg: #f8fafc;
   min-height: 100vh;
   background: #eef4fb;
-  color: #1f2937;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  font-family: var(--rb-font-sans);
 }
 
- .login-shell {
+.login-shell {
   display: grid;
   min-height: 100vh;
   grid-template-columns: 540px 1fr;
@@ -224,45 +209,77 @@ const login = async () => {
 .form-panel {
   display: flex;
   min-height: 100vh;
+  align-items: center;
   justify-content: flex-start;
-  padding: 0;
+  padding: 40px clamp(24px, 8vw, 140px);
 }
 
 .form-card {
   width: 100%;
-  max-width: 460px;
-  margin-top: 62px;
-  margin-left: 140px;
+  max-width: 420px;
 }
 
+/* ── MOBILE BRAND ── */
 .mobile-brand {
   display: none;
 }
 
+.mobile-brand-curve {
+  position: relative;
+  width: calc(100% + 48px);
+  margin: -36px -24px 20px;
+  padding: 44px 24px 56px;
+  background: #1565C0;
+  text-align: center;
+}
+
+.mobile-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}
+
 .mobile-brand .brand-name {
-  color: #1769c9;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mobile-brand .brand-name span {
+  color: var(--danger);
 }
 
 .mobile-brand .brand-subtitle {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 4px 0 0;
 }
 
 .back-link {
   display: inline-flex;
   align-items: center;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
+  border-radius: 8px;
+  transition: color 150ms ease;
 }
 
 .back-link:hover {
-  color: #334155;
+  color: var(--text-primary);
 }
 
 h1 {
   margin: 46px 0 0;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 38px;
   font-weight: 800;
   letter-spacing: 0;
@@ -271,7 +288,7 @@ h1 {
 
 .form-subtitle {
   margin: 16px 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -290,7 +307,7 @@ h1 {
 
 label {
   display: block;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 800;
   line-height: 1.2;
@@ -301,10 +318,17 @@ label {
   height: 52px;
   align-items: center;
   margin-top: 12px;
-  padding: 0 14px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--field-bg);
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.input-shell:focus-within {
+  border-color: var(--primary);
   background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.1);
 }
 
 .field-icon {
@@ -315,7 +339,7 @@ label {
   align-items: center;
   justify-content: center;
   margin-right: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 svg {
@@ -336,7 +360,7 @@ input {
 }
 
 input::placeholder {
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .icon-button {
@@ -350,13 +374,14 @@ input::placeholder {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .icon-button:hover {
   background: #f1f5f9;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .icon-button svg {
@@ -370,31 +395,20 @@ input::placeholder {
   margin-top: 22px;
 }
 
-.forgot-row a,
-.signup-text a {
-  color: #1266c3;
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.forgot-row a:hover,
-.signup-text a:hover {
-  color: #0d4f9c;
-}
-
 .link-button {
   border: 0;
   background: transparent;
   cursor: pointer;
-  padding: 0;
-  color: #1266c3;
+  padding: 2px;
+  border-radius: 6px;
+  color: var(--primary);
   font-size: 14px;
   font-weight: 800;
+  transition: color 150ms ease;
 }
 
 .link-button:hover {
-  color: #0d4f9c;
+  color: var(--primary-hover);
 }
 
 .sign-in-button {
@@ -403,19 +417,20 @@ input::placeholder {
   height: 52px;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   margin-top: 12px;
   border: 0;
-  border-radius: 8px;
-  background: #1e6fc8;
+  border-radius: 999px;
+  background: var(--rb-primary, #1565C0);
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
+  transition: background-color 150ms ease;
 }
 
-.sign-in-button:hover {
-  background: #185dac;
+.sign-in-button:hover:not(:disabled) {
+  background: #0D47A1;
 }
 
 .sign-in-button:disabled {
@@ -424,23 +439,104 @@ input::placeholder {
 }
 
 .sign-in-button svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
-.error-message {
-  margin: 16px 0 0;
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
+.btn-spinner {
+  animation: spin 900ms linear infinite;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.alert-card {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #FDF1F1;
+  border: 1px solid #F2D2D2;
+  text-align: left;
+}
+
+.alert-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #C62828;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.alert-message svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alert-card--action .alert-message {
+  margin-bottom: 12px;
+}
+
+.verify-resend-button {
+  display: flex;
+  width: 100%;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: background-color 150ms ease;
+}
+
+.verify-resend-button:hover:not(:disabled) { background: #fdf3f3; }
+
+.verify-resend-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.verify-resend-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--success);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.verify-resend-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.verify-resend-note--error { color: var(--danger); }
 
 .signup-text {
   margin: 24px 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
+}
+
+.signup-text a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.signup-text a:hover {
+  color: var(--primary-hover);
 }
 
 .divider {
@@ -458,7 +554,7 @@ input::placeholder {
 
 .divider p {
   margin: 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -474,13 +570,13 @@ input::placeholder {
   height: 46px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border: 1px solid #d6e0eb;
-  border-radius: 8px;
-  background: #ffffff;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 
 .role-button svg {
@@ -489,24 +585,42 @@ input::placeholder {
 }
 
 .hospital {
-  color: #1266c3;
+  background: #eaf3fc;
+  color: var(--primary);
 }
 
 .hospital:hover {
-  border-color: #1266c3;
+  border-color: var(--primary);
 }
 
 .blood-center {
-  color: #2da1ff;
+  background: #fbeaea;
+  color: var(--danger);
 }
 
 .blood-center:hover {
-  border-color: #2da1ff;
+  border-color: var(--danger);
 }
 
-@keyframes logoFloat{ 0%,100%{ transform:translateY(0);} 50% { transform:translateY(-8px);} }
-@keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-18px);} }
-@keyframes floatParticle { 0%, 100% { transform:translateY(0);} 50% { transform:translateY(-20px);} }
+.back-link:focus-visible,
+.link-button:focus-visible,
+.icon-button:focus-visible,
+.sign-in-button:focus-visible,
+.verify-resend-button:focus-visible,
+.role-button:focus-visible,
+.signup-text a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner,
+  .sign-in-button,
+  .role-button {
+    animation: none;
+    transition: none;
+  }
+}
 
 @media (max-width: 1023px) {
   .login-shell {
@@ -518,31 +632,128 @@ input::placeholder {
   }
 
   .form-panel {
+    position: relative;
     justify-content: center;
-    padding: 56px 24px;
+    padding: 0 24px 56px;
   }
 
   .form-card {
     margin: 0;
+    text-align: center;
   }
 
   .mobile-brand {
     display: block;
-    margin-bottom: 48px;
+  }
+
+  .back-link {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    z-index: 5;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    padding: 6px 12px 6px 8px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  .back-link:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .mobile-brand-curve {
+    padding-top: 56px;
+  }
+
+  h1 {
+    margin-top: 22px;
+    font-size: 24px;
+    line-height: 1.25;
+  }
+
+  .form-subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .login-form {
+    text-align: left;
+    margin-top: 32px;
+  }
+
+  .forgot-row {
+    justify-content: right;
   }
 }
 
 @media (max-width: 520px) {
   .form-panel {
-    padding: 36px 18px;
+    padding: 0 18px 40px;
+  }
+
+  .mobile-brand-curve {
+    width: calc(100% + 36px);
+    margin: -20px -18px 18px;
+    padding: 52px 18px 48px;
   }
 
   h1 {
-    font-size: 34px;
+    font-size: 22px;
   }
 
   .role-grid {
     grid-template-columns: 1fr;
   }
+}
+
+:global(.dark .login-screen) {
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+  --field-bg: #263449;
+  background: #0F172A;
+}
+
+:global(.dark input) {
+  color: #E2E8F0;
+}
+
+:global(.dark .input-shell:focus-within) {
+  background: #2c3e57;
+}
+
+:global(.dark .icon-button:hover) {
+  background: #334155;
+}
+
+:global(.dark .alert-card) {
+  background: rgba(239, 83, 80, 0.10);
+  border-color: rgba(239, 83, 80, 0.24);
+}
+
+:global(.dark .alert-message) {
+  color: #f2b8b8;
+}
+
+:global(.dark .verify-resend-button) {
+  background: #1E293B;
+}
+
+:global(.dark .verify-resend-button:hover:not(:disabled)) {
+  background: #263449;
+}
+
+:global(.dark .divider span) {
+  background: #334155;
+}
+
+:global(.dark .hospital) {
+  background: rgba(21, 101, 192, 0.16);
+}
+
+:global(.dark .blood-center) {
+  background: rgba(211, 47, 47, 0.16);
 }
 </style>

@@ -6,7 +6,7 @@
 
     <div v-else class="drives-inner">
       <!-- Header -->
-      <div class="header-row fade-in" style="--delay: 0ms">
+      <div class="header-row">
         <div>
           <h1 class="page-title">Mobile Drives</h1>
           <p class="page-subtitle">Create, publish, and manage mobile donation drive events.</p>
@@ -18,7 +18,7 @@
       </div>
 
       <!-- Summary stats -->
-      <div class="stats-row fade-in" style="--delay: 60ms">
+      <div class="stats-row">
         <div class="stat-card stat-card--blue">
           <div class="stat-card__icon">
             <AssetIcon name="calendar" :size="20" />
@@ -55,7 +55,7 @@
 
       <!-- Drive list -->
       <div v-if="drives.length" class="drive-list">
-        <div v-for="(drive, i) in drives" :key="drive.id" class="drive-card fade-in" :style="{ '--delay': `${100 + i * 50}ms` }">
+        <div v-for="drive in drives" :key="drive.id" class="drive-card">
           <div class="drive-card__top">
             <div>
               <p class="drive-card__title">{{ drive.facility_name }} · {{ drive.location }}</p>
@@ -109,7 +109,7 @@
         </div>
       </div>
 
-      <div v-else class="empty-state fade-in" style="--delay: 100ms">
+      <div v-else class="empty-state">
         <AssetIcon name="truck" :size="40" style="color:#e5e7eb" />
         <p>No mobile drives scheduled yet</p>
         <button type="button" class="btn-primary btn-primary--sm" @click="openCreateModal">Create your first drive</button>
@@ -356,8 +356,8 @@ onMounted(async () => {
   --warning: #f57c00;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
-  max-width: 1152px;
-  background: #F5F7FA;
+  max-width: 1200px;
+  background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
 }
@@ -383,18 +383,8 @@ onMounted(async () => {
   to { transform: rotate(360deg); }
 }
 
-.fade-in {
-  animation: fadeInUp 0.5s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .spinner { animation: none !important; }
+  .spinner { animation: none !important; }
 }
 
 .drives-inner {
@@ -464,12 +454,11 @@ onMounted(async () => {
   border: 1px solid #eef0f3;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   padding: 18px 20px;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .stat-card__icon {
@@ -482,13 +471,10 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.stat-card--blue .stat-card__icon { background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); color: var(--primary); }
-.stat-card--violet .stat-card__icon { background: linear-gradient(135deg, #EDE7F6 0%, #D1C4E9 100%); color: #5E35B1; }
-.stat-card--green .stat-card__icon { background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); color: var(--success); }
+.stat-card--blue .stat-card__icon { background: #E3F2FD; color: var(--primary); }
+.stat-card--violet .stat-card__icon { background: #EDE7F6; color: #5E35B1; }
+.stat-card--green .stat-card__icon { background: #E8F5E9; color: var(--success); }
 
-.stat-card--blue { background: linear-gradient(135deg, #ffffff 0%, #f0f7fe 100%);}
-.stat-card--violet { background: linear-gradient(135deg, #ffffff 0%, #f4f1fb 100%);}
-.stat-card--green { background: linear-gradient(135deg, #ffffff 0%, #f0f9f0 100%);}
 
 .stat-card__body {
   min-width: 0;
@@ -526,13 +512,13 @@ onMounted(async () => {
 
 .drive-card {
   position: relative;
-  background: linear-gradient(135deg, #f1f6fb 0%, #e4f0fc 45%, #d3e8fb 100%);
+  background: #fff;
   border-radius: 14px;
-  border: 1px solid #cfe3f7;
-  box-shadow: 0 1px 2px rgba(21, 101, 192, 0.06);
+  border: 1px solid #eef0f3;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   padding: 18px 20px;
   overflow: hidden;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .drive-card::before {
@@ -542,12 +528,11 @@ onMounted(async () => {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #1565c0, #42a5f5);
+  background: var(--primary);
 }
 
 .drive-card:hover {
-  box-shadow: 0 8px 20px rgba(21, 101, 192, 0.09);
-  transform: translateY(-2px);
+  border-color: #d9e2ee;
 }
 
 .drive-card__top {
@@ -738,7 +723,6 @@ onMounted(async () => {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -748,12 +732,12 @@ onMounted(async () => {
 
 .modal-card {
   background: white;
-  border-radius: 16px;
+  border-radius: 14px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
 }
 
 .modal-card__header {
@@ -925,5 +909,13 @@ onMounted(async () => {
   .stats-row { grid-template-columns: 1fr; }
   .drive-card__actions { flex-direction: column; align-items: stretch; }
   .drive-card__actions a { text-align: center; }
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-outline-blue:focus-visible,
+.btn-cancel:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

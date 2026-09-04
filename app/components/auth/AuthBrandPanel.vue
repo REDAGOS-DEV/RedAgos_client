@@ -1,16 +1,5 @@
 <template>
   <aside class="brand-panel">
-    <div class="particle particle1"></div>
-    <div class="particle particle2"></div>
-    <div class="particle particle3"></div>
-    <div class="particle particle4"></div>
-
-    <div class="circle circle-top"></div>
-    <div class="circle circle-bottom"></div>
-
-    <div class="top-ring"></div>
-    <div class="top-ring-2"></div>
-
     <div class="brand-lockup">
       <div class="brand-mark">
         <img :src="logo" alt="RedAgos Logo" class="logo-image" />
@@ -53,7 +42,6 @@
         <span>Digital</span>
       </div>
     </div>
-    <div class="red-glow"></div>
   </aside>
 </template>
 
@@ -69,82 +57,6 @@ import logo from '~/assets/images/RedAgosLogo.png'
   padding: 48px;
   background: #206fbd;
   color: #ffffff;
-}
-.top-ring {
-  position: absolute;
-  top: -120px;
-  left: -120px;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.top-ring-2 {
-  position: absolute;
-  top: -70px;
-  left: -70px;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.particle {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #ff5a74;
-}
-
-.particle1 {
-  left: 60px;
-  bottom: 260px;
-  animation: float 6s infinite ease-in-out;
-}
-
-.particle2 {
-  left: 200px;
-  bottom: 340px;
-  animation: float 8s infinite ease-in-out;
-}
-
-.particle3 {
-  left: 500px;
-  bottom: 220px;
-  animation: float 7s infinite ease-in-out;
-}
-
-.particle4 {
-  left: 420px;
-  bottom: 160px;
-  animation: float 9s infinite ease-in-out;
-}
-
-.circle {
-  position: absolute;
-  pointer-events: none;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.circle-top {
-  top: -96px;
-  right: -128px;
-  width: 320px;
-  height: 320px;
-}
-
-.circle-bottom {
-  left: -96px;
-  bottom: -96px;
-  width: 384px;
-  height: 384px;
-}
-
-.brand-lockup {
-  animation: logoFloat 5s infinite ease-in-out;
 }
 
 .brand-mark {
@@ -203,17 +115,6 @@ import logo from '~/assets/images/RedAgosLogo.png'
   line-height: 2.15;
 }
 
-.red-glow {
-  position: absolute;
-  left: -120px;
-  bottom: -250px;
-  width: 650px;
-  height: 650px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ff4d6d 0%, #ff2f55 20%, rgba(255, 47, 85, 0.4) 60%, transparent 85%);
-  filter: blur(100px);
-}
-
 .stats-row {
   position: absolute;
   z-index: 1;
@@ -238,24 +139,6 @@ import logo from '~/assets/images/RedAgosLogo.png'
   color: rgba(255, 255, 255, 0.55);
   font-size: 11px;
   font-weight: 400;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-@keyframes logoFloat {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
 }
 
 @media (max-width: 1023px) {

@@ -494,6 +494,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
 definePageMeta({
+  middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
 })
 
@@ -884,7 +885,7 @@ const donutSegments = computed(() => {
   --ba-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --ba-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   color: var(--ba-text);
   background: var(--ba-bg); 
   max-width: 1400px;
@@ -1015,7 +1016,7 @@ const donutSegments = computed(() => {
   color: #fff;
   border: none;
   border-radius: 12px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
   font-size: 14px;
   font-weight: 600;
   display: inline-flex;
@@ -1120,7 +1121,7 @@ const donutSegments = computed(() => {
   background: var(--ba-bg);
   color: var(--ba-text);
   font-size: 14px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 .ba-search-input:focus {
   outline: 2px solid var(--ba-primary);
@@ -1154,7 +1155,7 @@ const donutSegments = computed(() => {
   background: var(--ba-bg);
   color: var(--ba-text);
   font-size: 14px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 .ba-filter-actions {
   display: flex;

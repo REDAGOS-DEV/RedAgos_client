@@ -312,7 +312,7 @@ function next() {
 
 .about-page {
   background: #eef0f5;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .section-inner {

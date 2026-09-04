@@ -43,7 +43,7 @@
     <div v-else-if="!originalRequest" class="eb-card eb-empty-state">
       <AssetIcon name="droplets" :size="28" class="eb-empty-icon" style="color: var(--eb-text-muted)" />
       <p class="eb-empty-text">This blood request could not be found.</p>
-      <NuxtLink to="/hospital/blood-requests" class="eb-btn eb-btn-outline">Back to Blood Requests</NuxtLink>
+      <NuxtLink to="/hospital/bloodrequests" class="eb-btn eb-btn-outline">Back to Blood Requests</NuxtLink>
     </div>
 
     <!-- ====== CONTENT ====== -->
@@ -308,7 +308,8 @@ import { computed, reactive, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 definePageMeta({
-  layout: 'dashboard'
+  middleware: ['auth', 'hospital-portal'],
+  layout: 'hospitaldashboard'
 })
 
 const route = useRoute()
@@ -615,7 +616,7 @@ function formatDateTime(iso) {
   --eb-text: #1a2233;
   --eb-text-muted: #6b7789;
 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--rb-font-sans);
   background: var(--eb-bg);
   min-height: 100%;
   padding: 24px 28px 110px;

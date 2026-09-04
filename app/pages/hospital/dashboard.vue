@@ -312,7 +312,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
-definePageMeta({ middleware: 'auth', layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 const router = useRouter()
 const goTo = (path) => router.push(path)
@@ -509,13 +509,6 @@ const quickActions = [
     title: 'Track Requests',
     description: 'Follow the status of active requests',
   },
-  {
-    path: '/hospital/billing',
-    icon: 'receipt',
-    color: '#F57C00',
-    title: 'Billing & Payments',
-    description: 'View invoices and payment history',
-  },
 ]
 
 onMounted(async () => {
@@ -571,7 +564,7 @@ onMounted(async () => {
   --success: #2e7d32;
   --info: #0288d1;
   --purple: #5e35b1;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
   margin: 0 auto;
@@ -1280,7 +1273,10 @@ onMounted(async () => {
 :global(.dark .status-dot--healthy) { background: rgba(102,187,106,0.16); }
 :global(.dark .status-dot--low) { background: rgba(255,167,38,0.16); }
 :global(.dark .status-dot--critical) { background: rgba(239,83,80,0.16); }
+/* background-image, not the `background` shorthand: the shorthand resets
+   background-size to `auto`, which collapses the 400%-wide gradient to the
+   element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .skeleton) {
-  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>

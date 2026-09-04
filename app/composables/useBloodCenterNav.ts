@@ -119,10 +119,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     label: 'System',
     items: [
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
-      // TODO: /blood-center/support has no page yet — this link 404s. Kept
-      // because it predates the department work and removing it would be a
-      // product decision, not a refactor.
-      { label: 'Help & Support', path: '/blood-center/support', icon: 'life-buoy', keywords: 'help contact support' },
+      // Help & Support removed: /blood-center/support has no page, so the link
+      // 404'd. Restore it together with the page, not before.
     ],
   },
 ]
@@ -165,7 +163,7 @@ export function useBloodCenterNav() {
   function labelForPath(path: string): string {
     const match = NAV_GROUPS
       .flatMap((group) => group.items)
-      .find((item) => item.path.toLowerCase() === path.toLowerCase())
+      .find((item) => item.path === path)
 
     return match?.label ?? ''
   }

@@ -173,7 +173,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
@@ -433,14 +433,13 @@ async function load() {
 watch([activeStatus, page], load)
 
 onMounted(async () => {
-  // UX ra ni nga pag-check — ang `role:admin` sa server mao gihapon ang tinuod
-  // nga gate. Kung dili admin, ang API mo-403 gihapon bisan makaabot sila diri.
+  // Ang role check kay sa `portal` global middleware na, nga modagan sa dili pa
+  // mo-render ang page. Kaniadto dinhi ni sa onMounted — nagpasabot nga ang
+  // dili-admin makakita una sa tibuok page ayha ma-redirect.
+  //
+  // Ang `role:admin` sa server gihapon ang tinuod nga gate.
   if (!user.value) {
     await fetchUser()
-  }
-
-  if (user.value && !user.value.roles?.includes('admin')) {
-    return navigateTo('/auth/role-selection')
   }
 
   await load()
@@ -530,12 +529,13 @@ onMounted(async () => {
   margin: 0 auto 16px;
   padding: 10px 14px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.banner-success { background: #ecfdf5; color: #047857; }
-.banner-error { background: #fef2f2; color: #b91c1c; }
-.banner-info { background: #eff6ff; color: #1d4ed8; }
+.banner-success { background: #F1F7F1; color: #2E7D32; }
+.banner-error { background: #FDF1F1; color: #C62828; }
+.banner-info { background: #EFF4FB; color: #1565C0; }
 
 .table-wrap {
   max-width: 1180px;

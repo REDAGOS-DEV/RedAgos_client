@@ -1,11 +1,19 @@
 <template>
   <div class="avatar-upload">
-    <div class="avatar-upload__preview">
-      <img v-if="previewUrl" :src="previewUrl" alt="Profile photo" class="avatar-upload__img">
-      <span v-else class="avatar-upload__initial">{{ fallbackInitial }}</span>
+    <!--
+      __frame is the positioning context and does NOT clip. Only __preview
+      clips, so the circular crop still applies to the photo while the camera
+      badge can sit on the circle's edge without being cut off by the
+      overflow:hidden that the crop requires.
+    -->
+    <div class="avatar-upload__frame">
+      <div class="avatar-upload__preview">
+        <img v-if="previewUrl" :src="previewUrl" alt="Profile photo" class="avatar-upload__img">
+        <span v-else class="avatar-upload__initial">{{ fallbackInitial }}</span>
 
-      <div v-if="uploading" class="avatar-upload__overlay">
-        <div class="avatar-upload__spinner" />
+        <div v-if="uploading" class="avatar-upload__overlay">
+          <div class="avatar-upload__spinner" />
+        </div>
       </div>
 
       <input
@@ -80,6 +88,13 @@ async function handleFileChange(e) {
   width: 100%;
 }
 
+.avatar-upload__frame {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+
 .avatar-upload__preview {
   position: relative;
   width: 96px;
@@ -130,11 +145,12 @@ async function handleFileChange(e) {
   to { transform: rotate(360deg); }
 }
 
-/* Camera badge attached to bottom-right of the circle */
+/* Separate floating control on the circle's lower-right edge. Anchored to
+   __frame (not __preview) so the crop cannot clip it. */
 .avatar-upload__badge {
   position: absolute;
   bottom: -2px;
-  right: 10px;
+  right: -2px;
   width: 28px;
   height: 28px;
   border-radius: 999px;

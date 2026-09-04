@@ -6,15 +6,17 @@
       <section class="form-panel">
         <div class="form-card">
           <div class="mobile-brand">
-            <p class="brand-name">
-              Red<span>Agos</span>
-            </p>
-            <p class="brand-subtitle">Blood Bank System</p>
+            <div class="mobile-brand-curve">
+              <img :src="logo" alt="RedAgos Logo" class="mobile-logo" />
+              <p class="brand-name">
+                Red<span>Agos</span>
+              </p>
+              <p class="brand-subtitle">Blood Bank System</p>
+            </div>
           </div>
 
           <NuxtLink to="/" class="back-link">
             <AssetIcon name="chevron-left" :size="18" />
-             Back to Home
           </NuxtLink>
 
           <h1>Create an Account</h1>
@@ -29,7 +31,11 @@
                 v-for="role in roles"
                 :key="role.id"
                 class="role-card"
-                :class="{ selected: selectedRole === role.id, [role.colorClass]: true }"
+                :class="{
+                  selected: selectedRole === role.id,
+                  'role-card--disabled': !role.available,
+                  [role.colorClass]: true,
+                }"
                 @click="selectRole(role.id)"
               >
                 <div class="role-card-content">
@@ -75,8 +81,13 @@
                     </svg>
                   </div>
                   <div class="role-info">
-                    <div class="role-name">{{ role.name }}</div>
-                    <div class="role-desc">{{ role.description }}</div>
+                    <div class="role-name">
+                      {{ role.name }}
+                      <span v-if="!role.available" class="role-badge">Coming soon</span>
+                    </div>
+                    <div class="role-desc">
+                      {{ role.available ? role.description : role.unavailableNote }}
+                    </div>
                   </div>
                 </div>
 
@@ -85,6 +96,7 @@
                   name="role"
                   :value="role.id"
                   :checked="selectedRole === role.id"
+                  :disabled="!role.available"
                   class="role-radio"
                   @change="selectRole(role.id)"
                 />
@@ -115,6 +127,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
@@ -124,11 +137,19 @@ definePageMeta({
 
 const selectedRole = ref('')
 
+// Ang hospital / blood-bank portal kay walay backend pa: walay `/hospital/*`
+// nga route ug walay registration endpoint. Gipakita gihapon nato siya —
+// disabled ug tinuod ang label — imbes tagoan, aron nahibalo ang hospital nga
+// naa sila sa plano. I-abli ni sa NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED.
+const { hospitalPortalEnabled } = useRuntimeConfig().public
+
 const roles = [
   {
     id: 'hospital',
     name: 'Hospital Blood Bank',
     description: 'Request and manage blood supply for your hospital',
+    unavailableNote: 'Not accepting registrations yet — this portal is still being built.',
+    available: Boolean(hospitalPortalEnabled),
     colorClass: 'role-hospital',
     iconClass: 'icon-hospital',
   },
@@ -136,6 +157,7 @@ const roles = [
     id: 'blood-center',
     name: 'Blood Center',
     description: 'Process requests, manage donors, and inventory.',
+    available: true,
     colorClass: 'role-blood-center',
     iconClass: 'icon-blood-center',
   },
@@ -143,6 +165,7 @@ const roles = [
     id: 'donor',
     name: 'Donor',
     description: 'Register to donate blood and book appointments.',
+    available: true,
     colorClass: 'role-donor',
     iconClass: 'icon-donor',
   },
@@ -150,12 +173,17 @@ const roles = [
     id: 'admin',
     name: 'Administrator',
     description: 'Manage the system, users, and overall operations.',
+    available: true,
     colorClass: 'role-admin',
     iconClass: 'icon-admin',
   },
 ]
 
 const selectRole = (roleId) => {
+  // Ang disabled nga role dili mapili — walay agianan padulong sa portal nga
+  // wala pay backend.
+  if (!roles.find((role) => role.id === roleId)?.available) return
+
   selectedRole.value = roleId
 }
 
@@ -183,7 +211,7 @@ const continueWithRole = async () => {
   min-height: 100vh;
   background: #eef4fb;
   color: #1f2937;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
 }
 
 .login-shell {
@@ -206,16 +234,47 @@ const continueWithRole = async () => {
   margin-left: 140px;
 }
 
+/* ── MOBILE BRAND — hidden on desktop ── */
 .mobile-brand {
   display: none;
 }
 
+.mobile-brand-curve {
+  position: relative;
+  width: calc(100% + 48px);
+  margin: -36px -24px 20px;
+  padding: 44px 24px 56px;
+  background: #1565C0;
+  text-align: center;
+}
+
+.mobile-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}
+
 .mobile-brand .brand-name {
-  color: #1769c9;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mobile-brand .brand-name span {
+  color: #eb3535;
 }
 
 .mobile-brand .brand-subtitle {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 4px 0 0;
 }
 
 .back-link {
@@ -337,11 +396,42 @@ h1 {
 }
 
 .role-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #1f2937;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 4px;
+}
+
+/* A role whose portal has no backend yet: visible, labelled, not selectable. */
+.role-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+.role-card--disabled:hover {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+
+.role-card--disabled .role-radio {
+  cursor: not-allowed;
+}
+
+.role-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .role-desc {
@@ -443,37 +533,77 @@ h1 {
     display: block;
   }
 
+  .brand-panel {
+    display: none;
+  }
+
   .form-panel {
+    position: relative;
     justify-content: center;
-    padding: 56px 24px;
+    padding: 0 24px 56px;
   }
 
   .form-card {
     margin: 0;
     max-width: 100%;
+    text-align: center;
   }
 
   .mobile-brand {
     display: block;
-    margin-bottom: 48px;
   }
 
-  .mobile-brand .brand-name {
-    color: #1769c9;
+  .back-link {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    z-index: 5;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    padding: 6px 12px 6px 8px;
+    border-radius: 999px;
+    font-size: 13px;
   }
 
-  .mobile-brand .brand-subtitle {
-    color: #64748b;
+  .back-link:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .mobile-brand-curve {
+    padding-top: 56px;
+  }
+
+  h1 {
+    margin-top: 22px;
+    font-size: 24px;
+    line-height: 1.25;
+  }
+
+  .form-subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .role-selection-form {
+    text-align: left;
+    margin-top: 32px;
   }
 }
 
 @media (max-width: 520px) {
   .form-panel {
-    padding: 36px 18px;
+    padding: 0 18px 40px;
+  }
+
+  .mobile-brand-curve {
+    width: calc(100% + 36px);
+    margin: -20px -18px 18px;
+    padding: 52px 18px 48px;
   }
 
   h1 {
-    font-size: 34px;
+    font-size: 24px;
   }
 
   .role-card {
@@ -492,5 +622,10 @@ h1 {
   .role-desc {
     font-size: 12px;
   }
+}
+
+.continue-button:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

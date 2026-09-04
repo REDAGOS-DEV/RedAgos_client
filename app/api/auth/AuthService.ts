@@ -40,6 +40,17 @@ class AuthService extends BaseService {
     async resendVerificationEmail(): Promise<any> {
         return await this.request('/email/verification-notification', 'POST');
     }
+
+    /**
+     * Ang endpoint sa ibabaw kay naa sa likod sa `auth:sanctum`, ug ang login
+     * gi-refuse na hangtod ma-verify ang email — so ang bag-ong rehistro walay
+     * token nga magamit. Kini nga guest variant ang ilang agianan: email ra ang
+     * gikinahanglan, ug pareho ra gyud ang tubag bisan unsa pa ang address, so
+     * dili siya magamit pang-usisa kung kinsa ang naka-rehistro.
+     */
+    async resendVerificationEmailFor(email: string): Promise<any> {
+        return await this.request('/email/resend-verification', 'POST', { email });
+    }
  
     async list(params: object = {}): Promise<any> {
         return await this.request(this.resource, 'GET', params);

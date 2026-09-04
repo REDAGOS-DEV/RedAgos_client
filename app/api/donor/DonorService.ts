@@ -100,6 +100,20 @@ class DonorService extends BaseService {
         return await this.request(`${this.resource}/avatar`, 'POST', formData);
     }
 
+    async submitIdentity(formData: FormData): Promise<any> {
+        return await this.request(`${this.resource}/identity`, 'POST', formData);
+    }
+
+    /**
+     * Fetch an identity document as a blob.
+     *
+     * The route is authenticated rather than signed, so the token has to travel
+     * with the request; the caller turns the blob into an object URL.
+     */
+    async identityImage(uuid: string): Promise<Blob> {
+        return await this.requestBlob(`${this.resource}/${uuid}/identity-image`);
+    }
+
     async deleteAccount(payload: { password: string }): Promise<any> {
         return await this.request(`${this.resource}/account`, 'DELETE', payload);
     }

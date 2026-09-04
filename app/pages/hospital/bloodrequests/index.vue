@@ -295,7 +295,7 @@
       <div v-if="drawerOpen" class="drawer-backdrop" @click="closeDrawer" />
     </Transition>
     <Transition name="drawer-slide">
-      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" aria-label="Request details">
+      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" v-focus-trap aria-label="Request details">
         <div class="drawer__header">
           <div>
             <p class="drawer__eyebrow">Request Details</p>
@@ -387,7 +387,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
-definePageMeta({ middleware: 'auth', layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 const router = useRouter()
 const loading = ref(true)
@@ -740,7 +740,7 @@ onUnmounted(() => {
   --warning: #f59e0b;
   --success: #2e7d32;
   --purple: #7c3aed;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
   margin: 0 auto;

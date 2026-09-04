@@ -24,7 +24,7 @@
         class="px-5 pt-3 pb-3 flex items-center gap-3 border-b dark:border-slate-700 flex-shrink-0 transition-colors duration-150"
         :style="{ borderColor: SIDEBAR_BORDER }">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-          style="background: linear-gradient(135deg, #1565C0, #42A5F5); box-shadow: 0 4px 12px rgba(21,101,192,0.25)">
+          style="background: #1565C0">
           <img :src="logo" alt="RedAgos Logo" class="logo-image">
         </div>
 
@@ -95,7 +95,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 // --- Dark mode awareness ---
@@ -223,10 +223,9 @@ const closeSidebar = () => {
 
 const hoveredPath = ref(null)
 
-// Case-insensitive kay ang uban ka page file kay naka-capital (Dashboard.vue →
-// /blood-center/Dashboard) samtang lowercase ang tanan link. Ang vue-router
-// mo-match gihapon, pero ang exact string comparison dili.
-const isActive = (path) => route.path.toLowerCase() === path.toLowerCase()
+// Lowercase na ang tanan page file, so exact comparison na. Kaniadto
+// case-insensitive ni tungod sa Dashboard.vue → /blood-center/Dashboard.
+const isActive = (path) => route.path === path
 
 const navStyle = (path) => {
   const active = isActive(path)

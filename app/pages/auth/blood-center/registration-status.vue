@@ -62,7 +62,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
@@ -190,9 +190,9 @@ onMounted(load)
   width: 100%;
   max-width: 560px;
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 32px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .brand {
@@ -268,11 +268,13 @@ onMounted(load)
 .reason {
   margin-top: 16px;
   padding: 12px 14px;
-  background: #fef2f2;
-  border-left: 3px solid #d32f2f;
+  background: #FDF1F1;
+  border-left: 3px solid #C62828;
   border-radius: 6px;
-  color: #7f1d1d;
-  font-size: 14px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.55;
 }
 
 .resubmit-form {
@@ -351,5 +353,11 @@ onMounted(load)
 
 .ghost-btn:hover {
   background: #f7f9fc;
+}
+
+.primary-btn:focus-visible,
+.ghost-btn:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 </style>

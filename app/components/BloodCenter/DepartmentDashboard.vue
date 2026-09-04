@@ -73,7 +73,7 @@ defineProps({
 
 <style scoped>
 .dept {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--rb-font-sans);
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px 32px 40px;

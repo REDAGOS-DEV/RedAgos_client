@@ -82,7 +82,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { useUser } from '~/composables/useUser.js'
+import { useUser } from '~/composables/useUser'
 import { hospitalService } from '~/api/hospital/HospitalService'
 
 // --- Dark mode awareness ---
@@ -150,18 +150,13 @@ const navGroups = [
       { label: 'Track Requests', path: '/hospital/trackrequests', icon: 'route' }
     ]
   },
-  {
-    label: 'Finance',
-    items: [
-      { label: 'Billing & Payments', path: '/hospital/billing', icon: 'receipt' },
-      { label: 'Transaction History', path: '/hospital/transactions', icon: 'history' }
-    ]
-  },
+  // Ang Finance group (billing, transactions) ug ang Help & Support kay
+  // gitangtang: walay page files para nila, so 404 ang tanan. Ibalik ni kung
+  // naa nay backend + page — tan-awa ang Phase P sa audit plan.
   {
     label: 'System',
     items: [
-      { label: 'Settings', path: '/hospital/settings', icon: 'settings' },
-      { label: 'Help & Support', path: '/hospital/help', icon: 'help-circle' }
+      { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
     ]
   }
 ]

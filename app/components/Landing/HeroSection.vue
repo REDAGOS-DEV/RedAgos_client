@@ -32,21 +32,23 @@
         </div>
       </div>
 
-      <!-- Right: Ring Visual -->
+      <!-- blood-bank photo -->
       <div class="hero-right" :class="{ 'animate-in': mounted }">
-        <div class="ring-scene">
+        <div class="visual-scene">
+          <img
+            :src="heroImage"
+            alt="Refrigerated blood bags labeled and stored in a blood bank facility"
+            class="visual-photo"
+            loading="eager"
+            width="620"
+            height="480"
+          />
 
-          <!-- TOP-CENTER-RIGHT: Real-time Alerts -->
-          <div class="fcard fcard-alert float-anim">
-            <AssetIcon name="bolt-fill" :size="14" />
-            Real-time Alerts
-          </div>
-
-          <!-- TOP-RIGHT: Blood Available -->
-          <div class="fcard fcard-blood float-anim" style="animation-delay: 0.4s">
+          <!-- Blood Available -->
+          <div class="fcard fcard-blood">
             <div class="fcard-row">
               <div class="fcard-icon-wrap fcard-icon-blue">
-                <AssetIcon name="activity" class="fcard-icon-blue-svg" :size="15" />
+                <AssetIcon name="activity" class="fcard-icon-blue-svg" :size="20" />
               </div>
               <div>
                 <div class="fcard-label">Blood Available</div>
@@ -58,49 +60,70 @@
             </div>
           </div>
 
-          <!-- Ring -->
-          <div class="ring-wrap">
-            <div class="rings ring-1 spin-cw"></div>
-            <div class="rings ring-2 spin-ccw"></div>
-            <div class="rings ring-3"></div>
-            <div class="heart-center pulse-heart">
-              <AssetIcon name="heart-fill" :size="44" />
-            </div>
-            <!-- 6 orbit dots -->
-            <span class="dot dot-blue  orbit-dot" style="top: -5px;  left: 175px;"></span>
-            <span class="dot dot-red   orbit-dot" style="top: 100px; left: 350px; animation-delay: 1.5s"></span>
-            <span class="dot dot-blue  orbit-dot" style="top: 200px; left: 260px; animation-delay: 1.0s"></span>
-            <span class="dot dot-blue  orbit-dot" style="top: 330px; left: 275px; animation-delay: 1.5s"></span>
-            <span class="dot dot-red   orbit-dot" style="top: 295px; left: 40px;  animation-delay: 0.8s"></span>
-            <span class="dot dot-green orbit-dot" style="top: 110px; left: 5px;   animation-delay: 1.8s"></span>
-          </div>
-
-          <!-- LEFT: Request Fulfilled -->
-          <div class="fcard fcard-fulfilled float-anim" style="animation-delay: 0.8s">
+          <!-- Request Fulfilled -->
+          <div class="fcard fcard-fulfilled">
             <div class="fcard-row">
               <div class="fcard-icon-wrap fcard-icon-green">
-                <AssetIcon name="shield" class="fcard-icon-green-svg" :size="15" />
+                <AssetIcon name="shield" class="fcard-icon-green-svg" :size="20" />
               </div>
-              <div>
+              <div class="fcard-fulfilled-body">
                 <div class="fcard-label">Request Fulfilled</div>
                 <div class="fcard-value">98.5%</div>
+                <div class="progress-track">
+                  <div class="progress-fill"></div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- BOTTOM-RIGHT: Active Donors -->
-          <div class="fcard fcard-donors float-anim" style="animation-delay: 1.2s">
+          <!-- Active Donors -->
+          <div class="fcard fcard-donors">
             <div class="fcard-row">
               <div class="fcard-icon-wrap fcard-icon-red">
-                <AssetIcon name="users" class="fcard-icon-red-svg" :size="15" />
+                <AssetIcon name="users" class="fcard-icon-red-svg" :size="20" />
               </div>
               <div>
                 <div class="fcard-label">Active Donors</div>
                 <div class="fcard-value">1,240+</div>
+                <div class="avatar-stack" aria-hidden="true">
+                  <img
+                    v-for="donor in donorAvatars"
+                    :key="donor.id"
+                    :src="donor.img"
+                    :alt="donor.name"
+                    class="avatar"
+                    loading="lazy"
+                  />
+                  <span class="avatar avatar-more">+</span>
+                </div>
               </div>
             </div>
           </div>
 
+          <!-- Real-time Alerts -->
+          <div class="fcard fcard-alert">
+            <div class="fcard-alert-title">
+              <AssetIcon name="bolt-fill" :size="16" />
+              Real-time Alerts
+            </div>
+            <ul class="alert-list">
+              <li>
+                <span class="alert-dot alert-dot-red"></span>
+                <span class="alert-text">Low Stock: O&minus;</span>
+                <span class="alert-value alert-value-red">5 Units Left</span>
+              </li>
+              <li>
+                <span class="alert-dot alert-dot-gold"></span>
+                <span class="alert-text">Expiring Soon</span>
+                <span class="alert-value">12 Units</span>
+              </li>
+              <li>
+                <span class="alert-dot alert-dot-blue"></span>
+                <span class="alert-text">New Request</span>
+                <span class="alert-value">SPMC Blood Bank</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -111,22 +134,28 @@
         <div class="stat-icon">
           <AssetIcon name="map-pin-simple" :size="22" />
         </div>
-        <div class="stat-num">100+</div>
-        <div class="stat-label">Units Needed Daily</div>
+        <div class="stat-text">
+          <div class="stat-num">100+</div>
+          <div class="stat-label">Units Needed Daily</div>
+        </div>
       </div>
       <div class="stat">
         <div class="stat-icon">
           <AssetIcon name="activity" :size="22" />
         </div>
-        <div class="stat-num">24/7</div>
-        <div class="stat-label">Live Monitoring</div>
+        <div class="stat-text">
+          <div class="stat-num">24/7</div>
+          <div class="stat-label">Live Monitoring</div>
+        </div>
       </div>
       <div class="stat">
         <div class="stat-icon">
           <AssetIcon name="shield" :size="22" />
         </div>
-        <div class="stat-num">98.5%</div>
-        <div class="stat-label">Fulfillment Rate</div>
+        <div class="stat-text">
+          <div class="stat-num">98.5%</div>
+          <div class="stat-label">Fulfillment Rate</div>
+        </div>
       </div>
     </div>
   </section>
@@ -137,6 +166,22 @@ import { ref, onMounted } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const mounted = ref(false)
+const heroImage = ref(
+  'https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=900&q=70'
+)
+
+// Active-donors avatar stack. Swap `img` for real donor photos once you
+// have them — either local assets:
+//   import donor1 from '~/assets/images/donors/donor-1.jpg'
+// or URLs coming back from `donorService`/`hospitalService` (whichever
+// endpoint eventually returns recent/featured donors). Keep it at 4
+// entries so it matches the "+" overflow chip after it.
+const donorAvatars = ref([
+  { id: 1, name: 'Donor 1', img: 'https://randomuser.me/api/portraits/men/32.jpg' },
+  { id: 2, name: 'Donor 2', img: 'https://randomuser.me/api/portraits/women/44.jpg' },
+  { id: 3, name: 'Donor 3', img: 'https://randomuser.me/api/portraits/men/65.jpg' },
+  { id: 4, name: 'Donor 4', img: 'https://randomuser.me/api/portraits/women/68.jpg' },
+])
 
 onMounted(() => {
   setTimeout(() => { mounted.value = true }, 80)
@@ -155,29 +200,6 @@ onMounted(() => {
   from { opacity: 0; transform: translateX(40px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-10px); }
-}
-@keyframes spinCW {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes spinCCW {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(-360deg); }
-}
-@keyframes pulseHeart {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  14%       { transform: translate(-50%, -50%) scale(1.15); }
-  28%       { transform: translate(-50%, -50%) scale(1); }
-  42%       { transform: translate(-50%, -50%) scale(1.08); }
-  56%       { transform: translate(-50%, -50%) scale(1); }
-}
-@keyframes dotPop {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%       { transform: scale(1.6); opacity: 0.7; }
-}
 @keyframes statSlideUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -185,6 +207,11 @@ onMounted(() => {
 @keyframes liveGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
   50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+}
+/* gentle floating bob for the dashboard cards */
+@keyframes cardFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
 }
 
 /* ── ENTER ANIMATIONS ── */
@@ -196,12 +223,6 @@ onMounted(() => {
 .hero-right.animate-in { animation: fadeSlideRight 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards; }
 .stats-bar.animate-in  { animation: statSlideUp    0.6s  ease                           0.7s forwards; }
 
-/* ── ANIMATION CLASSES ── */
-.float-anim  { animation: float      4s    ease-in-out infinite; }
-.spin-cw     { animation: spinCW     22s   linear      infinite; }
-.spin-ccw    { animation: spinCCW    18s   linear      infinite; }
-.pulse-heart { animation: pulseHeart 2.4s  ease-in-out infinite; }
-.orbit-dot   { animation: dotPop     2.5s  ease-in-out infinite; }
 .live-dot    { animation: liveGlow   1.8s  ease-in-out infinite; }
 
 /* ── HERO ── */
@@ -231,8 +252,9 @@ onMounted(() => {
   padding: 80px 3rem 40px;
   max-width: 1200px; margin: 0 auto; width: 100%;
 }
-.hero-left { flex: 1; max-width: 480px; }
+.hero-left { flex: 1; max-width: 480px; min-width: 0; }
 
+/* ── LEFT COLUMN — unchanged: badge, heading, description, CTA ── */
 .live-badge {
   display: inline-flex; align-items: center; gap: 8px;
   background: rgba(255,255,255,0.9); border: 1px solid #e5e7eb;
@@ -272,7 +294,7 @@ onMounted(() => {
 .hero-desc { font-size: 15px; color: #4b5563; line-height: 1.75; margin-bottom: 32px; }
 .hero-desc strong { font-weight: 600; color: #111; }
 
-.hero-btns { display: flex; align-items: center; gap: 14px; }
+.hero-btns { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .btn-primary {
   background: #2563eb; color: #fff; font-size: 14px; font-weight: 600;
   padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;
@@ -287,7 +309,7 @@ onMounted(() => {
 }
 .btn-secondary:hover { background: #f9fafb; border-color: #2563eb; color: #2563eb; transform: translateY(-1px); }
 
-/* ── RING SCENE ── */
+/* ── RIGHT: PHOTO + DASHBOARD CARDS ── */
 .hero-right {
   flex: 1;
   display: flex;
@@ -295,53 +317,25 @@ onMounted(() => {
   justify-content: center;
   min-width: 0;
 }
-.ring-scene {
+.visual-scene {
   position: relative;
   width: 500px;
-  height: 480px;
+  max-width: 100%;
   flex-shrink: 0;
 }
-.ring-wrap {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 360px; height: 360px;
+.visual-photo {
+  width: 100%;
+  height: 420px;
+  object-fit: cover;
+  display: block;
+  border-radius: 18px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
 }
-.ring-wrap::after {
-  content: '';
-  position: absolute;
-  bottom: -40px; left: -40px;
-  width: 220px; height: 220px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(227, 38, 54, 0.22) 0%, rgba(227, 38, 54, 0) 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-.rings { position: absolute; border-radius: 50%; }
-.ring-1 { width: 360px; height: 360px; top: 0;    left: 0;    transform-origin: 180px 180px; border: 1px solid rgba(37, 99, 235, 0.09); }
-.ring-2 { width: 270px; height: 270px; top: 45px; left: 45px; transform-origin: 135px 135px; border: 1.5px solid rgba(37, 99, 235, 0.20); }
-.ring-3 { width: 170px; height: 170px; top: 95px; left: 95px; border: 2px solid rgba(37, 99, 235, 0.30); background: radial-gradient(circle, rgba(200,210,255,0.15) 0%, rgba(255,200,210,0.15) 100%); }
-
-.heart-center {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 88px; height: 88px; border-radius: 50%;
-  background: linear-gradient(135deg, #e32636 0%, #c0392b 100%);
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 6px 28px rgba(227, 38, 54, 0.35);
-  z-index: 2;
-}
-
-.dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; }
-.dot-blue  { background: #2563eb; }
-.dot-red   { background: #e32636; }
-.dot-green { background: #22c55e; }
 
 /* ── FLOATING CARDS ── */
 .fcard {
   position: absolute;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 10px 14px;
@@ -349,19 +343,20 @@ onMounted(() => {
   min-width: 130px;
   transition: box-shadow 0.2s;
   box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+  animation: cardFloat 4.5s ease-in-out infinite;
 }
-.fcard:hover { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12); }
-
-/* Row layout for cards with icon */
-.fcard-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.fcard:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  animation-play-state: paused;
+  transform: translateY(-4px);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
-/* Icon badge */
+.fcard-row { display: flex; align-items: center; gap: 10px; }
+
+/* Icon badge — enlarged so icons read clearly inside the chip */
 .fcard-icon-wrap {
-  width: 32px; height: 32px; border-radius: 8px;
+  width: 40px; height: 40px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
@@ -390,43 +385,92 @@ onMounted(() => {
   background: #22c55e; flex-shrink: 0;
 }
 
-/* Real-time Alerts */
-.fcard-alert {
-  top: 50px;
-  left: 5%;
-  transform: translateX(-20%);
-  background: #e32636;
-  border-color: transparent;
-  color: #fff;
-  font-size: 12px; font-weight: 600;
-  padding: 8px 16px;
-  min-width: unset;
-  white-space: nowrap;
-  display: flex; align-items: center; gap: 7px;
-  border-radius: 20px;
-  box-shadow: 0 4px 14px rgba(227,38,54,0.35);
+/* Blood Available — top right, over the photo */
+.fcard-blood {
+  top: 10px; right: -30px; min-width: 165px;
+  animation-duration: 4.6s;
+  animation-delay: 0s;
 }
 
-/* Blood Available */
-.fcard-blood { top: 70px; right: -50px; min-width: 160px; }
-
 /* Request Fulfilled */
-.fcard-fulfilled { top: 50%; left: -80px; transform: translateY(-50%); min-width: 160px; }
+.fcard-fulfilled {
+  top: 150px; left: -90px; min-width: 165px;
+  animation-duration: 5.2s;
+  animation-delay: 0.6s;
+}
+.fcard-fulfilled-body { min-width: 0; }
+.progress-track { height: 4px; border-radius: 2px; background: #e5e7eb; margin-top: 7px; overflow: hidden; }
+.progress-fill { width: 98.5%; height: 100%; background: #22c55e; border-radius: 2px; }
 
 /* Active Donors */
-.fcard-donors { bottom: 10px; left: 110px; min-width: 150px; }
+.fcard-donors {
+  bottom: -32px; left: 30px; min-width: 170px;
+  animation-duration: 4.2s;
+  animation-delay: 1.1s;
+}
+.avatar-stack { display: flex; align-items: center; margin-top: 8px; }
+.avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid #fff;
+  margin-left: -8px;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: #e5e7eb; /* shows while the photo loads */
+  display: block;
+}
+.avatar:first-child { margin-left: 0; }
+.avatar-more {
+  background: #2563eb; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
 
-/* ── STATS BAR ── */
+/* Real-time AlertS */
+.fcard-alert {
+  bottom: 20px;
+  right: -40px;
+  min-width: 200px;
+  background: #10192F;
+  border-color: transparent;
+  color: #fff;
+  padding: 14px 16px;
+  animation-duration: 5.6s;
+  animation-delay: 0.3s;
+}
+.fcard-alert-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  margin-bottom: 10px;
+}
+.alert-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.alert-list li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.alert-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.alert-dot-red  { background: #f87171; }
+.alert-dot-gold { background: #f4c430; }
+.alert-dot-blue { background: #60a5fa; }
+.alert-text { color: #cbd5e1; flex: 1; }
+.alert-value { color: #e2e8f0; font-weight: 600; white-space: nowrap; }
+.alert-value-red { color: #f87171; }
 .stats-bar {
   position: relative; z-index: 2;
   display: flex; max-width: 1200px;
   margin: 0 auto; padding: 0 3rem 3rem;
+  gap: 2rem;
 }
-.stat { flex: 1; display: flex; flex-direction: column; padding-right: 2rem; }
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-right: 2rem;
+  min-width: 0;
+}
 .stat + .stat { padding-left: 2rem; border-left: 1px solid #e5e7eb; }
-.stat-icon  { color: #9ca3af; margin-bottom: 6px; }
+.stat-icon  { color: #9ca3af; flex-shrink: 0; display: flex; }
+.stat-text  { min-width: 0; }
 .stat-num   { font-size: 34px; font-weight: 800; color: #111; line-height: 1; }
-.stat-label { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+.stat-label { font-size: 13px; color: #9ca3af; margin-top: 4px; white-space: nowrap; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1150px) {
@@ -434,18 +478,53 @@ onMounted(() => {
   .hero-left { max-width: 100%; }
   .hero-title   { font-size: 38px; }
   .hero-right   { width: 100%; }
-  .ring-scene   { width: 340px; height: 340px; }
+  .visual-scene { width: 420px; margin: 0 auto; }
+  .visual-photo { height: 360px; }
   .stats-bar    { padding: 0 1.5rem 2rem; }
 }
+
+@media (max-width: 900px) {
+  .fcard-blood     { top: -12px; right: 0; }
+  .fcard-fulfilled { left: 0; top: 160px; }
+  .fcard-donors    { left: 16px; bottom: -24px; }
+  .fcard-alert     { right: 0; bottom: -16px; }
+}
+
 @media (max-width: 600px) {
   .hero-title { font-size: 30px; }
-  .ring-scene { width: 300px; height: 300px; }
-  .stats-bar  { flex-direction: column; gap: 1.5rem; }
-  .stat + .stat { border-left: none; border-top: 1px solid #e5e7eb; padding-left: 0; padding-top: 1.5rem; }
+  .visual-scene { width: 320px; }
+  .visual-photo { height: 280px; border-radius: 16px; }
+
+  .fcard { padding: 8px 10px; min-width: 130px; }
+  .fcard-value { font-size: 14px; }
+  .fcard-icon-wrap { width: 32px; height: 32px; }
+  .fcard-blood,
+  .fcard-fulfilled,
+  .fcard-donors,
+  .fcard-alert {
+    position: static;
+    margin: 12px auto 0;
+    width: 100%;
+    max-width: 320px;
+    min-width: 0;
+  }
+
+  .stats-bar {
+    padding: 0 1.25rem 2rem;
+    gap: 0.75rem;
+  }
+  .stat {
+    padding-right: 0.75rem;
+    gap: 8px;
+  }
+  .stat + .stat { padding-left: 0.75rem; }
+  .stat-num   { font-size: 19px; }
+  .stat-label { font-size: 10px; white-space: normal; line-height: 1.25; }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .float-anim, .spin-cw, .spin-ccw, .pulse-heart, .orbit-dot, .live-dot { animation: none; }
+  .live-dot { animation: none; }
   .hero-left, .hero-right, .stats-bar { opacity: 1; animation: none; }
-  .accent::after { animation: none; }
+  .fcard { animation: none; }
 }
 </style>
