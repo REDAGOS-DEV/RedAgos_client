@@ -9,26 +9,14 @@
       </div>
 
       <div class="header-actions">
-        <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
-
-        <!-- Dark Mode Toggle Button -->
-        <button type="button" class="theme-toggle-btn" @click="toggleDarkMode" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-          <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="16" />
-        </button>
-
         <button type="button" class="primary-btn" @click="openCreate">
           <AssetIcon name="plus" :size="16" />
           Create Facility
         </button>
 
-        <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+        <button type="button" class="ghost-btn" :disabled="busy" @click="load">
           <AssetIcon name="refresh-cw" :size="16" />
-          {{ loading ? 'Loading…' : 'Refresh' }}
-        </button>
-
-        <button type="button" class="ghost-btn" :disabled="loggingOut" @click="handleLogout">
-          <AssetIcon name="log-out" :size="16" />
-          {{ loggingOut ? 'Logging out…' : 'Log Out' }}
+          {{ busy ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
@@ -75,9 +63,16 @@
         </thead>
 
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="state">Loading facilities…</td>
-          </tr>
+          <!-- Skeleton rows rather than a "Loading…" line: the table keeps its
+               shape, so the page does not collapse to a single row and jump
+               back when the data lands. -->
+          <template v-if="loading">
+            <tr v-for="n in 5" :key="`sk-${n}`" class="skeleton-row">
+              <td v-for="(width, c) in SKELETON_WIDTHS" :key="c">
+                <span class="skeleton" :style="{ width }" />
+              </td>
+            </tr>
+          </template>
 
           <tr v-else-if="loadError">
             <td colspan="6" class="state state-error">{{ loadError }}</td>
@@ -399,18 +394,20 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
+  layout: 'admindashboard',
+  keepalive: true,
 })
 
 useHead({ title: 'Facility Management · RedAgos' })
 
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser } = useUser()
 
 // --- Dark mode awareness (following blood center sidebar pattern) ---
 const isDark = ref(false)
@@ -428,21 +425,12 @@ onUnmounted(() => {
   themeObserver?.disconnect()
 })
 
-const toggleDarkMode = () => {
-  if (isDark.value) {
-    document.documentElement.classList.remove('dark')
-  } else {
-    document.documentElement.classList.add('dark')
-  }
-  isDark.value = !isDark.value
-}
 
 // --- Color tokens for light/dark mode ---
-const BG_PRIMARY = computed(() => (isDark.value ? '#0F172A' : '#f7f9fc'))
 const BG_SECONDARY = computed(() => (isDark.value ? '#1E293B' : '#ffffff'))
 const BG_TERTIARY = computed(() => (isDark.value ? '#334155' : '#f4f6f9'))
 
-const TEXT_PRIMARY = computed(() => (isDark.value ? '#F1F5F9' : '#1e293b'))
+const TEXT_PRIMARY = computed(() => (isDark.value ? '#F1F5F9' : '#1f2937'))
 const TEXT_SECONDARY = computed(() => (isDark.value ? '#CBD5E1' : '#64748b'))
 const TEXT_MUTED = computed(() => (isDark.value ? '#94A3B8' : '#94a3b8'))
 
@@ -479,7 +467,6 @@ const STATUS_LABELS = {
   rejected: 'Rejected',
 }
 
-const loggingOut = ref(false)
 
 const activeType = ref('')
 const activeStatus = ref('')
@@ -489,6 +476,14 @@ const lastPage = ref(1)
 const total = ref(null)
 
 const loading = ref(true)
+/* Uneven widths so the placeholder reads as text, not as a progress bar. */
+const SKELETON_WIDTHS = ['70%', '45%', '60%', '75%', '50%', '40%']
+
+// Background refresh over content already on screen; see load({ silent }).
+const refreshing = ref(false)
+const loaded = ref(false)
+// Either kind of in-flight load, for the Refresh control.
+const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const busyId = ref(null)
 const banner = ref('')
@@ -739,10 +734,6 @@ function showBanner(message, kind) {
   bannerKind.value = kind
 }
 
-async function handleLogout() {
-  loggingOut.value = true
-  await logout('/auth/admin/login')
-}
 
 function changeType(type) {
   if (activeType.value === type) return
@@ -758,10 +749,20 @@ function goToPage(next) {
 
 let latestRequest = 0
 
-async function load() {
+/*
+ * `silent` keeps the cached page on screen while it refreshes.
+ *
+ * Without it the return trip flips `loading` on, the template swaps to
+ * skeletons, and the keepalive cache buys nothing visible — the page still
+ * appears to reload every time. A first visit and a filter change do want the
+ * loading state; a background refresh over content already on screen does not.
+ */
+async function load({ silent = false } = {}) {
   const requestId = ++latestRequest
 
-  loading.value = true
+  if (silent) refreshing.value = true
+  else loading.value = true
+
   loadError.value = ''
 
   try {
@@ -784,6 +785,8 @@ async function load() {
   } finally {
     if (requestId === latestRequest) {
       loading.value = false
+      refreshing.value = false
+      loaded.value = true
     }
   }
 }
@@ -797,24 +800,42 @@ watch([activeType, activeStatus, page], (next, previous) => {
   load()
 })
 
-onMounted(async () => {
+/*
+ * onActivated, not onMounted: this page is keepalive'd, so the instance is
+ * cached rather than destroyed when you navigate away and onMounted would run
+ * exactly once per session. onActivated fires on the first mount *and* on every
+ * return, which is what keeps a queue two admins are both working from going
+ * stale behind the cached markup.
+ */
+/*
+ * Two hooks on purpose.
+ *
+ * onMounted always fires and owns the first load, so the page can never sit on
+ * its initial `loading = true` if KeepAlive is not in play for any reason.
+ * onActivated fires only on a *return* to the cached instance — guarded on
+ * `loaded` so the first mount, where Vue fires both, does not fetch twice.
+ */
+async function boot() {
   if (!user.value) {
     await fetchUser()
   }
 
-  await load()
+  await load({ silent: loaded.value })
+}
+
+onMounted(boot)
+onActivated(() => {
+  if (loaded.value) boot()
 })
 </script>
 
 <style scoped>
 .admin-page {
-  min-height: 100vh;
-  padding: 32px 24px 48px;
+  padding: 24px 32px 40px;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .admin-page {
-  background: v-bind('BG_PRIMARY');
   color: v-bind('TEXT_PRIMARY');
 }
 
@@ -907,32 +928,6 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-.signed-in-as {
-  font-size: 13px;
-  color: v-bind('TEXT_SECONDARY');
-  white-space: nowrap;
-}
-
-.theme-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid v-bind('BORDER_COLOR');
-  border-radius: 8px;
-  background: v-bind('BG_SECONDARY');
-  color: v-bind('TEXT_SECONDARY');
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.theme-toggle-btn:hover {
-  border-color: v-bind('ACCENT_PRIMARY');
-  color: v-bind('ACCENT_PRIMARY');
-}
 
 .banner {
   max-width: 1180px;
@@ -1381,5 +1376,32 @@ onMounted(async () => {
   .header-actions {
     width: 100%;
   }
+}
+/* Shimmer placeholder, same treatment as the dashboard and administrators
+   pages so a loading table looks like the rest of the console. */
+.skeleton-row td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+.admin-page.dark .skeleton {
+  background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
 }
 </style>

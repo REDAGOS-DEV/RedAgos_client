@@ -9,21 +9,9 @@
       </div>
 
       <div class="header-actions">
-        <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
-
-        <NuxtLink to="/admin/facilities" class="ghost-btn">
-          <AssetIcon name="building-2" :size="16" />
-          Facility Management
-        </NuxtLink>
-
-        <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+        <button type="button" class="ghost-btn" :disabled="busy" @click="load">
           <AssetIcon name="refresh-cw" :size="16" />
-          {{ loading ? 'Loading…' : 'Refresh' }}
-        </button>
-
-        <button type="button" class="ghost-btn" :disabled="loggingOut" @click="handleLogout">
-          <AssetIcon name="log-out" :size="16" />
-          {{ loggingOut ? 'Logging out…' : 'Log Out' }}
+          {{ busy ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
@@ -58,9 +46,16 @@
         </thead>
 
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="state">Loading submissions…</td>
-          </tr>
+          <!-- Skeleton rows rather than a "Loading…" line: the table keeps its
+               shape, so the page does not collapse to a single row and jump
+               back when the data lands. -->
+          <template v-if="loading">
+            <tr v-for="n in 5" :key="`sk-${n}`" class="skeleton-row">
+              <td v-for="(width, c) in SKELETON_WIDTHS" :key="c">
+                <span class="skeleton" :style="{ width }" />
+              </td>
+            </tr>
+          </template>
 
           <tr v-else-if="loadError">
             <td colspan="6" class="state state-error">{{ loadError }}</td>
@@ -166,18 +161,20 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorIdentityService } from '~/api/admin/DonorIdentityService'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
+  layout: 'admindashboard',
+  keepalive: true,
 })
 
 useHead({ title: 'Donor ID Verification · RedAgos' })
 
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser } = useUser()
 
 const TABS = [
   { value: 'pending', label: 'Awaiting Review' },
@@ -192,7 +189,6 @@ const STATUS_LABELS = {
   rejected: 'Not approved',
 }
 
-const loggingOut = ref(false)
 
 const activeStatus = ref('pending')
 const rows = ref([])
@@ -201,6 +197,14 @@ const lastPage = ref(1)
 const total = ref(null)
 
 const loading = ref(true)
+/* Uneven widths so the placeholder reads as text, not as a progress bar. */
+const SKELETON_WIDTHS = ['70%', '45%', '60%', '75%', '50%', '40%']
+
+// Background refresh over content already on screen; see load({ silent }).
+const refreshing = ref(false)
+const loaded = ref(false)
+// Either kind of in-flight load, for the Refresh control.
+const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const banner = ref('')
 const bannerKind = ref('info')
@@ -345,10 +349,6 @@ function showBanner(message, kind) {
   bannerKind.value = kind
 }
 
-async function handleLogout() {
-  loggingOut.value = true
-  await logout('/auth/admin/login')
-}
 
 function changeStatus(status) {
   if (activeStatus.value === status) return
@@ -367,10 +367,20 @@ function goToPage(next) {
 // tugotan nga mosulat sa state.
 let latestRequest = 0
 
-async function load() {
+/*
+ * `silent` keeps the cached page on screen while it refreshes.
+ *
+ * Without it the return trip flips `loading` on, the template swaps to
+ * skeletons, and the keepalive cache buys nothing visible — the page still
+ * appears to reload every time. A first visit and a filter change do want the
+ * loading state; a background refresh over content already on screen does not.
+ */
+async function load({ silent = false } = {}) {
   const requestId = ++latestRequest
 
-  loading.value = true
+  if (silent) refreshing.value = true
+  else loading.value = true
+
   loadError.value = ''
 
   try {
@@ -392,13 +402,30 @@ async function load() {
   } finally {
     if (requestId === latestRequest) {
       loading.value = false
+      refreshing.value = false
+      loaded.value = true
     }
   }
 }
 
-watch([activeStatus, page], load)
+watch([activeStatus, page], () => load())
 
-onMounted(async () => {
+/*
+ * onActivated, not onMounted: this page is keepalive'd, so the instance is
+ * cached rather than destroyed when you navigate away and onMounted would run
+ * exactly once per session. onActivated fires on the first mount *and* on every
+ * return, which is what keeps a queue two admins are both working from going
+ * stale behind the cached markup.
+ */
+/*
+ * Two hooks on purpose.
+ *
+ * onMounted always fires and owns the first load, so the page can never sit on
+ * its initial `loading = true` if KeepAlive is not in play for any reason.
+ * onActivated fires only on a *return* to the cached instance — guarded on
+ * `loaded` so the first mount, where Vue fires both, does not fetch twice.
+ */
+async function boot() {
   // Tan-awa ang facilities.vue: ang role check kay sa `portal` global
   // middleware na, sa dili pa mo-render. Ang `role:admin` sa server gihapon ang
   // tinuod nga gate.
@@ -406,7 +433,12 @@ onMounted(async () => {
     await fetchUser()
   }
 
-  await load()
+  await load({ silent: loaded.value })
+}
+
+onMounted(boot)
+onActivated(() => {
+  if (loaded.value) boot()
 })
 
 onUnmounted(releasePhoto)
@@ -414,8 +446,8 @@ onUnmounted(releasePhoto)
 
 <style scoped>
 .admin-page {
-  padding: 32px 40px 48px;
-  max-width: 1200px;
+  padding: 24px 32px 40px;
+  max-width: 1280px;
   margin: 0 auto;
   color: #0f172a;
 }
@@ -448,10 +480,6 @@ onUnmounted(releasePhoto)
   flex-wrap: wrap;
 }
 
-.signed-in-as {
-  font-size: 13px;
-  color: #64748b;
-}
 
 .ghost-btn {
   display: inline-flex;
@@ -833,5 +861,123 @@ onUnmounted(releasePhoto)
 .danger-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+/*
+ * Dark mode.
+ *
+ * This page had none: the shell paints a dark page background while every rule
+ * above is a hardcoded light value, so the table rendered as a white card of
+ * near-black text on a near-black page. Written as additive overrides rather
+ * than by converting the rules above to custom properties, so the light theme
+ * stays byte-for-byte what it was.
+ *
+ * Values match the other admin pages: #1E293B surfaces, #334155 borders,
+ * #F1F5F9 primary text, #94A3B8 secondary, and #64B5F6 as the primary accent
+ * (#1565C0 does not carry enough contrast on a dark ground).
+ */
+:global(.dark .admin-page) { color: #f1f5f9; }
+
+:global(.dark .subtitle),
+:global(.dark .tab),
+:global(.dark .submissions th),
+:global(.dark .page-label),
+:global(.dark .modal-lede),
+:global(.dark .donor-meta),
+:global(.dark .state),
+:global(.dark .photo-state),
+:global(.dark .review-facts dt) { color: #94a3b8; }
+
+:global(.dark .ghost-btn) {
+  border-color: #334155;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+:global(.dark .ghost-btn:hover:not(:disabled)) { background: #263449; }
+
+:global(.dark .tabs) { border-bottom-color: #334155; }
+
+:global(.dark .tab.active) {
+  color: #64b5f6;
+  border-bottom-color: #64b5f6;
+}
+
+:global(.dark .tab-count) {
+  background: rgba(66, 165, 245, 0.16);
+  color: #64b5f6;
+}
+
+:global(.dark .banner-success) { background: rgba(76, 175, 80, 0.14); color: #81c784; }
+:global(.dark .banner-error) { background: rgba(239, 83, 80, 0.14); color: #ef9a9a; }
+:global(.dark .banner-info) { background: rgba(66, 165, 245, 0.14); color: #64b5f6; }
+
+:global(.dark .table-wrap) {
+  border-color: #334155;
+  background: #1e293b;
+}
+
+:global(.dark .submissions td) { border-bottom-color: #334155; }
+:global(.dark .submissions th) { background: #182234; }
+:global(.dark .submissions tbody tr:hover) { background: #263449; }
+
+:global(.dark .status-pending) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .status-verified) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+:global(.dark .status-rejected) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
+:global(.dark .status-unsubmitted) { background: #334155; color: #94a3b8; }
+
+:global(.dark .link-btn) { color: #64b5f6; }
+
+:global(.dark .state-error),
+:global(.dark .photo-state--error),
+:global(.dark .modal-error) { color: #ef9a9a; }
+
+:global(.dark .modal) {
+  background: #1e293b;
+  border: 1px solid #334155;
+}
+
+:global(.dark .review-photo) {
+  border-color: #334155;
+  background: #182234;
+}
+
+:global(.dark .review-facts dd) { color: #f1f5f9; }
+:global(.dark .reason-label) { color: #cbd5e1; }
+
+:global(.dark .reason-input) {
+  border-color: #334155;
+  background: #182234;
+  color: #f1f5f9;
+}
+
+:global(.dark .reason-input:focus) { border-color: #64b5f6; }
+:global(.dark .reason-input::placeholder) { color: #64748b; }
+
+:global(.dark .skeleton) {
+  background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
+}
+/* Shimmer placeholder, same treatment as the dashboard and administrators
+   pages so a loading table looks like the rest of the console. */
+.skeleton-row td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 </style>
