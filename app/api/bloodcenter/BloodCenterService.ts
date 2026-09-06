@@ -16,20 +16,13 @@ class BloodCenterService extends BaseService {
     return BloodCenterService.instance
   }
 
-  async register(payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/register`, 'POST', payload)
-  }
+  // Walay register(), registrationStatus() ug resubmitRegistration() dinhi.
+  // Gitangtang na sa server ang tulo ka endpoint: ang Super Admin ra ang
+  // mohimo og facility pinaagi sa POST /admin/facilities, so wala nay
+  // registration nga i-submit o i-follow-up.
 
   async referenceData(): Promise<any> {
     return this.request(`${this.resource}/reference-data`, 'GET')
-  }
-
-  async registrationStatus(): Promise<any> {
-    return this.request(`${this.resource}/registration-status`, 'GET')
-  }
-
-  async resubmitRegistration(payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/registration/resubmit`, 'POST', payload)
   }
 
   async dashboard(): Promise<any> {

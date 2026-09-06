@@ -39,9 +39,10 @@ export default defineNuxtConfig({
       apiBaseURL: process.env.API_BASE_URL || '',
 
       // Ang hospital / blood-bank portal kay naka-off hangtod naa nay backend.
-      // Walay `/hospital/*` nga route ang Laravel karon ug walay registration
-      // endpoint para sa blood bank, so ang mga page mo-render og shell unya
-      // mo-404 ang tanan nga call. I-on ra ni kung human na ang Phase P.
+      // Naa nay tinuod nga blood-bank account karon — ang Super Admin ang
+      // mohimo niini sa Facility Management — apan walay `/hospital/*` nga
+      // route ang Laravel, so ang mga page mo-render og shell unya mo-404 ang
+      // tanan nga call. I-on ra ni kung human na ang Phase P.
       // Set NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED=true para i-abli.
       hospitalPortalEnabled: process.env.HOSPITAL_PORTAL_ENABLED === 'true',
 

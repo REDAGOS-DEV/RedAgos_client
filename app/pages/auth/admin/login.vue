@@ -22,7 +22,7 @@
           <h1>Administrator Sign In</h1>
 
           <p class="form-subtitle">
-            Review facility registrations and manage the system
+            Manage facilities, users, and the rest of the system
           </p>
 
           <form

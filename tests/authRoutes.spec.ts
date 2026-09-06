@@ -29,7 +29,7 @@ describe('loginRouteFor', () => {
     ['/donor/appointments?tab=past', '/auth/donor/login'],
     ['/blood-center/inventory', '/auth/blood-center/login'],
     ['/hospital/dashboard', '/auth/hospital/login'],
-    ['/admin/registrations', '/auth/admin/login'],
+    ['/admin/facilities', '/auth/admin/login'],
   ])('sends %s to %s', (path, expected) => {
     expect(loginRouteFor(path)).toBe(expected)
   })
@@ -56,7 +56,7 @@ describe('isAuthRoute', () => {
 
   it('is false for portal pages', () => {
     expect(isAuthRoute('/donor/dashboard')).toBe(false)
-    expect(isAuthRoute('/admin/registrations')).toBe(false)
+    expect(isAuthRoute('/admin/facilities')).toBe(false)
   })
 
   /**
@@ -77,7 +77,7 @@ describe('portalRoleFor', () => {
     ['/donor/dashboard', 'donor'],
     ['/hospital/dashboard', 'blood_bank'],
     ['/blood-center/inventory', 'blood_center'],
-    ['/admin/registrations', 'admin'],
+    ['/admin/facilities', 'admin'],
   ])('%s requires %s', (path, role) => {
     expect(portalRoleFor(path)).toBe(role)
   })
@@ -101,7 +101,7 @@ describe('portalRoleFor', () => {
 
 describe('portalHomeFor', () => {
   it('sends each role to its own portal', () => {
-    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/registrations')
+    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/facilities')
     expect(portalHomeFor({ roles: ['donor'] } as any)).toBe('/donor/dashboard')
     expect(portalHomeFor({ roles: ['blood_bank'] } as any)).toBe('/hospital/dashboard')
   })

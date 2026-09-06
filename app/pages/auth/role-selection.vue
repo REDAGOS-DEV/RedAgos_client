@@ -25,6 +25,13 @@
             Select your role to get started with RedAgos
           </p>
 
+          <!-- Blood centers and hospital blood banks are absent on purpose: a
+               RedAgos administrator creates those accounts. -->
+          <p class="facility-note">
+            Blood center and hospital blood bank accounts are created by a
+            RedAgos administrator. Contact them to have yours set up.
+          </p>
+
           <div class="role-selection-form">
             <div class="roles-container">
               <label
@@ -33,7 +40,6 @@
                 class="role-card"
                 :class="{
                   selected: selectedRole === role.id,
-                  'role-card--disabled': !role.available,
                   [role.colorClass]: true,
                 }"
                 @click="selectRole(role.id)"
@@ -41,28 +47,7 @@
                 <div class="role-card-content">
                   <div class="role-icon" :class="role.iconClass">
                     <svg
-                      v-if="role.id === 'hospital'"
-                      aria-hidden="true"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 21h16M6 21V7l6-3 6 3v14M9 11h2M13 11h2M9 15h2M13 15h2" />
-                    </svg>
-                    <svg
-                      v-else-if="role.id === 'blood-center'"
-                      aria-hidden="true"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 3s6 6.1 6 10a6 6 0 1 1-12 0c0-3.9 6-10 6-10z" />
-                      <path stroke-linecap="round" d="M9.5 14.5a2.5 2.5 0 0 0 5 0" />
-                    </svg>
-                    <svg
-                      v-else-if="role.id === 'donor'"
+                      v-if="role.id === 'donor'"
                       aria-hidden="true"
                       fill="currentColor"
                       viewBox="0 0 24 24"
@@ -83,10 +68,9 @@
                   <div class="role-info">
                     <div class="role-name">
                       {{ role.name }}
-                      <span v-if="!role.available" class="role-badge">Coming soon</span>
                     </div>
                     <div class="role-desc">
-                      {{ role.available ? role.description : role.unavailableNote }}
+                      {{ role.description }}
                     </div>
                   </div>
                 </div>
@@ -96,7 +80,6 @@
                   name="role"
                   :value="role.id"
                   :checked="selectedRole === role.id"
-                  :disabled="!role.available"
                   class="role-radio"
                   @change="selectRole(role.id)"
                 />
@@ -130,6 +113,7 @@ import { ref } from 'vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AuthBrandPanel from '~/components/auth/AuthBrandPanel.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { PUBLIC_ROLES, destinationFor } from '~/utils/publicRoles'
 
 definePageMeta({
   alias: ['/home'],
@@ -137,68 +121,20 @@ definePageMeta({
 
 const selectedRole = ref('')
 
-// Ang hospital / blood-bank portal kay walay backend pa: walay `/hospital/*`
-// nga route ug walay registration endpoint. Gipakita gihapon nato siya —
-// disabled ug tinuod ang label — imbes tagoan, aron nahibalo ang hospital nga
-// naa sila sa plano. I-abli ni sa NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED.
-const { hospitalPortalEnabled } = useRuntimeConfig().public
-
-const roles = [
-  {
-    id: 'hospital',
-    name: 'Hospital Blood Bank',
-    description: 'Request and manage blood supply for your hospital',
-    unavailableNote: 'Not accepting registrations yet — this portal is still being built.',
-    available: Boolean(hospitalPortalEnabled),
-    colorClass: 'role-hospital',
-    iconClass: 'icon-hospital',
-  },
-  {
-    id: 'blood-center',
-    name: 'Blood Center',
-    description: 'Process requests, manage donors, and inventory.',
-    available: true,
-    colorClass: 'role-blood-center',
-    iconClass: 'icon-blood-center',
-  },
-  {
-    id: 'donor',
-    name: 'Donor',
-    description: 'Register to donate blood and book appointments.',
-    available: true,
-    colorClass: 'role-donor',
-    iconClass: 'icon-donor',
-  },
-  {
-    id: 'admin',
-    name: 'Administrator',
-    description: 'Manage the system, users, and overall operations.',
-    available: true,
-    colorClass: 'role-admin',
-    iconClass: 'icon-admin',
-  },
-]
+// Duha na lang ka kapilian ang nahibilin. Gitangtang ang Blood Center ug ang
+// Hospital Blood Bank: ang Super Admin ra ang mohimo niadto nga account pinaagi
+// sa Facility Management, ug wala nay public endpoint sa server nga mohimo og
+// facility. Kon ibalik ang card, motultol ra siya sa dead end.
+const roles = PUBLIC_ROLES
 
 const selectRole = (roleId) => {
-  // Ang disabled nga role dili mapili — walay agianan padulong sa portal nga
-  // wala pay backend.
-  if (!roles.find((role) => role.id === roleId)?.available) return
-
   selectedRole.value = roleId
 }
 
 const continueWithRole = async () => {
   if (!selectedRole.value) return
 
-  // Walay self-registration ang admin — ang mga admin account kay gihimo ra sa
-  // laing admin pinaagi sa POST /users. So diretso ta sa login page imbes sa
-  // register page nga wala nay sulod.
-  if (selectedRole.value === 'admin') {
-    await navigateTo('/auth/admin/login')
-    return
-  }
-
-  await navigateTo(`/register/${selectedRole.value}`)
+  await navigateTo(destinationFor(selectedRole.value))
 }
 </script>
 
@@ -306,6 +242,17 @@ h1 {
   line-height: 1.5;
 }
 
+.facility-note {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid #1e6fc8;
+  border-radius: 0 8px 8px 0;
+  background: #eef4fb;
+  color: #475569;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
 .role-selection-form {
   margin-top: 54px;
 }
@@ -333,15 +280,6 @@ h1 {
   border-color: #d1d5db;
   background: #F0F7FF;
 }
-.role-card[class*="role-hospital"]:hover{
-    border-color: #2563eb;
-    background: #F0F7FF;
-}
-.role-card[class*="role-blood-center"]:hover {
-  border-color: #42A5F5;
-  background: #F0F7FF;
-}
-
 .role-card[class*="role-donor"]:hover {
   border-color: #ef4444;
   background: #FEF2F2;
@@ -375,14 +313,6 @@ h1 {
   height: 24px;
 }
 
-.icon-hospital {
-  background: #2563eb;
-}
-
-.icon-blood-center {
-  background: #3b82f6;
-}
-
 .icon-donor {
   background: #ef4444;
 }
@@ -398,40 +328,11 @@ h1 {
 .role-name {
   display: flex;
   align-items: center;
-  gap: 8px;
   color: #1f2937;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 4px;
-}
-
-/* A role whose portal has no backend yet: visible, labelled, not selectable. */
-.role-card--disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  background: #f9fafb;
-}
-
-.role-card--disabled:hover {
-  border-color: #e5e7eb;
-  background: #f9fafb;
-}
-
-.role-card--disabled .role-radio {
-  cursor: not-allowed;
-}
-
-.role-badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  color: #4b5563;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .role-desc {
@@ -447,14 +348,6 @@ h1 {
   cursor: pointer;
 }
 
-.role-card.role-hospital .role-radio {
-  accent-color: #2563eb;
-}
-
-.role-card.role-blood-center .role-radio {
-  accent-color: #3b82f6;
-}
-
 .role-card.role-donor .role-radio {
   accent-color: #ef4444;
 }
@@ -466,13 +359,6 @@ h1 {
 /* Selected states with colors */
 .role-card.selected {
   border-width: 2px;
-}
-
-.role-card.selected.role-hospital
-
-.role-card.selected.role-blood-center {
-  border-color: #42A5F5;
-  background: rgba(37, 99, 235, 0.04);
 }
 
 .role-card.selected.role-donor {

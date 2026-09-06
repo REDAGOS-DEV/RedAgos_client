@@ -50,14 +50,12 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     title: 'Blood Center Sign In · RedAgos',
     forgotPasswordPath: '/auth/blood-center/forgot-password',
     requiresLicense: true,
-    resolveHome: async (response) => {
-      // A centre still awaiting approval, or rejected, holds no role yet — it
-      // can only see its own status page.
-      const status = response?.user?.facility?.status
-      if (status === 'pending_approval' || status === 'rejected') {
-        return '/auth/blood-center/registration-status'
-      }
-
+    resolveHome: async () => {
+      // No status branch here any more. A centre is created active by a Super
+      // Admin, and the handful of legacy accounts whose facility never was are
+      // refused at the API with `facility_not_activated` — they never reach
+      // this point, so there is no unapproved state to route around.
+      //
       // Landing page depends on the staffer's department, so the profile has
       // to be loaded before we know where to send them.
       const { ensureUser } = useUser()
@@ -77,7 +75,7 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     role: 'admin',
     title: 'Administrator Sign In · RedAgos',
     forgotPasswordPath: '/auth/admin/forgot-password',
-    resolveHome: () => '/admin/registrations',
+    resolveHome: () => '/admin/facilities',
   },
 }
 
