@@ -13,12 +13,14 @@
       </p>
 
       <p class="unavailable__body">
-        Donor and blood centre accounts are unaffected and available now.
+        Your account is real and signed in — a RedAgos administrator created it. It is
+        the request screens behind it that are not ready. Donor and blood centre
+        accounts are unaffected and available now.
       </p>
 
       <div class="unavailable__actions">
-        <NuxtLink to="/auth/role-selection" class="unavailable__btn unavailable__btn--primary">
-          Choose a different account type
+        <NuxtLink to="/auth/hospital/login" class="unavailable__btn unavailable__btn--primary">
+          Back to sign in
         </NuxtLink>
         <NuxtLink to="/" class="unavailable__btn">
           Back to home

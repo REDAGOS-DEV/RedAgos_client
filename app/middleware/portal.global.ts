@@ -2,7 +2,7 @@
  * Keep a signed-in user inside the portal their role belongs to.
  *
  * Before this, `auth` only checked that *a* token existed, so any authenticated
- * user could open `/admin/registrations` or `/blood-center/inventory` and get
+ * user could open `/admin/facilities` or `/blood-center/inventory` and get
  * the full shell — which then 403'd every request it made. A donor could read
  * the admin page's chrome, headings and empty tables.
  *

@@ -129,11 +129,11 @@
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
+            <!-- No self-registration link: facility accounts are created by
+                 a RedAgos administrator, so there is nothing to sign up for
+                 here. -->
             <p class="signup-text">
-              Need an account?
-              <NuxtLink to="/auth/hospital/register">
-                Register Now
-              </NuxtLink>
+              Need an account? Contact your RedAgos administrator.
             </p>
 
             <div class="divider">

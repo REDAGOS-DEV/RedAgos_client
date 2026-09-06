@@ -11,9 +11,9 @@
       <div class="header-actions">
         <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
 
-        <NuxtLink to="/admin/registrations" class="ghost-btn">
+        <NuxtLink to="/admin/facilities" class="ghost-btn">
           <AssetIcon name="building-2" :size="16" />
-          Facility Registrations
+          Facility Management
         </NuxtLink>
 
         <button type="button" class="ghost-btn" :disabled="loading" @click="load">
@@ -362,7 +362,7 @@ function goToPage(next) {
   page.value = next
 }
 
-// Parehas sa registrations page: kung mag-ilis-ilis og tab, posible nga ang
+// Parehas sa facilities page: kung mag-ilis-ilis og tab, posible nga ang
 // daan nga response mo-abot human sa bag-o. Ang katapusang request ra ang
 // tugotan nga mosulat sa state.
 let latestRequest = 0
@@ -399,7 +399,7 @@ async function load() {
 watch([activeStatus, page], load)
 
 onMounted(async () => {
-  // Tan-awa ang registrations.vue: ang role check kay sa `portal` global
+  // Tan-awa ang facilities.vue: ang role check kay sa `portal` global
   // middleware na, sa dili pa mo-render. Ang `role:admin` sa server gihapon ang
   // tinuod nga gate.
   if (!user.value) {

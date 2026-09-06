@@ -22,7 +22,12 @@ export interface Facility {
   id: number
   facility_name: string
   address: string | null
-  /** e.g. `pending_approval`, `approved`, `suspended`, `rejected`. */
+  /**
+   * One of `approved`, `pending_approval` or `rejected`. There is no suspended
+   * state: a facility is created active by a Super Admin and stays that way,
+   * and the other two only occur on records left by the removed public
+   * registration flow.
+   */
   status: string | null
 }
 

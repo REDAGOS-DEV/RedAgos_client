@@ -72,7 +72,7 @@ export function portalRoleFor(path: string): RoleName | null {
 export function portalHomeFor(user: Pick<AppUser, 'roles'> | null | undefined): string {
   const roles = user?.roles ?? []
 
-  if (roles.includes('admin')) return '/admin/registrations'
+  if (roles.includes('admin')) return '/admin/facilities'
   if (roles.includes('donor')) return '/donor/dashboard'
   if (roles.includes('blood_center')) return departmentHome(user)
   // The hospital portal is closed until it has a backend; `hospital-portal`
