@@ -953,9 +953,6 @@ onUnmounted(releasePhoto)
 :global(.dark .reason-input:focus) { border-color: #64b5f6; }
 :global(.dark .reason-input::placeholder) { color: #64748b; }
 
-:global(.dark .skeleton) {
-  background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
-}
 /* Shimmer placeholder, same treatment as the dashboard and administrators
    pages so a loading table looks like the rest of the console. */
 .skeleton-row td {
@@ -979,5 +976,8 @@ onUnmounted(releasePhoto)
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
+}
+:global(.dark .skeleton) {
+  background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
 }
 </style>
