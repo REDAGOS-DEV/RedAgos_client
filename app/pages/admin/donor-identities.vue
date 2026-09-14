@@ -100,43 +100,77 @@
 
     <!-- Review drawer -->
     <div v-if="review.open" class="modal-backdrop" @click.self="closeReview">
-      <div class="modal modal-wide">
-        <h2 class="modal-title">{{ review.row?.full_name }}</h2>
-        <p class="modal-lede">
-          Check the photo against the details below, then verify or reject.
-        </p>
+      <div class="modal modal-review">
+        <div class="modal-head">
+          <h2 class="modal-title">{{ review.row?.full_name }}</h2>
+          <p class="modal-lede">
+            Check the photo against the details below, then verify or reject.
+          </p>
+        </div>
 
-        <div class="review-body">
-          <div class="review-photo">
-            <p v-if="loadingImage" class="photo-state">Loading photo…</p>
-            <p v-else-if="!imageUrl" class="photo-state photo-state--error">
-              {{ photoError || 'No photo on file.' }}
-            </p>
-            <img v-else :src="imageUrl" alt="Submitted ID" class="photo">
+        <!--
+          Only the middle scrolls. At 90vh the decision buttons would otherwise
+          sit below the fold behind a tall ID, and a reviewer who has to scroll
+          to find Reject is a reviewer who stops reading the photo first.
+        -->
+        <div class="modal-scroll">
+          <div class="review-body">
+            <section class="review-photo-pane">
+              <header class="photo-bar">
+                <span class="photo-bar__label">Submitted ID</span>
+
+                <div v-if="imageUrl" class="photo-modes" role="group" aria-label="Photo size">
+                  <button
+                    v-for="mode in PHOTO_MODES"
+                    :key="mode.value"
+                    type="button"
+                    class="photo-mode"
+                    :class="{ active: photoMode === mode.value }"
+                    :aria-pressed="photoMode === mode.value"
+                    @click="photoMode = mode.value"
+                  >
+                    {{ mode.label }}
+                  </button>
+                </div>
+              </header>
+
+              <div class="review-photo" :class="`review-photo--${photoMode}`">
+                <p v-if="loadingImage" class="photo-state">Loading photo…</p>
+                <p v-else-if="!imageUrl" class="photo-state photo-state--error">
+                  {{ photoError || 'No photo on file.' }}
+                </p>
+                <img v-else :src="imageUrl" alt="Submitted ID" class="photo">
+              </div>
+
+              <p v-if="imageUrl && isTwoSided" class="photo-note">
+                This ID has two sides. A camera capture stores them as one image, front above
+                back — switch to Full width and scroll to read each side at full size.
+              </p>
+            </section>
+
+            <dl class="review-facts">
+              <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
+              <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
+              <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
+              <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
+              <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
+              <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
+            </dl>
           </div>
 
-          <dl class="review-facts">
-            <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
-            <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
-            <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
-            <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
-            <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
-            <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
-          </dl>
-        </div>
+          <div v-if="review.rejecting" class="reason-block">
+            <label class="reason-label" for="reason">Reason</label>
+            <textarea
+              id="reason"
+              v-model="review.reason"
+              class="reason-input"
+              rows="3"
+              placeholder="Tell the donor what to fix, e.g. the photo is too blurry to read."
+            />
+          </div>
 
-        <div v-if="review.rejecting" class="reason-block">
-          <label class="reason-label" for="reason">Reason</label>
-          <textarea
-            id="reason"
-            v-model="review.reason"
-            class="reason-input"
-            rows="3"
-            placeholder="Tell the donor what to fix, e.g. the photo is too blurry to read."
-          />
+          <p v-if="review.error" class="modal-error">{{ review.error }}</p>
         </div>
-
-        <p v-if="review.error" class="modal-error">{{ review.error }}</p>
 
         <div class="modal-actions">
           <button type="button" class="ghost-btn" :disabled="review.submitting" @click="closeReview">Cancel</button>
@@ -164,6 +198,7 @@
 import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorIdentityService } from '~/api/admin/DonorIdentityService'
+import { idSidesFor } from '~/composables/useIdentityDocument'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
@@ -209,12 +244,27 @@ const loadError = ref('')
 const banner = ref('')
 const bannerKind = ref('info')
 
-// Ang litrato kay authenticated ang route, so dili siya mahimong <img src>.
-// I-fetch nato dala ang token, unya object URL ang i-render.
+// Ang litrato kay authenticated ang route, so dili siya mahimong i-turo
+// direkta sa browser. I-fetch nato dala ang token, unya object URL ang i-render.
 const imageUrl = ref(null)
 const loadingImage = ref(false)
 const photoError = ref('')
 let objectUrl = null
+
+/**
+ * Fit shows the whole document at once; Full width trades the overview for
+ * legible print and scrolls.
+ *
+ * Both preserve the aspect ratio. A reviewer is doing two different jobs with
+ * the same image — "is this the right kind of card" and "does this number match
+ * the record" — and no single size serves both.
+ */
+const PHOTO_MODES = [
+  { value: 'fit', label: 'Fit' },
+  { value: 'wide', label: 'Full width' },
+]
+
+const photoMode = ref('fit')
 
 const review = reactive({
   open: false,
@@ -224,6 +274,10 @@ const review = reactive({
   error: '',
   submitting: false,
 })
+
+// The donor's own camera flow decides this from the same helper, so the note
+// the reviewer reads and the sides the donor was asked for cannot disagree.
+const isTwoSided = computed(() => idSidesFor(review.row?.valid_id_type).length > 1)
 
 function labelFor(status) {
   return STATUS_LABELS[status] ?? status
@@ -260,6 +314,10 @@ async function openReview(row) {
   })
 
   releasePhoto()
+
+  // Every review starts on the overview. Carrying the last donor's zoom over
+  // would open the next ID already scrolled to the middle of it.
+  photoMode.value = 'fit'
 
   if (!row.image_url) {
     photoError.value = 'No photo on file.'
@@ -701,10 +759,34 @@ onUnmounted(releasePhoto)
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
 }
 
-.modal-wide {
-  max-width: 720px;
+/*
+ * Wide because the job is reading a government ID, not skimming a dialog. At
+ * 720px the photo column came out around 360px across, which is smaller than
+ * the card in the reviewer's hand and the reason numbers were being squinted at.
+ *
+ * Three bands rather than one scrolling block: the name stays visible while
+ * scrolling a long document, and Cancel/Reject/Verify stay put.
+ */
+.modal-review {
+  max-width: 1060px;
   max-height: 90vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-head {
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-head .modal-lede { margin: 0; }
+
+.modal-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: 18px 24px;
 }
 
 .modal-title {
@@ -719,35 +801,96 @@ onUnmounted(releasePhoto)
   color: #64748b;
 }
 
+/* Roughly 57/43 — the photo takes the larger share, the facts stay wide enough
+   that an address does not wrap to five lines. */
 .review-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 57fr) minmax(0, 43fr);
+  gap: 22px;
   margin-bottom: 16px;
+  align-items: start;
 }
 
-@media (max-width: 720px) {
-  .review-body {
-    grid-template-columns: 1fr;
-  }
+.review-photo-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
+
+.photo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.photo-bar__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.photo-modes {
+  display: inline-flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-mode {
+  padding: 5px 11px;
+  border: none;
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.photo-mode + .photo-mode { border-left: 1px solid #e2e8f0; }
+.photo-mode:hover:not(.active) { background: #f1f5f9; }
+.photo-mode.active { background: #1565c0; color: #fff; }
 
 .review-photo {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
-  min-height: 200px;
+  height: min(64vh, 640px);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  /* Scrolls rather than clips: in Full width the document is taller than the
+     pane on purpose, and hiding the overflow would crop the ID. */
+  overflow: auto;
+  padding: 8px;
 }
 
 .photo {
-  max-width: 100%;
-  max-height: 320px;
-  object-fit: contain;
   display: block;
+  max-width: 100%;
+}
+
+/* Whole document, never cropped, never stretched. */
+.review-photo--fit .photo {
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.review-photo--wide { align-items: flex-start; }
+
+.review-photo--wide .photo {
+  width: 100%;
+  height: auto;
+}
+
+.photo-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #94a3b8;
 }
 
 .photo-state {
@@ -828,6 +971,41 @@ onUnmounted(releasePhoto)
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* The review modal supplies its own frame, so the band that holds the decision
+   carries the padding the modal no longer has. */
+.modal-review .modal-actions {
+  padding: 14px 24px 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/*
+ * Mobile keeps the single column it always had. The photo pane is given a
+ * shorter fixed height rather than being left to size itself: an ID that fills
+ * the screen pushes the donor's details off it, and the two are meant to be
+ * compared.
+ */
+@media (max-width: 720px) {
+  .review-body {
+    grid-template-columns: 1fr;
+  }
+
+  .review-photo {
+    height: min(46vh, 360px);
+  }
+
+  .modal-head {
+    padding: 18px 16px 12px;
+  }
+
+  .modal-scroll {
+    padding: 16px;
+  }
+
+  .modal-review .modal-actions {
+    padding: 12px 16px 16px;
+  }
 }
 
 .primary-btn,
@@ -940,6 +1118,18 @@ onUnmounted(releasePhoto)
   border-color: #334155;
   background: #182234;
 }
+
+:global(.dark .modal-head),
+:global(.dark .modal-review .modal-actions) { border-color: #334155; }
+
+:global(.dark .photo-bar__label),
+:global(.dark .photo-note) { color: #94a3b8; }
+
+:global(.dark .photo-modes) { border-color: #334155; }
+:global(.dark .photo-mode) { background: #1e293b; color: #cbd5e1; }
+:global(.dark .photo-mode + .photo-mode) { border-left-color: #334155; }
+:global(.dark .photo-mode:hover:not(.active)) { background: #263449; }
+:global(.dark .photo-mode.active) { background: #1565c0; color: #fff; }
 
 :global(.dark .review-facts dd) { color: #f1f5f9; }
 :global(.dark .reason-label) { color: #cbd5e1; }

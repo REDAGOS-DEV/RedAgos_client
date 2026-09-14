@@ -1,6 +1,33 @@
 import { donorService } from '~/api/donor/DonorService'
 
 /**
+ * Ang mga ID nga naay kinahanglanon sa luyo nga bahin.
+ *
+ * Only the IDs whose back face carries something a reviewer needs: the PhilSys
+ * QR and address, the UMID's signature panel, and the restriction codes on a
+ * driver's licence. The rest are readable from one side, and asking for a
+ * second photo of a blank back is a step people abandon the flow at.
+ */
+const TWO_SIDED_ID_TYPES = ['philsys', 'umid', 'drivers_license']
+
+/**
+ * Which faces of a given ID type need photographing.
+ *
+ * Drives the camera flow only. The upload itself is unchanged: one image per
+ * submission, whichever route produced it.
+ */
+export function idSidesFor(validIdType) {
+  if (TWO_SIDED_ID_TYPES.includes(validIdType)) {
+    return [
+      { key: 'front', label: 'Front' },
+      { key: 'back', label: 'Back' },
+    ]
+  }
+
+  return [{ key: 'front', label: 'Front' }]
+}
+
+/**
  * Ang valid ID kay dili sama sa avatar: authenticated ang route nga nag-serve
  * niya, so dili siya mahimong <img src="...">. Kinahanglan i-fetch nato siya
  * dala ang token, unya himoon nga object URL.
@@ -19,6 +46,14 @@ export function useIdentityDocument() {
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
   const MAX_SIZE_MB = 4
 
+  /**
+   * Gi-export na pud ni para magamit sa camera nga dalan.
+   *
+   * The camera produces a File the same way the file picker does, so it has to
+   * clear the same bar before it is offered for submission. Two copies of these
+   * rules would drift, and the copy that drifts is the one that lets an upload
+   * through that the server then rejects.
+   */
   function validateFile(file) {
     if (!ALLOWED_TYPES.includes(file.type)) {
       throw new Error('Please upload a JPG, PNG, or WEBP image.')
@@ -98,6 +133,8 @@ export function useIdentityDocument() {
     submitIdentity,
     submitting,
     error,
+    validateFile,
+    idSidesFor,
     loadImage,
     loadingImage,
     imageUrl,
