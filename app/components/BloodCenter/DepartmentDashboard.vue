@@ -74,7 +74,7 @@ defineProps({
 <style scoped>
 .dept {
   font-family: var(--rb-font-sans);
-  max-width: 1200px;
+  max-width: 1152px;
   margin: 0 auto;
   padding: 24px 32px 40px;
   background: var(--rb-page-bg);
@@ -101,8 +101,9 @@ defineProps({
 
 .dept__title {
   margin: 4px 0 0;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--rb-text-primary);
 }
 
@@ -148,8 +149,8 @@ defineProps({
   align-items: center;
   justify-content: center;
   margin-bottom: 12px;
-  color: var(--tone, var(--rb-primary));
-  background: color-mix(in srgb, var(--tone, var(--rb-primary)) 10%, transparent);
+  color: var(--tone, var(--rb-primary-text));
+  background: color-mix(in srgb, var(--tone, var(--rb-primary-text)) 12%, transparent);
 }
 
 .stat__label {
@@ -210,7 +211,7 @@ defineProps({
   flex-shrink: 0;
   font-size: 12px;
   font-weight: 600;
-  color: var(--rb-primary);
+  color: var(--rb-primary-text);
   text-decoration: none;
 }
 
@@ -243,9 +244,23 @@ defineProps({
   max-width: 42ch;
 }
 
+@media (max-width: 900px) {
+  .dept {
+    padding: 22px 24px 36px;
+  }
+}
+
 @media (max-width: 640px) {
   .dept {
     padding: 20px 16px 32px;
+  }
+
+  .dept__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .dept__panels {
+    grid-template-columns: 1fr;
   }
 }
 </style>

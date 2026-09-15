@@ -296,7 +296,7 @@ defineExpose({ stop, reset })
   min-height: 1.2em;
 }
 
-.qr-scanner__status--error { color: var(--rb-accent); }
+.qr-scanner__status--error { color: var(--rb-accent-text); }
 
 .qr-scanner__actions {
   display: flex;
