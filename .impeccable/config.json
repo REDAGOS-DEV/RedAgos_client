@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/pages/blood-center/appointments.vue"
+        ],
+        "createdAt": "2026-09-15T01:08:44.299Z",
+        "reason": "Claude: the only match is .progress-fill, a progress bar whose width IS the quantity shown; scaleX would distort its border-radius:999px pill caps. Pre-existing style, untouched by this change."
+      }
+    ]
+  }
+}

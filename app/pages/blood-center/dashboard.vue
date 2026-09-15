@@ -26,10 +26,14 @@
             <AssetIcon name="download" :size="14" />
             {{ exporting ? 'Exporting…' : 'Export Report' }}
           </button>
-          <button type="button" class="btn-primary" @click="openRecordDonation">
+          <!--
+            A donation needs a verified donor, a screening and a collection, so
+            it is recorded at the counter rather than from a dashboard modal.
+          -->
+          <NuxtLink to="/blood-center/collection" class="btn-primary">
             <AssetIcon name="plus" :size="15" />
             Record Donation
-          </button>
+          </NuxtLink>
         </div>
       </div>
 
@@ -539,68 +543,6 @@
       </Transition>
     </Teleport>
 
-    <!-- Record donation modal -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="recordModalOpen" class="modal-overlay" @click.self="closeRecordDonation">
-          <div class="modal-card modal-card--form" role="dialog" v-focus-trap aria-modal="true">
-            <button type="button" class="modal-close" @click="closeRecordDonation">
-              <AssetIcon name="x" :size="16" />
-            </button>
-
-            <h3 class="modal-title modal-title--left">Record Donation</h3>
-            <p class="modal-subtitle modal-subtitle--left">Log a new blood donation at this center.</p>
-
-            <form class="donation-form" @submit.prevent="submitDonation">
-              <label class="form-field">
-                <span class="form-field__label">Donor ID or Name *</span>
-                <input v-model="donationForm.donorIdOrName" type="text" required placeholder="e.g. DNR-001 or Maria Santos" class="form-field__input" />
-              </label>
-
-              <div class="form-row">
-                <label class="form-field">
-                  <span class="form-field__label">Blood Type *</span>
-                  <select v-model="donationForm.bloodType" required class="form-field__input form-field__select">
-                    <option value="" disabled>Select</option>
-                    <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                </label>
-
-                <label class="form-field">
-                  <span class="form-field__label">Component</span>
-                  <select v-model="donationForm.component" class="form-field__input form-field__select">
-                    <option value="" disabled>Select</option>
-                    <option v-for="c in componentOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
-                  </select>
-                </label>
-              </div>
-
-              <label class="form-field">
-                <span class="form-field__label">Volume Collected</span>
-                <input v-model="donationForm.volume" type="text" placeholder="e.g. 450 mL" class="form-field__input" />
-              </label>
-
-              <label class="form-field">
-                <span class="form-field__label">Notes</span>
-                <textarea v-model="donationForm.notes" rows="3" placeholder="Optional remarks…" class="form-field__input form-field__textarea" />
-              </label>
-
-              <p v-if="donationError" class="form-error">{{ donationError }}</p>
-
-              <div class="modal-actions">
-                <button type="submit" class="btn-primary modal-actions__btn" :disabled="donationSubmitting">
-                  <AssetIcon name="check-circle" :size="15" />
-                  {{ donationSubmitting ? 'Saving…' : 'Record Donation' }}
-                </button>
-                <button type="button" class="btn-outline modal-actions__btn" @click="closeRecordDonation" :disabled="donationSubmitting">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 </template>
 
@@ -822,7 +764,7 @@ const systemActivity = ref([])
 // ang makaabot ani nga page karon, ang shortcut dili gyud mo-offer og aksyon
 // nga i-refuse ra sa server.
 const ALL_QUICK_ACTIONS = [
-  { label: 'Record Donation', description: 'Log a new donation entry', icon: 'droplets', kind: 'modal', requires: 'donations.record' },
+  { label: 'Record Donation', description: 'Open the donation counter', icon: 'droplets', kind: 'link', to: '/blood-center/collection', requires: 'donations.record' },
   { label: 'Manage Inventory', description: 'Update stock levels and units', icon: 'package', kind: 'link', to: '/blood-center/inventory', requires: 'inventory.view' },
   { label: 'Process Requests', description: 'Review and fulfill hospital requests', icon: 'clipboard-list', kind: 'link', to: '/blood-center/bloodrequests', requires: 'requests.view' },
   { label: 'Generate Reports', description: 'Export operational summaries', icon: 'file-text', kind: 'export', requires: 'reports.view_own' },
@@ -833,7 +775,6 @@ const ALL_QUICK_ACTIONS = [
 const quickActions = computed(() => ALL_QUICK_ACTIONS.filter((action) => can(action.requires)))
 
 function handleQuickAction(action) {
-  if (action.kind === 'modal') return openRecordDonation()
   if (action.kind === 'export') return exportReport()
   if (action.kind === 'link' && action.to) return navigateTo(action.to)
 }
@@ -896,49 +837,6 @@ const confirmAction = async () => {
     console.error('Failed to update hospital request:', err)
   } finally {
     confirmSubmitting.value = false
-  }
-}
-
-// --- Record donation modal ---
-const recordModalOpen = ref(false)
-const donationSubmitting = ref(false)
-const donationError = ref('')
-
-const emptyDonationForm = () => ({
-  donorIdOrName: '',
-  bloodType: '',
-  component: '',
-  volume: '',
-  notes: '',
-})
-const donationForm = reactive(emptyDonationForm())
-
-const openRecordDonation = () => {
-  Object.assign(donationForm, emptyDonationForm())
-  donationError.value = ''
-  recordModalOpen.value = true
-}
-const closeRecordDonation = () => {
-  if (donationSubmitting.value) return
-  recordModalOpen.value = false
-}
-const submitDonation = async () => {
-  if (!donationForm.donorIdOrName.trim() || !donationForm.bloodType) {
-    donationError.value = 'Donor and blood type are required.'
-    return
-  }
-  donationSubmitting.value = true
-  donationError.value = ''
-  try {
-    // Dev note: i-connect sa /blood-center/donations endpoint para ma-log ang bag-ong donation
-    await bloodCenterService.recordDonation?.({ ...donationForm })
-    donationsToday.value += 1
-    recordModalOpen.value = false
-  } catch (err) {
-    console.error('Failed to record donation:', err)
-    donationError.value = 'Something went wrong while saving. Please try again.'
-  } finally {
-    donationSubmitting.value = false
   }
 }
 

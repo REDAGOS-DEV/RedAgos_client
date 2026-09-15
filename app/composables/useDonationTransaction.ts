@@ -1,4 +1,4 @@
-import BloodCenterService from '~/api/bloodcenter/BloodCenterService'
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
  * One donor's visit, from the single QR scan to the recorded collection.
@@ -42,7 +42,7 @@ export interface TransactionDonation {
 }
 
 export function useDonationTransaction() {
-  const service = BloodCenterService.getInstance()
+  const service = bloodCenterService
 
   const donor = ref<TransactionDonor | null>(null)
   const appointment = ref<TransactionAppointment | null>(null)

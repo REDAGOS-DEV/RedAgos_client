@@ -201,10 +201,16 @@
                 <section v-else class="tab-content">
                     <div class="history-header">
                         <p class="section-label section-label--tight">All recorded donor events</p>
-                        <button type="button" class="btn-outline" @click="openRecordDonation">
+                        <!--
+                          A donation is recorded at the counter, not from a
+                          donor's history page: it needs the screening and the
+                          collection, both of which belong to the verified visit
+                          on /blood-center/collection.
+                        -->
+                        <NuxtLink to="/blood-center/collection" class="btn-outline">
                             <AssetIcon name="plus" :size="14" />
-                            Record Donation
-                        </button>
+                            Record at counter
+                        </NuxtLink>
                     </div>
 
                     <div v-if="loadingHistory" class="history-list">
@@ -391,59 +397,6 @@
             </div>
         </Transition>
 
-        <!-- RECORD DONATION modal -->
-        <Transition name="modal">
-            <div v-if="showRecordDonationModal" class="modal-overlay" @click.self="closeRecordDonation">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Record Donation</h2>
-                        <button type="button" class="modal-card__close" @click="closeRecordDonation">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Blood type</label>
-                                <input :value="selectedDonor?.bloodType" type="text" class="form-input" disabled />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Volume (mL)</label>
-                                <input v-model.number="donationForm.volume" type="number" class="form-input"
-                                    placeholder="450" />
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Date</label>
-                                <input v-model="donationForm.date" type="date" class="form-input" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Method</label>
-                                <select v-model="donationForm.method" class="form-input">
-                                    <option value="Walk-in">Walk-in</option>
-                                    <option value="Appointment">Appointment</option>
-                                    <option value="Mobile Drive">Mobile Drive</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Staff notes</label>
-                            <textarea v-model="donationForm.notes" class="form-input form-textarea" rows="2"></textarea>
-                        </div>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeRecordDonation">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="savingDonation"
-                                @click="submitRecordDonation">
-                                {{ savingDonation ? 'Saving...' : 'Record Donation' }}
-                            </button>
-                        </div>
-                        <p v-if="donationError" class="modal-error">{{ donationError }}</p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
     </div>
 </template>
 
@@ -526,7 +479,6 @@ const api = {
     getFacilities: notImplemented('Facility list'),
     updateDonor: notImplemented('Updating a donor'),
     addFlag: notImplemented('Flagging a donor'),
-    recordDonation: notImplemented('Recording a donation'),
 }
 
 const initialLoading = ref(true)
@@ -758,41 +710,6 @@ async function submitAddFlag() {
         console.error(err)
     } finally {
         savingFlag.value = false
-    }
-}
-
-// ---- RECORD DONATION modal ----
-const showRecordDonationModal = ref(false)
-const savingDonation = ref(false)
-const donationError = ref('')
-const donationForm = reactive({ volume: 450, date: '', method: 'Walk-in', notes: '' })
-
-function openRecordDonation() {
-    showRecordDonationModal.value = true
-    donationError.value = ''
-    Object.assign(donationForm, { volume: 450, date: '', method: 'Walk-in', notes: '' })
-}
-
-function closeRecordDonation() {
-    showRecordDonationModal.value = false
-}
-
-async function submitRecordDonation() {
-    if (!donationForm.date) {
-        donationError.value = 'Please select a donation date.'
-        return
-    }
-    savingDonation.value = true
-    donationError.value = ''
-    try {
-        await api.recordDonation(selectedDonorId.value, { ...donationForm })
-        closeRecordDonation()
-        await Promise.all([loadDonorDetail(selectedDonorId.value), loadDonorHistory(selectedDonorId.value)])
-    } catch (err) {
-        donationError.value = 'Could not record donation. Please try again.'
-        console.error(err)
-    } finally {
-        savingDonation.value = false
     }
 }
 

@@ -59,6 +59,37 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/appointments/${appointmentId}/no-show`, 'POST')
   }
 
+  // Ang scanned nga token ra ang ipadala. Ang facility kay gikan sa bearer
+  // token sa staff, dili gikan sa request — mao nay nag-scope sa verification
+  // ngadto sa center nga gi-scanan.
+  async verifyDonorQr(token: string): Promise<any> {
+    return this.request(`${this.resource}/collection/verify-qr`, 'POST', { token })
+  }
+
+  // --- Active donation transaction (Donor / Collection) ---
+
+  async donations(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations`, 'GET', params)
+  }
+
+  async openDonation(payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations`, 'POST', payload)
+  }
+
+  async updateDonationStatus(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations/${donationId}/status`, 'PATCH', payload)
+  }
+
+  // Mao ni ang mo-abli sa `screening` nga status — dili ang updateDonationStatus.
+  // Pareho sa collection: kinahanglan naay record, dili lang status.
+  async recordScreening(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations/${donationId}/screening`, 'POST', payload)
+  }
+
+  async recordCollection(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations/${donationId}/collection`, 'POST', payload)
+  }
+
   // --- Donor management (Collection department) ---
   //
   // Ang server nga prefix kay `/blood-center/donors` — dili `/bloodcenter/...`

@@ -163,10 +163,39 @@
               </div>
 
               <div class="appt-status-col">
-                <span v-if="appt.arrivedBadge" class="pill pill--outline">Arrived</span>
+                <span v-if="appt.inProgress" class="pill pill--outline">In progress</span>
                 <span class="pill" :class="'pill--' + appt.status.toLowerCase()">{{ appt.status
                 }}</span>
-                <button type="button" class="view-link" @click="viewAppointment(appt)">View</button>
+
+                <div class="appt-actions">
+                  <button
+                    v-if="appt.canCheckIn"
+                    type="button"
+                    class="row-action row-action--primary"
+                    :disabled="rowBusyId === appt.id"
+                    @click="checkInAppointment(appt)"
+                  >
+                    {{ rowBusyId === appt.id ? 'Working…' : 'Check in' }}
+                  </button>
+
+                  <NuxtLink
+                    v-else-if="appt.canOpenCounter"
+                    to="/blood-center/collection"
+                    class="row-action row-action--primary"
+                  >
+                    Open counter
+                  </NuxtLink>
+
+                  <button
+                    v-if="appt.canMarkNoShow"
+                    type="button"
+                    class="row-action"
+                    :disabled="rowBusyId === appt.id"
+                    @click="markNoShow(appt)"
+                  >
+                    No-show
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -409,12 +438,13 @@ function slotKeyOf(date) {
  * Ang queue mo-return og server field names; lahi ang gidahom sa template.
  * Usa ra ka lugar ang mo-tabok aron dili magkatag ang mapping.
  */
-function mapAppointment(row) {
+function mapAppointment(row, openDonorUuids = new Set()) {
   const at = new Date(row.appointment_datetime)
 
   return {
     id: row.id,
     rawStatus: row.status,
+    donorUuid: row.donor?.uuid || null,
     donorName: row.donor?.full_name || 'Unknown donor',
     donorCode: row.donor?.donor_code || '—',
     bloodType: row.donor?.blood_type || '—',
@@ -425,7 +455,14 @@ function mapAppointment(row) {
     dateDay: at.getDate(),
     dateMonth: at.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
     status: STATUS_LABELS[row.status] ?? row.status,
-    arrivedBadge: row.status === 'confirmed',
+
+    // `in_progress` already comes back in the queue payload — this is the
+    // donation the counter has open for this donor right now.
+    inProgress: Boolean(row.donor?.uuid && openDonorUuids.has(row.donor.uuid)),
+
+    canCheckIn: row.status === 'scheduled',
+    canOpenCounter: row.status === 'confirmed',
+    canMarkNoShow: row.status === 'scheduled' || row.status === 'confirmed',
   }
 }
 
@@ -450,6 +487,10 @@ const loadError = ref('')
 
 const stats = reactive({ todayWalkIns: 0, confirmedArrived: 0, donatedToday: 0, noShows: 0 })
 const loadingStats = ref(false)
+
+// Which row is mid-request, so only that row's buttons disable rather than
+// the whole queue freezing.
+const rowBusyId = ref(null)
 
 const timeSlots = ref([])
 const loadingSlots = ref(false)
@@ -558,7 +599,15 @@ async function loadQueue() {
 
   try {
     const data = await bloodCenterService.collectionQueue({ date: selectedDateFilter.value })
-    const rows = (data?.appointments ?? []).map(mapAppointment)
+
+    // The payload has always carried the donations already open at this
+    // counter; nothing used to read it, so a donor mid-visit looked identical
+    // to one who had only just arrived.
+    const openDonorUuids = new Set(
+      (data?.in_progress ?? []).map((d) => d.donor?.uuid).filter(Boolean),
+    )
+
+    const rows = (data?.appointments ?? []).map((row) => mapAppointment(row, openDonorUuids))
 
     walkInAppointments.value = rows
     Object.assign(stats, deriveStats(rows))
@@ -646,12 +695,42 @@ function onDateFilterChange() {
   loadTimeSlots()
 }
 
-function viewAppointment(appt) {
-  // Placeholder: walay donor detail route/modal pa. Ang buton mo-render nga
-  // daw molihok apan wala gyuy mahitabo — ipakita ni sa dev aron dili malimtan,
-  // hilom sa production.
-  if (import.meta.dev) {
-    console.warn('[Appointments] viewAppointment is not wired up yet', appt.id)
+/**
+ * Mark an expected donor as arrived, then hand over to the counter.
+ *
+ * The queue only starts the visit. Everything after check-in — screening,
+ * collection, completion — belongs to the one continuous transaction on
+ * /blood-center/collection, which holds the donor context the QR scan verified.
+ */
+async function checkInAppointment(appt) {
+  rowBusyId.value = appt.id
+  loadError.value = ''
+
+  try {
+    await bloodCenterService.checkInAppointment(appt.id)
+    await loadQueue()
+  } catch (err) {
+    loadError.value = err?.data?.code === 'appointment_not_pending'
+      ? 'This appointment has already been checked in or closed.'
+      : err?.message || 'The donor could not be checked in.'
+  } finally {
+    rowBusyId.value = null
+  }
+}
+
+async function markNoShow(appt) {
+  if (!window.confirm(`Mark ${appt.donorName} as a no-show?`)) return
+
+  rowBusyId.value = appt.id
+  loadError.value = ''
+
+  try {
+    await bloodCenterService.markAppointmentNoShow(appt.id)
+    await loadQueue()
+  } catch (err) {
+    loadError.value = err?.message || 'The appointment could not be updated.'
+  } finally {
+    rowBusyId.value = null
   }
 }
 
@@ -1352,6 +1431,49 @@ onMounted(async () => {
 
 .view-link:hover {
   text-decoration: underline;
+}
+
+.appt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.row-action {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-action:hover:not(:disabled) {
+  background: var(--rb-surface-hover);
+  border-color: var(--rb-border-hover);
+}
+
+.row-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.row-action--primary {
+  background: var(--rb-primary);
+  border-color: var(--rb-primary);
+  color: #fff;
+}
+
+.row-action--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
 }
 
 /* Pills / badges */
