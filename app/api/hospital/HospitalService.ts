@@ -24,6 +24,10 @@ class HospitalService extends BaseService {
   requestDetail(id: string | number) { return this.request<any>(`/hospital/bloodrequests/${id}`) }
   createRequest(payload: BloodRequestPayload) { return this.request<any>('/hospital/bloodrequests', 'POST', payload) }
   cancelRequest(id: string | number, reason?: string) { return this.request<any>(`/hospital/bloodrequests/${id}/cancel`, 'POST', { reason }) }
+  requestBilling(id: string | number) { return this.request<any>(`/hospital/bloodrequests/${id}/billing`) }
+  payRequestBilling(id: string | number, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
+    return this.request<any>(`/hospital/bloodrequests/${id}/billing/pay`, 'POST', payload)
+  }
   reports(params: object = {}) { return this.request<any>('/hospital/reports', 'GET', params) }
   notifications(params: object = {}) { return this.request<any>('/hospital/notifications', 'GET', params) }
   markNotificationRead(id: string | number) { return this.request<any>(`/hospital/notifications/${id}/read`, 'PATCH') }
