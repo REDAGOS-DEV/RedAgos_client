@@ -95,22 +95,20 @@
             </div>
           </template>
 
-          <div class="drive-card__actions">
-            <NuxtLink :to="`/blood-center/drives/${drive.id}/Donors`" class="btn-outline">
-              View all {{ drive.registered_count }} donors
-            </NuxtLink>
-            <NuxtLink v-if="drive.status !== 'planning'" :to="`/blood-center/drives/${drive.id}/Attendance`" class="btn-outline-blue">
-              Mark Attendance
-            </NuxtLink>
-            <NuxtLink :to="`-/blood-center/drives/${drive.id}`" class="btn-primary btn-primary--sm">
-              Manage Drive
-            </NuxtLink>
-          </div>
+          <!--
+            Three dead links used to sit here. None of /blood-center/drives/:id,
+            /:id/Donors or /:id/Attendance has a page — there is no
+            app/pages/blood-center/drives/ directory at all — and the third was
+            written `-/blood-center/drives/…` with a stray leading hyphen, so it
+            did not even resolve to that. All three 404'd on click. Restore the
+            row together with the drive detail screens, the same call
+            useBloodCenterNav made for Help & Support.
+          -->
         </div>
       </div>
 
       <div v-else class="empty-state">
-        <AssetIcon name="truck" :size="40" style="color:#e5e7eb" />
+        <AssetIcon name="truck" :size="40" style="color: var(--rb-border-hover)" />
         <p>No mobile drives scheduled yet</p>
         <button type="button" class="btn-primary btn-primary--sm" @click="openCreateModal">Create your first drive</button>
       </div>
@@ -350,16 +348,27 @@ onMounted(async () => {
 
 <style scoped>
 .drives-page {
-  --primary: #1565c0;
-  --accent: #d32f2f;
-  --success: #2e7d32;
-  --warning: #f57c00;
-  --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
-  max-width: 1200px;
+  /*
+   * Fills stay dark in both themes because white text sits on them; the -text
+   * variants are what the page paints words and icons with. Everything else
+   * here reads a shared token, so the whole page follows the theme instead of
+   * staying white on a dark background.
+   */
+  --primary: var(--rb-primary);
+  --primary-text: var(--rb-primary-text);
+  --accent: var(--rb-accent-text);
+  --success: var(--rb-success-text);
+  --warning: var(--rb-warning-text);
+  --purple: var(--rb-purple-text);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
+  font-family: var(--rb-font-sans);
+  color: var(--text-primary);
+  max-width: 1152px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
+  transition: background-color 0.2s ease;
 }
 
 /* Loading */
@@ -374,8 +383,8 @@ onMounted(async () => {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  border: 4px solid #e3ebf6;
-  border-top-color: var(--primary);
+  border: 4px solid var(--rb-border-strong);
+  border-top-color: var(--primary-text);
   animation: spin 0.8s linear infinite;
 }
 
@@ -431,7 +440,9 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.btn-primary:hover { opacity: 0.92; }
+.btn-primary:hover { background: #0D47A1; }
+
+.btn-primary:disabled:hover { background: var(--primary); }
 
 .btn-primary--sm {
   padding: 8px 14px;
@@ -439,9 +450,12 @@ onMounted(async () => {
 }
 
 /* Stats row */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 
@@ -449,16 +463,16 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: white;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
   padding: 18px 20px;
   transition: box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px rgba(var(--rb-shadow-rgb), 0.08);
 }
 
 .stat-card__icon {
@@ -471,9 +485,9 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.stat-card--blue .stat-card__icon { background: #E3F2FD; color: var(--primary); }
-.stat-card--violet .stat-card__icon { background: #EDE7F6; color: #5E35B1; }
-.stat-card--green .stat-card__icon { background: #E8F5E9; color: var(--success); }
+.stat-card--blue .stat-card__icon { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
+.stat-card--violet .stat-card__icon { background: rgba(var(--rb-purple-rgb), 0.12); color: var(--purple); }
+.stat-card--green .stat-card__icon { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
 
 
 .stat-card__body {
@@ -512,10 +526,10 @@ onMounted(async () => {
 
 .drive-card {
   position: relative;
-  background: #fff;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
   padding: 18px 20px;
   overflow: hidden;
   transition: border-color 0.2s ease;
@@ -528,11 +542,15 @@ onMounted(async () => {
   left: 0;
   right: 0;
   height: 4px;
-  background: var(--primary);
+  background: var(--primary-text);
+}
+
+.drive-card:focus-within {
+  border-color: var(--rb-border-hover);
 }
 
 .drive-card:hover {
-  border-color: #d9e2ee;
+  border-color: var(--rb-border-hover);
 }
 
 .drive-card__top {
@@ -564,29 +582,31 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.status-badge--upcoming { background: #E3F2FD; color: var(--primary); }
-.status-badge--open { background: #E8F5E9; color: var(--success); }
-.status-badge--planning { background: #F3F4F6; color: #6b7280; }
-.status-badge--completed { background: #ECEFF1; color: #455A64; }
+.status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
+.status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
+.status-badge--planning { background: var(--rb-surface-hover); color: var(--text-secondary); }
+.status-badge--completed { background: var(--rb-surface-hover); color: var(--text-secondary); }
 
 /* Progress bar */
 .progress-track {
   margin-top: 14px;
   height: 6px;
   border-radius: 999px;
-  background: #eef0f3;
+  background: var(--rb-border-strong);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--primary);
+  /* The lifted blue, not the fill blue: at 2.3:1 against the dark track the
+     base #1565C0 bar was effectively invisible in dark mode. */
+  background: var(--primary-text);
   transition: width 0.4s ease;
 }
 
 .progress-fill--full {
-  background: var(--success);
+  background: var(--rb-success);
 }
 
 .progress-meta {
@@ -605,7 +625,7 @@ onMounted(async () => {
   letter-spacing: 0.03em;
   color: var(--text-secondary);
   margin: 18px 0 8px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--rb-border);
   padding-top: 14px;
 }
 
@@ -660,55 +680,17 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.donor-badge--confirmed { background: #E8F5E9; color: var(--success); }
-.donor-badge--pending { background: #FFF3E0; color: var(--warning); }
-.donor-badge--attended { background: #E3F2FD; color: var(--primary); }
-.donor-badge--no_show { background: #FDEAEA; color: var(--accent); }
+.donor-badge--confirmed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
+.donor-badge--pending { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--warning); }
+.donor-badge--attended { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
+.donor-badge--no_show { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--accent); }
 
-/* Actions */
-.drive-card__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
-  flex-wrap: wrap;
-}
-
-.btn-outline {
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  background: #F3F4F6;
-  color: #374151;
-  border: none;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-
-.btn-outline:hover { background: #e5e7eb; }
-
-.btn-outline-blue {
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  background: #E3F2FD;
-  color: var(--primary);
-  border: none;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-
-.btn-outline-blue:hover { background: #d3e6fa; }
 
 /* Empty state */
 .empty-state {
-  background: white;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--rb-border);
   padding: 48px 24px;
   text-align: center;
   color: var(--text-secondary);
@@ -722,7 +704,7 @@ onMounted(async () => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--rb-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -731,13 +713,13 @@ onMounted(async () => {
 }
 
 .modal-card {
-  background: white;
+  background: var(--rb-surface);
   border-radius: 14px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.28);
 }
 
 .modal-card__header {
@@ -745,7 +727,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--rb-border);
 }
 
 .modal-card__title {
@@ -796,27 +778,40 @@ onMounted(async () => {
   letter-spacing: 0.03em;
 }
 
-.form-input,
-.form-textarea {
+/*
+ * Anchored on the page root on purpose. Several other portals ship
+ * `:global(.dark .form-input) { … }` — an unscoped rule at (0,2,0) that ties
+ * with a plain scoped `.form-input[data-v-...]`, so which one won came down to
+ * chunk load order. The page-root ancestor takes these to (0,3,0) and settles
+ * it, without this page having to hardcode a dark palette of its own.
+ */
+.drives-page .form-input,
+.drives-page .form-textarea {
   width: 100%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--rb-border-strong);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
-  background: #fafbfc;
+  background: var(--rb-surface-alt);
   font-family: inherit;
   transition: border-color 0.15s ease;
 }
 
-.form-input:focus,
-.form-textarea:focus {
+.drives-page .form-input:focus,
+.drives-page .form-textarea:focus {
   outline: none;
-  border-color: var(--primary);
-  background: white;
+  border-color: var(--primary-text);
+  background: var(--rb-surface);
+  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.14);
 }
 
-.form-textarea {
+.drives-page .form-input::placeholder,
+.drives-page .form-textarea::placeholder {
+  color: var(--rb-placeholder);
+}
+
+.drives-page .form-textarea {
   resize: vertical;
   min-height: 64px;
 }
@@ -860,7 +855,7 @@ onMounted(async () => {
 }
 
 .stepper__btn:hover {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .modal-actions {
@@ -876,15 +871,16 @@ onMounted(async () => {
   border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
-  background: #F3F4F6;
-  color: #374151;
-  border: none;
+  background: var(--rb-surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--rb-border-strong);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-cancel:hover {
-  background: #e5e7eb;
+  background: var(--rb-surface-alt);
+  border-color: var(--rb-border-hover);
 }
 
 .btn-primary:disabled {
@@ -903,17 +899,18 @@ onMounted(async () => {
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 640px) {
   .drives-page { padding: 16px 16px 32px; }
+  .modal-actions { flex-direction: column-reverse; align-items: stretch; }
+  .modal-actions .btn-primary, .modal-actions .btn-cancel { width: 100%; }
   .header-row { flex-direction: column; align-items: stretch; }
-  .stats-row { grid-template-columns: 1fr; }
-  .drive-card__actions { flex-direction: column; align-items: stretch; }
-  .drive-card__actions a { text-align: center; }
 }
 
 .btn-primary:focus-visible,
-.btn-outline:focus-visible,
-.btn-outline-blue:focus-visible,
 .btn-cancel:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;

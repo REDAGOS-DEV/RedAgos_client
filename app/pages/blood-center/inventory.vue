@@ -40,7 +40,7 @@
       <!-- ============ EXPIRY ALERT ============ -->
       <div v-if="expiryAlert.visible && expiringBatches.length" class="alert-banner">
         <div class="alert-banner__icon">
-          <AssetIcon name="alert-triangle" :size="18" style="color: var(--rb-warning)" />
+          <AssetIcon name="alert-triangle" :size="18" style="color: var(--rb-warning-text)" />
         </div>
         <div class="alert-banner__body">
           <p class="alert-banner__title">Attention Required</p>
@@ -149,7 +149,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Total Inventory</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
-              <AssetIcon name="database" :size="14" style="color: var(--rb-primary)" />
+              <AssetIcon name="database" :size="14" style="color: var(--rb-primary-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ totalInventoryUnits === null ? '—' : totalInventoryUnits }}</p>
@@ -160,7 +160,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Healthy Inventory</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
-              <AssetIcon name="shield-check" :size="14" style="color: var(--rb-success)" />
+              <AssetIcon name="shield-check" :size="14" style="color: var(--rb-success-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ healthyBatchCount }}</p>
@@ -171,7 +171,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Reserved Inventory</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-purple-rgb), 0.08)' }">
-              <AssetIcon name="lock" :size="14" style="color: var(--rb-purple)" />
+              <AssetIcon name="lock" :size="14" style="color: var(--rb-purple-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ totalReservedUnits === null ? '—' : totalReservedUnits }}</p>
@@ -182,7 +182,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Expiring Soon</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
-              <AssetIcon name="clock" :size="14" style="color: var(--rb-warning)" />
+              <AssetIcon name="clock" :size="14" style="color: var(--rb-warning-text)" />
             </div>
           </div>
           <p class="stat-card__value" :style="expiringSoonCount ? { color: 'var(--rb-warning)' } : {}">{{ expiringSoonCount }}</p>
@@ -568,7 +568,7 @@
                 @click="handleQuickAction(action)"
               >
                 <div class="quick-action-card__icon quick-action-card__icon--primary">
-                  <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary)" />
+                  <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary-text)" />
                 </div>
                 <p class="quick-action-card__label">{{ action.label }}</p>
                 <p class="quick-action-card__desc">{{ action.description }}</p>
@@ -699,27 +699,27 @@
 
             <div class="manage-actions-grid">
               <button type="button" class="manage-action-card" @click="runManageAction('reserve')">
-                <AssetIcon name="lock" :size="18" style="color: var(--rb-primary)" />
+                <AssetIcon name="lock" :size="18" style="color: var(--rb-primary-text)" />
                 <span>Reserve Inventory</span>
               </button>
               <button type="button" class="manage-action-card" @click="runManageAction('release')">
-                <AssetIcon name="unlock" :size="18" style="color: var(--rb-primary)" />
+                <AssetIcon name="unlock" :size="18" style="color: var(--rb-primary-text)" />
                 <span>Release Inventory</span>
               </button>
               <button type="button" class="manage-action-card" @click="runManageAction('transfer')">
-                <AssetIcon name="send" :size="18" style="color: var(--rb-primary)" />
+                <AssetIcon name="send" :size="18" style="color: var(--rb-primary-text)" />
                 <span>Transfer Inventory</span>
               </button>
               <button type="button" class="manage-action-card" @click="runManageAction('print')">
-                <AssetIcon name="printer" :size="18" style="color: var(--rb-primary)" />
+                <AssetIcon name="printer" :size="18" style="color: var(--rb-primary-text)" />
                 <span>Print Label</span>
               </button>
               <button type="button" class="manage-action-card manage-action-card--danger" @click="runManageAction('archive')">
-                <AssetIcon name="archive" :size="18" style="color: var(--rb-accent)" />
+                <AssetIcon name="archive" :size="18" style="color: var(--rb-accent-text)" />
                 <span>Archive Inventory</span>
               </button>
               <button type="button" class="manage-action-card manage-action-card--danger" @click="runManageAction('discard')">
-                <AssetIcon name="trash-2" :size="18" style="color: var(--rb-accent)" />
+                <AssetIcon name="trash-2" :size="18" style="color: var(--rb-accent-text)" />
                 <span>Discard Inventory</span>
               </button>
             </div>
@@ -1522,7 +1522,7 @@ onMounted(loadDashboard)
 <style scoped>
 .inv-page {
   font-family: var(--rb-font-sans);
-  max-width: 1200px;
+  max-width: 1152px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -1551,7 +1551,7 @@ onMounted(loadDashboard)
 }
 
 .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
@@ -1560,19 +1560,19 @@ onMounted(loadDashboard)
 
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 15px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
   color: #ffffff; background: var(--rb-primary); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
   transition: opacity 0.15s ease; border: none; cursor: pointer;
   text-decoration: none; line-height: 1.2; font-family: inherit;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.92; }
+.btn-primary:hover:not(:disabled) { background: #0D47A1; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.btn-primary:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .btn-primary--sm { padding: 7px 13px; font-size: 12px; }
 
 .btn-outline {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 9px 15px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
   color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong);
   cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; line-height: 1.2; font-family: inherit;
 }
@@ -1591,7 +1591,7 @@ onMounted(loadDashboard)
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .alert-banner__body { flex: 1; min-width: 0; }
-.alert-banner__title { font-size: 13px; font-weight: 600; color: #B45309; margin: 0; }
+.alert-banner__title { font-size: 13px; font-weight: 600; color: var(--rb-warning-text); margin: 0; }
 .alert-banner__desc { font-size: 12.5px; font-weight: 400; line-height: 1.55; color: var(--rb-text-secondary); margin: 3px 0 8px; }
 .alert-banner__list { display: flex; flex-wrap: wrap; gap: 6px; }
 .alert-banner__chip {
@@ -1607,7 +1607,10 @@ onMounted(loadDashboard)
 .alert-banner__dismiss:hover { background: rgba(var(--rb-warning-rgb), 0.12); }
 
 /* Blood type summary cards */
-.type-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
+.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
 .type-card {
   display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px;
   border-radius: 14px; background: var(--rb-surface); border: 1px solid var(--rb-border);
@@ -1616,15 +1619,15 @@ onMounted(loadDashboard)
 .type-card:hover { border-color: var(--rb-border-hover); background: var(--rb-surface-hover); }
 .type-card--active { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.05); box-shadow: 0 0 0 1px var(--rb-primary); }
 .type-card__top { display: flex; align-items: center; justify-content: space-between; }
-.type-card__type { font-size: 15px; font-weight: 800; color: var(--rb-accent); }
+.type-card__type { font-size: 15px; font-weight: 800; color: var(--rb-accent-text); }
 .type-card__units { font-size: 19px; font-weight: 800; color: var(--rb-text-primary); margin: 0; }
 .type-card__units-label { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
 .type-card__updated { font-size: 10.5px; color: var(--rb-text-secondary); margin: 0; }
 
 .health-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
-.health-badge--healthy { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success); }
-.health-badge--low { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning); }
-.health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent); }
+.health-badge--healthy { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.health-badge--low { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
+.health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 
 .progress-track { height: 5px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
 .progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
@@ -1661,7 +1664,7 @@ onMounted(loadDashboard)
 .panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 /* Stats grid */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .stat-card {
   background: var(--rb-surface); border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
   border: 1px solid var(--rb-border); display: flex; flex-direction: column; gap: 8px;
@@ -1689,21 +1692,21 @@ onMounted(loadDashboard)
 .inventory-row:hover { background: var(--rb-surface-hover); }
 .mono-cell { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; }
 
-.type-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent); }
+.type-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 
 .status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: capitalize; }
 .status-pill__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
-.status-pill--available { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success); }
-.status-pill--reserved { background: rgba(var(--rb-purple-rgb), 0.08); color: var(--rb-purple); }
-.status-pill--low { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning); }
-.status-pill--critical { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent); }
+.status-pill--available { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.status-pill--reserved { background: rgba(var(--rb-purple-rgb), 0.08); color: var(--rb-purple-text); }
+.status-pill--low { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); }
+.status-pill--critical { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 .status-pill--expired { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 .expiry-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
 .expiry-row--low td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
 
 .link-btn {
-  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-primary);
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text);
   background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-decoration: none;
 }
 .link-btn:hover { text-decoration: underline; }
@@ -1725,13 +1728,13 @@ onMounted(loadDashboard)
   color: var(--rb-text-primary); font-size: 12.5px; font-weight: 500; text-align: left; cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .row-menu__item:hover { background: var(--rb-surface-alt); }
-.row-menu__item--danger { color: var(--rb-accent); }
+.row-menu__item--danger { color: var(--rb-accent-text); }
 .row-menu__item--danger:hover { background: rgba(var(--rb-accent-rgb), 0.08); }
 .row-menu__divider { height: 1px; background: var(--rb-border); margin: 4px 2px; }
 
 /* Expanded row */
 .expanded-row td { padding: 0; border-top: none; }
-.expanded-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 18px 20px; background: var(--rb-surface-alt); white-space: normal; }
+.expanded-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; padding: 18px 20px; background: var(--rb-surface-alt); white-space: normal; }
 .expanded-col__title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0 0 8px; }
 .expanded-col__title--spaced { margin-top: 14px; }
 .expanded-dl { display: flex; flex-direction: column; gap: 6px; margin: 0; }
@@ -1754,7 +1757,7 @@ onMounted(loadDashboard)
 .insight-card { display: flex; flex-direction: column; }
 .segmented-control { display: inline-flex; padding: 3px; background: var(--rb-surface-alt); border-radius: 999px; gap: 2px; flex-shrink: 0; }
 .segmented-control__btn { padding: 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); background: transparent; border: none; border-radius: 999px; cursor: pointer; font-family: inherit; transition: background 0.15s ease, color 0.15s ease; }
-.segmented-control__btn--active { background: var(--rb-surface); color: var(--rb-primary); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
+.segmented-control__btn--active { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
 
 .chart-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
 .chart-legend { display: flex; gap: 16px; }
@@ -1799,8 +1802,8 @@ onMounted(loadDashboard)
 .quick-actions-body { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
 .quick-actions-group__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); margin: 0 0 10px; }
 .quick-actions-grid { display: grid; gap: 12px; }
-.quick-actions-grid--primary { grid-template-columns: repeat(2, 1fr); }
-.quick-actions-grid--secondary { grid-template-columns: repeat(3, 1fr); }
+.quick-actions-grid--primary { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.quick-actions-grid--secondary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .quick-action-card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; border-radius: 12px;
   border: 1px solid var(--rb-border); background: var(--rb-surface-alt); cursor: pointer; text-align: left; font-family: inherit;
@@ -1845,16 +1848,16 @@ onMounted(loadDashboard)
 .form-field__input::placeholder { color: var(--rb-placeholder); }
 .form-field__select { appearance: none; background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center; }
 .form-field__textarea { resize: vertical; min-height: 64px; }
-.form-error { font-size: 12px; color: var(--rb-accent); margin: -6px 0 0; }
+.form-error { font-size: 12px; color: var(--rb-accent-text); margin: -6px 0 0; }
 
-.manage-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.manage-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
 .manage-action-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px 10px; border-radius: 12px;
   border: 1px solid var(--rb-border-strong); background: var(--rb-surface-alt); cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
   color: var(--rb-text-primary); text-align: center; transition: background 0.15s ease;
 }
 .manage-action-card:hover { background: var(--rb-surface); }
-.manage-action-card--danger { color: var(--rb-accent); }
+.manage-action-card--danger { color: var(--rb-accent-text); }
 .manage-action-card--danger:hover { background: rgba(var(--rb-accent-rgb), 0.06); }
 
 /* Print labels modal */
@@ -1868,7 +1871,7 @@ onMounted(loadDashboard)
 .print-preview { margin-bottom: 16px; }
 .print-preview__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
 .print-label-card { border: 1px dashed var(--rb-border-strong); border-radius: 10px; padding: 10px; font-size: 10.5px; }
-.print-label-card__type { font-weight: 800; color: var(--rb-accent); margin: 0; font-size: 13px; }
+.print-label-card__type { font-weight: 800; color: var(--rb-accent-text); margin: 0; font-size: 13px; }
 .print-label-card__meta { color: var(--rb-text-secondary); margin: 2px 0 0; }
 .print-label-card__barcode { margin-top: 6px; height: 20px; background: repeating-linear-gradient(90deg, var(--rb-text-primary) 0 2px, transparent 2px 4px); }
 
@@ -1896,20 +1899,11 @@ onMounted(loadDashboard)
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
-@media (max-width: 1200px) {
-  .type-grid { grid-template-columns: repeat(4, 1fr); }
-}
 @media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .insights-grid { grid-template-columns: 1fr; }
-  .quick-actions-grid--primary { grid-template-columns: repeat(2, 1fr); }
-  .quick-actions-grid--secondary { grid-template-columns: repeat(3, 1fr); }
-  .expanded-panel { grid-template-columns: 1fr; }
-  .manage-actions-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
   .inv-page { padding: 16px 16px 32px; }
-  .type-grid { grid-template-columns: repeat(2, 1fr); }
   .header-row { flex-direction: column; align-items: stretch; }
   .header-actions { justify-content: space-between; }
   .panel-header { flex-direction: column; align-items: stretch; }
@@ -1918,8 +1912,6 @@ onMounted(loadDashboard)
   .toolbar__row--end .btn-outline, .toolbar__row--end .btn-primary { flex: 1; }
   .form-row { grid-template-columns: 1fr; }
   .donut-body { flex-direction: column; }
-  .quick-actions-grid--primary, .quick-actions-grid--secondary { grid-template-columns: repeat(2, 1fr); }
-  .manage-actions-grid { grid-template-columns: 1fr; }
   .detail-drawer { width: 100%; }
   .detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 100%; }
 }

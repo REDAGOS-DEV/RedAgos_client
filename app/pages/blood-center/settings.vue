@@ -664,17 +664,23 @@ onMounted(async () => {
 
 <style scoped>
 .settings-page {
-  --primary: #1565c0;
+  /*
+   * Fills keep the dark base (white text sits on them); everything painted AS
+   * text or an icon reads the -text variant, which lifts in dark mode. The
+   * page-local names stay so the rest of the sheet did not have to change.
+   */
+  --primary: var(--rb-primary);
+  --primary-text: var(--rb-primary-text);
   --primary-dark: #0d47a1;
-  --accent: #d32f2f;
-  --success: #2e7d32;
-  --warning: #f57c00;
-  --purple: #5e35b1;
-  --teal: #00796b;
-  --indigo: #3949ab;
-  --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
-  max-width: 1200px;
+  --accent: var(--rb-accent-text);
+  --success: var(--rb-success-text);
+  --warning: var(--rb-warning-text);
+  --purple: var(--rb-purple-text);
+  --teal: var(--rb-teal-text);
+  --indigo: var(--rb-primary-text);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
+  max-width: 1152px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -696,7 +702,7 @@ onMounted(async () => {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  border: 4px solid #e3ebf6;
+  border: 4px solid var(--rb-border-strong);
   border-top-color: var(--primary);
   animation: spin 0.8s linear infinite;
 }
@@ -730,8 +736,9 @@ onMounted(async () => {
 }
 
 .page-title {
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: -0.02em;
   margin: 0;
   color: #fff;
 }
@@ -756,10 +763,10 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: #fff;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
   padding: 10px;
 }
 
@@ -781,13 +788,13 @@ onMounted(async () => {
 }
 
 .nav-item:hover {
-  background: #f3f6fa;
+  background: var(--rb-surface-hover);
   color: var(--text-primary);
 }
 
 .nav-item--active {
-  background: #E3F2FD;
-  color: var(--primary);
+  background: rgba(var(--rb-primary-rgb), 0.12);
+  color: var(--primary-text);
 }
 
 .nav-item__icon {
@@ -797,15 +804,15 @@ onMounted(async () => {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--rb-surface-hover);
+  color: var(--rb-text-muted);
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .nav-item--active .nav-item__icon {
-  background: #fff;
-  color: var(--primary);
+  background: var(--rb-surface);
+  color: var(--primary-text);
 }
 
 .nav-item__drop {
@@ -815,7 +822,7 @@ onMounted(async () => {
   width: 8px;
   height: 8px;
   transform: translateY(-50%) rotate(45deg);
-  background: var(--primary);
+  background: var(--primary-text);
   border-radius: 0 50% 50% 50%;
 }
 
@@ -828,10 +835,10 @@ onMounted(async () => {
 .settings-panel {
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
   padding: 24px 26px;
   display: flex;
   flex-direction: column;
@@ -861,12 +868,12 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.panel-icon-badge--blue { background: #E3F2FD; color: var(--primary); }
-.panel-icon-badge--red { background: #FDEAEA; color: var(--accent); }
-.panel-icon-badge--orange { background: #FEF1E1; color: var(--warning); }
-.panel-icon-badge--purple { background: #EDE7F6; color: var(--purple); }
-.panel-icon-badge--teal { background: #E0F2F1; color: var(--teal); }
-.panel-icon-badge--indigo { background: #E8EAF6; color: var(--indigo); }
+.panel-icon-badge--blue { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
+.panel-icon-badge--red { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--accent); }
+.panel-icon-badge--orange { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--warning); }
+.panel-icon-badge--purple { background: rgba(var(--rb-purple-rgb), 0.12); color: var(--purple); }
+.panel-icon-badge--teal { background: rgba(var(--rb-teal-rgb), 0.14); color: var(--teal); }
+.panel-icon-badge--indigo { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--indigo); }
 
 .panel-title {
   font-size: 15px;
@@ -893,7 +900,7 @@ onMounted(async () => {
   height: 80px;
   border-radius: 999px;
   padding: 4px;
-  background: var(--border-strong, #e2e8f0);
+  background: var(--rb-border-strong);
   flex-shrink: 0;
 }
 
@@ -908,7 +915,7 @@ onMounted(async () => {
   font-size: 22px;
   font-weight: 700;
   overflow: hidden;
-  border: 3px solid #fff;
+  border: 3px solid var(--rb-surface);
 }
 
 .avatar-circle img {
@@ -930,7 +937,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border: 2.5px solid #fff;
+  border: 2.5px solid var(--rb-surface);
 }
 
 .avatar-upload-input {
@@ -985,28 +992,39 @@ onMounted(async () => {
   letter-spacing: 0.03em;
 }
 
-.form-input {
+/*
+ * Anchored on the page root on purpose. Several other portals ship
+ * `:global(.dark .form-input) { … }` — an unscoped rule at (0,2,0) that ties
+ * with a plain scoped `.form-input[data-v-...]`, so which one won came down to
+ * chunk load order. The page-root ancestor takes these to (0,3,0) and settles
+ * it, without this page having to hardcode a dark palette of its own.
+ */
+.settings-page .form-input {
   width: 100%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--rb-border-strong);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
-  background: #fafbfc;
+  background: var(--rb-surface-alt);
   font-family: inherit;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.form-input:focus {
+.settings-page .form-input:focus {
   outline: none;
-  border-color: var(--primary);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
+  border-color: var(--primary-text);
+  background: var(--rb-surface);
+  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.16);
 }
 
-.form-input:disabled {
-  background: #f3f4f6;
-  color: #6b7280;
+.settings-page .form-input::placeholder {
+  color: var(--rb-placeholder);
+}
+
+.settings-page .form-input:disabled {
+  background: var(--rb-surface-hover);
+  color: var(--rb-text-muted);
   cursor: not-allowed;
 }
 
@@ -1023,19 +1041,19 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-.form-input--icon {
+.settings-page .form-input--icon {
   padding-left: 36px;
 }
 
-.form-select {
+.settings-page .form-select {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 34px;
   cursor: pointer;
-  background: #fafbfc;
+  background: var(--rb-surface-alt);
 }
 
-.form-select:disabled {
+.settings-page .form-select:disabled {
   cursor: not-allowed;
 }
 
@@ -1069,7 +1087,7 @@ onMounted(async () => {
 }
 
 .password-toggle:hover {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .field-error {
@@ -1118,7 +1136,7 @@ onMounted(async () => {
 }
 
 .btn-primary:hover {
-  opacity: 0.92;
+  background: var(--primary-dark);
 }
 
 .btn-primary:disabled {
@@ -1132,15 +1150,16 @@ onMounted(async () => {
   border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
-  background: #F3F4F6;
-  color: #374151;
-  border: none;
+  background: var(--rb-surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--rb-border-strong);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-cancel:hover {
-  background: #e5e7eb;
+  background: var(--rb-surface-alt);
+  border-color: var(--rb-border-hover);
 }
 
 .btn-outline {
@@ -1151,15 +1170,16 @@ onMounted(async () => {
   border-radius: 10px;
   font-size: 12.5px;
   font-weight: 700;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
+  background: var(--rb-surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--rb-border-strong);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-outline:hover {
-  background: #e5e7eb;
+  background: var(--rb-surface-alt);
+  border-color: var(--rb-border-hover);
 }
 
 .btn-outline-blue {
@@ -1170,15 +1190,15 @@ onMounted(async () => {
   border-radius: 10px;
   font-size: 12.5px;
   font-weight: 700;
-  background: #e3f2fd;
-  color: var(--primary);
-  border: none;
+  background: rgba(var(--rb-primary-rgb), 0.10);
+  color: var(--primary-text);
+  border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .btn-outline-blue:hover {
-  background: #d3e6fa;
+  background: rgba(var(--rb-primary-rgb), 0.18);
 }
 
 .btn-outline-red {
@@ -1189,15 +1209,15 @@ onMounted(async () => {
   border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
-  background: #FDEAEA;
+  background: rgba(var(--rb-accent-rgb), 0.10);
   color: var(--accent);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .btn-outline-red:hover {
-  background: #f9d3d3;
+  background: rgba(var(--rb-accent-rgb), 0.18);
 }
 
 .btn-outline-red:disabled {
@@ -1217,7 +1237,7 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 20px;
   padding: 14px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--rb-border);
 }
 
 .toggle-row:last-child {
@@ -1254,7 +1274,7 @@ onMounted(async () => {
 .toggle-switch__track {
   position: absolute;
   inset: 0;
-  background: #d1d5db;
+  background: var(--rb-border-hover);
   border-radius: 999px;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -1270,7 +1290,7 @@ onMounted(async () => {
   background: #fff;
   border-radius: 50%;
   transition: transform 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .toggle-switch input:checked + .toggle-switch__track {
@@ -1287,14 +1307,14 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 14px;
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--rb-border);
   border-radius: 14px;
   padding: 16px 18px;
   overflow: hidden;
 }
 
 .session-card--current {
-  background: #F8FAFC;
+  background: var(--rb-surface-hover);
 }
 
 .session-card--current::before {
@@ -1311,8 +1331,8 @@ onMounted(async () => {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: #E3F2FD;
-  color: var(--primary);
+  background: rgba(var(--rb-primary-rgb), 0.12);
+  color: var(--primary-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1350,7 +1370,7 @@ onMounted(async () => {
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #E8F5E9;
+  background: rgba(var(--rb-success-rgb), 0.14);
   color: var(--success);
   white-space: nowrap;
   flex-shrink: 0;
@@ -1368,7 +1388,7 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--rb-border);
   font-size: 13px;
 }
 
@@ -1388,14 +1408,17 @@ onMounted(async () => {
   border-radius: 999px;
 }
 
-.status-badge--active { background: #E8F5E9; color: var(--success); }
-.status-badge--inactive { background: #f3f4f6; color: #6b7280; }
-.status-badge--suspended { background: #FDEAEA; color: var(--accent); }
+.status-badge--active { background: rgba(var(--rb-success-rgb), 0.14); color: var(--success); }
+.status-badge--inactive { background: var(--rb-surface-hover); color: var(--text-secondary); }
+.status-badge--suspended { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--accent); }
 
 /* Appearance */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .theme-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
   max-width: 540px;
 }
@@ -1406,10 +1429,10 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--rb-border-strong);
   border-radius: 14px;
   padding: 14px 12px 16px;
-  background: #fff;
+  background: var(--rb-surface);
   cursor: pointer;
   font-size: 12.5px;
   font-weight: 600;
@@ -1418,12 +1441,12 @@ onMounted(async () => {
 }
 
 .theme-card:hover {
-  border-color: #bcd7f2;
+  border-color: var(--rb-border-hover);
 }
 
 .theme-card--active {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
+  border-color: var(--primary-text);
+  box-shadow: 0 0 0 1px var(--primary-text);
 }
 
 .theme-card__preview {
@@ -1499,7 +1522,7 @@ onMounted(async () => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--rb-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1508,13 +1531,13 @@ onMounted(async () => {
 }
 
 .modal-card {
-  background: #fff;
+  background: var(--rb-surface);
   border-radius: 14px;
   width: 100%;
   max-width: 440px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.28);
 }
 
 .modal-card__header {
@@ -1522,7 +1545,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--rb-border);
 }
 
 .modal-card__heading {
@@ -1538,7 +1561,7 @@ onMounted(async () => {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #FDEAEA;
+  background: rgba(var(--rb-accent-rgb), 0.12);
   color: var(--accent);
   flex-shrink: 0;
 }
@@ -1604,6 +1627,15 @@ onMounted(async () => {
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rb-border-hover) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav::-webkit-scrollbar { height: 4px; }
+  .settings-nav::-webkit-scrollbar-thumb {
+    background: var(--rb-border-hover);
+    border-radius: 999px;
   }
 
   .nav-item {

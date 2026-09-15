@@ -436,10 +436,19 @@ function finishVisit() {
 
 <style scoped>
 .collection {
+  /*
+   * This page carried no page shell at all — only a 0.25rem block padding — so
+   * its content ran flush into the layout's edges while every other
+   * blood-centre page sat in a centred 1152px column with 32px gutters.
+   */
+  font-family: var(--rb-font-sans);
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
+  background: var(--rb-page-bg);
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  padding-block: 0.25rem;
 }
 
 .collection__header {
@@ -456,20 +465,21 @@ function finishVisit() {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--rb-primary);
+  color: var(--rb-primary-text);
 }
 
 .collection__title {
   margin: 0.15rem 0 0;
-  font-size: 1.45rem;
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--rb-text-primary);
 }
 
 .collection__subtitle {
   margin: 0.3rem 0 0;
-  max-width: 60ch;
-  font-size: 0.88rem;
+  max-width: 62ch;
+  font-size: 13px;
   color: var(--rb-text-secondary);
 }
 
@@ -518,7 +528,7 @@ function finishVisit() {
   flex: none;
   border-radius: 50%;
   background: rgba(var(--rb-primary-rgb), 0.12);
-  color: var(--rb-primary);
+  color: var(--rb-primary-text);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -565,12 +575,12 @@ function finishVisit() {
   border: 1px solid var(--rb-border);
 }
 
-.pill--scheduled { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary); border-color: transparent; }
+.pill--scheduled { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: transparent; }
 .pill--confirmed,
-.pill--screening { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning); border-color: transparent; }
+.pill--screening { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); border-color: transparent; }
 .pill--completed,
-.pill--collected { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success); border-color: transparent; }
-.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent); border-color: transparent; }
+.pill--collected { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: transparent; }
+.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
 
 /* --- progress --- */
 .steps {
@@ -631,6 +641,12 @@ function finishVisit() {
 
 @media (min-width: 820px) {
   .scan-grid { grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); align-items: start; }
+}
+
+@media (max-width: 640px) {
+  .collection {
+    padding: 16px 16px 32px;
+  }
 }
 
 .lookup {
@@ -735,18 +751,18 @@ function finishVisit() {
 
 .alert--error {
   background: rgba(var(--rb-accent-rgb), 0.1);
-  color: var(--rb-accent);
+  color: var(--rb-accent-text);
   border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
 }
 
 .alert--notice {
   background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary);
+  color: var(--rb-primary-text);
   border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
 }
 
 .outcome { display: flex; align-items: flex-start; gap: 0.75rem; }
-.outcome--success { color: var(--rb-success); }
-.outcome--deferred { color: var(--rb-warning); }
+.outcome--success { color: var(--rb-success-text); }
+.outcome--deferred { color: var(--rb-warning-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
 </style>

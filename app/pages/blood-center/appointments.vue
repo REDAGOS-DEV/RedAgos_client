@@ -24,9 +24,11 @@
             <AssetIcon name="clock" :size="16" />
             Manage Time Slots
           </button>
-          <NuxtLink to="/blood-center/notifications" class="bell-btn" aria-label="Open notifications">
-            <AssetIcon name="bell" :size="16" />
-          </NuxtLink>
+          <!--
+            The bell that stood here linked to /blood-center/notifications,
+            which has no page: the link 404'd. Removed until the page exists,
+            the same call useBloodCenterNav made for Help & Support.
+          -->
         </div>
       </div>
 
@@ -813,7 +815,7 @@ onMounted(async () => {
   --warning: #f57c00;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
-  max-width: 1200px;
+  max-width: 1152px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -866,14 +868,15 @@ onMounted(async () => {
 }
 
 .page-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: -0.02em;
   margin: 0;
   color: var(--text-primary);
 }
 
 .page-subtitle {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text-secondary);
   margin: 4px 0 0;
   line-height: 1.5;
@@ -886,23 +889,6 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.bell-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #eef0f3;
-  color: var(--primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: background-color 0.15s ease;
-}
-
-.bell-btn:hover {
-  background: #f9fafb;
-}
 
 .date-filter-wrap {
   position: relative;
@@ -1056,9 +1042,12 @@ onMounted(async () => {
 }
 
 /* Stat cards */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
 }
 
@@ -1163,35 +1152,57 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
+/*
+ * The panel's bands share one 28px gutter: the header, the tab labels, the
+ * underline beneath the active one, the section label and the first slot card
+ * all start on the same line.
+ *
+ * This strip was `justify-content: center` with a hardcoded `gap: 75px`, so
+ * the tabs sat wherever those two labels happened to centre. Putting the
+ * gutter on the strip and taking the horizontal padding off the tab is what
+ * lets the label and its underline land on the same 28px — with padding on
+ * the tab, only one of the two can.
+ */
 .tabs {
   display: flex;
-  justify-content: center;
-  gap: 75px;
+  justify-content: flex-start;
+  gap: 28px;
   border-bottom: 1px solid #f3f4f6;
-  padding: 0 32px;
+  padding: 0 28px;
   background: #FAFBFC;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .tab {
   background: none;
   border: none;
-  padding: 12px 18px;
+  padding: 14px 0;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  border-radius: 10px 10px 0 0;
+  white-space: nowrap;
   border-bottom: 2px solid transparent;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--rb-primary-text);
+  outline-offset: -2px;
 }
 
 .tab:hover {
   color: var(--text-primary);
 }
 
+/*
+ * Colour plus an underline, not a raised block. A padded block cannot share a
+ * gutter with the text inside it, so its left edge was the one thing in this
+ * panel that lined up with nothing. Same treatment as donors.vue.
+ */
 .tab--active {
   color: var(--primary);
-  background: #fff;
   border-bottom: 2px solid var(--primary);
 }
 
@@ -1287,9 +1298,27 @@ onMounted(async () => {
   background: #fff;
 }
 
+/*
+ * One caret, drawn by us. These were bare native selects while the dashboard
+ * and inventory selects carried a custom chevron, so the same control looked
+ * different depending on which blood-centre page you were on.
+ *
+ * The `background` shorthand is deliberate, and so is repeating it in the dark
+ * rule: a later `background: <colour>` anywhere in the cascade resets
+ * background-image to none, and the dark override for .form-input is exactly
+ * such a rule. Spelling the whole shorthand out in both themes makes the caret
+ * immune to that ordering. #94a3b8 reads on both surfaces, so the glyph itself
+ * does not need to change.
+ */
 .filter-select {
   flex: 1;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: #fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background-size: 10px 6px;
+  padding-right: 32px;
 }
 
 .form-input-icon {
@@ -1891,9 +1920,6 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 900px) {
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .time-slot-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1930,283 +1956,282 @@ onMounted(async () => {
   background: #0F172A;
 }
 
-:global(.dark .stat-card),
-:global(.dark .panel),
-:global(.dark .time-slot-card),
-:global(.dark .appointment-card),
-:global(.dark .drive-card),
-:global(.dark .modal-card),
-:global(.dark .bell-btn),
-:global(.dark .date-filter),
-:global(.dark .form-input),
-:global(.dark .btn-cancel),
-:global(.dark .btn-outline),
-:global(.dark .btn-outline-blue) {
+:global(.dark .appointments-page .stat-card),
+:global(.dark .appointments-page .panel),
+:global(.dark .appointments-page .time-slot-card),
+:global(.dark .appointments-page .appointment-card),
+:global(.dark .appointments-page .drive-card),
+:global(.dark .appointments-page .modal-card),
+:global(.dark .appointments-page .date-filter),
+:global(.dark .appointments-page .form-input),
+:global(.dark .appointments-page .btn-cancel),
+:global(.dark .appointments-page .btn-outline),
+:global(.dark .appointments-page .btn-outline-blue) {
   background: #1E293B;
   border-color: #334155;
 }
 
-:global(.dark .stat-card--blue) { border-top-color: #60A5FA; }
-:global(.dark .stat-card--orange) { border-top-color: #FBBF24; }
-:global(.dark .stat-card--green) { border-top-color: #34D399; }
-:global(.dark .stat-card--red) { border-top-color: #F87171; }
-
-:global(.dark .stat-card__value),
-:global(.dark .page-title),
-:global(.dark .panel-title),
-:global(.dark .section-label),
-:global(.dark .slot-time),
-:global(.dark .appt-name),
-:global(.dark .drive-card__title),
-:global(.dark .donor-row__name),
-:global(.dark .modal-card__title),
-:global(.dark .form-label--muted) {
+/* After the rule above, whose `background` shorthand would otherwise reset
+   the caret to none. */
+:global(.dark .appointments-page .filter-select) {
+  background: #1E293B url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background-size: 10px 6px;
+  border-color: #334155;
   color: #F1F5F9;
 }
 
-:global(.dark .stat-card__label),
-:global(.dark .page-subtitle),
-:global(.dark .appt-meta),
-:global(.dark .appt-screening),
-:global(.dark .drive-card__meta),
-:global(.dark .drive-progress-label),
-:global(.dark .progress-meta),
-:global(.dark .drive-note),
-:global(.dark .preview-label),
-:global(.dark .donor-row__meta),
-:global(.dark .empty-state),
-:global(.dark .modal-subtitle),
-:global(.dark .form-label) {
+:global(.dark .appointments-page .stat-card--blue) { border-top-color: #60A5FA; }
+:global(.dark .appointments-page .stat-card--orange) { border-top-color: #FBBF24; }
+:global(.dark .appointments-page .stat-card--green) { border-top-color: #34D399; }
+:global(.dark .appointments-page .stat-card--red) { border-top-color: #F87171; }
+
+:global(.dark .appointments-page .stat-card__value),
+:global(.dark .appointments-page .page-title),
+:global(.dark .appointments-page .panel-title),
+:global(.dark .appointments-page .section-label),
+:global(.dark .appointments-page .slot-time),
+:global(.dark .appointments-page .appt-name),
+:global(.dark .appointments-page .drive-card__title),
+:global(.dark .appointments-page .donor-row__name),
+:global(.dark .appointments-page .modal-card__title),
+:global(.dark .appointments-page .form-label--muted) {
+  color: #F1F5F9;
+}
+
+:global(.dark .appointments-page .stat-card__label),
+:global(.dark .appointments-page .page-subtitle),
+:global(.dark .appointments-page .appt-meta),
+:global(.dark .appointments-page .appt-screening),
+:global(.dark .appointments-page .drive-card__meta),
+:global(.dark .appointments-page .drive-progress-label),
+:global(.dark .appointments-page .progress-meta),
+:global(.dark .appointments-page .drive-note),
+:global(.dark .appointments-page .preview-label),
+:global(.dark .appointments-page .donor-row__meta),
+:global(.dark .appointments-page .empty-state),
+:global(.dark .appointments-page .modal-subtitle),
+:global(.dark .appointments-page .form-label) {
   color: #94A3B8;
 }
 
-:global(.dark .stat-card__icon--blue) { background: #1E3A5F; color: #60A5FA; }
-:global(.dark .stat-card__icon--orange) { background: #3E2C1A; color: #FBBF24; }
-:global(.dark .stat-card__icon--green) { background: #1A3A2A; color: #34D399; }
-:global(.dark .stat-card__icon--red) { background: #3A1A1A; color: #F87171; }
+:global(.dark .appointments-page .stat-card__icon--blue) { background: #1E3A5F; color: #60A5FA; }
+:global(.dark .appointments-page .stat-card__icon--orange) { background: #3E2C1A; color: #FBBF24; }
+:global(.dark .appointments-page .stat-card__icon--green) { background: #1A3A2A; color: #34D399; }
+:global(.dark .appointments-page .stat-card__icon--red) { background: #3A1A1A; color: #F87171; }
 
 
-:global(.dark .panel) {
+:global(.dark .appointments-page .panel) {
   border-color: #334155;
 }
 
-:global(.dark .tabs) {
+:global(.dark .appointments-page .tabs) {
   background: #0F172A;
   border-bottom-color: #334155;
 }
 
-:global(.dark .tab) {
+:global(.dark .appointments-page .tab) {
   color: #94A3B8;
 }
-:global(.dark .tab:hover) {
+:global(.dark .appointments-page .tab:hover) {
   color: #F1F5F9;
 }
-:global(.dark .tab--active) {
+:global(.dark .appointments-page .tab--active) {
   color: #60A5FA;
-  background: #1E293B;
   border-bottom-color: #60A5FA;
 }
 
-:global(.dark .time-slot-card) {
+:global(.dark .appointments-page .time-slot-card) {
   border-color: #334155;
   background: #1E293B;
 }
-:global(.dark .time-slot-card:hover) {
+:global(.dark .appointments-page .time-slot-card:hover) {
   border-color: #60A5FA;
   background: #263449;
 }
-:global(.dark .time-slot-card--selected) {
+:global(.dark .appointments-page .time-slot-card--selected) {
   border-color: #60A5FA;
   background: #1A3A5F;
   box-shadow: 0 0 0 1px #60A5FA;
 }
-:global(.dark .time-slot-card--full) {
+:global(.dark .appointments-page .time-slot-card--full) {
   border-color: #F87171;
   background: #2D1A1A;
 }
-:global(.dark .slot-count--full) {
+:global(.dark .appointments-page .slot-count--full) {
   color: #F87171;
 }
 
-:global(.dark .form-input) {
+:global(.dark .appointments-page .form-input) {
   background: #1E293B;
   color: #F1F5F9;
   border-color: #334155;
 }
-:global(.dark .form-input:focus) {
+:global(.dark .appointments-page .form-input:focus) {
   border-color: #60A5FA;
   background: #263449;
 }
-:global(.dark .form-input-icon__icon) {
+:global(.dark .appointments-page .form-input-icon__icon) {
   color: #94A3B8;
 }
 
-:global(.dark .appointment-card) {
+:global(.dark .appointments-page .appointment-card) {
   border-color: #334155;
   background: #1E293B;
 }
-:global(.dark .appointment-card:hover) {
+:global(.dark .appointments-page .appointment-card:hover) {
   border-color: #60A5FA;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
-:global(.dark .appt-date-badge) {
+:global(.dark .appointments-page .appt-date-badge) {
   background: #1A3A5F;
   color: #60A5FA;
 }
 
-:global(.dark .view-link) {
+:global(.dark .appointments-page .view-link) {
   color: #60A5FA;
 }
 
-:global(.dark .pill--outline) {
+:global(.dark .appointments-page .pill--outline) {
   background: #1E293B;
   border-color: #475569;
   color: #94A3B8;
 }
-:global(.dark .pill--blood) {
+:global(.dark .appointments-page .pill--blood) {
   background: #2D1A1A;
   color: #F87171;
 }
-:global(.dark .pill--arrived),
-:global(.dark .pill--donated) {
+:global(.dark .appointments-page .pill--arrived),
+:global(.dark .appointments-page .pill--donated) {
   background: #1A3A2A;
   color: #34D399;
 }
-:global(.dark .pill--confirmed),
-:global(.dark .pill--attended) {
+:global(.dark .appointments-page .pill--confirmed),
+:global(.dark .appointments-page .pill--attended) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-:global(.dark .pill--no-show) {
+:global(.dark .appointments-page .pill--no-show) {
   background: #2D1A1A;
   color: #F87171;
 }
-:global(.dark .pill--cancelled) {
+:global(.dark .appointments-page .pill--cancelled) {
   background: rgba(156, 163, 175, 0.16);
   color: #d1d5db;
 }
 
-:global(.dark .pill--pending),
-:global(.dark .pill--scheduled) {
+:global(.dark .appointments-page .pill--pending),
+:global(.dark .appointments-page .pill--scheduled) {
   background: #3E2C1A;
   color: #FBBF24;
 }
 
-:global(.dark .screening-status--passed) { color: #34D399; }
-:global(.dark .screening-status--failed) { color: #F87171; }
-:global(.dark .screening-status--pending) { color: #FBBF24; }
+:global(.dark .appointments-page .screening-status--passed) { color: #34D399; }
+:global(.dark .appointments-page .screening-status--failed) { color: #F87171; }
+:global(.dark .appointments-page .screening-status--pending) { color: #FBBF24; }
 
-:global(.dark .drive-card) {
+:global(.dark .appointments-page .drive-card) {
   border-color: #334155;
 }
 
-:global(.dark .status-badge--upcoming) {
+:global(.dark .appointments-page .status-badge--upcoming) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-:global(.dark .status-badge--open) {
+:global(.dark .appointments-page .status-badge--open) {
   background: #1A3A2A;
   color: #34D399;
 }
-:global(.dark .status-badge--closed) {
+:global(.dark .appointments-page .status-badge--closed) {
   background: #1E293B;
   color: #94A3B8;
 }
 
-:global(.dark .progress-track) {
+:global(.dark .appointments-page .progress-track) {
   background: #334155;
 }
-:global(.dark .progress-fill) {
+:global(.dark .appointments-page .progress-fill) {
   background: #60A5FA;
 }
-:global(.dark .progress-fill--full) {
+:global(.dark .appointments-page .progress-fill--full) {
   background: #34D399;
 }
 
-:global(.dark .preview-label),
-:global(.dark .drive-card__actions) {
+:global(.dark .appointments-page .preview-label),
+:global(.dark .appointments-page .drive-card__actions) {
   border-top-color: #334155;
 }
 
-:global(.dark .donor-row__avatar) {
+:global(.dark .appointments-page .donor-row__avatar) {
   color: #fff;
 }
 
-:global(.dark .btn-primary) {
+:global(.dark .appointments-page .btn-primary) {
   background: #60A5FA;
   color: #0F172A;
 }
-:global(.dark .btn-primary:hover) {
+:global(.dark .appointments-page .btn-primary:hover) {
   opacity: 0.9;
 }
-:global(.dark .btn-cancel) {
+:global(.dark .appointments-page .btn-cancel) {
   background: #263449;
   color: #F1F5F9;
 }
-:global(.dark .btn-cancel:hover) {
+:global(.dark .appointments-page .btn-cancel:hover) {
   background: #334155;
 }
-:global(.dark .btn-outline) {
+:global(.dark .appointments-page .btn-outline) {
   background: #263449;
   color: #F1F5F9;
 }
-:global(.dark .btn-outline:hover) {
+:global(.dark .appointments-page .btn-outline:hover) {
   background: #334155;
 }
-:global(.dark .btn-outline-blue) {
+:global(.dark .appointments-page .btn-outline-blue) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-:global(.dark .btn-outline-blue:hover) {
+:global(.dark .appointments-page .btn-outline-blue:hover) {
   background: #1E4A7A;
 }
-:global(.dark .btn-clear-date) {
+:global(.dark .appointments-page .btn-clear-date) {
   background: #263449;
   color: #F1F5F9;
 }
-:global(.dark .btn-clear-date:hover) {
+:global(.dark .appointments-page .btn-clear-date:hover) {
   background: #334155;
 }
-:global(.dark .bell-btn) {
-  background: #1E293B;
-  border-color: #334155;
-  color: #60A5FA;
-}
-:global(.dark .bell-btn:hover) {
-  background: #263449;
-}
 
-:global(.dark .modal-overlay) {
+:global(.dark .appointments-page .modal-overlay) {
   background: rgba(0, 0, 0, 0.7);
 }
-:global(.dark .modal-card__header) {
+:global(.dark .appointments-page .modal-card__header) {
   border-bottom-color: #334155;
 }
-:global(.dark .modal-card__close) {
+:global(.dark .appointments-page .modal-card__close) {
   color: #94A3B8;
 }
-:global(.dark .modal-card__close:hover) {
+:global(.dark .appointments-page .modal-card__close:hover) {
   color: #F1F5F9;
 }
-:global(.dark .modal-error) {
+:global(.dark .appointments-page .modal-error) {
   color: #F87171;
 }
 
-:global(.dark .error-banner) {
+:global(.dark .appointments-page .error-banner) {
   background: rgba(239, 83, 80, 0.10);
   color: #EF9A9A;
   border-color: rgba(239, 83, 80, 0.24);
 }
 
-:global(.dark .stepper__btn) {
+:global(.dark .appointments-page .stepper__btn) {
   color: #94A3B8;
 }
-:global(.dark .stepper__btn:hover) {
+:global(.dark .appointments-page .stepper__btn:hover) {
   color: #60A5FA;
 }
 
-:global(.dark .skeleton-block) {
+:global(.dark .appointments-page .skeleton-block) {
   background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
   background-size: 400% 100%;
   animation: skeleton-loading-dark 1.4s ease infinite;
@@ -2217,7 +2242,7 @@ onMounted(async () => {
   100% { background-position: 0 50%; }
 }
 
-:global(.dark .btn-link) {
+:global(.dark .appointments-page .btn-link) {
   color: #60A5FA;
 }
 
@@ -2225,7 +2250,6 @@ onMounted(async () => {
 .btn-outline:focus-visible,
 .btn-outline-blue:focus-visible,
 .btn-cancel:focus-visible,
-.bell-btn:focus-visible,
 .btn-link:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;

@@ -936,17 +936,31 @@ onMounted(() => {
 <style scoped>
 /* TOKENS */
 .page {
+  /*
+   * Two families. The `-fill` tokens are the surfaces that carry white text,
+   * so they stay deep in both themes; the plain names are the colours used AS
+   * text and icons, and those lift in the dark block below. Left as one set,
+   * every status pill, trend arrow and stage badge sat between 2.2:1 and 3:1
+   * on a dark card.
+   */
   --primary: #1565c0;
-  --primary-hover: #0d47a1;
+  --primary-fill: #1565c0;
+  --primary-fill-hover: #0d47a1;
   --bg: #F7F8FA;
   --card: #ffffff;
   --border: #e5eaf0;
   --text: #1e293b;
   --text-secondary: #64748b;
   --success: #2e7d32;
-  --warning: #f59e0b;
+  --success-fill: #2e7d32;
+  /* amber-500 is 2.1:1 on the pale tint it sits on; amber-700 reads. The
+     fill keeps the brighter value — nothing writes on it. */
+  --warning: #b45309;
+  --warning-fill: #f59e0b;
   --danger: #d32f2f;
+  --danger-fill: #d32f2f;
   --info: #2563eb;
+  --info-fill: #2563eb;
   --purple: #7c3aed;
   --radius: 14px;
   --card-padding: 24px;
@@ -955,11 +969,14 @@ onMounted(() => {
   background: var(--bg);
   color: var(--text);
   font-family: var(--rb-font-sans);
-  padding: 32px;
+  /* Same column as every other blood-centre page, so a user moving between
+     them does not see the content jump width and the gutters change. */
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  min-height: 100vh;
 }
 
 /* TOASTS */
@@ -973,31 +990,33 @@ onMounted(() => {
 }
 .toast-title { font-size: 13px; font-weight: 600; }
 .toast-message { font-size: 12.5px; font-weight: 400; line-height: 1.55; margin-top: 2px; }
-.toast--success { background: var(--success); }
-.toast--danger { background: var(--danger); }
+.toast--success { background: var(--success-fill); }
+.toast--danger { background: var(--danger-fill); }
 .toast--warning { background: #B45309; }
-.toast--info { background: var(--info); }
+.toast--info { background: var(--info-fill); }
 .toast-enter-active, .toast-leave-active { transition: all 0.25s ease; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(20px); }
 
 /* HEADER */
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
-.page-title { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
-.page-subtitle { font-size: 14px; color: var(--text-secondary); margin: 0; }
+.page-title { font-size: 20px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin: 0; }
 .header-actions { display: flex; gap: 10px; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 6px; border-radius: 10px;
-  font-size: 14px; font-weight: 600; padding: 10px 16px; cursor: pointer;
-  border: 1px solid transparent; transition: all 0.15s ease;
+  font-size: 13px; font-weight: 700; padding: 10px 16px; cursor: pointer;
+  border: 1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.btn-sm { padding: 7px 12px; font-size: 13px; }
+
+.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.btn-sm { padding: 8px 14px; font-size: 12px; }
 .btn-xs { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-primary { background: var(--primary-fill); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-fill-hover); }
 .btn-outline { background: var(--card); color: var(--text); border-color: var(--border); }
 .btn-outline:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
-.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger { background: var(--danger-fill); color: #fff; }
 .btn-danger:hover:not(:disabled) { background: #a82424; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -1027,20 +1046,23 @@ onMounted(() => {
 }
 .emergency-main { display: flex; gap: 14px; }
 .emergency-icon {
-  width: 36px; height: 36px; border-radius: 10px; background: var(--danger); color: #fff;
+  width: 36px; height: 36px; border-radius: 10px; background: var(--danger-fill); color: #fff;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .emergency-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .emergency-title { font-weight: 600; font-size: 15px; color: #C62828; }
 .emergency-id { font-size: 12px; color: var(--text-secondary); font-family: monospace; }
-.emergency-grid { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 10px 24px; }
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
+.emergency-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 24px; }
 .e-label { display: block; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 .e-value { display: block; font-size: 14px; font-weight: 600; }
 .insufficient-tag { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #C62828; }
 .emergency-actions { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
 
 /* SUMMARY CARDS */
-.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .summary-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: var(--card-padding); display: flex; gap: 14px; box-shadow: var(--shadow);
@@ -1065,7 +1087,7 @@ onMounted(() => {
   cursor: pointer; transition: all 0.15s ease;
 }
 .pill:hover { border-color: var(--primary); color: var(--primary); }
-.pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.pill.active { background: var(--primary-fill); border-color: var(--primary-fill); color: #fff; }
 
 /* TOOLBAR */
 .toolbar {
@@ -1148,7 +1170,7 @@ onMounted(() => {
 /* EXPANDED ROW */
 .expanded-row td { padding: 0; }
 .expanded-content { background: var(--bg); padding: 18px 20px; border-bottom: 1px solid var(--border); }
-.expanded-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 20px; margin-bottom: 14px; }
+.expanded-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 20px; margin-bottom: 14px; }
 .expanded-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* skeleton / empty */
@@ -1198,7 +1220,7 @@ onMounted(() => {
 .health-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
 .health-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
 .health-fill.inv-ok { background: var(--success); }
-.health-fill.inv-low { background: var(--warning); }
+.health-fill.inv-low { background: var(--warning-fill); }
 .health-fill.inv-insufficient { background: var(--danger); }
 
 .timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -1241,13 +1263,8 @@ onMounted(() => {
 .drawer-enter-from .drawer, .drawer-leave-to .drawer { transform: translateX(100%); }
 
 /* RESPONSIVE */
-@media (max-width: 1100px) {
-  .summary-grid { grid-template-columns: repeat(2, 1fr); }
-  .emergency-grid { grid-template-columns: repeat(2, 1fr); }
-  .expanded-grid { grid-template-columns: repeat(2, 1fr); }
-}
 @media (max-width: 640px) {
-  .page { padding: 18px; }
+  .page { padding: 16px 16px 32px; }
   .summary-grid { grid-template-columns: 1fr; }
   .emergency-banner { flex-direction: column; }
   .emergency-actions { flex-wrap: wrap; }
@@ -1257,40 +1274,55 @@ onMounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .summary-card, .pill, .table-row, .drawer, .health-fill, .spinning { transition: none !important; animation: none !important; }
 }
-/* DARK MODE — :global(.dark .selector), NOT :global(.dark) .selector */
+/*
+ * DARK MODE. Two rules about the selectors here, both learned the hard way:
+ *
+ *  - `:global(.dark) .selector` does NOT work — this toolchain drops the
+ *    descendant half and emits a bare `.dark { … }`, putting the declaration
+ *    on <html>.
+ *  - `:global(.dark .selector)` works but is fully global, so it must be
+ *    anchored on `.page`. Unanchored, these rules matched .summary-card,
+ *    .table-row and friends on every other page in the app the moment this
+ *    route's stylesheet was fetched.
+ */
 :global(.dark .page) {
   --bg: #0F172A; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
+  /* Only the text family lifts; the -fill tokens keep their deep values so
+     white-on-fill buttons and toasts stay legible. */
+  --primary: #64b5f6; --success: #66bb6a; --warning: #fbbf24;
+  --danger: #f87171; --info: #60a5fa; --purple: #a78bfa;
+  --primary-fill-hover: #1976d2;
 }
-:global(.dark .summary-icon) { background: #1c2a42; }
-:global(.dark .summary-icon.is-danger) { background: #3a1f22; }
-:global(.dark .emergency-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); }
-:global(.dark .retry-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); color: #EF9A9A; }
-:global(.dark .blood-pill) { background: #3a1f22; }
-:global(.dark .inv-ok) { background: #16301c; }
-:global(.dark .inv-low) { background: #3a2c10; }
-:global(.dark .inv-insufficient) { background: #3a1f22; }
-:global(.dark .inventory-status-line.inv-ok) { background: #16301c; }
-:global(.dark .inventory-status-line.inv-low) { background: #3a2c10; }
-:global(.dark .inventory-status-line.inv-insufficient) { background: #3a1f22; }
-:global(.dark .status-pending) { background: #1e2635; }
-:global(.dark .status-under-review) { background: #16223a; }
-:global(.dark .status-approved) { background: #16301c; }
-:global(.dark .status-rejected) { background: #3a1f22; }
-:global(.dark .status-ready-for-fulfillment) { background: #2a1f42; }
-:global(.dark .table-row:hover) { background: #1c2536; }
-:global(.dark .expanded-content) { background: #141b29; }
-:global(.dark .skeleton-row),
-:global(.dark .skeleton-card) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
-:global(.dark .notes-block),
-:global(.dark .batch-row),
-:global(.dark .modal-summary),
-:global(.dark .field-select),
-:global(.dark .field-textarea),
-:global(.dark .toolbar-search input),
-:global(.dark .toolbar select),
-:global(.dark .toolbar input[type="date"]) { background: #1c2536; }
-:global(.dark .context-menu),
-:global(.dark .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+:global(.dark .page .summary-icon) { background: #1c2a42; }
+:global(.dark .page .summary-icon.is-danger) { background: #3a1f22; }
+:global(.dark .page .emergency-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); }
+:global(.dark .page .retry-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); color: #EF9A9A; }
+:global(.dark .page .blood-pill) { background: #3a1f22; }
+:global(.dark .page .inv-ok) { background: #16301c; }
+:global(.dark .page .inv-low) { background: #3a2c10; }
+:global(.dark .page .inv-insufficient) { background: #3a1f22; }
+:global(.dark .page .inventory-status-line.inv-ok) { background: #16301c; }
+:global(.dark .page .inventory-status-line.inv-low) { background: #3a2c10; }
+:global(.dark .page .inventory-status-line.inv-insufficient) { background: #3a1f22; }
+:global(.dark .page .status-pending) { background: #1e2635; }
+:global(.dark .page .status-under-review) { background: #16223a; }
+:global(.dark .page .status-approved) { background: #16301c; }
+:global(.dark .page .status-rejected) { background: #3a1f22; }
+:global(.dark .page .status-ready-for-fulfillment) { background: #2a1f42; }
+:global(.dark .page .table-row:hover) { background: #1c2536; }
+:global(.dark .page .expanded-content) { background: #141b29; }
+:global(.dark .page .skeleton-row),
+:global(.dark .page .skeleton-card) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
+:global(.dark .page .notes-block),
+:global(.dark .page .batch-row),
+:global(.dark .page .modal-summary),
+:global(.dark .page .field-select),
+:global(.dark .page .field-textarea),
+:global(.dark .page .toolbar-search input),
+:global(.dark .page .toolbar select),
+:global(.dark .page .toolbar input[type="date"]) { background: #1c2536; }
+:global(.dark .page .context-menu),
+:global(.dark .page .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 
 .btn:focus-visible,
 .icon-btn:focus-visible,

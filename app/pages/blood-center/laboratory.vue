@@ -24,10 +24,10 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 // mao nay mo-explain ngano — mas maayo na kaysa sample number nga mabasa nga
 // tinuod.
 const stats = computed(() => [
-  { label: 'Awaiting Screening', value: null, caption: 'Donations registered', icon: 'clipboard-check', tone: 'var(--rb-primary)' },
-  { label: 'In Processing', value: null, caption: 'Collected, not yet tested', icon: 'flask-conical', tone: 'var(--rb-warning)' },
-  { label: 'Tested', value: null, caption: 'Results recorded', icon: 'check-circle', tone: 'var(--rb-teal)' },
-  { label: 'Cleared for Inventory', value: null, caption: 'Completed donations', icon: 'package', tone: 'var(--rb-success)' },
+  { label: 'Awaiting Screening', value: null, caption: 'Donations registered', icon: 'clipboard-check', tone: 'var(--rb-primary-text)' },
+  { label: 'In Processing', value: null, caption: 'Collected, not yet tested', icon: 'flask-conical', tone: 'var(--rb-warning-text)' },
+  { label: 'Tested', value: null, caption: 'Results recorded', icon: 'check-circle', tone: 'var(--rb-teal-text)' },
+  { label: 'Cleared for Inventory', value: null, caption: 'Completed donations', icon: 'package', tone: 'var(--rb-success-text)' },
 ])
 
 const panels = [
