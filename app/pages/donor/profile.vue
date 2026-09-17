@@ -210,6 +210,7 @@
               <div class="form-field">
                 <label class="form-label">Blood type</label>
                 <select v-model="profileForm.blood_type" class="form-input">
+                  <option value="">Not known yet</option>
                   <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
                 </select>
               </div>
@@ -371,7 +372,10 @@ async function load({ silent = false } = {}) {
     profileForm.first_name = res.first_name || ''
     profileForm.last_name = res.last_name || ''
     profileForm.date_of_birth = res.date_of_birth || ''
-    profileForm.blood_type = res.blood_type || 'O+'
+    // Never fall back to a real blood type. A donor who has none on file would
+    // otherwise see one pre-selected and save it by editing something else
+    // entirely, recording a type nobody tested.
+    profileForm.blood_type = res.blood_type || ''
     profileForm.contact_number = res.contact_number || ''
     profileForm.email = user.value?.email || ''
     profileForm.address = res.address || ''

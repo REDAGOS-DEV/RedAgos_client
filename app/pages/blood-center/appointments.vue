@@ -40,7 +40,7 @@
 
       <!-- Stat cards -->
       <div class="stats-row">
-        <div class="stat-card stat-card--blue">
+        <div class="stat-card">
           <div class="stat-card__icon stat-card__icon--blue">
             <AssetIcon name="user-check" :size="18" />
           </div>
@@ -50,7 +50,7 @@
               stats.todayWalkIns }}</p>
           </div>
         </div>
-        <div class="stat-card stat-card--orange">
+        <div class="stat-card">
           <div class="stat-card__icon stat-card__icon--orange">
             <AssetIcon name="check-circle" :size="18" />
           </div>
@@ -60,7 +60,7 @@
               stats.confirmedArrived }}</p>
           </div>
         </div>
-        <div class="stat-card stat-card--green">
+        <div class="stat-card">
           <div class="stat-card__icon stat-card__icon--green">
             <AssetIcon name="droplets" :size="18" />
           </div>
@@ -70,7 +70,7 @@
               stats.donatedToday }}</p>
           </div>
         </div>
-        <div class="stat-card stat-card--red">
+        <div class="stat-card">
           <div class="stat-card__icon stat-card__icon--red">
             <AssetIcon name="user-x" :size="18" />
           </div>
@@ -1055,27 +1055,12 @@ onMounted(async () => {
   background: #fff;
   border-radius: 14px;
   border: 1px solid #eef0f3;
-  border-top: 3px solid transparent;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   padding: 20px 22px;
   display: flex;
   align-items: flex-start;
   gap: 14px;
 }
-
-.stat-card--blue {
-  border-top-color: var(--primary);
-}
-.stat-card--orange {
-  border-top-color: var(--warning);
-}
-.stat-card--green {
-  border-top-color: var(--success);
-}
-.stat-card--red {
-  border-top-color: var(--accent);
-}
-
 
 .stat-card__icon {
   width: 40px;
@@ -1979,11 +1964,6 @@ onMounted(async () => {
   border-color: #334155;
   color: #F1F5F9;
 }
-
-:global(.dark .appointments-page .stat-card--blue) { border-top-color: #60A5FA; }
-:global(.dark .appointments-page .stat-card--orange) { border-top-color: #FBBF24; }
-:global(.dark .appointments-page .stat-card--green) { border-top-color: #34D399; }
-:global(.dark .appointments-page .stat-card--red) { border-top-color: #F87171; }
 
 :global(.dark .appointments-page .stat-card__value),
 :global(.dark .appointments-page .page-title),

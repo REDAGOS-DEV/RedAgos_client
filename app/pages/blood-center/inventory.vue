@@ -29,10 +29,10 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': syncing }" />
               {{ syncing ? 'Syncing…' : 'Sync Inventory' }}
             </button>
-            <button type="button" class="btn-primary" @click="openAddBatchModal">
+            <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
               <AssetIcon name="plus" :size="15" />
-              Add Inventory Batch
-            </button>
+              Record Stock
+            </NuxtLink>
           </div>
         </div>
       </div>
@@ -203,10 +203,10 @@
           <AssetIcon name="inbox" :size="40" style="color: var(--rb-border-strong)" />
           <p class="empty-state__title">No Inventory Found</p>
           <p class="empty-state__desc">No blood inventory matches your current filters.</p>
-          <button type="button" class="btn-primary" @click="openAddBatchModal">
+          <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
             <AssetIcon name="plus" :size="14" />
-            Add Inventory Batch
-          </button>
+            Record Stock
+          </NuxtLink>
         </div>
 
         <div v-else class="inventory-table-wrap">
@@ -607,78 +607,52 @@
               <AssetIcon name="x" :size="16" />
             </button>
 
-            <h3 class="modal-title modal-title--left">{{ batchModalMode === 'edit' ? 'Edit Inventory' : 'Add Inventory Batch' }}</h3>
-            <p class="modal-subtitle modal-subtitle--left">{{ batchModalMode === 'edit' ? 'Update this inventory batch record.' : 'Log a new inventory batch into the system.' }}</p>
+            <h3 class="modal-title modal-title--left">Edit unit {{ editingBatchId }}</h3>
+            <p class="modal-subtitle modal-subtitle--left">
+              Only where a unit is kept and when it expires can be changed. Its blood type, component and
+              donation are facts about the donation it came from, so they are fixed here.
+            </p>
 
             <form class="batch-form" @submit.prevent="submitBatchForm">
-              <p class="batch-form__section">Inventory Information</p>
-              <div class="form-row">
-                <label class="form-field">
-                  <span class="form-field__label">Blood Type *</span>
-                  <select v-model="batchForm.bloodType" required class="form-field__input form-field__select">
-                    <option value="" disabled>Select</option>
-                    <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                </label>
-                <label class="form-field">
-                  <span class="form-field__label">Component *</span>
-                  <select v-model="batchForm.component" required class="form-field__input form-field__select">
-                    <option value="" disabled>Select</option>
-                    <option v-for="c in componentOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
-                  </select>
-                </label>
-              </div>
-              <label class="form-field">
-                <span class="form-field__label">Available Units *</span>
-                <input v-model.number="batchForm.availableUnits" type="number" min="0" required class="form-field__input" />
-              </label>
-
-              <p class="batch-form__section">Collection Details</p>
-              <div class="form-row">
-                <label class="form-field">
-                  <span class="form-field__label">Collection Date *</span>
-                  <input v-model="batchForm.collectionDate" type="date" required class="form-field__input" />
-                </label>
-                <label class="form-field">
-                  <span class="form-field__label">Expiry Date *</span>
-                  <input v-model="batchForm.expiryDate" type="date" required class="form-field__input" />
-                </label>
-              </div>
-              <label class="form-field">
-                <span class="form-field__label">Donation Source</span>
-                <input v-model="batchForm.donationSource" type="text" placeholder="e.g. Mobile blood drive, walk-in donor" class="form-field__input" />
-              </label>
-
+              <p class="batch-form__section">Unit</p>
               <div class="form-row">
                 <label class="form-field">
                   <span class="form-field__label">Storage Location</span>
                   <select v-model="batchForm.storageLocation" class="form-field__input form-field__select">
-                    <option value="" disabled>Select</option>
+                    <option value="">Not recorded</option>
                     <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
                   </select>
                 </label>
                 <label class="form-field">
-                  <span class="form-field__label">Batch Number</span>
-                  <input v-model="batchForm.batchNumber" type="text" placeholder="Auto-generated if left blank" class="form-field__input" />
+                  <span class="form-field__label">Expiry Date</span>
+                  <input v-model="batchForm.expiryDate" type="date" class="form-field__input" >
                 </label>
               </div>
-
-              <label class="form-field">
-                <span class="form-field__label">Notes</span>
-                <textarea v-model="batchForm.notes" rows="3" placeholder="Optional remarks…" class="form-field__input form-field__textarea" />
-              </label>
 
               <p v-if="batchFormError" class="form-error">{{ batchFormError }}</p>
 
               <div class="modal-actions">
                 <button type="submit" class="btn-primary modal-actions__btn" :disabled="batchSubmitting">
                   <AssetIcon name="circle-check" :size="15" />
-                  {{ batchSubmitting ? 'Saving…' : (batchModalMode === 'edit' ? 'Save Changes' : 'Add Batch') }}
+                  {{ batchSubmitting ? 'Saving…' : 'Save Changes' }}
                 </button>
                 <button type="button" class="btn-outline modal-actions__btn" @click="closeBatchModal" :disabled="batchSubmitting">Cancel</button>
               </div>
             </form>
           </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Says why an action did nothing, rather than closing a modal in silence. -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="manageActionNote" class="inventory-toast" role="status">
+          <AssetIcon name="circle-alert" :size="15" />
+          <span>{{ manageActionNote }}</span>
+          <button type="button" class="inventory-toast__close" aria-label="Dismiss" @click="manageActionNote = ''">
+            <AssetIcon name="x" :size="13" />
+          </button>
         </div>
       </Transition>
     </Teleport>
@@ -905,6 +879,7 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || user
 const loading = ref(true)
 const syncing = ref(false)
 const lastSyncedLabel = ref('')
+const inventorySummaryData = ref(null)
 
 // --- Reference/dropdown data — (/blood-center/reference-data) endpoint ---
 const bloodTypeOptions = ref([])
@@ -1024,23 +999,27 @@ const paginatedBatches = computed(() => {
 
 // --- Blood type summary cards ---
 const bloodTypeSummary = computed(() => {
-  const order = bloodTypeOptions.value.length ? bloodTypeOptions.value : []
-  return order.map(bt => {
-    const rows = inventoryBatches.value.filter(r => r.blood_type === bt)
-    const total = rows.reduce((sum, r) => sum + (r.available_units || 0), 0)
-    const criticalCount = rows.filter(r => r.status === 'critical').length
-    const lowCount = rows.filter(r => r.status === 'low').length
-    let health = 'healthy'
-    if (criticalCount) health = 'critical'
-    else if (lowCount) health = 'low'
+  // Counted by the server rather than re-derived from the rows on this page:
+  // those rows are one page of units, so summing them would report a page
+  // total as though it were the facility's whole stock.
+  const available = new Map(
+    (inventorySummaryData.value?.by_blood_type ?? []).map(row => [row.code, row.available])
+  )
+
+  return bloodTypeOptions.value.map(code => {
+    const total = available.get(code) ?? 0
+
+    // Only the two ends are claimed. Grading "low" needs a per-type minimum
+    // that nothing in this system configures, and inventing a threshold here
+    // would put a stock-level judgement on screen that nobody has made. The
+    // old code read r.status === 'critical' | 'low', which are not unit
+    // statuses at all, so every card reported "Healthy" regardless.
+    const health = total === 0 ? 'critical' : 'healthy'
+
     const maxRef = 120
     const progress = Math.min(100, Math.round((total / maxRef) * 100))
-    const lastUpdated = rows
-      .map(r => r.last_updated)
-      .filter(Boolean)
-      .sort()
-      .slice(-1)[0]
-    return { blood_type: bt, total_units: total, health, progress, last_updated: lastUpdated }
+
+    return { blood_type: code, total_units: total, health, progress, last_updated: null }
   })
 })
 
@@ -1132,8 +1111,11 @@ function handleRowAction(action, row) {
     return
   }
   if (action === 'mark-expiring') {
-    // i-connect sa /blood-center/inventory/:id/mark-expiring endpoint
-    bloodCenterService.markAsExpiring?.(row.id)
+    // Nothing to call. A unit expires from the expiry_date it already carries,
+    // swept server-side, so there is no flag to set by hand. This previously
+    // called markAsExpiring?.(), which does not exist and did nothing. Editing
+    // the date is the only real action, so offer that.
+    openEditBatchModal(row)
   }
 }
 
@@ -1287,10 +1269,11 @@ const quickActions = [
     tier: 'primary',
   },
   {
-    label: 'Add Inventory Batch',
-    description: 'Add collected units to inventory.',
+    label: 'Record Stock',
+    description: 'Book a cleared donation onto the shelf.',
     icon: 'plus',
-    kind: 'modal',
+    kind: 'link',
+    to: '/blood-center/inventory-intake',
     tier: 'primary',
   },
   {
@@ -1319,7 +1302,6 @@ const primaryQuickActions = computed(() => quickActions.filter(a => a.tier === '
 const secondaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'secondary'))
 
 function handleQuickAction(action) {
-  if (action.kind === 'modal') return openAddBatchModal()
   if (action.kind === 'manage') return openManageModal(null, 'transfer')
   if (action.kind === 'print') return openPrintLabelsModal()
   if (action.kind === 'report') {
@@ -1331,8 +1313,8 @@ function handleQuickAction(action) {
 async function syncInventory() {
   syncing.value = true
   try {
-    // i-connect sa /blood-center/inventory/sync endpoint
-    await bloodCenterService.syncInventory?.()
+    // There is no /inventory/sync endpoint and never was. Re-reading the
+    // facility's stock is all "sync" ever meant here.
     await loadDashboard()
   } catch (err) {
     console.error('Failed to sync inventory:', err)
@@ -1361,24 +1343,13 @@ const emptyBatchForm = () => ({
 })
 const batchForm = reactive(emptyBatchForm())
 
-function openAddBatchModal() {
-  Object.assign(batchForm, emptyBatchForm())
-  batchModalMode.value = 'add'
-  editingBatchId.value = null
-  batchFormError.value = ''
-  batchModalOpen.value = true
-}
+// There is deliberately no "add" counterpart. Stock is created by booking a
+// cleared donation in at /blood-center/inventory-intake, because every unit has
+// to point back at the donation it came from — a free-standing batch cannot.
 function openEditBatchModal(row) {
   Object.assign(batchForm, {
-    bloodType: row.blood_type,
-    component: row.component,
-    availableUnits: row.available_units,
-    collectionDate: row.collection_date,
-    expiryDate: row.expiry_date,
-    donationSource: row.donation_source || '',
+    expiryDate: row.expiry_date || '',
     storageLocation: row.storage_location || '',
-    batchNumber: row.batch_number || '',
-    notes: row.notes || '',
   })
   batchModalMode.value = 'edit'
   editingBatchId.value = row.id
@@ -1390,25 +1361,20 @@ function closeBatchModal() {
   batchModalOpen.value = false
 }
 async function submitBatchForm() {
-  if (!batchForm.bloodType || !batchForm.component || batchForm.availableUnits === null) {
-    batchFormError.value = 'Blood type, component, and available units are required.'
-    return
-  }
+  if (!editingBatchId.value) return
+
   batchSubmitting.value = true
   batchFormError.value = ''
   try {
-    if (batchModalMode.value === 'edit' && editingBatchId.value) {
-      // i-connect sa /blood-center/inventory/:id endpoint (PUT/PATCH)
-      await bloodCenterService.updateInventoryBatch?.(editingBatchId.value, { ...batchForm })
-    } else {
-      // i-connect sa /blood-center/inventory endpoint (POST)
-      await bloodCenterService.createInventoryBatch?.({ ...batchForm })
-    }
+    await bloodCenterService.updateBloodUnit(editingBatchId.value, {
+      storage_location: batchForm.storageLocation || null,
+      ...(batchForm.expiryDate ? { expiry_date: batchForm.expiryDate } : {}),
+    })
     batchModalOpen.value = false
     await loadDashboard()
   } catch (err) {
-    console.error('Failed to save inventory batch:', err)
-    batchFormError.value = 'Something went wrong while saving. Please try again.'
+    console.error('Failed to update blood unit:', err)
+    batchFormError.value = err?.data?.message || 'Something went wrong while saving. Please try again.'
   } finally {
     batchSubmitting.value = false
   }
@@ -1417,6 +1383,7 @@ async function submitBatchForm() {
 // --- Manage inventory modal (reserve/release/transfer/archive/discard) ---
 const manageModalOpen = ref(false)
 const manageTargetBatch = ref(null)
+const manageActionNote = ref('')
 function openManageModal(row, presetAction) {
   manageTargetBatch.value = row
   manageModalOpen.value = true
@@ -1426,16 +1393,41 @@ function closeManageModal() {
   manageModalOpen.value = false
   manageTargetBatch.value = null
 }
+/**
+ * Only discard is a direct action on a unit.
+ *
+ * Reserving and releasing happen by allocating a unit to a hospital request,
+ * not by editing the unit here, and there is no transfer or archive endpoint at
+ * all. Those used to call `manageInventoryAction?.()`, which does not exist —
+ * the modal closed and nothing happened. They now say so instead.
+ */
 async function runManageAction(action) {
   const row = manageTargetBatch.value
+
+  if (action === 'print') {
+    manageModalOpen.value = false
+    openPrintLabelsModal(row)
+    return
+  }
+
+  if (action !== 'discard') {
+    manageModalOpen.value = false
+    manageActionNote.value = action === 'reserve' || action === 'release'
+      ? 'Units are reserved and released by allocating them to a hospital request, under Requests Fulfillment.'
+      : `There is no "${action}" action for a blood unit. Discard it if it can no longer be issued.`
+    return
+  }
+
+  const reason = window.prompt('Why is this unit being discarded?')
+
+  if (!reason?.trim()) return
+
   try {
-    // i-connect sa /blood-center/inventory/:id/{action} endpoints
-    await bloodCenterService.manageInventoryAction?.(row?.id, action)
-    if (['reserve', 'release', 'archive', 'discard'].includes(action)) {
-      await loadDashboard()
-    }
+    await bloodCenterService.discardBloodUnit(row?.id, { reason: reason.trim() })
+    await loadDashboard()
   } catch (err) {
-    console.error(`Failed to run inventory action "${action}":`, err)
+    console.error('Failed to discard blood unit:', err)
+    manageActionNote.value = err?.data?.message || 'The unit could not be discarded.'
   } finally {
     manageModalOpen.value = false
   }
@@ -1472,13 +1464,13 @@ async function submitPrintLabels() {
   if (!printSelectedIds.value.length) return
   printSubmitting.value = true
   try {
-    // i-connect sa /blood-center/inventory/print-labels endpoint (POST).
-    // Payload: [{ batchId, quantity }]. Backend should return a barcode/PDF per
-    // batch. Per spec, labels expose only batch/type/component/dates — no
-    // patient or donor identifying information.
-    const payload = printSelectedIds.value.map(id => ({ batchId: id, quantity: printQuantities[id] || 1 }))
-    await bloodCenterService.printInventoryLabels?.(payload)
+    // Printed in the browser, from data already on this page. There is no
+    // server endpoint for this and the previous printInventoryLabels?.() call
+    // silently did nothing. Labels carry unit, type, component and dates only —
+    // never donor or patient identifying information.
     printModalOpen.value = false
+    await nextTick()
+    window.print()
   } catch (err) {
     console.error('Failed to print labels:', err)
   } finally {
@@ -1487,28 +1479,56 @@ async function submitPrintLabels() {
 }
 
 async function loadDashboard() {
+  loading.value = true
   try {
-    // gikan sa /blood-center/inventory-overview endpoint — nag-uli sa tanan
-    // (batches, reference data, trends, distribution, activity log). Walay hardcoded/mock
-    // values diri; kung wala'y balik gikan sa API, mag-empty state na lang ang UI.
-    const data = await bloodCenterService.inventoryOverview?.()
+    // Three endpoints that exist. This page used to call a single
+    // `inventoryOverview()` that was never implemented; because it was invoked
+    // as `?.()`, the missing method returned undefined instead of throwing and
+    // the page rendered zeros with no error anywhere. Optional-call on a
+    // service method is banned in this file for that reason.
+    const [units, summary, reference] = await Promise.all([
+      bloodCenterService.inventory({ per_page: 100 }),
+      bloodCenterService.inventorySummary(),
+      bloodCenterService.referenceData(),
+    ])
 
-    inventoryBatches.value = data?.batches ?? []
-    activityLog.value = data?.activity_log ?? []
-    lastSyncedLabel.value = data?.last_synced_label ?? ''
+    // One row per physical bag. The server records individual units rather than
+    // batches, because a unit has to be traceable back to the donation it came
+    // from — so the counts here are 1 or 0, not a batch quantity.
+    inventoryBatches.value = (units?.data ?? []).map(unit => ({
+      id: unit.id,
+      batch_id: unit.id,
+      blood_type: unit.blood_type?.code ?? null,
+      component: unit.component?.name ?? null,
+      status: unit.status,
+      available_units: unit.status === 'available' ? 1 : 0,
+      reserved_units: unit.status === 'reserved' ? 1 : 0,
+      expiry_date: unit.expiry_date,
+      days_remaining: unit.days_remaining,
+      storage_location: unit.storage_location,
+      donation_id: unit.donation_id,
+      last_updated: unit.recorded_at,
+      last_updated_at: unit.recorded_at,
+    }))
 
-    const trends = data?.inventory_trends ?? {}
-    inventoryTrends.weekly = trends.weekly ?? []
-    inventoryTrends.monthly = trends.monthly ?? []
-    inventoryTrends.quarterly = trends.quarterly ?? []
+    inventorySummaryData.value = summary ?? null
+    lastSyncedLabel.value = summary?.as_of ? formatDate(summary.as_of) : ''
 
-    componentDistributionOverride.value = data?.component_distribution ?? []
+    // No endpoint serves these three. They stay empty rather than invented —
+    // the panels already explain themselves when there is nothing to show.
+    activityLog.value = []
+    inventoryTrends.weekly = []
+    inventoryTrends.monthly = []
+    inventoryTrends.quarterly = []
+    componentDistributionOverride.value = []
 
-    const reference = data?.reference ?? (await bloodCenterService.referenceData?.()) ?? {}
-    bloodTypeOptions.value = reference?.blood_types ?? []
-    componentOptions.value = reference?.components ?? []
+    // Blood types arrive as {id, code, label} but are rendered and compared as
+    // bare codes; components arrive as {id, name, …} but these selects expect
+    // {value, label}. Rendering either one raw puts a JSON object on screen.
+    bloodTypeOptions.value = (reference?.blood_types ?? []).map(t => t.code)
+    componentOptions.value = (reference?.components ?? []).map(c => ({ value: c.name, label: c.name }))
     statusOptions.value = reference?.statuses ?? []
-    storageLocationOptions.value = reference?.storage_locations ?? []
+    storageLocationOptions.value = summary?.storage_locations ?? reference?.storage_locations ?? []
   } catch (err) {
     console.error('Failed to load blood inventory:', err)
   } finally {
@@ -1914,5 +1934,32 @@ onMounted(loadDashboard)
   .donut-body { flex-direction: column; }
   .detail-drawer { width: 100%; }
   .detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 100%; }
+}
+.inventory-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(46rem, calc(100vw - 32px));
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  box-shadow: 0 8px 24px rgba(var(--rb-shadow-rgb), 0.18);
+  font-size: 0.84rem;
+}
+
+.inventory-toast__close {
+  border: 0;
+  background: none;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0.15rem;
 }
 </style>

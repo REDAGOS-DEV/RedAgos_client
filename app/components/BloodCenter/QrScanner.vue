@@ -151,17 +151,20 @@ async function start() {
     return
   }
 
-  decoder = await createQrDecoder()
-
-  if (!decoder) {
-    supported.value = false
-    error.value = QR_UNSUPPORTED_MESSAGE
-    return
-  }
-
+  // Set before building the decoder, not after: on a browser without
+  // BarcodeDetector that step fetches the jsQR chunk over the network, and an
+  // enabled button during that wait invites a second click and a second camera.
   starting.value = true
 
   try {
+    decoder = await createQrDecoder()
+
+    if (!decoder) {
+      supported.value = false
+      error.value = QR_UNSUPPORTED_MESSAGE
+      return
+    }
+
     stream = await navigator.mediaDevices.getUserMedia({
       // `ideal` rather than `exact`: a counter PC with only a front-facing
       // webcam should still get a working scanner.

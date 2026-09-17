@@ -90,6 +90,34 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donations/${donationId}/collection`, 'POST', payload)
   }
 
+  // --- Laboratory / Processing department ---
+  //
+  // Picks up where the counter stops. The counter leaves a donation at
+  // `collected`; nothing here is reachable before that, and `completed` —
+  // cleared for issue to a patient — is only ever set from this department.
+
+  async laboratoryQueue(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/queue`, 'GET', params)
+  }
+
+  async laboratoryDonation(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}`, 'GET')
+  }
+
+  /** Record the result a medical technologist reported. Moves it to `tested`. */
+  async recordTestResult(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/results`, 'POST', payload)
+  }
+
+  async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/components`, 'POST', payload)
+  }
+
+  /** Clear for issue, or reject. The only two outcomes the laboratory may set. */
+  async updateLaboratoryStatus(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/status`, 'PATCH', payload)
+  }
+
   // --- Donor management (Collection department) ---
   //
   // Ang server nga prefix kay `/blood-center/donors` — dili `/bloodcenter/...`
@@ -124,6 +152,17 @@ class BloodCenterService extends BaseService {
 
   async inventorySummary(): Promise<any> {
     return this.request(`${this.resource}/inventory/summary`, 'GET')
+  }
+
+  /**
+   * Donations the laboratory has cleared that still owe units.
+   *
+   * Its own endpoint rather than the laboratory queue: Inventory holds
+   * `donations.view` but not `lab.view`, and this carries the declared-versus-
+   * recorded counts that neither of the donation listings does.
+   */
+  async inventoryIntakeQueue(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/inventory/intake-queue`, 'GET', params)
   }
 
   async recordBloodUnits(payload: Record<string, any> = {}): Promise<any> {

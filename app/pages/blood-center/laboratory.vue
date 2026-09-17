@@ -29,17 +29,31 @@
           </p>
         </div>
 
-        <button type="button" class="btn" :disabled="loadingQueue" @click="loadQueue">
-          <AssetIcon name="refresh-cw" :size="14" />
-          {{ loadingQueue ? 'Loading…' : 'Refresh' }}
-        </button>
+        <div class="card__tools">
+          <label class="field field--filter">
+            <span class="field__label">Show</span>
+            <select v-model="statusFilter" class="field__input" @change="loadQueue">
+              <option value="">Awaiting the laboratory</option>
+              <option value="collected">Collected — not yet tested</option>
+              <option value="tested">Tested — not yet released</option>
+              <option value="completed">Cleared for issue</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+
+          <button type="button" class="btn" :disabled="loadingQueue" @click="loadQueue">
+            <AssetIcon name="refresh-cw" :size="14" />
+            {{ loadingQueue ? 'Loading…' : 'Refresh' }}
+          </button>
+        </div>
       </div>
 
       <p v-if="loadingQueue" class="card__hint">Loading the queue…</p>
 
       <div v-else-if="!queue.length" class="empty">
         <AssetIcon name="flask-conical" :size="28" />
-        <p>No units are waiting. Donations appear here once the counter records a collection.</p>
+        <p v-if="statusFilter">Nothing matches this filter yet.</p>
+        <p v-else>No units are waiting. Donations appear here once the counter records a collection.</p>
       </div>
 
       <ul v-else class="queue">
@@ -176,6 +190,10 @@
               <span v-if="!selected.donor?.blood_type" class="field__optional">
                 This donor has no type on file. A passed result records it on their profile.
               </span>
+              <span v-else class="field__optional">
+                The donor's profile says {{ selected.donor.blood_type }}. Recording a different type is
+                refused — the profile has to be corrected first, so only change this if the profile is wrong.
+              </span>
             </label>
 
             <label class="field">
@@ -196,15 +214,11 @@
           </section>
 
           <!-- PROCESSING -->
-          <section class="card" :class="{ 'card--waiting': !hasResult }">
+          <section class="card">
             <h2 class="card__title">Processing</h2>
             <p class="card__hint">
-              Record the components this unit was separated into, and how many of each.
-            </p>
-
-            <p v-if="!hasResult" class="alert alert--notice">
-              The component breakdown can only be saved once the test result is recorded — that is the
-              server's current rule, not the order the bench works in.
+              Record the components this unit was separated into, and how many of each. This runs alongside
+              testing — neither waits on the other.
             </p>
 
             <div v-if="selected.components?.length" class="recorded">
@@ -217,7 +231,7 @@
             <div v-for="(row, index) in componentRows" :key="index" class="component-row">
               <label class="field">
                 <span class="field__label">Component</span>
-                <select v-model.number="row.component_id" class="field__input" :disabled="!hasResult">
+                <select v-model.number="row.component_id" class="field__input">
                   <option :value="null" disabled>Select</option>
                   <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
@@ -225,13 +239,13 @@
 
               <label class="field field--qty">
                 <span class="field__label">Quantity</span>
-                <input v-model.number="row.quantity" type="number" min="1" max="10" class="field__input" :disabled="!hasResult" >
+                <input v-model.number="row.quantity" type="number" min="1" max="10" class="field__input" >
               </label>
 
               <button
                 type="button"
                 class="btn btn--icon"
-                :disabled="!hasResult || componentRows.length === 1"
+                :disabled="componentRows.length === 1"
                 aria-label="Remove this component"
                 @click="componentRows.splice(index, 1)"
               >
@@ -240,13 +254,13 @@
             </div>
 
             <div class="actions">
-              <button type="button" class="btn" :disabled="!hasResult || componentRows.length >= 10" @click="addComponentRow">
+              <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
                 Add component
               </button>
               <button
                 type="button"
                 class="btn btn--primary"
-                :disabled="busy || !hasResult || !validComponents"
+                :disabled="busy || !validComponents"
                 @click="submitComponents"
               >
                 {{ selected.components?.length ? 'Update breakdown' : 'Record components' }}
@@ -326,6 +340,9 @@ const selected = ref(null)
 const bloodTypes = ref([])
 const components = ref([])
 
+// Empty means the laboratory's own working queue: collected and tested, which
+// is what the endpoint returns when no status is given.
+const statusFilter = ref('')
 const loadingQueue = ref(false)
 const busy = ref(false)
 const error = ref(null)
@@ -403,11 +420,18 @@ function formatDate(value) {
  * The one line a technologist scanning the queue actually needs.
  */
 function nextStepFor(row) {
-  if (!row.test_result) return 'Needs testing'
-  if (!row.test_result.clears_for_issue) return 'Needs rejecting'
-  if (!row.components?.length) return 'Needs processing'
+  if (row.status === 'completed') return 'Cleared for issue'
+  if (row.status === 'rejected') return row.rejection_reason || 'Rejected'
+  if (row.test_result && !row.test_result.clears_for_issue) return 'Needs rejecting'
 
-  return 'Ready to release'
+  // Either branch may be outstanding, and in any order — neither is "next"
+  // ahead of the other.
+  const outstanding = []
+
+  if (!row.test_result) outstanding.push('testing')
+  if (!row.components?.length) outstanding.push('processing')
+
+  return outstanding.length ? `Needs ${outstanding.join(' and ')}` : 'Ready to release'
 }
 
 /**
@@ -457,7 +481,7 @@ async function loadQueue() {
   error.value = null
 
   try {
-    const res = await service.laboratoryQueue()
+    const res = await service.laboratoryQueue(statusFilter.value ? { status: statusFilter.value } : {})
 
     queue.value = res?.data ?? []
   } catch (err) {
@@ -492,8 +516,14 @@ function adopt(payload) {
 
   resultForm.result = payload.test_result?.result ?? 'passed'
   resultForm.notes = payload.test_result?.notes ?? ''
-  resultForm.blood_type_id = payload.test_result?.blood_type
-    ? bloodTypes.value.find((t) => t.code === payload.test_result.blood_type)?.id ?? null
+  // Seed from the result if one exists, otherwise from the donor's profile.
+  // The two agree in almost every case, and starting blank meant an ordinary
+  // typing was one careless click away from a `blood_type_mismatch` that no
+  // screen in this application can then resolve.
+  const seedCode = payload.test_result?.blood_type ?? payload.donor?.blood_type ?? null
+
+  resultForm.blood_type_id = seedCode
+    ? bloodTypes.value.find((t) => t.code === seedCode)?.id ?? null
     : null
 
   componentRows.value = payload.components?.length
@@ -644,8 +674,6 @@ onMounted(async () => {
   background: var(--rb-surface);
 }
 
-.card--waiting { background: var(--rb-surface-alt); }
-
 .card__head {
   display: flex;
   flex-wrap: wrap;
@@ -653,6 +681,8 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
 }
+
+.card__tools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
 
 .card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
 
@@ -815,6 +845,7 @@ onMounted(async () => {
 /* --- forms --- */
 .field { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
 .field--qty { max-width: 7rem; }
+.field--filter { max-width: 15rem; }
 
 .field__label { font-size: 0.75rem; font-weight: 600; color: var(--rb-text-primary); }
 .field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }

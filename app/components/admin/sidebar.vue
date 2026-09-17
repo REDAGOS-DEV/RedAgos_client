@@ -252,6 +252,7 @@ const navGroups = [
   [
     { label: 'Organizations', path: '/admin/facilities', icon: 'building-2', requires: 'admin.facility.manage' },
     { label: 'ID Verification', path: '/admin/donor-identities', icon: 'id-card', requires: 'admin.donor_identity.verify' },
+    { label: 'Blood Components', path: '/admin/blood-components', icon: 'flask-conical', requires: 'admin.components.manage' },
   ],
   [
     { label: 'Administrators', path: '/admin/administrators', icon: 'shield-check', requires: 'admin.accounts.manage' },
