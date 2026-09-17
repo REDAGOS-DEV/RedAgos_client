@@ -596,13 +596,27 @@ select.form-input {
 :global(.dark .identity__badge--verified) { background: rgba(4, 120, 87, 0.2); color: #6ee7b7; }
 :global(.dark .identity__badge--rejected) { background: rgba(185, 28, 28, 0.2); color: #fca5a5; }
 :global(.dark .identity__reason) { background: rgba(185, 28, 28, 0.12); border-color: rgba(185, 28, 28, 0.35); }
-:global(.dark .status-row) { border-color: #263449; }
-:global(.dark .form-input) { background: #0f172a; border-color: #334155; color-scheme: dark; }
-:global(.dark .form-input--wanted) { border-color: #fdba74; }
+/*
+ * The generic names below are anchored on .identity. `:global(…)` leaves the
+ * scope system, so `:global(.dark .form-input)` was matching .form-input on
+ * every page in the app once this component's stylesheet had loaded — and the
+ * blood-centre pages use that class too.
+ *
+ * The select rule was the one that showed: it set background-image alone and
+ * inherited repeat/position/size from the *scoped* `select.form-input` rule
+ * above, which does not match on a foreign page. The chevron then tiled across
+ * the whole control at its intrinsic size.
+ */
+:global(.dark .identity .status-row) { border-color: #263449; }
+:global(.dark .identity .form-input) { background: #0f172a; border-color: #334155; color-scheme: dark; }
+:global(.dark .identity .form-input--wanted) { border-color: #fdba74; }
 :global(.dark .identity__hint--wanted) { color: #fdba74; }
-:global(.dark .form-input:disabled) { background: #1e293b; }
-:global(.dark select.form-input) {
+:global(.dark .identity .form-input:disabled) { background: #1e293b; }
+:global(.dark .identity select.form-input) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
 }
 :global(.dark .identity__dropzone) { border-color: #334155; background: #0f172a; }
 :global(.dark .identity__dropzone:hover:not(:disabled)) { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }

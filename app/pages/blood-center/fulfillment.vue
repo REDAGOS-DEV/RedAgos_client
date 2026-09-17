@@ -1622,13 +1622,26 @@ if (typeof window !== 'undefined') {
 .rf-page {
   --rf-primary: #1565C0;
   --rf-primary-hover: #0D47A1;
+  /*
+   * The fill that carries white text. Below, the dark theme lifts
+   * --rf-primary so that primary-coloured TEXT and icons clear 4.5:1 on a
+   * dark card; a filled button painted with that lifted blue would put white
+   * on it at under 3:1, so the fill is held separate and stays deep.
+   */
+  --rf-primary-fill: #1565C0;
+  --rf-primary-fill-hover: #0D47A1;
+  --rf-info-fill: #2563EB;
+  /* The shimmer had rgba(255,255,255,.6) baked into it, which flashed a
+     white bar across the dark cards while the table loaded. */
+  --rf-skeleton-a: #E9EEF5;
+  --rf-skeleton-b: #F7F9FC;
   --rf-bg: #F7F8FA;
   --rf-card: #FFFFFF;
   --rf-border: #E5EAF0;
   --rf-text: #1E293B;
   --rf-text-secondary: #64748B;
   --rf-success: #2E7D32;
-  --rf-warning: #F59E0B;
+  --rf-warning: #B45309;
   --rf-danger: #D32F2F;
   --rf-info: #2563EB;
   --rf-purple: #7C3AED;
@@ -1640,8 +1653,12 @@ if (typeof window !== 'undefined') {
   background: var(--rf-bg);
   color: var(--rf-text);
   font-family: var(--rb-font-sans);
-  padding: 28px clamp(16px, 3vw, 40px) 60px;
-  min-height: 100vh;
+  /* Was full-bleed with a clamp()ed gutter and min-height:100vh. The layout's
+     <main> already guarantees a full-height, correctly coloured page, and the
+     extra 100vh inside a 64px-offset main forced a scrollbar on every screen. */
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
 }
 .rf-page *,
 .rf-page *::before,
@@ -1655,6 +1672,24 @@ if (typeof window !== 'undefined') {
   --rf-text: #E6EBF3;
   --rf-text-secondary: #94A3B8;
   --rf-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  /*
+   * Accents lift in dark mode. Left at the light values, primary/success/
+   * danger/info/purple/teal text sat between 2.2:1 and 3:1 on --rf-card —
+   * every stage badge, KPI trend and toast label in the page.
+   */
+  --rf-primary: #64B5F6;
+  --rf-primary-hover: #90CAF9;
+  --rf-primary-fill: #1565C0;
+  --rf-primary-fill-hover: #1976D2;
+  --rf-info-fill: #2563EB;
+  --rf-success: #66BB6A;
+  --rf-warning: #FBBF24;
+  --rf-danger: #F87171;
+  --rf-info: #60A5FA;
+  --rf-purple: #A78BFA;
+  --rf-teal: #4DB6AC;
+  --rf-skeleton-a: #202A3C;
+  --rf-skeleton-b: #2A3650;
 }
 
 /* ---------- Teleported theme scope ----------
@@ -1668,13 +1703,26 @@ if (typeof window !== 'undefined') {
 .rf-toast-container {
   --rf-primary: #1565C0;
   --rf-primary-hover: #0D47A1;
+  /*
+   * The fill that carries white text. Below, the dark theme lifts
+   * --rf-primary so that primary-coloured TEXT and icons clear 4.5:1 on a
+   * dark card; a filled button painted with that lifted blue would put white
+   * on it at under 3:1, so the fill is held separate and stays deep.
+   */
+  --rf-primary-fill: #1565C0;
+  --rf-primary-fill-hover: #0D47A1;
+  --rf-info-fill: #2563EB;
+  /* The shimmer had rgba(255,255,255,.6) baked into it, which flashed a
+     white bar across the dark cards while the table loaded. */
+  --rf-skeleton-a: #E9EEF5;
+  --rf-skeleton-b: #F7F9FC;
   --rf-bg: #F7F8FA;
   --rf-card: #FFFFFF;
   --rf-border: #E5EAF0;
   --rf-text: #1E293B;
   --rf-text-secondary: #64748B;
   --rf-success: #2E7D32;
-  --rf-warning: #F59E0B;
+  --rf-warning: #B45309;
   --rf-danger: #D32F2F;
   --rf-info: #2563EB;
   --rf-purple: #7C3AED;
@@ -1701,19 +1749,35 @@ if (typeof window !== 'undefined') {
   --rf-text: #E6EBF3;
   --rf-text-secondary: #94A3B8;
   --rf-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  /* The same lifted accents as .rf-page.rf-dark. The drawer is where the
+     stage badges and unit statuses actually live, so leaving them out here
+     was the half of the dark theme users see most. */
+  --rf-primary: #64B5F6;
+  --rf-primary-hover: #90CAF9;
+  --rf-primary-fill: #1565C0;
+  --rf-primary-fill-hover: #1976D2;
+  --rf-info-fill: #2563EB;
+  --rf-success: #66BB6A;
+  --rf-warning: #FBBF24;
+  --rf-danger: #F87171;
+  --rf-info: #60A5FA;
+  --rf-purple: #A78BFA;
+  --rf-teal: #4DB6AC;
+  --rf-skeleton-a: #202A3C;
+  --rf-skeleton-b: #2A3650;
 }
 
 /* ---------- Header ---------- */
 .rf-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
-.rf-title { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 6px; }
-.rf-subtitle { color: var(--rf-text-secondary); font-size: 14.5px; max-width: 560px; margin: 0; }
+.rf-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+.rf-subtitle { color: var(--rf-text-secondary); font-size: 13px; max-width: 62ch; margin: 0; }
 .rf-header-actions { display: flex; gap: 10px; }
 
-.rf-btn { display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-weight: 600; font-size: 14px; padding: 10px 18px; border-radius: 12px; border: 1px solid transparent; cursor: pointer; transition: all .18s ease; white-space: nowrap; }
+.rf-btn { display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-weight: 700; font-size: 13px; padding: 10px 16px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; white-space: nowrap; }
 .rf-btn:disabled { opacity: .6; cursor: not-allowed; }
-.rf-btn-sm { padding: 7px 12px; font-size: 13px; }
-.rf-btn-primary { background: var(--rf-primary); color: #fff; box-shadow: var(--rf-shadow); }
-.rf-btn-primary:hover:not(:disabled) { background: var(--rf-primary-hover); }
+.rf-btn-sm { padding: 8px 14px; font-size: 12px; }
+.rf-btn-primary { background: var(--rf-primary-fill); color: #fff; box-shadow: var(--rf-shadow); }
+.rf-btn-primary:hover:not(:disabled) { background: var(--rf-primary-fill-hover); }
 .rf-btn-outline { background: transparent; border-color: var(--rf-border); color: var(--rf-text); }
 .rf-btn-outline:hover:not(:disabled) { background: rgba(21,101,192,0.06); border-color: var(--rf-primary); }
 .rf-btn-ghost { background: transparent; border-color: transparent; color: var(--rf-text-secondary); }
@@ -1730,9 +1794,12 @@ if (typeof window !== 'undefined') {
 .rf-alert-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 /* ---------- KPI grid ---------- */
-.rf-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
+.rf-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 24px; }
 .rf-kpi-card { background: var(--rf-card); border: 1px solid var(--rf-border); border-radius: var(--rf-radius); padding: var(--rf-pad); box-shadow: var(--rf-shadow); min-height: 128px; }
-.rf-skeleton-card { background: linear-gradient(90deg, var(--rf-border) 25%, rgba(255,255,255,.6) 50%, var(--rf-border) 75%); background-size: 200% 100%; animation: rf-shimmer 1.4s infinite; }
+.rf-skeleton-card { background: linear-gradient(90deg, var(--rf-skeleton-a) 25%, var(--rf-skeleton-b) 50%, var(--rf-skeleton-a) 75%); background-size: 200% 100%; animation: rf-shimmer 1.4s infinite; }
 .rf-kpi-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .rf-kpi-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--kpi-accent) 14%, transparent); color: var(--kpi-accent); }
 .rf-kpi-trend { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
@@ -1762,7 +1829,7 @@ if (typeof window !== 'undefined') {
   transition: all .15s ease;
 }
 .rf-pill:hover { border-color: var(--rf-primary); color: var(--rf-primary); }
-.rf-pill.is-active { background: var(--rf-primary); border-color: var(--rf-primary); color: #fff; }
+.rf-pill.is-active { background: var(--rf-primary-fill); border-color: var(--rf-primary-fill); color: #fff; }
 .rf-pill-count {
   position: absolute;
   top: -9px;
@@ -1889,7 +1956,7 @@ if (typeof window !== 'undefined') {
 .rf-empty-state p { margin: 0 0 18px; font-size: 13.5px; }
 .rf-empty-actions { display: flex; gap: 10px; }
 .rf-skeleton-table { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
-.rf-skeleton-row { height: 46px; border-radius: 10px; background: linear-gradient(90deg, var(--rf-border) 25%, rgba(255,255,255,.6) 50%, var(--rf-border) 75%); background-size: 200% 100%; animation: rf-shimmer 1.4s infinite; }
+.rf-skeleton-row { height: 46px; border-radius: 10px; background: linear-gradient(90deg, var(--rf-skeleton-a) 25%, var(--rf-skeleton-b) 50%, var(--rf-skeleton-a) 75%); background-size: 200% 100%; animation: rf-shimmer 1.4s infinite; }
 
 /* ---------- Side column ---------- */
 .rf-side-col { display: flex; flex-direction: column; gap: 18px; }
@@ -1956,8 +2023,8 @@ if (typeof window !== 'undefined') {
 .rf-stepper::-webkit-scrollbar { display: none; height: 0; }
 .rf-step { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; position: relative; }
 .rf-step-dot { width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; background: var(--rf-border); color: var(--rf-text-secondary); transition: all .2s ease; }
-.rf-step.is-complete .rf-step-dot { background: var(--rf-primary); color: #fff; }
-.rf-step.is-current .rf-step-dot { background: var(--rf-info); color: #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.18); }
+.rf-step.is-complete .rf-step-dot { background: var(--rf-primary-fill); color: #fff; }
+.rf-step.is-current .rf-step-dot { background: var(--rf-info-fill); color: #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.18); }
 .rf-step-label { font-size: 9px; text-align: center; color: var(--rf-text-secondary); line-height: 1.25; white-space: normal; overflow-wrap: break-word; padding: 0 1px; }
 .rf-step.is-complete .rf-step-label, .rf-step.is-current .rf-step-label { color: var(--rf-text); font-weight: 600; }
 
@@ -2023,11 +2090,13 @@ if (typeof window !== 'undefined') {
 @keyframes rf-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 1180px) {
+/* The side rail drops under the table once the column can no longer hold
+   both — measured against the content column, which is now 1152 + the page
+   gutters rather than the full viewport. */
+@media (max-width: 1100px) {
   .rf-content-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .rf-kpi-grid { grid-template-columns: 1fr 1fr; }
   .rf-header { flex-direction: column; }
   .rf-drawer, .rf-timeline-modal { width: 100%; }
   .rf-form-grid { grid-template-columns: 1fr; }
@@ -2035,6 +2104,10 @@ if (typeof window !== 'undefined') {
   .rf-drawer-header, .rf-drawer-body, .rf-drawer-footer { padding-left: 16px; padding-right: 16px; }
   .rf-step-label { font-size: 8px; }
 }
+@media (max-width: 640px) {
+  .rf-page { padding: 16px 16px 32px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rf-kpi-card, .rf-row td, .rf-drawer, .rf-drawer-overlay, .rf-spin, .rf-modal, .rf-toast { animation: none !important; transition: none !important; }
 }

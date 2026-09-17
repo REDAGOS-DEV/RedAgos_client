@@ -43,7 +43,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Total Blood Units</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
-              <AssetIcon name="droplets" :size="14" style="color: var(--rb-primary)" />
+              <AssetIcon name="droplets" :size="14" style="color: var(--rb-primary-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ totalUnits === null ? '—' : totalUnits }}</p>
@@ -58,7 +58,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Donations Today</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
-              <AssetIcon name="trending-up" :size="14" style="color: var(--rb-success)" />
+              <AssetIcon name="trending-up" :size="14" style="color: var(--rb-success-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ donationsToday === null ? '—' : donationsToday }}</p>
@@ -73,7 +73,7 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Pending Hospital Requests</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
-              <AssetIcon name="package" :size="14" style="color: var(--rb-warning)" />
+              <AssetIcon name="package" :size="14" style="color: var(--rb-warning-text)" />
             </div>
           </div>
           <p class="stat-card__value">{{ pendingRequestsCount }}</p>
@@ -84,10 +84,10 @@
           <div class="stat-card__top">
             <p class="stat-card__label">Critical Blood Types</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-accent-rgb), 0.08)' }">
-              <AssetIcon name="alert" :size="14" style="color: var(--rb-accent)" />
+              <AssetIcon name="alert" :size="14" style="color: var(--rb-accent-text)" />
             </div>
           </div>
-          <p class="stat-card__value" style="color: var(--rb-accent)">{{ criticalTypesCount }}</p>
+          <p class="stat-card__value" style="color: var(--rb-accent-text)">{{ criticalTypesCount }}</p>
           <span class="stat-chip stat-chip--neutral truncate-chip">{{ criticalTypesLabel }}</span>
         </div>
       </div>
@@ -298,7 +298,9 @@
             <h2 class="panel-title">Incoming Hospital Requests</h2>
             <p class="panel-subtitle">New and in-progress requests from partner hospitals.</p>
           </div>
-          <NuxtLink to="/blood-center/hospital-requests" class="panel-link">View all</NuxtLink>
+          <!-- /blood-center/hospital-requests is the API path, not a page; the
+               screen that lists these is Incoming Requests. -->
+          <NuxtLink to="/blood-center/bloodrequests" class="panel-link">View all</NuxtLink>
         </div>
 
         <div v-if="requests.length" class="request-list">
@@ -340,7 +342,7 @@
       <div class="health-grid">
         <div class="health-card health-card--healthy">
           <div class="health-card__icon">
-            <AssetIcon name="shield-check" :size="18" style="color: var(--rb-success)" />
+            <AssetIcon name="shield-check" :size="18" style="color: var(--rb-success-text)" />
           </div>
           <div>
             <p class="health-card__value">{{ healthSummary.healthy }}</p>
@@ -350,7 +352,7 @@
         </div>
         <div class="health-card health-card--low">
           <div class="health-card__icon">
-            <AssetIcon name="triangle-alert" :size="18" style="color: var(--rb-warning)" />
+            <AssetIcon name="triangle-alert" :size="18" style="color: var(--rb-warning-text)" />
           </div>
           <div>
             <p class="health-card__value">{{ healthSummary.low }}</p>
@@ -360,7 +362,7 @@
         </div>
         <div class="health-card health-card--critical">
           <div class="health-card__icon">
-            <AssetIcon name="alert" :size="18" style="color: var(--rb-accent)" />
+            <AssetIcon name="alert" :size="18" style="color: var(--rb-accent-text)" />
           </div>
           <div>
             <p class="health-card__value">{{ healthSummary.critical }}</p>
@@ -427,13 +429,18 @@
             <h2 class="panel-title">Recent Donation Activity</h2>
             <p class="panel-subtitle">Latest donations recorded at this center.</p>
           </div>
-          <NuxtLink to="/blood-center/donations" class="panel-link">View History</NuxtLink>
+          <!--
+            "View History" pointed at /blood-center/donations, which has no
+            page — the link 404'd. There is no donation-history screen to send
+            people to yet, and Donor Management is not one, so nothing is
+            offered here. Restore it with the page, not before.
+          -->
         </div>
 
         <div v-if="donationActivity.length" class="timeline">
           <div v-for="item in donationActivity" :key="item.id" class="timeline-item">
             <div class="timeline-item__marker">
-              <AssetIcon name="droplets" :size="13" style="color: var(--rb-primary)" />
+              <AssetIcon name="droplets" :size="13" style="color: var(--rb-primary-text)" />
             </div>
             <div class="timeline-item__body">
               <div class="timeline-item__row">
@@ -500,7 +507,7 @@
             @click="handleQuickAction(action)"
           >
             <div class="quick-action-card__icon">
-              <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary)" />
+              <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary-text)" />
             </div>
             <p class="quick-action-card__label">{{ action.label }}</p>
             <p class="quick-action-card__desc">{{ action.description }}</p>
@@ -519,7 +526,7 @@
             </button>
 
             <div class="modal-icon">
-              <AssetIcon name="alert" :size="18" style="color: var(--rb-primary)" />
+              <AssetIcon name="alert" :size="18" style="color: var(--rb-primary-text)" />
             </div>
 
             <h3 class="modal-title">
@@ -897,7 +904,7 @@ onMounted(async () => {
 
 .dashboard {
   font-family: var(--rb-font-sans);
-  max-width: 1200px;
+  max-width: 1152px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -938,9 +945,9 @@ onMounted(async () => {
   gap: 16px;
 }
 .page-title {
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--rb-text-primary);
   margin: 0;
 }
@@ -961,10 +968,10 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 9px 15px;
+  padding: 10px 16px;
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: #ffffff;
   background: var(--rb-primary);
   box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
@@ -975,9 +982,9 @@ onMounted(async () => {
   line-height: 1.2;
   font-family: inherit;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.92; }
+.btn-primary:hover:not(:disabled) { background: #0D47A1; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.btn-primary:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .btn-primary--sm { padding: 7px 13px; font-size: 12px; }
 
 .btn-outline {
@@ -985,10 +992,10 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 9px 15px;
+  padding: 10px 16px;
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--rb-text-primary);
   background: var(--rb-surface);
   border: 1px solid var(--rb-border-strong);
@@ -999,12 +1006,15 @@ onMounted(async () => {
 }
 .btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
 .btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-outline:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.btn-outline:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 /* Stats */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
 }
 .stat-card {
@@ -1058,8 +1068,8 @@ onMounted(async () => {
 }
 .truncate-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stat-trend { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; }
-.stat-trend--up { color: var(--rb-success); }
-.stat-trend--down { color: var(--rb-accent); }
+.stat-trend--up { color: var(--rb-success-text); }
+.stat-trend--down { color: var(--rb-accent-text); }
 
 /* Panels */
 .panel {
@@ -1081,7 +1091,7 @@ onMounted(async () => {
 }
 .panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
 .panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
-.panel-link { font-size: 12px; font-weight: 600; color: var(--rb-primary); text-decoration: none; flex-shrink: 0; }
+.panel-link { font-size: 12px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; flex-shrink: 0; }
 .panel-link:hover { text-decoration: underline; }
 
 .search-box { position: relative; flex-shrink: 0; width: 200px; }
@@ -1119,7 +1129,7 @@ onMounted(async () => {
 .sortable-th:hover { color: var(--rb-text-primary); }
 .sortable-th__inner { display: inline-flex; align-items: center; gap: 4px; }
 .sort-icon { opacity: 0.5; }
-.sort-icon--active { opacity: 1; color: var(--rb-primary); }
+.sort-icon--active { opacity: 1; color: var(--rb-primary-text); }
 
 .inventory-table tbody td {
   padding: 12px 18px;
@@ -1140,7 +1150,7 @@ onMounted(async () => {
   padding: 3px 10px;
   border-radius: 999px;
   background: rgba(var(--rb-accent-rgb), 0.08);
-  color: var(--rb-accent);
+  color: var(--rb-accent-text);
 }
 .type-pill--sm { font-size: 11px; padding: 2px 8px; }
 
@@ -1156,11 +1166,11 @@ onMounted(async () => {
 }
 .status-pill--sm { font-size: 11px; padding: 3px 9px; }
 .status-pill__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
-.status-pill--adequate { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success); }
-.status-pill--low { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning); }
-.status-pill--critical { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent); }
+.status-pill--adequate { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.status-pill--low { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); }
+.status-pill--critical { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 .status-pill--pending { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-.status-pill--processing { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary); }
+.status-pill--processing { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
 
 /* Near-expiry row emphasis */
 .expiry-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
@@ -1172,7 +1182,7 @@ onMounted(async () => {
   gap: 5px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--rb-primary);
+  color: var(--rb-primary-text);
   text-decoration: none;
 }
 .link-btn:hover { text-decoration: underline; }
@@ -1201,7 +1211,7 @@ onMounted(async () => {
   font-family: inherit;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.segmented-control__btn--active { background: var(--rb-surface); color: var(--rb-primary); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
+.segmented-control__btn--active { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
 
 .chart-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
 .chart-legend { display: flex; gap: 16px; }
@@ -1276,9 +1286,9 @@ onMounted(async () => {
 .request-info__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .request-hospital { font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .urgency-pill { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; flex-shrink: 0; }
-.urgency-pill--urgent { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning); }
-.urgency-pill--routine { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary); }
-.urgency-pill--emergency { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent); }
+.urgency-pill--urgent { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); }
+.urgency-pill--routine { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.urgency-pill--emergency { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 
 .request-meta { font-size: 11.5px; color: var(--rb-text-secondary); margin: 4px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .request-item__right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -1286,7 +1296,7 @@ onMounted(async () => {
 .empty-state { padding: 28px; text-align: center; color: var(--rb-text-secondary); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
 /* Inventory health summary */
-.health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .health-card {
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
@@ -1337,7 +1347,7 @@ onMounted(async () => {
   gap: 3px;
   font-size: 10.5px;
   font-weight: 700;
-  color: var(--rb-success);
+  color: var(--rb-success-text);
   background: rgba(var(--rb-success-rgb), 0.08);
   padding: 2px 7px;
   border-radius: 999px;
@@ -1354,7 +1364,7 @@ onMounted(async () => {
 .activity-feed__time { font-size: 11px; color: var(--rb-text-secondary); flex-shrink: 0; white-space: nowrap; }
 
 /* Quick actions */
-.quick-actions-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 18px; }
+.quick-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); gap: 12px; padding: 18px; }
 .quick-action-card {
   display: flex;
   flex-direction: column;
@@ -1390,7 +1400,7 @@ onMounted(async () => {
 .modal-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
 .modal-card { background: var(--rb-surface); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.18); position: relative; }
 .modal-card .btn-primary { color: #ffffff; background: var(--rb-primary); }
-.modal-card .btn-primary:hover:not(:disabled) { opacity: 0.92; }
+.modal-card .btn-primary:hover:not(:disabled) { background: #0D47A1; }
 .modal-card .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-card .btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
 .modal-card .btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
@@ -1443,17 +1453,14 @@ onMounted(async () => {
   background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
 }
 .form-field__textarea { resize: vertical; min-height: 64px; }
-.form-error { font-size: 12px; color: var(--rb-accent); margin: -6px 0 0; }
+.form-error { font-size: 12px; color: var(--rb-accent-text); margin: -6px 0 0; }
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .insights-grid { grid-template-columns: 1fr; }
-  .health-grid { grid-template-columns: 1fr; }
-  .quick-actions-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 640px) {
@@ -1466,6 +1473,5 @@ onMounted(async () => {
   .request-item__right { justify-content: space-between; }
   .form-row { grid-template-columns: 1fr; }
   .donut-body { flex-direction: column; }
-  .quick-actions-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

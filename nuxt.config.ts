@@ -38,22 +38,23 @@ export default defineNuxtConfig({
       // sa browser. Sa deploy, i-set ang NUXT_PUBLIC_API_BASE_URL.
       apiBaseURL: process.env.API_BASE_URL || '',
 
-      // Ang hospital / blood-bank portal kay naka-off hangtod naa nay backend.
-      // Naa nay tinuod nga blood-bank account karon — ang Super Admin ang
-      // mohimo niini sa Facility Management — apan walay `/hospital/*` nga
-      // route ang Laravel, so ang mga page mo-render og shell unya mo-404 ang
-      // tanan nga call. I-on ra ni kung human na ang Phase P.
-      // Set NUXT_PUBLIC_HOSPITAL_PORTAL_ENABLED=true para i-abli.
-      hospitalPortalEnabled: process.env.HOSPITAL_PORTAL_ENABLED === 'true',
-
-      // Ang Reports, Fulfillment, Incoming Requests, Billing ug Drives kay walay
-      // backend gihapon — walay katugbang nga route sa Laravel. Nagdagan sila sa
-      // fixture data. Default `true` kay kon i-off nimo karon, blangko ang mga
-      // page; ang punto sa flag kay makita ug ma-flip ang mock, dili nga tago.
+      // Ang hospital / blood-bank portal kay ABLI na by default.
       //
-      // I-set og false kada domain nga mahuman, ug tangtangon ni sa dihang wala
-      // nay mock. Tan-awa ang endpoint matrix para sa kinsa ang nag-utang unsa.
-      useMocks: process.env.USE_MOCKS !== 'false'
+      // Naa nay `/hospital/*` nga route ang Laravel: availability search,
+      // eligible facilities, blood-requests CRUD, track by reference, cancel,
+      // confirm-receipt ug notifications. Mao nga ang default kay `true` karon
+      // — i-set og `HOSPITAL_PORTAL_ENABLED=false` kung gusto nimo i-sirado
+      // pag-usab (pananglitan sa usa ka demo nga walay blood-bank account).
+      hospitalPortalEnabled: process.env.HOSPITAL_PORTAL_ENABLED !== 'false',
+
+      // Ang mock data kay PATAY na by default para sa blood request workflow.
+      //
+      // Incoming Requests, Fulfillment ug Billing kay naa nay tinuod nga
+      // endpoint, ug ang `useMockFulfillmentApi` composable gitangtang na.
+      // Ang nahibilin nga mock kay Reports ug Drives ra — kadto pa ang walay
+      // backend. I-set og `USE_MOCKS=true` kung kinahanglan nimo sila balikon
+      // sa lokal nga dev.
+      useMocks: process.env.USE_MOCKS === 'true'
     }
   },
 

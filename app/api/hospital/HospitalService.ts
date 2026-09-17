@@ -1,40 +1,136 @@
 import BaseService from '../BaseService'
+import type {
+  AvailabilityResult,
+  BloodRequest,
+  BloodRequestFilters,
+  CreateBloodRequestPayload,
+} from '~/types/bloodRequest'
 
-export type RequestFilters = { status?: string; urgency?: string; search?: string; page?: number }
-export type BloodRequestPayload = {
-  blood_type_id: number | string
-  component_id: number | string
-  patient_name: string
-  patient_identifier?: string
-  quantity: number
-  urgency_level: 'routine' | 'emergency'
+/**
+ * The requester side of the API: a hospital blood bank's own requests.
+ *
+ * Every method here maps to a route that exists. The previous version of this
+ * file declared a surface the Laravel app never served, and the pages called a
+ * further dozen methods it did not even declare — `listRequests`,
+ * `bloodAvailability`, `uploadDocument` and the rest — which threw at runtime.
+ * Anything not below is not available; add the endpoint before adding a method.
+ */
+
+export type { BloodRequestFilters, CreateBloodRequestPayload }
+
+export interface Paginated<T> {
+  data: T[]
+  current_page: number
+  last_page: number
+  per_page: number
+  total: number
 }
 
 class HospitalService extends BaseService {
   private static instance: HospitalService
+
   static getInstance() {
     if (!HospitalService.instance) HospitalService.instance = new HospitalService()
     return HospitalService.instance
   }
 
-  dashboard() { return this.request<any>('/hospital/dashboard') }
-  referenceData() { return this.request<any>('/hospital/reference-data') }
-  availability(params: object = {}) { return this.request<any>('/hospital/availability', 'GET', params) }
-  requests(params: RequestFilters = {}) { return this.request<any>('/hospital/requests', 'GET', params) }
-  requestDetail(id: string | number) { return this.request<any>(`/hospital/bloodrequests/${id}`) }
-  createRequest(payload: BloodRequestPayload) { return this.request<any>('/hospital/bloodrequests', 'POST', payload) }
-  cancelRequest(id: string | number, reason?: string) { return this.request<any>(`/hospital/bloodrequests/${id}/cancel`, 'POST', { reason }) }
-  requestBilling(id: string | number) { return this.request<any>(`/hospital/bloodrequests/${id}/billing`) }
-  payRequestBilling(id: string | number, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
-    return this.request<any>(`/hospital/bloodrequests/${id}/billing/pay`, 'POST', payload)
+  /**
+   * Search participating blood centres for a type and component.
+   *
+   * Advisory only — the response says so in its own `advisory` field. Nothing
+   * is held until a request is raised and a centre approves it.
+   */
+  availability(params: { blood_type_id: number; component_id: number; quantity?: number }) {
+    return this.request<AvailabilityResult>('/hospital/availability', 'GET', params)
   }
-  reports(params: object = {}) { return this.request<any>('/hospital/reports', 'GET', params) }
-  notifications(params: object = {}) { return this.request<any>('/hospital/notifications', 'GET', params) }
-  markNotificationRead(id: string | number) { return this.request<any>(`/hospital/notifications/${id}/read`, 'PATCH') }
-  notificationPreferences() { return this.request<any>('/hospital/notification-preferences') }
-  updateNotificationPreferences(payload: object) { return this.request<any>('/hospital/notification-preferences', 'PATCH', payload) }
-  profile() { return this.request<any>('/hospital/profile') }
-  updateProfile(payload: object) { return this.request<any>('/hospital/profile', 'PATCH', payload) }
+
+  /** The facilities this blood bank may address a request to. */
+  eligibleFacilities() {
+    return this.request<{ facilities: Array<{ id: number; name: string; address: string | null }> }>(
+      '/hospital/facilities',
+    )
+  }
+
+  /** This blood bank's own requests. */
+  listRequests(params: BloodRequestFilters = {}) {
+    return this.request<Paginated<BloodRequest>>('/hospital/blood-requests', 'GET', params)
+  }
+
+  createRequest(payload: CreateBloodRequestPayload) {
+    return this.request<{ message: string; request: BloodRequest }>(
+      '/hospital/blood-requests',
+      'POST',
+      payload,
+    )
+  }
+
+  showRequest(id: number | string) {
+    return this.request<{ request: BloodRequest }>(`/hospital/blood-requests/${id}`)
+  }
+
+  /** Track by the reference number printed on the paperwork. */
+  trackRequest(reference: string) {
+    return this.request<{ request: BloodRequest }>(
+      `/hospital/blood-requests/track/${encodeURIComponent(reference)}`,
+    )
+  }
+
+  /** Withdraw a request. Only possible while nothing is held for it. */
+  cancelRequest(id: number | string, reason?: string) {
+    return this.request<{ message: string; request: BloodRequest }>(
+      `/hospital/blood-requests/${id}/cancel`,
+      'POST',
+      reason ? { reason } : {},
+    )
+  }
+
+  /**
+   * Billing summary for a request.
+   *
+   * No Laravel route serves this yet — `useBloodRequestBilling` mocks it
+   * until one exists.
+   */
+  requestBilling(id: number | string) {
+    return this.request<any>(`/hospital/blood-requests/${id}/billing`)
+  }
+
+  /** Record a payment against a request's billing. Also mock-gated for now. */
+  payRequestBilling(id: number | string, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
+    return this.request<any>(`/hospital/blood-requests/${id}/billing/pay`, 'POST', payload)
+  }
+
+  /**
+   * Confirm dispatched units arrived.
+   *
+   * Omit `allocationIds` to confirm everything outstanding; pass them when a
+   * delivery arrived short and only part of it should be confirmed.
+   */
+  confirmReceipt(id: number | string, allocationIds?: number[]) {
+    return this.request<{ message: string; status: string; status_label: string }>(
+      `/hospital/blood-requests/${id}/confirm-receipt`,
+      'POST',
+      allocationIds ? { allocation_ids: allocationIds } : {},
+    )
+  }
+
+  listNotifications(params: { category?: string; read?: boolean; per_page?: number } = {}) {
+    return this.request<any>('/hospital/notifications', 'GET', params)
+  }
+
+  notificationsUnreadCount() {
+    return this.request<{ unread_count: number }>('/hospital/notifications/unread-count')
+  }
+
+  markNotificationRead(id: string) {
+    return this.request<any>(`/hospital/notifications/${id}`, 'PATCH')
+  }
+
+  markAllNotificationsRead() {
+    return this.request<{ message: string; unread_count: number }>(
+      '/hospital/notifications/mark-all-read',
+      'POST',
+    )
+  }
 }
 
 export const hospitalService = HospitalService.getInstance()

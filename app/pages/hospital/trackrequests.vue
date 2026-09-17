@@ -520,25 +520,16 @@ function handlePrint() {
   window.print()
 }
 
-async function handleDownloadPdf() {
+/**
+ * Produce a copy of the tracked request.
+ *
+ * The browser's print dialogue, for the same reason as on the detail page: the
+ * `/download` endpoint this used to call does not exist, and the helper it
+ * called it through is not defined anywhere in the repository.
+ */
+function handleDownloadPdf() {
   if (!request.value) return
-  try {
-    const { data, error } = await useApi().get(
-      `/hospital/bloodrequests/${request.value.id}/download`,
-      { responseType: 'blob' }
-    )
-    if (error?.value) throw error.value
-    const blob = data?.value
-    if (!blob) return
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `blood-request-${request.value.reference_number}.pdf`
-    link.click()
-    window.URL.revokeObjectURL(url)
-  } catch (err) {
-    console.error('Failed to download PDF', err)
-  }
+  window.print()
 }
 
 function viewRequestDetails() {

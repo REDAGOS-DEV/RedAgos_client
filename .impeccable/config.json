@@ -11,6 +11,33 @@
         ],
         "createdAt": "2026-09-15T01:08:44.299Z",
         "reason": "Claude: the only match is .progress-fill, a progress bar whose width IS the quantity shown; scaleX would distort its border-radius:999px pill caps. Pre-existing style, untouched by this change."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "tests/bloodCenterShell.spec.ts"
+        ],
+        "createdAt": "2026-09-15T11:46:16.536Z",
+        "reason": "String assertions, not CSS: the spec asserts that the rail's transition declaration and the content column's match, so the literal text 'transition: width 200ms' appears inside expect().toContain(). No style is authored here."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/components/BloodCenter/sidebar.vue"
+        ],
+        "createdAt": "2026-09-15T11:46:22.019Z",
+        "reason": "Rail must physically widen 80px to 256px to reveal nav labels; transform cannot change a box's width and scaleX would distort the text. The layout cost is accepted and scoped with will-change."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/layouts/blood-centerdashboard.vue"
+        ],
+        "createdAt": "2026-09-15T11:46:22.207Z",
+        "reason": "padding-left IS the requested reflow: user asked that the expanded sidebar not overlay content and that the main area adjust its available width. A transform gives the overlay behaviour they explicitly ruled out."
       }
     ]
   }

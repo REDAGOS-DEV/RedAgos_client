@@ -158,10 +158,11 @@
             <label for="bloodType">Blood Type</label>
             <div class="select-wrap">
               <select id="bloodType" v-model="form.bloodType">
-                <option value="" disabled selected>Select</option>
+                <option value="">I don't know yet</option>
                 <option v-for="type in bloodTypes" :key="type" :value="type">{{ type }}</option>
               </select>
             </div>
+            <p class="field-hint">Leave this if you are unsure. It is recorded for you from the laboratory test on your first donation.</p>
             <p v-if="fieldErrors.blood_type" class="field-error">{{ fieldErrors.blood_type }}</p>
           </div>
         </div>
@@ -344,7 +345,9 @@ async function handleSubmit() {
       last_name: form.lastName,
       email: form.email,
       phone: form.phone,
-      blood_type: form.bloodType,
+      // An unanswered blood type is sent as null, not '', so the server stores
+      // "not known" rather than being handed something to look up.
+      blood_type: form.bloodType || null,
       gender: form.gender,
       birth_date: form.dob,
       address: form.address,

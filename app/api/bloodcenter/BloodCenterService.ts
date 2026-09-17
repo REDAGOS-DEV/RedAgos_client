@@ -90,6 +90,34 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donations/${donationId}/collection`, 'POST', payload)
   }
 
+  // --- Laboratory / Processing department ---
+  //
+  // Picks up where the counter stops. The counter leaves a donation at
+  // `collected`; nothing here is reachable before that, and `completed` —
+  // cleared for issue to a patient — is only ever set from this department.
+
+  async laboratoryQueue(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/queue`, 'GET', params)
+  }
+
+  async laboratoryDonation(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}`, 'GET')
+  }
+
+  /** Record the result a medical technologist reported. Moves it to `tested`. */
+  async recordTestResult(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/results`, 'POST', payload)
+  }
+
+  async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/components`, 'POST', payload)
+  }
+
+  /** Clear for issue, or reject. The only two outcomes the laboratory may set. */
+  async updateLaboratoryStatus(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/status`, 'PATCH', payload)
+  }
+
   // --- Donor management (Collection department) ---
   //
   // Ang server nga prefix kay `/blood-center/donors` — dili `/bloodcenter/...`
@@ -116,6 +144,21 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}/history`, 'GET')
   }
 
+  // --- Component settings (supervisor only) ---
+  //
+  // Shelf life and price, held per facility. blood_components has no
+  // facility_id and four facilities share it, so a value written there would
+  // decide another centre's expiry dates — and a price switches on the
+  // payment-before-release gate, which one centre must not turn on for another.
+
+  async componentSettings(): Promise<any> {
+    return this.request(`${this.resource}/blood-components`, 'GET')
+  }
+
+  async updateComponentSetting(componentId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
+  }
+
   // --- Inventory (Inventory / Storage department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
@@ -124,6 +167,17 @@ class BloodCenterService extends BaseService {
 
   async inventorySummary(): Promise<any> {
     return this.request(`${this.resource}/inventory/summary`, 'GET')
+  }
+
+  /**
+   * Donations the laboratory has cleared that still owe units.
+   *
+   * Its own endpoint rather than the laboratory queue: Inventory holds
+   * `donations.view` but not `lab.view`, and this carries the declared-versus-
+   * recorded counts that neither of the donation listings does.
+   */
+  async inventoryIntakeQueue(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/inventory/intake-queue`, 'GET', params)
   }
 
   async recordBloodUnits(payload: Record<string, any> = {}): Promise<any> {
@@ -186,6 +240,93 @@ class BloodCenterService extends BaseService {
 
   async restore(uuid: string): Promise<any> {
     return this.request(`${this.resource}/${uuid}/restore`, 'POST')
+  }
+
+  // ---------------------------------------------------------------------
+  // Incoming blood requests — the fulfilling side of the workflow.
+  //
+  // These replace the fixture data in useIncomingRequests and the mock $fetch
+  // shadow inside fulfillment.vue. Every path below is a route the Laravel app
+  // actually serves; the commented-out paths those mocks carried
+  // (/blood-center/bloodrequests, /api/center/requests/...) never existed.
+  // ---------------------------------------------------------------------
+
+  /** Requests addressed to this facility, emergencies first. */
+  async incomingRequests(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/blood-requests', 'GET', params)
+  }
+
+  /** Queue counters for the dashboard. */
+  async incomingRequestsSummary(): Promise<any> {
+    return this.request('/blood-center/blood-requests/summary', 'GET')
+  }
+
+  /** One request, with the live stock that could fill it. Holds nothing. */
+  async reviewRequest(id: number | string): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}`, 'GET')
+  }
+
+  /**
+   * Approve and hold stock.
+   *
+   * Omit `quantity` to hold everything the request still needs. Whatever is
+   * sent, the server caps it at the outstanding amount and at what is on the
+   * shelf, so a partial hold is a normal outcome rather than an error.
+   */
+  async allocateRequest(id: number | string, quantity?: number): Promise<any> {
+    return this.request(
+      `/blood-center/blood-requests/${id}/allocate`,
+      'POST',
+      quantity ? { quantity } : {},
+    )
+  }
+
+  /** Refuse a request. The reason is required and reaches the requester. */
+  async rejectRequest(id: number | string, reason: string): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/reject`, 'POST', { reason })
+  }
+
+  /** Give up holds and return those units to available stock. */
+  async releaseHolds(id: number | string, reason: string, allocationIds?: number[]): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/release-holds`, 'POST', {
+      reason,
+      ...(allocationIds ? { allocation_ids: allocationIds } : {}),
+    })
+  }
+
+  /** Dispatch held units. Refused while the statement is unsettled. */
+  async releaseRequest(id: number | string, allocationIds?: number[]): Promise<any> {
+    return this.request(
+      `/blood-center/blood-requests/${id}/release`,
+      'POST',
+      allocationIds ? { allocation_ids: allocationIds } : {},
+    )
+  }
+
+  /** The statement raised against one request. */
+  async billingForRequest(requestId: number | string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}`, 'GET')
+  }
+
+  /** Record a settlement. GCash payments must carry their reference. */
+  async recordPayment(requestId: number | string, payload: Record<string, any>): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/payments`, 'POST', payload)
+  }
+
+  async listNotifications(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/notifications', 'GET', params)
+  }
+
+  async notificationsUnreadCount(): Promise<any> {
+    return this.request('/blood-center/notifications/unread-count', 'GET')
+  }
+
+  async markNotificationRead(id: string): Promise<any> {
+    return this.request(`/blood-center/notifications/${id}`, 'PATCH')
+  }
+
+  async markAllNotificationsRead(): Promise<any> {
+    return this.request('/blood-center/notifications/mark-all-read', 'POST')
   }
 }
 

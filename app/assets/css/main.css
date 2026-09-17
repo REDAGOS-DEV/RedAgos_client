@@ -33,8 +33,32 @@
   --rb-teal: #0F766E;
   --rb-teal-rgb: 15, 118, 110;
 
+  /*
+   * Accent colours come in two flavours because one value cannot do both jobs.
+   * The base (--rb-primary) is the *fill*: white text sits on it, so it has to
+   * stay dark. The `-text` variant is the same colour used AS text or an icon
+   * on a surface, where the surface changes with the theme. #1565C0 reads at
+   * 5.8:1 on white and 2.5:1 on a dark card — the same token cannot be both,
+   * which is why panel links and stat values looked washed out in dark mode.
+   *
+   * Light values are the base colours, except warning: #F57C00 is only 2.7:1
+   * on white, so text uses amber-700 (4.8:1). The fill keeps #F57C00.
+   */
+  --rb-primary-text: #1565C0;
+  --rb-accent-text: #D32F2F;
+  --rb-success-text: #2E7D32;
+  --rb-warning-text: #B45309;
+  --rb-purple-text: #7C3AED;
+  --rb-teal-text: #0F766E;
+
+  /*
+   * #94A3B8 on white is 3.0:1 — under AA for body text, and this token carries
+   * captions, table meta and form hints across the blood centre. Slate-500 is
+   * 4.8:1 and reads as the same grey.
+   */
   --rb-text-primary: #1F2937;
-  --rb-text-secondary: #94A3B8;
+  --rb-text-secondary: #64748B;
+  --rb-text-muted: #94A3B8;
   --rb-border: #EEF1F5;
   --rb-border-strong: #E2E8F0;
   --rb-border-hover: #E2E8F0;
@@ -42,7 +66,9 @@
   --rb-surface-alt: #FAFBFC;
   --rb-surface-hover: #F8FAFC;
   --rb-page-bg: #F7F8FA;
-  --rb-placeholder: #B0BAC5;
+  /* Slate-500: 4.8:1 on white. The old #B0BAC5 was ~2:1 — a hint nobody
+     could read counts as content that fails AA. */
+  --rb-placeholder: #64748B;
   --rb-skeleton-a: #EEF1F5;
   --rb-skeleton-b: #F6F8FA;
   --rb-overlay: rgba(15, 23, 42, 0.45);
@@ -51,8 +77,22 @@
 
 /* Dark mode is class-based (tailwind.config.js darkMode: 'class'). */
 .dark {
+  /*
+   * Lifted accents, each at or above 4.5:1 on --rb-surface (#1E293B). The
+   * fills (--rb-primary and friends) deliberately do not move: they still
+   * carry white text.
+   */
+  --rb-primary-text: #64B5F6;
+  --rb-accent-text: #F87171;
+  --rb-success-text: #66BB6A;
+  --rb-warning-text: #FFB74D;
+  --rb-purple-text: #A78BFA;
+  --rb-teal-text: #4DB6AC;
+
   --rb-text-primary: #F1F5F9;
   --rb-text-secondary: #94A3B8;
+  --rb-text-muted: #64748B;
+  --rb-placeholder: #94A3B8;
   --rb-border: #334155;
   --rb-border-strong: #334155;
   --rb-border-hover: #475569;
@@ -67,6 +107,23 @@
 
 html {
   font-family: var(--rb-font-sans);
+  /*
+   * The blood-centre rail reflows the content column on hover. Without a
+   * reserved gutter, a reflow that changes the page height by a row toggles
+   * the scrollbar and the whole layout jumps sideways by its width mid
+   * transition.
+   */
+  scrollbar-gutter: stable;
+}
+
+/*
+ * A light form control on a dark page renders its own chrome — the calendar
+ * picker, the select arrow, the spinners — in the light scheme regardless of
+ * what CSS says, which is where the stray bright squares in dark mode come
+ * from. This tells the UA which scheme the page is actually in.
+ */
+.dark {
+  color-scheme: dark;
 }
 @keyframes slideDown{
 
