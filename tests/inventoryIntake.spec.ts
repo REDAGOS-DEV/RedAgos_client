@@ -73,6 +73,31 @@ describe('BloodCenterService inventory intake', () => {
     expect(config.body.units[0]).not.toHaveProperty('unit_id')
   })
 
+  it('reads component settings from the blood-centre namespace, not admin', async () => {
+    fetchMock.mockResolvedValueOnce({ data: [] })
+    await service.componentSettings()
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    // Shelf life and price are a facility's own setting. An /admin/... path
+    // here would mean one centre editing values the other three read.
+    expect(url).toBe('/blood-center/blood-components')
+    expect(config.method).toBe('GET')
+  })
+
+  it('sends a cleared shelf life as null rather than omitting it', async () => {
+    fetchMock.mockResolvedValueOnce({})
+    await service.updateComponentSetting(4, { shelf_life_days: null, price: 0 })
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe('/blood-center/blood-components/4')
+    expect(config.method).toBe('PATCH')
+    // Null means "not configured", which intake refuses on. Dropping the key
+    // would read as "leave it alone" and the clear would silently not happen.
+    expect(config.body).toEqual({ shelf_life_days: null, price: 0 })
+  })
+
   it('discards a unit through the unit-scoped route', async () => {
     fetchMock.mockResolvedValueOnce({})
     await service.discardBloodUnit('SNBC-0001-01', { reason: 'Bag compromised' })

@@ -121,6 +121,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'System',
     items: [
+      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'center.configure', keywords: 'shelf life expiry price component settings' },
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
       // Help & Support removed: /blood-center/support has no page, so the link
       // 404'd. Restore it together with the page, not before.

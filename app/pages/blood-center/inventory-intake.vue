@@ -113,7 +113,7 @@
         <p v-if="unconfigured.length" class="alert alert--warning">
           {{ unconfigured.join(', ') }} {{ unconfigured.length === 1 ? 'has' : 'have' }} no shelf life
           configured, so no expiry date can be derived and {{ unconfigured.length === 1 ? 'it' : 'they' }}
-          cannot be shelved. A platform administrator sets this once, under Blood Components.
+          cannot be shelved. A supervisor sets this for your centre, under Blood Components.
         </p>
       </section>
 
@@ -192,7 +192,7 @@
             <h2 class="card__title">Nothing can be shelved yet</h2>
             <p class="card__hint">
               Every outstanding component on this donation is missing a shelf life, so no expiry date can
-              be derived. Ask a platform administrator to set them under Blood Components.
+              be derived. Ask a supervisor to set them for your centre, under Blood Components.
             </p>
           </div>
         </div>

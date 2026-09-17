@@ -144,6 +144,21 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}/history`, 'GET')
   }
 
+  // --- Component settings (supervisor only) ---
+  //
+  // Shelf life and price, held per facility. blood_components has no
+  // facility_id and four facilities share it, so a value written there would
+  // decide another centre's expiry dates — and a price switches on the
+  // payment-before-release gate, which one centre must not turn on for another.
+
+  async componentSettings(): Promise<any> {
+    return this.request(`${this.resource}/blood-components`, 'GET')
+  }
+
+  async updateComponentSetting(componentId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
+  }
+
   // --- Inventory (Inventory / Storage department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
