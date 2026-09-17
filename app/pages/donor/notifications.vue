@@ -6,7 +6,7 @@ Output:
         <div class="header-row">
             <div>
                 <h1 class="page-title">Stay updated!</h1>
-                <p class="page-subtitle">Stay informed with appointment reminders, donation updates, and important announcements.</p>
+                <p class="page-subtitle">Stay informed with important announcements.</p>
             </div>
             <button
                 type="button"
@@ -250,7 +250,7 @@ onActivated(() => {
     --warning: #f57c00;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
@@ -543,11 +543,6 @@ onActivated(() => {
 @media (max-width: 640px) {
     .notifications-page {
         padding: 16px 16px 32px;
-    }
-
-    .header-row {
-        flex-direction: column;
-        align-items: stretch;
     }
 
     .notif-row {

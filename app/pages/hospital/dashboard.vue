@@ -550,18 +550,18 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard {
-  --primary: #1565c0;
+  --primary: var(--rb-primary, #1565c0);
   --primary-hover: #0d47a1;
-  --light-blue: #42a5f5;
+  --light-blue: var(--rb-secondary, #42a5f5);
   --bg: #f7f9fc;
   --surface: #ffffff;
   --border: #e5eaf0;
   --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --danger: #d32f2f;
-  --warning: #f57c00;
-  --success: #2e7d32;
+  --text-secondary: var(--rb-text-secondary, #64748b);
+  --text-muted: var(--rb-text-muted, #94a3b8);
+  --danger: var(--rb-accent, #d32f2f);
+  --warning: var(--rb-warning, #f57c00);
+  --success: var(--rb-success, #2e7d32);
   --info: #0288d1;
   --purple: #5e35b1;
   font-family: var(--rb-font-sans);

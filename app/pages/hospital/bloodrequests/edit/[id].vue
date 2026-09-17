@@ -449,7 +449,7 @@ onMounted(() => {
 const isEditable = computed(() => originalRequest.value?.status === 'Pending')
 
 const statusMeta = {
-  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F59E0B' },
+  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F57C00' },
   Approved:           { bg: '#E8F0FE', fg: '#1565C0', dot: '#1565C0' },
   Processing:         { bg: '#EDE7F6', fg: '#5E35B1', dot: '#5E35B1' },
   'Ready for Pickup': { bg: '#E3F2FD', fg: '#0277BD', dot: '#0277BD' },
@@ -604,11 +604,11 @@ function formatDateTime(iso) {
 
 <style scoped>
 .eb-page {
-  --eb-primary: #1565c0;
+  --eb-primary: var(--rb-primary, #1565c0);
   --eb-primary-hover: #0d47a1;
-  --eb-warning: #f59e0b;
-  --eb-success: #2e7d32;
-  --eb-danger: #d32f2f;
+  --eb-warning: var(--rb-warning, #F57C00);
+  --eb-success: var(--rb-success, #2e7d32);
+  --eb-danger: var(--rb-accent, #d32f2f);
   --eb-bg: #f7f9fc;
   --eb-card: #ffffff;
   --eb-border: #e5eaf0;

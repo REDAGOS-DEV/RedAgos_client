@@ -2,23 +2,43 @@
   <div>
     <HospitalSidebar />
 
-    <div class="lg:pl-64">
+    <div :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'" class="transition-[padding-left] duration-200">
       <!-- Top bar -->
       <header
-        class="fixed top-0 left-0 right-0 lg:left-64 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 pl-16 lg:pl-6 transition-colors duration-150"
+        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
+        :class="collapsed ? 'lg:left-20' : 'lg:left-64'"
         :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
 
-        <!-- Breadcrumb + greeting (desktop only) -->
-        <div class="hidden lg:flex flex-col justify-center min-w-[160px] flex-shrink-0">
-          <span class="text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">{{ breadcrumb }}</span>
-          <span class="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{{ greeting }}</span>
+        <!-- Left cluster: mobile menu toggle + titles -->
+        <div class="flex items-center gap-2 min-w-0">
+          <!-- Mobile menu toggle -->
+          <button @click="openMobile"
+            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            aria-label="Open menu">
+            <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
+          </button>
+
+          <!-- Page title (mobile only) -->
+          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
+            {{ pageLabels[route.path] || 'Dashboard' }}
+          </span>
+
+          <!-- Breadcrumb + greeting (tablet & desktop) -->
+          <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
+            <span class="hidden lg:block text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">
+              {{ breadcrumb }}
+            </span>
+            <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 truncate leading-tight">
+              {{ greeting }}
+            </span>
+          </div>
         </div>
 
         <!-- Mobile -->
         <button v-if="!searchOpenMobile" @click="openMobileSearch"
           class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
           aria-label="Open search">
-          <AssetIcon name="search" :size="17" class="text-[#64748b] dark:text-slate-300" />
+          <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
         </button>
 
         <!-- Search bar -->
@@ -69,16 +89,16 @@
         </div>
 
         <!-- Right cluster -->
-        <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ml-auto">
+        <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <button @click="toggleTheme"
             class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
             :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="16" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
           <NuxtLink to="/hospital/notifications"
             class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
-            <AssetIcon name="bell" :size="16" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon name="bell" :size="18" class="text-[#64748b] dark:text-slate-300" />
             <span v-if="unreadCount > 0"
               class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-white dark:ring-slate-900"
               style="background:#D32F2F">
@@ -87,7 +107,7 @@
           </NuxtLink>
 
           <!-- Divider -->
-          <div class="hidden xs:block w-px h-6 mx-1 bg-[#EEF1F5] dark:bg-slate-700" />
+          <div class="hidden xs:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
 
           <div class="relative">
             <button @click="showUserMenu = !showUserMenu"
@@ -156,7 +176,7 @@
         </button>
       </header>
 
-      <main class="min-h-screen bg-[#F7F9FC] dark:bg-slate-900 transition-colors duration-150 pt-16">
+      <main class="min-h-screen bg-[#F7F9FC] dark:bg-slate-900 transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
     </div>
@@ -170,7 +190,9 @@ import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
+import { useSidebar } from '~/composables/useSidebar.js'
 
+const { collapsed, openMobile } = useSidebar('hospital')
 const router = useRouter()
 const route = useRoute()
 const { user, fetchUser, logout } = useUser()

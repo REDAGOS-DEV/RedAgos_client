@@ -471,7 +471,7 @@
                   <span class="ba-legend-dot" style="background:#2E7D32;"></span> Healthy
                 </span>
                 <span class="ba-legend-chip badge-low">
-                  <span class="ba-legend-dot" style="background:#F59E0B;"></span> Low
+                  <span class="ba-legend-dot" style="background:#F57C00;"></span> Low
                 </span>
                 <span class="ba-legend-chip badge-critical">
                   <span class="ba-legend-dot" style="background:#D32F2F;"></span> Critical
@@ -870,18 +870,18 @@ const donutSegments = computed(() => {
 
 <style scoped>
 .ba-page {
-  --ba-primary: #1565C0;
+  --ba-primary: var(--rb-primary, #1565C0);
   --ba-primary-hover: #0D47A1;
   --ba-bg: #F7F9FC;
   --ba-card: #FFFFFF;
   --ba-border: #E5EAF0;
   --ba-text: #1E293B;
-  --ba-text-secondary: #64748B;
-  --ba-text-muted: #94A3B8;
-  --ba-success: #2E7D32;
-  --ba-warning: #F59E0B;
-  --ba-danger: #D32F2F;
-  --ba-purple: #7C3AED;
+  --ba-text-secondary: var(--rb-text-secondary, #64748B);
+  --ba-text-muted: var(--rb-text-muted, #94A3B8);
+  --ba-success: var(--rb-success, #2E7D32);
+  --ba-warning: var(--rb-warning, #F57C00);
+  --ba-danger: var(--rb-accent, #D32F2F);
+  --ba-purple: var(--rb-purple, #7C3AED);
   --ba-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --ba-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 

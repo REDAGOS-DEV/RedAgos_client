@@ -178,7 +178,7 @@ const chipOptions = [
 
 const categoryStyleMap = {
   blood_request: { color: '#1565C0', bg: '#1565C014', icon: 'clipboard-list' },
-  blood_availability: { color: '#F59E0B', bg: '#F59E0B14', icon: 'droplets' },
+  blood_availability: { color: '#F57C00', bg: '#F57C0014', icon: 'droplets' },
   pickup: { color: '#2E7D32', bg: '#2E7D3214', icon: 'package-check' },
   billing: { color: '#7C3AED', bg: '#7C3AED14', icon: 'receipt' },
   announcement: { color: '#0F766E', bg: '#0F766E14', icon: 'megaphone' },
@@ -366,19 +366,19 @@ onMounted(() => {
 
 <style scoped>
 .notif-page {
-  --np-primary: #1565C0;
+  --np-primary: var(--rb-primary, #1565C0);
   --np-primary-hover: #0D47A1;
   --np-bg: #F7F9FC;
   --np-card: #FFFFFF;
   --np-border: #E5EAF0;
   --np-text: #1E293B;
-  --np-text-secondary: #64748B;
-  --np-text-muted: #94A3B8;
-  --np-success: #2E7D32;
-  --np-warning: #F59E0B;
-  --np-danger: #D32F2F;
-  --np-purple: #7C3AED;
-  --np-teal: #0F766E;
+  --np-text-secondary: var(--rb-text-secondary, #64748B);
+  --np-text-muted: var(--rb-text-muted, #94A3B8);
+  --np-success: var(--rb-success, #2E7D32);
+  --np-warning: var(--rb-warning, #F57C00);
+  --np-danger: var(--rb-accent, #D32F2F);
+  --np-purple: var(--rb-purple, #7C3AED);
+  --np-teal: var(--rb-teal, #0F766E);
   --np-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --np-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
