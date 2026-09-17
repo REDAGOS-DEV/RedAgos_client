@@ -715,9 +715,15 @@ onActivated(() => {
   color: var(--text-secondary);
 }
 
-/* Skeleton */
+/*
+ * Shimmer placeholder. Both stops are the shared --rb-skeleton tokens, so the
+ * dark variant comes from main.css the way the donor pages get theirs. The
+ * paired `:global(.dark .skeleton)` rule this replaces was a shade brighter
+ * than the rest of the product and, being fully global, reached every other
+ * page's skeletons too.
+ */
 .skeleton {
-  background-image: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   border-radius: 8px;
   animation: shimmer 1.4s ease infinite;
@@ -761,5 +767,4 @@ onActivated(() => {
 :global(.dark .missing) { color: #ffb74d; }
 :global(.dark .panel-link) { color: #64b5f6; }
 :global(.dark .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
-:global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 </style>

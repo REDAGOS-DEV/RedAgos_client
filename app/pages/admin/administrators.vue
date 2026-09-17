@@ -788,8 +788,14 @@ onActivated(() => {
 .empty-state__title { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--text-primary); }
 .empty-state__text { margin: 0; max-width: 38ch; font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
 
+/*
+ * Shimmer placeholder. Both stops are the shared --rb-skeleton tokens, so the
+ * dark variant comes from main.css the way the donor pages get theirs, rather
+ * than from a paired `:global(.dark .skeleton)` rule that was a shade brighter
+ * than the rest of the product.
+ */
 .skeleton {
-  background-image: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   border-radius: 8px;
   animation: shimmer 1.4s ease infinite;
@@ -1074,5 +1080,4 @@ onActivated(() => {
 :global(.dark .banner--success) { background: rgba(76, 175, 80, 0.14); border-color: rgba(76, 175, 80, 0.3); color: #81c784; }
 :global(.dark .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
 :global(.dark .note) { background: rgba(66, 165, 245, 0.12); border-color: rgba(66, 165, 245, 0.3); }
-:global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 </style>

@@ -1144,7 +1144,9 @@ onUnmounted(releasePhoto)
 :global(.dark .reason-input::placeholder) { color: #64748b; }
 
 /* Shimmer placeholder, same treatment as the dashboard and administrators
-   pages so a loading table looks like the rest of the console. */
+   pages so a loading table looks like the rest of the console. The two stops
+   are the shared --rb-skeleton tokens, so the dark variant comes from main.css
+   the way the donor pages get theirs. */
 .skeleton-row td {
   padding-top: 18px;
   padding-bottom: 18px;
@@ -1154,7 +1156,7 @@ onUnmounted(releasePhoto)
   display: block;
   height: 12px;
   border-radius: 6px;
-  background-image: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
 }
@@ -1166,8 +1168,5 @@ onUnmounted(releasePhoto)
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-}
-:global(.dark .skeleton) {
-  background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
 }
 </style>

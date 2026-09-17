@@ -1,75 +1,120 @@
 <template>
   <div>
-    <!-- Mobile Overlay -->
-    <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-black/40" @click="closeMobile" />
+    <!--
+      Mobile overlay. The trigger that opens the drawer lives in the layout
+      header, not floating over the page, so the header needs no permanent
+      left gutter to clear it at desktop widths.
+    -->
+    <Transition name="scrim">
+      <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-slate-900/50" @click="closeMobile" />
+    </Transition>
 
     <aside
-      class="fixed top-0 left-0 h-screen z-50 flex flex-col overflow-hidden transition-[width,transform] duration-200 lg:translate-x-0"
-      :class="[mobileOpen ? 'translate-x-0' : '-translate-x-full', railCollapsed ? 'lg:w-20' : 'lg:w-64', 'w-64']"
+      aria-label="Super Admin navigation"
+      class="sidebar fixed top-0 left-0 h-screen z-50 flex flex-col overflow-hidden w-[272px] lg:translate-x-0"
+      :class="[
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        railCollapsed ? 'lg:w-20' : 'lg:w-64'
+      ]"
       :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow }"
       @mouseenter="handleSidebarEnter"
       @mouseleave="handleSidebarLeave"
       @focusin="handleSidebarEnter"
       @focusout="handleSidebarLeave">
-      <!-- Close button (mobile) -->
-      <button class="lg:hidden absolute top-4 right-4 z-10" :style="{ color: SIDEBAR_IDLE_TEXT }" @click="closeMobile">
-        <AssetIcon name="x" :size="20" />
+
+      <!-- Close button (mobile drawer only) -->
+      <button
+        class="lg:hidden absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+        aria-label="Close menu"
+        :style="{ color: SIDEBAR_IDLE_TEXT }"
+        @click="closeMobile">
+        <AssetIcon name="x" :size="18" />
       </button>
 
-      <!-- Logo -->
+      <!--
+        The brand row is height-matched to the topbar (h-14 / sm:h-16) so the
+        sidebar's divider lines up with the header's instead of sitting a few
+        pixels adrift.
+      -->
       <div
-        class="px-5 h-14 sm:h-16 flex items-center gap-3 border-b dark:border-slate-700 flex-shrink-0 transition-colors duration-150 cursor-pointer select-none"
-        :class="railCollapsed ? 'lg:justify-center lg:px-0' : ''" :style="{ borderColor: SIDEBAR_BORDER }"
-        @click="goToDashboard">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+        class="brand px-5 h-14 sm:h-16 flex items-center gap-3 border-b flex-shrink-0 transition-colors duration-150 cursor-pointer select-none"
+        :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
+        :style="{ borderColor: SIDEBAR_BORDER }"
+        role="link"
+        tabindex="0"
+        aria-label="RedAgos — go to the dashboard"
+        @click="goHome"
+        @keydown.enter.prevent="goHome"
+        @keydown.space.prevent="goHome">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative"
           style="background: #1565C0">
-          <img :src="logo" alt="RedAgos Logo" class="logo-image">
+          <img v-if="!navigatingHome" :src="logo" alt="RedAgos" class="logo-image">
+          <span v-else class="logo-spinner" />
         </div>
 
-        <div v-if="showLabels" class="lg:block whitespace-nowrap">
+        <div v-if="showLabels" class="min-w-0 whitespace-nowrap">
           <h1 class="font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
             Red<span style="color:#D32F2F">Agos</span>
           </h1>
-          <p class="text-[11px] mt-0.5" :style="{ color: SIDEBAR_IDLE_TEXT }">
+          <p class="text-[11px] mt-0.5 truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
             Super Admin
           </p>
         </div>
       </div>
 
-      <!-- Navigation. No group headings: the clusters are separated by spacing. -->
-      <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-4" :class="isDark ? 'nav-dark' : ''">
-        <div v-for="(group, gIndex) in visibleGroups" :key="gIndex" :class="gIndex > 0 ? 'mt-3.5' : ''">
-          <NuxtLink v-for="item in group" :key="item.path" :to="item.path"
-            class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-colors duration-150"
-            :class="railCollapsed && !isMobile ? 'lg:justify-center' : ''"
-            :title="railCollapsed && !isMobile ? item.label : null" :style="navStyle(item.path)"
-            @click="closeSidebar" @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null">
-            <span
-              class="flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors duration-150"
-              :style="{ background: isActive(item.path) ? '#1565C0' : 'transparent' }">
-              <AssetIcon :name="item.icon" :size="14"
-                :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
-            </span>
-            <span v-if="showLabels" class="flex-1 font-medium whitespace-nowrap">{{ item.label }}</span>
-          </NuxtLink>
-        </div>
+      <!--
+        Navigation. The clusters carry no headings, so they are separated by
+        spacing while the labels are readable and by a rule once the rail is
+        collapsed — at 80px the vertical gap alone is too weak to read as a
+        break.
+      -->
+      <nav
+        class="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4"
+        :class="[isDark ? 'nav-dark' : '', railCollapsed && !isMobile ? 'nav-rail' : '']">
+        <template v-for="(group, gIndex) in visibleGroups" :key="gIndex">
+          <div v-if="!showLabels" class="group-rule" :class="gIndex === 0 ? 'is-first' : ''"
+            :style="{ background: SIDEBAR_BORDER }" />
+
+          <div :class="showLabels && gIndex > 0 ? 'mt-3.5' : ''">
+            <NuxtLink v-for="item in group" :key="item.path" :to="item.path"
+              class="nav-item flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-colors duration-150"
+              :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
+              :title="railCollapsed && !isMobile ? item.label : null"
+              :aria-current="isActive(item.path) ? 'page' : null"
+              :style="navStyle(item.path)"
+              @click="closeMobile"
+              @mouseenter="hoveredPath = item.path"
+              @mouseleave="hoveredPath = null">
+              <span
+                class="flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors duration-150"
+                :style="{ background: isActive(item.path) ? '#1565C0' : 'transparent' }">
+                <AssetIcon :name="item.icon" :size="14"
+                  :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
+              </span>
+
+              <span v-if="showLabels" class="flex-1 min-w-0 truncate whitespace-nowrap">{{ item.label }}</span>
+            </NuxtLink>
+          </div>
+        </template>
       </nav>
 
       <!--
         Account block.
 
-        The donor portal puts this in a top-bar dropdown. The admin console has
-        no per-page chrome competing for that corner, so the same vocabulary —
-        #1565C0 avatar, initial fallback, name over access level — sits at the
-        foot of the rail instead. Collapses to the avatar alone at 80px, where a
-        dropdown would have nothing to align against.
+        The donor and blood-centre portals put this in a top-bar dropdown. The
+        admin console has no per-page chrome competing for that corner, so the
+        same vocabulary — #1565C0 avatar, initial fallback, name over access
+        level — sits at the foot of the rail instead. Collapses to the avatar
+        alone at 80px, where a dropdown would have nothing to align against.
       -->
-      <div ref="profileRoot" class="relative flex-shrink-0 px-3 pt-2.5 pb-3.5 border-t dark:border-slate-700"
+      <div ref="profileRoot" class="relative flex-shrink-0 px-3 pt-2.5 pb-3.5 border-t"
         :style="{ borderColor: SIDEBAR_BORDER }">
         <button type="button"
-          class="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl border border-transparent transition-colors hover:bg-white dark:hover:bg-slate-800"
+          class="account-btn flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl border border-transparent transition-colors"
           :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
-          :title="railCollapsed && !isMobile ? user?.full_name : null" :aria-expanded="menuOpen"
+          :title="railCollapsed && !isMobile ? user?.full_name : null"
+          :aria-expanded="menuOpen"
+          aria-haspopup="menu"
           @click="menuOpen = !menuOpen">
           <span class="relative flex-shrink-0">
             <span
@@ -95,15 +140,22 @@
           </span>
 
           <AssetIcon v-if="showLabels" name="chevron-down" :size="14"
-            class="text-[#94a3b8] flex-shrink-0 transition-transform duration-150"
-            :class="{ 'rotate-180': menuOpen }" />
+            class="flex-shrink-0 transition-transform duration-150"
+            :class="{ 'rotate-180': menuOpen }"
+            :style="{ color: SIDEBAR_IDLE_TEXT }" />
         </button>
 
         <Transition name="popup">
+          <!--
+            Surface and border are bound rather than written as `dark:` classes
+            beside a hard-coded inline colour: an inline `border-color` outranks
+            the variant, which is what pinned this popup's border to the light
+            #EEF1F5 in dark mode.
+          -->
           <div v-if="menuOpen"
-            class="absolute left-3 right-3 bottom-[calc(100%-4px)] rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-lg z-20"
-            style="border-color:#eef1f5">
-            <div class="flex items-start gap-3 px-4 py-3.5 border-b dark:border-slate-700" style="border-color:#eef1f5">
+            class="absolute left-3 right-3 bottom-[calc(100%-4px)] rounded-xl overflow-hidden border shadow-lg z-20"
+            :style="{ background: SIDEBAR_POPUP_BG, borderColor: SIDEBAR_BORDER }">
+            <div class="flex items-start gap-3 px-4 py-3.5 border-b" :style="{ borderColor: SIDEBAR_BORDER }">
               <div
                 class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
                 style="background:#1565C0">
@@ -111,20 +163,23 @@
               </div>
 
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">
+                <p class="text-sm font-semibold truncate" :style="{ color: SIDEBAR_HEADING_TEXT }">
                   {{ user?.full_name || 'Administrator' }}
                 </p>
-                <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
-                <p class="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-[#1565C0] dark:text-[#64B5F6]">
+                <p class="text-xs truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
+                  {{ user?.email }}
+                </p>
+                <p class="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold"
+                  :style="{ color: SIDEBAR_ACTIVE_TEXT }">
                   <AssetIcon name="shield-check" :size="14" />
                   {{ adminRoleLabel(user?.admin_role) }}
                 </p>
               </div>
             </div>
 
-            <div class="border-t dark:border-slate-700 py-2" style="border-color:#eef1f5">
+            <div class="py-2">
               <button type="button"
-                class="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
+                class="logout-btn flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors"
                 style="color:#D32F2F" :disabled="loggingOut" @click="handleLogout">
                 <AssetIcon name="log-out" :size="16" />
                 <span>{{ loggingOut ? 'Logging out…' : 'Log Out' }}</span>
@@ -141,11 +196,15 @@
 /*
  * Super Admin rail.
  *
- * Behaviour is deliberately identical to the donor sidebar — collapsed to 80px
- * on desktop and widened on hover, with the layout still reserving the narrow
- * width so the expanded rail floats over the page instead of reflowing it, and
- * a full drawer below 1024px. `useSidebar()` is shared with the donor build on
- * purpose: it is generic rail state, not donor-facing UI.
+ * Behaviour matches the blood-centre rail: collapsed to 80px on desktop and
+ * widened on hover, with the layout *reflowing* the content column beside it
+ * rather than letting the widened rail float over the page, and a full drawer
+ * below 1024px.
+ *
+ * `useSidebar('admin')` takes its own namespace. The admin build used to share
+ * the donor bucket, so opening the donor drawer and coming back left this rail
+ * holding a hover the admin user never made — and now that the layout tracks
+ * the rail's width, that stale state would reflow the page with it.
  *
  * Navigation is filtered by privilege. This is presentation only — every route
  * behind these links is re-checked by `can:` middleware on the server — but
@@ -159,15 +218,26 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser'
 import { useSidebar } from '~/composables/useSidebar.js'
 
-const { collapsed, hoverExpanded, expandOnHover, collapseOnHover, mobileOpen, closeMobile } = useSidebar()
+const {
+  hoverExpanded,
+  railExpanded,
+  expandOnHover,
+  collapseOnHover,
+  mobileOpen,
+  closeMobile
+} = useSidebar('admin')
+
 const { user, logout } = useUser()
 
 const route = useRoute()
 const router = useRouter()
 
+// --- Dark mode awareness ---
 const isDark = ref(false)
 let themeObserver = null
 
+// --- Viewport awareness ---
+// Below lg the sidebar is a drawer, so hover must not apply there at all.
 const isMobile = ref(false)
 let mobileMql = null
 
@@ -175,12 +245,45 @@ const menuOpen = ref(false)
 const profileRoot = ref(null)
 const loggingOut = ref(false)
 const hoveredPath = ref(null)
+const navigatingHome = ref(false)
+
+/** The rail's visual state: collapsed unless hovered, or unless it is a drawer. */
+const railCollapsed = computed(() => !railExpanded.value)
+
+/** Whether labels/text should render at all. */
+const showLabels = computed(() => isMobile.value || railExpanded.value)
 
 const updateIsMobile = (event) => {
   isMobile.value = event ? event.matches : mobileMql.matches
   // Dropping to drawer widths with a hover still latched would leave the rail
-  // stuck open when the viewport goes back up.
+  // — and the content padding that tracks it — stuck open on the way back up.
   if (isMobile.value) collapseOnHover()
+}
+
+/*
+ * Leaving is deferred by a beat. Without it a pointer crossing the rail's own
+ * edge — which moves out from under the cursor as the sidebar widens and the
+ * content reflows — can fire leave/enter in quick succession and flicker.
+ */
+let leaveTimer = null
+
+const handleSidebarEnter = () => {
+  if (isMobile.value) return
+  clearTimeout(leaveTimer)
+  expandOnHover()
+}
+
+const handleSidebarLeave = () => {
+  if (isMobile.value) return
+  clearTimeout(leaveTimer)
+  leaveTimer = setTimeout(collapseOnHover, 120)
+}
+
+const handleEscape = (e) => {
+  if (e.key !== 'Escape') return
+  if (menuOpen.value) menuOpen.value = false
+  else if (mobileOpen.value) closeMobile()
+  else if (hoverExpanded.value) collapseOnHover()
 }
 
 function onDocumentClick(event) {
@@ -201,37 +304,43 @@ onMounted(() => {
   mobileMql.addEventListener('change', updateIsMobile)
 
   document.addEventListener('click', onDocumentClick, true)
+  window.addEventListener('keydown', handleEscape)
 })
 
 onUnmounted(() => {
+  clearTimeout(leaveTimer)
   themeObserver?.disconnect()
   mobileMql?.removeEventListener('change', updateIsMobile)
   document.removeEventListener('click', onDocumentClick, true)
+  window.removeEventListener('keydown', handleEscape)
+  if (typeof document !== 'undefined') document.body.style.removeProperty('overflow')
 })
 
-const railCollapsed = computed(() => collapsed.value && !hoverExpanded.value)
-const showLabels = computed(() => isMobile.value || !railCollapsed.value)
+// The drawer covers the page; letting the page scroll under it is what makes a
+// mobile menu feel broken.
+watch(mobileOpen, (open) => {
+  if (typeof document === 'undefined') return
+  if (open) document.body.style.setProperty('overflow', 'hidden')
+  else document.body.style.removeProperty('overflow')
+})
 
 // A menu anchored to an 80px rail would have nothing to line up against.
 watch(railCollapsed, (isRail) => {
   if (isRail && !isMobile.value) menuOpen.value = false
 })
 
-const handleSidebarEnter = () => {
-  if (!isMobile.value) expandOnHover()
-}
-
-const handleSidebarLeave = () => {
-  if (!isMobile.value) collapseOnHover()
-}
-
-// Light/dark theme tokens — same values as the donor rail.
+// Light/dark theme tokens — the same palette the donor and blood-centre rails
+// use, so the three portals read as one product rather than three.
 const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
 const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
-const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? '#42A5F529' : '#1565C014'))
+const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? 'rgba(66,165,245,0.16)' : 'rgba(21,101,192,0.08)'))
+const SIDEBAR_HOVER_BG = computed(() => (isDark.value ? 'rgba(148,163,184,0.12)' : 'rgba(21,101,192,0.06)'))
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
 const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
-const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1f2937'))
+const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
+// --rb-surface, so the popup lifts off the #0F172A rail instead of blending
+// into it the way a slate-900 panel did.
+const SIDEBAR_POPUP_BG = computed(() => (isDark.value ? '#1E293B' : '#FFFFFF'))
 const sidebarShadow = computed(() =>
   isDark.value
     ? `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(0,0,0,0.35)`
@@ -281,21 +390,26 @@ const navStyle = (path) => {
   const active = isActive(path)
   const hovered = hoveredPath.value === path
 
+  let background = 'transparent'
+  if (active) background = SIDEBAR_ACTIVE_BG.value
+  else if (hovered) background = SIDEBAR_HOVER_BG.value
+
   return {
-    background: active || hovered ? SIDEBAR_ACTIVE_BG.value : 'transparent',
+    background,
     color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
     fontWeight: active ? '700' : '500',
   }
 }
 
-const closeSidebar = () => {
+const goHome = async () => {
+  if (route.path === '/admin/dashboard' || navigatingHome.value) return
+  navigatingHome.value = true
   closeMobile()
-}
-
-const goToDashboard = async () => {
-  if (route.path === '/admin/dashboard') return
-  closeSidebar()
-  await router.push('/admin/dashboard')
+  try {
+    await router.push('/admin/dashboard')
+  } finally {
+    navigatingHome.value = false
+  }
 }
 
 const handleLogout = async () => {
@@ -313,6 +427,17 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+/*
+ * Width and transform are the only animated properties, and they share the
+ * layout's 200ms/ease-out so the rail and the content padding that tracks it
+ * move as one. Animating anything that repaints the whole nav during the same
+ * window is what makes a hover rail read as flicker.
+ */
+.sidebar {
+  will-change: width, transform;
+  transition: width 200ms ease-out, transform 200ms ease-out;
+}
+
 .logo-image {
   width: 100%;
   height: 100%;
@@ -320,10 +445,72 @@ const handleLogout = async () => {
   padding: 6px;
 }
 
-/* Sidebar Navigation Scrollbar */
+.logo-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Divider standing in for the cluster gap while the rail is collapsed. */
+.group-rule {
+  height: 1px;
+  margin: 10px 12px;
+  border-radius: 999px;
+}
+
+.group-rule.is-first {
+  display: none;
+}
+
+.account-btn:hover {
+  background: rgba(100, 116, 139, 0.10);
+}
+
+.logout-btn:hover {
+  background: rgba(211, 47, 47, 0.08);
+}
+
+/*
+ * The focus ring reads its colour from the token rather than a second
+ * :global(.dark) rule. This build's scoped-CSS transform drops the descendant
+ * half of `:global(.dark) .x` and emits a bare `.dark { … }`, which puts the
+ * declaration on <html> instead. The token flips on its own, so no second rule
+ * is needed.
+ */
+.brand:focus-visible,
+.nav-item:focus-visible,
+.account-btn:focus-visible,
+.logout-btn:focus-visible {
+  outline: 2px solid var(--rb-primary-text);
+  outline-offset: -2px;
+}
+
+/* Sidebar navigation scrollbar */
 nav {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+/*
+ * No scrollbar gutter while the rail is collapsed. A 5px track inside an 80px
+ * rail takes its 5px off the content box, so the centred icons render 2.5px
+ * left of centre while the brand mark above them — which sits outside this
+ * scroller — stays on 40px.
+ */
+.nav-rail {
+  scrollbar-width: none;
+}
+
+.nav-rail::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 nav::-webkit-scrollbar {
@@ -347,9 +534,14 @@ nav::-webkit-scrollbar-track {
   scrollbar-color: #334155 transparent;
 }
 
-aside {
-  position: fixed;
-  will-change: width, transform;
+.scrim-enter-active,
+.scrim-leave-active {
+  transition: opacity 200ms ease;
+}
+
+.scrim-enter-from,
+.scrim-leave-to {
+  opacity: 0;
 }
 
 .popup-enter-active,
@@ -363,10 +555,33 @@ aside {
   transform: translateY(6px) scale(0.98);
 }
 
+/* Touch devices get a pressed state instead of a hover that never ends. */
 @media (hover: none) {
-  nav a:active {
-    background: rgba(21, 101, 192, 0.08) !important;
-    color: #1565c0 !important;
+  .nav-item {
+    transition: background 0.1s ease, color 0.1s ease;
   }
+
+  .nav-item:active {
+    background: rgba(21, 101, 192, 0.10) !important;
+    color: #1565C0 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .scrim-enter-active,
+  .scrim-leave-active,
+  .popup-enter-active,
+  .popup-leave-active {
+    transition: none;
+  }
+
+  .logo-spinner {
+    animation: none;
+  }
+}
+
+a, button {
+  touch-action: manipulation;
 }
 </style>
