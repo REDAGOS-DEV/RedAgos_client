@@ -279,7 +279,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 import { donorService } from '~/api/donor/DonorService'
@@ -362,6 +362,10 @@ async function handleSubmit() {
     // hangtod ma-verify ang address, so dinhi ra siya magpabilin diin naa ang
     // instruksyon ug ang resend.
     registeredEmail.value = form.email.trim()
+
+    // Gi-sulat sa localStorage aron ma-survive ang refresh, ug aron makaila ang
+    // page sa signal gikan sa tab nga mo-abli sa verification link.
+    rememberPendingVerification(registeredEmail.value)
   } catch (err) {
     applyValidationErrors(err)
     submitError.value = err?.message || 'Something went wrong while creating your account. Please try again.'
@@ -389,6 +393,62 @@ async function resendVerification() {
     isResending.value = false
   }
 }
+
+/**
+ * Balhin padulong sa login kay na-verify na ang address.
+ *
+ * Gi-tawag ra ni gikan sa marker nga gisulat sa verify-email page human mo-tubag
+ * og 200/204 ang `POST /api/email/verify` — so ang backend gyud ang nag-ingon,
+ * dili ang pag-klik sa link ug dili pod usa ka timeout.
+ */
+function proceedToLogin() {
+  clearVerificationHandoff()
+
+  return navigateTo('/auth/donor/login')
+}
+
+/**
+ * Ang tab nga nag-rehistro kay wala nakakita sa verification — sa laing tab man
+ * na nahitabo. Duha ka agianan padulong dinhi:
+ *
+ *   - `storage`: nag-abli pa ang duha ka tab, ug mi-verify siya sa pikas. Ang
+ *     event mo-fire ra sa mga tab nga WALA nagsulat, so kini ra gyud.
+ *   - mount: gi-refresh niya kini nga tab human ma-verify. Ang `storage` wala
+ *     mi-fire para niya, so ang marker mismo ang basahon.
+ *
+ * Kung walay pending nga registration, wala gyuy bation nga marker: gi-clear man
+ * siya sa `rememberPendingVerification` sa matag bag-ong sign-up.
+ */
+let stopListening = () => {}
+
+onMounted(() => {
+  // Kanunay maminaw, bisan walay pending karon: mahimong mo-rehistro siya dinhi
+  // mismo karon ug unya mo-verify sa laing tab, ug kung hulaton pa nato ang
+  // pending sa mount, wala gyuy maminaw niadtong signal.
+  stopListening = onEmailVerified(() => {
+    // Ang panel ra ang gi-balhin. Kung nagbasa pa siya sa porma, pasagdi siya.
+    if (registeredEmail.value) {
+      proceedToLogin()
+    }
+  })
+
+  const pending = readPendingVerification()
+
+  if (!pending) {
+    return
+  }
+
+  if (hasVerifiedSignal()) {
+    proceedToLogin()
+    return
+  }
+
+  // Ibalik ang panel: kung wala ni, ang refresh mo-balik sa blangko nga porma ug
+  // mawala ang resend button nga mao ra ang ilang agianan.
+  registeredEmail.value = pending.email
+})
+
+onBeforeUnmount(() => stopListening())
 
 function clearFieldErrors() {
   for (const key of Object.keys(fieldErrors)) {
