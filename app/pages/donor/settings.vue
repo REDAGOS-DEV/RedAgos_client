@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 6 seconds
-Output:
 <template>
     <div class="settings-page">
         <!-- Skeleton loading state -->
@@ -553,7 +550,7 @@ function splitFullName(fullName) {
     --warning: #f57c00;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;

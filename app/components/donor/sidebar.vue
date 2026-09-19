@@ -40,13 +40,6 @@
       <!-- Navigation -->
       <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-4" :class="isDark ? 'nav-dark' : ''">
         <template v-for="(group, gIndex) in navGroups" :key="gIndex">
-          <p v-if="group.label && isMobile"
-            class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 mb-1 mt-5"
-            :style="{ color: SIDEBAR_IDLE_TEXT }">
-            <span class="w-3 h-[2px] rounded-full" :style="{ background: isDark ? '#475569' : '#CBD5E1' }" />
-            {{ group.label }}
-          </p>
-
           <NuxtLink v-for="item in group.items" :key="item.path" :to="item.path" @click="closeSidebar"
             @mouseenter="hoveredPath = item.path" @mouseleave="hoveredPath = null" @touchstart="() => { }"
             class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-colors duration-150"

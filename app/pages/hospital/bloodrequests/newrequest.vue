@@ -328,7 +328,7 @@
                 </div>
                 <div class="success-details__row">
                   <span>Current Status</span>
-                  <span class="badge" style="background:#F59E0B14;color:#F59E0B">{{ submissionResult.status_label || 'Pending Approval' }}</span>
+                  <span class="badge" style="background:#F57C0014;color:#F57C00">{{ submissionResult.status_label || 'Pending Approval' }}</span>
                 </div>
                 <div class="success-details__row">
                   <span>Estimated Processing Time</span>
@@ -505,7 +505,7 @@ const touched = reactive({ step1: false, step2: false, step3: false });
 
 const priorityOptions = [
   { value: 'normal', label: 'Normal', color: '#1565C0', icon: 'clock' },
-  { value: 'urgent', label: 'Urgent', color: '#F59E0B', icon: 'circle-alert' },
+  { value: 'urgent', label: 'Urgent', color: '#F57C00', icon: 'circle-alert' },
   { value: 'emergency', label: 'Emergency', color: '#D32F2F', icon: 'triangle-alert' },
 ];
 
@@ -547,7 +547,7 @@ function availabilityPercent(a) {
   return Math.min(100, Math.round((a.units / max) * 100));
 }
 function availabilityStatusColor(status) {
-  return { healthy: '#2E7D32', low: '#F59E0B', critical: '#D32F2F' }[status] || '#64748B';
+  return { healthy: '#2E7D32', low: '#F57C00', critical: '#D32F2F' }[status] || '#64748B';
 }
 function availabilityStatusLabel(status) {
   return { healthy: 'available', low: 'running low', critical: 'critically low' }[status] || status;
@@ -720,18 +720,18 @@ function resetForm() {
 
 <style scoped>
 .new-request-page {
-  --primary: #1565c0;
+  --primary: var(--rb-primary, #1565c0);
   --primary-hover: #0d47a1;
   --bg: #f7f9fc;
   --surface: #ffffff;
   --border: #e5eaf0;
   --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --danger: #d32f2f;
-  --warning: #f59e0b;
-  --success: #2e7d32;
-  --purple: #7c3aed;
+  --text-secondary: var(--rb-text-secondary, #64748b);
+  --text-muted: var(--rb-text-muted, #94a3b8);
+  --danger: var(--rb-accent, #d32f2f);
+  --warning: var(--rb-warning, #F57C00);
+  --success: var(--rb-success, #2e7d32);
+  --purple: var(--rb-purple, #7c3aed);
   font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
@@ -770,10 +770,10 @@ function resetForm() {
 
 .draft-badge {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 14px; border-radius: 999px; background: #F59E0B14; color: #F59E0B;
+  padding: 8px 14px; border-radius: 999px; background: #F57C0014; color: #F57C00;
   font-size: 12.5px; font-weight: 600;
 }
-.draft-badge__dot { width: 6px; height: 6px; border-radius: 999px; background: #F59E0B; }
+.draft-badge__dot { width: 6px; height: 6px; border-radius: 999px; background: #F57C00; }
 
 /* Stepper */
 .stepper { display: flex; align-items: flex-start; gap: 4px; }
@@ -873,7 +873,7 @@ function resetForm() {
 /* Review */
 .review-warning {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px;
-  background: #F59E0B14; color: #B45309; font-size: 13px; font-weight: 500; margin-bottom: 18px;
+  background: #F57C0014; color: #B45309; font-size: 13px; font-weight: 500; margin-bottom: 18px;
 }
 .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 0 0 22px; }
 .summary-field { display: flex; flex-direction: column; gap: 3px; }
