@@ -542,7 +542,7 @@ onActivated(() => {
     --success: #2e7d32;
     --warning: #f57c00;
     --text-primary: #1f2937;
-    --text-secondary: #9ca3af;
+    --text-secondary: var(--rb-text-secondary, #64748b);
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
@@ -787,7 +787,7 @@ onActivated(() => {
     background: white;
     border-radius: 14px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-    border: 1px solid #eef0f3;
+    border: 1px solid #E5EAF0;
     overflow: hidden;
 }
 
@@ -1007,7 +1007,7 @@ onActivated(() => {
     font-size: 13.5px;
     font-weight: 700;
     color: white;
-    background: var(--primary);
+    background: var(--primary, var(--rb-primary, #1565C0));
     border: none;
     cursor: pointer;
     transition: opacity 0.15s ease;
@@ -1093,7 +1093,7 @@ onActivated(() => {
     height: 44px;
     border-radius: 999px;
     background: #e8f5e9;
-    color: var(--success);
+    color: var(--success, #2E7D32);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1103,13 +1103,13 @@ onActivated(() => {
 .modal-title {
     font-size: 16px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-primary, #1F2937);
     margin: 0;
 }
 
 .modal-subtitle {
     font-size: 12.5px;
-    color: var(--text-secondary);
+    color: var(--text-secondary, #64748B);
     line-height: 1.5;
     margin: 6px 0 20px;
     max-width: 300px;
@@ -1118,7 +1118,7 @@ onActivated(() => {
 .modal-qr-wrap {
     padding: 10px;
     border-radius: 12px;
-    border: 1px solid #eef0f3;
+    border: 1px solid #E5EAF0;
     margin-bottom: 14px;
 }
 
@@ -1140,7 +1140,7 @@ onActivated(() => {
     height: 22px;
     border-radius: 999px;
     border: 3px solid #e3ebf6;
-    border-top-color: var(--primary);
+    border-top-color: var(--primary, #1565C0);
     animation: modal-spin 0.8s linear infinite;
 }
 
@@ -1151,7 +1151,7 @@ onActivated(() => {
 .modal-validity {
     font-size: 12px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-primary, #1F2937);
     margin: 0 0 20px;
 }
 
@@ -1211,7 +1211,7 @@ onActivated(() => {
 :global(.dark .eligibility-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
-    background: #0F172A;
+    background: var(--rb-page-bg, #0F172A);
 }
 
 :global(.dark .panel),

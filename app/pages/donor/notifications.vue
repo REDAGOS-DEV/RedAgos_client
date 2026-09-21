@@ -249,7 +249,7 @@ onActivated(() => {
     --success: #2e7d32;
     --warning: #f57c00;
     --text-primary: #1f2937;
-    --text-secondary: #9ca3af;
+    --text-secondary: var(--rb-text-secondary, #64748b);
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
@@ -336,7 +336,7 @@ onActivated(() => {
     background: white;
     border-radius: 14px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-    border: 1px solid #eef0f3;
+    border: 1px solid #E5EAF0;
     overflow: hidden;
 }
 
@@ -563,7 +563,7 @@ onActivated(() => {
 :global(.dark .notifications-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
-    background: #0F172A;
+    background: var(--rb-page-bg, #0F172A);
 }
 
 :global(.dark .tabs-bar) { border-color: #334155; }
@@ -608,4 +608,9 @@ onActivated(() => {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+/* Blue TEXT on dark needs the lighter shade. */
+:global(.dark .tab-btn--active) { color: #64B5F6; border-bottom-color: #64B5F6; }
+:global(.dark .notif-row__action) { color: #64B5F6; }
+
 </style>

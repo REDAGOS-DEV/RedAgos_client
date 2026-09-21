@@ -65,6 +65,12 @@
           </div>
           <div class="onboarding-card__progress-ring">
             <svg viewBox="0 0 36 36" class="progress-ring__svg">
+              <defs>
+                <linearGradient id="onboarding-ring-gradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" class="ring-stop-a" />
+                  <stop offset="100%" class="ring-stop-b" />
+                </linearGradient>
+              </defs>
               <circle class="progress-ring__bg" cx="18" cy="18" r="15.5" />
               <circle class="progress-ring__fill" cx="18" cy="18" r="15.5"
                 :style="{ strokeDasharray: `${progressPercent}, 100` }" />
@@ -513,8 +519,8 @@ watch(() => route.path, (path) => {
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
-  --border: #eef0f3;
+  --text-secondary: var(--rb-text-secondary, #64748b);
+  --border: #E5EAF0;
   --card-bg: #ffffff;
 
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -741,9 +747,11 @@ watch(() => route.path, (path) => {
 
 .progress-ring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .progress-ring__bg { fill: none; stroke: var(--border); stroke-width: 3.5; }
+.ring-stop-a { stop-color: #1565c0; }
+.ring-stop-b { stop-color: #42a5f5; }
 .progress-ring__fill {
   fill: none;
-  stroke: var(--primary);
+  stroke: url(#onboarding-ring-gradient);
   stroke-width: 3.5;
   stroke-linecap: round;
   transition: stroke-dasharray 0.5s ease;
@@ -1324,7 +1332,7 @@ watch(() => route.path, (path) => {
   --text-secondary: #94a3b8;
   --border: #334155;
   --card-bg: #1e293b;
-  background: #0f172a;
+  background: var(--rb-page-bg, #0f172a);
 }
 
 :global(.dark .panel-header) {
@@ -1370,6 +1378,30 @@ watch(() => route.path, (path) => {
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
+
+/*
+ * Blue used as TEXT or a thin stroke needs the lighter shade on dark surfaces:
+ * #1565C0 on #1E293B is only ~2.6:1. Solid fills that carry white text
+ * (buttons, the date chip) keep the deeper blue, so --primary itself is not
+ * redefined here.
+ */
+:global(.dark .text-primary),
+:global(.dark .panel-link),
+:global(.dark .panel-link-plain),
+:global(.dark .chart__label--current),
+:global(.dark .period-pill),
+:global(.dark .appt-notice) { color: #64B5F6 !important; }
+:global(.dark .ring-stop-a) { stop-color: #1e88e5; }
+:global(.dark .ring-stop-b) { stop-color: #4fc3f7; }
+:global(.dark .progress-ring__bg) { stroke: rgba(255, 255, 255, 0.08); }
+:global(.dark .quick-action:hover .quick-action__chevron) { color: #64B5F6; }
+
+/* Tinted icon badges: a touch more fill so they read against the dark card. */
+:global(.dark .stat-card__badge--primary) { background: rgba(66, 165, 245, 0.18); color: #64B5F6; }
+:global(.dark .stat-card__badge--secondary) { background: rgba(79, 195, 247, 0.18); color: #4FC3F7; }
+:global(.dark .stat-card__badge--accent) { background: rgba(248, 113, 113, 0.18); color: #F87171; }
+:global(.dark .stat-card__badge--success) { background: rgba(102, 187, 106, 0.18); color: #66BB6A; }
+:global(.dark .stat-card__badge--warning) { background: rgba(255, 183, 77, 0.18); color: #FFB74D; }
 
 .btn-primary:focus-visible,
 .btn-danger:focus-visible {

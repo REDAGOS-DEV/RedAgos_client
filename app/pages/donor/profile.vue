@@ -507,7 +507,7 @@ async function handleLogout() {
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  --text-secondary: var(--rb-text-secondary, #64748b);
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -528,7 +528,7 @@ async function handleLogout() {
   background: white;
   border-radius: 14px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  border: 1px solid #eef0f3;
+  border: 1px solid #E5EAF0;
   overflow: hidden;
 }
 .panel-header--simple { padding: 16px 20px; border-bottom: 1px solid #f3f4f6; }
@@ -684,7 +684,7 @@ select.form-input {
 :global(.dark .profile-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
-    background: #0F172A;
+    background: var(--rb-page-bg, #0F172A);
 }
 
 :global(.dark .profile-page .panel) {

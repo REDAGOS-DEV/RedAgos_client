@@ -142,17 +142,19 @@ onUnmounted(() => {
   mobileMql?.removeEventListener('change', updateIsMobile)
 })
 
-// Light/dark theme tokens
-const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
+// White rail; the premium feel comes from the gradient active pill.
+const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#FFFFFF'))
 const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? '#42A5F529' : '#1565C014'))
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
+const SIDEBAR_HOVER_BG = computed(() => (isDark.value ? '#1E293B' : '#F1F5F9'))
+const SIDEBAR_HOVER_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
 const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
 const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1f2937'))
 const sidebarShadow = computed(() =>
   isDark.value
     ? `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(0,0,0,0.35)`
-    : `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(15,23,42,0.04)`
+    : `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(15,23,42,0.05)`
 )
 
 const route = useRoute()
@@ -228,10 +230,20 @@ const navStyle = (path) => {
   const active = isActive(path)
   const hovered = hoveredPath.value === path
 
+  let background = 'transparent'
+  if (active) background = SIDEBAR_ACTIVE_BG.value
+  else if (hovered) background = SIDEBAR_HOVER_BG.value
+
+  let color = SIDEBAR_IDLE_TEXT.value
+  if (active) color = SIDEBAR_ACTIVE_TEXT.value
+  else if (hovered) color = SIDEBAR_HOVER_TEXT.value
+
   return {
-    background: active || hovered ? SIDEBAR_ACTIVE_BG.value : 'transparent',
-    color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
-    fontWeight: active ? '700' : '500'
+    background,
+    color,
+    fontWeight: active ? '700' : '500',
+    // Inset left bar, not a real border, so an active item never shifts the layout.
+    boxShadow: active ? `inset 3px 0 0 ${SIDEBAR_ACTIVE_TEXT.value}` : 'none'
   }
 }
 

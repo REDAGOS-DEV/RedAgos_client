@@ -243,7 +243,14 @@
         </button>
       </header>
 
-      <main class="min-h-screen bg-[#F7F8FA] dark:bg-slate-900 transition-colors duration-150 pt-14 sm:pt-16">
+      <!--
+        The donor portal sets its own page tone: a slightly deeper, blue-tinted
+        gray than the shared --rb-page-bg, so the white sidebar, header and cards
+        read as separate layers. Every donor page paints var(--rb-page-bg), so
+        overriding the token here reaches all of them and no other portal.
+      -->
+      <main class="min-h-screen transition-colors duration-150 pt-14 sm:pt-16"
+        :style="{ '--rb-page-bg': isDark ? '#0B1220' : '#EEF2F7', background: 'var(--rb-page-bg)' }">
         <slot />
       </main>
     </div>

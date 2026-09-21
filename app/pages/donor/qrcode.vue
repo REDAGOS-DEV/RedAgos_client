@@ -188,7 +188,8 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 const loading = ref(true)
 const profile = ref(null)
 const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'expired' | 'pending'
-const upcomingAppointment = ref(null)
+const myAppointments = ref([])
+const myDonations = ref([])
 const qrCodeDataUrl = ref('')
 const qrValidUntil = ref(null)
 const qrValidDays = ref(14)
@@ -280,31 +281,68 @@ const statusValueClass = computed(() =>
 )
 
 
+// Human sa usa ka nahuman nga donation, magpabilin nga kompleto ang lista
+// hangtod mag-book og bag-o o molapas kini nga mga adlaw. Parehas sa 56 ka
+// adlaw nga interval sa server, kay dili pa siya makadonate pag-usab sa sulod.
+const JOURNEY_RESET_DAYS = 56
+
+const activeAppointment = computed(() =>
+  myAppointments.value.find(a => a.status === 'scheduled' || a.status === 'confirmed') ?? null
+)
+
+// Ang donation nga gisundan sa lista. Ang pinakabag-o nga donation kay una sa
+// listahan. Ang wala pa mahuman ang kanunay; ang nahuman o gi-reject ihap ra
+// kung wala nay bag-ong appointment ug bag-o pa.
+const journeyDonation = computed(() => {
+  const latest = myDonations.value[0]
+  if (!latest) return null
+
+  if (['registered', 'screening', 'collected', 'tested'].includes(latest.status)) return latest
+
+  if (activeAppointment.value) return null
+
+  const ageDays = (Date.now() - new Date(latest.donated_on).getTime()) / 86_400_000
+  return Number.isFinite(ageDays) && ageDays <= JOURNEY_RESET_DAYS ? latest : null
+})
+
+// Kinsa ang pinakataas nga lakang nga naabot na (0-5). Ang naunang mga lakang
+// mahimong done tungod niini, mao nga dili mag-atras ang lista.
+const journeyReached = computed(() => {
+  const donation = journeyDonation.value?.status
+
+  if (['collected', 'tested', 'completed'].includes(donation)) return 5
+  if (donation === 'screening') return 4
+  if (donation === 'registered' || donation === 'rejected') return 3
+  if (activeAppointment.value?.status === 'confirmed') return 3
+  if (activeAppointment.value) return 2
+  return eligibilityStatus.value === 'eligible' ? 1 : 0
+})
+
 const steps = computed(() => [
   {
     title: 'Complete eligibility screening',
     desc: 'Take the online questionnaire on the donor portal. If you pass, the system automatically generates your QR code.',
-    done: eligibilityStatus.value === 'eligible',
+    done: journeyReached.value >= 1,
   },
   {
     title: 'Book your appointment',
     desc: 'Choose a blood center or mobile drive, select your preferred date and time slot, and confirm your booking.',
-    done: !!upcomingAppointment.value,
+    done: journeyReached.value >= 2,
   },
   {
     title: 'Arrive at the blood center',
     desc: 'Present this QR code to the blood center staff upon arrival. They will scan it to verify your eligibility screening status.',
-    done: false,
+    done: journeyReached.value >= 3,
   },
   {
     title: 'Proceed to physical screening',
     desc: 'After QR verification, the blood center nurse or med tech will conduct a final on-site physical screening (blood pressure, hemoglobin, weight, etc.).',
-    done: false,
+    done: journeyReached.value >= 4,
   },
   {
     title: 'Donate blood',
     desc: 'If you pass the physical screening, you will proceed to donation. The staff records your donation in the system.',
-    done: false,
+    done: journeyReached.value >= 5,
   },
 ])
 
@@ -460,14 +498,31 @@ async function load({ silent = false } = {}) {
     }
 
 
-    // Ang upcoming_appointment kay wala gi-serve ani nga endpoint — gikan na
-    // siya sa appointments API, so null sa karon.
+    // Dili gi-await: ang QR mo-render una, ang progress sa lista mosunod.
+    loadJourney()
   } catch (err) {
     console.error('Failed to load QR code data:', err)
   } finally {
     loading.value = false
     loadedOnce = true
   }
+}
+
+// Ang appointments ug donations kay gikan sa ilang kaugalingong API, dili sa
+// qr-code endpoint. Kung mapakyas ang usa, ang lista mopabilin sa unang duha
+// ka lakang imbes mobungkag sa page.
+async function loadJourney() {
+  const [appointments, donations] = await Promise.allSettled([
+    donorService.appointments(),
+    donorService.donations(),
+  ])
+
+  myAppointments.value = appointments.status === 'fulfilled' && Array.isArray(appointments.value)
+    ? appointments.value
+    : []
+  myDonations.value = donations.status === 'fulfilled'
+    ? (donations.value?.donations ?? [])
+    : []
 }
 
 onMounted(() => load())
@@ -484,7 +539,7 @@ onActivated(() => {
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  --text-secondary: var(--rb-text-secondary, #64748b);
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px 32px 60px;
@@ -572,7 +627,7 @@ onActivated(() => {
 .qr-image-wrap {
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #eef0f3;
+  border: 1px solid #E5EAF0;
   margin-bottom: 20px;
 }
 
@@ -846,7 +901,7 @@ onActivated(() => {
 :global(.dark .qr-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
-    background: #0F172A;
+    background: var(--rb-page-bg, #0F172A);
 }
 
 :global(.dark .panel) {
@@ -863,6 +918,7 @@ onActivated(() => {
 :global(.dark .qr-details__row:nth-child(odd)) { background: #172033; }
 
 :global(.dark .step-dot) { border-color: #475569; background: #1E293B; }
+:global(.dark .step-dot--done) { border-color: var(--primary, #1565C0); background: var(--primary, #1565C0); }
 :global(.dark .step-line) { background: #334155; }
 
 :global(.dark .warning-banner) {

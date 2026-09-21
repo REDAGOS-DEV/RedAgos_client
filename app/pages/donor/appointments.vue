@@ -274,6 +274,9 @@
     <!-- Confirmation modal -->
     <div v-if="showConfirmation" class="modal-overlay">
       <div class="modal-card modal-card--confirm">
+        <button type="button" class="modal-close" aria-label="Close" @click="showConfirmation = false">
+          <AssetIcon name="x" :size="18" />
+        </button>
         <div class="confirm-icon">
           <AssetIcon name="check" :size="22" class="confirm-icon__svg" />
         </div>
@@ -779,8 +782,8 @@ function goDashboard() {
   --success: #2e7d32;
   --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
-  --border: #eef0f3;
+  --text-secondary: var(--rb-text-secondary, #64748b);
+  --border: #E5EAF0;
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px 32px 60px;
@@ -1538,8 +1541,36 @@ function goDashboard() {
 }
 
 .modal-card--confirm {
+  position: relative;
   align-items: center;
   text-align: center;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: top-right;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rb-text-secondary, #64748b);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+  background: var(--rb-surface-hover, #f1f5f9);
+  color: var(--rb-text-primary, #1f2937);
+}
+
+.modal-close:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
 }
 
 .confirm-icon {
@@ -1601,7 +1632,7 @@ function goDashboard() {
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
   --border: #334155;
-  background: #0F172A;
+  background: var(--rb-page-bg, #0F172A);
 }
 
 :global(.dark .type-card),
@@ -1656,6 +1687,13 @@ function goDashboard() {
 
 :global(.dark .reschedule-banner__text) { color: #CBD5E1; }
 
+/* #D32F2F on the dark card is only ~3:1; the lighter red keeps the same meaning and is readable. */
+:global(.dark .my-appointment-card__cancel) {
+  color: #F87171;
+  border-color: rgba(248, 113, 113, 0.55);
+}
+:global(.dark .my-appointment-error) { color: #F87171; }
+
 :global(.dark .my-appointment-card__cancel:hover:not(:disabled)) {
   background: rgba(239, 83, 80, 0.16);
 }
@@ -1684,4 +1722,9 @@ function goDashboard() {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+/* Blue TEXT on dark needs the lighter shade; the solid active icon keeps its fill. */
+:global(.dark .step-label__num),
+:global(.dark .type-card:not(.type-card--active) .type-card__icon) { color: #64B5F6; }
+
 </style>
