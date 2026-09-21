@@ -24,7 +24,7 @@
                 <p class="page-subtitle">Complete the short health assessment below to determine whether you're currently eligible to donate blood.</p>
             </div>
 
-            <!-- Info banner -->
+            <!-- Inf banner -->
             <div class="info-banner">
                 <span class="info-banner__icon">
                     <AssetIcon name="info" :size="16" class="banner-icon" />
