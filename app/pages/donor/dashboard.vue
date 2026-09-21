@@ -106,7 +106,7 @@
             </div>
           </div>
           <div class="stat-card__value-group">
-            <p class="stat-card__value text-accent">{{ bloodType }}</p>
+            <p class="stat-card__value">{{ bloodType }}</p>
             <span class="blood-type-tag">Donor</span>
           </div>
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
@@ -225,7 +225,7 @@
                         'Pending' }}
                     </p>
                     <p class="donation-meta">
-                      <strong class="text-accent">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
+                      <strong class="donation-meta__highlight">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
                         d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
                     </p>
                   </div>
@@ -320,7 +320,7 @@
                 </div>
                 <div class="eligibility-details__row">
                   <span class="eligibility-details__label">Blood type</span>
-                  <span class="eligibility-details__value text-accent font-extrabold">{{ bloodType }}</span>
+                  <span class="eligibility-details__value">{{ bloodType }}</span>
                 </div>
               </div>
 
@@ -359,8 +359,11 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+
+const route = useRoute()
 
 const loading = ref(true)
 
@@ -488,8 +491,17 @@ async function load({ silent = false } = {}) {
 }
 
 onMounted(() => load())
-onActivated(() => {
-  if (loadedOnce) load({ silent: true })
+
+/*
+ * `route` is the app-wide reactive current route, so this watcher keeps
+ * firing even while this page sits deactivated inside <KeepAlive> — unlike
+ * `onActivated`, it doesn't depend on Vue matching this component back into
+ * the keep-alive cache to notice the return trip. Any step completed on
+ * another page (screening, booking, profile edits) shows up here the moment
+ * the donor navigates back, without a full reload.
+ */
+watch(() => route.path, (path) => {
+  if (path === '/donor/dashboard' && loadedOnce) load({ silent: true })
 })
 </script>
 
@@ -506,7 +518,7 @@ onActivated(() => {
   --card-bg: #ffffff;
 
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  max-width: 1152px;
+  max-width: 1400px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -514,7 +526,6 @@ onActivated(() => {
 }
 
 .text-primary { color: var(--primary) !important; }
-.text-accent { color: var(--accent) !important; }
 .text-success { color: var(--success) !important; }
 .text-warning { color: var(--warning) !important; }
 .font-extrabold { font-weight: 800; }
@@ -691,14 +702,21 @@ onActivated(() => {
 
 .banner-link:hover { opacity: 0.8; text-decoration: underline; }
 
-/* Onboarding Hero Card */
+/*
+ * Onboarding card — deliberately neutral (same surface/border/shadow as
+ * .stat-card and .panel) rather than a solid brand-color block. Color here
+ * is now reserved for the progress ring fill and the "done" checkmarks, so
+ * it reads as one signal instead of competing with the rest of the page.
+ */
 .onboarding-card {
   position: relative;
   overflow: hidden;
-  background: var(--primary);
+  background: var(--card-bg);
   border-radius: 14px;
-  padding: 24px 28px;
-  color: white;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 22px 24px;
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -711,21 +729,21 @@ onActivated(() => {
   gap: 16px;
 }
 
-.onboarding-card__title { font-size: 18px; font-weight: 800; margin: 0; }
-.onboarding-card__subtitle { font-size: 13px; opacity: 0.85; margin: 4px 0 0; }
+.onboarding-card__title { font-size: 16px; font-weight: 800; margin: 0; color: var(--text-primary); }
+.onboarding-card__subtitle { font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 0; }
 
 .onboarding-card__progress-ring {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
 
 .progress-ring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.progress-ring__bg { fill: none; stroke: rgba(255, 255, 255, 0.22); stroke-width: 3.5; }
+.progress-ring__bg { fill: none; stroke: var(--border); stroke-width: 3.5; }
 .progress-ring__fill {
   fill: none;
-  stroke: white;
+  stroke: var(--primary);
   stroke-width: 3.5;
   stroke-linecap: round;
   transition: stroke-dasharray 0.5s ease;
@@ -737,8 +755,9 @@ onActivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
+  color: var(--text-primary);
 }
 
 .onboarding-steps {
@@ -753,40 +772,41 @@ onActivated(() => {
   gap: 10px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--rb-surface-hover, #f8fafc);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .onboarding-step:not(.onboarding-step--disabled):hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(21, 101, 192, 0.06);
+  border-color: rgba(21, 101, 192, 0.28);
 }
 
 .onboarding-step--done {
-  opacity: 0.7;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
+  opacity: 0.65;
+  background: transparent;
 }
 
 .onboarding-step__check {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border: 1.5px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: transparent;
 }
 
 .onboarding-step--done .onboarding-step__check {
-  background: white;
-  color: var(--primary);
-  border-color: white;
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 .onboarding-step__label { flex: 1; white-space: normal; word-break: break-word; }
@@ -862,8 +882,8 @@ onActivated(() => {
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 6px;
-  background: rgba(211, 47, 47, 0.1);
-  color: var(--accent);
+  background: #f1f5f9;
+  color: var(--text-secondary);
 }
 
 .stat-chip {
@@ -1078,6 +1098,7 @@ onActivated(() => {
 
 .donation-title { font-size: 13.5px; font-weight: 800; color: var(--text-primary); margin: 0; }
 .donation-meta { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
+.donation-meta__highlight { color: var(--text-primary); font-weight: 800; }
 .donation-item__right { text-align: right; flex-shrink: 0; }
 .donation-date { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); margin: 0; }
 
@@ -1332,6 +1353,7 @@ onActivated(() => {
 }
 
 :global(.dark .stat-chip--neutral),
+:global(.dark .blood-type-tag),
 :global(.dark .trend-empty__icon),
 :global(.dark .empty-state__icon) {
   background: #334155;

@@ -85,6 +85,21 @@ class HospitalService extends BaseService {
   }
 
   /**
+   * Billing summary for a request.
+   *
+   * No Laravel route serves this yet — `useBloodRequestBilling` mocks it
+   * until one exists.
+   */
+  requestBilling(id: number | string) {
+    return this.request<any>(`/hospital/blood-requests/${id}/billing`)
+  }
+
+  /** Record a payment against a request's billing. Also mock-gated for now. */
+  payRequestBilling(id: number | string, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
+    return this.request<any>(`/hospital/blood-requests/${id}/billing/pay`, 'POST', payload)
+  }
+
+  /**
    * Confirm dispatched units arrived.
    *
    * Omit `allocationIds` to confirm everything outstanding; pass them when a
