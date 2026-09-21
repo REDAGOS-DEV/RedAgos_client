@@ -9,21 +9,9 @@
       </div>
 
       <div class="header-actions">
-        <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
-
-        <NuxtLink to="/admin/facilities" class="ghost-btn">
-          <AssetIcon name="building-2" :size="16" />
-          Facility Management
-        </NuxtLink>
-
-        <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+        <button type="button" class="ghost-btn" :disabled="busy" @click="load">
           <AssetIcon name="refresh-cw" :size="16" />
-          {{ loading ? 'Loading…' : 'Refresh' }}
-        </button>
-
-        <button type="button" class="ghost-btn" :disabled="loggingOut" @click="handleLogout">
-          <AssetIcon name="log-out" :size="16" />
-          {{ loggingOut ? 'Logging out…' : 'Log Out' }}
+          {{ busy ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
@@ -58,9 +46,16 @@
         </thead>
 
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="state">Loading submissions…</td>
-          </tr>
+          <!-- Skeleton rows rather than a "Loading…" line: the table keeps its
+               shape, so the page does not collapse to a single row and jump
+               back when the data lands. -->
+          <template v-if="loading">
+            <tr v-for="n in 5" :key="`sk-${n}`" class="skeleton-row">
+              <td v-for="(width, c) in SKELETON_WIDTHS" :key="c">
+                <span class="skeleton" :style="{ width }" />
+              </td>
+            </tr>
+          </template>
 
           <tr v-else-if="loadError">
             <td colspan="6" class="state state-error">{{ loadError }}</td>
@@ -105,43 +100,77 @@
 
     <!-- Review drawer -->
     <div v-if="review.open" class="modal-backdrop" @click.self="closeReview">
-      <div class="modal modal-wide">
-        <h2 class="modal-title">{{ review.row?.full_name }}</h2>
-        <p class="modal-lede">
-          Check the photo against the details below, then verify or reject.
-        </p>
+      <div class="modal modal-review">
+        <div class="modal-head">
+          <h2 class="modal-title">{{ review.row?.full_name }}</h2>
+          <p class="modal-lede">
+            Check the photo against the details below, then verify or reject.
+          </p>
+        </div>
 
-        <div class="review-body">
-          <div class="review-photo">
-            <p v-if="loadingImage" class="photo-state">Loading photo…</p>
-            <p v-else-if="!imageUrl" class="photo-state photo-state--error">
-              {{ photoError || 'No photo on file.' }}
-            </p>
-            <img v-else :src="imageUrl" alt="Submitted ID" class="photo">
+        <!--
+          Only the middle scrolls. At 90vh the decision buttons would otherwise
+          sit below the fold behind a tall ID, and a reviewer who has to scroll
+          to find Reject is a reviewer who stops reading the photo first.
+        -->
+        <div class="modal-scroll">
+          <div class="review-body">
+            <section class="review-photo-pane">
+              <header class="photo-bar">
+                <span class="photo-bar__label">Submitted ID</span>
+
+                <div v-if="imageUrl" class="photo-modes" role="group" aria-label="Photo size">
+                  <button
+                    v-for="mode in PHOTO_MODES"
+                    :key="mode.value"
+                    type="button"
+                    class="photo-mode"
+                    :class="{ active: photoMode === mode.value }"
+                    :aria-pressed="photoMode === mode.value"
+                    @click="photoMode = mode.value"
+                  >
+                    {{ mode.label }}
+                  </button>
+                </div>
+              </header>
+
+              <div class="review-photo" :class="`review-photo--${photoMode}`">
+                <p v-if="loadingImage" class="photo-state">Loading photo…</p>
+                <p v-else-if="!imageUrl" class="photo-state photo-state--error">
+                  {{ photoError || 'No photo on file.' }}
+                </p>
+                <img v-else :src="imageUrl" alt="Submitted ID" class="photo">
+              </div>
+
+              <p v-if="imageUrl && isTwoSided" class="photo-note">
+                This ID has two sides. A camera capture stores them as one image, front above
+                back — switch to Full width and scroll to read each side at full size.
+              </p>
+            </section>
+
+            <dl class="review-facts">
+              <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
+              <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
+              <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
+              <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
+              <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
+              <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
+            </dl>
           </div>
 
-          <dl class="review-facts">
-            <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
-            <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
-            <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
-            <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
-            <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
-            <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
-          </dl>
-        </div>
+          <div v-if="review.rejecting" class="reason-block">
+            <label class="reason-label" for="reason">Reason</label>
+            <textarea
+              id="reason"
+              v-model="review.reason"
+              class="reason-input"
+              rows="3"
+              placeholder="Tell the donor what to fix, e.g. the photo is too blurry to read."
+            />
+          </div>
 
-        <div v-if="review.rejecting" class="reason-block">
-          <label class="reason-label" for="reason">Reason</label>
-          <textarea
-            id="reason"
-            v-model="review.reason"
-            class="reason-input"
-            rows="3"
-            placeholder="Tell the donor what to fix, e.g. the photo is too blurry to read."
-          />
+          <p v-if="review.error" class="modal-error">{{ review.error }}</p>
         </div>
-
-        <p v-if="review.error" class="modal-error">{{ review.error }}</p>
 
         <div class="modal-actions">
           <button type="button" class="ghost-btn" :disabled="review.submitting" @click="closeReview">Cancel</button>
@@ -166,18 +195,21 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorIdentityService } from '~/api/admin/DonorIdentityService'
+import { idSidesFor } from '~/composables/useIdentityDocument'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
+  layout: 'admindashboard',
+  keepalive: true,
 })
 
 useHead({ title: 'Donor ID Verification · RedAgos' })
 
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser } = useUser()
 
 const TABS = [
   { value: 'pending', label: 'Awaiting Review' },
@@ -192,7 +224,6 @@ const STATUS_LABELS = {
   rejected: 'Not approved',
 }
 
-const loggingOut = ref(false)
 
 const activeStatus = ref('pending')
 const rows = ref([])
@@ -201,16 +232,39 @@ const lastPage = ref(1)
 const total = ref(null)
 
 const loading = ref(true)
+/* Uneven widths so the placeholder reads as text, not as a progress bar. */
+const SKELETON_WIDTHS = ['70%', '45%', '60%', '75%', '50%', '40%']
+
+// Background refresh over content already on screen; see load({ silent }).
+const refreshing = ref(false)
+const loaded = ref(false)
+// Either kind of in-flight load, for the Refresh control.
+const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const banner = ref('')
 const bannerKind = ref('info')
 
-// Ang litrato kay authenticated ang route, so dili siya mahimong <img src>.
-// I-fetch nato dala ang token, unya object URL ang i-render.
+// Ang litrato kay authenticated ang route, so dili siya mahimong i-turo
+// direkta sa browser. I-fetch nato dala ang token, unya object URL ang i-render.
 const imageUrl = ref(null)
 const loadingImage = ref(false)
 const photoError = ref('')
 let objectUrl = null
+
+/**
+ * Fit shows the whole document at once; Full width trades the overview for
+ * legible print and scrolls.
+ *
+ * Both preserve the aspect ratio. A reviewer is doing two different jobs with
+ * the same image — "is this the right kind of card" and "does this number match
+ * the record" — and no single size serves both.
+ */
+const PHOTO_MODES = [
+  { value: 'fit', label: 'Fit' },
+  { value: 'wide', label: 'Full width' },
+]
+
+const photoMode = ref('fit')
 
 const review = reactive({
   open: false,
@@ -220,6 +274,10 @@ const review = reactive({
   error: '',
   submitting: false,
 })
+
+// The donor's own camera flow decides this from the same helper, so the note
+// the reviewer reads and the sides the donor was asked for cannot disagree.
+const isTwoSided = computed(() => idSidesFor(review.row?.valid_id_type).length > 1)
 
 function labelFor(status) {
   return STATUS_LABELS[status] ?? status
@@ -256,6 +314,10 @@ async function openReview(row) {
   })
 
   releasePhoto()
+
+  // Every review starts on the overview. Carrying the last donor's zoom over
+  // would open the next ID already scrolled to the middle of it.
+  photoMode.value = 'fit'
 
   if (!row.image_url) {
     photoError.value = 'No photo on file.'
@@ -345,10 +407,6 @@ function showBanner(message, kind) {
   bannerKind.value = kind
 }
 
-async function handleLogout() {
-  loggingOut.value = true
-  await logout('/auth/admin/login')
-}
 
 function changeStatus(status) {
   if (activeStatus.value === status) return
@@ -367,10 +425,20 @@ function goToPage(next) {
 // tugotan nga mosulat sa state.
 let latestRequest = 0
 
-async function load() {
+/*
+ * `silent` keeps the cached page on screen while it refreshes.
+ *
+ * Without it the return trip flips `loading` on, the template swaps to
+ * skeletons, and the keepalive cache buys nothing visible — the page still
+ * appears to reload every time. A first visit and a filter change do want the
+ * loading state; a background refresh over content already on screen does not.
+ */
+async function load({ silent = false } = {}) {
   const requestId = ++latestRequest
 
-  loading.value = true
+  if (silent) refreshing.value = true
+  else loading.value = true
+
   loadError.value = ''
 
   try {
@@ -392,13 +460,30 @@ async function load() {
   } finally {
     if (requestId === latestRequest) {
       loading.value = false
+      refreshing.value = false
+      loaded.value = true
     }
   }
 }
 
-watch([activeStatus, page], load)
+watch([activeStatus, page], () => load())
 
-onMounted(async () => {
+/*
+ * onActivated, not onMounted: this page is keepalive'd, so the instance is
+ * cached rather than destroyed when you navigate away and onMounted would run
+ * exactly once per session. onActivated fires on the first mount *and* on every
+ * return, which is what keeps a queue two admins are both working from going
+ * stale behind the cached markup.
+ */
+/*
+ * Two hooks on purpose.
+ *
+ * onMounted always fires and owns the first load, so the page can never sit on
+ * its initial `loading = true` if KeepAlive is not in play for any reason.
+ * onActivated fires only on a *return* to the cached instance — guarded on
+ * `loaded` so the first mount, where Vue fires both, does not fetch twice.
+ */
+async function boot() {
   // Tan-awa ang facilities.vue: ang role check kay sa `portal` global
   // middleware na, sa dili pa mo-render. Ang `role:admin` sa server gihapon ang
   // tinuod nga gate.
@@ -406,7 +491,12 @@ onMounted(async () => {
     await fetchUser()
   }
 
-  await load()
+  await load({ silent: loaded.value })
+}
+
+onMounted(boot)
+onActivated(() => {
+  if (loaded.value) boot()
 })
 
 onUnmounted(releasePhoto)
@@ -414,8 +504,8 @@ onUnmounted(releasePhoto)
 
 <style scoped>
 .admin-page {
-  padding: 32px 40px 48px;
-  max-width: 1200px;
+  padding: 24px 32px 40px;
+  max-width: 1280px;
   margin: 0 auto;
   color: #0f172a;
 }
@@ -448,10 +538,6 @@ onUnmounted(releasePhoto)
   flex-wrap: wrap;
 }
 
-.signed-in-as {
-  font-size: 13px;
-  color: #64748b;
-}
 
 .ghost-btn {
   display: inline-flex;
@@ -673,10 +759,34 @@ onUnmounted(releasePhoto)
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
 }
 
-.modal-wide {
-  max-width: 720px;
+/*
+ * Wide because the job is reading a government ID, not skimming a dialog. At
+ * 720px the photo column came out around 360px across, which is smaller than
+ * the card in the reviewer's hand and the reason numbers were being squinted at.
+ *
+ * Three bands rather than one scrolling block: the name stays visible while
+ * scrolling a long document, and Cancel/Reject/Verify stay put.
+ */
+.modal-review {
+  max-width: 1060px;
   max-height: 90vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-head {
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-head .modal-lede { margin: 0; }
+
+.modal-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: 18px 24px;
 }
 
 .modal-title {
@@ -691,35 +801,96 @@ onUnmounted(releasePhoto)
   color: #64748b;
 }
 
+/* Roughly 57/43 — the photo takes the larger share, the facts stay wide enough
+   that an address does not wrap to five lines. */
 .review-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 57fr) minmax(0, 43fr);
+  gap: 22px;
   margin-bottom: 16px;
+  align-items: start;
 }
 
-@media (max-width: 720px) {
-  .review-body {
-    grid-template-columns: 1fr;
-  }
+.review-photo-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
+
+.photo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.photo-bar__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.photo-modes {
+  display: inline-flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-mode {
+  padding: 5px 11px;
+  border: none;
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.photo-mode + .photo-mode { border-left: 1px solid #e2e8f0; }
+.photo-mode:hover:not(.active) { background: #f1f5f9; }
+.photo-mode.active { background: #1565c0; color: #fff; }
 
 .review-photo {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
-  min-height: 200px;
+  height: min(64vh, 640px);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  /* Scrolls rather than clips: in Full width the document is taller than the
+     pane on purpose, and hiding the overflow would crop the ID. */
+  overflow: auto;
+  padding: 8px;
 }
 
 .photo {
-  max-width: 100%;
-  max-height: 320px;
-  object-fit: contain;
   display: block;
+  max-width: 100%;
+}
+
+/* Whole document, never cropped, never stretched. */
+.review-photo--fit .photo {
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.review-photo--wide { align-items: flex-start; }
+
+.review-photo--wide .photo {
+  width: 100%;
+  height: auto;
+}
+
+.photo-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #94a3b8;
 }
 
 .photo-state {
@@ -802,6 +973,41 @@ onUnmounted(releasePhoto)
   flex-wrap: wrap;
 }
 
+/* The review modal supplies its own frame, so the band that holds the decision
+   carries the padding the modal no longer has. */
+.modal-review .modal-actions {
+  padding: 14px 24px 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/*
+ * Mobile keeps the single column it always had. The photo pane is given a
+ * shorter fixed height rather than being left to size itself: an ID that fills
+ * the screen pushes the donor's details off it, and the two are meant to be
+ * compared.
+ */
+@media (max-width: 720px) {
+  .review-body {
+    grid-template-columns: 1fr;
+  }
+
+  .review-photo {
+    height: min(46vh, 360px);
+  }
+
+  .modal-head {
+    padding: 18px 16px 12px;
+  }
+
+  .modal-scroll {
+    padding: 16px;
+  }
+
+  .modal-review .modal-actions {
+    padding: 12px 16px 16px;
+  }
+}
+
 .primary-btn,
 .danger-btn {
   padding: 9px 16px;
@@ -833,5 +1039,134 @@ onUnmounted(releasePhoto)
 .danger-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+/*
+ * Dark mode.
+ *
+ * This page had none: the shell paints a dark page background while every rule
+ * above is a hardcoded light value, so the table rendered as a white card of
+ * near-black text on a near-black page. Written as additive overrides rather
+ * than by converting the rules above to custom properties, so the light theme
+ * stays byte-for-byte what it was.
+ *
+ * Values match the other admin pages: #1E293B surfaces, #334155 borders,
+ * #F1F5F9 primary text, #94A3B8 secondary, and #64B5F6 as the primary accent
+ * (#1565C0 does not carry enough contrast on a dark ground).
+ */
+:global(.dark .admin-page) { color: #f1f5f9; }
+
+:global(.dark .subtitle),
+:global(.dark .tab),
+:global(.dark .submissions th),
+:global(.dark .page-label),
+:global(.dark .modal-lede),
+:global(.dark .donor-meta),
+:global(.dark .state),
+:global(.dark .photo-state),
+:global(.dark .review-facts dt) { color: #94a3b8; }
+
+:global(.dark .ghost-btn) {
+  border-color: #334155;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+:global(.dark .ghost-btn:hover:not(:disabled)) { background: #263449; }
+
+:global(.dark .tabs) { border-bottom-color: #334155; }
+
+:global(.dark .tab.active) {
+  color: #64b5f6;
+  border-bottom-color: #64b5f6;
+}
+
+:global(.dark .tab-count) {
+  background: rgba(66, 165, 245, 0.16);
+  color: #64b5f6;
+}
+
+:global(.dark .banner-success) { background: rgba(76, 175, 80, 0.14); color: #81c784; }
+:global(.dark .banner-error) { background: rgba(239, 83, 80, 0.14); color: #ef9a9a; }
+:global(.dark .banner-info) { background: rgba(66, 165, 245, 0.14); color: #64b5f6; }
+
+:global(.dark .table-wrap) {
+  border-color: #334155;
+  background: #1e293b;
+}
+
+:global(.dark .submissions td) { border-bottom-color: #334155; }
+:global(.dark .submissions th) { background: #182234; }
+:global(.dark .submissions tbody tr:hover) { background: #263449; }
+
+:global(.dark .status-pending) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .status-verified) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+:global(.dark .status-rejected) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
+:global(.dark .status-unsubmitted) { background: #334155; color: #94a3b8; }
+
+:global(.dark .link-btn) { color: #64b5f6; }
+
+:global(.dark .state-error),
+:global(.dark .photo-state--error),
+:global(.dark .modal-error) { color: #ef9a9a; }
+
+:global(.dark .modal) {
+  background: #1e293b;
+  border: 1px solid #334155;
+}
+
+:global(.dark .review-photo) {
+  border-color: #334155;
+  background: #182234;
+}
+
+:global(.dark .modal-head),
+:global(.dark .modal-review .modal-actions) { border-color: #334155; }
+
+:global(.dark .photo-bar__label),
+:global(.dark .photo-note) { color: #94a3b8; }
+
+:global(.dark .photo-modes) { border-color: #334155; }
+:global(.dark .photo-mode) { background: #1e293b; color: #cbd5e1; }
+:global(.dark .photo-mode + .photo-mode) { border-left-color: #334155; }
+:global(.dark .photo-mode:hover:not(.active)) { background: #263449; }
+:global(.dark .photo-mode.active) { background: #1565c0; color: #fff; }
+
+:global(.dark .review-facts dd) { color: #f1f5f9; }
+:global(.dark .reason-label) { color: #cbd5e1; }
+
+:global(.dark .reason-input) {
+  border-color: #334155;
+  background: #182234;
+  color: #f1f5f9;
+}
+
+:global(.dark .reason-input:focus) { border-color: #64b5f6; }
+:global(.dark .reason-input::placeholder) { color: #64748b; }
+
+/* Shimmer placeholder, same treatment as the dashboard and administrators
+   pages so a loading table looks like the rest of the console. The two stops
+   are the shared --rb-skeleton tokens, so the dark variant comes from main.css
+   the way the donor pages get theirs. */
+.skeleton-row td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 </style>

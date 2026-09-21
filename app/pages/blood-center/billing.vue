@@ -24,10 +24,10 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 // mao nay mo-explain ngano — mas maayo na kaysa sample number nga mabasa nga
 // tinuod.
 const stats = computed(() => [
-  { label: 'Unpaid', value: null, caption: 'Statements awaiting payment', icon: 'credit-card', tone: 'var(--rb-accent)' },
-  { label: 'Partially Paid', value: null, caption: 'Balance outstanding', icon: 'clock', tone: 'var(--rb-warning)' },
-  { label: 'Paid Today', value: null, caption: 'Confirmed payments', icon: 'check-circle', tone: 'var(--rb-success)' },
-  { label: 'Awaiting Confirmation', value: null, caption: 'Cash pending staff sign-off', icon: 'alert', tone: 'var(--rb-purple)' },
+  { label: 'Unpaid', value: null, caption: 'Statements awaiting payment', icon: 'credit-card', tone: 'var(--rb-accent-text)' },
+  { label: 'Partially Paid', value: null, caption: 'Balance outstanding', icon: 'clock', tone: 'var(--rb-warning-text)' },
+  { label: 'Paid Today', value: null, caption: 'Confirmed payments', icon: 'check-circle', tone: 'var(--rb-success-text)' },
+  { label: 'Awaiting Confirmation', value: null, caption: 'Cash pending staff sign-off', icon: 'alert', tone: 'var(--rb-purple-text)' },
 ])
 
 const panels = [

@@ -1,162 +1,195 @@
-/*
- * Expected Laravel endpoints (adjust paths to match your actual routes):
- *   GET /api/hospital/blood-requests/:id
- *       -> { request: {...}, history: [...] }
- *   GET /api/blood-inventory/availability
- *       -> [{ blood_type, units_available, status }, ...]
+import { hospitalService } from '~/api/hospital/HospitalService'
+import {
+  REQUEST_STATUSES as CANONICAL_STATUSES,
+  REQUEST_STATUS_LABELS,
+  REQUEST_STATUS_TONES,
+  requestStage,
+} from '~/types/bloodRequest'
+
+/**
+ * One blood request, as the requesting hospital sees it.
  *
- * The shape of `request` is expected to roughly look like:
- * {
- *   id, reference_number, status, priority,
- *   request_date, required_date, estimated_completion,
- *   hospital, department, requesting_physician, patient_reference_number,
- *   purpose, notes,
- *   blood_type, blood_component, units_requested, compatibility, special_requirements,
- *   clinical_indication, diagnosis, additional_notes,
- *   documents: [{ id, name, url, mime_type, size }],
- *   timeline: [{ step, label, status: 'completed'|'current'|'upcoming', timestamp }]
- * }
- *
- * If your backend doesn't return `timeline` explicitly, this composable will
- * derive it from `status` — see buildTimeline() below. Prefer having the
- * backend send it directly since it owns the source of truth.
+ * Rewritten to call the real API through HospitalService. The previous version
+ * called `useApi()`, which is defined nowhere in this repository — every page
+ * using it threw as soon as it mounted. It also spoke a status vocabulary
+ * ("Ready for Pickup", "Approved") the schema has never accepted; the canonical
+ * set now lives in ~/types/bloodRequest and is re-exported here so existing
+ * imports keep working.
  */
 
-export const REQUEST_STATUSES = [
-  'Pending',
-  'Approved',
-  'Processing',
-  'Ready for Pickup',
-  'Completed',
-  'Rejected',
-  'Cancelled',
-]
+export const REQUEST_STATUSES = CANONICAL_STATUSES
 
-const TIMELINE_STEPS = [
-  { key: 'submitted', label: 'Submitted' },
-  { key: 'reviewed', label: 'Reviewed' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'preparing', label: 'Preparing Blood Units' },
-  { key: 'ready_for_pickup', label: 'Ready for Pickup' },
-  { key: 'completed', label: 'Completed' },
-]
-
-// Maps a request status to how far along the timeline we are, only used as
-// a fallback when the backend does not send an explicit `timeline` array.
-const STATUS_TO_STEP_INDEX = {
-  Pending: 0,
-  Approved: 2,
-  Processing: 3,
-  'Ready for Pickup': 4,
-  Completed: 5,
-  Rejected: 1,
-  Cancelled: 0,
-}
-
+/**
+ * Map a request status to the badge classes the detail pages use.
+ */
 export function statusBadgeColor(status) {
-  switch (status) {
-    case 'Completed':
-    case 'Approved':
-      return 'success'
-    case 'Pending':
-    case 'Processing':
-      return 'warning'
-    case 'Ready for Pickup':
-      return 'info'
-    case 'Rejected':
-    case 'Cancelled':
-      return 'danger'
-    default:
-      return 'neutral'
-  }
+  const tone = REQUEST_STATUS_TONES[status] ?? 'muted'
+
+  return {
+    info: 'bg-blue-100 text-blue-700',
+    progress: 'bg-indigo-100 text-indigo-700',
+    warning: 'bg-amber-100 text-amber-700',
+    success: 'bg-emerald-100 text-emerald-700',
+    danger: 'bg-red-100 text-red-700',
+    muted: 'bg-slate-100 text-slate-600',
+  }[tone]
 }
 
+/**
+ * Human label for a status value.
+ */
+export function statusLabel(status) {
+  return REQUEST_STATUS_LABELS[status] ?? status
+}
+
+/**
+ * Build the progress timeline from a request and its allocations.
+ *
+ * Derived, never stored. The API keeps request status deliberately coarse and
+ * records dispatch and receipt per allocated unit, so the finer steps here are
+ * a reading of those rows rather than a status the server sends.
+ */
 export function buildTimeline(request) {
   if (!request) return []
 
-  // Prefer backend-provided timeline so timestamps/labels stay authoritative.
-  if (Array.isArray(request.timeline) && request.timeline.length) {
-    return request.timeline
-  }
+  const allocations = request.allocations ?? []
+  const released = allocations.filter((a) => a.status === 'released')
+  const received = allocations.filter((a) => a.received_at)
 
-  const currentIndex = STATUS_TO_STEP_INDEX[request.status] ?? 0
-  const isTerminatedEarly = request.status === 'Rejected' || request.status === 'Cancelled'
+  const terminal = ['rejected', 'cancelled'].includes(request.status)
 
-  return TIMELINE_STEPS.map((step, index) => {
-    let stepStatus = 'upcoming'
-    if (isTerminatedEarly) {
-      stepStatus = index <= currentIndex ? 'completed' : 'upcoming'
-    } else if (index < currentIndex) {
-      stepStatus = 'completed'
-    } else if (index === currentIndex) {
-      stepStatus = 'current'
-    }
-    return {
-      step: step.key,
-      label: step.label,
-      status: stepStatus,
-      timestamp: null, // unknown unless backend supplies real timestamps
-    }
-  })
+  const steps = [
+    {
+      key: 'submitted',
+      label: 'Submitted',
+      done: true,
+      timestamp: request.request_date,
+    },
+    {
+      key: 'reviewed',
+      label: request.status === 'rejected' ? 'Rejected' : 'Reviewed',
+      done: Boolean(request.reviewed_at),
+      timestamp: request.reviewed_at,
+    },
+    {
+      key: 'reserved',
+      label: 'Stock reserved',
+      done: request.allocated_count > 0,
+      timestamp: allocations[0]?.allocated_at ?? null,
+    },
+    {
+      key: 'dispatched',
+      label: 'Dispatched',
+      done: released.length > 0,
+      timestamp: released[0]?.released_at ?? null,
+    },
+    {
+      key: 'received',
+      label: 'Received',
+      done: received.length > 0,
+      timestamp: received[0]?.received_at ?? null,
+    },
+    {
+      key: 'completed',
+      label: 'Completed',
+      done: request.status === 'fulfilled',
+      timestamp: request.fulfilled_at,
+    },
+  ]
+
+  const firstPending = steps.findIndex((s) => !s.done)
+
+  return steps.map((step, index) => ({
+    step: step.key,
+    label: step.label,
+    status: step.done ? 'completed' : index === firstPending && !terminal ? 'current' : 'upcoming',
+    timestamp: step.timestamp,
+  }))
 }
 
 export const useBloodRequestDetails = (requestId) => {
-  // Uses the project's existing useApi() composable (same one powering
-  // useBloodRequests.js) so auth cookies / base URL handling stay consistent.
   const request = ref(null)
   const history = ref([])
   const bloodAvailability = ref([])
 
   const isLoadingRequest = ref(true)
-  const isLoadingAvailability = ref(true)
+  const isLoadingAvailability = ref(false)
   const requestError = ref(null)
   const availabilityError = ref(null)
 
   const timeline = computed(() => buildTimeline(request.value))
+
+  const stage = computed(() => (request.value ? requestStage(request.value) : null))
 
   const progressPercent = computed(() => {
     const steps = timeline.value
     if (!steps.length) return 0
     const completedCount = steps.filter((s) => s.status === 'completed').length
     const hasCurrent = steps.some((s) => s.status === 'current')
-    const numerator = completedCount + (hasCurrent ? 0.5 : 0)
-    return Math.round((numerator / steps.length) * 100)
+    return Math.round(((completedCount + (hasCurrent ? 0.5 : 0)) / steps.length) * 100)
   })
 
   async function fetchRequest() {
     isLoadingRequest.value = true
     requestError.value = null
+
     try {
-      const { data, error } = await useApi().get(`/hospital/bloodrequests/${requestId}`)
-      if (error?.value) throw error.value
-      request.value = data?.value?.request ?? data?.value ?? null
-      history.value = data?.value?.history ?? []
-    } catch (err) {
-      requestError.value = err
-      request.value = null
+      const response = await hospitalService.showRequest(requestId)
+      request.value = response?.request ?? null
+      // The API keeps no separate event log for a request; the timeline above
+      // is built from the request's own timestamps instead.
       history.value = []
+    } catch (err) {
+      requestError.value = err?.message ?? 'Could not load this blood request.'
+      request.value = null
     } finally {
       isLoadingRequest.value = false
     }
   }
 
+  /**
+   * Look up how much matching stock the network currently holds.
+   *
+   * Advisory: nothing here is reserved for this request. What is actually held
+   * is `request.allocated_count` and the allocations list.
+   */
   async function fetchAvailability() {
+    if (!request.value) return
+
     isLoadingAvailability.value = true
     availabilityError.value = null
+
     try {
-      const { data, error } = await useApi().get('/blood-inventory/availability')
-      if (error?.value) throw error.value
-      bloodAvailability.value = data?.value ?? []
+      const response = await hospitalService.availability({
+        blood_type_id: request.value.blood_type?.id,
+        component_id: request.value.component?.id,
+        quantity: request.value.outstanding_quantity || undefined,
+      })
+      bloodAvailability.value = response?.facilities ?? []
     } catch (err) {
-      availabilityError.value = err
+      availabilityError.value = err?.message ?? 'Could not load blood availability.'
       bloodAvailability.value = []
     } finally {
       isLoadingAvailability.value = false
     }
   }
 
+  /**
+   * Confirm that dispatched units arrived, then refresh.
+   */
+  async function confirmReceipt(allocationIds) {
+    await hospitalService.confirmReceipt(requestId, allocationIds)
+    await fetchRequest()
+  }
+
+  async function cancelRequest(reason) {
+    await hospitalService.cancelRequest(requestId, reason)
+    await fetchRequest()
+  }
+
   async function refresh() {
-    await Promise.all([fetchRequest(), fetchAvailability()])
+    await fetchRequest()
+    await fetchAvailability()
   }
 
   return {
@@ -164,6 +197,7 @@ export const useBloodRequestDetails = (requestId) => {
     history,
     bloodAvailability,
     timeline,
+    stage,
     progressPercent,
     isLoadingRequest,
     isLoadingAvailability,
@@ -171,6 +205,8 @@ export const useBloodRequestDetails = (requestId) => {
     availabilityError,
     fetchRequest,
     fetchAvailability,
+    confirmReceipt,
+    cancelRequest,
     refresh,
   }
 }

@@ -201,10 +201,16 @@
                 <section v-else class="tab-content">
                     <div class="history-header">
                         <p class="section-label section-label--tight">All recorded donor events</p>
-                        <button type="button" class="btn-outline" @click="openRecordDonation">
+                        <!--
+                          A donation is recorded at the counter, not from a
+                          donor's history page: it needs the screening and the
+                          collection, both of which belong to the verified visit
+                          on /blood-center/collection.
+                        -->
+                        <NuxtLink to="/blood-center/collection" class="btn-outline">
                             <AssetIcon name="plus" :size="14" />
-                            Record Donation
-                        </button>
+                            Record at counter
+                        </NuxtLink>
                     </div>
 
                     <div v-if="loadingHistory" class="history-list">
@@ -391,59 +397,6 @@
             </div>
         </Transition>
 
-        <!-- RECORD DONATION modal -->
-        <Transition name="modal">
-            <div v-if="showRecordDonationModal" class="modal-overlay" @click.self="closeRecordDonation">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Record Donation</h2>
-                        <button type="button" class="modal-card__close" @click="closeRecordDonation">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Blood type</label>
-                                <input :value="selectedDonor?.bloodType" type="text" class="form-input" disabled />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Volume (mL)</label>
-                                <input v-model.number="donationForm.volume" type="number" class="form-input"
-                                    placeholder="450" />
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Date</label>
-                                <input v-model="donationForm.date" type="date" class="form-input" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Method</label>
-                                <select v-model="donationForm.method" class="form-input">
-                                    <option value="Walk-in">Walk-in</option>
-                                    <option value="Appointment">Appointment</option>
-                                    <option value="Mobile Drive">Mobile Drive</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Staff notes</label>
-                            <textarea v-model="donationForm.notes" class="form-input form-textarea" rows="2"></textarea>
-                        </div>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeRecordDonation">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="savingDonation"
-                                @click="submitRecordDonation">
-                                {{ savingDonation ? 'Saving...' : 'Record Donation' }}
-                            </button>
-                        </div>
-                        <p v-if="donationError" class="modal-error">{{ donationError }}</p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
     </div>
 </template>
 
@@ -526,7 +479,6 @@ const api = {
     getFacilities: notImplemented('Facility list'),
     updateDonor: notImplemented('Updating a donor'),
     addFlag: notImplemented('Flagging a donor'),
-    recordDonation: notImplemented('Recording a donation'),
 }
 
 const initialLoading = ref(true)
@@ -761,41 +713,6 @@ async function submitAddFlag() {
     }
 }
 
-// ---- RECORD DONATION modal ----
-const showRecordDonationModal = ref(false)
-const savingDonation = ref(false)
-const donationError = ref('')
-const donationForm = reactive({ volume: 450, date: '', method: 'Walk-in', notes: '' })
-
-function openRecordDonation() {
-    showRecordDonationModal.value = true
-    donationError.value = ''
-    Object.assign(donationForm, { volume: 450, date: '', method: 'Walk-in', notes: '' })
-}
-
-function closeRecordDonation() {
-    showRecordDonationModal.value = false
-}
-
-async function submitRecordDonation() {
-    if (!donationForm.date) {
-        donationError.value = 'Please select a donation date.'
-        return
-    }
-    savingDonation.value = true
-    donationError.value = ''
-    try {
-        await api.recordDonation(selectedDonorId.value, { ...donationForm })
-        closeRecordDonation()
-        await Promise.all([loadDonorDetail(selectedDonorId.value), loadDonorHistory(selectedDonorId.value)])
-    } catch (err) {
-        donationError.value = 'Could not record donation. Please try again.'
-        console.error(err)
-    } finally {
-        savingDonation.value = false
-    }
-}
-
 onMounted(async () => {
     await loadAll()
     initialLoading.value = false
@@ -811,7 +728,7 @@ onMounted(async () => {
     --purple: #5e35b1;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1200px;
+    max-width: 1152px;
     background: var(--rb-page-bg);
     margin: 0 auto;
     padding: 24px 32px 40px;
@@ -956,9 +873,12 @@ onMounted(async () => {
 }
 
 /* Stats */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
 }
 
@@ -1077,9 +997,27 @@ onMounted(async () => {
     font-family: inherit;
 }
 
+/*
+ * One caret, drawn by us. These were bare native selects while the dashboard
+ * and inventory selects carried a custom chevron, so the same control looked
+ * different depending on which blood-centre page you were on.
+ *
+ * The `background` shorthand is deliberate, and so is repeating it in the dark
+ * rule: a later `background: <colour>` anywhere in the cascade resets
+ * background-image to none, and the dark override for .form-input is exactly
+ * such a rule. Spelling the whole shorthand out in both themes makes the caret
+ * immune to that ordering. #94a3b8 reads on both surfaces, so the glyph itself
+ * does not need to change.
+ */
 .filter-select {
     width: 150px;
     cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: #fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background-size: 10px 6px;
+    padding-right: 32px;
 }
 
 /* Donor table */
@@ -1248,12 +1186,19 @@ onMounted(async () => {
 }
 
 /* Tabs */
+/*
+ * 20px here plus the tab's own 4px puts the first label on 24px, level with
+ * .panel-header and .tab-content. It was 24 + 4 = 28, four pixels adrift of
+ * everything else in the same panel.
+ */
 .tabs {
     display: flex;
     gap: 32px;
     border-bottom: 1px solid #f3f4f6;
-    padding: 0 24px;
+    padding: 0 20px;
     background: #fafbfc;
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 .tab {
@@ -1264,6 +1209,7 @@ onMounted(async () => {
     font-weight: 700;
     color: var(--text-secondary);
     cursor: pointer;
+    white-space: nowrap;
     border-bottom: 2px solid transparent;
     transition: color 0.15s ease;
 }
@@ -1612,10 +1558,6 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 900px) {
-    .stats-row {
-        grid-template-columns: 1fr;
-    }
-
     .donor-row {
         grid-template-columns: 1fr;
         gap: 6px;
@@ -1662,272 +1604,273 @@ onMounted(async () => {
     background: #0F172A;
 }
 
-:global(.dark .stat-card),
-:global(.dark .panel),
-:global(.dark .detail-header-card),
-:global(.dark .modal-card) {
+:global(.dark .donors-page .stat-card),
+:global(.dark .donors-page .panel),
+:global(.dark .donors-page .detail-header-card),
+:global(.dark .donors-page .modal-card) {
     background: #1E293B;
     border-color: #334155;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-:global(.dark .stat-card:hover) {
+:global(.dark .donors-page .stat-card:hover) {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
-:global(.dark .stat-card__value) {
+:global(.dark .donors-page .stat-card__value) {
     color: #F1F5F9;
 }
-:global(.dark .stat-card__value--success) {
+:global(.dark .donors-page .stat-card__value--success) {
     color: #34D399;
 }
-:global(.dark .stat-card__value--accent) {
+:global(.dark .donors-page .stat-card__value--accent) {
     color: #F87171;
 }
 
-:global(.dark .panel-header) {
+:global(.dark .donors-page .panel-header) {
     border-bottom-color: #334155;
 }
 
-:global(.dark .section-label) {
+:global(.dark .donors-page .section-label) {
     color: #F1F5F9;
 }
 
-:global(.dark .form-input) {
+:global(.dark .donors-page .form-input) {
     background: #1E293B;
     color: #F1F5F9;
     border-color: #334155;
 }
-:global(.dark .form-input:focus) {
+:global(.dark .donors-page .form-input:focus) {
     border-color: #60A5FA;
     background: #263449;
 }
-:global(.dark .form-input:disabled) {
+:global(.dark .donors-page .form-input:disabled) {
     background: #263449;
     color: #94A3B8;
 }
-:global(.dark .form-input-icon__icon) {
+:global(.dark .donors-page .form-input-icon__icon) {
     color: #94A3B8;
 }
 
-:global(.dark .filter-select) {
-    background: #1E293B;
+:global(.dark .donors-page .filter-select) {
+    background: #1E293B url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background-size: 10px 6px;
     color: #F1F5F9;
 }
 
-:global(.dark .donor-row) {
+:global(.dark .donors-page .donor-row) {
     border-top-color: #263449;
 }
-:global(.dark .donor-row--head) {
+:global(.dark .donors-page .donor-row--head) {
     background: #263449;
     color: #94A3B8;
 }
-:global(.dark .donor-cell__name) {
+:global(.dark .donors-page .donor-cell__name) {
     color: #F1F5F9;
 }
-:global(.dark .donor-cell__id) {
+:global(.dark .donors-page .donor-cell__id) {
     color: #94A3B8;
 }
 
-:global(.dark .view-link) {
+:global(.dark .donors-page .view-link) {
     color: #60A5FA;
 }
 
-:global(.dark .empty-state) {
+:global(.dark .donors-page .empty-state) {
     color: #94A3B8;
 }
 
-:global(.dark .breadcrumb__link) {
+:global(.dark .donors-page .breadcrumb__link) {
     color: #60A5FA;
 }
-:global(.dark .breadcrumb__sep) {
+:global(.dark .donors-page .breadcrumb__sep) {
     color: #94A3B8;
 }
-:global(.dark .breadcrumb__current) {
+:global(.dark .donors-page .breadcrumb__current) {
     color: #F1F5F9;
 }
 
-:global(.dark .detail-header-card__name) {
+:global(.dark .donors-page .detail-header-card__name) {
     color: #F1F5F9;
 }
-:global(.dark .detail-header-card__meta) {
+:global(.dark .donors-page .detail-header-card__meta) {
     color: #94A3B8;
 }
 
-:global(.dark .tabs) {
+:global(.dark .donors-page .tabs) {
     background: #0F172A;
     border-bottom-color: #334155;
 }
-:global(.dark .tab) {
+:global(.dark .donors-page .tab) {
     color: #94A3B8;
 }
-:global(.dark .tab:hover) {
+:global(.dark .donors-page .tab:hover) {
     color: #F1F5F9;
 }
-:global(.dark .tab--active) {
+:global(.dark .donors-page .tab--active) {
     color: #60A5FA;
     border-bottom-color: #60A5FA;
 }
 
-:global(.dark .info-row) {
+:global(.dark .donors-page .info-row) {
     border-bottom-color: #263449;
 }
-:global(.dark .info-row__label) {
+:global(.dark .donors-page .info-row__label) {
     color: #94A3B8;
 }
-:global(.dark .info-row__value) {
+:global(.dark .donors-page .info-row__value) {
     color: #F1F5F9;
 }
 
-:global(.dark .flag-card) {
+:global(.dark .donors-page .flag-card) {
     background: #3A1A1A;
     border-color: #F87171;
 }
-:global(.dark .flag-card__icon) {
+:global(.dark .donors-page .flag-card__icon) {
     color: #F87171;
 }
-:global(.dark .flag-card__reason) {
+:global(.dark .donors-page .flag-card__reason) {
     color: #F1F5F9;
 }
-:global(.dark .flag-card__meta) {
+:global(.dark .donors-page .flag-card__meta) {
     color: #94A3B8;
 }
 
-:global(.dark .history-item) {
+:global(.dark .donors-page .history-item) {
     border-bottom-color: #263449;
 }
-:global(.dark .history-item__date) {
+:global(.dark .donors-page .history-item__date) {
     color: #94A3B8;
 }
-:global(.dark .history-item__title) {
+:global(.dark .donors-page .history-item__title) {
     color: #F1F5F9;
 }
-:global(.dark .history-item__meta) {
+:global(.dark .donors-page .history-item__meta) {
     color: #94A3B8;
 }
-:global(.dark .history-item__result) {
+:global(.dark .donors-page .history-item__result) {
     color: #34D399;
 }
-:global(.dark .history-item__dot--deferred) {
+:global(.dark .donors-page .history-item__dot--deferred) {
     background: #FBBF24;
 }
 
-:global(.dark .pill--eligible) {
+:global(.dark .donors-page .pill--eligible) {
     background: #1A3A2A;
     color: #34D399;
 }
-:global(.dark .pill--deferred) {
+:global(.dark .donors-page .pill--deferred) {
     background: #3E2C1A;
     color: #FBBF24;
 }
-:global(.dark .pill--flagged) {
+:global(.dark .donors-page .pill--flagged) {
     background: #3A1A1A;
     color: #F87171;
 }
-:global(.dark .pill--completed) {
+:global(.dark .donors-page .pill--completed) {
     background: #1A3A2A;
     color: #34D399;
 }
-:global(.dark .pill--type-a) {
+:global(.dark .donors-page .pill--type-a) {
     background: #3E2C1A;
     color: #FBBF24;
 }
-:global(.dark .pill--type-b) {
+:global(.dark .donors-page .pill--type-b) {
     background: #1A3A2A;
     color: #34D399;
 }
-:global(.dark .pill--type-ab) {
+:global(.dark .donors-page .pill--type-ab) {
     background: #2D1A4A;
     color: #A78BFA;
 }
-:global(.dark .pill--type-o) {
+:global(.dark .donors-page .pill--type-o) {
     background: #1A3A5F;
     color: #60A5FA;
 }
 
-:global(.dark .checkbox-row) {
+:global(.dark .donors-page .checkbox-row) {
     color: #F1F5F9;
 }
-:global(.dark .checkbox-row input) {
+:global(.dark .donors-page .checkbox-row input) {
     accent-color: #60A5FA;
 }
 
-:global(.dark .modal-card__header) {
+:global(.dark .donors-page .modal-card__header) {
     border-bottom-color: #334155;
 }
-:global(.dark .modal-card__title) {
+:global(.dark .donors-page .modal-card__title) {
     color: #F1F5F9;
 }
-:global(.dark .modal-card__close) {
+:global(.dark .donors-page .modal-card__close) {
     color: #94A3B8;
 }
-:global(.dark .modal-card__close:hover) {
+:global(.dark .donors-page .modal-card__close:hover) {
     color: #F1F5F9;
 }
-:global(.dark .modal-subtitle) {
+:global(.dark .donors-page .modal-subtitle) {
     color: #94A3B8;
 }
-:global(.dark .form-label) {
+:global(.dark .donors-page .form-label) {
     color: #94A3B8;
 }
-:global(.dark .modal-error) {
+:global(.dark .donors-page .modal-error) {
     color: #F87171;
 }
 
-:global(.dark .modal-overlay) {
+:global(.dark .donors-page .modal-overlay) {
     background: rgba(0, 0, 0, 0.7);
 }
 
-:global(.dark .btn-primary) {
+:global(.dark .donors-page .btn-primary) {
     background: #60A5FA;
     color: #0F172A;
 }
-:global(.dark .btn-primary:hover) {
+:global(.dark .donors-page .btn-primary:hover) {
     opacity: 0.9;
 }
-:global(.dark .btn-primary:disabled) {
+:global(.dark .donors-page .btn-primary:disabled) {
     opacity: 0.4;
 }
 
-:global(.dark .btn-outline) {
+:global(.dark .donors-page .btn-outline) {
     background: #263449;
     color: #F1F5F9;
 }
-:global(.dark .btn-outline:hover) {
+:global(.dark .donors-page .btn-outline:hover) {
     background: #334155;
 }
 
-:global(.dark .btn-cancel) {
+:global(.dark .donors-page .btn-cancel) {
     background: #263449;
     color: #F1F5F9;
 }
-:global(.dark .btn-cancel:hover) {
+:global(.dark .donors-page .btn-cancel:hover) {
     background: #334155;
 }
 
-:global(.dark .btn-link) {
+:global(.dark .donors-page .btn-link) {
     color: #60A5FA;
 }
 
-:global(.dark .error-banner) {
+:global(.dark .donors-page .error-banner) {
     background: rgba(239, 83, 80, 0.10);
     color: #EF9A9A;
     border-color: rgba(239, 83, 80, 0.24);
 }
 
-:global(.dark .page-title) {
+:global(.dark .donors-page .page-title) {
     color: #F1F5F9;
 }
-:global(.dark .page-subtitle) {
+:global(.dark .donors-page .page-subtitle) {
     color: #94A3B8;
 }
 
-:global(.dark .spinner) {
+:global(.dark .donors-page .spinner) {
     border-color: #1E293B;
     border-top-color: #60A5FA;
 }
 
-:global(.dark .skeleton-block) {
+:global(.dark .donors-page .skeleton-block) {
     background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
     background-size: 400% 100%;
     animation: skeleton-loading-dark 1.4s ease infinite;
@@ -1938,11 +1881,11 @@ onMounted(async () => {
     100% { background-position: 0 50%; }
 }
 
-:global(.dark .avatar) {
+:global(.dark .donors-page .avatar) {
     border: 2px solid #334155;
 }
 
-:global(.dark .avatar--lg) {
+:global(.dark .donors-page .avatar--lg) {
     border-width: 3px;
 }
 

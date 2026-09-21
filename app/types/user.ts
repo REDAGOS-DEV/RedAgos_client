@@ -56,6 +56,27 @@ export interface AppUser {
   is_supervisor: boolean
 
   /**
+   * Unrestricted platform admin. Holds every `admin.*` privilege without any of
+   * them being stored, so read this rather than inspecting `admin_privileges`
+   * when asking "may they do everything".
+   */
+  is_super_admin: boolean
+
+  /**
+   * The admin privileges actually granted, resolved by the server — already the
+   * full set for a super admin. Empty for donors and blood-centre staff.
+   */
+  admin_privileges: string[]
+
+  /**
+   * The preset the granted privileges match (`verification_officer`,
+   * `network_admin`, `auditor`), `super_admin` for the unrestricted kind, or
+   * null for a hand-picked set the account form shows as "Custom". Derived by
+   * the server from the stored list, never stored alongside it.
+   */
+  admin_role: string | null
+
+  /**
    * Mirrored so the client can render the right navigation. Presentation only:
    * every ability is re-checked by `can:` middleware on the route that uses it.
    * Never treat this as authorization.

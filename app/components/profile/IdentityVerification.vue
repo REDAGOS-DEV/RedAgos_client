@@ -40,7 +40,14 @@
         <div class="form-grid">
           <div class="form-field">
             <label class="form-label" for="identity-type">ID type</label>
-            <select id="identity-type" v-model="form.validIdType" class="form-input" :disabled="submitting">
+            <select
+              id="identity-type"
+              ref="idTypeSelect"
+              v-model="form.validIdType"
+              class="form-input"
+              :class="{ 'form-input--wanted': needsIdType }"
+              :disabled="submitting"
+            >
               <option value="" disabled>Select an ID</option>
               <option v-for="option in idTypeOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
@@ -71,38 +78,86 @@
               @change="handleFileChange"
             >
 
-            <!-- Photo already chosen: show it with a small overlay control to swap it. -->
+            <!-- Photo already chosen: show it with small overlay controls to swap it. -->
             <div v-if="previewUrl" class="identity__preview-wrap">
               <img :src="previewUrl" alt="Your ID" class="identity__preview">
+              <div class="identity__change">
+                <button
+                  type="button"
+                  class="btn-outline"
+                  :disabled="submitting"
+                  @click="openCamera"
+                >
+                  <AssetIcon name="camera" :size="12" />
+                  Retake
+                </button>
+                <button
+                  type="button"
+                  class="btn-outline"
+                  :disabled="submitting"
+                  @click="fileInput.click()"
+                >
+                  <AssetIcon name="refresh-cw" :size="12" />
+                  Change photo
+                </button>
+              </div>
+            </div>
+
+            <!-- No photo yet: two ways in, both ending at the same upload. -->
+            <div v-else class="identity__choices">
               <button
                 type="button"
-                class="btn-outline identity__change"
+                class="identity__dropzone"
+                :disabled="submitting"
+                @click="openCamera"
+              >
+                <span class="identity__dropzone-icon">
+                  <AssetIcon name="camera" :size="18" />
+                </span>
+                <span class="identity__dropzone-text">Take photo</span>
+                <span class="identity__dropzone-sub">Scan it with your camera</span>
+              </button>
+
+              <button
+                type="button"
+                class="identity__dropzone"
                 :disabled="submitting"
                 @click="fileInput.click()"
               >
-                <AssetIcon name="refresh-cw" :size="12" />
-                Change photo
+                <span class="identity__dropzone-icon">
+                  <AssetIcon name="upload" :size="18" />
+                </span>
+                <span class="identity__dropzone-text">Attach file</span>
+                <span class="identity__dropzone-sub">Choose a photo you already have</span>
               </button>
             </div>
 
-            <!-- No photo yet: the whole zone is the trigger. -->
-            <button
-              v-else
-              type="button"
-              class="identity__dropzone"
-              :disabled="submitting"
-              @click="fileInput.click()"
-            >
-              <span class="identity__dropzone-icon">
-                <AssetIcon name="upload" :size="18" />
-              </span>
-              <span class="identity__dropzone-text">Choose a photo</span>
-              <span class="identity__dropzone-sub">Tap to browse your files</span>
-            </button>
-
+            <!--
+              Raised on demand rather than standing there permanently: before
+              anyone reaches for the camera it is an instruction about a problem
+              they do not have yet, and a panel that opens already scolding you
+              is one people read past.
+            -->
+            <p v-if="needsIdType" class="identity__hint identity__hint--wanted">
+              <AssetIcon name="triangle-alert" :size="13" />
+              <span>Choose your ID type first, so the camera knows whether to ask for the back.</span>
+            </p>
             <p class="identity__hint">JPG, PNG or WEBP, up to 4MB. Make sure the number and your name are readable.</p>
           </div>
         </div>
+
+        <!--
+          Mounted only while it is open so the camera exists for exactly as long
+          as the donor is pointing it at something.
+        -->
+        <IdCameraCapture
+          v-if="cameraOpen"
+          :valid-id-type="form.validIdType"
+          :id-type-label="selectedIdTypeLabel"
+          @captured="handleCaptured"
+          @close="cameraOpen = false"
+          @fallback="handleCameraFallback"
+        />
 
         <div class="form-actions identity__actions">
           <button class="btn-primary btn-block" :disabled="!canSubmit || submitting" @click="handleSubmit">
@@ -124,6 +179,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import IdCameraCapture from '~/components/profile/IdCameraCapture.vue'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
 const props = defineProps({
@@ -131,7 +187,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['submitted'])
 
-const { submitIdentity, submitting, error, loadImage, imageUrl, releaseImage, idTypeOptions } = useIdentityDocument()
+const { submitIdentity, submitting, error, validateFile, loadImage, imageUrl, releaseImage, idTypeOptions } = useIdentityDocument()
 const { setIdentityStatus } = useIdentityStatus()
 
 const fileInput = ref(null)
@@ -139,6 +195,9 @@ const selectedFile = ref(null)
 const localPreview = ref(null)
 const message = ref('')
 const failed = ref(false)
+const cameraOpen = ref(false)
+const idTypeSelect = ref(null)
+const needsIdType = ref(false)
 
 const form = reactive({
   validIdType: '',
@@ -183,8 +242,8 @@ watch(() => props.identity, (identity) => {
   // back down through this same prop.
   setIdentityStatus(identity.status)
 
-  // Authenticated route, so this cannot be an <img src>: fetch it with the
-  // token and render the blob.
+  // Authenticated route, so the browser cannot be pointed straight at it:
+  // fetch it with the token and render the blob.
   if (identity.image_url && identity.status !== 'unsubmitted') {
     const uuid = identity.image_url.split('/')[2]
     loadImage(uuid)
@@ -202,6 +261,74 @@ function handleFileChange(e) {
   selectedFile.value = file
   localPreview.value = URL.createObjectURL(file)
   message.value = ''
+}
+
+const selectedIdTypeLabel = computed(() =>
+  idTypeOptions.find((option) => option.value === form.validIdType)?.label || ''
+)
+
+// The prompt has done its job the moment they pick something; leaving it up
+// would turn an answered question into a standing complaint.
+watch(() => form.validIdType, (type) => {
+  if (type) needsIdType.value = false
+})
+
+/**
+ * The camera needs the ID type, because the type is what says whether there is
+ * a back to photograph.
+ *
+ * Sending them to the field beats greying the button out. A disabled control
+ * states that something is wrong without saying what, and it is the wrong thing
+ * to grey here anyway: Attach File needs the type just as much — canSubmit
+ * refuses without it either way — and only one of the two was being punished
+ * for it.
+ */
+function openCamera() {
+  if (!form.validIdType) {
+    needsIdType.value = true
+    idTypeSelect.value?.focus()
+
+    return
+  }
+
+  message.value = ''
+  failed.value = false
+  cameraOpen.value = true
+}
+
+/**
+ * The camera hands back a File, so from here on it is the attach-file flow.
+ *
+ * Deliberately the same two lines as handleFileChange: the scanner's job ends
+ * at producing an image, and everything after this point — the preview, the
+ * submit button, the multipart POST, the private storage, the review queue —
+ * is the path that already existed.
+ */
+function handleCaptured(file) {
+  try {
+    validateFile(file)
+  } catch (err) {
+    failed.value = true
+    message.value = err.message
+    cameraOpen.value = false
+
+    return
+  }
+
+  if (localPreview.value) URL.revokeObjectURL(localPreview.value)
+
+  selectedFile.value = file
+  localPreview.value = URL.createObjectURL(file)
+  cameraOpen.value = false
+}
+
+/**
+ * The camera could not run, so hand the donor straight to the picker rather
+ * than closing onto a panel they have to work out for themselves.
+ */
+function handleCameraFallback() {
+  cameraOpen.value = false
+  nextTick(() => fileInput.value?.click())
 }
 
 async function handleSubmit() {
@@ -383,6 +510,19 @@ select.form-input {
 .btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Dropzone / preview ── */
+
+/*
+ * Two equal cards rather than a primary action with a link underneath: neither
+ * route is a fallback for the other. A donor holding the card wants the camera,
+ * a donor who already photographed it wants the picker, and guessing which one
+ * somebody is just adds a step for half of them.
+ */
+.identity__choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .identity__dropzone {
   display: flex;
   flex-direction: column;
@@ -418,12 +558,35 @@ select.form-input {
   background: #f8fafc;
 }
 .identity__preview { width: 100%; max-height: 180px; object-fit: contain; display: block; background: #f8fafc; }
-.identity__change { position: absolute; right: 8px; bottom: 8px; }
+.identity__change {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
 .identity__hint { margin: 8px 0 0; font-size: 11px; color: var(--text-secondary); }
 
+.identity__hint--wanted {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--warning);
+}
+.identity__hint--wanted svg { flex-shrink: 0; margin-top: 1px; }
+
+/* Points at the field the prompt just sent them to, so the focus ring is not
+   the only thing tying the two together. */
+.form-input--wanted { border-color: var(--warning); }
+
 @media (max-width: 420px) {
   .form-grid { grid-template-columns: 1fr; }
+  .identity__choices { grid-template-columns: 1fr; }
+  .identity__dropzone { padding: 18px 16px; }
 }
 
 /* ============ Dark mode ============ */
@@ -433,11 +596,27 @@ select.form-input {
 :global(.dark .identity__badge--verified) { background: rgba(4, 120, 87, 0.2); color: #6ee7b7; }
 :global(.dark .identity__badge--rejected) { background: rgba(185, 28, 28, 0.2); color: #fca5a5; }
 :global(.dark .identity__reason) { background: rgba(185, 28, 28, 0.12); border-color: rgba(185, 28, 28, 0.35); }
-:global(.dark .status-row) { border-color: #263449; }
-:global(.dark .form-input) { background: #0f172a; border-color: #334155; color-scheme: dark; }
-:global(.dark .form-input:disabled) { background: #1e293b; }
-:global(.dark select.form-input) {
+/*
+ * The generic names below are anchored on .identity. `:global(…)` leaves the
+ * scope system, so `:global(.dark .form-input)` was matching .form-input on
+ * every page in the app once this component's stylesheet had loaded — and the
+ * blood-centre pages use that class too.
+ *
+ * The select rule was the one that showed: it set background-image alone and
+ * inherited repeat/position/size from the *scoped* `select.form-input` rule
+ * above, which does not match on a foreign page. The chevron then tiled across
+ * the whole control at its intrinsic size.
+ */
+:global(.dark .identity .status-row) { border-color: #263449; }
+:global(.dark .identity .form-input) { background: #0f172a; border-color: #334155; color-scheme: dark; }
+:global(.dark .identity .form-input--wanted) { border-color: #fdba74; }
+:global(.dark .identity__hint--wanted) { color: #fdba74; }
+:global(.dark .identity .form-input:disabled) { background: #1e293b; }
+:global(.dark .identity select.form-input) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
 }
 :global(.dark .identity__dropzone) { border-color: #334155; background: #0f172a; }
 :global(.dark .identity__dropzone:hover:not(:disabled)) { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }

@@ -399,25 +399,19 @@ function handlePrint() {
   window.print()
 }
 
-async function handleDownloadPdf() {
-  if (!request.value) return
-  try {
-    const { data, error } = await useApi().get(
-      `/hospital/bloodrequests/${requestId}/download`,
-      { responseType: 'blob' }
-    )
-    if (error?.value) throw error.value
-    const blob = data?.value
-    if (!blob) return
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `blood-request-${request.value.reference_number || requestId}.pdf`
-    link.click()
-    window.URL.revokeObjectURL(url)
-  } catch (err) {
-    console.error('Failed to download PDF', err)
-  }
+/**
+ * Produce a copy of the request.
+ *
+ * Routed through the browser's own print dialogue, which offers "Save as PDF"
+ * on every supported platform. The previous version fetched
+ * `/hospital/bloodrequests/{id}/download` through an undefined `useApi()`
+ * helper — an endpoint the API has never served — so the button threw rather
+ * than downloading anything. Printing works today and keeps the page as the
+ * single source of what a request says; a server-rendered PDF can replace this
+ * if the paperwork ever needs a fixed layout.
+ */
+function handleDownloadPdf() {
+  window.print()
 }
 
 function scrollToTimeline() {

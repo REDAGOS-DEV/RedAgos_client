@@ -210,6 +210,7 @@
               <div class="form-field">
                 <label class="form-label">Blood type</label>
                 <select v-model="profileForm.blood_type" class="form-input">
+                  <option value="">Not known yet</option>
                   <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
                 </select>
               </div>
@@ -371,7 +372,10 @@ async function load({ silent = false } = {}) {
     profileForm.first_name = res.first_name || ''
     profileForm.last_name = res.last_name || ''
     profileForm.date_of_birth = res.date_of_birth || ''
-    profileForm.blood_type = res.blood_type || 'O+'
+    // Never fall back to a real blood type. A donor who has none on file would
+    // otherwise see one pre-selected and save it by editing something else
+    // entirely, recording a type nobody tested.
+    profileForm.blood_type = res.blood_type || ''
     profileForm.contact_number = res.contact_number || ''
     profileForm.email = user.value?.email || ''
     profileForm.address = res.address || ''
@@ -660,41 +664,61 @@ select.form-input {
 }
 
 /* ============ Dark mode ============ */
+/*
+ * Every rule below is anchored on .profile-page, and that is load-bearing.
+ * `:global(…)` takes the selector out of the scope system entirely, so
+ * `:global(.dark .form-input)` matched .form-input on EVERY page in the app
+ * once this route's stylesheet had been fetched — and .form-input, .panel,
+ * .btn-outline, .skeleton and .toggle-row are all names the blood-centre
+ * pages use too.
+ *
+ * The visible damage was the pair below it: `.dark select.form-input` set only
+ * background-image, taking repeat/position/size from the *scoped*
+ * `select.form-input` rule further up. On a foreign page that scoped rule does
+ * not match, so the chevron fell back to `repeat` at its intrinsic size and
+ * tiled a dozen arrows across the control, through the label.
+ *
+ * The descendant form `:global(.dark) .x` is not the fix — this toolchain
+ * drops the descendant and emits a bare `.dark { … }`.
+ */
 :global(.dark .profile-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
     background: #0F172A;
 }
 
-:global(.dark .panel) {
+:global(.dark .profile-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .panel-header--simple) { border-color: #334155; }
+:global(.dark .profile-page .panel-header--simple) { border-color: #334155; }
 
-:global(.dark .status-row) { border-color: #263449; }
+:global(.dark .profile-page .status-row) { border-color: #263449; }
 
-:global(.dark .form-input) {
+:global(.dark .profile-page .form-input) {
     background: #0F172A;
     border-color: #334155;
     color-scheme: dark;
 }
 
-:global(.dark select.form-input) {
+:global(.dark .profile-page select.form-input) {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
 }
 
-:global(.dark .btn-outline) {
+:global(.dark .profile-page .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover) { background: #334155; }
+:global(.dark .profile-page .btn-outline:hover) { background: #334155; }
 
-:global(.dark .toggle-row) { border-color: #263449; }
-:global(.dark .toggle-switch) { background: #1565c0; }
+:global(.dark .profile-page .toggle-row) { border-color: #263449; }
+:global(.dark .profile-page .toggle-switch) { background: #1565c0; }
 
-:global(.dark .skeleton) {
+:global(.dark .profile-page .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
 }

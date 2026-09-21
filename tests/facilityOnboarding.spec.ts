@@ -92,8 +92,19 @@ describe('facility management access', () => {
     expect(portalRoleFor('/admin/facilities')).toBe('admin')
   })
 
-  it('is where an administrator lands', () => {
-    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/facilities')
+  /*
+   * It used to be the landing page. It is not any more: admin accounts carry
+   * privileges, /admin/facilities is guarded by `can:admin.facility.manage`,
+   * and an admin scoped to the donor ID queue would land on a 403. Everyone
+   * lands on the dashboard, which renders only the modules the account holds
+   * and is therefore openable by every privilege set.
+   */
+  it('is no longer the landing page, since not every admin may open it', () => {
+    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/dashboard')
+  })
+
+  it('still sits in the admin portal the landing page belongs to', () => {
+    expect(portalRoleFor('/admin/dashboard')).toBe('admin')
   })
 
   it('sends a signed-out visitor to the admin login, not role selection', () => {

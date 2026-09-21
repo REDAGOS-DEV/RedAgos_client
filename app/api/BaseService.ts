@@ -37,6 +37,19 @@ export class BaseService {
       baseURL,
       method,
       headers,
+      /*
+       * Walay timeout, walay katapusan ang paghulat.
+       *
+       * Ang baseURL sa ibabaw kay gi-derive gikan sa browser host, so kung
+       * naka-bind ang Laravel sa 127.0.0.1 lang ug gi-abli ang app pinaagi sa
+       * LAN IP, ang connection sa `:8000` kay ma-drop — dili ma-refuse. Ang
+       * fetch mag-hangtod hangtod sa TCP timeout sa OS, ug ang page mag-skeleton
+       * sa tibuok panahon nga wala gyuy error nga makita.
+       *
+       * 30s: taas pa sa kinatas-ang tinuod nga request niini nga app, mubo pa
+       * sa punto nga mo-hunahuna ang user nga nag-hang na.
+       */
+      timeout: 30_000,
     };
  
     if (method.toUpperCase() === "GET") {

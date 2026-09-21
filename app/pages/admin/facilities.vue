@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-page">
+  <div class="admin-page" :class="isDark ? 'dark' : ''">
     <header class="page-header">
       <div>
         <h1>Facility Management</h1>
@@ -9,21 +9,14 @@
       </div>
 
       <div class="header-actions">
-        <span v-if="user" class="signed-in-as">{{ user.full_name || user.email }}</span>
-
         <button type="button" class="primary-btn" @click="openCreate">
           <AssetIcon name="plus" :size="16" />
           Create Facility
         </button>
 
-        <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+        <button type="button" class="ghost-btn" :disabled="busy" @click="load">
           <AssetIcon name="refresh-cw" :size="16" />
-          {{ loading ? 'Loading…' : 'Refresh' }}
-        </button>
-
-        <button type="button" class="ghost-btn" :disabled="loggingOut" @click="handleLogout">
-          <AssetIcon name="log-out" :size="16" />
-          {{ loggingOut ? 'Logging out…' : 'Log Out' }}
+          {{ busy ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
@@ -70,9 +63,16 @@
         </thead>
 
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="state">Loading facilities…</td>
-          </tr>
+          <!-- Skeleton rows rather than a "Loading…" line: the table keeps its
+               shape, so the page does not collapse to a single row and jump
+               back when the data lands. -->
+          <template v-if="loading">
+            <tr v-for="n in 5" :key="`sk-${n}`" class="skeleton-row">
+              <td v-for="(width, c) in SKELETON_WIDTHS" :key="c">
+                <span class="skeleton" :style="{ width }" />
+              </td>
+            </tr>
+          </template>
 
           <tr v-else-if="loadError">
             <td colspan="6" class="state state-error">{{ loadError }}</td>
@@ -394,18 +394,53 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
   middleware: 'auth',
+  layout: 'admindashboard',
+  keepalive: true,
 })
 
 useHead({ title: 'Facility Management · RedAgos' })
 
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser } = useUser()
+
+// --- Dark mode awareness (following blood center sidebar pattern) ---
+const isDark = ref(false)
+let themeObserver = null
+
+onMounted(() => {
+  isDark.value = document.documentElement.classList.contains('dark')
+  themeObserver = new MutationObserver(() => {
+    isDark.value = document.documentElement.classList.contains('dark')
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+})
+
+onUnmounted(() => {
+  themeObserver?.disconnect()
+})
+
+
+// --- Color tokens for light/dark mode ---
+const BG_SECONDARY = computed(() => (isDark.value ? '#1E293B' : '#ffffff'))
+const BG_TERTIARY = computed(() => (isDark.value ? '#334155' : '#f4f6f9'))
+
+const TEXT_PRIMARY = computed(() => (isDark.value ? '#F1F5F9' : '#1f2937'))
+const TEXT_SECONDARY = computed(() => (isDark.value ? '#CBD5E1' : '#64748b'))
+const TEXT_MUTED = computed(() => (isDark.value ? '#94A3B8' : '#94a3b8'))
+
+const BORDER_COLOR = computed(() => (isDark.value ? '#334155' : '#eef1f5'))
+const BORDER_SUBTLE = computed(() => (isDark.value ? '#1E293B' : '#f4f6f9'))
+
+const ACCENT_PRIMARY = computed(() => '#1565c0')
+const ACCENT_SUCCESS = computed(() => '#2e7d32')
+const ACCENT_DANGER = computed(() => '#d32f2f')
+const ACCENT_WARNING = computed(() => '#b45309')
 
 const TYPE_TABS = [
   { value: '', label: 'All Facilities' },
@@ -426,16 +461,12 @@ const FACILITY_TYPES = [
   },
 ]
 
-// Tulo ka status ra ang naa sa server nga FacilityStatus. Ang `pending_approval`
-// ug `rejected` kay para ra sa mga legacy nga record — ang bag-o nga facility
-// kay `approved` gyud dayon.
 const STATUS_LABELS = {
   pending_approval: 'Pending Approval',
   approved: 'Active',
   rejected: 'Rejected',
 }
 
-const loggingOut = ref(false)
 
 const activeType = ref('')
 const activeStatus = ref('')
@@ -445,6 +476,14 @@ const lastPage = ref(1)
 const total = ref(null)
 
 const loading = ref(true)
+/* Uneven widths so the placeholder reads as text, not as a progress bar. */
+const SKELETON_WIDTHS = ['70%', '45%', '60%', '75%', '50%', '40%']
+
+// Background refresh over content already on screen; see load({ silent }).
+const refreshing = ref(false)
+const loaded = ref(false)
+// Either kind of in-flight load, for the Refresh control.
+const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const busyId = ref(null)
 const banner = ref('')
@@ -516,13 +555,6 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-/**
- * Ang mga aksyon kay gisunod gyud sa state rules sa server, mao nga wala gyud
- * ta mo-presenta og button nga mo-409 ra puhon.
- *
- * Ang Approve ug Reject na lang ang nahibilin, ug para ra sila sa mga legacy
- * nga entry — ang bag-o nga facility kay `approved` na dayon pag-himo.
- */
 function actionsFor(status) {
   if (status === 'pending_approval') {
     return [
@@ -531,9 +563,6 @@ function actionsFor(status) {
     ]
   }
 
-  // Walay aksyon sa usa ka active nga facility. Ang suspend ug reinstate kay
-  // gitangtang na — walay endpoint sa server nga mo-usab sa status sa usa ka
-  // facility nga nahuman na og onboarding.
   return []
 }
 
@@ -602,8 +631,6 @@ async function runAction(row, kind) {
   } catch (error) {
     showBanner(messageFor(error), 'error')
 
-    // Ang 409 nagpasabot nga nausab ang state samtang nagtan-aw ta, so
-    // i-refresh nato ang lista aron sakto ang gipakita nga mga buton.
     if (error?.status === 409) {
       await load()
     }
@@ -619,8 +646,6 @@ function callEndpoint(id, kind, reason = '') {
   throw new Error(`Unknown action: ${kind}`)
 }
 
-// --- Create facility --------------------------------------------------------
-
 function openCreate() {
   Object.assign(form, emptyForm())
   Object.assign(create, { open: true, submitting: false, error: '', errors: {} })
@@ -631,24 +656,12 @@ function closeCreate() {
   create.open = false
 }
 
-/**
- * Ang server nagpadala og nested nga key para sa primary account, pananglitan
- * `primary_account.email`. Gikuha nato ang una nga mensahe kada field aron
- * mabutang sa tapad sa mismong input.
- */
 function errorFor(field) {
   const messages = create.errors?.[field]
 
   return Array.isArray(messages) ? messages[0] : messages || ''
 }
 
-/**
- * Ang mga blangko nga optional field kay wala gyud ipadala.
- *
- * Ang `slots_start_at` kay `nullable|date_format:H:i` sa server, ug ang empty
- * string dili mo-agi niana — mao nga ang wala napuno nga porma mo-422 unta bisan
- * walay sayop ang admin.
- */
 function buildPayload() {
   const payload = {
     facility_type: form.facility_type,
@@ -696,8 +709,6 @@ async function submitCreate() {
     create.open = false
     showBanner(response?.message || 'Facility created.', 'success')
 
-    // Balik sa unang page aron makita dayon ang bag-o nga facility, nga
-    // gi-order sa server pinaagi sa created_at descending.
     page.value = 1
     await load()
   } catch (error) {
@@ -708,11 +719,6 @@ async function submitCreate() {
   }
 }
 
-/**
- * Gi-attach na sa BaseService ang `code` ug ang 422 `errors` bag, so ipakita
- * nato ang tinuod nga mensahe sa server — labi na ang self_approval_forbidden
- * ug ang mga facility_not_* nga 409.
- */
 function messageFor(error) {
   const fieldErrors = error?.errors
 
@@ -728,14 +734,6 @@ function showBanner(message, kind) {
   bannerKind.value = kind
 }
 
-/**
- * Ang `logout()` mao nay mo-revoke sa token sa server, mo-clear sa localStorage,
- * ug mo-redirect — walay laing lakang nga kinahanglan dinhi.
- */
-async function handleLogout() {
-  loggingOut.value = true
-  await logout('/auth/admin/login')
-}
 
 function changeType(type) {
   if (activeType.value === type) return
@@ -749,16 +747,22 @@ function goToPage(next) {
   page.value = next
 }
 
-// Ang Supabase kay mahinay usahay (4-17s). Kung mag-ilis-ilis og filter ang
-// user, posible nga ang daan nga response mo-abot HUMAN sa bag-o — so mo-render
-// ta og sayop nga data. Kini nga counter mao ang mo-piho nga ang katapusang
-// request ra ang makasulat sa state.
 let latestRequest = 0
 
-async function load() {
+/*
+ * `silent` keeps the cached page on screen while it refreshes.
+ *
+ * Without it the return trip flips `loading` on, the template swaps to
+ * skeletons, and the keepalive cache buys nothing visible — the page still
+ * appears to reload every time. A first visit and a filter change do want the
+ * loading state; a background refresh over content already on screen does not.
+ */
+async function load({ silent = false } = {}) {
   const requestId = ++latestRequest
 
-  loading.value = true
+  if (silent) refreshing.value = true
+  else loading.value = true
+
   loadError.value = ''
 
   try {
@@ -779,17 +783,15 @@ async function load() {
     rows.value = []
     loadError.value = messageFor(error)
   } finally {
-    // Ang stale nga request dili mo-clear sa loading flag, kay naa pay bag-o
-    // nga nagdagan.
     if (requestId === latestRequest) {
       loading.value = false
+      refreshing.value = false
+      loaded.value = true
     }
   }
 }
 
 watch([activeType, activeStatus, page], (next, previous) => {
-  // Ang pag-ilis sa status filter kay mobalik sa unang page; kon dili, posible
-  // nga mag-landing ta sa page 4 sa lista nga tulo ra ka page.
   if (next[1] !== previous[1] && page.value !== 1) {
     page.value = 1
     return
@@ -798,25 +800,43 @@ watch([activeType, activeStatus, page], (next, previous) => {
   load()
 })
 
-onMounted(async () => {
-  // Ang role check kay sa `portal` global middleware na, nga modagan sa dili pa
-  // mo-render ang page — walay dili-admin nga makakita niini nga shell.
-  //
-  // Ang `role:admin` sa server gihapon ang tinuod nga gate.
+/*
+ * onActivated, not onMounted: this page is keepalive'd, so the instance is
+ * cached rather than destroyed when you navigate away and onMounted would run
+ * exactly once per session. onActivated fires on the first mount *and* on every
+ * return, which is what keeps a queue two admins are both working from going
+ * stale behind the cached markup.
+ */
+/*
+ * Two hooks on purpose.
+ *
+ * onMounted always fires and owns the first load, so the page can never sit on
+ * its initial `loading = true` if KeepAlive is not in play for any reason.
+ * onActivated fires only on a *return* to the cached instance — guarded on
+ * `loaded` so the first mount, where Vue fires both, does not fetch twice.
+ */
+async function boot() {
   if (!user.value) {
     await fetchUser()
   }
 
-  await load()
+  await load({ silent: loaded.value })
+}
+
+onMounted(boot)
+onActivated(() => {
+  if (loaded.value) boot()
 })
 </script>
 
 <style scoped>
 .admin-page {
-  min-height: 100vh;
-  padding: 32px 24px 48px;
-  background: #f7f9fc;
-  color: #1e293b;
+  padding: 24px 32px 40px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.admin-page {
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .page-header {
@@ -832,12 +852,13 @@ onMounted(async () => {
   margin: 0;
   font-size: 24px;
   font-weight: 800;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .subtitle {
   margin: 6px 0 0;
   font-size: 14px;
-  color: #64748b;
+  color: v-bind('TEXT_SECONDARY');
 }
 
 .tabs {
@@ -854,18 +875,23 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border: 1px solid #e5eaf0;
+  border: 1px solid v-bind('BORDER_COLOR');
   border-radius: 999px;
-  background: #ffffff;
-  color: #475569;
+  background: v-bind('BG_SECONDARY');
+  color: v-bind('TEXT_SECONDARY');
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  border-color: v-bind('ACCENT_PRIMARY');
 }
 
 .tab.active {
-  background: #1565c0;
-  border-color: #1565c0;
+  background: v-bind('ACCENT_PRIMARY');
+  border-color: v-bind('ACCENT_PRIMARY');
   color: #ffffff;
 }
 
@@ -879,13 +905,19 @@ onMounted(async () => {
 .status-filter {
   margin-left: auto;
   padding: 8px 12px;
-  border: 1px solid #e5eaf0;
+  border: 1px solid v-bind('BORDER_COLOR');
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: v-bind('BG_SECONDARY');
+  color: v-bind('TEXT_SECONDARY');
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.status-filter:focus {
+  outline: none;
+  border-color: v-bind('ACCENT_PRIMARY');
 }
 
 .header-actions {
@@ -896,11 +928,6 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-.signed-in-as {
-  font-size: 13px;
-  color: #64748b;
-  white-space: nowrap;
-}
 
 .banner {
   max-width: 1180px;
@@ -909,19 +936,44 @@ onMounted(async () => {
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.banner-success { background: #F1F7F1; color: #2E7D32; }
-.banner-error { background: #FDF1F1; color: #C62828; }
-.banner-info { background: #EFF4FB; color: #1565C0; }
+.banner-success { 
+  background: #F1F7F1; 
+  color: #2E7D32; 
+}
+
+.banner-error { 
+  background: #FDF1F1; 
+  color: #C62828; 
+}
+
+.banner-info { 
+  background: #EFF4FB; 
+  color: #1565C0; 
+}
+
+.admin-page.dark .banner-success {
+  background: #1B3B1B;
+}
+
+.admin-page.dark .banner-error {
+  background: #3B1B1B;
+}
+
+.admin-page.dark .banner-info {
+  background: #1B2E3B;
+}
 
 .table-wrap {
   max-width: 1180px;
   margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #eef1f5;
+  background: v-bind('BG_SECONDARY');
+  border: 1px solid v-bind('BORDER_COLOR');
   border-radius: 12px;
   overflow-x: auto;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .facilities {
@@ -937,29 +989,37 @@ onMounted(async () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
-  border-bottom: 1px solid #eef1f5;
+  color: v-bind('TEXT_SECONDARY');
+  border-bottom: 1px solid v-bind('BORDER_SUBTLE');
   white-space: nowrap;
+  background: v-bind('BG_TERTIARY');
 }
 
 .facilities td {
   padding: 14px 16px;
-  border-bottom: 1px solid #f4f6f9;
+  border-bottom: 1px solid v-bind('BORDER_SUBTLE');
   vertical-align: top;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .facilities tbody tr:last-child td {
   border-bottom: none;
 }
 
+.facilities tbody tr:hover {
+  background: v-bind('BG_TERTIARY');
+  transition: background-color 0.15s ease;
+}
+
 .facility-name {
   display: block;
   font-weight: 600;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .muted {
   display: block;
-  color: #94a3b8;
+  color: v-bind('TEXT_MUTED');
   font-size: 12px;
   margin-top: 2px;
 }
@@ -969,7 +1029,7 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #b45309;
+  color: v-bind('ACCENT_WARNING');
 }
 
 .reason {
@@ -980,6 +1040,7 @@ onMounted(async () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   white-space: nowrap;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .pill,
@@ -996,8 +1057,15 @@ onMounted(async () => {
 .pill-approved { background: #ecfdf5; color: #047857; }
 .pill-rejected { background: #fef2f2; color: #b91c1c; }
 
+.admin-page.dark .pill-pending_approval { background: #3B2415; color: #FCA060; }
+.admin-page.dark .pill-approved { background: #154E31; color: #6EE7B7; }
+.admin-page.dark .pill-rejected { background: #3B1515; color: #FCA5A5; }
+
 .type-blood_center { background: #eff6ff; color: #1d4ed8; }
 .type-blood_bank { background: #f5f3ff; color: #6d28d9; }
+
+.admin-page.dark .type-blood_center { background: #1B2E42; color: #60A5FA; }
+.admin-page.dark .type-blood_bank { background: #2E1F42; color: #A78BFA; }
 
 .actions-col {
   text-align: right;
@@ -1019,6 +1087,12 @@ onMounted(async () => {
   color: #ffffff;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn:disabled {
@@ -1027,7 +1101,10 @@ onMounted(async () => {
 }
 
 .action-btn.approve { background: #2e7d32; }
+.action-btn.approve:hover:not(:disabled) { background: #1b5e20; }
+
 .action-btn.reject { background: #d32f2f; }
+.action-btn.reject:hover:not(:disabled) { background: #b71c1c; }
 
 .primary-btn {
   display: inline-flex;
@@ -1036,16 +1113,18 @@ onMounted(async () => {
   padding: 8px 16px;
   border: none;
   border-radius: 8px;
-  background: #1565c0;
+  background: v-bind('ACCENT_PRIMARY');
   color: #ffffff;
   font-family: inherit;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .primary-btn:hover:not(:disabled) {
   background: #12539f;
+  transform: translateY(-1px);
 }
 
 .primary-btn:disabled {
@@ -1058,13 +1137,19 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: 1px solid #e5eaf0;
+  border: 1px solid v-bind('BORDER_COLOR');
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: v-bind('BG_SECONDARY');
+  color: v-bind('TEXT_SECONDARY');
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ghost-btn:hover:not(:disabled) {
+  border-color: v-bind('ACCENT_PRIMARY');
+  color: v-bind('ACCENT_PRIMARY');
 }
 
 .ghost-btn:disabled {
@@ -1075,11 +1160,11 @@ onMounted(async () => {
 .state {
   padding: 32px 16px;
   text-align: center;
-  color: #94a3b8;
+  color: v-bind('TEXT_MUTED');
 }
 
 .state-error {
-  color: #b91c1c;
+  color: v-bind('ACCENT_DANGER');
   font-size: 14px;
 }
 
@@ -1094,7 +1179,7 @@ onMounted(async () => {
 
 .page-label {
   font-size: 13px;
-  color: #64748b;
+  color: v-bind('TEXT_SECONDARY');
 }
 
 .modal-overlay {
@@ -1105,15 +1190,22 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.45);
+  background: v-bind('isDark ? "rgba(15,23,42,0.65)" : "rgba(15,23,42,0.45)"');
+  transition: background 0.2s ease;
 }
 
 .modal {
   width: 100%;
   max-width: 460px;
-  background: #ffffff;
+  background: v-bind('BG_SECONDARY');
   border-radius: 14px;
   padding: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s ease;
+}
+
+.admin-page.dark .modal {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
 .modal-wide {
@@ -1126,6 +1218,7 @@ onMounted(async () => {
   margin: 0 0 6px;
   font-size: 18px;
   font-weight: 700;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .section-heading {
@@ -1134,13 +1227,13 @@ onMounted(async () => {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #64748b;
+  color: v-bind('TEXT_SECONDARY');
 }
 
 .modal-lede {
   margin: 0 0 18px;
   font-size: 13px;
-  color: #64748b;
+  color: v-bind('TEXT_SECONDARY');
   line-height: 1.5;
 }
 
@@ -1148,7 +1241,7 @@ onMounted(async () => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: v-bind('TEXT_PRIMARY');
   margin-bottom: 6px;
 }
 
@@ -1157,19 +1250,22 @@ onMounted(async () => {
 .modal textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #e5eaf0;
+  border: 1px solid v-bind('BORDER_COLOR');
   border-radius: 8px;
   font-family: inherit;
   font-size: 14px;
-  color: #1e293b;
+  color: v-bind('TEXT_PRIMARY');
+  background: v-bind('BG_SECONDARY');
   resize: vertical;
+  transition: all 0.2s ease;
 }
 
 .modal input:focus,
 .modal select:focus,
 .modal textarea:focus {
   outline: none;
-  border-color: #1565c0;
+  border-color: v-bind('ACCENT_PRIMARY');
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
 }
 
 .type-choice {
@@ -1186,7 +1282,7 @@ onMounted(async () => {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .type-option {
@@ -1195,14 +1291,20 @@ onMounted(async () => {
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
-  border: 2px solid #e5eaf0;
+  border: 2px solid v-bind('BORDER_COLOR');
   border-radius: 10px;
   cursor: pointer;
+  background: var-bind('BG_SECONDARY');
+  transition: all 0.2s ease;
+}
+
+.type-option:hover {
+  border-color: v-bind('ACCENT_PRIMARY');
 }
 
 .type-option.selected {
-  border-color: #1565c0;
-  background: #f4f8fd;
+  border-color: v-bind('ACCENT_PRIMARY');
+  background: v-bind('isDark ? "#1E3A4F" : "#f4f8fd"');
 }
 
 .type-option input {
@@ -1213,7 +1315,7 @@ onMounted(async () => {
 .type-option strong {
   display: block;
   font-size: 14px;
-  color: #1e293b;
+  color: v-bind('TEXT_PRIMARY');
 }
 
 .type-option small {
@@ -1221,7 +1323,7 @@ onMounted(async () => {
   margin-top: 2px;
   font-size: 12px;
   font-weight: 500;
-  color: #64748b;
+  color: v-bind('TEXT_SECONDARY');
   line-height: 1.4;
 }
 
@@ -1239,14 +1341,14 @@ onMounted(async () => {
   margin: 6px 0 0;
   font-size: 12px;
   font-weight: 600;
-  color: #b91c1c;
+  color: v-bind('ACCENT_DANGER');
 }
 
 .counter {
   display: block;
   text-align: right;
   font-size: 11px;
-  color: #94a3b8;
+  color: v-bind('TEXT_MUTED');
   margin-top: 4px;
 }
 
@@ -1258,9 +1360,49 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .admin-page {
+    padding: 24px 16px 32px;
+  }
+
   .type-choice,
   .field-grid {
     grid-template-columns: 1fr;
   }
+
+  .modal {
+    max-width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+}
+/* Shimmer placeholder, same treatment as the dashboard and administrators
+   pages so a loading table looks like the rest of the console. The two stops
+   are the shared --rb-skeleton tokens, which is what carries the dark variant
+   now — the `.admin-page.dark .skeleton` rule this replaces was the one place
+   in the console that hung a skeleton's dark colours off this page's own
+   manually-applied `dark` class instead of the document's. */
+.skeleton-row td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 </style>

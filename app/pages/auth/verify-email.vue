@@ -93,6 +93,12 @@ const resending = ref(false)
 const resendMessage = ref('')
 const resendFailed = ref(false)
 
+const DONOR_LOGIN = '/auth/donor/login'
+
+// Gi-ilis kung mo-klik siya sa link sa wala pa mahuman ang paglangan, ug gi-clear
+// sa unmount para dili mo-navigate ang usa ka page nga wala na.
+let redirectTimer = null
+
 const stateIcon = computed(() => ({
   verifying: 'loader',
   success: 'circle-check-big',
@@ -199,11 +205,33 @@ onMounted(async () => {
     // 200 kung bag-o pa ma-verify, 204 kung na-verify na sauna.
     await authService.verifyEmail(rawQuery)
     state.value = 'success'
+
+    // Dinhi ra gyud gisulat ang marker, ug human ra mo-tubag og 200/204 ang
+    // API — ang tab nga nagpabilin sa "Check your email" mao ang maminaw.
+    markEmailVerified()
+
+    // Walay session: bag-ong rehistro ni, ug ang login na ang sunod nga lakang.
+    // Ang redirect kay gi-gate sa confirmed nga tubag sa server sa ibabaw —
+    // dili sa timer. Ang paglangan kay para lang makita niya ang "Email
+    // verified" una mo-balhin, ug ma-laktawan pinaagi sa link sa ubos.
+    //
+    // Ang marker kay wala gi-clear dinhi. Ang mo-konsumo niini ang mo-clear, kay
+    // basin nag-reload pa ang pikas nga tab ug mapalagpot ang signal sa wala pa
+    // niya kini mabasa. Dili pod siya makapasipala kung magpabilin: ang
+    // register page mo-konsulta ra niini kung naay pending nga registration, ug
+    // ang matag bag-ong sign-up mo-clear sa daan.
+    if (!hasSession.value) {
+      redirectTimer = window.setTimeout(() => navigateTo(DONOR_LOGIN), 1500)
+    }
   } catch (err) {
     console.error('Failed to verify email:', err)
     state.value = 'error'
     errorMessage.value = describeFailure(err)
   }
+})
+
+onBeforeUnmount(() => {
+  if (redirectTimer) window.clearTimeout(redirectTimer)
 })
 </script>
 

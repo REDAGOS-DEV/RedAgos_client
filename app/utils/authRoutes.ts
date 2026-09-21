@@ -72,7 +72,10 @@ export function portalRoleFor(path: string): RoleName | null {
 export function portalHomeFor(user: Pick<AppUser, 'roles'> | null | undefined): string {
   const roles = user?.roles ?? []
 
-  if (roles.includes('admin')) return '/admin/facilities'
+  // The dashboard rather than Facility Management: it is the only admin page
+  // every privilege set can open. A Verification Officer sent to /admin/facilities
+  // would land on a 403 the moment it loaded.
+  if (roles.includes('admin')) return '/admin/dashboard'
   if (roles.includes('donor')) return '/donor/dashboard'
   if (roles.includes('blood_center')) return departmentHome(user)
   // The hospital portal is closed until it has a backend; `hospital-portal`

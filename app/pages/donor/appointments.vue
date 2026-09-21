@@ -281,7 +281,10 @@ Output:
           <AssetIcon name="check" :size="22" class="confirm-icon__svg" />
         </div>
         <h3 class="modal-title modal-title--center">{{ wasRescheduled ? "Appointment Updated!" : "Appointment Confirmed!" }}</h3>
-        <p class="modal-sub">Your appointment has been booked. Remember to bring your QR code when you arrive.</p>
+        <p class="modal-sub">
+          {{ wasRescheduled ? "Your appointment has been updated." : "Your appointment has been booked, and the details are on their way to your email." }}
+          Remember to bring your QR code when you arrive.
+        </p>
         <div class="summary-list">
           <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
           <div class="summary-row"><span>Date &amp; Time</span><span>{{ confirmDateTimeLabel }}</span></div>

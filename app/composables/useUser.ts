@@ -50,6 +50,11 @@ export function useUser() {
         department: payload.department ?? null,
         department_label: payload.department_label ?? null,
         is_supervisor: Boolean(payload.is_supervisor),
+        // Admin privileges. Sama sa department permissions sa ibabaw: ang
+        // server gihapon ang gate, presentation ra ni nga kopya para sa nav.
+        is_super_admin: Boolean(payload.is_super_admin),
+        admin_privileges: Array.isArray(payload.admin_privileges) ? payload.admin_privileges : [],
+        admin_role: payload.admin_role ?? null,
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
         blood_type: payload.blood_type ?? null,
       }

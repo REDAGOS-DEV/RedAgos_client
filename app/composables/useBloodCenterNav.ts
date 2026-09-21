@@ -85,6 +85,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     label: 'Blood Management',
     items: [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
+      // inventory.create rather than inventory.view: Collection and Laboratory
+      // both read stock, but only Inventory books it in.
+      { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests' },
       { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.process', keywords: 'allocate release dispatch' },
     ],
@@ -118,6 +121,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'System',
     items: [
+      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'center.configure', keywords: 'shelf life expiry price component settings' },
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
       // Help & Support removed: /blood-center/support has no page, so the link
       // 404'd. Restore it together with the page, not before.

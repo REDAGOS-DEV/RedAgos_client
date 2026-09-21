@@ -101,7 +101,12 @@ describe('portalRoleFor', () => {
 
 describe('portalHomeFor', () => {
   it('sends each role to its own portal', () => {
-    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/facilities')
+    // The admin dashboard, not Facility Management. Admin accounts carry
+    // privileges now, and /admin/facilities is guarded by
+    // `can:admin.facility.manage` — a Verification Officer sent there would
+    // land on a 403. The dashboard is the one admin page every privilege set
+    // can open, because it renders only the modules the account holds.
+    expect(portalHomeFor({ roles: ['admin'] } as any)).toBe('/admin/dashboard')
     expect(portalHomeFor({ roles: ['donor'] } as any)).toBe('/donor/dashboard')
     expect(portalHomeFor({ roles: ['blood_bank'] } as any)).toBe('/hospital/dashboard')
   })

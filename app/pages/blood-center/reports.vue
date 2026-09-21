@@ -1148,6 +1148,14 @@ onMounted(async () => {
     --rf-text-secondary: #64748b;
     --rf-primary: #1565c0;
     --rf-primary-hover: #0d47a1;
+    /*
+     * The one surface that carries white text. In dark mode --rf-primary
+     * lifts to a pale blue so chart strokes, links and tinted icons can be
+     * seen; white on that pale blue is 2.8:1, which is what the filled
+     * buttons and the active tab were rendering at. The fill stays deep.
+     */
+    --rf-primary-fill: #1565c0;
+    --rf-primary-fill-hover: #0d47a1;
     --rf-primary-soft: #e3f2fd;
     --rf-success: #2e7d32;
     --rf-success-soft: #e8f5e9;
@@ -1171,6 +1179,8 @@ onMounted(async () => {
     --rf-text-secondary: #94a3b8;
     --rf-primary: #4f9cf9;
     --rf-primary-hover: #7ab8ff;
+    --rf-primary-fill: #1565c0;
+    --rf-primary-fill-hover: #1976d2;
     --rf-primary-soft: rgba(79, 156, 249, 0.14);
     --rf-success: #4ade80;
     --rf-success-soft: rgba(74, 222, 128, 0.12);
@@ -1187,7 +1197,7 @@ onMounted(async () => {
 }
 
 .reports-page {
-    max-width: 1200px;
+    max-width: 1152px;
     background: var(--rf-bg);
     margin: 0 auto;
     padding: 24px 32px 40px;
@@ -1297,7 +1307,7 @@ onMounted(async () => {
     font-size: 13px;
     font-weight: 700;
     color: #fff;
-    background: var(--rf-primary);
+    background: var(--rf-primary-fill);
     border: none;
     cursor: pointer;
     transition: background-color 0.15s ease;
@@ -1305,7 +1315,7 @@ onMounted(async () => {
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: var(--rf-primary-hover);
+    background: var(--rf-primary-fill-hover);
 }
 
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
@@ -1320,10 +1330,10 @@ onMounted(async () => {
     border: none;
     cursor: pointer;
     white-space: nowrap;
-    transition: opacity 0.15s ease;
+    transition: background-color 0.15s ease;
 }
 
-.btn-outline-blue:hover { opacity: 0.85; }
+.btn-outline-blue:hover { background: color-mix(in srgb, var(--rf-primary) 24%, transparent); }
 
 .btn-link {
     background: none;
@@ -1339,14 +1349,16 @@ onMounted(async () => {
     border-radius: 10px;
     font-size: 13px;
     font-weight: 700;
-    background: var(--rf-border);
+    background: var(--rf-card);
     color: var(--rf-text);
-    border: none;
+    border: 1px solid var(--rf-border);
     cursor: pointer;
-    transition: opacity 0.15s ease;
+    /* Was `opacity: .85` on hover, which faded the label along with the fill
+       and read as the button dimming rather than responding. */
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.btn-cancel:hover { opacity: 0.85; }
+.btn-cancel:hover { background: var(--rf-bg); }
 
 .error-banner {
     background: var(--rf-danger-soft);
@@ -1381,9 +1393,12 @@ onMounted(async () => {
 }
 
 /* Stat cards */
+/* auto-fit, not a fixed count: the content column now changes width
+   when the rail expands, so the grid has to answer to its container
+   rather than to a viewport breakpoint that no longer describes it. */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 16px;
 }
 
@@ -1472,12 +1487,22 @@ onMounted(async () => {
     overflow: hidden;
 }
 
+/*
+ * Left-aligned, like every other tab strip in the portal. These were centred
+ * while the .tab-content under them insets 28px, so the tab row floated free
+ * of its own panel.
+ *
+ * These are pills, not underlined text, so the gutter aligns the pill's edge
+ * rather than its label — the filled shape is what the eye reads as the edge.
+ */
 .tabs {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 6px;
-    padding: 16px 32px;
+    padding: 16px 28px;
     border-bottom: 1px solid var(--rf-border);
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 .tab {
@@ -1488,6 +1513,7 @@ onMounted(async () => {
     font-weight: 700;
     color: var(--rf-text-secondary);
     cursor: pointer;
+    white-space: nowrap;
     border-radius: 999px;
     transition: color 0.15s ease, background 0.15s ease;
 }
@@ -1496,10 +1522,12 @@ onMounted(async () => {
 
 .tab--active {
     color: #fff;
-    background: var(--rf-primary);
+    background: var(--rf-primary-fill);
 }
 
-.tab--active:hover { color: #fff; background: var(--rf-primary-hover); }
+.tab--active:hover { color: #fff; background: var(--rf-primary-fill-hover); }
+
+.tab:focus-visible { outline: 2px solid var(--rf-primary); outline-offset: 2px; }
 
 .tab-content { padding: 28px; }
 
@@ -1560,7 +1588,14 @@ onMounted(async () => {
 
 .forecast-toolbar .section-label { margin: 0; }
 
-.form-input {
+/*
+ * Anchored on the page root on purpose. Several other portals ship
+ * `:global(.dark .form-input) { … }` — an unscoped rule at (0,2,0) that ties
+ * with a plain scoped `.form-input[data-v-...]`, so which one won came down to
+ * chunk load order. The page-root ancestor takes these to (0,3,0) and settles
+ * it, without this page having to hardcode a dark palette of its own.
+ */
+.reports-page .form-input {
     border: 1px solid var(--rf-border);
     border-radius: 10px;
     padding: 9px 12px;
@@ -1571,9 +1606,27 @@ onMounted(async () => {
     transition: border-color 0.15s ease;
 }
 
-.form-input:focus {
+.reports-page .form-input:focus {
     outline: none;
     border-color: var(--rf-primary);
+}
+
+/*
+ * This page drew selects two different ways: the two header filters wrap a
+ * select in .select-wrap with an AssetIcon chevron, while the six inside the
+ * panels were bare `select.form-input` showing the native arrow. Same control,
+ * two looks, on one screen. These now carry the same caret the dashboard,
+ * inventory and appointments selects use. #94a3b8 reads on both surfaces, so
+ * one rule covers both themes.
+ */
+.reports-page select.form-input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    background: var(--rf-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background-size: 10px 6px;
+    padding-right: 32px;
 }
 
 .filter-select { cursor: pointer; width: 180px; }
@@ -2202,7 +2255,6 @@ onMounted(async () => {
 
 /* Responsive */
 @media (max-width: 900px) {
-    .stats-row { grid-template-columns: repeat(2, 1fr); }
     .report-generator { grid-template-columns: 1fr 1fr; }
     .quick-controls__actions { margin-left: 0; width: 100%; }
 }
@@ -2212,7 +2264,6 @@ onMounted(async () => {
     .header-row { flex-direction: column; align-items: stretch; }
     .header-actions { flex-direction: column; align-items: stretch; }
     .select-wrap { width: 100%; }
-    .stats-row { grid-template-columns: 1fr; }
     .quick-controls { flex-direction: column; align-items: stretch; }
     .breakdown-row, .reports-row { grid-template-columns: 1fr; gap: 4px; }
     .report-generator { grid-template-columns: 1fr; }

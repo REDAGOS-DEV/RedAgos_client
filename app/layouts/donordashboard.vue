@@ -142,9 +142,9 @@
                   unsubmitted/rejected -> pulsing amber dot.
                 -->
                 <div v-if="identityStatus === 'verified'"
-                  class="absolute -top-0.5 -right-0.5 bg-white dark:bg-slate-900 rounded-full p-0.5 shadow z-10"
+                  class="id-verified-badge absolute -top-1 -right-1 rounded-full p-0.5 z-10"
                   title="ID Verified">
-                  <AssetIcon name="badge-check" :size="12" class="text-[#0052FF]" />
+                  <AssetIcon name="badge-check" :size="14" class="text-[#0052FF] dark:text-white" />
                 </div>
 
                 <span v-else-if="identityStatus === 'pending'"
@@ -446,6 +446,16 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+/*
+ * badge-check is an outline glyph on a 24 viewBox. Rendered at 14px its
+ * authored stroke-width of 2 scales down to ~1.2px, which reads as a hairline
+ * on the avatar. A CSS stroke-width overrides the presentation attribute and
+ * gives the mark enough weight to actually be seen at this size.
+ */
+.id-verified-badge :deep(svg) {
+  stroke-width: 3;
+}
+
 .popup-enter-active,
 .popup-leave-active {
   transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
