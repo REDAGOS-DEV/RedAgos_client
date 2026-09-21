@@ -27,8 +27,8 @@
       <div class="stats-grid fade-in" style="--delay:60ms">
         <div class="stat-card">
           <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#F59E0B14">
-              <AssetIcon name="clock" :size="18" style="color:#F59E0B" />
+            <div class="stat-card__icon" style="background:#F57C0014">
+              <AssetIcon name="clock" :size="18" style="color:#F57C00" />
             </div>
             <span class="stat-card__title">Pending Requests</span>
           </div>
@@ -397,7 +397,7 @@ const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelets', 'Cryoprecipitate']
 
 const statusMap = {
-  pending: { label: 'Pending', bg: '#F59E0B14', color: '#F59E0B' },
+  pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
   approved: { label: 'Approved', bg: '#2E7D3214', color: '#2E7D32' },
   processing: { label: 'Processing', bg: '#1565C014', color: '#1565C0' },
   ready: { label: 'Ready for Pickup', bg: '#7C3AED14', color: '#7C3AED' },
@@ -408,7 +408,7 @@ const statusMap = {
 
 const priorityMap = {
   normal: { label: 'Normal', bg: '#1565C014', color: '#1565C0' },
-  urgent: { label: 'Urgent', bg: '#F59E0B14', color: '#F59E0B' },
+  urgent: { label: 'Urgent', bg: '#F57C0014', color: '#F57C00' },
   emergency: { label: 'Emergency', bg: '#D32F2F14', color: '#D32F2F' },
 }
 
@@ -727,19 +727,19 @@ onUnmounted(() => {
 
 <style scoped>
 .requests-page {
-  --primary: #1565c0;
+  --primary: var(--rb-primary, #1565c0);
   --primary-hover: #0d47a1;
   --bg: #f7f9fc;
   --surface: #ffffff;
   --border: #e5eaf0;
   --border-dark: #2a3447;
   --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --danger: #d32f2f;
-  --warning: #f59e0b;
-  --success: #2e7d32;
-  --purple: #7c3aed;
+  --text-secondary: var(--rb-text-secondary, #64748b);
+  --text-muted: var(--rb-text-muted, #94a3b8);
+  --danger: var(--rb-accent, #d32f2f);
+  --warning: var(--rb-warning, #F57C00);
+  --success: var(--rb-success, #2e7d32);
+  --purple: var(--rb-purple, #7c3aed);
   font-family: var(--rb-font-sans);
   max-width: 1400px;
   background: var(--bg);
