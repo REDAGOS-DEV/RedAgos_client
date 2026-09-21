@@ -38,6 +38,15 @@
         ],
         "createdAt": "2026-09-15T11:46:22.207Z",
         "reason": "padding-left IS the requested reflow: user asked that the expanded sidebar not overlay content and that the main area adjust its available width. A transform gives the overlay behaviour they explicitly ruled out."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/pages/blood-center/drives.vue"
+        ],
+        "createdAt": "2026-09-21T02:58:27.259Z",
+        "reason": "Claude: progress-bar width animation is the literal domain-appropriate use and is the house pattern in 9 files (donor/appointments.vue, blood-center/inventory.vue, hospital/dashboard.vue, ...); pre-existing code untouched by this change"
       }
     ]
   }

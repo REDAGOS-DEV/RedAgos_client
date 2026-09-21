@@ -4,6 +4,7 @@ import type {
   BloodRequest,
   BloodRequestFilters,
   CreateBloodRequestPayload,
+  RequestReferenceData,
 } from '~/types/bloodRequest'
 
 /**
@@ -44,6 +45,17 @@ class HospitalService extends BaseService {
     return this.request<AvailabilityResult>('/hospital/availability', 'GET', params)
   }
 
+  /**
+   * The blood types, components and indication codes a request form needs.
+   *
+   * Served rather than hard-coded: the indication codes are the criteria a
+   * physician certifies against, and a second copy in the client is a second
+   * chance to offer a code the API would reject.
+   */
+  referenceData() {
+    return this.request<RequestReferenceData>('/hospital/reference-data')
+  }
+
   /** The facilities this blood bank may address a request to. */
   eligibleFacilities() {
     return this.request<{ facilities: Array<{ id: number; name: string; address: string | null }> }>(
@@ -66,6 +78,17 @@ class HospitalService extends BaseService {
 
   showRequest(id: number | string) {
     return this.request<{ request: BloodRequest }>(`/hospital/blood-requests/${id}`)
+  }
+
+  /**
+   * Download this request as the DOH Blood Request Form (Adult).
+   *
+   * Rendered server-side so the hospital and the fulfilling centre print the
+   * same document. requestBlob carries the bearer token, which a plain
+   * <a href> could not.
+   */
+  downloadRequestForm(id: number | string) {
+    return this.requestBlob(`/hospital/blood-requests/${id}/form`)
   }
 
   /** Track by the reference number printed on the paperwork. */

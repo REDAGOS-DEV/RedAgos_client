@@ -54,16 +54,24 @@
       </div>
 
       <!-- Drive list -->
-      <div v-if="drives.length" class="drive-list">
+      <div v-if="loadError" class="empty-state">
+        <AssetIcon name="circle-alert" :size="40" style="color: var(--accent)" />
+        <p>{{ loadError }}</p>
+        <button type="button" class="btn-primary btn-primary--sm" @click="loadDrives">Try again</button>
+      </div>
+
+      <div v-else-if="drives.length" class="drive-list">
         <div v-for="drive in drives" :key="drive.id" class="drive-card">
           <div class="drive-card__top">
             <div>
-              <p class="drive-card__title">{{ drive.facility_name }} · {{ drive.location }}</p>
+              <p class="drive-card__title">{{ drive.name }}</p>
               <p class="drive-card__meta">
-                {{ formatDateRange(drive.event_date, drive.start_time, drive.end_time) }} · Capacity {{ drive.capacity }}
+                {{ drive.location }} · {{ formatDateRange(drive.event_date, drive.start_time, drive.end_time) }}
+                · {{ drive.capacity ? `Capacity ${drive.capacity}` : 'No capacity limit' }}
               </p>
             </div>
-            <span class="status-badge" :class="`status-badge--${drive.status}`">{{ statusLabel(drive.status) }}</span>
+            <!-- Capitalized gikan sa server ('Open'), lowercase ang CSS class. -->
+            <span class="status-badge" :class="`status-badge--${String(drive.status).toLowerCase()}`">{{ drive.status }}</span>
           </div>
 
           <div class="progress-track">
@@ -72,7 +80,7 @@
           </div>
           <div class="progress-meta">
             <span>{{ drive.registered_count }} registered donors</span>
-            <span>{{ drive.status === 'open' ? 'Registration open' : `${fillPercent(drive)}% full` }}</span>
+            <span>{{ drive.status === 'Open' ? 'Registration open' : `${fillPercent(drive)}% full` }}</span>
           </div>
 
           <template v-if="drive.donor_preview?.length">
@@ -126,25 +134,33 @@
           </div>
 
           <form class="modal-form" @submit.prevent="handleCreateDrive">
+            <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+
+            <div class="form-group">
+              <label class="form-label">Drive name</label>
+              <input v-model="driveForm.name" type="text" class="form-input" placeholder="e.g. UM Matina Bloodletting Drive" maxlength="150" required>
+              <p class="form-hint">Mao ni ang makita sa mga donor sa ilang booking screen.</p>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Venue</label>
-              <input v-model="driveForm.venue" type="text" class="form-input" placeholder="Venue name and address" required>
+              <input v-model="driveForm.location" type="text" class="form-input" placeholder="Venue name and address" maxlength="150" required>
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Date</label>
-                <input v-model="driveForm.date" type="date" class="form-input" required>
+                <input v-model="driveForm.event_date" type="date" class="form-input" :min="todayIso" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Capacity</label>
                 <div class="stepper">
-                  <input v-model.number="driveForm.capacity" type="number" min="1" class="form-input stepper__input" placeholder="Max Donors" required>
+                  <input v-model.number="driveForm.max_capacity" type="number" min="1" class="form-input stepper__input" placeholder="Max Donors" required>
                   <div class="stepper__controls">
-                    <button type="button" class="stepper__btn" @click="driveForm.capacity = (driveForm.capacity || 0) + 1">
+                    <button type="button" class="stepper__btn" @click="driveForm.max_capacity = (driveForm.max_capacity || 0) + 1">
                       <AssetIcon name="chevron-up" :size="10" />
                     </button>
-                    <button type="button" class="stepper__btn" @click="driveForm.capacity = Math.max(1, (driveForm.capacity || 1) - 1)">
+                    <button type="button" class="stepper__btn" @click="driveForm.max_capacity = Math.max(1, (driveForm.max_capacity || 1) - 1)">
                       <AssetIcon name="chevron-down" :size="10" />
                     </button>
                   </div>
@@ -188,7 +204,9 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -199,25 +217,36 @@ definePageMeta({
 const loading = ref(true)
 const submitting = ref(false)
 const showCreateModal = ref(false)
+const loadError = ref('')
 
+// Ang mga key dinhi kay pareho gyud sa mga column sa `mobile_events`, dili ang
+// UI labels ('venue', 'capacity'). Usa ra ka vocabulary sa tibuok wire, so
+// walay translation layer nga pwede mag-drift sa server.
 const driveForm = reactive({
-  venue: '',
-  date: '',
-  capacity: 50,
+  name: '',
+  location: '',
+  event_date: '',
+  max_capacity: 50,
   start_time: '08:00',
   end_time: '16:00',
   assigned_staff: '',
   announcement: '',
 })
 
+const formError = ref('')
+
+const todayIso = computed(() => new Date().toISOString().slice(0, 10))
+
 function resetDriveForm() {
-  driveForm.venue = ''
-  driveForm.date = ''
-  driveForm.capacity = 50
+  driveForm.name = ''
+  driveForm.location = ''
+  driveForm.event_date = ''
+  driveForm.max_capacity = 50
   driveForm.start_time = '08:00'
   driveForm.end_time = '16:00'
   driveForm.assigned_staff = ''
   driveForm.announcement = ''
+  formError.value = ''
 }
 
 function openCreateModal() {
@@ -231,25 +260,32 @@ function closeCreateModal() {
 
 async function handleCreateDrive() {
   submitting.value = true
+  formError.value = ''
   try {
-    // Backend contract: POST /api/bloodcenter/mobile-drives
-    // Body: { venue, date, capacity, start_time, end_time, assigned_staff, announcement }
-    // Response: the newly created drive record, same shape as items in `drives`
-    const newDrive = await $fetch('/api/bloodcenter/mobile-drives', {
-      method: 'POST',
-      body: { ...driveForm },
-    })
+    // POST /api/blood-center/drives — ang facility_id ug created_by kay gikan sa
+    // token, dili sa payload, so wala tay ipadala nga facility dinhi.
+    const newDrive = await bloodCenterService.createDrive({ ...driveForm })
     drives.value = [newDrive, ...drives.value]
     upcomingDrivesCount.value += 1
+    totalRegistered.value += newDrive.registered_count ?? 0
     closeCreateModal()
   } catch (err) {
-    // NOTE: wala pay live nga endpoint karon, so mag-fail ni nga call sa dev/UI stage.
-    // Wala tay ipakita nga fake/optimistic drive card aron dili mag-mismatch sa tinuod nga data
-    // sa higayon nga naka-connect na ang backend.
-    console.error('Failed to create mobile drive (expected while backend is not yet wired up):', err)
+    // Ang BaseService nagbutang sa message sa server sa `err.message` ug sa
+    // per-field nga 422 sa `err.errors`. Ipakita gyud — kaniadto console ra ni,
+    // mao nga ang "Save Changes" morag walay gibuhat.
+    formError.value = firstFieldError(err) || err?.message || 'Could not create this drive. Please try again.'
   } finally {
     submitting.value = false
   }
+}
+
+// Ang una nga field error mao ang labing tino nga rason sa 422; ang top-level
+// nga message sa Laravel kay generic ra ("The given data was invalid.").
+function firstFieldError(err) {
+  const errors = err?.errors
+  if (!errors) return ''
+  const first = Object.values(errors)[0]
+  return Array.isArray(first) ? first[0] : first
 }
 
 // All values start empty/zero — populated only from the API response.
@@ -258,10 +294,13 @@ const totalRegistered = ref(0)
 const unitsCollectedMonth = ref(0)
 const drives = ref([])
 // drive shape: {
-//   id, facility_name, location, event_date, start_time, end_time, capacity,
-//   registered_count, status: 'planning' | 'open' | 'upcoming' | 'completed',
+//   id, name, facility_name, location, event_date, start_time, end_time,
+//   capacity, registered_count, assigned_staff, announcement,
+//   status: 'Completed' | 'Full' | 'Open' | 'Upcoming',   // capitalized, server-computed
 //   donor_preview: [{ id, full_name, blood_type, registered_at, screening_status, attendance_status }]
 // }
+// Ang donor_preview kay kanunay [] sa karon — wala pay endpoint nga mo-list sa
+// mga donor kada drive, so ang block sa ibabaw dili gyud mo-render.
 
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
 
@@ -282,16 +321,6 @@ function initials(fullName) {
 function fillPercent(drive) {
   if (!drive.capacity) return 0
   return Math.round((drive.registered_count / drive.capacity) * 100)
-}
-
-function statusLabel(status) {
-  const map = {
-    planning: 'Planning',
-    open: 'Open',
-    upcoming: 'Upcoming',
-    completed: 'Completed',
-  }
-  return map[status] ?? status
 }
 
 function donorStatusLabel(status) {
@@ -321,29 +350,36 @@ function formatDateRange(eventDate, startTime, endTime) {
   const day = d.getDate()
   const monthShort = d.toLocaleDateString('en-US', { month: 'short' })
   const year = d.getFullYear()
-  const timeRange = startTime && endTime ? ` · ${startTime} – ${endTime}` : ''
+  const timeRange = startTime && endTime ? ` · ${hhmm(startTime)} – ${hhmm(endTime)}` : ''
   return `${monthShort} ${day}, ${year}${timeRange}`
 }
 
-onMounted(async () => {
+// Ang TIME nga column mo-balik ug 'HH:MM:SS'; ang seconds walay pulos dinhi.
+function hhmm(value) {
+  return String(value).slice(0, 5)
+}
+
+async function loadDrives() {
+  loadError.value = ''
   try {
-    // Backend contract: GET /api/bloodcenter/mobile-drives
-    // Response fields:
+    // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman na.
     // { upcoming_drives_count, total_registered, units_collected_month, drives: [...] }
-    const data = await $fetch('/api/bloodcenter/mobile-drives')
+    const data = await bloodCenterService.drives()
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
     totalRegistered.value = data.total_registered ?? 0
     unitsCollectedMonth.value = data.units_collected_month ?? 0
     drives.value = data.drives ?? []
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/bloodcenter/mobile-drives endpoint,
-    // so mag-fail gyud ni nga call. Nagpabilin ra sa default nga 0/empty values,
-    // so mag-display ug empty state ang UI imbes mag-crash o mag-display ug fake data.
-    console.error('Failed to load mobile drives (expected while backend is not yet wired up):', err)
+    // Ipakita ang kapakyasan imbes mo-render ug empty state: managlahi ang
+    // "walay drive pa" ug "wala ma-load ang mga drive".
+    loadError.value = err?.message || 'Could not load mobile drives. Please try again.'
+    drives.value = []
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadDrives)
 </script>
 
 <style scoped>
@@ -584,7 +620,7 @@ onMounted(async () => {
 
 .status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
 .status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
-.status-badge--planning { background: var(--rb-surface-hover); color: var(--text-secondary); }
+.status-badge--full { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--accent); }
 .status-badge--completed { background: var(--rb-surface-hover); color: var(--text-secondary); }
 
 /* Progress bar */
@@ -776,6 +812,23 @@ onMounted(async () => {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.form-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 8px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 /*

@@ -160,10 +160,21 @@ export const useBloodRequestDetails = (requestId) => {
     availabilityError.value = null
 
     try {
+      // A request asks per component now, and the availability endpoint
+      // answers for one. The first line is the one shown beside the request;
+      // `component` on the request itself no longer exists, and reading it
+      // here sent component_id: undefined and got a 422 back.
+      const firstLine = request.value.items?.[0]
+
+      if (!firstLine) {
+        bloodAvailability.value = []
+        return
+      }
+
       const response = await hospitalService.availability({
         blood_type_id: request.value.blood_type?.id,
-        component_id: request.value.component?.id,
-        quantity: request.value.outstanding_quantity || undefined,
+        component_id: firstLine.component?.id,
+        quantity: firstLine.outstanding_quantity || request.value.outstanding_quantity || undefined,
       })
       bloodAvailability.value = response?.facilities ?? []
     } catch (err) {

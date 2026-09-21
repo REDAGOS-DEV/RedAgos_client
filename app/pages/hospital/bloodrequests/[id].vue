@@ -133,30 +133,71 @@
           </section>
 
           <!-- SECTION 2: BLOOD DETAILS -->
+          <!--
+            Reads the request's own lines. The four fields this section used
+            before — blood_component, units_requested, compatibility and
+            special_requirements — have never existed on the API, so it showed
+            nothing but em dashes.
+          -->
           <section class="card">
             <h2 class="section-title">Blood Details</h2>
             <div class="info-grid">
               <div class="info-item">
+                <span class="info-label">Purpose</span>
+                <span class="info-value">{{ request.purpose_label || '—' }}</span>
+              </div>
+              <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value info-value--emphasis">{{ request.blood_type || '—' }}</span>
+                <span class="info-value info-value--emphasis">{{ request.blood_type?.code || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Blood Component</span>
-                <span class="info-value">{{ request.blood_component || '—' }}</span>
+                <span class="info-label">Priority</span>
+                <span class="info-value">{{ priorityLabel }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Units Requested</span>
-                <span class="info-value">{{ request.units_requested ?? '—' }}</span>
+                <span class="info-label">Total Units Requested</span>
+                <span class="info-value">{{ request.quantity ?? '—' }}</span>
               </div>
-              <div class="info-item">
-                <span class="info-label">Compatibility</span>
-                <span class="info-value">{{ request.compatibility || '—' }}</span>
-              </div>
-              <div class="info-item info-item--full">
-                <span class="info-label">Special Requirements</span>
-                <span class="info-value">{{ request.special_requirements || 'None specified.' }}</span>
+              <div v-if="request.patient" class="info-item info-item--full">
+                <span class="info-label">Patient</span>
+                <span class="info-value">
+                  {{ request.patient.full_name || '—' }}
+                  <template v-if="request.patient.age !== null">
+                    · {{ request.patient.age }} yrs
+                  </template>
+                  <template v-if="request.patient.sex">
+                    · {{ request.patient.sex === 'male' ? 'Male' : 'Female' }}
+                  </template>
+                </span>
               </div>
             </div>
+
+            <table v-if="request.items?.length" class="items-table">
+              <thead>
+                <tr>
+                  <th scope="col">Component</th>
+                  <th scope="col" class="num">Units</th>
+                  <th scope="col">Indication</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in request.items" :key="item.id">
+                  <td>{{ item.component?.name || '—' }}</td>
+                  <td class="num">
+                    {{ item.quantity }}
+                    <span v-if="item.allocated_count !== undefined" class="items-table__held">
+                      ({{ item.allocated_count }} held)
+                    </span>
+                  </td>
+                  <td>
+                    <template v-if="item.indication_code">
+                      <strong>{{ item.indication_label }}</strong> — {{ item.indication_text }}
+                    </template>
+                    <template v-else>—</template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </section>
 
           <!-- SECTION: BILLING & PAYMENT -->
@@ -470,6 +511,8 @@
 </template>
 
 <script setup>
+import { hospitalService } from '~/api/hospital/HospitalService'
+import { PRIORITY_LABELS } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 definePageMeta({
@@ -490,6 +533,10 @@ useHead({
 
 const route = useRoute()
 const requestId = route.params.id
+
+// Guards the download button against a second click while the server is still
+// rendering the form.
+const downloadingForm = ref(false)
 
 const {
   request,
@@ -553,6 +600,11 @@ function formatCurrency(value) {
 
 const toastMessage = ref('')
 let toastTimer = null
+/** The DOH form calls these ROUTINE and STAT; the stored value is unchanged. */
+const priorityLabel = computed(() =>
+  request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—',
+)
+
 function showToast(msg) {
   toastMessage.value = msg
   clearTimeout(toastTimer)
@@ -613,18 +665,33 @@ function handlePrint() {
 }
 
 /**
- * Produce a copy of the request.
+ * Download the request as the DOH Blood Request Form (Adult).
  *
- * Routed through the browser's own print dialogue, which offers "Save as PDF"
- * on every supported platform. The previous version fetched
- * `/hospital/bloodrequests/{id}/download` through an undefined `useApi()`
- * helper — an endpoint the API has never served — so the button threw rather
- * than downloading anything. Printing works today and keeps the page as the
- * single source of what a request says; a server-rendered PDF can replace this
- * if the paperwork ever needs a fixed layout.
+ * This used to fall back to window.print(), which produced a picture of this
+ * web page rather than the paperwork a blood bank actually files. The API now
+ * renders the real form, and the fulfilling centre downloads the identical
+ * document from its own portal. handlePrint() above still exists for anyone
+ * who just wants the screen.
  */
-function handleDownloadPdf() {
-  window.print()
+async function handleDownloadPdf() {
+  if (!requestId || downloadingForm.value) return
+
+  downloadingForm.value = true
+
+  try {
+    const blob = await hospitalService.downloadRequestForm(requestId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `BRF-${request.value?.reference_number ?? requestId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Failed to download request form:', err)
+    showToast(err?.message || 'Could not download the request form.')
+  } finally {
+    downloadingForm.value = false
+  }
 }
 
 function scrollToTimeline() {
@@ -1436,5 +1503,38 @@ function scrollToTimeline() {
   .content-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Request lines. A form can tick several components, so this is a table
+   rather than another pair of label/value cells. */
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 13px;
+}
+.items-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--rb-text-secondary);
+    padding: 0 10px 7px;
+    border-bottom: 1px solid var(--rb-border-strong);
+}
+.items-table td {
+    padding: 9px 10px;
+    color: var(--rb-text-primary);
+    border-bottom: 1px solid var(--rb-border);
+    vertical-align: top;
+}
+.items-table tr:last-child td { border-bottom: none; }
+.items-table .num { text-align: right; white-space: nowrap; }
+.items-table__held { color: var(--rb-text-secondary); font-size: 11.5px; }
+
+@media (max-width: 640px) {
+    .items-table { font-size: 12px; }
+    .items-table th, .items-table td { padding: 7px 6px; }
 }
 </style>

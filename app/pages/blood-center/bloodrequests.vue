@@ -569,6 +569,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
   requires: 'requests.view',
@@ -884,9 +885,25 @@ function handlePrint(request) {
   window.print()
 }
 
-function handleExportPdf(request) {
-  // connect to actual PDF export endpoint (e.g. GET /api/center/requests/:id/export)
-  toast('Export Started', 'info', `Preparing a PDF export for ${request.id}.`)
+/**
+ * Download this incoming request as the DOH Blood Request Form (Adult).
+ *
+ * Byte-identical to the copy the requesting hospital prints — both portals
+ * call the same server-side renderer.
+ */
+async function handleExportPdf(request) {
+  try {
+    const blob = await bloodCenterService.downloadRequestForm(request.id)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `BRF-${request.reference_number ?? request.id}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Failed to download request form:', err)
+    toast('Export Failed', 'danger', err?.message || 'Could not download the request form.')
+  }
 }
 
 function handleExportAll() {

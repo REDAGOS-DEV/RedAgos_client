@@ -267,18 +267,36 @@ class BloodCenterService extends BaseService {
   }
 
   /**
+   * Download this incoming request as the DOH Blood Request Form (Adult).
+   *
+   * The same document the requesting hospital prints, rendered by the same
+   * server-side service, so the two copies cannot disagree.
+   */
+  async downloadRequestForm(id: number | string): Promise<Blob> {
+    return this.requestBlob(`/blood-center/blood-requests/${id}/form`)
+  }
+
+  /**
    * Approve and hold stock.
    *
    * Omit `quantity` to hold everything the request still needs. Whatever is
    * sent, the server caps it at the outstanding amount and at what is on the
    * shelf, so a partial hold is a normal outcome rather than an error.
+   *
+   * Pass `requestItemId` to hold against one component of a multi-component
+   * request; omit it and the server fills each line in form order.
    */
-  async allocateRequest(id: number | string, quantity?: number): Promise<any> {
-    return this.request(
-      `/blood-center/blood-requests/${id}/allocate`,
-      'POST',
-      quantity ? { quantity } : {},
-    )
+  async allocateRequest(
+    id: number | string,
+    quantity?: number,
+    requestItemId?: number,
+  ): Promise<any> {
+    const payload: Record<string, number> = {}
+
+    if (quantity) payload.quantity = quantity
+    if (requestItemId) payload.request_item_id = requestItemId
+
+    return this.request(`/blood-center/blood-requests/${id}/allocate`, 'POST', payload)
   }
 
   /** Refuse a request. The reason is required and reaches the requester. */
@@ -311,6 +329,22 @@ class BloodCenterService extends BaseService {
   /** Record a settlement. GCash payments must carry their reference. */
   async recordPayment(requestId: number | string, payload: Record<string, any>): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}/payments`, 'POST', payload)
+  }
+
+  /**
+   * Mobile blood drives this facility runs.
+   *
+   * Lahi ni sa donor-facing nga GET /blood-drives: kana kay read-only nga
+   * catalogue sa umaabot nga drives sa tanang centre. Kini facility-scoped ug
+   * apil ang mga drive nga nahuman na.
+   */
+  async drives(): Promise<any> {
+    return this.request(`${this.resource}/drives`, 'GET')
+  }
+
+  /** Schedule a drive. Ang facility kay gikan sa token, dili sa payload. */
+  async createDrive(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/drives`, 'POST', payload)
   }
 
   async listNotifications(params: Record<string, any> = {}): Promise<any> {

@@ -383,6 +383,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { componentSummary } from '~/types/bloodRequest'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -446,10 +447,14 @@ function normalizeRequest(r) {
     id: r.id,
     reference_number: r.reference_number ?? r.reference_no ?? r.reference,
     hospital_name: r.hospital_name ?? r.facility_name ?? '',
-    blood_type: r.blood_type,
-    component: r.component_name ?? r.component,
+    // blood_type arrives as { id, code }; rendering the object printed
+    // "[object Object]" in the table.
+    blood_type: r.blood_type?.code ?? r.blood_type ?? '',
+    component: componentSummary(r),
     units: r.quantity ?? r.units,
-    priority: r.priority ?? 'normal',
+    purpose: r.purpose_label ?? '',
+    patient: r.patient?.full_name ?? '',
+    priority: r.urgency_level ?? r.priority ?? 'routine',
     status: r.status,
     request_date: r.request_date ? new Date(r.request_date) : (r.created_at ? new Date(r.created_at) : null),
     requested_by: r.requested_by ?? r.requester_name ?? '',
@@ -622,18 +627,24 @@ function trackRequest(req) {
   closeMenu()
   router.push(`/hospital/track-requests?ref=${req.reference_number}`)
 }
+/**
+ * Download the request as the DOH Blood Request Form.
+ *
+ * The method this called before, `downloadRequestPdf`, was never defined on
+ * HospitalService, so the menu item threw every time it was clicked.
+ */
 async function downloadPdf(req) {
   closeMenu()
   try {
-    const blob = await hospitalService.downloadRequestPdf(req.id)
+    const blob = await hospitalService.downloadRequestForm(req.id)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${req.reference_number}.pdf`
+    link.download = `BRF-${req.reference_number}.pdf`
     link.click()
     URL.revokeObjectURL(url)
   } catch (err) {
-    console.error('Failed to download request PDF:', err)
+    console.error('Failed to download request form:', err)
   }
 }
 function printPage() {

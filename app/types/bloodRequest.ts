@@ -22,8 +22,23 @@ export type BloodRequestStatus =
   | 'rejected'
   | 'cancelled'
 
-/** blood_requests.urgency_level — the only two the schema accepts. */
+/**
+ * blood_requests.urgency_level — the only two the schema accepts.
+ *
+ * The DOH request form calls these ROUTINE and STAT, and so does the UI. The
+ * stored value stays `emergency`, because the triage scope, the emergency
+ * banner and the submission notification all key off it. See PRIORITY_LABELS.
+ */
 export type UrgencyLevel = 'routine' | 'emergency'
+
+/**
+ * blood_requests.request_purpose — why the request was raised.
+ *
+ * Separate from urgency and never to be merged with it: a restock can be STAT
+ * and a named-patient transfusion can be routine. This decides whether the
+ * request carries patient identity at all.
+ */
+export type RequestPurpose = 'patient_transfusion' | 'replenishment'
 
 /** request_allocations.status — one bag's hold against one request. */
 export type AllocationStatus = 'allocated' | 'released' | 'cancelled'
@@ -61,6 +76,8 @@ export interface ComponentStub {
 
 export interface RequestAllocation {
   id: number
+  /** Which line of the request this bag answers. */
+  request_item_id: number | null
   unit_id: string
   status: AllocationStatus
   status_label: string
@@ -71,14 +88,51 @@ export interface RequestAllocation {
   received_at: string | null
 }
 
+/**
+ * One component asked for on a request, with the indication claimed for it.
+ *
+ * The coverage fields are only sent when the caller loaded allocations — a
+ * listing has not, and reporting every line as uncovered would be worse than
+ * saying nothing.
+ */
+export interface BloodRequestItem {
+  id: number
+  component: ComponentStub
+  quantity: number
+  indication_code: string | null
+  indication_label: string | null
+  indication_description: string | null
+  indication_other: string | null
+  /** The criterion to show: the requester's own words for an "Others" code. */
+  indication_text: string | null
+  allocated_count?: number
+  outstanding_quantity?: number
+}
+
+/** Null on a replenishment request, which has no patient. */
+export interface PatientDetails {
+  surname: string | null
+  first_name: string | null
+  middle_name: string | null
+  /** "SURNAME, First Middle", as the form prints it. */
+  full_name: string | null
+  age: number | null
+  sex: 'male' | 'female' | null
+}
+
 export interface BloodRequest {
   id: number
   reference_number: string
   requesting_facility: FacilityStub | null
   /** Absent on the fulfilling side's projection, which always means itself. */
   target_facility?: FacilityStub | null
+  request_purpose: RequestPurpose
+  purpose_label: string
+  patient: PatientDetails | null
   blood_type: BloodTypeStub
-  component: ComponentStub
+  /** What the request asks for. A form can tick several components. */
+  items: BloodRequestItem[]
+  /** The sum of every line's units. Derived server-side, never stored. */
   quantity: number
   urgency_level: UrgencyLevel
   urgency_label: string
@@ -130,12 +184,48 @@ export interface Billing {
   billing_date: string | null
 }
 
+export interface CreateBloodRequestItemPayload {
+  component_id: number
+  quantity: number
+  indication_code: string | null
+  /** Required when the chosen code is an "Others" code. */
+  indication_other?: string | null
+}
+
 export interface CreateBloodRequestPayload {
   target_facility_id: number
   blood_type_id: number
-  component_id: number
-  quantity: number
   urgency_level: UrgencyLevel
+  request_purpose: RequestPurpose
+  /** Required for a transfusion, omitted for a replenishment. */
+  patient_surname?: string | null
+  patient_first_name?: string | null
+  patient_middle_name?: string | null
+  patient_age?: number | null
+  patient_sex?: 'male' | 'female' | null
+  items: CreateBloodRequestItemPayload[]
+}
+
+/** GET /hospital/reference-data — what the request form is built from. */
+export interface IndicationCodeOption {
+  code: string
+  label: string
+  description: string
+  /** True for the "Others" codes, which the form says trigger a review. */
+  requires_explanation: boolean
+}
+
+export interface ComponentOption {
+  id: number
+  name: string
+  indication_codes: IndicationCodeOption[]
+}
+
+export interface RequestReferenceData {
+  blood_types: Array<{ id: number; code: string; label: string }>
+  components: ComponentOption[]
+  purposes: Array<{ value: RequestPurpose; label: string; requires_patient: boolean }>
+  priorities: Array<{ value: UrgencyLevel; label: string }>
 }
 
 export interface BloodRequestFilters {
@@ -169,6 +259,24 @@ export const URGENCY_LABELS: Record<UrgencyLevel, string> = {
   emergency: 'Emergency',
 }
 
+/**
+ * The same two levels as the DOH request form names them.
+ *
+ * Use these anywhere the user is looking at request paperwork; URGENCY_LABELS
+ * remains for the operational screens that have always said "Emergency".
+ */
+export const PRIORITY_LABELS: Record<UrgencyLevel, string> = {
+  routine: 'Routine',
+  emergency: 'STAT',
+}
+
+export const REQUEST_PURPOSE_LABELS: Record<RequestPurpose, string> = {
+  patient_transfusion: 'Patient Transfusion',
+  replenishment: 'Blood Bank Replenishment',
+}
+
+export const REQUEST_PURPOSES: RequestPurpose[] = ['patient_transfusion', 'replenishment']
+
 export const ALLOCATION_STATUS_LABELS: Record<AllocationStatus, string> = {
   allocated: 'Reserved',
   released: 'Released',
@@ -200,6 +308,24 @@ export const REQUEST_STATUS_TONES: Record<BloodRequestStatus, 'info' | 'progress
   fulfilled: 'success',
   rejected: 'danger',
   cancelled: 'muted',
+}
+
+/**
+ * Name the components a request asks for, in one line.
+ *
+ * A request can tick several components on one form, but a table row has room
+ * for one phrase. Two are listed in full because that is the common case; past
+ * that it counts the rest rather than overflowing the column.
+ */
+export function componentSummary(request: Pick<BloodRequest, 'items'>): string {
+  const names = (request.items ?? [])
+    .map((item) => item.component?.name)
+    .filter((name): name is string => Boolean(name))
+
+  if (names.length === 0) return '\u2014'
+  if (names.length <= 2) return names.join(', ')
+
+  return `${names[0]}, ${names[1]} +${names.length - 2} more`
 }
 
 /**
