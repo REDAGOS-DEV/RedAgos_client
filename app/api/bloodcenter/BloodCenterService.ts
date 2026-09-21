@@ -321,9 +321,29 @@ class BloodCenterService extends BaseService {
     )
   }
 
+  /** Every statement raised against this facility's incoming requests. */
+  async billings(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/billings', 'GET', params)
+  }
+
   /** The statement raised against one request. */
   async billingForRequest(requestId: number | string): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}`, 'GET')
+  }
+
+  /**
+   * Meet a statement from the government subsidy instead of charging for it.
+   *
+   * Zero-rates the statement and clears the request for release without
+   * recording a payment, because none was taken. Money already collected is
+   * left alone.
+   */
+  async applySubsidy(requestId: number | string, reason?: string): Promise<any> {
+    return this.request(
+      `/blood-center/billings/${requestId}/subsidy`,
+      'POST',
+      reason ? { reason } : {},
+    )
   }
 
   /** Record a settlement. GCash payments must carry their reference. */

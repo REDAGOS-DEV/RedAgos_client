@@ -45,7 +45,7 @@
           <div class="emergency-body">
             <div class="emergency-title-row">
               <span class="emergency-title">Emergency Blood Request</span>
-              <span class="emergency-id">{{ primaryEmergency.id }}</span>
+              <span class="emergency-id">{{ primaryEmergency.code }}</span>
             </div>
             <div class="emergency-grid">
               <div><span class="e-label">Hospital</span><span class="e-value">{{ primaryEmergency.hospital }}</span></div>
@@ -54,15 +54,20 @@
               <div><span class="e-label">Units Requested</span><span class="e-value">{{ primaryEmergency.units }}</span></div>
               <div><span class="e-label">Needed Within</span><span class="e-value">{{ primaryEmergency.neededBy }}</span></div>
               <div>
-                <span class="e-label">Available Inventory</span>
-                <span class="e-value inv-inline" :class="'inv-' + inventoryLevel(primaryEmergency)">
-                  <AssetIcon :name="inventoryIcon(inventoryLevel(primaryEmergency))" :size="13" />
-                  {{ primaryEmergency.available }} units
+                <!--
+                  Coverage, not shelf stock. The queue endpoint does not carry
+                  availability, so this read `available` and rendered a bare
+                  " units" with a permanent red flag beneath it.
+                -->
+                <span class="e-label">Reserved</span>
+                <span class="e-value inv-inline" :class="'inv-' + coverageLevel(primaryEmergency)">
+                  <AssetIcon :name="inventoryIcon(coverageLevel(primaryEmergency))" :size="13" />
+                  {{ primaryEmergency.allocated }} / {{ primaryEmergency.units }} units
                 </span>
               </div>
             </div>
-            <p v-if="inventoryLevel(primaryEmergency) === 'insufficient'" class="insufficient-tag">
-              <AssetIcon name="octagon-alert" :size="14" /> Insufficient Inventory
+            <p v-if="primaryEmergency.allocated === 0" class="insufficient-tag">
+              <AssetIcon name="octagon-alert" :size="14" /> No stock reserved yet — review to check availability
             </p>
           </div>
         </div>
@@ -134,16 +139,16 @@
       <select v-model="toolbarFilters.priority">
         <option value="">Priority</option>
         <option>Routine</option>
-        <option>Urgent</option>
         <option>Emergency</option>
       </select>
       <select v-model="toolbarFilters.status">
         <option value="">Status</option>
         <option>Pending</option>
-        <option>Under Review</option>
-        <option>Approved</option>
+        <option>Processing</option>
+        <option>Partial</option>
+        <option>Fulfilled</option>
         <option>Rejected</option>
-        <option>Ready for Fulfillment</option>
+        <option>Cancelled</option>
       </select>
       <input v-model="toolbarFilters.date" type="date" title="Request Date" />
       <input v-model="toolbarFilters.neededBy" type="date" title="Needed By" />
@@ -154,7 +159,7 @@
       </div>
 
       <div class="toolbar-meta">
-        <span>Showing {{ requests.length }} requests</span>
+        <span>Showing {{ visibleRequests.length }} of {{ meta.total }} requests</span>
         <span class="dot">·</span>
         <span>Updated {{ lastUpdatedLabel }}</span>
         <template v-if="activeFilterCount > 0">
@@ -170,14 +175,14 @@
         <div v-for="n in 5" :key="n" class="skeleton-row" />
       </div>
 
-      <div v-else-if="!error && requests.length === 0 && activeFilterCount === 0 && !searchQuery" class="empty-state">
+      <div v-else-if="!error && visibleRequests.length === 0 && activeFilterCount === 0 && !searchQuery" class="empty-state">
         <AssetIcon name="inbox" :size="40" />
         <h3>No Incoming Requests</h3>
         <p>There are currently no hospital blood requests waiting for review.</p>
         <button class="btn btn-primary btn-sm" @click="handleRefresh">Refresh Requests</button>
       </div>
 
-      <div v-else-if="!error && requests.length === 0" class="empty-state">
+      <div v-else-if="!error && visibleRequests.length === 0" class="empty-state">
         <AssetIcon name="filter-x" :size="40" />
         <h3>No Requests Match Your Filters</h3>
         <p>Try adjusting your filters or clearing the current search.</p>
@@ -193,7 +198,7 @@
             <th>Blood Type</th>
             <th>Component</th>
             <th>Units</th>
-            <th>Available</th>
+            <th>Reserved</th>
             <th>Priority</th>
             <th>Needed By</th>
             <th>Status</th>
@@ -201,7 +206,7 @@
           </tr>
         </thead>
         <tbody>
-          <template v-for="r in requests" :key="r.id">
+          <template v-for="r in visibleRequests" :key="r.id">
             <tr
               class="table-row"
               :class="{ 'is-mutating': isMutating(r.id) }"
@@ -215,7 +220,7 @@
                 >
                   <AssetIcon :name="expandedIds.has(r.id) ? 'chevron-down' : 'chevron-right'" :size="14" />
                 </button>
-                {{ r.id }}
+                {{ r.code }}
               </td>
               <td>
                 <div class="hospital-cell">
@@ -230,7 +235,7 @@
               <td>
                 <span class="inv-pill" :class="'inv-' + inventoryLevel(r)">
                   <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" />
-                  {{ r.available }} available
+                  {{ r.allocated }} / {{ r.units }} held
                 </span>
               </td>
               <td>
@@ -259,7 +264,7 @@
                       <AssetIcon name="search" :size="14" /> Review Request
                     </button>
                     <button
-                      :disabled="isMutating(r.id) || inventoryLevel(r) === 'insufficient'"
+                      :disabled="isMutating(r.id)"
                       @click="openMenuId = null; requestApprove(r)"
                     >
                       <AssetIcon name="check" :size="14" /> Approve Request
@@ -271,7 +276,7 @@
                       <AssetIcon name="package-search" :size="14" /> Check Inventory
                     </button>
                     <button
-                      :disabled="isMutating(r.id) || inventoryLevel(r) === 'insufficient'"
+                      :disabled="isMutating(r.id)"
                       @click="openMenuId = null; requestApprove(r)"
                     >
                       <AssetIcon name="archive" :size="14" /> Reserve Inventory
@@ -301,7 +306,7 @@
                     <div>
                       <span class="e-label">Inventory Availability</span>
                       <span class="e-value inv-inline" :class="'inv-' + inventoryLevel(r)">
-                        <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" /> {{ r.available }} available
+                        <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" /> {{ r.allocated }} / {{ r.units }} held
                       </span>
                     </div>
                     <div>
@@ -327,10 +332,10 @@
                     </button>
                     <button
                       class="btn btn-primary btn-xs"
-                      :disabled="isMutating(r.id) || inventoryLevel(r) === 'insufficient'"
+                      :disabled="isMutating(r.id)"
                       @click="requestApprove(r)"
                     >
-                      {{ inventoryLevel(r) === 'insufficient' ? 'Insufficient Inventory' : 'Approve & Reserve' }}
+                      Approve &amp; Reserve
                     </button>
                   </div>
                 </div>
@@ -381,7 +386,7 @@
             <section class="drawer-section">
               <h3>Request Information</h3>
               <dl class="detail-grid">
-                <div><dt>Request ID</dt><dd class="mono">{{ activeRequest.id }}</dd></div>
+                <div><dt>Request ID</dt><dd class="mono">{{ activeRequest.code }}</dd></div>
                 <div><dt>Request Date</dt><dd>{{ activeRequest.requestDate }}</dd></div>
                 <div><dt>Priority</dt><dd><span class="priority-badge" :class="'priority-' + activeRequest.priority.toLowerCase()"><AssetIcon :name="priorityIcon(activeRequest.priority)" :size="12" /> {{ activeRequest.priority }}</span></dd></div>
                 <div><dt>Status</dt><dd><span class="status-badge" :class="'status-' + activeRequest.status.toLowerCase().replace(/\s+/g, '-')">{{ activeRequest.status }}</span></dd></div>
@@ -420,42 +425,65 @@
 
             <section class="drawer-section">
               <h3>Inventory Availability</h3>
-              <dl class="detail-grid">
-                <div><dt>Requested</dt><dd>{{ activeRequest.units }} {{ activeRequest.bloodType }} {{ activeRequest.component }}</dd></div>
-                <div>
-                  <dt>Available</dt>
-                  <dd class="inv-inline" :class="'inv-' + inventoryLevel(activeRequest)">
-                    <AssetIcon :name="inventoryIcon(inventoryLevel(activeRequest))" :size="13" />
-                    {{ activeRequest.available }} compatible units
-                  </dd>
-                </div>
-              </dl>
-              <p class="inventory-status-line" :class="'inv-' + inventoryLevel(activeRequest)">
-                <AssetIcon :name="inventoryIcon(inventoryLevel(activeRequest))" :size="14" />
-                {{ inventoryLevel(activeRequest) === 'insufficient' ? 'Insufficient Inventory' : 'Sufficient Inventory' }}
+              <!--
+                One row per component. A request can ask for several, each
+                answered from a different shelf, so a single "Requested /
+                Available" pair could only ever describe the first of them —
+                and printed the request's TOTAL units beside one component's
+                name, which read as a larger request than it was.
+              -->
+              <table v-if="(activeRequest.lines || []).length" class="avail-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Component</th>
+                    <th scope="col" class="num">Requested</th>
+                    <th scope="col" class="num">Outstanding</th>
+                    <th scope="col" class="num">Available</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
+                    <td>{{ line.component?.name || '—' }}</td>
+                    <td class="num">{{ line.requested ?? '—' }}</td>
+                    <td class="num">{{ line.outstanding }}</td>
+                    <td class="num">{{ line.available }}</td>
+                    <td>
+                      <span class="inv-inline" :class="'inv-' + lineLevel(line)">
+                        <AssetIcon :name="inventoryIcon(lineLevel(line))" :size="12" />
+                        {{ lineLevel(line) === 'ok'
+                          ? 'Can cover'
+                          : lineLevel(line) === 'low'
+                            ? `Part only (${line.can_cover_now})`
+                            : 'No stock' }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p v-else class="batch-empty">Availability is loading.</p>
+
+              <p class="inventory-status-line" :class="'inv-' + availabilityLevel(activeRequest)">
+                <AssetIcon :name="inventoryIcon(availabilityLevel(activeRequest))" :size="14" />
+                {{ availabilityLevel(activeRequest) === 'ok'
+                  ? 'Sufficient Inventory'
+                  : availabilityLevel(activeRequest) === 'low'
+                    ? 'Partial Inventory — some units can be reserved now'
+                    : 'Insufficient Inventory' }}
               </p>
 
-              <p class="batches-label">Suggested Batches (earliest-expiring first)</p>
-              <div class="batch-list">
-                <div v-if="!(activeRequest.batches || []).length" class="batch-empty">No suggested batches available.</div>
-                <div v-for="batch in activeRequest.batches || []" :key="batch.code" class="batch-row">
-                  <div class="batch-main">
-                    <span class="batch-code mono">{{ batch.code }}</span>
-                    <span class="batch-expiry">Expires {{ batch.expiry || '—' }}</span>
-                  </div>
-                  <div class="batch-meta">
-                    <span>{{ batch.unitsToReserve ?? batch.units }} of {{ batch.units }} units</span>
-                    <span>{{ batch.location || 'Main Storage' }}</span>
-                  </div>
-                </div>
-              </div>
+              <p class="inventory-advisory">
+                Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held until you
+                approve, and allocation re-checks every unit under a lock before reserving.
+              </p>
 
               <p class="health-bar-label">Inventory Health</p>
               <div class="health-bar">
                 <div
                   class="health-fill"
-                  :class="'inv-' + inventoryLevel(activeRequest)"
-                  :style="{ width: Math.min(100, (activeRequest.available / Math.max(activeRequest.units, 1)) * 100) + '%' }"
+                  :class="'inv-' + availabilityLevel(activeRequest)"
+                  :style="{ width: Math.min(100, ((activeRequest.available ?? 0) / Math.max(activeRequest.outstanding || activeRequest.units || 1, 1)) * 100) + '%' }"
                 />
               </div>
             </section>
@@ -482,7 +510,7 @@
               Reject Request
             </button>
             <button
-              v-if="activeRequest && inventoryLevel(activeRequest) === 'insufficient'"
+              v-if="activeRequest && availabilityLevel(activeRequest) === 'insufficient'"
               class="btn btn-outline"
               @click="handleReviewInventory(activeRequest)"
             >
@@ -510,12 +538,16 @@
           <div class="modal-row"><span>Hospital</span><strong>{{ requestToApprove?.hospital }}</strong></div>
           <div class="modal-row"><span>Blood Type / Component</span><strong>{{ requestToApprove?.bloodType }} · {{ requestToApprove?.component }}</strong></div>
           <div class="modal-row"><span>Units Requested</span><strong>{{ requestToApprove?.units }}</strong></div>
-          <div class="modal-row">
+          <div v-if="requestToApprove?.available !== undefined" class="modal-row">
             <span>Compatible Inventory</span>
-            <strong class="inv-inline" :class="'inv-' + inventoryLevel(requestToApprove)">
-              <AssetIcon :name="inventoryIcon(inventoryLevel(requestToApprove))" :size="13" />
-              {{ requestToApprove?.available }} units available
+            <strong class="inv-inline" :class="'inv-' + availabilityLevel(requestToApprove)">
+              <AssetIcon :name="inventoryIcon(availabilityLevel(requestToApprove))" :size="13" />
+              {{ requestToApprove.available }} units available
             </strong>
+          </div>
+          <div v-else class="modal-row">
+            <span>Compatible Inventory</span>
+            <strong>Checked when the hold is taken</strong>
           </div>
         </div>
         <p class="modal-desc">Approving this request will reserve the selected inventory units and move the request to Request Fulfillment.</p>
@@ -569,6 +601,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
+import { componentSummary, REQUEST_STATUS_LABELS } from '~/types/bloodRequest'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
@@ -577,20 +610,88 @@ definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashbo
 
 const { isDark } = useDarkMode()
 
+/*
+ * This page destructured eleven names from useIncomingRequests(), seven of
+ * which it has never returned — `activity`, `loading`, `isMutating`,
+ * `fetchRequestDetail`, `approveAndReserve`, `rejectRequest` and
+ * `fetchActivity` were all undefined. Calling one threw, and the table then
+ * read `r.priority.toLowerCase()` on rows that carry no `priority`, which
+ * throws during render and takes the whole page down with it.
+ *
+ * The composable's real surface is below. Everything the template expects but
+ * the API does not send is built in mapRequest(), with a defined fallback for
+ * every field so a render can no longer throw.
+ */
 const {
-  requests,
+  requests: apiRequests,
   summary,
-  activity,
-  loading,
+  selected,
+  inventory,
+  filters,
+  meta,
+  isLoading: loading,
+  isActing,
   error,
-  isMutating,
   fetchRequests,
   fetchSummary,
-  fetchRequestDetail,
-  approveAndReserve,
-  rejectRequest,
-  fetchActivity,
+  openRequest,
+  allocate,
+  reject,
 } = useIncomingRequests()
+
+/* ------------------------------------------------------------------ *
+ * API row -> the view model this page's markup was written against.
+ * ------------------------------------------------------------------ */
+
+function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+/**
+ * Flatten one request for the table.
+ *
+ * `id` stays the numeric key every API call needs; `code` is the reference
+ * number staff actually read. Fields the schema has no answer for — the
+ * requesting doctor, their phone, the department — resolve to an em dash
+ * rather than being invented, which is the rule this feature has followed
+ * throughout.
+ */
+function mapRequest(r) {
+  const allocated = r.allocated_count ?? 0
+  const units = r.quantity ?? 0
+
+  return {
+    id: r.id,
+    code: r.reference_number ?? `#${r.id}`,
+    hospital: r.requesting_facility?.name ?? '—',
+    contact: r.requesting_facility?.address ?? '',
+    requestedBy: '',
+    bloodType: r.blood_type?.code ?? '—',
+    component: componentSummary(r),
+    units,
+    items: r.items ?? [],
+    // Coverage, not shelf stock: the queue endpoint does not carry
+    // availability, and printing "0 available" beside a request nobody has
+    // checked would read as "we have none" rather than "we have not looked".
+    allocated,
+    outstanding: r.outstanding_quantity ?? Math.max(0, units - allocated),
+    priority: r.is_emergency ? 'Emergency' : 'Routine',
+    status: r.status_label ?? REQUEST_STATUS_LABELS[r.status] ?? 'Pending',
+    statusValue: r.status,
+    urgency: r.urgency_level,
+    purpose: r.purpose_label ?? '',
+    patient: r.patient?.full_name ?? '',
+    requestDate: formatDateTime(r.request_date),
+    neededBy: r.is_emergency ? 'Immediate' : 'Routine',
+    reason: r.rejection_reason ?? '',
+    reference_number: r.reference_number,
+  }
+}
+
+const requests = computed(() => (apiRequests.value ?? []).map(mapRequest))
 
 /* TOASTS */
 const toasts = ref([])
@@ -608,8 +709,20 @@ const activeFilter = ref('All')
 const searchQuery = ref('')
 const dismissedAlertIds = ref([])
 
-// Matches the RedAgos spec's Request Filter Tabs exactly (no fulfillment-stage statuses here).
-const filterOptions = ['All', 'Emergency', 'Urgent', 'Routine', 'Pending', 'Under Review', 'Approved', 'Rejected']
+// The statuses the schema actually accepts, plus the two urgency levels.
+// "Urgent", "Under Review", "Approved" and "Ready for Fulfillment" were never
+// values this API could return, so filtering by them matched nothing.
+const filterOptions = ['All', 'Emergency', 'Routine', 'Pending', 'Processing', 'Partial', 'Fulfilled', 'Rejected', 'Cancelled']
+
+const STATUS_FILTERS = {
+  Pending: 'pending',
+  Processing: 'processing',
+  Partial: 'partial',
+  Fulfilled: 'fulfilled',
+  Rejected: 'rejected',
+  Cancelled: 'cancelled',
+}
+const URGENCY_FILTERS = { Emergency: 'emergency', Routine: 'routine' }
 
 const toolbarFilters = ref({
   hospital: '',
@@ -625,7 +738,27 @@ const activeFilterCount = computed(() => Object.values(toolbarFilters.value).fil
 
 const hospitalOptions = computed(() => [...new Set(requests.value.map((r) => r.hospital))])
 const bloodTypeOptions = computed(() => [...new Set(requests.value.map((r) => r.bloodType))])
-const componentOptions = computed(() => [...new Set(requests.value.map((r) => r.component))])
+const componentOptions = computed(() =>
+  [...new Set(requests.value.flatMap((r) => r.items.map((i) => i.component?.name).filter(Boolean)))],
+)
+
+/**
+ * The rows actually shown.
+ *
+ * Status, urgency and the free-text search are applied by the API. Hospital,
+ * blood type and component are narrowed here, because the queue endpoint takes
+ * ids for those and this toolbar collects names.
+ */
+const visibleRequests = computed(() =>
+  requests.value.filter((r) => {
+    const f = toolbarFilters.value
+    if (f.hospital && r.hospital !== f.hospital) return false
+    if (f.bloodType && r.bloodType !== f.bloodType) return false
+    if (f.component && !r.items.some((i) => i.component?.name === f.component)) return false
+    if (f.priority && r.priority !== f.priority) return false
+    return true
+  }),
+)
 
 const lastUpdatedAt = ref(null)
 const lastUpdatedLabel = computed(() => {
@@ -642,22 +775,22 @@ function onSearchInput() {
   searchDebounce = setTimeout(() => loadRequests(), 400)
 }
 
-function buildParams() {
-  return {
-    filter: activeFilter.value !== 'All' ? activeFilter.value : undefined,
-    search: searchQuery.value.trim() || undefined,
-    hospital: toolbarFilters.value.hospital || undefined,
-    blood_type: toolbarFilters.value.bloodType || undefined,
-    component: toolbarFilters.value.component || undefined,
-    priority: toolbarFilters.value.priority || undefined,
-    status: toolbarFilters.value.status || undefined,
-    date: toolbarFilters.value.date || undefined,
-    needed_by: toolbarFilters.value.neededBy || undefined,
-  }
-}
-
+/**
+ * Push the toolbar into the composable's filter bag, then load page one.
+ *
+ * fetchRequests() takes a page number. This used to hand it the whole filter
+ * object, which went out as page[status]=… and came back 422 — the queue then
+ * rendered empty no matter what was in it.
+ */
 async function loadRequests() {
-  await fetchRequests(buildParams())
+  const quick = activeFilter.value
+  const toolbar = toolbarFilters.value
+
+  filters.status = STATUS_FILTERS[toolbar.status] ?? STATUS_FILTERS[quick] ?? undefined
+  filters.urgency_level = URGENCY_FILTERS[quick] ?? URGENCY_FILTERS[toolbar.priority] ?? undefined
+  filters.search = searchQuery.value.trim() || undefined
+
+  await fetchRequests(1)
   lastUpdatedAt.value = Date.now()
 }
 
@@ -669,7 +802,18 @@ function resetFilters() {
 }
 
 async function handleRefresh() {
-  await Promise.all([loadRequests(), fetchSummary(), fetchActivity()])
+  await Promise.all([loadRequests(), fetchSummary()])
+}
+
+/**
+ * Whether an action is in flight against this row.
+ *
+ * The composable exposes one `isActing` flag for the whole queue, so the id of
+ * the row being acted on is tracked here to keep the spinner on the right one.
+ */
+const mutatingId = ref(null)
+function isMutating(id) {
+  return isActing.value && mutatingId.value === id
 }
 
 /* re-fetch whenever a quick filter pill changes */
@@ -678,8 +822,72 @@ watch(activeFilter, () => loadRequests())
 /* SUMMARY CARDS */
 const summaryLoading = computed(() => loading.value && !summary.value)
 
+/**
+ * Recent activity, derived from the requests already loaded.
+ *
+ * There is no activity endpoint, and the page previously called a
+ * `fetchActivity` the composable does not have. Every event below is a
+ * timestamp the queue already carries, so the card shows real history instead
+ * of throwing.
+ */
+const activity = computed(() => {
+  const events = []
+
+  for (const r of apiRequests.value ?? []) {
+    const hospital = r.requesting_facility?.name ?? '—'
+
+    if (r.request_date) {
+      events.push({
+        id: `${r.id}-received`,
+        type: r.is_emergency ? 'emergency' : 'received',
+        description: `${r.reference_number} ${r.is_emergency ? 'raised as an emergency' : 'received'}`,
+        hospital,
+        at: r.request_date,
+        staff: 'Requesting facility',
+      })
+    }
+
+    if (r.reviewed_at) {
+      events.push({
+        id: `${r.id}-reviewed`,
+        type: r.status === 'rejected' ? 'rejected' : 'approved',
+        description: `${r.reference_number} ${r.status === 'rejected' ? 'rejected' : 'reviewed'}`,
+        hospital,
+        at: r.reviewed_at,
+        staff: 'Blood centre',
+      })
+    }
+
+    if (r.fulfilled_at) {
+      events.push({
+        id: `${r.id}-fulfilled`,
+        type: 'reserved',
+        description: `${r.reference_number} fulfilled`,
+        hospital,
+        at: r.fulfilled_at,
+        staff: 'Blood centre',
+      })
+    }
+  }
+
+  return events
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 8)
+    .map((event) => ({ ...event, time: formatDateTime(event.at) }))
+})
+
 const summaryStats = computed(() => {
-  const s = summary.value || {}
+  // The endpoint returns { totals: {…per status}, open_emergencies,
+  // awaiting_release }, not the flat camelCase keys this block assumed.
+  const payload = summary.value || {}
+  const totals = payload.totals || {}
+  const s = {
+    pending: totals.pending ?? 0,
+    emergency: payload.open_emergencies ?? 0,
+    underReview: totals.processing ?? 0,
+    readyForFulfillment: payload.awaiting_release ?? 0,
+  }
+
   return [
     {
       key: 'pending',
@@ -759,18 +967,40 @@ const statusStepIndex = {
 }
 const currentStepIndex = computed(() => statusStepIndex[activeRequest.value?.status] ?? 0)
 
-const drawerMutating = computed(() => activeRequest.value && isMutating(activeRequest.value.id))
+const drawerMutating = computed(() => Boolean(activeRequest.value) && isActing.value)
 
+/**
+ * Open one request beside the stock that could fill it.
+ *
+ * fetchRequestDetail() never existed; the composable's openRequest() loads
+ * `selected` and `inventory` instead. The per-line availability from the
+ * review endpoint is folded back in so the drawer can show real coverage.
+ */
 async function openReview(request) {
   drawerOpen.value = true
   drawerLoading.value = true
   activeRequest.value = request
 
-  const { data, error: detailError } = await fetchRequestDetail(request.id)
-  if (!detailError.value && data.value) {
-    activeRequest.value = { ...request, ...data.value }
+  try {
+    await openRequest(request.id)
+
+    if (selected.value) {
+      const lines = inventory.value?.lines ?? []
+
+      activeRequest.value = {
+        ...mapRequest(selected.value),
+        available: lines.reduce((sum, line) => sum + (line.available ?? 0), 0),
+        outstanding: inventory.value?.outstanding ?? 0,
+        canFullyCover: inventory.value?.can_fully_cover ?? false,
+        availabilityAsOf: inventory.value?.as_of
+          ? new Date(inventory.value.as_of).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+          : null,
+        lines,
+      }
+    }
+  } finally {
+    drawerLoading.value = false
   }
-  drawerLoading.value = false
 }
 
 function closeDrawer() {
@@ -778,8 +1008,8 @@ function closeDrawer() {
   setTimeout(() => (activeRequest.value = null), 250)
 }
 
-function handleReviewInventory(request) {
-  toast('Insufficient Inventory', 'warning', 'The requested quantity cannot currently be fulfilled.')
+/** Scroll the drawer back to the availability table. */
+function handleReviewInventory() {
   document.querySelector('.drawer-content')?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -788,12 +1018,17 @@ const showApproveModal = ref(false)
 const requestToApprove = ref(null)
 const approving = ref(false)
 
+/**
+ * Open the approval confirmation.
+ *
+ * No longer refuses up front. The guard here asked coverage whether there was
+ * stock, so a request with nothing reserved yet — which is every new request —
+ * was turned away before the server was ever asked. Allocation re-checks every
+ * unit under a lock anyway, and a partial hold is a normal outcome it reports
+ * rather than an error, so the decision belongs there.
+ */
 function requestApprove(request) {
   if (!request) return
-  if (inventoryLevel(request) === 'insufficient') {
-    toast('Insufficient Inventory', 'warning', 'The requested quantity cannot currently be fulfilled.')
-    return
-  }
   requestToApprove.value = request
   showApproveModal.value = true
 }
@@ -807,18 +1042,23 @@ function closeApproveModal() {
 async function confirmApprove() {
   if (!requestToApprove.value) return
   approving.value = true
+  mutatingId.value = requestToApprove.value.id
+
   try {
-    // POST /api/center/requests/:id/approve — reserves compatible inventory (FEFO) and
-    // moves the request to Request Fulfillment.
-    await approveAndReserve(requestToApprove.value.id)
-    toast('Request Approved', 'success', `${requestToApprove.value.id} was approved and inventory has been reserved.`)
+    // Holds stock FEFO across the request's lines and moves it to Processing.
+    await allocate(requestToApprove.value.id)
+    toast('Request Approved', 'success', `${requestToApprove.value.code} was approved and stock has been reserved.`)
     showApproveModal.value = false
     requestToApprove.value = null
     closeDrawer()
+    await Promise.all([loadRequests(), fetchSummary()])
   } catch (err) {
-    toast('Unable to Approve Request', 'danger', 'Please try again in a moment.')
+    // The API refuses with a message written for staff; show it rather than
+    // replacing it with something vaguer.
+    toast('Unable to Approve Request', 'danger', err?.message || 'Please try again in a moment.')
   } finally {
     approving.value = false
+    mutatingId.value = null
   }
 }
 
@@ -846,18 +1086,24 @@ function closeRejectModal() {
 async function confirmReject() {
   if (!requestToReject.value || !rejectReason.value) return
   rejecting.value = true
+  mutatingId.value = requestToReject.value.id
+
+  // The API takes one reason string and shows it to the requester, so the
+  // optional notes are appended rather than dropped.
+  const reason = [rejectReason.value, rejectNotes.value].filter(Boolean).join(' — ')
+
   try {
-    // PATCH /api/center/requests/:id/reject
-    // body: { reason: rejectReason, notes: rejectNotes }
-    await rejectRequest(requestToReject.value.id, { reason: rejectReason.value, notes: rejectNotes.value })
+    await reject(requestToReject.value.id, reason)
     toast('Request Rejected', 'danger', 'The request has been marked as rejected.')
     showRejectModal.value = false
     requestToReject.value = null
     closeDrawer()
+    await Promise.all([loadRequests(), fetchSummary()])
   } catch (err) {
-    toast('Unable to Reject Request', 'danger', 'Please try again in a moment.')
+    toast('Unable to Reject Request', 'danger', err?.message || 'Please try again in a moment.')
   } finally {
     rejecting.value = false
+    mutatingId.value = null
   }
 }
 
@@ -912,12 +1158,54 @@ function handleExportAll() {
 }
 
 /* INVENTORY HELPERS */
-function inventoryLevel(request) {
-  if (!request) return 'ok'
-  if (request.available <= 0) return 'insufficient'
-  if (request.available < request.units) return 'low'
-  return 'ok'
+/*
+ * Coverage and availability are two different questions and this page needs
+ * both. Coverage is how much stock is already held FOR the request; the queue
+ * endpoint carries it for every row. Availability is how much issuable stock
+ * is on the shelf, which only the review endpoint knows, per component.
+ *
+ * They were briefly the same function, which is why a request for one unit
+ * with one unit available still read "Insufficient Inventory": nothing had
+ * been reserved yet, and coverage was being asked an availability question.
+ */
+
+/** How much of the request is already reserved. Used by the queue and banner. */
+function coverageLevel(request) {
+  if (!request || !request.units) return 'insufficient'
+  if (request.allocated >= request.units) return 'ok'
+  if (request.allocated > 0) return 'low'
+  return 'insufficient'
 }
+
+/**
+ * Whether the shelf can answer what is still outstanding.
+ *
+ * Measured against `outstanding` rather than the full request: units already
+ * held are not needed from stock again, so judging against the original figure
+ * would call a part-reserved request short when it is not.
+ */
+function availabilityLevel(request) {
+  if (!request) return 'insufficient'
+
+  const available = request.available ?? 0
+  const needed = request.outstanding ?? request.units ?? 0
+
+  if (needed <= 0) return 'ok'
+  if (available >= needed) return 'ok'
+  if (available > 0) return 'low'
+  return 'insufficient'
+}
+
+/** Per-component availability, as the review endpoint reports it. */
+function lineLevel(line) {
+  if (!line) return 'insufficient'
+  if (line.can_fully_cover) return 'ok'
+  if ((line.available ?? 0) > 0) return 'low'
+  return 'insufficient'
+}
+
+// The queue column and the emergency banner both speak coverage.
+const inventoryLevel = coverageLevel
 function inventoryIcon(level) {
   return { ok: 'check', low: 'triangle-alert', insufficient: 'x' }[level] || 'check'
 }
@@ -1346,5 +1634,36 @@ onMounted(() => {
 .expand-btn:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
+}
+
+/* Per-component availability in the review drawer. */
+.avail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-bottom: 10px;
+}
+.avail-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--rb-border-strong);
+}
+.avail-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--rb-border);
+  color: var(--rb-text-primary);
+}
+.avail-table tr:last-child td { border-bottom: none; }
+.avail-table .num { text-align: right; }
+
+.inventory-advisory {
+  font-size: 11.5px;
+  color: var(--rb-text-secondary);
+  margin: 6px 0 12px;
 }
 </style>

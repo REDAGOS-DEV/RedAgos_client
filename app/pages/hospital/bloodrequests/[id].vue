@@ -492,6 +492,77 @@
         </div>
       </Transition>
 
+      <!-- ============== AWAITING RECEIPT ============== -->
+      <!--
+        The last step of the workflow. The endpoint and the composable wrapper
+        both existed; nothing in this page ever called them, so a request could
+        be dispatched and then never confirmed, leaving it open for ever.
+      -->
+      <section v-if="awaitingReceipt.length" class="card receipt-card">
+        <div class="receipt-head">
+          <AssetIcon name="package-search" :size="18" />
+          <div>
+            <h2 class="section-title">Units on their way</h2>
+            <p class="receipt-sub">
+              {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
+              they physically arrive — this is what closes the request, and only your facility
+              can assert it.
+            </p>
+          </div>
+        </div>
+
+        <table class="receipt-table">
+          <thead>
+            <tr>
+              <th scope="col" class="pick">
+                <input
+                  type="checkbox"
+                  :checked="allReceiptSelected"
+                  aria-label="Select every dispatched unit"
+                  @change="toggleAllReceipt"
+                >
+              </th>
+              <th scope="col">Unit</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Dispatched</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="allocation in awaitingReceipt" :key="allocation.id">
+              <td class="pick">
+                <input
+                  type="checkbox"
+                  :checked="receiptSelection.includes(allocation.id)"
+                  :aria-label="`Select unit ${allocation.unit_id}`"
+                  @change="toggleReceipt(allocation.id)"
+                >
+              </td>
+              <td class="mono">{{ allocation.unit_id }}</td>
+              <td>{{ allocation.expiry_date || '—' }}</td>
+              <td>{{ formatDateTime(allocation.released_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p v-if="receiptError" class="receipt-error">{{ receiptError }}</p>
+
+        <div class="receipt-actions">
+          <span class="receipt-note">
+            {{ receiptSelection.length
+              ? `${receiptSelection.length} of ${awaitingReceipt.length} selected`
+              : 'Nothing selected — confirming will accept every dispatched unit.' }}
+          </span>
+          <button
+            class="btn btn--primary"
+            type="button"
+            :disabled="confirmingReceipt"
+            @click="handleConfirmReceipt"
+          >
+            {{ confirmingReceipt ? 'Confirming…' : 'Confirm Receipt' }}
+          </button>
+        </div>
+      </section>
+
       <!-- ============== BOTTOM ACTIONS ============== -->
       <div class="bottom-actions">
         <button class="btn btn--outline" type="button" @click="goBack">Back to Blood Requests</button>
@@ -549,6 +620,7 @@ const {
   requestError,
   fetchRequest,
   fetchAvailability,
+  confirmReceipt,
 } = useBloodRequestDetails(requestId)
 
 const {
@@ -600,6 +672,54 @@ function formatCurrency(value) {
 
 const toastMessage = ref('')
 let toastTimer = null
+/*
+ * Confirming receipt of dispatched units.
+ *
+ * Only allocations that have left the blood centre and have not been confirmed
+ * are offered: `released` with no received_at. A reserved unit has not moved
+ * yet, and a received one is already done.
+ */
+const receiptSelection = ref([])
+const confirmingReceipt = ref(false)
+const receiptError = ref('')
+
+const awaitingReceipt = computed(() =>
+  (request.value?.allocations ?? []).filter((a) => a.status === 'released' && !a.received_at),
+)
+
+const allReceiptSelected = computed(() =>
+  awaitingReceipt.value.length > 0 && awaitingReceipt.value.every((a) => receiptSelection.value.includes(a.id)),
+)
+
+function toggleReceipt(id) {
+  receiptSelection.value = receiptSelection.value.includes(id)
+    ? receiptSelection.value.filter((each) => each !== id)
+    : [...receiptSelection.value, id]
+}
+
+function toggleAllReceipt() {
+  receiptSelection.value = allReceiptSelected.value ? [] : awaitingReceipt.value.map((a) => a.id)
+}
+
+async function handleConfirmReceipt() {
+  if (confirmingReceipt.value || awaitingReceipt.value.length === 0) return
+
+  confirmingReceipt.value = true
+  receiptError.value = ''
+
+  try {
+    // An empty selection means the whole delivery, which is what the API does
+    // with an omitted allocation_ids.
+    await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
+    receiptSelection.value = []
+    showToast('Receipt confirmed. Thank you.')
+  } catch (err) {
+    receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'
+  } finally {
+    confirmingReceipt.value = false
+  }
+}
+
 /** The DOH form calls these ROUTINE and STAT; the stored value is unchanged. */
 const priorityLabel = computed(() =>
   request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—',
@@ -1536,5 +1656,75 @@ function scrollToTimeline() {
 @media (max-width: 640px) {
     .items-table { font-size: 12px; }
     .items-table th, .items-table td { padding: 7px 6px; }
+}
+
+/* Awaiting-receipt panel. The hospital is the only party that can say units
+   arrived, so this lives here rather than on the blood centre's screens. */
+.receipt-card {
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    border: 1px solid rgba(var(--rb-primary-rgb), 0.3);
+    background: rgba(var(--rb-primary-rgb), 0.04);
+}
+.receipt-head {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    color: var(--rb-primary-text);
+}
+.receipt-sub {
+    font-size: 13px;
+    color: var(--rb-text-secondary);
+    margin: 4px 0 0;
+    max-width: 68ch;
+}
+.receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 14px;
+}
+.receipt-table th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--rb-text-secondary);
+    padding: 0 10px 6px;
+    border-bottom: 1px solid var(--rb-border-strong);
+}
+.receipt-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--rb-border);
+    color: var(--rb-text-primary);
+}
+.receipt-table tr:last-child td { border-bottom: none; }
+.receipt-table .pick { width: 30px; }
+.receipt-table .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 600;
+}
+.receipt-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+.receipt-note {
+    flex: 1;
+    font-size: 12px;
+    color: var(--rb-text-secondary);
+    min-width: 180px;
+}
+.receipt-error {
+    font-size: 12px;
+    color: var(--rb-accent-text);
+    margin: 10px 0 0;
+}
+
+@media print {
+    .receipt-card { display: none; }
 }
 </style>
