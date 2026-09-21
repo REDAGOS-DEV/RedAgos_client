@@ -1,13 +1,31 @@
 <template>
   <div>
-    <DonorSidebar :donor="user" />
+    <!-- `:donor` was never declared as a prop on the sidebar, so it only landed
+         on its root div as donor="[object Object]". The component reads the
+         user from useUser() itself. -->
+    <DonorSidebar />
 
-    <div :class="collapsed ? 'lg:pl-20' : 'lg:pl-64'" class="transition-[padding-left] duration-200">
+    <!--
+      The content column tracks the rail's width instead of a fixed lg:pl-20.
+      Padding — not a margin or a transform — because it is the one property
+      that both reserves the space and reflows the children inside it, which is
+      what keeps the widened sidebar beside the page rather than over it.
+    -->
+    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
       <!-- Top bar -->
       <header
-        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 lg:px-4 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-700 lg:pl-6 transition-colors duration-150"
-        :class="collapsed ? 'lg:left-20' : 'lg:left-64'"
-        :style="{ borderColor: headerBorderColor, boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }">
+        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b"
+        :class="railExpanded ? 'lg:left-64' : 'lg:left-20'"
+        :style="{ borderColor: headerBorderColor, boxShadow: headerShadow }">
+
+        <!--
+          The bar spans the full width — it carries the background and the
+          divider — but its contents sit in the same centred 1152px column the
+          donor pages use, with the same 16/32px gutters, so the breadcrumb
+          lines up with the page title directly beneath it instead of drifting
+          as the rail reflows the column.
+        -->
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1152px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
 
         <!-- Left Cluster: Mobile Menu Toggle + Titles -->
         <div class="flex items-center gap-2 min-w-0">
@@ -51,7 +69,7 @@
             searchOpenMobile
               ? 'flex flex-1 z-40'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-[48%] lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]">
           <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
           <input ref="searchInput" v-model="searchQuery" type="text" placeholder="Search pages, records..."
@@ -70,9 +88,15 @@
 
           <!-- Results dropdown -->
           <Transition name="popup">
+            <!--
+              The borders here are bound, not a `dark:border-slate-700` class
+              beside a hard-coded inline colour: an inline `border-color`
+              outranks the variant, which is what pinned every one of this
+              header's popups to the light #EEF1F5 in dark mode.
+            -->
             <div v-if="showSearchResults && searchQuery && filteredResults.length"
-              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-lg z-40"
-              style="border-color:#eef1f5">
+              class="search-results-dropdown absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border shadow-lg z-40"
+              :style="{ borderColor: headerBorderColor }">
               <NuxtLink v-for="(item, i) in filteredResults" :key="item.path" :to="item.path"
                 @click="closeSearchResults(); searchOpenMobile = false"
                 class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" :class="i === highlightIndex
@@ -84,8 +108,8 @@
             </div>
 
             <div v-else-if="showSearchResults && searchQuery && !filteredResults.length"
-              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
-              style="border-color:#eef1f5">
+              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
+              :style="{ borderColor: headerBorderColor }">
               No matches for "{{ searchQuery }}"
             </div>
           </Transition>
@@ -118,8 +142,12 @@
             </span>
           </NuxtLink>
 
-          <!-- Divider -->
-          <div class="hidden xs:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
+          <!--
+            `xs:` is not a breakpoint in this project — tailwind.config.js adds
+            no screens, so `hidden xs:block` compiled to `hidden` and this
+            divider never rendered at any width. sm is the real first step up.
+          -->
+          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
 
           <!-- Profile Menu Dropdown -->
           <div class="relative">
@@ -166,10 +194,10 @@
             <!-- Profile Dropdown Card -->
             <Transition name="popup">
               <div v-if="showUserMenu" v-click-outside="closeUserMenu"
-                class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 z-40 shadow-lg"
-                style="border-color:#eef1f5">
-                <div class="flex items-center gap-3 px-4 py-4 border-b dark:border-slate-700"
-                  style="border-color:#eef1f5">
+                class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border z-40 shadow-lg"
+                :style="{ borderColor: headerBorderColor }">
+                <div class="flex items-center gap-3 px-4 py-4 border-b"
+                  :style="{ borderColor: headerBorderColor }">
                   <div
                     class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
                     style="background:#1565C0">
@@ -218,7 +246,7 @@
                   </NuxtLink>
                 </div>
 
-                <div class="border-t dark:border-slate-700 py-2" style="border-color:#eef1f5">
+                <div class="border-t py-2" :style="{ borderColor: headerBorderColor }">
                   <button @click="handleLogout"
                     class="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
                     style="color:#D32F2F">
@@ -227,7 +255,7 @@
                   </button>
                 </div>
 
-                <div class="px-4 py-2 border-t dark:border-slate-700" style="border-color:#eef1f5">
+                <div class="px-4 py-2 border-t" :style="{ borderColor: headerBorderColor }">
                   <p class="text-[11px] text-center text-gray-400 dark:text-slate-500">v1.0.0 · Terms & Conditions</p>
                 </div>
               </div>
@@ -241,9 +269,15 @@
           aria-label="Close search">
           <AssetIcon name="x" :size="18" class="text-[#64748b] dark:text-slate-300" />
         </button>
+        </div>
       </header>
 
-      <main class="min-h-screen bg-[#F7F8FA] dark:bg-slate-900 transition-colors duration-150 pt-14 sm:pt-16">
+      <!--
+        The page background is the token, not bg-white/dark:bg-slate-900. Every
+        donor page paints itself inside a centred max-width, so the margins on
+        either side are this element and have to be the page colour.
+      -->
+      <main class="min-h-screen transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
     </div>
@@ -260,13 +294,26 @@ import { donorService } from '~/api/donor/DonorService'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
-const { collapsed, openMobile } = useSidebar()
+const { railExpanded, openMobile } = useSidebar()
 const router = useRouter()
 const route = useRoute()
 const { user, fetchUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
+/*
+ * Bound rather than written as a `:global(.dark) header` rule. This build's
+ * scoped-CSS transform drops the descendant half of `:global(.dark) .x` and
+ * emits a bare `.dark { … }` — all four of this file's `:global(.dark) x`
+ * rules collapsed into one `.dark{color:#f8fafc;background-color:#475569;
+ * box-shadow:…}` on <html>, so the header lost its shadow and the document
+ * root picked up a slate-600 background it was never meant to have.
+ */
+const headerShadow = computed(() => (
+  isDark.value
+    ? '0 1px 3px rgba(0,0,0,0.30), 0 1px 2px -1px rgba(0,0,0,0.30)'
+    : '0 1px 2px rgba(15,23,42,0.05)'
+))
 
 onMounted(() => {
   if (!user.value) fetchUser()
@@ -467,24 +514,47 @@ const handleLogout = async () => {
   transform: translateY(6px) scale(0.98);
 }
 
-header {
-  will-change: padding-left, left;
+/*
+ * Both of these carry the sidebar's own 200ms/ease-out, so the rail, the
+ * header's left edge and the content column arrive together. Mismatched
+ * durations here are what make a reflowing sidebar look like it is tearing.
+ */
+.content-shift {
+  transition: padding-left 200ms ease-out;
+}
+
+.topbar {
+  transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
+  will-change: left;
+}
+
+main {
+  background: var(--rb-page-bg);
 }
 
 input:focus {
   outline: none;
 }
 
+/*
+ * Tokens, not a paired `:global(.dark) input` rule — see headerShadow. The four
+ * rules that used to live at the bottom of this block all collapsed onto <html>
+ * and did nothing here.
+ */
 input::placeholder {
-  color: #64748b;
+  color: var(--rb-placeholder);
   opacity: 1;
+}
+
+input {
+  color: var(--rb-text-primary);
 }
 
 .search-results-dropdown {
   max-height: 320px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--rb-border-hover) transparent;
 }
 
 .search-results-dropdown::-webkit-scrollbar {
@@ -496,28 +566,12 @@ input::placeholder {
 }
 
 .search-results-dropdown::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background-color: var(--rb-border-hover);
   border-radius: 999px;
 }
 
 a, button {
   touch-action: manipulation;
-}
-
-:global(.dark) input::placeholder {
-  color: #94a3b8;
-}
-
-:global(.dark) input {
-  color: #f8fafc;
-}
-
-:global(.dark) .search-results-dropdown::-webkit-scrollbar-thumb {
-  background-color: #475569;
-}
-
-:global(.dark) header {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3) !important;
 }
 
 @media (max-width: 639px) {
@@ -527,6 +581,13 @@ a, button {
 
   main {
     padding-top: 3.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-shift,
+  .topbar {
+    transition: none;
   }
 }
 </style>

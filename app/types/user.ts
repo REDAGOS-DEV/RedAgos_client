@@ -70,9 +70,9 @@ export interface AppUser {
 
   /**
    * The preset the granted privileges match (`verification_officer`,
-   * `network_admin`, `auditor`), `super_admin` for the unrestricted kind, or
-   * null for a hand-picked set the account form shows as "Custom". Derived by
-   * the server from the stored list, never stored alongside it.
+   * `auditor`), `super_admin` for the unrestricted kind, or null for a
+   * hand-picked set the account form shows as "Custom". Derived by the server
+   * from the stored list, never stored alongside it.
    */
   admin_role: string | null
 

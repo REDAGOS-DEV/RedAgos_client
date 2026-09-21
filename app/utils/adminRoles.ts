@@ -10,7 +10,6 @@
 export const ADMIN_ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Administrator',
   verification_officer: 'Verification Officer',
-  network_admin: 'Network Administrator',
   auditor: 'Auditor',
 }
 
