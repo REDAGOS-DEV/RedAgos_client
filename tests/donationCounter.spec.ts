@@ -402,3 +402,93 @@ describe('the health questionnaire at the counter', () => {
     expect(config.params ?? config.query ?? config.body).toEqual({})
   })
 })
+
+/**
+ * A prior permanent or indefinite deferral, surfaced at the counter.
+ *
+ * It rides on the scan because an officer must not have to go looking for it,
+ * and it carries no reason because that is clinical detail belonging behind the
+ * donor's own record. It blocks nothing — the stage machine is untouched.
+ */
+describe('a prior deferral at the counter', () => {
+  const DEFERRAL = {
+    outcome: 'permanently_deferred',
+    outcome_label: 'Permanently Deferred',
+    recorded_on: '2026-03-12',
+  }
+
+  it('takes it from the scan', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        donor: DONOR, appointment: APPOINTMENT, open_donation: null,
+        health_questionnaire: null, prior_deferral: DEFERRAL,
+      },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+
+    expect(tx.priorDeferral.value).toEqual(DEFERRAL)
+  })
+
+  it('is null for a donor with none', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        donor: DONOR, appointment: APPOINTMENT, open_donation: null,
+        health_questionnaire: null, prior_deferral: null,
+      },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+
+    expect(tx.priorDeferral.value).toBeNull()
+  })
+
+  it('blocks nothing — the visit proceeds exactly as it would without one', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        donor: DONOR, appointment: APPOINTMENT, open_donation: null,
+        health_questionnaire: null, prior_deferral: DEFERRAL,
+      },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+
+    // The banner is information for the officer, not a gate. If this ever
+    // fails, a block was introduced that nobody decided on.
+    expect(tx.stage.value).toBe('verified')
+    expect(tx.error.value).toBeNull()
+  })
+
+  it('is cleared with the rest of the visit', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        donor: DONOR, appointment: APPOINTMENT, open_donation: null,
+        health_questionnaire: null, prior_deferral: DEFERRAL,
+      },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    tx.reset()
+
+    expect(tx.priorDeferral.value).toBeNull()
+  })
+
+  it('does not survive a manual valid-ID lookup, which carries no scan', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        donor: DONOR, appointment: APPOINTMENT, open_donation: null,
+        health_questionnaire: null, prior_deferral: DEFERRAL,
+      },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    tx.adoptDonor(DONOR)
+
+    expect(tx.priorDeferral.value).toBeNull()
+  })
+})

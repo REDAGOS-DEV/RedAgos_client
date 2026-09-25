@@ -49,6 +49,8 @@
       </button>
     </section>
 
+    <BloodCenterPriorDeferralNotice v-if="priorDeferral" :deferral="priorDeferral" />
+
     <BloodCenterDonorQuestionnaireSummary
       v-if="donor"
       :meta="questionnaireMeta"
@@ -157,6 +159,43 @@
         <strong>Review questionnaire</strong> above.
       </p>
 
+      <!--
+        Asked in person, before anything is measured. The officer puts these to
+        the donor while they sit down and types what they are told, so they sit
+        above the readings rather than among them.
+      -->
+      <fieldset class="exam">
+        <legend class="exam__legend">Ask the donor</legend>
+        <div class="vitals">
+          <label class="field">
+            <span class="field__label">Sleep</span>
+            <input v-model="screeningForm.sleep" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Meal</span>
+            <input v-model="screeningForm.meal" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Meds</span>
+            <input v-model="screeningForm.meds" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Allergies</span>
+            <input v-model="screeningForm.allergies" type="text" class="field__input" maxlength="255" >
+          </label>
+        </div>
+        <!--
+          Deliberately not pre-filled from the donor's questionnaire, including
+          Meds, which they also answered in Section I-B. Pre-filling would turn
+          this finding into a confirmation of their claim, and the two are
+          recorded apart precisely so they can disagree.
+        -->
+        <p class="exam__hint">
+          What the donor tells you now. Their own questionnaire answers are under
+          <strong>Review questionnaire</strong> above, and are a separate record.
+        </p>
+      </fieldset>
+
       <div class="vitals">
         <label class="field">
           <span class="field__label">Systolic BP</span>
@@ -184,14 +223,50 @@
         </label>
       </div>
 
+      <!-- Observed, in the order the form prints them. -->
+      <fieldset class="exam">
+        <legend class="exam__legend">On examination</legend>
+        <div class="vitals">
+          <label class="field">
+            <span class="field__label">General appearance</span>
+            <input v-model="screeningForm.general_appearance" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Skin</span>
+            <input v-model="screeningForm.skin" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">HEENT</span>
+            <input v-model="screeningForm.heent" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Heart and lungs</span>
+            <input v-model="screeningForm.heart_and_lungs" type="text" class="field__input" maxlength="255" >
+          </label>
+        </div>
+      </fieldset>
+
       <label class="field">
         <span class="field__label">Notes <span class="field__optional">optional</span></span>
         <textarea v-model="screeningForm.notes" class="field__input" rows="2" maxlength="500" />
       </label>
 
       <div v-if="deferring" class="defer">
+        <!--
+          Which of the form's three deferral boxes. They behave identically in
+          the workflow; what differs is what the donor is told afterwards, so
+          the choice has to be explicit rather than inferred.
+        -->
+        <fieldset class="defer__options">
+          <legend class="field__label">Deferral</legend>
+          <label v-for="option in deferralOptions" :key="option.value" class="defer__option">
+            <input v-model="screeningForm.outcome" type="radio" :value="option.value" >
+            <span>{{ option.label }}</span>
+          </label>
+        </fieldset>
+
         <label class="field">
-          <span class="field__label">Reason for deferral</span>
+          <span class="field__label">Reason</span>
           <input
             v-model="screeningForm.deferral_reason"
             type="text"
@@ -200,7 +275,12 @@
             placeholder="What the donor should be told"
           >
         </label>
+
         <p class="card__hint">The donor's visit ends here and their appointment closes.</p>
+        <p v-if="isBlockingChoice" class="card__hint card__hint--warn">
+          The donor will not be invited to book again, and the next counter to scan
+          them will see this deferral.
+        </p>
       </div>
 
       <div class="actions">
@@ -209,9 +289,9 @@
           type="button"
           class="btn btn--primary"
           :disabled="busy"
-          @click="submitScreening('qualified')"
+          @click="submitScreening('accepted')"
         >
-          {{ busy ? 'Saving…' : 'Qualified — continue' }}
+          {{ busy ? 'Saving…' : 'Accepted — continue' }}
         </button>
 
         <button v-if="!deferring" type="button" class="btn btn--danger" :disabled="busy" @click="deferring = true">
@@ -223,9 +303,9 @@
             type="button"
             class="btn btn--danger"
             :disabled="busy || !screeningForm.deferral_reason.trim()"
-            @click="submitScreening('deferred')"
+            @click="submitScreening(screeningForm.outcome)"
           >
-            {{ busy ? 'Saving…' : 'Confirm deferral' }}
+            {{ busy ? 'Saving…' : `Confirm — ${selectedDeferralLabel}` }}
           </button>
           <button type="button" class="btn" :disabled="busy" @click="deferring = false">Back</button>
         </template>
@@ -288,6 +368,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQrScanner from '~/components/BloodCenter/QrScanner.vue'
 import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
 import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
+import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferralNotice.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
@@ -312,6 +393,7 @@ const service = bloodCenterService
 
 const {
   donor, appointment, donation, stage, busy, error, notice, isDeferred,
+  priorDeferral,
   questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
   loadQuestionnaire,
   verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
@@ -350,7 +432,35 @@ const lookupValue = ref('')
 const lookupError = ref(null)
 const deferring = ref(false)
 
+/**
+ * The form's three deferral boxes. Accepted is the primary action rather than
+ * an option here, because it is the outcome that does not end the visit.
+ */
+const deferralOptions = [
+  { value: 'temporarily_deferred', label: 'Temporarily Deferred' },
+  { value: 'permanently_deferred', label: 'Permanently Deferred' },
+  { value: 'indefinite_deferral', label: 'Indefinite Deferral' },
+]
+
+const BLOCKING_OUTCOMES = ['permanently_deferred', 'indefinite_deferral']
+
+const isBlockingChoice = computed(() => BLOCKING_OUTCOMES.includes(screeningForm.outcome))
+
+const selectedDeferralLabel = computed(() =>
+  deferralOptions.find((o) => o.value === screeningForm.outcome)?.label ?? 'deferral')
+
 const screeningForm = reactive({
+  // Section I-D. The outcome lives on the form rather than being a bare
+  // argument, now that there are four of them and three end the visit.
+  outcome: 'temporarily_deferred',
+  sleep: '',
+  meal: '',
+  meds: '',
+  allergies: '',
+  general_appearance: '',
+  skin: '',
+  heent: '',
+  heart_and_lungs: '',
   systolic_bp: null,
   diastolic_bp: null,
   pulse_bpm: null,
@@ -444,8 +554,17 @@ async function submitScreening(outcome) {
     if (screeningForm[key] !== null && screeningForm[key] !== '') payload[key] = screeningForm[key]
   }
 
+  // Section I-D free text: send only what was actually written, so a field the
+  // officer tabbed past stays absent rather than becoming an empty string.
+  for (const key of ['sleep', 'meal', 'meds', 'allergies',
+    'general_appearance', 'skin', 'heent', 'heart_and_lungs']) {
+    if (screeningForm[key].trim()) payload[key] = screeningForm[key].trim()
+  }
+
   if (screeningForm.notes.trim()) payload.notes = screeningForm.notes.trim()
-  if (outcome === 'deferred') payload.deferral_reason = screeningForm.deferral_reason.trim()
+
+  // Any of the three deferrals carries a reason; only Accepted has none.
+  if (outcome !== 'accepted') payload.deferral_reason = screeningForm.deferral_reason.trim()
 
   await recordScreening(payload)
   deferring.value = false
@@ -478,6 +597,9 @@ function finishVisit() {
   lookupValue.value = ''
   lookupError.value = null
   Object.assign(screeningForm, {
+    outcome: 'temporarily_deferred',
+    sleep: '', meal: '', meds: '', allergies: '',
+    general_appearance: '', skin: '', heent: '', heart_and_lungs: '',
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
     notes: '', deferral_reason: '',
@@ -817,4 +939,61 @@ function finishVisit() {
 .outcome--success { color: var(--rb-success-text); }
 .outcome--deferred { color: var(--rb-warning-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
+
+/* --- Section I-D groupings --- */
+/*
+ * Grouped rather than run together, so an officer working from the paper finds
+ * the spoken answers, the readings and the findings where the form puts them.
+ */
+.exam {
+  margin: 0;
+  padding: 0.85rem 0.9rem 0.9rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.exam__legend {
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.exam__hint {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--rb-text-secondary);
+}
+
+.defer__options {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.defer__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+
+.card__hint--warn {
+  color: var(--rb-accent-text);
+  font-weight: 600;
+}
+
 </style>

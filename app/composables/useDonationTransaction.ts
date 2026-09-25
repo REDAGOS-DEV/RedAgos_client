@@ -49,6 +49,20 @@ export interface QuestionnaireMeta {
   consent_captured: boolean
 }
 
+/**
+ * A permanent or indefinite deferral already on this donor's record.
+ *
+ * Carries no reason: what check-in needs is that a decision exists and when it
+ * was made. The reason is clinical detail and lives behind the donor's history.
+ *
+ * It blocks nothing. The officer reads it and decides.
+ */
+export interface PriorDeferral {
+  outcome: string
+  outcome_label: string
+  recorded_on: string | null
+}
+
 export interface TransactionDonation {
   id: number
   status: string
@@ -74,6 +88,7 @@ export function useDonationTransaction() {
   // the donor and outlives any single visit, and it must stay readable from the
   // moment they are verified right through to the end of the collection. Staff
   // compare their own findings against these answers while recording them.
+  const priorDeferral = ref<PriorDeferral | null>(null)
   const questionnaireMeta = ref<QuestionnaireMeta | null>(null)
   const questionnaire = ref<Record<string, unknown> | null>(null)
   const questionnaireOpen = ref(false)
@@ -183,6 +198,7 @@ export function useDonationTransaction() {
     appointment.value = result.data?.appointment ?? null
     donation.value = result.data?.open_donation ?? null
     questionnaireMeta.value = result.data?.health_questionnaire ?? null
+    priorDeferral.value = result.data?.prior_deferral ?? null
 
     notice.value = donation.value
       ? `Resuming donation #${donation.value.id} already in progress.`
@@ -209,6 +225,11 @@ export function useDonationTransaction() {
     questionnaireMeta.value = null
     questionnaire.value = null
     questionnaireError.value = null
+
+    // The manual valid-ID path has no scan to carry this. Staff who need a
+    // donor's deferral history open their record, which is where the reason
+    // lives anyway.
+    priorDeferral.value = null
   }
 
   /**
@@ -318,6 +339,7 @@ export function useDonationTransaction() {
     questionnaire.value = null
     questionnaireOpen.value = false
     questionnaireError.value = null
+    priorDeferral.value = null
   }
 
   return {
@@ -330,6 +352,7 @@ export function useDonationTransaction() {
     notice,
     isDeferred,
     isCollected,
+    priorDeferral,
     questionnaireMeta,
     questionnaire,
     questionnaireOpen,

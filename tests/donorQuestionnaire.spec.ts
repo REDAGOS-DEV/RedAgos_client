@@ -112,3 +112,38 @@ describe('the questionnaire summary strip', () => {
     expect(summary).not.toMatch(/border-left:\s*[34]px/)
   })
 })
+
+describe('the prior-deferral notice', () => {
+  const notice = component('PriorDeferralNotice.vue')
+
+  it('never renders the deferral reason', () => {
+    // The reason is clinical detail and lives behind the donor's history. What
+    // check-in needs is that a decision exists and when it was made.
+    //
+    // Asserted against the bindings rather than the source text, because the
+    // component's own comment explains the absence and says the word.
+    expect(notice).not.toContain('deferral_reason')
+    expect(notice).not.toMatch(/\{\{[^}]*reason[^}]*\}\}/)
+    expect(notice).not.toMatch(/deferral\.reason/)
+  })
+
+  it('states a fact and offers no action', () => {
+    // It blocks nothing and must not look like it does. No buttons, no links.
+    expect(notice).not.toContain('<button')
+    expect(notice).not.toContain('NuxtLink')
+    expect(notice).toContain('Review their record before proceeding')
+  })
+
+  it('carries no accent stripe, matching the band it sits in', () => {
+    expect(notice).not.toContain('border-left-width: 3px')
+    expect(notice).not.toMatch(/border-left:\s*[34]px/)
+  })
+
+  it('takes its wording from the server label rather than hardcoding the outcomes', () => {
+    // Three deferral values share this banner; naming them here would mean a
+    // fourth silently rendering as a blank.
+    expect(notice).toContain('outcome_label')
+    expect(notice).not.toContain('permanently_deferred')
+    expect(notice).not.toContain('indefinite_deferral')
+  })
+})
