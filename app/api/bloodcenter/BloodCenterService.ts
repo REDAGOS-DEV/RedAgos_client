@@ -144,6 +144,22 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}/history`, 'GET')
   }
 
+  /**
+   * The donor's health questionnaire, Sections I-A to I-C.
+   *
+   * Deliberately its own call rather than something the scan hands over. The
+   * scan says who is at the counter; this is thirty declared health answers,
+   * so the server gates and audits it separately. Nothing is fetched until a
+   * staff member actually opens the drawer.
+   *
+   * `screening_id` is the pin carried through from the scan, which makes the
+   * read exact. The manual valid-ID path has no token to pin with, so it omits
+   * it and the server resolves the questionnaire itself.
+   */
+  async donorHealthQuestionnaire(uuid: string, params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire`, 'GET', params)
+  }
+
   // --- Component settings (supervisor only) ---
   //
   // Shelf life and price, held per facility. blood_components has no

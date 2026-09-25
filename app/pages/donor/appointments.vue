@@ -50,6 +50,20 @@
                 : 'The 24-hour window for changing this appointment has passed.' }}
             </p>
 
+            <!--
+              Booking no longer requires a health questionnaire, so this is the
+              only thing on the donor's own screens that tells them one is due.
+              Silent here means a donor arrives at the counter with nothing to
+              scan.
+            -->
+            <div v-if="screeningNotice(appointment)" class="screening-notice"
+              :class="`screening-notice--${screeningNotice(appointment).tone}`">
+              <p class="screening-notice__text">{{ screeningNotice(appointment).text }}</p>
+              <NuxtLink v-if="screeningNotice(appointment).cta" to="/donor/eligibility" class="screening-notice__link">
+                {{ screeningNotice(appointment).cta }}
+              </NuxtLink>
+            </div>
+
             <div v-if="appointment.can_cancel" class="my-appointment-card__actions">
               <button type="button" class="btn-outline" :disabled="appointmentActionId === appointment.id"
                 @click="startReschedule(appointment)">
@@ -635,16 +649,47 @@ const bookedDateTimeLabel = computed(() => {
 })
 
 
+/**
+ * What to tell the donor about the questionnaire for one booking.
+ *
+ * Returns null when there is nothing to say -- an answered questionnaire needs
+ * no banner, and neither does a booking that no longer holds its slot.
+ */
+function screeningNotice(appointment) {
+  switch (appointment.screening_status) {
+    case 'not_due':
+      return {
+        tone: 'info',
+        text: `Your health questionnaire opens on ${formatDate(appointment.screening_window_opens_on)}, the day before this appointment. We'll email you a reminder.`,
+        cta: null,
+      }
+    case 'due':
+      return {
+        tone: 'warn',
+        text: 'Your health questionnaire is open. Complete it now so your visit starts with a scan rather than a form.',
+        cta: 'Answer it now',
+      }
+    case 'missed':
+      return {
+        tone: 'warn',
+        text: 'You have not completed your health questionnaire. You can still fill it in at the centre, but doing it now will be quicker.',
+        cta: 'Answer it now',
+      }
+    default:
+      // 'answered', or a booking that is no longer active.
+      return null
+  }
+}
+
 function bookingErrorMessage(err) {
   const code = err?.data?.code
 
   switch (code) {
     case 'email_unverified':
       return 'Please verify your email address before booking an appointment.'
-    case 'screening_expired':
-      return 'Your eligibility screening has expired. Please complete a new screening first.'
-    case 'screening_required':
-      return err?.message || 'Please complete an eligibility screening before booking.'
+    // No screening code here any more: booking does not require a
+    // questionnaire. The donor answers it the day before, and
+    // ScreeningWindowOpen reminds them when it falls due.
     case 'below_min_interval':
       return err?.data?.next_eligible_date
         ? `You cannot donate again until ${formatDate(err.data.next_eligible_date)}.`
@@ -1684,4 +1729,41 @@ function goDashboard() {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+/* --- Questionnaire notice on an appointment card --- */
+
+.screening-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.screening-notice--info {
+  background: #eff6ff;
+  border-color: #dbeafe;
+  color: #1e40af;
+}
+
+.screening-notice--warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.screening-notice__text { margin: 0; flex: 1 1 16rem; }
+
+.screening-notice__link {
+  flex: none;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+}
+
 </style>

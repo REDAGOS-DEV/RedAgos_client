@@ -31,6 +31,24 @@ export interface TransactionAppointment {
   event_id: number | null
 }
 
+/**
+ * What the scan tells the counter about the donor's questionnaire.
+ *
+ * Metadata only. Enough to draw the summary strip and decide whether to warn
+ * about a superseded form or missing consent, with no answers in it -- the
+ * document comes from its own endpoint when staff ask for it.
+ */
+export interface QuestionnaireMeta {
+  available: boolean
+  screening_id: number | null
+  question_version: number | null
+  is_current_version: boolean | null
+  question_count: number | null
+  screened_on: string | null
+  valid_until: string | null
+  consent_captured: boolean
+}
+
 export interface TransactionDonation {
   id: number
   status: string
@@ -51,6 +69,16 @@ export function useDonationTransaction() {
   const busy = ref(false)
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
+
+  // The questionnaire is held apart from the donation on purpose: it belongs to
+  // the donor and outlives any single visit, and it must stay readable from the
+  // moment they are verified right through to the end of the collection. Staff
+  // compare their own findings against these answers while recording them.
+  const questionnaireMeta = ref<QuestionnaireMeta | null>(null)
+  const questionnaire = ref<Record<string, unknown> | null>(null)
+  const questionnaireOpen = ref(false)
+  const questionnaireError = ref<string | null>(null)
+  const questionnaireLoading = ref(false)
 
   /**
    * Where the visit has got to, derived from the records rather than tracked.
@@ -107,6 +135,12 @@ export function useDonationTransaction() {
         return 'The bag has already been drawn, so the screening can no longer be changed.'
       case 'facility_missing':
         return 'This account is not linked to a facility.'
+      case 'donor_not_presented':
+        return 'This donor has not presented here yet. Open their donation first, then review the questionnaire.'
+      case 'questionnaire_not_found':
+        return 'This donor has not completed the health questionnaire in the app.'
+      case 'questionnaire_unavailable':
+        return 'The questionnaire is temporarily unavailable. Try again shortly.'
       default:
         return err?.message || 'Something went wrong. Try again.'
     }
@@ -148,6 +182,7 @@ export function useDonationTransaction() {
     donor.value = result.data?.donor ?? null
     appointment.value = result.data?.appointment ?? null
     donation.value = result.data?.open_donation ?? null
+    questionnaireMeta.value = result.data?.health_questionnaire ?? null
 
     notice.value = donation.value
       ? `Resuming donation #${donation.value.id} already in progress.`
@@ -167,6 +202,45 @@ export function useDonationTransaction() {
     donation.value = null
     error.value = null
     notice.value = null
+
+    // Found by ID rather than scanned, so there is no pinned screening and no
+    // metadata to draw the strip from. The questionnaire is still reachable --
+    // the server resolves which one -- but only once loadQuestionnaire() asks.
+    questionnaireMeta.value = null
+    questionnaire.value = null
+    questionnaireError.value = null
+  }
+
+  /**
+   * Fetch the questionnaire, once per visit.
+   *
+   * Cached rather than re-fetched on every open: it cannot change while the
+   * donor stands at the counter, and re-requesting would write another audit
+   * entry each time a staff member closed and reopened the drawer.
+   */
+  async function loadQuestionnaire(force = false) {
+    if (!donor.value) return false
+    if (questionnaire.value && !force) return true
+
+    questionnaireLoading.value = true
+    questionnaireError.value = null
+
+    try {
+      const params: Record<string, number> = {}
+      if (questionnaireMeta.value?.screening_id) {
+        params.screening_id = questionnaireMeta.value.screening_id
+      }
+
+      const result = await service.donorHealthQuestionnaire(donor.value.uuid, params)
+      questionnaire.value = result.data ?? null
+
+      return true
+    } catch (err: any) {
+      questionnaireError.value = messageFor(err)
+      return false
+    } finally {
+      questionnaireLoading.value = false
+    }
   }
 
   async function checkIn() {
@@ -240,6 +314,10 @@ export function useDonationTransaction() {
     donation.value = null
     error.value = null
     notice.value = null
+    questionnaireMeta.value = null
+    questionnaire.value = null
+    questionnaireOpen.value = false
+    questionnaireError.value = null
   }
 
   return {
@@ -252,6 +330,12 @@ export function useDonationTransaction() {
     notice,
     isDeferred,
     isCollected,
+    questionnaireMeta,
+    questionnaire,
+    questionnaireOpen,
+    questionnaireError,
+    questionnaireLoading,
+    loadQuestionnaire,
     verifyQr,
     adoptDonor,
     checkIn,

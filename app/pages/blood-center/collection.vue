@@ -49,6 +49,23 @@
       </button>
     </section>
 
+    <BloodCenterDonorQuestionnaireSummary
+      v-if="donor"
+      :meta="questionnaireMeta"
+      :flagged-count="flaggedCount"
+      :loading="questionnaireLoading"
+      @open="openQuestionnaire"
+      @refresh="refreshQuestionnaire"
+    />
+
+    <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireError }}</p>
+
+    <BloodCenterDonorQuestionnaire
+      v-if="questionnaireOpen && questionnaire"
+      :data="questionnaire"
+      @close="questionnaireOpen = false"
+    />
+
     <!-- Progress through the one continuous transaction. -->
     <ol v-if="donor" class="steps" aria-label="Visit progress">
       <li v-for="step in steps" :key="step.key" class="step" :class="step.state">
@@ -134,6 +151,10 @@
       <p class="card__hint">
         Record what the attending professional found. RedAgos stores this assessment — it does not perform or
         judge it, and no value here decides the outcome.
+      </p>
+      <p class="card__hint">
+        This is your assessment. What the donor declared is under
+        <strong>Review questionnaire</strong> above.
       </p>
 
       <div class="vitals">
@@ -265,6 +286,8 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQrScanner from '~/components/BloodCenter/QrScanner.vue'
+import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
+import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
@@ -289,8 +312,37 @@ const service = bloodCenterService
 
 const {
   donor, appointment, donation, stage, busy, error, notice, isDeferred,
+  questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
+  loadQuestionnaire,
   verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
 } = useDonationTransaction()
+
+const flaggedCount = computed(() => questionnaire.value?.flagged_codes?.length ?? 0)
+
+/**
+ * Fetch on first open and keep it for the visit.
+ *
+ * Nothing is requested until a staff member asks for it, which is why the scan
+ * carries only metadata: the answers are fetched once, from an endpoint that
+ * records who read them.
+ */
+async function openQuestionnaire() {
+  const ok = await loadQuestionnaire()
+
+  if (ok) questionnaireOpen.value = true
+}
+
+/**
+ * Re-fetch for the donor who is filling it in on their phone at the counter.
+ *
+ * Without this, a donor who arrives having never answered would have to be
+ * re-scanned before staff could see what they just submitted.
+ */
+async function refreshQuestionnaire() {
+  const ok = await loadQuestionnaire(true)
+
+  if (ok) questionnaireOpen.value = true
+}
 
 const scannerRef = ref(null)
 const manualOpen = ref(false)

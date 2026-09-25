@@ -88,8 +88,26 @@
                                 </div>
 
                                 <div class="form-field">
-                                    <label class="form-label">Address</label>
+                                    <label class="form-label">Home address</label>
                                     <input v-model="profile.address" type="text" class="form-input" placeholder="Street, Barangay, City">
+                                </div>
+
+                                <!--
+                                    Section I-A. Editable here as well as on the
+                                    profile page, which both write through the
+                                    same endpoint.
+                                -->
+                                <div class="form-field">
+                                    <label class="form-label">Middle name</label>
+                                    <input v-model="profile.middle_name" type="text" class="form-input">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Occupation</label>
+                                    <input v-model="profile.occupation" type="text" class="form-input">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Nationality</label>
+                                    <input v-model="profile.nationality" type="text" class="form-input">
                                 </div>
                             </div>
 
@@ -311,6 +329,9 @@ const profile = reactive({
     birthDate: '',
     bloodType: '',
     address: '',
+    middle_name: '',
+    occupation: '',
+    nationality: '',
     donorId: '',
     avatarUrl: '',
 })
@@ -391,6 +412,9 @@ async function saveProfile() {
             birth_date: profile.birthDate,
             blood_type: profile.bloodType,
             address: profile.address,
+            middle_name: profile.middle_name,
+            occupation: profile.occupation,
+            nationality: profile.nationality,
         })
         applyProfile(response?.data || {})
         await fetchUser()
@@ -529,6 +553,9 @@ function applyProfile(data) {
     profile.birthDate = data?.birth_date ?? ''
     profile.bloodType = data?.blood_type ?? ''
     profile.address = data?.address ?? ''
+    profile.middle_name = data?.middle_name ?? ''
+    profile.occupation = data?.occupation ?? ''
+    profile.nationality = data?.nationality ?? ''
     profile.donorId = data?.donor_id ?? ''
     profile.avatarUrl = data?.avatar_url ?? ''
 }

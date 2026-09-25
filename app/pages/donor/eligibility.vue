@@ -20,8 +20,8 @@
 
         <template v-else>
             <div class="header-row">
-                <h1 class="page-title">Check your donation readiness</h1>
-                <p class="page-subtitle">Complete the short health assessment below to determine whether you're currently eligible to donate blood.</p>
+                <h1 class="page-title">Blood Donor's Health Questionnaire</h1>
+                <p class="page-subtitle">Answer every question honestly. The blood centre reviews your answers with you when you arrive — a "Yes" does not by itself mean you cannot donate.</p>
             </div>
 
             <!-- Info banner -->
@@ -30,8 +30,8 @@
                     <AssetIcon name="info" :size="16" class="banner-icon" />
                 </span>
                 <p class="info-banner__text">
-                    This screening is valid for 90 days. Once you pass, a QR code will be generated for you to present at
-                    the donation center.
+                    Your QR code is generated as soon as you submit. Present it at the donation centre, where staff will
+                    go through your answers with you.
                 </p>
             </div>
 
@@ -59,7 +59,27 @@
                 </template>
             </div>
 
-            <div class="main-grid">
+            <!--
+                The most likely new state a donor meets: booked, but too early.
+                It has to read as a schedule, not as an error, and it must never
+                render an empty form behind it.
+            -->
+            <div v-if="windowClosed" class="panel window-closed">
+                <div class="panel-header panel-header--simple">
+                    <h2 class="panel-title">Your questionnaire opens on {{ formatDate(windowOpensOn) }}</h2>
+                </div>
+                <div class="form-body">
+                    <p class="window-closed__text">
+                        You answer this the day before your appointment, so that what the blood centre reads is current.
+                        Come back on {{ formatDate(windowOpensOn) }} — we will email you a reminder.
+                    </p>
+                    <NuxtLink to="/donor/appointments" class="btn-outline window-closed__link">
+                        View my appointment
+                    </NuxtLink>
+                </div>
+            </div>
+
+            <div v-else class="main-grid">
               <!-- Left column: questions -->
                 <div class="col-left">
                     <div v-if="loadError" class="panel">
@@ -74,20 +94,41 @@
                         </div>
                     </div>
 
-                    <div v-for="(section, idx) in sections" :key="section.key" class="panel">
+                    <div v-for="section in sections" :key="section.key" class="panel">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Section {{ idx + 1 }} - {{ section.title }}</h2>
+                            <h2 class="panel-title">{{ section.title }}</h2>
+                            <span class="panel-count">{{ sectionProgress(section) }}</span>
                         </div>
                         <div class="question-list">
-                            <div v-for="q in section.questions" :key="q.code" class="question-card">
+                            <div v-for="q in section.questions" :key="q.code" class="question-card"
+                                :id="`q-${q.code}`"
+                                :class="{ 'question-card--missing': missingHighlight === q.code }">
                                 <p class="question-card__text">{{ q.number }}. {{ q.text }}</p>
                                 <div class="answer-toggle">
                                     <button type="button" class="answer-btn answer-btn--yes"
                                         :class="{ 'answer-btn--active': answers[q.code] === true }"
-                                        @click="answers[q.code] = true">Yes</button>
+                                        @click="answers[q.code] = true">
+                                        {{ q.kind === 'acknowledgement' ? 'Yes, I understand' : 'Yes' }}
+                                    </button>
                                     <button type="button" class="answer-btn answer-btn--no"
                                         :class="{ 'answer-btn--active': answers[q.code] === false }"
                                         @click="answers[q.code] = false">No</button>
+                                    <!--
+                                        Only where the server says the question is not required of
+                                        this donor. It omits the code from the payload rather than
+                                        sending a boolean, because "not pregnant" from someone the
+                                        question was never meant for is a falsehood in the record.
+                                    -->
+                                    <button v-if="q.required === false" type="button"
+                                        class="answer-btn answer-btn--na"
+                                        :class="{ 'answer-btn--active': answers[q.code] === null }"
+                                        @click="answers[q.code] = null">Not applicable to me</button>
+                                </div>
+
+                                <div v-if="q.code === lastMenstrualCode && answers[q.code] !== null" class="lmp-field">
+                                    <label class="form-label" :for="`lmp-${q.code}`">Last menstrual period</label>
+                                    <input :id="`lmp-${q.code}`" v-model="vitals.lastMenstrualPeriod" type="date"
+                                        class="form-input">
                                 </div>
                             </div>
                         </div>
@@ -141,27 +182,57 @@
                         </div>
                     </div>
 
-                    <!-- Result preview -->
+                    <!--
+                        Section I-C. Every statement has to be ticked before the
+                        questionnaire can be submitted.
+                    -->
+                    <div v-if="consentStatements.length" class="panel">
+                        <div class="panel-header panel-header--simple">
+                            <h2 class="panel-title">Donor's informed consent</h2>
+                        </div>
+                        <div class="form-body">
+                            <label v-for="(statement, i) in consentStatements" :key="i" class="consent-item">
+                                <input v-model="consentTicked[i]" type="checkbox" class="consent-item__box">
+                                <span class="consent-item__text">{{ statement }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!--
+                        The review step. With no result preview, this is the only
+                        feedback the form gives before submitting, so it is not
+                        optional polish: it is where a donor catches a mis-tap
+                        across thirty questions.
+                    -->
                     <div class="panel">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Screening result preview</h2>
+                            <h2 class="panel-title">Review and submit</h2>
                         </div>
-                        <div class="result-body">
-                            <div class="result-box result-box--pending">
-                                <p class="result-box__label">Based on your answers</p>
-                                <p class="result-box__value result-box__value--pending">{{ resultLabel }}</p>
-                            </div>
-
-                            <p class="result-body__note">
-                                Final eligibility is confirmed upon submission. If you pass, a QR code will be generated
-                                automatically for your next donation.
+                        <div class="form-body">
+                            <p v-if="!allAnswered" class="review-missing">
+                                {{ unansweredCount }} question{{ unansweredCount === 1 ? '' : 's' }} still to answer.
+                                <button type="button" class="review-missing__link" @click="goToFirstUnanswered">
+                                    Go to the first one
+                                </button>
                             </p>
+                            <p v-else-if="!allConsentTicked" class="review-missing">
+                                Please read and accept every consent statement above.
+                            </p>
+                            <p v-else class="review-ready">
+                                All {{ answeredCount }} questions answered and consent accepted.
+                                Check your answers, then submit.
+                            </p>
+
+                            <button type="button" class="btn-outline btn-block" :disabled="!allAnswered"
+                                @click="showReview = true">
+                                Review my answers
+                            </button>
                         </div>
                     </div>
 
                     <button type="button" class="btn-primary btn-block btn-submit"
-                        :disabled="submitting || !allAnswered" @click="handleSubmit()">
-                        <span>{{ submitting ? 'Submitting...' : 'Submit screening' }}</span>
+                        :disabled="submitting || !canSubmit" @click="handleSubmit()">
+                        <span>{{ submitting ? 'Submitting...' : 'Submit questionnaire' }}</span>
                         <AssetIcon name="arrow-right" :size="16" class="btn-submit__icon" />
                     </button>
 
@@ -169,7 +240,7 @@
                         <p class="submit-error__text">{{ submitError }}</p>
                         <button v-if="canForceResubmit" type="button" class="btn-outline btn-block"
                             :disabled="submitting" @click="handleSubmit(true)">
-                            Re-screen anyway
+                            Answer it again anyway
                         </button>
                     </div>
 
@@ -177,7 +248,48 @@
             </div>
         </template>
 
-        <!-- Success modal, makita rani if ang result sa eligibility screening kay "eligible" -->
+        <!-- The review step: everything about to be sent, read-only. -->
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div v-if="showReview" class="modal-backdrop" @click.self="showReview = false">
+                    <div class="modal-card modal-card--review" role="dialog" v-focus-trap aria-modal="true"
+                        aria-labelledby="rev-title">
+                        <h2 id="rev-title" class="modal-title">Review your answers</h2>
+                        <p class="modal-subtitle">
+                            This is exactly what will be sent. Close this to change anything.
+                        </p>
+
+                        <div class="review-list">
+                            <section v-for="section in sections" :key="section.key" class="review-section">
+                                <h3 class="review-section__title">{{ section.title }}</h3>
+                                <ol class="review-answers">
+                                    <li v-for="q in section.questions" :key="q.code" class="review-answer">
+                                        <span class="review-answer__text">{{ q.number }}. {{ q.text }}</span>
+                                        <span class="review-answer__value">{{ answerLabel(q) }}</span>
+                                    </li>
+                                </ol>
+                            </section>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn-outline" @click="showReview = false">
+                                Change something
+                            </button>
+                            <button type="button" class="btn-primary" :disabled="submitting || !canSubmit"
+                                @click="showReview = false; handleSubmit()">
+                                {{ submitting ? 'Submitting...' : 'Submit questionnaire' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!--
+            Gipakita ni pagkahuman sa submit. Walay verdict diri -- walay
+            "passed" ug walay "deferred" -- kay ang blood center na ang mo-basa
+            sa mga tubag ug mo-desisyon didto sa counter.
+        -->
         <Teleport to="body">
             <Transition name="modal-fade">
                 <div v-if="showPassedModal" class="modal-backdrop" @click.self="showPassedModal = false">
@@ -186,10 +298,10 @@
                             <AssetIcon name="check" :size="26" />
                         </div>
 
-                        <h2 id="epm-title" class="modal-title">Eligibility screening passed!</h2>
+                        <h2 id="epm-title" class="modal-title">Questionnaire submitted</h2>
                         <p class="modal-subtitle">
                             {{ qrCodeDataUrl
-                                ? 'Your QR code has been generated. Present it at the blood center to proceed with your next test.'
+                                ? 'Bring this QR code with you. The blood centre will review your answers when you arrive.'
                                 : 'Verify your email address to receive your check-in QR code.' }}
                         </p>
 
@@ -238,8 +350,10 @@ const submitting = ref(false)
 const loading = ref(true)
 const loadError = ref('')
 
-// Modal + QR state shown after an eligible result
+// Modal + QR state shown after a submitted questionnaire
 const showPassedModal = ref(false)
+const showReview = ref(false)
+const missingHighlight = ref('')
 const qrCodeDataUrl = ref('')
 const qrExpiresOn = ref(null)
 const qrValidityDays = ref(14)
@@ -257,7 +371,25 @@ const vitals = reactive({
     weight: null,
     bloodType: '',
     lastDonationDate: '',
+    lastDonationVenue: '',
+    // The form's free field inside the female-donors section.
+    lastMenstrualPeriod: '',
 })
+
+// Section I-C, served alongside the questions so the version echoed back is
+// provably the one that was rendered.
+const consentVersion = ref(null)
+const consentStatements = ref([])
+const consentTicked = reactive({})
+
+// Set when the donor holds an appointment whose window has not opened yet.
+const windowClosed = ref(false)
+const windowOpensOn = ref(null)
+
+// The DOH form puts "Last menstrual period" under question 5.
+const lastMenstrualCode = computed(() =>
+    sections.value.find(s => s.key === 'female_donors')?.questions?.[0]?.code ?? ''
+)
 
 // Gi-track kung asa nga fields gikan sa profile, kay kato ra ang i-lock. Kung
 // wala nag-return og value ang server, editable gihapon para sa donor.
@@ -273,35 +405,76 @@ const submitError = ref('')
 const canForceResubmit = ref(false)
 
 
-// Step indicator: one step per served section, then Vital Information, then
-// Ready to submit. Auto-advances as the user finishes each card.
-const steps = computed(() =>
-    Array.from({ length: sections.value.length + 2 }, (_, i) => ({ number: i + 1 }))
-)
+// Four macro-steps that map to the printed form, rather than one dot per
+// served section. Six sections would have produced eight dots in an indicator
+// whose layout was built for four.
+const STEP_COUNT = 4
+const steps = computed(() => Array.from({ length: STEP_COUNT }, (_, i) => ({ number: i + 1 })))
 
 const allQuestions = computed(() => sections.value.flatMap(section => section.questions))
 
-const allAnswered = computed(() =>
-    allQuestions.value.length > 0 && allQuestions.value.every(q => answers[q.code] !== undefined)
+// `null` is a real answer here -- "not applicable to me" -- so only `undefined`
+// counts as unanswered.
+const unanswered = computed(() =>
+    allQuestions.value.filter(q => answers[q.code] === undefined)
 )
+
+const unansweredCount = computed(() => unanswered.value.length)
+const answeredCount = computed(() => allQuestions.value.length - unansweredCount.value)
+
+const allAnswered = computed(() =>
+    allQuestions.value.length > 0 && unansweredCount.value === 0
+)
+
+const allConsentTicked = computed(() =>
+    consentStatements.value.length > 0
+    && consentStatements.value.every((_, i) => consentTicked[i] === true)
+)
+
+const canSubmit = computed(() => allAnswered.value && allConsentTicked.value)
 
 const currentStep = computed(() => {
-    const unfinished = sections.value.findIndex(
-        section => section.questions.some(q => answers[q.code] === undefined)
-    )
-    if (unfinished !== -1) return unfinished + 1
+    if (unansweredCount.value === allQuestions.value.length) return 1
+    if (unansweredCount.value > 0) return 2
+    if (!vitals.weight) return 3
 
-    const vitalsDone = vitals.age && vitals.weight && vitals.bloodType && vitals.lastDonationDate
-    if (!vitalsDone) return sections.value.length + 1
-
-    return sections.value.length + 2
+    return 4
 })
 
-// Ang disqualification flags kay wala gi-serve sa /eligibility/questions, tinuyo
-// gyud, kay ang server ra ang mo-score. So walay verdict nga ma-compute diri.
-const resultLabel = computed(() =>
-    allAnswered.value ? 'Ready to submit' : 'Answer all questions to see your result'
-)
+function sectionProgress(section) {
+    const done = section.questions.filter(q => answers[q.code] !== undefined).length
+
+    return `${done}/${section.questions.length}`
+}
+
+function answerLabel(q) {
+    const value = answers[q.code]
+
+    if (value === undefined) return 'Not answered'
+    if (value === null) return 'Not applicable'
+
+    return value ? 'Yes' : 'No'
+}
+
+/**
+ * Take the donor to the first question they have not answered.
+ *
+ * At eight questions a disabled submit button was survivable. At thirty it is a
+ * dead end, and with the result preview gone there is nothing else telling them
+ * what is left.
+ */
+function goToFirstUnanswered() {
+    const first = unanswered.value[0]
+    if (!first) return
+
+    missingHighlight.value = first.code
+
+    if (import.meta.client) {
+        document.getElementById(`q-${first.code}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+
+    setTimeout(() => { missingHighlight.value = '' }, 2000)
+}
 
 function formatDate(value) {
     if (!value) return '-'
@@ -318,37 +491,38 @@ const statusBanner = computed(() => {
     const current = eligibility.value
     if (!current) return null
 
-    const reasons = current.deferral_reasons || []
+    switch (current.questionnaire_status) {
+        case 'answered':
+            // Ang bag-ong version kay lahi nga porma, dili balik-balik nga
+            // tubag, so gi-agda ang donor nga mo-tubag pag-usab -- dili siya
+            // gi-pugngan.
+            if (current.re_screen_recommended) {
+                return {
+                    tone: 'warning',
+                    icon: 'clock',
+                    title: 'The questionnaire has been updated since you last answered it.',
+                    detail: 'Please answer the current version so the blood centre has your full history.',
+                    reasons: [],
+                }
+            }
 
-    switch (current.eligibility_status) {
-        case 'eligible':
             return {
                 tone: 'success',
                 icon: 'circle-check-big',
-                title: `You already have a valid screening, good until ${formatDate(current.screening_valid_until)}.`,
-                detail: 'Re-screen only if your health details have changed since then.',
+                title: `You answered this on ${formatDate(current.screening_date)}, good until ${formatDate(current.screening_valid_until)}.`,
+                detail: 'Answer it again only if your health details have changed since then.',
                 reasons: [],
-            }
-        case 'deferred':
-            return {
-                tone: 'danger',
-                icon: 'octagon-alert',
-                title: 'Your last screening was deferred.',
-                detail: current.next_eligible_date
-                    ? `You may be eligible again on ${formatDate(current.next_eligible_date)}.`
-                    : '',
-                reasons,
             }
         case 'expired':
             return {
                 tone: 'warning',
                 icon: 'clock',
-                title: `Your previous screening expired on ${formatDate(current.screening_valid_until)}.`,
-                detail: 'Complete the questionnaire again to refresh your eligibility.',
+                title: `Your previous answers expired on ${formatDate(current.screening_valid_until)}.`,
+                detail: 'Complete the questionnaire again to restore your check-in code.',
                 reasons: [],
             }
         default:
-            // 'pending' — igo na ang static info banner para sa wala pa na-screen.
+            // 'not_answered' — igo na ang static info banner.
             return null
     }
 })
@@ -376,10 +550,27 @@ function handleSubmitError(err) {
         return
     }
 
-    if (code === 'questionnaire_version_stale') {
+    if (code === 'questionnaire_version_stale' || code === 'consent_version_stale') {
         submitError.value = err.message
         // Kuhaon ang bag-ong version aron mo-trabaho ang sunod nga submit.
         load()
+        return
+    }
+
+    // Ang tulo ka objective threshold -- edad, timbang, ug ang 56 ka adlaw nga
+    // interval. Gi-ingon ni sila nga plain nga kamatuoran, dili isip verdict sa
+    // panglawas sa donor.
+    if (code === 'threshold_not_met') {
+        submitError.value = (err?.data?.reasons || [])
+            .map(reason => reason.message)
+            .join(' ') || err.message
+        return
+    }
+
+    if (code === 'screening_window_not_open') {
+        windowClosed.value = true
+        windowOpensOn.value = err?.data?.window_opens_on ?? null
+        submitError.value = err.message
         return
     }
 
@@ -400,7 +591,16 @@ async function handleSubmit(force = false) {
     try {
         const payload = {
             question_version: questionVersion.value,
-            answers: allQuestions.value.map(q => ({ code: q.code, answer: answers[q.code] })),
+            // Ang `null` nga tubag ("not applicable to me") kay gi-laktawan, dili
+            // gi-send isip boolean: ang server na ang mo-hibalo nga wala kadto
+            // gipangutana ani nga donor.
+            answers: allQuestions.value
+                .filter(q => answers[q.code] !== undefined && answers[q.code] !== null)
+                .map(q => ({ code: q.code, answer: answers[q.code] })),
+            consent: {
+                version: consentVersion.value,
+                accepted: true,
+            },
         }
 
         // `vitals.weight` kay required_with:vitals, so kung walay weight, i-omit
@@ -411,6 +611,14 @@ async function handleSubmit(force = false) {
             if (vitals.lastDonationDate) {
                 payload.vitals.last_donation_date = vitals.lastDonationDate
             }
+
+            if (vitals.lastDonationVenue) {
+                payload.vitals.last_donation_venue = vitals.lastDonationVenue
+            }
+
+            if (vitals.lastMenstrualPeriod) {
+                payload.vitals.last_menstrual_period = vitals.lastMenstrualPeriod
+            }
         }
 
         if (force) {
@@ -419,31 +627,26 @@ async function handleSubmit(force = false) {
 
         const data = await donorService.submitEligibilityScreening(payload)
 
-        // I-refresh ang status banner aron mo-reflect na sa bag-ong screening.
+        // I-refresh ang status banner aron mo-reflect na sa bag-ong tubag.
         await loadStatus()
 
-        if (data?.result === 'eligible') {
-            qrExpiresOn.value = data?.qr_valid_until ?? null
-            qrValidityDays.value = data?.qr_valid_days ?? qrValidityDays.value
-            qrCodeDataUrl.value = ''
+        // Walay `result` nga i-check. Ang matag kompleto nga questionnaire kay
+        // makakuha og QR code -- ang blood center na ang mo-desisyon didto sa
+        // counter kung makahatag ba og dugo ang donor.
+        qrExpiresOn.value = data?.qr_valid_until ?? null
+        qrValidityDays.value = data?.qr_valid_days ?? qrValidityDays.value
+        qrCodeDataUrl.value = ''
 
-            // Walay qr_token kung wala pa ma-verify ang email sa donor.
-            if (data?.qr_token) {
-                qrCodeDataUrl.value = await QRCode.toDataURL(data.qr_token, {
-                    width: 220,
-                    margin: 1,
-                    color: { dark: '#1f2937', light: '#ffffff' },
-                })
-            }
-
-            showPassedModal.value = true
-            return
+        // Walay qr_token kung wala pa ma-verify ang email sa donor.
+        if (data?.qr_token) {
+            qrCodeDataUrl.value = await QRCode.toDataURL(data.qr_token, {
+                width: 220,
+                margin: 1,
+                color: { dark: '#1f2937', light: '#ffffff' },
+            })
         }
 
-        // Deferred: ang status banner sa taas mao nay mo-explain sa mga reasons.
-        if (import.meta.client) {
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-        }
+        showPassedModal.value = true
     } catch (err) {
         handleSubmitError(err)
     } finally {
@@ -457,9 +660,11 @@ async function load() {
     loadError.value = ''
     try {
         // GET /api/donors/eligibility/questions
-        // Response: { version, sections: [{ key, title, questions: [{ code, number, text }] }] }
+        // Response: { version, sections: [{ key, number, title, questions:
+        //   [{ code, number, text, kind, required }] }], consent: { version, statements } }
         const data = await donorService.eligibilityQuestions()
 
+        windowClosed.value = false
         questionVersion.value = data?.version ?? null
         sections.value = (data?.sections || []).map(section => ({
             key: section.key,
@@ -467,11 +672,23 @@ async function load() {
             questions: section.questions || [],
         }))
 
+        consentVersion.value = data?.consent?.version ?? null
+        consentStatements.value = data?.consent?.statements || []
+
         // Limpyohan ang answers aron walay stale nga code nga mabilin after reload
         Object.keys(answers).forEach(code => delete answers[code])
+        Object.keys(consentTicked).forEach(i => delete consentTicked[i])
     } catch (err) {
+        // Naa pa'y appointment ang donor pero sayo pa siya. Dili ni error --
+        // schedule ni -- so ang petsa ang i-pakita, dili blangko nga porma.
+        if (err?.data?.code === 'screening_window_not_open') {
+            windowClosed.value = true
+            windowOpensOn.value = err?.data?.window_opens_on ?? null
+            return
+        }
+
         console.error('Failed to load eligibility questions:', err)
-        loadError.value = err?.message || 'Unable to load the screening questionnaire.'
+        loadError.value = err?.message || 'Unable to load the health questionnaire.'
     } finally {
         loading.value = false
     }
@@ -509,9 +726,10 @@ async function loadPrefill() {
 async function loadStatus() {
     try {
         // GET /api/donors/eligibility
-        // Response: { eligibility_status, screening_date, screening_valid_until,
-        //             deferral_reasons: [{ code, message }], last_donation_date,
-        //             next_eligible_date, questionnaire_version }
+        // Response: { questionnaire_status, screening_date, screening_valid_until,
+        //             consented_on, last_donation_date, next_eligible_date,
+        //             questionnaire_version, screening_question_version,
+        //             re_screen_recommended, appointment }
         eligibility.value = await donorService.eligibilityStatus()
     } catch (err) {
         // Informational ra ang banner, so dili ni angay mo-block sa form.
@@ -792,8 +1010,22 @@ onActivated(() => {
 }
 
 .panel-header--simple {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
     padding: 16px 20px;
     border-bottom: 1px solid #f3f4f6;
+}
+
+/* Per-section progress. At thirty questions a donor needs to see where they
+   are without counting the cards themselves. */
+.panel-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary, #6b7280);
+    font-variant-numeric: tabular-nums;
+    flex: none;
 }
 
 .panel-title {
@@ -1332,4 +1564,139 @@ onActivated(() => {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+/* --- Section I-C consent, the review step, and the closed window --- */
+
+.consent-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+}
+
+.consent-item:last-child { border-bottom: none; }
+
+.consent-item__box {
+    margin-top: 3px;
+    width: 16px;
+    height: 16px;
+    flex: none;
+    accent-color: var(--brand, #b91c1c);
+    cursor: pointer;
+}
+
+.consent-item__text {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-primary);
+}
+
+.review-missing,
+.review-ready {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.review-missing { color: #92400e; }
+.review-ready { color: #166534; }
+
+.review-missing__link {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--brand, #b91c1c);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* A question the donor was sent back to. Fades out on its own so it marks the
+   place without leaving a permanent error state on an untouched field. */
+.question-card--missing {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+}
+
+.answer-btn--na.answer-btn--active {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+    color: #374151;
+}
+
+.lmp-field {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.window-closed { max-width: 640px; }
+
+.window-closed__text {
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary, #6b7280);
+}
+
+.window-closed__link { display: inline-flex; width: auto; }
+
+/* --- Review modal --- */
+
+.modal-card--review {
+    max-width: 640px;
+    width: 100%;
+    text-align: left;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.review-list {
+    flex: 1;
+    overflow-y: auto;
+    margin: 16px 0;
+    padding-right: 4px;
+}
+
+.review-section { margin-bottom: 18px; }
+
+.review-section__title {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #6b7280);
+}
+
+.review-answers { margin: 0; padding: 0; list-style: none; }
+
+.review-answer {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.review-answer__text {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.review-answer__value {
+    flex: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
 </style>

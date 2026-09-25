@@ -249,3 +249,156 @@ describe('BloodCenterService counter endpoints', () => {
     expect(fetchMock.mock.calls[0]![0]).toBe('/blood-center/appointments/7/check-in')
   })
 })
+
+/**
+ * The donor's health questionnaire at the counter.
+ *
+ * Two rules are worth locking in. The scan carries a reference and never the
+ * answers, so the document is fetched only when a staff member asks for it and
+ * only from the endpoint that records who read it. And the stage machine is
+ * untouched by any of it: the questionnaire is not a step in the visit, it is
+ * something staff read alongside every step.
+ */
+describe('the health questionnaire at the counter', () => {
+  const META = {
+    available: true,
+    screening_id: 51,
+    question_version: 2,
+    is_current_version: true,
+    question_count: 29,
+    screened_on: '2026-09-20',
+    valid_until: '2026-12-19',
+    consent_captured: true,
+  }
+
+  it('takes the reference from the scan without fetching the answers', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+
+    expect(tx.questionnaireMeta.value).toEqual(META)
+    // Nothing fetched yet: one call, the scan itself.
+    expect(tx.questionnaire.value).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not add a stage to the visit', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+
+    // The regression this feature most risks: the questionnaire is read
+    // alongside the visit, never as a step in it.
+    expect(tx.stage.value).toBe('verified')
+  })
+
+  it('pins the screening from the scan when fetching the document', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+    fetchMock.mockResolvedValueOnce({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    await tx.loadQuestionnaire()
+
+    const [url, config] = fetchMock.mock.calls[1]!
+
+    expect(url).toBe('/blood-center/donors/donor-uuid/health-questionnaire')
+    expect(config.params ?? config.query ?? config.body).toEqual({ screening_id: 51 })
+  })
+
+  it('fetches once and keeps it for the visit', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+    fetchMock.mockResolvedValueOnce({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    await tx.loadQuestionnaire()
+    await tx.loadQuestionnaire()
+
+    // Re-reading would write a second audit entry for the same look.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-fetches when asked to, for the donor filling it in at the counter', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+    fetchMock.mockResolvedValue({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    await tx.loadQuestionnaire()
+    await tx.loadQuestionnaire(true)
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('explains a refusal in terms of what staff should do next', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: null, open_donation: null, health_questionnaire: null },
+    })
+    fetchMock.mockRejectedValueOnce(httpError(403, { code: 'donor_not_presented' }))
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    const ok = await tx.loadQuestionnaire()
+
+    expect(ok).toBe(false)
+    expect(tx.questionnaireError.value).toContain('Open their donation first')
+  })
+
+  it('says so plainly when the donor never answered it', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: null },
+    })
+    fetchMock.mockRejectedValueOnce(httpError(404, { code: 'questionnaire_not_found' }))
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    await tx.loadQuestionnaire()
+
+    expect(tx.questionnaireError.value).toContain('has not completed the health questionnaire')
+  })
+
+  it('clears the questionnaire with the rest of the visit', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null, health_questionnaire: META },
+    })
+    fetchMock.mockResolvedValueOnce({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    await tx.verifyQr('raw-token')
+    await tx.loadQuestionnaire()
+    tx.questionnaireOpen.value = true
+
+    tx.reset()
+
+    // A donor's health answers left on a shared counter machine is the whole
+    // reason this state is per-visit rather than app-wide.
+    expect(tx.questionnaire.value).toBeNull()
+    expect(tx.questionnaireMeta.value).toBeNull()
+    expect(tx.questionnaireOpen.value).toBe(false)
+  })
+
+  it('drops the pin on the manual valid-ID path, since there is no token', async () => {
+    fetchMock.mockResolvedValueOnce({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.loadQuestionnaire()
+
+    const [, config] = fetchMock.mock.calls[0]!
+
+    expect(config.params ?? config.query ?? config.body).toEqual({})
+  })
+})

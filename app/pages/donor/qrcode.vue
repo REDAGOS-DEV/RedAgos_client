@@ -187,7 +187,10 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 
 const loading = ref(true)
 const profile = ref(null)
-const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'expired' | 'pending'
+// Kung na-answer na ba ang questionnaire ug valid pa ba -- dili kung
+// pwede na ba mo-donate. Ang blood center ang mo-desisyon ana, didto sa
+// counter, base sa ilang kaugalingong assessment.
+const questionnaireStatus = ref('not_answered') // 'not_answered' | 'answered' | 'expired'
 const upcomingAppointment = ref(null)
 const qrCodeDataUrl = ref('')
 const qrValidUntil = ref(null)
@@ -228,9 +231,11 @@ const QR_STORAGE_KEY = 'donor-qr-code'
 const canShowQr = computed(() => !!qrCodeDataUrl.value)
 
 const qrState = computed(() => {
-  if (eligibilityStatus.value === 'deferred') return 'deferred'
-  if (eligibilityStatus.value === 'expired') return 'expired'
-  if (eligibilityStatus.value !== 'eligible') return 'pending'
+  // Wala nay 'deferred' nga state. Ang donor dili na i-hukman sa iyang
+  // kaugalingong mga tubag, so ang tanan nga kompleto nga questionnaire
+  // makakuha og QR code.
+  if (questionnaireStatus.value === 'expired') return 'expired'
+  if (questionnaireStatus.value !== 'answered') return 'pending'
   return emailVerified.value ? 'ready' : 'unverified'
 })
 
@@ -238,7 +243,7 @@ const qrEmptyCopy = computed(() => {
   switch (qrState.value) {
     case 'ready':
       return {
-        title: 'Your screening passed',
+        title: 'Your questionnaire is submitted',
         sub: hasActiveToken.value
           ? `You have an active check-in code, valid until ${formatDate(qrValidUntil.value)}.`
           : 'Generate your check-in QR code to present at the blood center.',
@@ -247,26 +252,20 @@ const qrEmptyCopy = computed(() => {
     case 'unverified':
       return {
         title: 'Verify your email address',
-        sub: 'Your screening passed. Confirm your email address to receive your check-in QR code.',
+        sub: 'Your questionnaire is submitted. Confirm your email address to receive your check-in QR code.',
         action: null,
-      }
-    case 'deferred':
-      return {
-        title: 'Your screening was deferred',
-        sub: "Please contact the blood center for more information, then retake the screening once you're cleared.",
-        action: { label: 'Retake Screening', to: '/donor/eligibility' },
       }
     case 'expired':
       return {
-        title: 'Your screening has expired',
-        sub: 'Complete the eligibility questionnaire again to restore your check-in code.',
-        action: { label: 'Retake Screening', to: '/donor/eligibility' },
+        title: 'Your questionnaire needs answering again',
+        sub: 'Complete the health questionnaire again to restore your check-in code.',
+        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
       }
     default:
       return {
         title: 'No QR code yet',
-        sub: 'Take the eligibility screening first. Your QR code is generated automatically once you pass.',
-        action: { label: 'Take Screening', to: '/donor/eligibility' },
+        sub: 'Complete the health questionnaire first. Your QR code is generated as soon as you submit it.',
+        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
       }
   }
 })
@@ -276,15 +275,15 @@ const qrStatusLabel = computed(() =>
 )
 
 const statusValueClass = computed(() =>
-  eligibilityStatus.value === 'eligible' ? 'qr-details__value--success' : ''
+  questionnaireStatus.value === 'answered' ? 'qr-details__value--success' : ''
 )
 
 
 const steps = computed(() => [
   {
-    title: 'Complete eligibility screening',
-    desc: 'Take the online questionnaire on the donor portal. If you pass, the system automatically generates your QR code.',
-    done: eligibilityStatus.value === 'eligible',
+    title: 'Complete the health questionnaire',
+    desc: 'Answer it on the donor portal the day before your appointment. Your QR code is generated as soon as you submit it.',
+    done: questionnaireStatus.value === 'answered',
   },
   {
     title: 'Book your appointment',
@@ -439,13 +438,13 @@ async function load({ silent = false } = {}) {
   try {
     // GET /api/donors/qr-code
     // Response: { profile: { full_name, donor_id, blood_type, screening_date,
-    //   screening_valid_until, qr_token }, eligibility_status, qr_valid_until,
+    //   screening_valid_until, qr_token }, questionnaire_status, qr_valid_until,
     //   qr_valid_days, has_active_token, email_verified }
     // NOTE: kanunay null ang profile.qr_token — tinuyo na sa server.
     const data = await donorService.qrCode()
 
     profile.value = data?.profile ?? null
-    eligibilityStatus.value = data?.eligibility_status ?? 'pending'
+    questionnaireStatus.value = data?.questionnaire_status ?? 'not_answered'
     qrValidUntil.value = data?.qr_valid_until ?? null
     qrValidDays.value = data?.qr_valid_days ?? qrValidDays.value
     hasActiveToken.value = !!data?.has_active_token

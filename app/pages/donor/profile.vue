@@ -223,8 +223,64 @@
                 <input v-model="profileForm.email" type="email" class="form-input">
               </div>
               <div class="form-field form-field--full">
-                <label class="form-label">Address</label>
+                <label class="form-label">Home address</label>
                 <input v-model="profileForm.address" type="text" class="form-input">
+              </div>
+
+              <!--
+                Section I-A of the DOH questionnaire. All optional: donors who
+                registered before these were collected cannot be back-filled,
+                and the blood centre prints what is missing as "Not provided"
+                rather than as a blank line on the form.
+              -->
+              <div class="form-field">
+                <label class="form-label">Middle name</label>
+                <input v-model="profileForm.middle_name" type="text" class="form-input">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Civil status</label>
+                <select v-model="profileForm.civil_status" class="form-input">
+                  <option value="">Select</option>
+                  <option v-for="option in civilStatusOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label class="form-label">Occupation</label>
+                <input v-model="profileForm.occupation" type="text" class="form-input">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Nationality</label>
+                <input v-model="profileForm.nationality" type="text" class="form-input">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Religion <span class="form-optional">optional</span></label>
+                <input v-model="profileForm.religion" type="text" class="form-input">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Telephone no.</label>
+                <input v-model="profileForm.telephone_no" type="text" class="form-input">
+              </div>
+              <div class="form-field form-field--full">
+                <label class="form-label">Office address</label>
+                <input v-model="profileForm.office_address" type="text" class="form-input">
+              </div>
+
+              <div class="form-field form-field--full">
+                <p class="form-section-label">Contact person (other relative/s)</p>
+              </div>
+              <div class="form-field">
+                <label class="form-label">Name</label>
+                <input v-model="profileForm.contact_person_name" type="text" class="form-input">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Contact number</label>
+                <input v-model="profileForm.contact_person_number" type="text" class="form-input">
+              </div>
+              <div class="form-field form-field--full">
+                <label class="form-label">Address</label>
+                <input v-model="profileForm.contact_person_address" type="text" class="form-input">
               </div>
             </div>
 
@@ -327,6 +383,33 @@ const savingPassword = ref(false)
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
+/**
+ * Section I-A fields, listed once so the hydrate and the save cannot drift.
+ *
+ * All optional. Donors who registered before these existed have them empty and
+ * cannot be back-filled, so nothing may treat a blank as an error.
+ */
+const PERSONAL_FIELDS = [
+  'middle_name',
+  'civil_status',
+  'occupation',
+  'nationality',
+  'religion',
+  'office_address',
+  'telephone_no',
+  'contact_person_name',
+  'contact_person_address',
+  'contact_person_number',
+]
+
+const civilStatusOptions = [
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'widowed', label: 'Widowed' },
+  { value: 'separated', label: 'Separated' },
+  { value: 'annulled', label: 'Annulled' },
+]
+
 const profileForm = reactive({
   first_name: '',
   last_name: '',
@@ -335,6 +418,16 @@ const profileForm = reactive({
   contact_number: '',
   email: '',
   address: '',
+  middle_name: '',
+  civil_status: '',
+  occupation: '',
+  nationality: '',
+  religion: '',
+  office_address: '',
+  telephone_no: '',
+  contact_person_name: '',
+  contact_person_address: '',
+  contact_person_number: '',
 })
 
 const passwordForm = reactive({
@@ -379,6 +472,9 @@ async function load({ silent = false } = {}) {
     profileForm.contact_number = res.contact_number || ''
     profileForm.email = user.value?.email || ''
     profileForm.address = res.address || ''
+    for (const field of PERSONAL_FIELDS) {
+      profileForm[field] = res[field] || ''
+    }
     formSnapshot = snapshotForm()
   } catch (err) {
     console.error('Failed to load profile:', err)
@@ -442,7 +538,8 @@ async function handleProfileSave() {
   savingProfile.value = true
   try {
     // Backend contract: PUT /api/donor-profile/me
-    // Body: { first_name, last_name, date_of_birth, blood_type, contact_number, email, address }
+    // Body: { first_name, last_name, date_of_birth, blood_type, contact_number,
+    //   email, address } plus the Section I-A fields in PERSONAL_FIELDS.
     // Kini mag-UPDATE sa existing row sa user, dili mag-create og bag-o
     const response = await donorService.updateProfile({
       first_name: profileForm.first_name,
@@ -452,6 +549,9 @@ async function handleProfileSave() {
       phone: profileForm.contact_number,
       email: profileForm.email,
       address: profileForm.address,
+      // Sent as given, including the blanks: an emptied field is the donor
+      // clearing it, and the server treats '' as absent.
+      ...Object.fromEntries(PERSONAL_FIELDS.map(field => [field, profileForm[field]])),
     })
     profile.value = response?.data || profile.value
     profileFailed.value = false
@@ -599,6 +699,19 @@ async function handleLogout() {
   color-scheme: light;
 }
 .form-input:focus { outline: none; border-color: var(--primary); }
+
+/* Section I-A additions. `optional` sits inline in the label; the section
+   label breaks the contact-person block out of the run of plain fields. */
+.form-optional { font-weight: 400; text-transform: none; color: #9ca3af; }
+
+.form-section-label {
+  margin: 8px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
 select.form-input {
   appearance: none;
   -webkit-appearance: none;
