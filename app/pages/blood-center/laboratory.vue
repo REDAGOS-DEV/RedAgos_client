@@ -3,7 +3,7 @@
     <header class="laboratory__header">
       <div>
         <p class="laboratory__eyebrow">Blood Center Portal / Laboratory</p>
-        <h1 class="laboratory__title">Laboratory &amp; Processing</h1>
+        <h1 class="laboratory__title">Testing &amp; Processing</h1>
         <p class="laboratory__subtitle">
           Record the results and component breakdown a medical technologist reported for each unit the
           counter has handed over. RedAgos stores what was found — it does not perform or interpret any test.
@@ -126,7 +126,7 @@
             </h2>
             <p class="card__hint">
               <template v-if="selected.status === 'completed'">
-                Inventory may now record this unit's components as stock.
+                Issuance may now record this unit's components as stock.
               </template>
               <template v-else>
                 {{ selected.rejection_reason || 'No reason was recorded.' }}
@@ -172,45 +172,51 @@
               </div>
             </div>
 
-            <label class="field">
-              <span class="field__label">Result</span>
-              <select v-model="resultForm.result" class="field__input">
-                <option value="passed">Passed — no reactive markers</option>
-                <option value="reactive">Reactive</option>
-                <option value="inconclusive">Inconclusive</option>
-              </select>
-            </label>
+            <p v-if="!canRecordResult" class="card__hint">
+              {{ selected.test_result ? 'Recorded by the Testing department.' : 'Waiting for the Testing department to record a result.' }}
+            </p>
 
-            <label class="field">
-              <span class="field__label">Blood type determined</span>
-              <select v-model.number="resultForm.blood_type_id" class="field__input">
-                <option :value="null" disabled>Select the type</option>
-                <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
-              </select>
-              <span v-if="!selected.donor?.blood_type" class="field__optional">
-                This donor has no type on file. A passed result records it on their profile.
-              </span>
-              <span v-else class="field__optional">
-                The donor's profile says {{ selected.donor.blood_type }}. Recording a different type is
-                refused — the profile has to be corrected first, so only change this if the profile is wrong.
-              </span>
-            </label>
+            <template v-else>
+              <label class="field">
+                <span class="field__label">Result</span>
+                <select v-model="resultForm.result" class="field__input">
+                  <option value="passed">Passed — no reactive markers</option>
+                  <option value="reactive">Reactive</option>
+                  <option value="inconclusive">Inconclusive</option>
+                </select>
+              </label>
 
-            <label class="field">
-              <span class="field__label">Notes <span class="field__optional">optional</span></span>
-              <textarea v-model="resultForm.notes" class="field__input" rows="2" />
-            </label>
+              <label class="field">
+                <span class="field__label">Blood type determined</span>
+                <select v-model.number="resultForm.blood_type_id" class="field__input">
+                  <option :value="null" disabled>Select the type</option>
+                  <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
+                </select>
+                <span v-if="!selected.donor?.blood_type" class="field__optional">
+                  This donor has no type on file. A passed result records it on their profile.
+                </span>
+                <span v-else class="field__optional">
+                  The donor's profile says {{ selected.donor.blood_type }}. Recording a different type is
+                  refused — the profile has to be corrected first, so only change this if the profile is wrong.
+                </span>
+              </label>
 
-            <div class="actions">
-              <button
-                type="button"
-                class="btn btn--primary"
-                :disabled="busy || !resultForm.blood_type_id"
-                @click="submitResult"
-              >
-                {{ selected.test_result ? 'Update result' : 'Record test result' }}
-              </button>
-            </div>
+              <label class="field">
+                <span class="field__label">Notes <span class="field__optional">optional</span></span>
+                <textarea v-model="resultForm.notes" class="field__input" rows="2" />
+              </label>
+
+              <div class="actions">
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  :disabled="busy || !resultForm.blood_type_id"
+                  @click="submitResult"
+                >
+                  {{ selected.test_result ? 'Update result' : 'Record test result' }}
+                </button>
+              </div>
+            </template>
           </section>
 
           <!-- PROCESSING -->
@@ -228,44 +234,50 @@
               </div>
             </div>
 
-            <div v-for="(row, index) in componentRows" :key="index" class="component-row">
-              <label class="field">
-                <span class="field__label">Component</span>
-                <select v-model.number="row.component_id" class="field__input">
-                  <option :value="null" disabled>Select</option>
-                  <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
-              </label>
+            <p v-if="!canRecordComponents" class="card__hint">
+              {{ selected.components?.length ? 'Recorded by the Processing department.' : 'Waiting for the Processing department to record the breakdown.' }}
+            </p>
 
-              <label class="field field--qty">
-                <span class="field__label">Quantity</span>
-                <input v-model.number="row.quantity" type="number" min="1" max="10" class="field__input" >
-              </label>
+            <template v-else>
+              <div v-for="(row, index) in componentRows" :key="index" class="component-row">
+                <label class="field">
+                  <span class="field__label">Component</span>
+                  <select v-model.number="row.component_id" class="field__input">
+                    <option :value="null" disabled>Select</option>
+                    <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                </label>
 
-              <button
-                type="button"
-                class="btn btn--icon"
-                :disabled="componentRows.length === 1"
-                aria-label="Remove this component"
-                @click="componentRows.splice(index, 1)"
-              >
-                <AssetIcon name="trash-2" :size="14" />
-              </button>
-            </div>
+                <label class="field field--qty">
+                  <span class="field__label">Quantity</span>
+                  <input v-model.number="row.quantity" type="number" min="1" max="10" class="field__input" >
+                </label>
 
-            <div class="actions">
-              <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
-                Add component
-              </button>
-              <button
-                type="button"
-                class="btn btn--primary"
-                :disabled="busy || !validComponents"
-                @click="submitComponents"
-              >
-                {{ selected.components?.length ? 'Update breakdown' : 'Record components' }}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  class="btn btn--icon"
+                  :disabled="componentRows.length === 1"
+                  aria-label="Remove this component"
+                  @click="componentRows.splice(index, 1)"
+                >
+                  <AssetIcon name="trash-2" :size="14" />
+                </button>
+              </div>
+
+              <div class="actions">
+                <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
+                  Add component
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  :disabled="busy || !validComponents"
+                  @click="submitComponents"
+                >
+                  {{ selected.components?.length ? 'Update breakdown' : 'Record components' }}
+                </button>
+              </div>
+            </template>
           </section>
         </div>
 
@@ -284,7 +296,11 @@
             </li>
           </ul>
 
-          <div v-if="rejecting" class="defer">
+          <p v-if="!canUpdateStatus" class="card__hint">
+            The Processing department clears this unit for issue or rejects it.
+          </p>
+
+          <div v-else-if="rejecting" class="defer">
             <label class="field">
               <span class="field__label">Why is this unit not being issued?</span>
               <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
@@ -319,8 +335,9 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
  * The laboratory's side of a donation.
  *
  * The counter leaves every donation at `collected` and stops there on purpose:
- * `completed` means *cleared for issue to a patient*, and only this department
- * may set it. Everything on this page is a record of what a medical
+ * `completed` means *cleared for issue to a patient*, and only Processing may
+ * set it. Testing and Processing share this page; each sees the other's work
+ * but can record only its own, matching the abilities the server enforces. Everything on this page is a record of what a medical
  * technologist found at the bench — nothing here performs or interprets a test.
  */
 
@@ -330,8 +347,14 @@ definePageMeta({
   requires: 'lab.view',
 })
 
-const { user } = useUser()
+const { user, can } = useUser()
 const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+
+// Testing records the result; Processing records the breakdown and makes the
+// final call. A supervisor holds all three.
+const canRecordResult = computed(() => can('lab.record_result'))
+const canRecordComponents = computed(() => can('lab.record_components'))
+const canUpdateStatus = computed(() => can('lab.update_status'))
 
 const service = bloodCenterService
 
@@ -452,7 +475,7 @@ function messageFor(err) {
     case 'units_already_recorded':
       return 'Inventory has already recorded units for this donation, so the breakdown is fixed.'
     case 'blood_type_mismatch':
-      return err?.data?.message || 'This type disagrees with the donor’s profile. Donor/Collection must correct it.'
+      return err?.data?.message || 'This type disagrees with the donor’s profile. Collection must correct it.'
     case 'donation_already_final':
       return 'This donation has already been cleared or rejected.'
     case 'facility_missing':

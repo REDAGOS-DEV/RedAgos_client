@@ -55,7 +55,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 /**
- * The shared shell behind each of the four department dashboards.
+ * The shared shell behind each department dashboard.
  *
  * The departments differ in which numbers and panels they show, not in how
  * they show them, so the chrome lives here once. Each page passes its own

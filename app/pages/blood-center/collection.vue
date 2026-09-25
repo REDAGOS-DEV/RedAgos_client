@@ -2,7 +2,7 @@
   <div class="collection">
     <header class="collection__header">
       <div>
-        <p class="collection__eyebrow">Donor / Collection</p>
+        <p class="collection__eyebrow">Collection</p>
         <h1 class="collection__title">Donation Counter</h1>
         <p class="collection__subtitle">
           Scan the donor once on arrival, then work through the visit without asking them to identify themselves again.

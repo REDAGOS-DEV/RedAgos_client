@@ -200,9 +200,10 @@ definePageMeta({
 useHead({ title: 'Staff Accounts · RedAgos' })
 
 const DEPARTMENTS = [
-  { value: 'collection', label: 'Donor / Collection' },
-  { value: 'laboratory', label: 'Laboratory / Processing' },
-  { value: 'inventory', label: 'Inventory / Storage & Requests' },
+  { value: 'collection', label: 'Collection' },
+  { value: 'testing', label: 'Testing' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'issuance', label: 'Issuance' },
   { value: 'billing', label: 'Billing / Payment' },
 ]
 

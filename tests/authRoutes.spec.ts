@@ -8,6 +8,7 @@ import {
   PORTAL_ROLES,
   ROLE_SELECTION,
 } from '~/utils/authRoutes'
+import { departmentHome } from '~/composables/useBloodCenterNav'
 
 // `portalHomeFor` calls `departmentHome`, a Nuxt auto-import from
 // useBloodCenterNav. Stubbed rather than imported so these stay pure-function
@@ -15,8 +16,9 @@ import {
 vi.stubGlobal('departmentHome', (user: any) => {
   const homes: Record<string, string> = {
     collection: '/blood-center/collection',
-    laboratory: '/blood-center/laboratory',
-    inventory: '/blood-center/storage',
+    testing: '/blood-center/laboratory',
+    processing: '/blood-center/laboratory',
+    issuance: '/blood-center/storage',
     billing: '/blood-center/billing',
   }
   if (user?.department && homes[user.department]) return homes[user.department]
@@ -112,9 +114,9 @@ describe('portalHomeFor', () => {
   })
 
   it('routes blood-centre staff by department', () => {
-    expect(portalHomeFor({ roles: ['blood_center'], department: 'laboratory' } as any))
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'testing' } as any))
       .toBe('/blood-center/laboratory')
-    expect(portalHomeFor({ roles: ['blood_center'], department: 'inventory' } as any))
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'issuance' } as any))
       .toBe('/blood-center/storage')
   })
 
@@ -147,5 +149,24 @@ describe('portalHomeFor', () => {
       // the user was just refused from.
       expect(required === null || typeof required === 'string').toBe(true)
     }
+  })
+})
+
+// The real map, not the stub above: every department the server's Department
+// enum declares must land somewhere, or its staff would be sent to settings.
+describe('departmentHome', () => {
+  it.each([
+    ['collection', '/blood-center/collection'],
+    ['testing', '/blood-center/laboratory'],
+    ['processing', '/blood-center/laboratory'],
+    ['issuance', '/blood-center/storage'],
+    ['billing', '/blood-center/billing'],
+  ])('sends %s staff to %s', (department, home) => {
+    expect(departmentHome({ department })).toBe(home)
+  })
+
+  it('no longer recognises the retired departments', () => {
+    expect(departmentHome({ department: 'laboratory' })).toBe('/blood-center/settings')
+    expect(departmentHome({ department: 'inventory' })).toBe('/blood-center/settings')
   })
 })

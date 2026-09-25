@@ -1,6 +1,6 @@
 <template>
   <BloodCenterDepartmentDashboard
-    title="Inventory / Storage & Requests"
+    title="Issuance"
     subtitle="Record and monitor blood units, and coordinate the fulfillment and release of hospital requests."
     :facility-label="facilityLabel"
     :stats="stats"

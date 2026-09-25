@@ -16,7 +16,7 @@
 export type RoleName = 'admin' | 'donor' | 'blood_center' | 'blood_bank'
 
 /** Blood-centre departments, from the server's `Department` enum. */
-export type Department = 'collection' | 'laboratory' | 'inventory' | 'billing'
+export type Department = 'collection' | 'testing' | 'processing' | 'issuance' | 'billing'
 
 export interface Facility {
   id: number

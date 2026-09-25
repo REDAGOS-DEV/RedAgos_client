@@ -45,7 +45,7 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/password`, 'POST', payload)
   }
 
-  // --- Collection (Donor / Collection department) ---
+  // --- Collection department ---
 
   async collectionQueue(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/collection/queue`, 'GET', params)
@@ -66,7 +66,7 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/collection/verify-qr`, 'POST', { token })
   }
 
-  // --- Active donation transaction (Donor / Collection) ---
+  // --- Active donation transaction (Collection) ---
 
   async donations(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/donations`, 'GET', params)
@@ -90,11 +90,11 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donations/${donationId}/collection`, 'POST', payload)
   }
 
-  // --- Laboratory / Processing department ---
+  // --- Laboratory queue (Testing and Processing departments) ---
   //
   // Picks up where the counter stops. The counter leaves a donation at
   // `collected`; nothing here is reachable before that, and `completed` —
-  // cleared for issue to a patient — is only ever set from this department.
+  // cleared for issue to a patient — is only ever set by Processing here.
 
   async laboratoryQueue(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/queue`, 'GET', params)
@@ -175,7 +175,7 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
   }
 
-  // --- Inventory (Inventory / Storage department) ---
+  // --- Inventory (Issuance department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory`, 'GET', params)
@@ -188,7 +188,7 @@ class BloodCenterService extends BaseService {
   /**
    * Donations the laboratory has cleared that still owe units.
    *
-   * Its own endpoint rather than the laboratory queue: Inventory holds
+   * Its own endpoint rather than the laboratory queue: Issuance holds
    * `donations.view` but not `lab.view`, and this carries the declared-versus-
    * recorded counts that neither of the donation listings does.
    */
