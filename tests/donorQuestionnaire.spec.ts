@@ -57,16 +57,41 @@ describe('the questionnaire drawer', () => {
 
   it('says plainly that it is not the on-site screening', () => {
     // The staff's own vitals form sits centimetres away on the same page.
-    expect(drawer).toContain('Read only')
+    // The chip names what is read-only rather than claiming the whole drawer
+    // is, now that the officer's own margin boxes sit at the top of it.
+    expect(drawer).toContain("Donor's answers are read only")
     expect(drawer).toContain("data?.notice")
   })
 
-  it('carries no inputs and no write actions', () => {
-    // It is a document. Anything editable here would be mistaken for the
-    // staff's own assessment.
-    expect(drawer).not.toMatch(/<input(?![^>]*type="?checkbox)/)
-    expect(drawer).not.toContain('v-model')
+  it("leaves the donor's own declaration read-only", () => {
+    // The drawer holds two things by two authors. Sections I-A to I-C are the
+    // donor's, made days ago in the app, and nothing at the counter may edit
+    // them. The four margin boxes above the tabs are the officer's, asked in
+    // person — they are the single exception, and it is bounded here.
+    const donorSections = drawer.slice(drawer.indexOf('<nav class="dhq__tabs"'))
+
+    expect(donorSections).not.toMatch(/<input/)
+    expect(donorSections).not.toContain('v-model')
+    expect(donorSections).not.toContain('$emit')
+  })
+
+  it('never writes into the intake object it was handed', () => {
+    // The counter owns that state, because the screening form has to send it
+    // and the two must not drift. The drawer asks for a change instead.
+    expect(drawer).not.toMatch(/v-model="intake/)
+    expect(drawer).toContain("$emit('update-intake'")
+  })
+
+  it('carries no save or submit action of its own', () => {
+    // The margin boxes are saved with the screening, not on their own: a set
+    // of answers with no screening behind them would belong to nothing.
     expect(drawer).not.toMatch(/@click="submit|@click="save/)
+    expect(drawer).toContain('Saved when you record the screening')
+  })
+
+  it('will not take intake answers before there is a visit to record them against', () => {
+    expect(drawer).toContain(':disabled="!canEditIntake"')
+    expect(drawer).toContain('Open the donation first')
   })
 
   it('prints a field the donor never supplied as absent rather than empty', () => {

@@ -6,7 +6,7 @@
           <div class="dhq__heading">
             <p class="dhq__eyebrow">
               Blood Donor's Health Questionnaire
-              <span class="dhq__chip">Read only</span>
+              <span class="dhq__chip">Donor's answers are read only</span>
             </p>
             <h2 class="dhq__title">{{ title }}</h2>
             <!--
@@ -32,6 +32,46 @@
         <p v-if="data?.is_expired" class="dhq__banner dhq__banner--warn">
           These answers are past their validity date of {{ longDate(data.valid_until) }}.
         </p>
+
+        <!--
+          The four boxes printed in the top margin of the donor's sheet, in the
+          same place here. Unlike everything below them these are the officer's
+          to fill: they are asked in person at the counter and typed in, which
+          is why the one editable block in this document sits above the tabs
+          rather than inside the donor's own declaration.
+
+          They are saved with the screening, not on their own — they describe
+          the visit the screening records, and a set of answers with no
+          screening behind them would belong to nothing.
+        -->
+        <fieldset class="dhq__intake" :disabled="!canEditIntake">
+          <legend class="dhq__intake-legend">
+            Ask the donor
+            <span class="dhq__intake-tag">Staff</span>
+          </legend>
+
+          <div class="dhq__intake-grid">
+            <label v-for="field in intakeFields" :key="field.key" class="dhq__intake-field">
+              <span class="dhq__intake-label">{{ field.label }}</span>
+              <input
+                :value="intake[field.key]"
+                type="text"
+                class="dhq__intake-input"
+                maxlength="255"
+                @input="$emit('update-intake', field.key, $event.target.value)"
+              >
+            </label>
+          </div>
+
+          <p class="dhq__intake-hint">
+            <template v-if="canEditIntake">
+              Saved when you record the screening.
+            </template>
+            <template v-else>
+              Open the donation first — these are recorded against this visit.
+            </template>
+          </p>
+        </fieldset>
 
         <nav class="dhq__tabs">
           <button
@@ -147,9 +187,23 @@
 
 const props = defineProps({
   data: { type: Object, default: null },
+  // The four margin boxes, held by the counter so the screening form and this
+  // drawer cannot drift apart.
+  intake: { type: Object, required: true },
+  // They describe a visit, so there has to be one to record them against.
+  canEditIntake: { type: Boolean, default: false },
 })
 
-defineEmits(['close'])
+const intakeFields = [
+  { key: 'sleep', label: 'Sleep' },
+  { key: 'meal', label: 'Meal' },
+  { key: 'meds', label: 'Meds' },
+  { key: 'allergies', label: 'Allergies' },
+]
+
+// `update-intake` rather than writing into the prop: the counter owns this
+// state, because the screening form has to send it and both have to agree.
+defineEmits(['close', 'update-intake'])
 
 const activeTab = ref('personal')
 
@@ -340,6 +394,79 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(var(--rb-warning-rgb), 0.3);
 }
 
+/* --- The officer's own block, above the donor's declaration --- */
+/*
+ * Marked out from everything below it. The rest of this drawer is a document
+ * the donor authored days ago; this is the one part the counter writes, and a
+ * staff member must never be in doubt about which they are looking at.
+ */
+.dhq__intake {
+  margin: 0.9rem 1.2rem 0;
+  padding: 0.75rem 0.85rem 0.8rem;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+}
+
+.dhq__intake[disabled] { opacity: 0.6; }
+
+.dhq__intake-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.dhq__intake-tag {
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(var(--rb-primary-rgb), 0.12);
+  color: var(--rb-primary-text);
+  letter-spacing: 0.04em;
+}
+
+.dhq__intake-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.dhq__intake-field { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.dhq__intake-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--rb-text-primary);
+}
+
+.dhq__intake-input {
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 0.83rem;
+}
+
+.dhq__intake-input:focus-visible {
+  outline: 2px solid var(--rb-primary);
+  outline-offset: 1px;
+  border-color: var(--rb-primary);
+}
+
+.dhq__intake-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.76rem;
+  color: var(--rb-text-secondary);
+}
+
 .dhq__tabs {
   display: flex;
   gap: 0.25rem;
@@ -476,6 +603,7 @@ onBeforeUnmount(() => {
   .dhq { width: 100%; height: auto; border: none; }
   .dhq__header-actions,
   .dhq__tabs { display: none; }
+  .dhq__intake { border-color: #000; background: none; }
   .dhq__panel { display: block !important; }
   .dhq__body { overflow: visible; }
 }

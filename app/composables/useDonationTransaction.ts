@@ -89,6 +89,29 @@ export function useDonationTransaction() {
   // moment they are verified right through to the end of the collection. Staff
   // compare their own findings against these answers while recording them.
   const priorDeferral = ref<PriorDeferral | null>(null)
+
+  /**
+   * The four boxes printed at the top of the donor's questionnaire sheet.
+   *
+   * They live here rather than in either component because both touch them:
+   * the questionnaire drawer is where staff fill them in, since that is where
+   * they sit on the paper, and the screening form is what carries them to the
+   * server. Holding them in one place is what stops the two drifting.
+   *
+   * Staff-entered throughout. The donor never fills these in the app — the
+   * officer asks in person and types what they are told, which is why they are
+   * editable in an otherwise read-only document.
+   */
+  const intakeForm = reactive({
+    sleep: '',
+    meal: '',
+    meds: '',
+    allergies: '',
+  })
+
+  function resetIntake() {
+    Object.assign(intakeForm, { sleep: '', meal: '', meds: '', allergies: '' })
+  }
   const questionnaireMeta = ref<QuestionnaireMeta | null>(null)
   const questionnaire = ref<Record<string, unknown> | null>(null)
   const questionnaireOpen = ref(false)
@@ -177,6 +200,20 @@ export function useDonationTransaction() {
 
   function adoptDonation(payload: any) {
     donation.value = payload ?? null
+
+    // A screening already recorded for this visit carries these, so a staff
+    // member reopening the drawer sees what was entered rather than a blank
+    // set of boxes they would have to fill twice.
+    const screening = payload?.screening
+
+    if (screening) {
+      Object.assign(intakeForm, {
+        sleep: screening.sleep ?? '',
+        meal: screening.meal ?? '',
+        meds: screening.meds ?? '',
+        allergies: screening.allergies ?? '',
+      })
+    }
 
     if (payload?.appointment_id && appointment.value?.id !== payload.appointment_id) return
 
@@ -340,6 +377,7 @@ export function useDonationTransaction() {
     questionnaireOpen.value = false
     questionnaireError.value = null
     priorDeferral.value = null
+    resetIntake()
   }
 
   return {
@@ -353,6 +391,8 @@ export function useDonationTransaction() {
     isDeferred,
     isCollected,
     priorDeferral,
+    intakeForm,
+    resetIntake,
     questionnaireMeta,
     questionnaire,
     questionnaireOpen,

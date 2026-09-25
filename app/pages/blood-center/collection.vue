@@ -65,7 +65,10 @@
     <BloodCenterDonorQuestionnaire
       v-if="questionnaireOpen && questionnaire"
       :data="questionnaire"
+      :intake="intakeForm"
+      :can-edit-intake="Boolean(donation)"
       @close="questionnaireOpen = false"
+      @update-intake="(key, value) => { intakeForm[key] = value }"
     />
 
     <!-- Progress through the one continuous transaction. -->
@@ -160,41 +163,16 @@
       </p>
 
       <!--
-        Asked in person, before anything is measured. The officer puts these to
-        the donor while they sit down and types what they are told, so they sit
-        above the readings rather than among them.
+        Sleep, Meal, Meds and Allergies are not here. They are printed in the
+        top margin of the donor's questionnaire sheet, so that is where staff
+        fill them in — inside the drawer under Review questionnaire, which is
+        the only part of that document the counter writes. They still travel to
+        the server with this form, because they describe the visit it records.
       -->
-      <fieldset class="exam">
-        <legend class="exam__legend">Ask the donor</legend>
-        <div class="vitals">
-          <label class="field">
-            <span class="field__label">Sleep</span>
-            <input v-model="screeningForm.sleep" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">Meal</span>
-            <input v-model="screeningForm.meal" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">Meds</span>
-            <input v-model="screeningForm.meds" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">Allergies</span>
-            <input v-model="screeningForm.allergies" type="text" class="field__input" maxlength="255" >
-          </label>
-        </div>
-        <!--
-          Deliberately not pre-filled from the donor's questionnaire, including
-          Meds, which they also answered in Section I-B. Pre-filling would turn
-          this finding into a confirmation of their claim, and the two are
-          recorded apart precisely so they can disagree.
-        -->
-        <p class="exam__hint">
-          What the donor tells you now. Their own questionnaire answers are under
-          <strong>Review questionnaire</strong> above, and are a separate record.
-        </p>
-      </fieldset>
+      <p class="card__hint">
+        Sleep, meal, meds and allergies are at the top of
+        <strong>Review questionnaire</strong> above, where the form prints them.
+      </p>
 
       <div class="vitals">
         <label class="field">
@@ -393,7 +371,7 @@ const service = bloodCenterService
 
 const {
   donor, appointment, donation, stage, busy, error, notice, isDeferred,
-  priorDeferral,
+  priorDeferral, intakeForm,
   questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
   loadQuestionnaire,
   verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
@@ -453,10 +431,6 @@ const screeningForm = reactive({
   // Section I-D. The outcome lives on the form rather than being a bare
   // argument, now that there are four of them and three end the visit.
   outcome: 'temporarily_deferred',
-  sleep: '',
-  meal: '',
-  meds: '',
-  allergies: '',
   general_appearance: '',
   skin: '',
   heent: '',
@@ -556,9 +530,14 @@ async function submitScreening(outcome) {
 
   // Section I-D free text: send only what was actually written, so a field the
   // officer tabbed past stays absent rather than becoming an empty string.
-  for (const key of ['sleep', 'meal', 'meds', 'allergies',
-    'general_appearance', 'skin', 'heent', 'heart_and_lungs']) {
+  for (const key of ['general_appearance', 'skin', 'heent', 'heart_and_lungs']) {
     if (screeningForm[key].trim()) payload[key] = screeningForm[key].trim()
+  }
+
+  // Filled in the questionnaire drawer, where the form prints them, and
+  // carried here because they belong to the screening this call records.
+  for (const key of ['sleep', 'meal', 'meds', 'allergies']) {
+    if (intakeForm[key].trim()) payload[key] = intakeForm[key].trim()
   }
 
   if (screeningForm.notes.trim()) payload.notes = screeningForm.notes.trim()
@@ -598,7 +577,6 @@ function finishVisit() {
   lookupError.value = null
   Object.assign(screeningForm, {
     outcome: 'temporarily_deferred',
-    sleep: '', meal: '', meds: '', allergies: '',
     general_appearance: '', skin: '', heent: '', heart_and_lungs: '',
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
