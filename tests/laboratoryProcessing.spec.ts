@@ -42,17 +42,54 @@ describe('BloodCenterService laboratory endpoints', () => {
     expect(config.method).toBe('GET')
   })
 
-  it('records a test result against the donation it belongs to', async () => {
+  it('records immunohematology against the donation it belongs to', async () => {
     fetchMock.mockResolvedValueOnce({})
-    await service.recordTestResult(42, { result: 'passed', blood_type_id: 3 })
+    await service.recordImmunohematology(42, { blood_type_id: 3 })
 
     const [url, config] = fetchMock.mock.calls[0]!
 
-    expect(url).toBe('/blood-center/laboratory/donations/42/results')
+    expect(url).toBe('/blood-center/laboratory/donations/42/immunohematology')
     expect(config.method).toBe('POST')
     // `recorded_by` is never sent: the server takes it from the bearer token,
-    // so a result cannot be attributed to someone who did not record it.
-    expect(config.body).toEqual({ result: 'passed', blood_type_id: 3 })
+    // so a section cannot be attributed to someone who did not screen it.
+    expect(config.body).toEqual({ blood_type_id: 3 })
+  })
+
+  it('records the serology panel on its own endpoint', async () => {
+    const panel = { hiv: 'non_reactive', hbsag: 'non_reactive', hcv: 'non_reactive', syphilis: 'non_reactive', malaria: 'non_reactive' }
+
+    fetchMock.mockResolvedValueOnce({})
+    await service.recordSerology(42, panel)
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe('/blood-center/laboratory/donations/42/serology')
+    expect(config.method).toBe('POST')
+    expect(config.body).toEqual(panel)
+    expect(config.body).not.toHaveProperty('recorded_by')
+  })
+
+  it('no longer offers a way to record an overall result directly', () => {
+    // The outcome is derived from the two sections on the server. A client
+    // call that set it would let a donation pass without all five markers.
+    expect((service as any).recordTestResult).toBeUndefined()
+  })
+
+  it('reads and moves on counselling referrals in the laboratory namespace', async () => {
+    fetchMock.mockResolvedValueOnce({ data: [] })
+    await service.counsellingReferrals({ status: 'open' })
+
+    let [url, config] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/blood-center/laboratory/referrals')
+    expect(config.method).toBe('GET')
+
+    fetchMock.mockResolvedValueOnce({})
+    await service.updateCounsellingReferral(7, { status: 'contacted', note: null })
+
+    ;[url, config] = fetchMock.mock.calls[1]!
+    expect(url).toBe('/blood-center/laboratory/referrals/7')
+    expect(config.method).toBe('PATCH')
+    expect(config.body).toEqual({ status: 'contacted', note: null })
   })
 
   it('declares components on their own endpoint', async () => {
@@ -79,11 +116,11 @@ describe('BloodCenterService laboratory endpoints', () => {
 
   it('carries the reason when a unit is rejected', async () => {
     fetchMock.mockResolvedValueOnce({})
-    await service.updateLaboratoryStatus(42, { status: 'rejected', rejection_reason: 'Reactive for HBsAg' })
+    await service.updateLaboratoryStatus(42, { status: 'rejected', rejection_reason: 'Clotted during separation.' })
 
     const [, config] = fetchMock.mock.calls[0]!
 
-    expect(config.body).toEqual({ status: 'rejected', rejection_reason: 'Reactive for HBsAg' })
+    expect(config.body).toEqual({ status: 'rejected', rejection_reason: 'Clotted during separation.' })
   })
 
   it('reads one donation from the laboratory namespace', async () => {

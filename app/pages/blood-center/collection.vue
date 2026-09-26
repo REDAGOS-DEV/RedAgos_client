@@ -201,6 +201,24 @@
         </label>
       </div>
 
+      <!--
+        Section II's small Hemoglobin / Blood Type table: both are fingerprick
+        readings taken here, before the donor is bled. The blood type is
+        preliminary — the Testing department's typing is the one that counts,
+        and this never pre-fills it or reaches the donor's record.
+      -->
+      <fieldset class="exam">
+        <legend class="exam__legend">Fingerprick blood type <span class="field__optional">optional</span></legend>
+        <BloodCenterBloodTypePicker
+          v-model="screeningForm.fingerprick_blood_type_id"
+          :blood-types="bloodTypes"
+          optional
+        />
+        <p class="exam__hint">
+          Preliminary. The Testing department confirms the typing; this does not change the donor's blood type on record.
+        </p>
+      </fieldset>
+
       <!-- Observed, in the order the form prints them. -->
       <fieldset class="exam">
         <legend class="exam__legend">On examination</legend>
@@ -290,22 +308,84 @@
       </div>
     </section>
 
-    <!-- STAGE 4 — the collection -->
+    <!-- STAGE 4 — the collection: Section II, "For Phlebotomist Use Only" -->
     <section v-else-if="stage === 'collection'" class="card">
       <h2 class="card__title">Record the collection</h2>
       <p class="card__hint">
-        Recording the collection finishes the donor's visit. Clearing the blood for issue is a separate
-        laboratory decision made later.
+        The phlebotomist's box on the form. Recording it finishes the donor's visit and hands the donation to the
+        Testing department.
       </p>
 
-      <label class="field field--narrow">
-        <span class="field__label">Volume collected</span>
-        <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
-        <span class="field__optional">A whole-blood bag is nominally 450 mL.</span>
-      </label>
+      <fieldset class="exam">
+        <legend class="exam__legend">Blood bag</legend>
+        <div class="bags" role="radiogroup" aria-label="Blood bag">
+          <label
+            v-for="bag in bagTypes"
+            :key="bag.value"
+            class="bag"
+            :class="{ 'bag--on': collectionForm.blood_bag_type === bag.value }"
+          >
+            <input v-model="collectionForm.blood_bag_type" type="radio" name="blood_bag_type" :value="bag.value" class="bag__radio" >
+            <span class="bag__code" aria-hidden="true">{{ bag.code }}</span>
+            <span class="bag__label">{{ bag.label }}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="vitals">
+        <label class="field">
+          <span class="field__label">Segment number</span>
+          <!--
+            A barcode scanner types the number and presses Enter. Enter moves on
+            to the next field rather than submitting half a record.
+          -->
+          <input
+            ref="segmentInput"
+            v-model="collectionForm.segment_number"
+            type="text"
+            class="field__input field__input--mono"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="characters"
+            maxlength="60"
+            placeholder="Scan or type"
+            @keydown.enter.prevent="startedInput?.focus()"
+          >
+        </label>
+
+        <label class="field">
+          <span class="field__label">Time started</span>
+          <span class="time-row">
+            <input ref="startedInput" v-model="collectionForm.started_time" type="time" class="field__input" >
+            <button type="button" class="btn btn--small" @click="collectionForm.started_time = timeNow()">Now</button>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Time ended</span>
+          <span class="time-row">
+            <input v-model="collectionForm.ended_time" type="time" class="field__input" >
+            <button type="button" class="btn btn--small" @click="collectionForm.ended_time = timeNow()">Now</button>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Volume collected</span>
+          <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
+          <span class="field__optional">A whole-blood bag is nominally 450 mL.</span>
+        </label>
+      </div>
+
+      <p class="card__hint">
+        Phlebotomist: <strong>{{ phlebotomistName }}</strong> — recorded from your sign-in.
+      </p>
+
+      <ul v-if="collectionAttempted && collectionProblems.length" class="problems" role="alert">
+        <li v-for="problem in collectionProblems" :key="problem">{{ problem }}</li>
+      </ul>
 
       <div class="actions">
-        <button type="button" class="btn btn--primary" :disabled="busy || !validVolume" @click="submitCollection">
+        <button type="button" class="btn btn--primary" :disabled="busy" @click="submitCollection">
           {{ busy ? 'Saving…' : 'Complete donation' }}
         </button>
 
@@ -326,9 +406,15 @@
               {{ donation?.rejection_reason || 'The donor was not able to donate today.' }}
             </template>
             <template v-else>
-              {{ donation?.volume_ml }} mL recorded. The donation is now with the laboratory, and the donor's
-              history and last donation date are updated.
+              {{ donation?.volume_ml }} mL recorded. The donation is now with the Testing department, and the
+              donor's history and last donation date are updated.
             </template>
+          </p>
+          <p v-if="!isDeferred && donation?.collection?.segment_number" class="done-facts">
+            <span>Segment <strong class="mono">{{ donation.collection.segment_number }}</strong></span>
+            <span v-if="donation.collection.blood_bag_type_label">
+              {{ donation.collection.blood_bag_type_label }} bag
+            </span>
           </p>
         </div>
       </div>
@@ -347,7 +433,9 @@ import BloodCenterQrScanner from '~/components/BloodCenter/QrScanner.vue'
 import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
 import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
 import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferralNotice.vue'
+import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { atTimeOn, normalizeSegmentNumber, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
 
 /**
  * The counter's one continuous donation transaction.
@@ -441,16 +529,57 @@ const screeningForm = reactive({
   temperature_c: null,
   weight_kg: null,
   haemoglobin_g_dl: null,
+  // Section II's fingerprick table. Preliminary; never adopted onto the donor.
+  fingerprick_blood_type_id: null,
   notes: '',
   deferral_reason: '',
 })
 
-const collectionForm = reactive({ volume_ml: 450 })
+/**
+ * Section II, "For Phlebotomist Use Only".
+ *
+ * No bag is pre-selected: single, double and triple decide what the bag can be
+ * separated into, so it has to be a deliberate choice. The phlebotomist is not
+ * a field at all — it is whoever is signed in.
+ */
+function blankCollection() {
+  return { blood_bag_type: '', segment_number: '', started_time: '', ended_time: '', volume_ml: 450 }
+}
 
-const validVolume = computed(() => {
-  const v = Number(collectionForm.volume_ml)
+const collectionForm = reactive(blankCollection())
+const collectionAttempted = ref(false)
+const collectionProblems = computed(() => phlebotomyProblems(collectionForm, new Date()))
 
-  return Number.isFinite(v) && v >= 100 && v <= 1000
+const segmentInput = ref(null)
+const startedInput = ref(null)
+
+// Ready for the scanner the moment the collection stage opens.
+watch(stage, (now) => {
+  if (now === 'collection') nextTick(() => segmentInput.value?.focus())
+})
+
+const phlebotomistName = computed(() => user.value?.full_name
+  || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ')
+  || 'You')
+
+// From the reference data, with the form's three boxes as the fallback so the
+// counter still works if that request fails.
+const bloodTypes = ref([])
+const bagTypes = ref([
+  { value: 'single', label: 'Single', code: 'S' },
+  { value: 'double', label: 'Double', code: 'D' },
+  { value: 'triple', label: 'Triple', code: 'T' },
+])
+
+onMounted(async () => {
+  try {
+    const reference = await service.referenceData()
+
+    bloodTypes.value = reference?.blood_types ?? []
+    if (reference?.blood_bag_types?.length) bagTypes.value = reference.blood_bag_types
+  } catch {
+    // The fingerprick picker stays empty and optional; nothing else depends on it.
+  }
 })
 
 const initials = computed(() => (donor.value?.full_name || '?')
@@ -506,7 +635,7 @@ async function lookupDonor() {
       full_name: found.full_name,
       blood_type: found.blood_type ?? null,
       phone: found.phone ?? null,
-    })
+    }, null, found.prior_deferral ?? null)
 
     manualOpen.value = false
     lookupValue.value = ''
@@ -542,6 +671,10 @@ async function submitScreening(outcome) {
 
   if (screeningForm.notes.trim()) payload.notes = screeningForm.notes.trim()
 
+  if (screeningForm.fingerprick_blood_type_id) {
+    payload.fingerprick_blood_type_id = screeningForm.fingerprick_blood_type_id
+  }
+
   // Any of the three deferrals carries a reason; only Accepted has none.
   if (outcome !== 'accepted') payload.deferral_reason = screeningForm.deferral_reason.trim()
 
@@ -550,7 +683,20 @@ async function submitScreening(outcome) {
 }
 
 async function submitCollection() {
-  await recordCollection({ volume_ml: Number(collectionForm.volume_ml) })
+  collectionAttempted.value = true
+
+  if (collectionProblems.value.length) return
+
+  // The draw happens during the visit, so the two times are on today's date.
+  const today = new Date()
+
+  await recordCollection({
+    volume_ml: Number(collectionForm.volume_ml),
+    blood_bag_type: collectionForm.blood_bag_type,
+    segment_number: normalizeSegmentNumber(collectionForm.segment_number),
+    started_at: atTimeOn(today, collectionForm.started_time),
+    ended_at: atTimeOn(today, collectionForm.ended_time),
+  })
 }
 
 async function abandonCollection() {
@@ -580,9 +726,11 @@ function finishVisit() {
     general_appearance: '', skin: '', heent: '', heart_and_lungs: '',
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
+    fingerprick_blood_type_id: null,
     notes: '', deferral_reason: '',
   })
-  collectionForm.volume_ml = 450
+  Object.assign(collectionForm, blankCollection())
+  collectionAttempted.value = false
 }
 </script>
 
@@ -972,6 +1120,108 @@ function finishVisit() {
 .card__hint--warn {
   color: var(--rb-accent-text);
   font-weight: 600;
+}
+
+/* --- Section II, phlebotomist's box --- */
+/*
+ * The bag is a three-way choice printed on the form as (S) (D) (T), so it is
+ * shown as three large targets carrying those letters rather than a dropdown.
+ */
+.bags {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bag {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.bag:hover { border-color: var(--rb-border-hover); }
+
+.bag--on {
+  border-color: var(--rb-primary);
+  background: rgba(var(--rb-primary-rgb), 0.06);
+}
+
+/* Visually hidden but still the focusable control, so keyboard users get the ring below. */
+.bag__radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bag:has(.bag__radio:focus-visible) {
+  outline: 2px solid var(--rb-primary);
+  outline-offset: 1px;
+}
+
+.bag__code {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rb-text-secondary);
+}
+
+.bag--on .bag__code {
+  background: var(--rb-primary);
+  border-color: var(--rb-primary);
+  color: #fff;
+}
+
+.bag__label { font-size: 0.85rem; font-weight: 600; color: var(--rb-text-primary); }
+
+.time-row { display: flex; gap: 0.4rem; align-items: stretch; }
+.time-row .field__input { min-width: 0; }
+
+.btn--small { padding: 0.35rem 0.6rem; font-size: 0.78rem; border-radius: 8px; }
+
+.field__input--mono,
+.mono {
+  font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: 0.02em;
+}
+
+.problems {
+  margin: 0;
+  padding: 0.6rem 0.85rem 0.6rem 1.9rem;
+  border-radius: 10px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+  color: var(--rb-accent-text);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.done-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  color: var(--rb-text-secondary);
+}
+
+.done-facts strong { color: var(--rb-text-primary); }
+
+@media (max-width: 480px) {
+  .bags { grid-template-columns: minmax(0, 1fr); }
 }
 
 </style>

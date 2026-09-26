@@ -63,6 +63,22 @@ export interface PriorDeferral {
   recorded_on: string | null
 }
 
+/**
+ * The "For Phlebotomist Use Only" box of Section II, as the server recorded it.
+ *
+ * Collections recorded before the box existed carry only who drew the bag and
+ * when; their bag, segment and times are null.
+ */
+export interface TransactionCollection {
+  blood_bag_type: string | null
+  blood_bag_type_label: string | null
+  segment_number: string | null
+  started_at: string | null
+  ended_at: string | null
+  collected_at: string | null
+  phlebotomist: string | null
+}
+
 export interface TransactionDonation {
   id: number
   status: string
@@ -71,6 +87,7 @@ export interface TransactionDonation {
   rejection_reason: string | null
   appointment_id: number | null
   screening: Record<string, unknown> | null
+  collection?: TransactionCollection | null
 }
 
 export function useDonationTransaction() {
@@ -151,6 +168,11 @@ export function useDonationTransaction() {
    */
   function messageFor(err: any): string {
     const code = err?.data?.code
+
+    // Two counters scanning the same tube, or a mis-scan. The server says it
+    // in a validation error rather than a code, from the rule or the index.
+    const segmentError = err?.data?.errors?.segment_number?.[0]
+    if (segmentError) return segmentError
 
     switch (code) {
       case 'qr_invalid':
@@ -249,7 +271,11 @@ export function useDonationTransaction() {
   /**
    * Adopt a donor the staff member found by valid ID instead of a scan.
    */
-  function adoptDonor(found: TransactionDonor, existing: TransactionAppointment | null = null) {
+  function adoptDonor(
+    found: TransactionDonor,
+    existing: TransactionAppointment | null = null,
+    deferral: PriorDeferral | null = null,
+  ) {
     donor.value = found
     appointment.value = existing
     donation.value = null
@@ -263,10 +289,11 @@ export function useDonationTransaction() {
     questionnaire.value = null
     questionnaireError.value = null
 
-    // The manual valid-ID path has no scan to carry this. Staff who need a
-    // donor's deferral history open their record, which is where the reason
-    // lives anyway.
-    priorDeferral.value = null
+    // The ID lookup carries the same notice the scan does. A donor who left
+    // their phone at home — or one a laboratory result permanently deferred —
+    // must not walk past it. Outcome and date only; the reason stays behind
+    // the donor's history.
+    priorDeferral.value = deferral
   }
 
   /**

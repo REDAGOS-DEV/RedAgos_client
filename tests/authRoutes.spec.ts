@@ -16,7 +16,7 @@ import { departmentHome } from '~/composables/useBloodCenterNav'
 vi.stubGlobal('departmentHome', (user: any) => {
   const homes: Record<string, string> = {
     collection: '/blood-center/collection',
-    testing: '/blood-center/laboratory',
+    testing: '/blood-center/testing',
     processing: '/blood-center/laboratory',
     issuance: '/blood-center/storage',
     billing: '/blood-center/billing',
@@ -115,6 +115,8 @@ describe('portalHomeFor', () => {
 
   it('routes blood-centre staff by department', () => {
     expect(portalHomeFor({ roles: ['blood_center'], department: 'testing' } as any))
+      .toBe('/blood-center/testing')
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'processing' } as any))
       .toBe('/blood-center/laboratory')
     expect(portalHomeFor({ roles: ['blood_center'], department: 'issuance' } as any))
       .toBe('/blood-center/storage')
@@ -157,7 +159,8 @@ describe('portalHomeFor', () => {
 describe('departmentHome', () => {
   it.each([
     ['collection', '/blood-center/collection'],
-    ['testing', '/blood-center/laboratory'],
+    // Each laboratory department has its own page now.
+    ['testing', '/blood-center/testing'],
     ['processing', '/blood-center/laboratory'],
     ['issuance', '/blood-center/storage'],
     ['billing', '/blood-center/billing'],

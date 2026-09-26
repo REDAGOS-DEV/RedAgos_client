@@ -104,9 +104,32 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/laboratory/donations/${donationId}`, 'GET')
   }
 
-  /** Record the result a medical technologist reported. Moves it to `tested`. */
-  async recordTestResult(donationId: number, payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/laboratory/donations/${donationId}/results`, 'POST', payload)
+  // --- Testing department: Section II of the DOH form ---
+  //
+  // Duha ka section, gi-save nga tagsa-tagsa, para ang matag usa naay kaugalingon
+  // nga "Screened by". Walay endpoint nga direkta mo-record og overall result:
+  // gikan kini sa duha, so walay donation nga makapasar nga kulang og marker.
+
+  /** ABO + Rh, as one `blood_type_id`. */
+  async recordImmunohematology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/immunohematology`, 'POST', payload)
+  }
+
+  /**
+   * The five-marker panel. A reactive marker must carry `confirm_reactive: true`:
+   * it rejects the donation, permanently defers the donor and refers them.
+   */
+  async recordSerology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/serology`, 'POST', payload)
+  }
+
+  /** Donors with a reactive result the Testing department must follow up. */
+  async counsellingReferrals(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals`, 'GET', params)
+  }
+
+  async updateCounsellingReferral(referralId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals/${referralId}`, 'PATCH', payload)
   }
 
   async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {

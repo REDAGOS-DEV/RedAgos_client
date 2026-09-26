@@ -233,13 +233,24 @@ describe('BloodCenterService counter endpoints', () => {
   })
 
   it('records a collection on the donation it belongs to', async () => {
+    const box = {
+      volume_ml: 450,
+      blood_bag_type: 'double',
+      segment_number: 'SEG-0001',
+      started_at: '2026-09-26T01:00:00.000Z',
+      ended_at: '2026-09-26T01:12:00.000Z',
+    }
+
     fetchMock.mockResolvedValueOnce({})
-    await service.recordCollection(42, { volume_ml: 450 })
+    await service.recordCollection(42, box)
 
     const [url, config] = fetchMock.mock.calls[0]!
 
     expect(url).toBe('/blood-center/donations/42/collection')
-    expect(config.body).toEqual({ volume_ml: 450 })
+    // The whole phlebotomist's box, and never a phlebotomist: that is
+    // whoever holds the bearer token.
+    expect(config.body).toEqual(box)
+    expect(config.body).not.toHaveProperty('collected_by')
   })
 
   it('checks in against the appointment route', async () => {
@@ -477,7 +488,7 @@ describe('a prior deferral at the counter', () => {
     expect(tx.priorDeferral.value).toBeNull()
   })
 
-  it('does not survive a manual valid-ID lookup, which carries no scan', async () => {
+  it('does not carry a scanned deferral over to a different lookup', async () => {
     fetchMock.mockResolvedValueOnce({
       data: {
         donor: DONOR, appointment: APPOINTMENT, open_donation: null,
@@ -490,5 +501,31 @@ describe('a prior deferral at the counter', () => {
     tx.adoptDonor(DONOR)
 
     expect(tx.priorDeferral.value).toBeNull()
+  })
+
+  it('shows the deferral the valid-ID lookup carries', () => {
+    // A donor who left their phone at home — or one a reactive laboratory
+    // result permanently deferred — must not walk past the notice.
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR, null, DEFERRAL)
+
+    expect(tx.priorDeferral.value).toEqual(DEFERRAL)
+  })
+
+  it('names a duplicate segment number in words the counter can act on', async () => {
+    fetchMock.mockResolvedValueOnce({ data: donation('screening') })
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.openDonation()
+
+    fetchMock.mockRejectedValueOnce({
+      data: {
+        message: 'The given data was invalid.',
+        errors: { segment_number: ['This segment number is already recorded at this facility. Scan the bag again.'] },
+      },
+    })
+    await tx.recordCollection({ segment_number: 'SEG-1' })
+
+    expect(tx.error.value).toBe('This segment number is already recorded at this facility. Scan the bag again.')
   })
 })

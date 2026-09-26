@@ -36,9 +36,10 @@ export interface BloodCenterNavGroup {
  */
 const DEPARTMENT_HOME: Record<string, string> = {
   collection: '/blood-center/collection',
-  // Testing and Processing work the same laboratory queue; the page shows
-  // each department only the part it may record.
-  testing: '/blood-center/laboratory',
+  // Each laboratory department has its own page. Testing records
+  // immunohematology and serology and works its referral list; Processing
+  // separates the unit and clears or rejects it.
+  testing: '/blood-center/testing',
   processing: '/blood-center/laboratory',
   issuance: '/blood-center/storage',
   billing: '/blood-center/billing',
@@ -77,11 +78,11 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Each department dashboard is gated on an ability distinctive to that
       // department, never on a shared read. inventory.view, for instance, is
       // held by Collection, Testing and Processing too, so gating Issuance on
-      // it would have shown them a dashboard that is not theirs. The laboratory
-      // page is shared by Testing and Processing, so it is gated on lab.view,
-      // which only those two hold.
+      // it would have shown them a dashboard that is not theirs. Testing and
+      // Processing share lab.view, so each is gated on its own write instead.
       { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: 'donors.manage', keywords: 'donor collection donation' },
-      { label: 'Testing & Processing', path: '/blood-center/laboratory', icon: 'flask-conical', requires: 'lab.view', keywords: 'lab laboratory processing screening testing components' },
+      { label: 'Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: 'lab.record_result', keywords: 'lab laboratory testing immunohematology serology abo rh hiv hbsag hcv syphilis malaria referral counselling segment' },
+      { label: 'Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
       { label: 'Billing Dashboard', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.create', keywords: 'billing payment finance' },
     ],

@@ -3,10 +3,10 @@
     <header class="laboratory__header">
       <div>
         <p class="laboratory__eyebrow">Blood Center Portal / Laboratory</p>
-        <h1 class="laboratory__title">Testing &amp; Processing</h1>
+        <h1 class="laboratory__title">Processing</h1>
         <p class="laboratory__subtitle">
-          Record the results and component breakdown a medical technologist reported for each unit the
-          counter has handed over. RedAgos stores what was found — it does not perform or interpret any test.
+          Record what each unit was separated into, then clear it for issue or reject it. The Testing department
+          records immunohematology and serology on its own page; its outcome appears here.
         </p>
       </div>
 
@@ -34,8 +34,8 @@
             <span class="field__label">Show</span>
             <select v-model="statusFilter" class="field__input" @change="loadQueue">
               <option value="">Awaiting the laboratory</option>
-              <option value="collected">Collected — not yet tested</option>
-              <option value="tested">Tested — not yet released</option>
+              <option value="collected">With Testing — not yet tested</option>
+              <option value="tested">Tested — ready for processing</option>
               <option value="completed">Cleared for issue</option>
               <option value="rejected">Rejected</option>
             </select>
@@ -99,6 +99,11 @@
         </div>
 
         <div class="fact">
+          <span class="fact__label">Segment</span>
+          <span class="fact__value mono">{{ selected.collection?.segment_number || '—' }}</span>
+        </div>
+
+        <div class="fact">
           <span class="fact__label">Status</span>
           <span class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
         </div>
@@ -147,76 +152,64 @@
       <template v-else>
         <!-- The two branches the technologist works in parallel -->
         <div class="lab-grid">
-          <!-- TESTING -->
+          <!--
+            TESTING — read-only here. The Testing department records
+            immunohematology and serology on its own page. Processing sees the
+            outcome and the typing, never which serology marker was reactive:
+            the server does not send it to this department.
+          -->
           <section class="card">
             <h2 class="card__title">Testing</h2>
             <p class="card__hint">
-              Record the result and the blood type the laboratory determined. Only a passed result can be
-              cleared for issue.
+              Recorded by the Testing department. Only a donation that passed both immunohematology and all five
+              serology markers can be cleared for issue.
             </p>
 
-            <div v-if="selected.test_result" class="recorded">
+            <div class="recorded">
               <div class="fact">
-                <span class="fact__label">Result</span>
+                <span class="fact__label">Immunohematology</span>
+                <span class="fact__value">
+                  {{ selected.immunohematology?.blood_type || (selected.test_result?.is_legacy ? selected.test_result.blood_type : null) || 'Not yet recorded' }}
+                </span>
+                <span v-if="selected.immunohematology?.recorded_by" class="fact__sub">
+                  {{ selected.immunohematology.recorded_by }} · {{ formatDate(selected.immunohematology.recorded_at) }}
+                </span>
+              </div>
+
+              <div class="fact">
+                <span class="fact__label">Serology</span>
+                <span
+                  v-if="selected.serology"
+                  class="pill"
+                  :class="selected.serology.outcome === 'reactive' ? 'pill--rejected' : 'pill--collected'"
+                >
+                  {{ selected.serology.outcome_label }}
+                </span>
+                <span v-else class="fact__value">Not yet recorded</span>
+                <span v-if="selected.serology?.recorded_by" class="fact__sub">
+                  {{ selected.serology.recorded_by }} · {{ formatDate(selected.serology.recorded_at) }}
+                </span>
+              </div>
+
+              <div v-if="selected.test_result" class="fact">
+                <span class="fact__label">Outcome</span>
                 <span class="pill" :class="selected.test_result.clears_for_issue ? 'pill--collected' : 'pill--rejected'">
                   {{ selected.test_result.result_label }}
                 </span>
               </div>
-              <div class="fact">
-                <span class="fact__label">Typed as</span>
-                <span class="fact__value">{{ selected.test_result.blood_type || '—' }}</span>
-              </div>
-              <div class="fact">
-                <span class="fact__label">Tested</span>
-                <span class="fact__value">{{ formatDate(selected.test_result.tested_at) }}</span>
-              </div>
             </div>
 
-            <p v-if="!canRecordResult" class="card__hint">
-              {{ selected.test_result ? 'Recorded by the Testing department.' : 'Waiting for the Testing department to record a result.' }}
+            <p v-if="selected.test_result?.is_legacy" class="card__hint card__hint--warn">
+              Recorded before the five-marker panel existed ({{ selected.test_result.result_label }}). The Testing
+              department must record serology before this unit can be cleared.
+            </p>
+            <p v-else-if="!selected.test_result" class="card__hint">
+              Waiting for the Testing department to record {{ testingOutstanding }}.
             </p>
 
-            <template v-else>
-              <label class="field">
-                <span class="field__label">Result</span>
-                <select v-model="resultForm.result" class="field__input">
-                  <option value="passed">Passed — no reactive markers</option>
-                  <option value="reactive">Reactive</option>
-                  <option value="inconclusive">Inconclusive</option>
-                </select>
-              </label>
-
-              <label class="field">
-                <span class="field__label">Blood type determined</span>
-                <select v-model.number="resultForm.blood_type_id" class="field__input">
-                  <option :value="null" disabled>Select the type</option>
-                  <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
-                </select>
-                <span v-if="!selected.donor?.blood_type" class="field__optional">
-                  This donor has no type on file. A passed result records it on their profile.
-                </span>
-                <span v-else class="field__optional">
-                  The donor's profile says {{ selected.donor.blood_type }}. Recording a different type is
-                  refused — the profile has to be corrected first, so only change this if the profile is wrong.
-                </span>
-              </label>
-
-              <label class="field">
-                <span class="field__label">Notes <span class="field__optional">optional</span></span>
-                <textarea v-model="resultForm.notes" class="field__input" rows="2" />
-              </label>
-
-              <div class="actions">
-                <button
-                  type="button"
-                  class="btn btn--primary"
-                  :disabled="busy || !resultForm.blood_type_id"
-                  @click="submitResult"
-                >
-                  {{ selected.test_result ? 'Update result' : 'Record test result' }}
-                </button>
-              </div>
-            </template>
+            <NuxtLink v-if="canRecordResult" :to="`/blood-center/testing?donation=${selected.id}`" class="btn btn--link">
+              Open on the Testing page
+            </NuxtLink>
           </section>
 
           <!-- PROCESSING -->
@@ -225,6 +218,9 @@
             <p class="card__hint">
               Record the components this unit was separated into, and how many of each. This runs alongside
               testing — neither waits on the other.
+              <template v-if="selected.collection?.blood_bag_type_label">
+                Drawn into a {{ selected.collection.blood_bag_type_label.toLowerCase() }} bag.
+              </template>
             </p>
 
             <div v-if="selected.components?.length" class="recorded">
@@ -332,26 +328,28 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
- * The laboratory's side of a donation.
+ * The Processing department's side of a donation.
  *
- * The counter leaves every donation at `collected` and stops there on purpose:
- * `completed` means *cleared for issue to a patient*, and only Processing may
- * set it. Testing and Processing share this page; each sees the other's work
- * but can record only its own, matching the abilities the server enforces. Everything on this page is a record of what a medical
+ * The counter leaves every donation at `collected`; the Testing department
+ * records immunohematology and serology on its own page, and a donation that
+ * passes both becomes `tested`. From there `completed` — *cleared for issue to
+ * a patient* — is Processing's to set, here. Testing's work shows on this page
+ * read-only, as its outcome: which serology marker was reactive never reaches
+ * this department. Everything on this page is a record of what a medical
  * technologist found at the bench — nothing here performs or interprets a test.
  */
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'lab.view',
+  requires: 'lab.record_components',
 })
 
 const { user, can } = useUser()
 const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 
-// Testing records the result; Processing records the breakdown and makes the
-// final call. A supervisor holds all three.
+// Processing records the breakdown and makes the final call. A supervisor
+// holds every ability, so can also jump across to the Testing page.
 const canRecordResult = computed(() => can('lab.record_result'))
 const canRecordComponents = computed(() => can('lab.record_components'))
 const canUpdateStatus = computed(() => can('lab.update_status'))
@@ -360,7 +358,6 @@ const service = bloodCenterService
 
 const queue = ref([])
 const selected = ref(null)
-const bloodTypes = ref([])
 const components = ref([])
 
 // Empty means the laboratory's own working queue: collected and tested, which
@@ -373,11 +370,22 @@ const notice = ref(null)
 const rejecting = ref(false)
 const rejectReason = ref('')
 
-const resultForm = reactive({ result: 'passed', blood_type_id: null, notes: '' })
 const componentRows = ref([{ component_id: null, quantity: 1 }])
 
-const hasResult = computed(() => Boolean(selected.value?.test_result))
+// Testing is finished once the donation has an outcome under the five-marker
+// panel. A legacy result — recorded before the panel existed — does not count.
+const hasResult = computed(() => Boolean(selected.value?.test_result) && !selected.value?.test_result?.is_legacy)
 const resultPassed = computed(() => Boolean(selected.value?.test_result?.clears_for_issue))
+
+/** Which Testing sections are still missing, in words. */
+const testingOutstanding = computed(() => {
+  const missing = []
+
+  if (!selected.value?.immunohematology) missing.push('immunohematology')
+  if (!selected.value?.serology) missing.push('serology')
+
+  return missing.length ? missing.join(' and ') : 'its outcome'
+})
 const hasComponents = computed(() => Boolean(selected.value?.components?.length))
 const isFinal = computed(() => ['completed', 'rejected'].includes(selected.value?.status))
 
@@ -401,8 +409,13 @@ const validComponents = computed(() => componentRows.value.some(
 const blockers = computed(() => {
   const list = []
 
-  if (!hasResult.value) list.push('The test result has not been recorded.')
-  else if (!resultPassed.value) list.push('This result cannot be cleared for issue. Reject the unit instead.')
+  if (selected.value?.test_result?.is_legacy) {
+    list.push('Serology has not been recorded under the five-marker panel. The Testing department must record it.')
+  } else if (!hasResult.value) {
+    list.push(`The Testing department has not recorded ${testingOutstanding.value}.`)
+  } else if (!resultPassed.value) {
+    list.push('This result cannot be cleared for issue. Reject the unit instead.')
+  }
 
   if (!hasComponents.value) list.push('The component breakdown has not been recorded.')
 
@@ -445,6 +458,7 @@ function formatDate(value) {
 function nextStepFor(row) {
   if (row.status === 'completed') return 'Cleared for issue'
   if (row.status === 'rejected') return row.rejection_reason || 'Rejected'
+  if (row.test_result?.is_legacy) return 'Needs serology from Testing'
   if (row.test_result && !row.test_result.clears_for_issue) return 'Needs rejecting'
 
   // Either branch may be outstanding, and in any order — neither is "next"
@@ -465,9 +479,14 @@ function messageFor(err) {
     case 'donation_not_collected':
       return 'The counter has not finished with this donation yet.'
     case 'donation_not_tested':
-      return 'Record the test result before declaring components.'
     case 'result_missing':
-      return 'Record the test result before clearing this unit for issue.'
+      return 'The Testing department has not finished immunohematology and serology for this unit.'
+    case 'serology_not_recorded':
+      return 'This unit has no five-marker serology panel. The Testing department must record it first.'
+    case 'immunohematology_not_recorded':
+      return 'This unit has no blood typing recorded. The Testing department must record it first.'
+    case 'results_locked':
+      return 'This donation is final, so its test results can no longer change.'
     case 'result_not_passed':
       return 'Only a passed result can be cleared for issue. Reject this unit instead.'
     case 'components_missing':
@@ -504,7 +523,9 @@ async function loadQueue() {
   error.value = null
 
   try {
-    const res = await service.laboratoryQueue(statusFilter.value ? { status: statusFilter.value } : {})
+    const res = await service.laboratoryQueue(
+      statusFilter.value ? { status: statusFilter.value } : { stage: 'processing' },
+    )
 
     queue.value = res?.data ?? []
   } catch (err) {
@@ -518,12 +539,11 @@ async function loadReference() {
   try {
     const res = await service.referenceData()
 
-    bloodTypes.value = res?.blood_types ?? []
     components.value = res?.components ?? []
   } catch {
-    // The page still works for reading the queue; the selects simply stay
-    // empty and the record buttons cannot be satisfied.
-    error.value = 'Reference data could not be loaded, so blood types and components are unavailable.'
+    // The page still works for reading the queue; the select simply stays
+    // empty and the record button cannot be satisfied.
+    error.value = 'Reference data could not be loaded, so components are unavailable.'
   }
 }
 
@@ -536,18 +556,6 @@ function adopt(payload) {
   rejectReason.value = ''
 
   if (!payload) return
-
-  resultForm.result = payload.test_result?.result ?? 'passed'
-  resultForm.notes = payload.test_result?.notes ?? ''
-  // Seed from the result if one exists, otherwise from the donor's profile.
-  // The two agree in almost every case, and starting blank meant an ordinary
-  // typing was one careless click away from a `blood_type_mismatch` that no
-  // screen in this application can then resolve.
-  const seedCode = payload.test_result?.blood_type ?? payload.donor?.blood_type ?? null
-
-  resultForm.blood_type_id = seedCode
-    ? bloodTypes.value.find((t) => t.code === seedCode)?.id ?? null
-    : null
 
   componentRows.value = payload.components?.length
     ? payload.components.map((c) => ({ component_id: c.component_id, quantity: c.quantity }))
@@ -575,19 +583,6 @@ function backToQueue() {
 
 function addComponentRow() {
   componentRows.value.push({ component_id: null, quantity: 1 })
-}
-
-async function submitResult() {
-  const res = await run(() => service.recordTestResult(selected.value.id, {
-    result: resultForm.result,
-    blood_type_id: resultForm.blood_type_id,
-    notes: resultForm.notes?.trim() || null,
-  }))
-
-  if (!res) return
-
-  adopt(res.data)
-  notice.value = res.message ?? null
 }
 
 async function submitComponents() {
@@ -806,6 +801,18 @@ onMounted(async () => {
 }
 
 .fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
+
+/* Who screened a section, and when — the form's "Screened by" column. */
+.fact__sub { font-size: 0.74rem; color: var(--rb-text-secondary); }
+
+.mono {
+  font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: 0.02em;
+}
+
+.card__hint--warn { color: var(--rb-warning-text); font-weight: 600; }
+
+.btn--link { align-self: flex-start; }
 
 .recorded {
   display: flex;
