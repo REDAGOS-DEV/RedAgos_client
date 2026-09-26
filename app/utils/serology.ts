@@ -63,7 +63,9 @@ export function serologyPayload(
 ): Record<string, string | boolean> {
   const payload: Record<string, string | boolean> = {}
 
-  for (const marker of markers) payload[marker.value] = readings[marker.value]
+  // A marker with no reading is sent blank, which the server refuses: the
+  // panel is recorded whole or not at all.
+  for (const marker of markers) payload[marker.value] = readings[marker.value] ?? ''
 
   if (reactiveMarkers(readings, markers).length > 0) payload.confirm_reactive = confirmed
 
