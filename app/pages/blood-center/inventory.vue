@@ -80,7 +80,11 @@
           </div>
           <p class="type-card__units">{{ bt.total_units }} <span class="type-card__units-label">units</span></p>
           <div class="progress-track">
-            <div class="progress-fill" :class="`progress-fill--${bt.health}`" :style="{ width: bt.progress + '%' }" />
+            <div
+              class="progress-fill"
+              :class="`progress-fill--${bt.health}`"
+              :style="{ transform: `scaleX(${Math.min(100, Math.max(0, Number(bt.progress) || 0)) / 100})` }"
+            />
           </div>
           <p class="type-card__updated">Updated {{ bt.last_updated || '—' }}</p>
         </button>
@@ -744,7 +748,12 @@
                 <div class="print-preview__grid">
                   <div v-for="id in printSelectedIds" :key="id" class="print-label-card">
                     <p class="print-label-card__type">{{ inventoryBatches.find(b => b.id === id)?.blood_type }}</p>
-                    <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.component }}</p>
+                    <p class="print-label-card__meta">
+                      {{ inventoryBatches.find(b => b.id === id)?.component }}
+                      <template v-if="inventoryBatches.find(b => b.id === id)?.volume_ml">
+                        &middot; {{ inventoryBatches.find(b => b.id === id)?.volume_ml }} mL
+                      </template>
+                    </p>
                     <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.batch_id }}</p>
                     <p class="print-label-card__meta">Exp {{ formatDate(inventoryBatches.find(b => b.id === id)?.expiry_date) }}</p>
                     <div class="print-label-card__barcode" />
@@ -791,6 +800,7 @@
                 <dl class="drawer-info-grid">
                   <div><dt>Blood Type</dt><dd>{{ drawerBatch.blood_type }}</dd></div>
                   <div><dt>Component</dt><dd>{{ drawerBatch.component }}</dd></div>
+                  <div><dt>Volume</dt><dd>{{ drawerBatch.volume_ml ? `${drawerBatch.volume_ml} mL` : '—' }}</dd></div>
                   <div><dt>Available Units</dt><dd>{{ drawerBatch.available_units }}</dd></div>
                   <div><dt>Reserved Units</dt><dd>{{ drawerBatch.reserved_units }}</dd></div>
                   <div><dt>Batch Number</dt><dd>{{ drawerBatch.batch_number || drawerBatch.batch_id }}</dd></div>
@@ -1223,8 +1233,9 @@ const componentColorMap = {
   'Packed RBC': 'var(--rb-primary)',
   'Whole Blood': 'var(--rb-accent)',
   'Fresh Frozen Plasma': 'var(--rb-purple)',
-  Platelets: 'var(--rb-teal)',
+  'Platelet Concentrate': 'var(--rb-teal)',
   Cryoprecipitate: 'var(--rb-warning)',
+  Cryosupernate: 'var(--rb-success)',
 }
 
 const computedDistribution = computed(() => {
@@ -1500,6 +1511,9 @@ async function loadDashboard() {
       batch_id: unit.id,
       blood_type: unit.blood_type?.code ?? null,
       component: unit.component?.name ?? null,
+      // The bag's volume as Processing recorded it; null for units booked in
+      // before volumes were kept.
+      volume_ml: unit.volume_ml ?? null,
       status: unit.status,
       available_units: unit.status === 'available' ? 1 : 0,
       reserved_units: unit.status === 'reserved' ? 1 : 0,
@@ -1650,7 +1664,15 @@ onMounted(loadDashboard)
 .health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 
 .progress-track { height: 5px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+/* Full width, scaled from the left: a transform animates on the compositor,
+   where animating `width` would re-lay out the card on every frame. */
+.progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left center;
+  transition: transform 0.4s ease;
+}
 .progress-fill--healthy { background: var(--rb-success); }
 .progress-fill--low { background: var(--rb-warning); }
 .progress-fill--critical { background: var(--rb-accent); }

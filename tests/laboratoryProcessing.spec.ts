@@ -92,15 +92,21 @@ describe('BloodCenterService laboratory endpoints', () => {
     expect(config.body).toEqual({ status: 'contacted', note: null })
   })
 
-  it('declares components on their own endpoint', async () => {
+  it('declares each bag, with its volume, on its own endpoint', async () => {
+    // One entry per bag: two bags of the same component are two entries.
+    const bags = [
+      { component_id: 1, volume_ml: 250 },
+      { component_id: 1, volume_ml: 230 },
+    ]
+
     fetchMock.mockResolvedValueOnce({})
-    await service.declareComponents(42, { components: [{ component_id: 1, quantity: 2 }] })
+    await service.declareComponents(42, { components: bags })
 
     const [url, config] = fetchMock.mock.calls[0]!
 
     expect(url).toBe('/blood-center/laboratory/donations/42/components')
     expect(config.method).toBe('POST')
-    expect(config.body).toEqual({ components: [{ component_id: 1, quantity: 2 }] })
+    expect(config.body).toEqual({ components: bags })
   })
 
   it('clears for issue through the laboratory status route', async () => {

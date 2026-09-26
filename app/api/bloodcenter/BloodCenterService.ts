@@ -198,6 +198,20 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
   }
 
+  // --- Facility logo (supervisor only) ---
+  //
+  // Ang facility kay gikan sa token sa staff, dili gikan sa request. FormData,
+  // so ang BaseService mobiya sa Content-Type para ang browser ang mobutang sa
+  // boundary.
+
+  async uploadFacilityLogo(form: FormData): Promise<any> {
+    return this.request(`${this.resource}/facility/logo`, 'POST', form)
+  }
+
+  async removeFacilityLogo(): Promise<any> {
+    return this.request(`${this.resource}/facility/logo`, 'DELETE')
+  }
+
   // --- Inventory (Issuance department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
@@ -221,6 +235,16 @@ class BloodCenterService extends BaseService {
 
   async recordBloodUnits(payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory`, 'POST', payload)
+  }
+
+  /** The Daily Blood Stock Inventory, as of now. Issuance and supervisors. */
+  async stockReport(): Promise<any> {
+    return this.request(`${this.resource}/inventory/stock-report`, 'GET')
+  }
+
+  /** The same report as the printable PDF sheet. */
+  async downloadStockReport(): Promise<Blob> {
+    return this.requestBlob(`${this.resource}/inventory/stock-report/pdf`)
   }
 
   async updateBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {

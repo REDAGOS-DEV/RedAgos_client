@@ -94,6 +94,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // inventory.create rather than inventory.view: Collection, Testing and
       // Processing all read stock, but only Issuance books it in.
       { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
+      // Issuance prepares and signs the daily sheet, so it carries Issuance's
+      // own ability rather than the inventory.view every lab department holds.
+      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.create', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests' },
       { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.process', keywords: 'allocate release dispatch' },
     ],

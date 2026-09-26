@@ -175,7 +175,7 @@ describe('page gutters', () => {
   const PAGES = [
     'appointments', 'bloodrequests', 'collection', 'dashboard', 'donors',
     'drives', 'fulfillment', 'inventory', 'reports', 'settings', 'staff',
-    'laboratory', 'testing',
+    'laboratory', 'testing', 'stock-report',
   ]
 
   for (const page of PAGES) {

@@ -216,17 +216,17 @@
           <section class="card">
             <h2 class="card__title">Processing</h2>
             <p class="card__hint">
-              Record the components this unit was separated into, and how many of each. This runs alongside
-              testing — neither waits on the other.
+              Record each bag this unit was separated into, with its volume. Two bags of the same component are two
+              rows. This runs alongside testing — neither waits on the other.
               <template v-if="selected.collection?.blood_bag_type_label">
                 Drawn into a {{ selected.collection.blood_bag_type_label.toLowerCase() }} bag.
               </template>
             </p>
 
             <div v-if="selected.components?.length" class="recorded">
-              <div v-for="c in selected.components" :key="c.component_id" class="fact">
+              <div v-for="c in selected.components" :key="c.id ?? c.component_id" class="fact">
                 <span class="fact__label">{{ c.component }}</span>
-                <span class="fact__value">{{ c.quantity }} unit{{ c.quantity === 1 ? '' : 's' }}</span>
+                <span class="fact__value">{{ bagLabel(c) }}</span>
               </div>
             </div>
 
@@ -245,24 +245,38 @@
                 </label>
 
                 <label class="field field--qty">
-                  <span class="field__label">Quantity</span>
-                  <input v-model.number="row.quantity" type="number" min="1" max="10" class="field__input" >
+                  <span class="field__label">Volume (mL)</span>
+                  <input
+                    v-model.number="row.volume_ml"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    inputmode="numeric"
+                    class="field__input"
+                    placeholder="mL"
+                  >
                 </label>
 
                 <button
                   type="button"
                   class="btn btn--icon"
                   :disabled="componentRows.length === 1"
-                  aria-label="Remove this component"
+                  aria-label="Remove this bag"
                   @click="componentRows.splice(index, 1)"
                 >
                   <AssetIcon name="trash-2" :size="14" />
                 </button>
               </div>
 
+              <!-- Information only: nothing here decides what a bag should hold. -->
+              <p v-if="declaredVolume > 0" class="card__hint">
+                {{ declaredVolume }} mL across {{ componentRows.filter(isCompleteBag).length }} bag(s)<template v-if="selected.volume_ml">
+                  — {{ selected.volume_ml }} mL was collected</template>.
+              </p>
+
               <div class="actions">
                 <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
-                  Add component
+                  Add bag
                 </button>
                 <button
                   type="button"
@@ -370,7 +384,27 @@ const notice = ref(null)
 const rejecting = ref(false)
 const rejectReason = ref('')
 
-const componentRows = ref([{ component_id: null, quantity: 1 }])
+// One row per bag, with its volume. Two bags of the same component are two
+// rows; inventory books in exactly one unit per row.
+const componentRows = ref([{ component_id: null, volume_ml: null }])
+
+function isCompleteBag(row) {
+  const volume = Number(row.volume_ml)
+
+  return Boolean(row.component_id) && Number.isInteger(volume) && volume >= 1 && volume <= 1000
+}
+
+/** The total declared across complete rows, shown beside the collected volume. */
+const declaredVolume = computed(() => componentRows.value
+  .filter(isCompleteBag)
+  .reduce((sum, row) => sum + Number(row.volume_ml), 0))
+
+/** How a recorded bag reads. A breakdown from before volumes were kept shows its count. */
+function bagLabel(bag) {
+  if (bag.volume_ml) return `${bag.volume_ml} mL`
+
+  return `${bag.quantity} unit${bag.quantity === 1 ? '' : 's'}`
+}
 
 // Testing is finished once the donation has an outcome under the five-marker
 // panel. A legacy result — recorded before the panel existed — does not count.
@@ -395,9 +429,10 @@ const initials = computed(() => {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '—'
 })
 
-const validComponents = computed(() => componentRows.value.some(
-  (row) => row.component_id && Number(row.quantity) >= 1,
-))
+// Every row complete, not just one: a half-filled row would otherwise be
+// dropped silently, and a bag would go unrecorded.
+const validComponents = computed(() => componentRows.value.length > 0
+  && componentRows.value.every(isCompleteBag))
 
 /**
  * What still stands between this unit and issuable stock.
@@ -557,9 +592,14 @@ function adopt(payload) {
 
   if (!payload) return
 
+  // A breakdown recorded before volumes were kept has a count and no
+  // volume; it opens as that many rows, each waiting for its volume.
   componentRows.value = payload.components?.length
-    ? payload.components.map((c) => ({ component_id: c.component_id, quantity: c.quantity }))
-    : [{ component_id: null, quantity: 1 }]
+    ? payload.components.flatMap((c) => Array.from(
+      { length: c.volume_ml ? 1 : Math.max(1, Number(c.quantity) || 1) },
+      () => ({ component_id: c.component_id, volume_ml: c.volume_ml ?? null }),
+    ))
+    : [{ component_id: null, volume_ml: null }]
 }
 
 async function openDonation(id) {
@@ -582,13 +622,13 @@ function backToQueue() {
 }
 
 function addComponentRow() {
-  componentRows.value.push({ component_id: null, quantity: 1 })
+  componentRows.value.push({ component_id: null, volume_ml: null })
 }
 
 async function submitComponents() {
   const payload = componentRows.value
-    .filter((row) => row.component_id && Number(row.quantity) >= 1)
-    .map((row) => ({ component_id: row.component_id, quantity: Number(row.quantity) }))
+    .filter(isCompleteBag)
+    .map((row) => ({ component_id: row.component_id, volume_ml: Number(row.volume_ml) }))
 
   const res = await run(() => service.declareComponents(selected.value.id, { components: payload }))
 

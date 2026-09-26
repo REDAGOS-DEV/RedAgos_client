@@ -129,6 +129,9 @@
                 {{ savingProfile ? 'Saving...' : 'Save Changes' }}
               </button>
             </div>
+
+            <!-- Supervisors only; the card hides itself for everyone else. -->
+            <BloodCenterFacilityLogoCard />
           </section>
 
           <!-- SECURITY -->
@@ -356,6 +359,7 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 definePageMeta({
@@ -1313,18 +1317,11 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+/* Marked by a tinted outline and the "This device" badge, rather than a
+   coloured bar down one side. */
 .session-card--current {
   background: var(--rb-surface-hover);
-}
-
-.session-card--current::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--primary);
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
 }
 
 .session-card__icon {

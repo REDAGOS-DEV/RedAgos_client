@@ -102,6 +102,10 @@
           <li v-for="c in selected.components" :key="c.component_id" class="declared__row">
             <span class="declared__name">{{ c.component }}</span>
             <span class="declared__count">{{ c.recorded }} of {{ c.declared }} recorded</span>
+            <!-- Each bag still to shelve, in the order units will take them. -->
+            <span v-if="c.outstanding_volumes?.some((v) => v)" class="declared__shelf">
+              Next: {{ c.outstanding_volumes.map((v) => (v ? `${v} mL` : '—')).join(', ') }}
+            </span>
             <span v-if="!c.shelf_life_configured" class="declared__flag">
               <AssetIcon name="circle-alert" :size="13" />
               No shelf life set

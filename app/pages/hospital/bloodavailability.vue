@@ -550,7 +550,7 @@ const criticalTypesDisplay = ref(0)
 
 // ======================= OPTIONS =======================
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const componentOptions = ['Packed RBC', 'Whole Blood', 'Platelets', 'Fresh Frozen Plasma', 'Cryoprecipitate']
+const componentOptions = ['Packed RBC', 'Whole Blood', 'Platelet Concentrate', 'Fresh Frozen Plasma', 'Cryoprecipitate', 'Cryosupernate']
 const centerOptions = ref([]) // populated from API response
 
 // ======================= RECOMMENDED ACTIONS =======================

@@ -395,7 +395,7 @@ const loading = ref(true)
 
 // ---------- Reference data ----------
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelets', 'Cryoprecipitate']
+const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelet Concentrate', 'Cryoprecipitate']
 
 const statusMap = {
   pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
