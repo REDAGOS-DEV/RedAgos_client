@@ -102,20 +102,20 @@
               <AssetIcon :name="item.icon" :size="14"
                 :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
               <!-- A status pill does not fit the rail, so it becomes a dot -->
-              <span v-if="!showLabels && item.badge && eligibilityStatus"
+              <span v-if="!showLabels && item.badge && questionnaireStatus"
                 class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
                 :style="{
-                  background: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00',
+                  background: qrValid ? '#2E7D32' : '#F57C00',
                   boxShadow: '0 0 0 2px ' + SIDEBAR_BG
                 }" />
             </span>
 
             <span v-if="showLabels" class="flex-1 min-w-0 truncate whitespace-nowrap">{{ item.label }}</span>
 
-            <span v-if="showLabels && item.badge && eligibilityStatus"
+            <span v-if="showLabels && item.badge && questionnaireStatus"
               class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
               :style="badgeStyle">
-              {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus }}
+              {{ qrLabel }}
             </span>
           </NuxtLink>
         </template>
@@ -269,10 +269,14 @@ const sidebarShadow = computed(() =>
     : `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(15,23,42,0.04)`
 )
 
-const eligibilityStatus = ref(null)
+// The questionnaire, not eligibility_status: every screening is recorded
+// `pending` until the centre decides, so that one never reads as valid.
+const questionnaireStatus = ref(null)
+const qrValid = computed(() => questionnaireStatus.value === 'answered')
+const qrLabel = computed(() => (qrValid.value ? 'Valid' : questionnaireStatus.value === 'expired' ? 'Expired' : 'Pending'))
 
 const badgeStyle = computed(() => {
-  const eligible = eligibilityStatus.value === 'eligible'
+  const eligible = qrValid.value
   return {
     background: eligible
       ? (isDark.value ? 'rgba(76,175,80,0.18)' : 'rgba(46,125,50,0.10)')
@@ -319,13 +323,19 @@ const loadUser = async () => {
     }
 
     const dashboard = await donorService.dashboard()
-    eligibilityStatus.value = dashboard.eligibility_status || 'pending'
+    questionnaireStatus.value = dashboard.questionnaire_status || 'not_answered'
   } catch (err) {
     console.error(err)
   }
 }
 
 onMounted(loadUser)
+
+// The rail outlives every page, so a questionnaire answered just now would
+// leave the badge on "Pending" until a reload. Re-read it on the way out.
+watch(() => route.path, (to, from) => {
+  if (from === '/donor/eligibility' && to !== from) loadUser()
+})
 
 const closeSidebar = () => {
   closeMobile()

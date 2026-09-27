@@ -55,9 +55,9 @@
             <AssetIcon name="check-circle" :size="18" />
           </div>
           <div class="stat-card__body">
-            <p class="stat-card__label">Confirmed Arrived</p>
+            <p class="stat-card__label">In Progress</p>
             <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.confirmedArrived }}</p>
+              stats.inProgress }}</p>
           </div>
         </div>
         <div class="stat-card">
@@ -65,9 +65,9 @@
             <AssetIcon name="droplets" :size="18" />
           </div>
           <div class="stat-card__body">
-            <p class="stat-card__label">Donated Today</p>
+            <p class="stat-card__label">Collected Today</p>
             <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.donatedToday }}</p>
+              stats.collectedToday }}</p>
           </div>
         </div>
         <div class="stat-card">
@@ -124,8 +124,9 @@
             <select v-model="statusFilter" class="form-input filter-select">
               <option value="all">All Status</option>
               <option value="scheduled">Scheduled</option>
-              <option value="arrived">Arrived</option>
-              <option value="donated">Donated</option>
+              <option value="in-progress">In progress</option>
+              <option value="collected">Collected</option>
+              <option value="deferred">Deferred</option>
               <option value="no-show">No-show</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -165,9 +166,7 @@
               </div>
 
               <div class="appt-status-col">
-                <span v-if="appt.inProgress" class="pill pill--outline">In progress</span>
-                <span class="pill" :class="'pill--' + appt.status.toLowerCase()">{{ appt.status
-                }}</span>
+                <span class="pill" :class="'pill--' + appt.statusKey">{{ appt.status }}</span>
 
                 <div class="appt-actions">
                   <button
@@ -412,13 +411,24 @@ const { user } = useUser()
 const facilityId = computed(() => user.value?.facility?.id ?? null)
 
 // Lima ka status ang gi-store sa server. Ang counter naay kaugalingon nga
-// pinulongan, so usa ra ka lugar ang mo-translate.
-const STATUS_LABELS = {
-  scheduled: 'Scheduled',
-  confirmed: 'Arrived',
-  completed: 'Donated',
-  no_show: 'No-show',
-  cancelled: 'Cancelled',
+// pinulongan, so usa ra ka lugar ang mo-translate. Ang `key` kay slug para sa
+// pill class ug sa filter — ang label "In progress" naay space.
+const STATUSES = {
+  scheduled: { key: 'scheduled', label: 'Scheduled' },
+  // Gi-scan na ang QR (o gi-check in), so nagsugod na ang visit.
+  confirmed: { key: 'in-progress', label: 'In progress' },
+  completed: { key: 'collected', label: 'Collected' },
+  no_show: { key: 'no-show', label: 'No-show' },
+  cancelled: { key: 'cancelled', label: 'Cancelled' },
+}
+
+// Ang deferred nga donor kay `completed` usab ang appointment — ang donation
+// ra ang mo-ingon nga wala diay nakuhaan og dugo.
+const DEFERRED = { key: 'deferred', label: 'Deferred' }
+
+function displayStatus(row) {
+  if (row.status === 'completed' && row.donation_status === 'rejected') return DEFERRED
+  return STATUSES[row.status] ?? { key: row.status, label: row.status }
 }
 
 // Parehas sa `bookedCountsByTime()` sa server: ang scheduled ug confirmed ra
@@ -440,8 +450,9 @@ function slotKeyOf(date) {
  * Ang queue mo-return og server field names; lahi ang gidahom sa template.
  * Usa ra ka lugar ang mo-tabok aron dili magkatag ang mapping.
  */
-function mapAppointment(row, openDonorUuids = new Set()) {
+function mapAppointment(row) {
   const at = new Date(row.appointment_datetime)
+  const status = displayStatus(row)
 
   return {
     id: row.id,
@@ -456,11 +467,8 @@ function mapAppointment(row, openDonorUuids = new Set()) {
     slotTime: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     dateDay: at.getDate(),
     dateMonth: at.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-    status: STATUS_LABELS[row.status] ?? row.status,
-
-    // `in_progress` already comes back in the queue payload — this is the
-    // donation the counter has open for this donor right now.
-    inProgress: Boolean(row.donor?.uuid && openDonorUuids.has(row.donor.uuid)),
+    status: status.label,
+    statusKey: status.key,
 
     canCheckIn: row.status === 'scheduled',
     canOpenCounter: row.status === 'confirmed',
@@ -473,13 +481,13 @@ function mapAppointment(row, openDonorUuids = new Set()) {
  * endpoint, ug wala man kinahanglana: naa na ang tanan nga row diri.
  */
 function deriveStats(rows) {
-  const count = (status) => rows.filter((r) => r.rawStatus === status).length
+  const count = (key) => rows.filter((r) => r.statusKey === key).length
 
   return {
     todayWalkIns: rows.filter((r) => r.kind === 'Walk-in').length,
-    confirmedArrived: count('confirmed'),
-    donatedToday: count('completed'),
-    noShows: count('no_show'),
+    inProgress: count('in-progress'),
+    collectedToday: count('collected'),
+    noShows: count('no-show'),
   }
 }
 
@@ -487,7 +495,7 @@ const initialLoading = ref(true)
 const activeTab = ref('walkin')
 const loadError = ref('')
 
-const stats = reactive({ todayWalkIns: 0, confirmedArrived: 0, donatedToday: 0, noShows: 0 })
+const stats = reactive({ todayWalkIns: 0, inProgress: 0, collectedToday: 0, noShows: 0 })
 const loadingStats = ref(false)
 
 // Which row is mid-request, so only that row's buttons disable rather than
@@ -565,7 +573,7 @@ const slotBookings = computed(() => {
 
 const filteredAppointments = computed(() => {
   return walkInAppointments.value.filter((appt) => {
-    const statusOk = statusFilter.value === 'all' || appt.status.toLowerCase() === statusFilter.value
+    const statusOk = statusFilter.value === 'all' || appt.statusKey === statusFilter.value
     const bloodOk = bloodTypeFilter.value === 'all' || appt.bloodType === bloodTypeFilter.value
     return statusOk && bloodOk
   })
@@ -602,20 +610,13 @@ async function loadQueue() {
   try {
     const data = await bloodCenterService.collectionQueue({ date: selectedDateFilter.value })
 
-    // The payload has always carried the donations already open at this
-    // counter; nothing used to read it, so a donor mid-visit looked identical
-    // to one who had only just arrived.
-    const openDonorUuids = new Set(
-      (data?.in_progress ?? []).map((d) => d.donor?.uuid).filter(Boolean),
-    )
-
-    const rows = (data?.appointments ?? []).map((row) => mapAppointment(row, openDonorUuids))
+    const rows = (data?.appointments ?? []).map(mapAppointment)
 
     walkInAppointments.value = rows
     Object.assign(stats, deriveStats(rows))
   } catch (err) {
     walkInAppointments.value = []
-    Object.assign(stats, { todayWalkIns: 0, confirmedArrived: 0, donatedToday: 0, noShows: 0 })
+    Object.assign(stats, { todayWalkIns: 0, inProgress: 0, collectedToday: 0, noShows: 0 })
     loadError.value = err?.message || 'Could not load the appointment queue.'
     console.error('Failed to load collection queue:', err)
   } finally {
@@ -1499,33 +1500,24 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.pill--outline {
-  background: #fff;
-  border: 1px solid #d1d5db;
-  color: #374151;
-}
-
 .pill--blood {
   background: #fdeaea;
   color: var(--accent);
 }
 
-.pill--arrived {
-  background: #e8f5e9;
-  color: var(--success);
-}
-
+.pill--in-progress,
 .pill--confirmed {
   background: #e3f2fd;
   color: var(--primary);
 }
 
-.pill--donated {
+.pill--collected {
   background: #e8f5e9;
   color: var(--success);
 }
 
-.pill--no-show {
+.pill--no-show,
+.pill--deferred {
   background: #fdeaea;
   color: var(--accent);
 }
@@ -2072,26 +2064,22 @@ onMounted(async () => {
   color: #60A5FA;
 }
 
-:global(.dark .appointments-page .pill--outline) {
-  background: #1E293B;
-  border-color: #475569;
-  color: #94A3B8;
-}
 :global(.dark .appointments-page .pill--blood) {
   background: #2D1A1A;
   color: #F87171;
 }
-:global(.dark .appointments-page .pill--arrived),
-:global(.dark .appointments-page .pill--donated) {
+:global(.dark .appointments-page .pill--collected) {
   background: #1A3A2A;
   color: #34D399;
 }
+:global(.dark .appointments-page .pill--in-progress),
 :global(.dark .appointments-page .pill--confirmed),
 :global(.dark .appointments-page .pill--attended) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-:global(.dark .appointments-page .pill--no-show) {
+:global(.dark .appointments-page .pill--no-show),
+:global(.dark .appointments-page .pill--deferred) {
   background: #2D1A1A;
   color: #F87171;
 }

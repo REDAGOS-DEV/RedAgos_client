@@ -126,7 +126,10 @@
     <section v-else-if="stage === 'verified'" class="card">
       <h2 class="card__title">Start the donation</h2>
       <p class="card__hint">
-        <template v-if="appointment">
+        <template v-if="appointment?.status === 'confirmed'">
+          The donor is checked in. Open their donation record to continue.
+        </template>
+        <template v-else-if="appointment">
           Mark the donor as arrived, then open their donation record.
         </template>
         <template v-else>

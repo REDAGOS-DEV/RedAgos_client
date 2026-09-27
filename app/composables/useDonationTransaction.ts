@@ -239,9 +239,20 @@ export function useDonationTransaction() {
 
     if (payload?.appointment_id && appointment.value?.id !== payload.appointment_id) return
 
-    // Keep the appointment card in step with the donation that closed it.
+    // Keep the appointment card in step with the donation that closed it. A
+    // deferral closes the booking too, but nothing was collected.
     if (appointment.value && payload && ['collected', 'tested', 'completed', 'rejected'].includes(payload.status)) {
-      appointment.value = { ...appointment.value, status: 'completed', status_label: 'Donated' }
+      appointment.value = {
+        ...appointment.value,
+        status: 'completed',
+        status_label: payload.status === 'rejected' ? 'Deferred' : 'Collected',
+      }
+      return
+    }
+
+    // Opening the donation checks a scheduled booking in on the server.
+    if (appointment.value?.status === 'scheduled' && payload) {
+      appointment.value = { ...appointment.value, status: 'confirmed', status_label: 'In progress' }
     }
   }
 

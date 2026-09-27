@@ -132,8 +132,9 @@
           />
           <h2 class="profile-card__name">{{ user?.full_name }}</h2>
           <p class="profile-card__meta">{{ donorCode }} · {{ bloodType }}</p>
-          <p v-if="eligibilityStatus === 'eligible'" class="profile-card__eligible">
-            Eligible to donate
+          <!-- Answered, not "eligible": the centre decides that at the counter. -->
+          <p v-if="qrValid" class="profile-card__eligible">
+            Screening complete
           </p>
         </div>
 
@@ -165,9 +166,9 @@
               <span class="status-row__label">QR code</span>
               <span
                 class="status-row__value"
-                :style="{ color: eligibilityStatus === 'eligible' ? '#2E7D32' : '#F57C00' }"
+                :style="{ color: qrValid ? '#2E7D32' : '#F57C00' }"
               >
-                {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus }}
+                {{ qrLabel }}
               </span>
             </div>
           </div>
@@ -492,7 +493,11 @@ onActivated(() => {
 const donorCode = computed(() => profile.value?.donor_code || '-')
 const bloodType = computed(() => profile.value?.blood_type || '-')
 const totalDonations = computed(() => profile.value?.total_donations ?? 0)
-const eligibilityStatus = computed(() => profile.value?.eligibility_status || 'pending')
+// The questionnaire, not eligibility_status: every screening is recorded
+// `pending` until the centre decides, so that one never reads as valid.
+const questionnaireStatus = computed(() => profile.value?.questionnaire_status || 'not_answered')
+const qrValid = computed(() => questionnaireStatus.value === 'answered')
+const qrLabel = computed(() => (qrValid.value ? 'Valid' : questionnaireStatus.value === 'expired' ? 'Expired' : 'Pending'))
 
 function formatDate(value) {
   if (!value) return '-'

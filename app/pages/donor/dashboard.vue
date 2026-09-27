@@ -27,7 +27,7 @@
           <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
         </div>
         <div class="header-actions">
-          <span v-if="eligibilityStatus === 'eligible'" class="icon-btn__dot" />
+          <span v-if="screeningDone" class="icon-btn__dot" />
           <NuxtLink to="/donor/appointments" class="btn-primary" aria-label="Book Appointment">
             <AssetIcon name="calendar" :size="16" />
             <span class="btn-text">Book Appointment</span>
@@ -36,7 +36,7 @@
       </div>
 
       <!-- Eligibility banner -->
-      <div v-if="eligibilityStatus === 'eligible'" class="banner banner--success">
+      <div v-if="screeningDone" class="banner banner--success">
         <div class="banner-icon-wrapper">
           <AssetIcon name="check-circle" :size="16" class="banner-icon" />
         </div>
@@ -112,20 +112,20 @@
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
         </div>
 
-        <div class="stat-card" :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }">
+        <div class="stat-card" :class="{ 'stat-card--emphasized': !screeningDone }">
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
             <div class="stat-card__badge"
-              :class="eligibilityStatus === 'eligible' ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
+              :class="screeningDone ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
               <AssetIcon name="shield-check" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" :class="eligibilityStatus === 'eligible' ? 'text-success' : 'text-warning'">
-            {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus === 'deferred' ? 'Deferred' : 'Pending' }}
+          <p class="stat-card__value" :class="screeningDone ? 'text-success' : 'text-warning'">
+            {{ screeningDone ? 'Valid' : questionnaireStatus === 'expired' ? 'Expired' : 'Pending' }}
           </p>
           <span class="stat-chip"
-            :class="eligibilityStatus === 'eligible' ? 'stat-chip--success' : 'stat-chip--warning'">
-            {{ eligibilityStatus === 'eligible' && profile?.screening_valid_until
+            :class="screeningDone ? 'stat-chip--success' : 'stat-chip--warning'">
+            {{ screeningDone && profile?.screening_valid_until
               ? `Until ${formatDate(profile.screening_valid_until, 'MMM D, YYYY')}`
               : 'Complete screening' }}
           </span>
@@ -300,11 +300,11 @@
             </div>
             <div class="eligibility-body">
               <div class="eligibility-status-row"
-                :class="eligibilityStatus === 'eligible' ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
+                :class="screeningDone ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
                 <AssetIcon name="shield-check" :size="20" />
                 <div>
-                  <p class="eligibility-status capitalize">
-                    {{ eligibilityStatus }}
+                  <p class="eligibility-status">
+                    {{ QUESTIONNAIRE_LABELS[questionnaireStatus] ?? 'Not yet answered' }}
                   </p>
                   <p v-if="profile?.screening_valid_until" class="eligibility-until">
                     Valid until {{ formatDate(profile.screening_valid_until, 'MMM D, YYYY') }}
@@ -325,7 +325,7 @@
               </div>
 
               <NuxtLink to="/donor/eligibility" class="btn-danger">
-                {{ eligibilityStatus === 'eligible' ? 'Retake Screening' : 'Take Screening' }}
+                {{ screeningDone ? 'Retake Screening' : 'Take Screening' }}
               </NuxtLink>
             </div>
           </div>
@@ -370,6 +370,18 @@ const loading = ref(true)
 // Core donor data
 const profile = ref(null)
 const eligibilityStatus = ref('pending')
+
+// Whether the questionnaire is answered and still stands. Every submission is
+// recorded `pending` until the centre decides, so eligibility_status never
+// reports it done — this is what the checklist and QR badge read instead.
+const questionnaireStatus = ref('not_answered')
+const screeningDone = computed(() => questionnaireStatus.value === 'answered')
+
+const QUESTIONNAIRE_LABELS = {
+  not_answered: 'Not yet answered',
+  answered: 'Answered',
+  expired: 'Needs answering again',
+}
 const bloodType = ref('-')
 const totalDonations = ref(0)
 const upcomingAppointment = ref(null)
@@ -414,7 +426,7 @@ const onboardingSteps = computed(() => [
     key: 'screening',
     label: 'Complete eligibility screening',
     path: '/donor/eligibility',
-    done: eligibilityStatus.value === 'eligible',
+    done: screeningDone.value,
   },
   {
     key: 'appointment',
@@ -477,6 +489,7 @@ async function load({ silent = false } = {}) {
     const data = await donorService.dashboard()
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
+    questionnaireStatus.value = data.questionnaire_status ?? 'not_answered'
     bloodType.value = data.blood_type ?? '-'
     totalDonations.value = data.total_donations ?? 0
     upcomingAppointment.value = data.upcoming_appointment ?? null

@@ -676,30 +676,38 @@ async function submitTyping() {
 
   if (!res) return
 
-  adopt(res.data)
+  adopt(res.data, ['typing'])
   notice.value = res.message ?? null
 }
 
 /**
- * Adopt a donation from the server and seed both forms from what it recorded.
+ * Adopt a donation from the server and seed the named forms from what it recorded.
+ *
+ * Saving one section re-seeds only that section. The other card may hold
+ * entries not yet saved, and the response knows nothing of them — re-seeding
+ * it would wipe what the technologist just typed.
  *
  * The typing is seeded only from this department's own earlier typing — never
  * from the fingerprick at screening, and never from the donor's profile.
  */
-function adopt(payload) {
+function adopt(payload, sections = ['typing', 'serology']) {
   selected.value = payload ?? null
 
   if (!payload) return
 
-  typingForm.blood_type_id = payload.immunohematology?.blood_type_id ?? null
-  typingForm.reverse_group = payload.immunohematology?.reverse_group ?? null
-  typingForm.antibody_screen = payload.immunohematology?.antibody_screen ?? null
-  typingForm.notes = payload.immunohematology?.notes ?? ''
+  if (sections.includes('typing')) {
+    typingForm.blood_type_id = payload.immunohematology?.blood_type_id ?? null
+    typingForm.reverse_group = payload.immunohematology?.reverse_group ?? null
+    typingForm.antibody_screen = payload.immunohematology?.antibody_screen ?? null
+    typingForm.notes = payload.immunohematology?.notes ?? ''
+  }
 
-  Object.assign(readings, blankPanel(markers.value))
+  if (sections.includes('serology')) {
+    Object.assign(readings, blankPanel(markers.value))
 
-  for (const marker of payload.serology?.markers ?? []) {
-    readings[marker.marker] = marker.result
+    for (const marker of payload.serology?.markers ?? []) {
+      readings[marker.marker] = marker.result
+    }
   }
 }
 
@@ -757,7 +765,7 @@ async function saveSerology(confirmed) {
 
   if (!res) return
 
-  adopt(res.data)
+  adopt(res.data, ['serology'])
   notice.value = res.message ?? null
 
   if (res.data?.status === 'rejected') loadReferrals()
