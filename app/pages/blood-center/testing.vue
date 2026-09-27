@@ -3,10 +3,11 @@
     <header class="testing__header">
       <div>
         <p class="testing__eyebrow">Blood Center Portal / Laboratory</p>
-        <h1 class="testing__title">Testing</h1>
+        <h1 class="testing__title">TTI Testing</h1>
         <p class="testing__subtitle">
-          Record immunohematology and the five-marker serology panel for each unit the counter has drawn. RedAgos
-          stores what the medical technologist found — it does not perform or interpret any test.
+          Record each drawn unit's confirmatory blood typing and its five-marker serology panel. Saving a result that
+          passes clears that section; a saved result changes only through an approved correction. RedAgos stores what
+          the medical technologist found — it does not perform or interpret any test.
         </p>
       </div>
 
@@ -51,7 +52,7 @@
           <div>
             <h2 class="card__title">Units awaiting testing</h2>
             <p class="card__hint">
-              Every drawn donation still missing immunohematology or serology. Scan a tube's segment number to go
+              Every drawn donation whose typing or serology is not yet cleared. Scan a tube's segment number to go
               straight to its donation.
             </p>
           </div>
@@ -93,7 +94,7 @@
         <ul v-else class="queue">
           <li v-for="row in queue" :key="row.id" class="queue__row">
             <div class="queue__main">
-              <p class="queue__name">{{ row.donor?.full_name || 'Unknown donor' }}</p>
+              <p class="queue__name">{{ donorTitle(row.donor, row.collection?.segment_number, row.id) }}</p>
               <p class="queue__meta">
                 Donation #{{ row.id }}
                 <template v-if="row.collection?.segment_number"> · Segment <span class="mono">{{ row.collection.segment_number }}</span></template>
@@ -103,12 +104,13 @@
             </div>
 
             <div class="queue__state">
-              <span class="chip" :class="row.immunohematology ? 'chip--done' : ''">
-                <AssetIcon v-if="row.immunohematology" name="check" :size="11" />
+              <span v-if="row.immunohematology?.clearance_hold" class="chip chip--alarm">Typing held</span>
+              <span v-else class="chip" :class="row.clearances?.immunohematology ? 'chip--done' : ''">
+                <AssetIcon v-if="row.clearances?.immunohematology" name="check" :size="11" />
                 Typing
               </span>
-              <span class="chip" :class="row.serology ? 'chip--done' : ''">
-                <AssetIcon v-if="row.serology" name="check" :size="11" />
+              <span class="chip" :class="row.clearances?.tti ? 'chip--done' : ''">
+                <AssetIcon v-if="row.clearances?.tti" name="check" :size="11" />
                 Serology
               </span>
             </div>
@@ -122,11 +124,15 @@
       <template v-else>
         <section class="unit-bar">
           <div class="unit-bar__identity">
-            <span class="unit-bar__avatar">{{ initials }}</span>
+            <!-- A bag, not a person, for the roles that work blind. -->
+            <span class="unit-bar__avatar">
+              <AssetIcon v-if="selected.donor?.blinded" name="droplets" :size="16" />
+              <template v-else>{{ initials }}</template>
+            </span>
             <div>
-              <p class="unit-bar__name">{{ selected.donor?.full_name || 'Unknown donor' }}</p>
+              <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.segment_number, selected.id) }}</p>
               <p class="unit-bar__sub">
-                Donation #{{ selected.id }} · {{ selected.donor?.donor_code || '—' }}
+                Donation #{{ selected.id }} · {{ donorReference(selected.donor) }}
                 <template v-if="selected.collection?.blood_bag_type_label"> · {{ selected.collection.blood_bag_type_label }} bag</template>
               </p>
             </div>
@@ -155,19 +161,14 @@
           <div class="outcome" :class="selected.status === 'rejected' ? 'outcome--rejected' : 'outcome--success'">
             <AssetIcon :name="selected.status === 'rejected' ? 'octagon-alert' : 'circle-check-big'" :size="26" />
             <div>
-              <h2 class="card__title">
-                {{ selected.status === 'rejected' ? 'Donation rejected' : 'Cleared for issue' }}
-              </h2>
+              <h2 class="card__title">Donation rejected</h2>
               <p class="card__hint">
                 <template v-if="isReactive">
                   Serology was reactive. The donation has been rejected, the donor permanently deferred and added to
                   Counselling referrals. These results can no longer be changed.
                 </template>
-                <template v-else-if="selected.status === 'rejected'">
-                  {{ selected.rejection_reason || 'No reason was recorded.' }} These results can no longer be changed.
-                </template>
                 <template v-else>
-                  Processing has cleared this unit. Its test results can no longer be changed.
+                  {{ selected.rejection_reason || 'No reason was recorded.' }} These results can no longer be changed.
                 </template>
               </p>
             </div>
@@ -181,40 +182,76 @@
           </div>
         </section>
 
-        <p v-else-if="selected.status === 'tested'" class="alert alert--notice" role="status">
-          Both sections are recorded and the unit is with Processing. You can still correct either section until it is
-          cleared or rejected.
+        <p v-else-if="selected.clearances?.tti && selected.clearances?.immunohematology" class="alert alert--notice" role="status">
+          Both sections are cleared, so this unit's bags may leave quarantine. A result can still be corrected, with
+          approval, until a bag has left quarantine.
         </p>
 
         <div class="lab-grid">
-          <!-- IMMUNOHEMATOLOGY -->
-          <section class="card">
+          <!-- IMMUNOHEMATOLOGY — recorded by the Immunohematology department. -->
+          <section v-if="canType" class="card">
             <div class="card__titles">
               <h2 class="card__title">Immunohematology</h2>
-              <span v-if="selected.immunohematology" class="pill pill--collected">Recorded</span>
+              <span v-if="selected.clearances?.immunohematology" class="pill pill--collected">Cleared</span>
+              <span v-else-if="typingHold" class="pill pill--rejected">{{ typingHoldLabel }}</span>
             </div>
-            <p class="card__hint">The confirmatory ABO and Rh typing of this unit's sample.</p>
+            <p class="card__hint">
+              The confirmatory ABO/Rh typing and antibody screen. It clears when forward and reverse grouping agree and
+              the antibody screen is negative.
+            </p>
+            <p v-if="typingHold" class="card__hint card__hint--warn">{{ typingHoldText }}</p>
 
-            <BloodCenterBloodTypePicker
-              v-model="typingForm.blood_type_id"
-              :blood-types="bloodTypes"
-              :disabled="isFinal || busy"
-              abo-label="Blood type (ABO)"
-              rh-label="Rh typing"
-            />
+            <fieldset class="exam" :disabled="isFinal || busy">
+              <BloodCenterBloodTypePicker
+                v-model="typingForm.blood_type_id"
+                :blood-types="bloodTypes"
+                :disabled="isFinal || busy"
+                abo-label="Forward group (ABO)"
+                rh-label="Rh typing"
+              />
+            </fieldset>
+
+            <div class="grouping">
+              <label class="field">
+                <span class="field__label">Reverse group</span>
+                <select v-model="typingForm.reverse_group" class="field__input" :disabled="isFinal || busy">
+                  <option :value="null" disabled>Select</option>
+                  <option v-for="group in ABO_GROUPS" :key="group" :value="group">{{ group }}</option>
+                </select>
+              </label>
+
+              <fieldset class="field" :disabled="isFinal || busy">
+                <legend class="field__label">Antibody screen</legend>
+                <div class="marker__choices">
+                  <label class="choice" :class="{ 'choice--on choice--safe': typingForm.antibody_screen === 'negative' }">
+                    <input v-model="typingForm.antibody_screen" type="radio" value="negative" class="choice__radio">
+                    Negative
+                  </label>
+                  <label class="choice" :class="{ 'choice--on choice--alarm': typingForm.antibody_screen === 'positive' }">
+                    <input v-model="typingForm.antibody_screen" type="radio" value="positive" class="choice__radio">
+                    Positive
+                  </label>
+                </div>
+              </fieldset>
+            </div>
+
+            <p
+              v-if="forwardGroup && typingForm.reverse_group && forwardGroup !== typingForm.reverse_group"
+              class="card__hint card__hint--warn"
+            >
+              Forward ({{ forwardGroup }}) and reverse ({{ typingForm.reverse_group }}) disagree. The typing will be saved
+              but held.
+            </p>
 
             <ul class="references">
               <li v-if="selected.donor?.blood_type">
                 The donor's record says <strong>{{ selected.donor.blood_type }}</strong>. A different typing is refused
                 until Collection corrects the record.
               </li>
-              <li v-else>This donor has no blood type on record. A passed unit records this typing on it.</li>
+              <li v-else>This donor has no blood type on record. A cleared typing is recorded on it.</li>
               <li v-if="selected.fingerprick_blood_type">
                 Fingerprick at screening read <strong>{{ selected.fingerprick_blood_type }}</strong> — for reference
                 only.
-                <strong v-if="typingCode && typingCode !== selected.fingerprick_blood_type" class="references__warn">
-                  Your typing differs.
-                </strong>
               </li>
             </ul>
 
@@ -229,19 +266,15 @@
             </p>
 
             <div v-if="!isFinal" class="actions">
-              <button
-                type="button"
-                class="btn btn--primary"
-                :disabled="busy || !typingForm.blood_type_id"
-                @click="submitTyping"
-              >
-                {{ busy ? 'Saving…' : selected.immunohematology ? 'Update typing' : 'Record typing' }}
+              <button type="button" class="btn btn--primary" :disabled="busy || !typingComplete" @click="submitTyping">
+                {{ busy ? 'Saving…' : selected.immunohematology ? 'Request correction' : 'Record typing' }}
               </button>
+              <span v-if="selected.immunohematology" class="card__hint">Saved typings change only with approval.</span>
             </div>
           </section>
 
-          <!-- SEROLOGY -->
-          <section class="card">
+          <!-- SEROLOGY — TTI Testing's section. -->
+          <section v-if="canSerology" class="card">
             <div class="card__titles">
               <h2 class="card__title">Serology</h2>
               <span
@@ -290,9 +323,10 @@
                 :disabled="busy || !panelIsComplete"
                 @click="submitSerology"
               >
-                {{ busy ? 'Saving…' : selected.serology ? 'Update serology' : 'Record serology' }}
+                {{ busy ? 'Saving…' : selected.serology ? 'Request correction' : 'Record serology' }}
               </button>
               <span v-if="!panelIsComplete" class="card__hint">Record a reading for all five markers.</span>
+              <span v-else-if="selected.serology" class="card__hint">Saved panels change only with approval.</span>
             </div>
           </section>
         </div>
@@ -406,6 +440,16 @@
       </ul>
     </section>
 
+    <BloodCenterCorrectionRequestDialog
+      v-if="correction && selected"
+      :donation-id="selected.id"
+      :subject="correction.subject"
+      :changes="correction.changes"
+      :previous="correction.previous"
+      @close="correction = null"
+      @submitted="onCorrectionSent"
+    />
+
     <!-- A reactive panel cannot be undone from here, so it is confirmed first. -->
     <div v-if="confirmingReactive" class="dialog-backdrop" @click.self="confirmingReactive = false">
       <div
@@ -448,8 +492,10 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { bloodTypeCodeFor } from '~/utils/bloodType'
+import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
+import { ABO_GROUPS, aboOf, bloodTypeCodeFor } from '~/utils/bloodType'
 import { normalizeSegmentNumber } from '~/utils/phlebotomy'
 import {
   SEROLOGY_MARKERS,
@@ -460,27 +506,34 @@ import {
 } from '~/utils/serology'
 
 /**
- * The Testing department's page: Section II's Immunohematology and Serology
- * tables, and the follow-up the donor consented to in Section I-C.
+ * The testing page: Section II's Immunohematology and Serology tables, and the
+ * follow-up the donor consented to in Section I-C.
  *
- * Its own page, separate from Processing. The two sections are saved
- * separately so each carries its own "Screened by". When both are in and all
- * five markers are non-reactive, the donation passes to Processing. A reactive
- * marker rejects it, permanently defers the donor and opens a counselling
- * referral — the server does all of that in one transaction, and refuses a
- * reactive panel that was not explicitly confirmed here.
+ * One page for two departments. Immunohematology records the typing and TTI
+ * Testing the serology panel; each card shows only to the role that records
+ * it. Saving a result that passes issues that section's clearance at once. A
+ * reactive marker rejects the donation, permanently defers the donor and opens
+ * a counselling referral, in one transaction, and the server refuses a
+ * reactive panel that was not explicitly confirmed here. A saved result is
+ * never saved over: it goes as a correction request.
  */
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'lab.record_result',
+  // Either laboratory section opens the page.
+  requires: ['lab.record_serology', 'lab.record_immunohematology'],
 })
 
 const route = useRoute()
 const { user, can } = useUser()
 const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 const canSeeReferrals = computed(() => can('lab.referrals'))
+
+// Two departments, one page: TTI Testing records serology, Immunohematology
+// types the unit. Each card shows only to the role that records it.
+const canSerology = computed(() => can('lab.record_serology'))
+const canType = computed(() => can('lab.record_immunohematology'))
 
 const service = bloodCenterService
 
@@ -552,25 +605,86 @@ function clearSearch() {
 // --- one unit ---------------------------------------------------------------
 
 const selected = ref(null)
-const typingForm = reactive({ blood_type_id: null, notes: '' })
 const readings = reactive(blankPanel())
+const typingForm = reactive({ blood_type_id: null, reverse_group: null, antibody_screen: null, notes: '' })
 
-const isFinal = computed(() => ['completed', 'rejected'].includes(selected.value?.status))
+// Nothing more can be recorded on a rejected donation. A cleared result is
+// not final here: it can still be corrected while its bags are in quarantine,
+// and the server says so if they are not.
+const isFinal = computed(() => selected.value?.status === 'rejected')
 const isReactive = computed(() => selected.value?.serology?.outcome === 'reactive')
-const typingCode = computed(() => bloodTypeCodeFor(bloodTypes.value, typingForm.blood_type_id))
 const panelIsComplete = computed(() => panelComplete(readings, markers.value))
 const pendingReactive = computed(() => reactiveMarkers(readings, markers.value))
 
-const initials = computed(() => (selected.value?.donor?.full_name || '')
-  .split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '—')
+const initials = computed(() => donorInitials(selected.value?.donor) || '—')
+
+// --- typing -------------------------------------------------------------------
+
+const forwardGroup = computed(() => aboOf(bloodTypeCodeFor(bloodTypes.value, typingForm.blood_type_id)))
+const typingComplete = computed(() => Boolean(typingForm.blood_type_id && typingForm.reverse_group && typingForm.antibody_screen))
+const typingHold = computed(() => selected.value?.immunohematology?.clearance_hold ?? null)
+
+const HOLDS = {
+  abo_discrepancy: {
+    label: 'ABO discrepancy',
+    text: 'Held: forward and reverse grouping disagree. Resolve the discrepancy at the bench, then request a correction.',
+  },
+  antibody_screen_positive: {
+    label: 'Antibody screen positive',
+    text: 'Held: the antibody screen is positive. Once the antibody is identified, request a correction.',
+  },
+  grouping_incomplete: {
+    label: 'Incomplete',
+    text: 'Held: the grouping or antibody screen was not recorded.',
+  },
+}
+
+const typingHoldLabel = computed(() => HOLDS[typingHold.value]?.label ?? 'Held')
+const typingHoldText = computed(() => HOLDS[typingHold.value]?.text ?? 'This typing is held.')
+
+function typingPayload() {
+  return {
+    blood_type_id: typingForm.blood_type_id,
+    forward_group: forwardGroup.value,
+    reverse_group: typingForm.reverse_group,
+    antibody_screen: typingForm.antibody_screen,
+    notes: typingForm.notes?.trim() || null,
+  }
+}
+
+async function submitTyping() {
+  // A saved typing is never saved over: it becomes a correction request for
+  // the Reference Laboratory Consultant.
+  if (selected.value.immunohematology) {
+    const saved = selected.value.immunohematology
+
+    correction.value = {
+      subject: 'immunohematology',
+      changes: typingPayload(),
+      previous: {
+        blood_type_id: saved.blood_type_id,
+        forward_group: saved.forward_group,
+        reverse_group: saved.reverse_group,
+        antibody_screen: saved.antibody_screen,
+        notes: saved.notes,
+      },
+    }
+    return
+  }
+
+  const res = await run(() => service.recordImmunohematology(selected.value.id, typingPayload()))
+
+  if (!res) return
+
+  adopt(res.data)
+  notice.value = res.message ?? null
+}
 
 /**
  * Adopt a donation from the server and seed both forms from what it recorded.
  *
- * The typing is seeded only from Testing's own earlier typing — never from the
- * fingerprick at screening, and never from the donor's profile. This is the
- * confirmatory reading; a pre-filled answer is one careless click from being
- * rubber-stamped.
+ * The typing is seeded only from this department's own earlier typing — never
+ * from the fingerprick at screening, and never from the donor's profile.
  */
 function adopt(payload) {
   selected.value = payload ?? null
@@ -578,6 +692,8 @@ function adopt(payload) {
   if (!payload) return
 
   typingForm.blood_type_id = payload.immunohematology?.blood_type_id ?? null
+  typingForm.reverse_group = payload.immunohematology?.reverse_group ?? null
+  typingForm.antibody_screen = payload.immunohematology?.antibody_screen ?? null
   typingForm.notes = payload.immunohematology?.notes ?? ''
 
   Object.assign(readings, blankPanel(markers.value))
@@ -604,18 +720,6 @@ function backToQueue() {
   loadQueue()
 }
 
-async function submitTyping() {
-  const res = await run(() => service.recordImmunohematology(selected.value.id, {
-    blood_type_id: typingForm.blood_type_id,
-    notes: typingForm.notes?.trim() || null,
-  }))
-
-  if (!res) return
-
-  adopt(res.data)
-  notice.value = res.message ?? null
-}
-
 const confirmingReactive = ref(false)
 const dialogRef = ref(null)
 
@@ -637,10 +741,17 @@ function confirmReactive() {
 }
 
 async function saveSerology(confirmed) {
-  const res = await run(() => service.recordSerology(
-    selected.value.id,
-    serologyPayload(readings, confirmed, markers.value),
-  ))
+  const panel = serologyPayload(readings, confirmed, markers.value)
+
+  // A saved panel is never saved over: the same values become a correction
+  // request for the Laboratory Supervisor.
+  if (selected.value.serology) {
+    confirmingReactive.value = false
+    correction.value = { subject: 'serology', changes: panel, previous: previousPanel.value }
+    return
+  }
+
+  const res = await run(() => service.recordSerology(selected.value.id, panel))
 
   confirmingReactive.value = false
 
@@ -650,6 +761,25 @@ async function saveSerology(confirmed) {
   notice.value = res.message ?? null
 
   if (res.data?.status === 'rejected') loadReferrals()
+}
+
+// --- corrections --------------------------------------------------------------
+
+const correction = ref(null)
+
+const previousPanel = computed(() => {
+  const saved = selected.value?.serology
+  if (!saved?.markers) return null
+
+  const panel = {}
+  for (const marker of saved.markers) panel[marker.marker] = marker.result
+
+  return panel
+})
+
+function onCorrectionSent(response) {
+  correction.value = null
+  notice.value = response?.message ?? 'Correction requested.'
 }
 
 // --- counselling referrals ---------------------------------------------------
@@ -758,7 +888,11 @@ function messageFor(err) {
     case 'donation_not_collected':
       return 'The counter has not finished with this donation yet.'
     case 'results_locked':
-      return 'This donation is final, so its test results can no longer be changed.'
+      return 'This donation is rejected, so its serology can no longer be changed.'
+    case 'results_cleared':
+      return 'This result is already cleared. Request a correction to change it.'
+    case 'correction_required':
+      return 'This result is already saved. Request a correction to change it.'
     case 'blood_type_mismatch':
       return err?.data?.message || 'This typing disagrees with the donor’s record. Collection must correct it first.'
     case 'donation_not_found':
@@ -1316,5 +1450,18 @@ onMounted(async () => {
   .scan { flex-wrap: wrap; }
   .field--scan { width: 100%; }
   .marker__choices { margin-left: 0; }
+}
+
+.grouping {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+.exam {
+  border: 0;
+  margin: 0;
+  padding: 0;
 }
 </style>

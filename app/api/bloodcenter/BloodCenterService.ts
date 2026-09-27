@@ -1,4 +1,11 @@
 import BaseService from '../BaseService'
+import type {
+  BloodRequest,
+  CreateWalkInPayload,
+  DuplicateMatch,
+  RequestEvent,
+  WalkInReference,
+} from '~/types/bloodRequest'
 
 class BloodCenterService extends BaseService {
   private static instance: BloodCenterService | null = null
@@ -124,6 +131,27 @@ class BloodCenterService extends BaseService {
   }
 
   /** Donors with a reactive result the Testing department must follow up. */
+  // --- Correction requests ---
+  //
+  // A saved record is never saved over. Its writer asks; the department's
+  // approver or the Center Admin decides, and the server applies it.
+
+  async corrections(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections`, 'GET', params)
+  }
+
+  async requestCorrection(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations/${donationId}/corrections`, 'POST', payload)
+  }
+
+  async approveCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections/${correctionId}/approve`, 'POST', payload)
+  }
+
+  async rejectCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections/${correctionId}/reject`, 'POST', payload)
+  }
+
   async counsellingReferrals(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/referrals`, 'GET', params)
   }
@@ -251,6 +279,16 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory/${unitId}`, 'PATCH', payload)
   }
 
+  /**
+   * Release every quarantined unit of a donation to available stock.
+   *
+   * The server refuses unless TTI Testing and Immunohematology have both
+   * cleared the donation — for a supervisor too. All or nothing per donation.
+   */
+  async releaseQuarantine(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/inventory/quarantine/${donationId}/release`, 'POST')
+  }
+
   async discardBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory/${unitId}/discard`, 'POST', payload)
   }
@@ -259,6 +297,14 @@ class BloodCenterService extends BaseService {
 
   async staff(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/staff`, 'GET', params)
+  }
+
+  /**
+   * Departments and the roles within each, with the abilities a role grants.
+   * Served so the staff form cannot drift from the server's matrix.
+   */
+  async staffRoles(): Promise<any> {
+    return this.request(`${this.resource}/staff/roles`, 'GET')
   }
 
   async createStaff(payload: Record<string, any> = {}): Promise<any> {
@@ -375,13 +421,65 @@ class BloodCenterService extends BaseService {
     })
   }
 
-  /** Dispatch held units. Refused while the statement is unsettled. */
-  async releaseRequest(id: number | string, allocationIds?: number[]): Promise<any> {
-    return this.request(
-      `/blood-center/blood-requests/${id}/release`,
-      'POST',
-      allocationIds ? { allocation_ids: allocationIds } : {},
-    )
+  /**
+   * Dispatch held units. Refused while the statement is unsettled.
+   *
+   * `handedTo` names who physically took the units — for a walk-in, the
+   * watcher. It is recorded on the request's history.
+   */
+  async releaseRequest(id: number | string, allocationIds?: number[], handedTo?: string | null): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/release`, 'POST', {
+      ...(allocationIds ? { allocation_ids: allocationIds } : {}),
+      ...(handedTo ? { handed_to: handedTo } : {}),
+    })
+  }
+
+  /**
+   * Close the rest of one line this centre cannot supply.
+   *
+   * The line keeps what was requested; the remainder is recorded as
+   * unavailable here and may still be sourced from another facility.
+   */
+  async closeRequestLine(id: number | string, itemId: number, note?: string | null): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/items/${itemId}/close`, 'POST', note ? { note } : {})
+  }
+
+  /** Everything that has happened to an incoming request, oldest first. */
+  async requestHistory(id: number | string): Promise<{ request_id: number; reference_number: string; events: RequestEvent[] }> {
+    return this.request(`/blood-center/blood-requests/${id}/history`, 'GET')
+  }
+
+  // ---------------------------------------------------------------------
+  // Walk-in Patient Transfusion requests.
+  //
+  // A watcher who came to the centre instead of the hospital blood bank.
+  // Issuance phones the hospital and records the request only once the
+  // hospital confirms it; a "no" is never sent.
+  // ---------------------------------------------------------------------
+
+  /** Hospitals, components, indications and ID types for the walk-in form. */
+  async walkInReference(): Promise<WalkInReference> {
+    return this.request('/blood-center/blood-requests/walk-in/reference', 'GET')
+  }
+
+  /**
+   * Look for a request the hospital already has open for this patient.
+   *
+   * A POST so the patient's name never sits in a URL or an access log.
+   */
+  async checkWalkInDuplicates(criteria: {
+    hospital_id: number
+    patient_surname?: string | null
+    patient_first_name?: string | null
+    blood_type_id?: number | null
+    presented_reference?: string | null
+  }): Promise<{ matches: DuplicateMatch[]; requires_acknowledgement: boolean; window_days: number }> {
+    return this.request('/blood-center/blood-requests/walk-in/duplicates', 'POST', criteria)
+  }
+
+  /** Record a walk-in the hospital has confirmed by phone. */
+  async createWalkInRequest(payload: CreateWalkInPayload): Promise<{ message: string; request: BloodRequest }> {
+    return this.request('/blood-center/blood-requests/walk-in', 'POST', payload)
   }
 
   /** Every statement raised against this facility's incoming requests. */

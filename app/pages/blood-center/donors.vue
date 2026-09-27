@@ -11,7 +11,7 @@
                     <h1 class="page-title">Donors</h1>
                     <p class="page-subtitle">View and manage all registered donors</p>
                 </div>
-                <button type="button" class="btn-primary" @click="openAddDonor">
+                <button v-if="canManage" type="button" class="btn-primary" @click="openAddDonor">
                     <AssetIcon name="plus" :size="16" />
                     Add Donor
                 </button>
@@ -86,7 +86,8 @@
                         <span>{{ donor.lastDonation || '—' }}</span>
                         <span><span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status
                                 }}</span></span>
-                        <span><button type="button" class="view-link" @click="viewDonor(donor)">View
+                        <!-- Recruitment reaches this list as contacts only, with no profile behind it. -->
+                        <span><button v-if="canViewProfile" type="button" class="view-link" @click="viewDonor(donor)">View
                                 <AssetIcon name="arrow-right" :size="12" />
                             </button></span>
                     </div>
@@ -119,7 +120,7 @@
                         </p>
                     </div>
                 </div>
-                <div class="detail-header-card__actions">
+                <div v-if="canManage" class="detail-header-card__actions">
                     <button type="button" class="btn-outline" @click="openEditInfo">Edit Info</button>
                     <button type="button" class="btn-primary" @click="openAddFlag">
                         <AssetIcon name="flag" :size="14" />
@@ -134,7 +135,8 @@
                         @click="activeDetailTab = 'info'">
                         Donor info
                     </button>
-                    <button type="button" class="tab" :class="{ 'tab--active': activeDetailTab === 'history' }"
+                    <!-- The history carries deferral reasons and final results: the physician's alone. -->
+                    <button v-if="canViewHistory" type="button" class="tab" :class="{ 'tab--active': activeDetailTab === 'history' }"
                         @click="activeDetailTab = 'history'">
                         Donation History
                     </button>
@@ -408,8 +410,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 definePageMeta({
     middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
-  requires: 'donors.view',
+  // donors.view_contact, which Recruitment also holds: the server answers them
+  // with a contact list, and the profile and history below stay hidden.
+  requires: 'donors.view_contact',
 })
+
+const { can } = useUser()
+const canViewProfile = computed(() => can('donors.view'))
+const canViewHistory = computed(() => can('donors.view_clinical'))
+const canManage = computed(() => can('donors.manage'))
 
 /**
  * NOTE ON API SHAPE
@@ -566,7 +575,10 @@ const loadingHistory = ref(false)
 async function viewDonor(donor) {
     selectedDonorId.value = donor.id
     activeDetailTab.value = 'info'
-    await Promise.all([loadDonorDetail(donor.id), loadDonorHistory(donor.id)])
+    await Promise.all([
+        loadDonorDetail(donor.id),
+        canViewHistory.value ? loadDonorHistory(donor.id) : Promise.resolve(),
+    ])
 }
 
 async function loadDonorDetail(id) {

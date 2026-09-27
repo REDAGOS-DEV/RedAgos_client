@@ -22,7 +22,7 @@
         </div>
 
         <div class="page-header__actions" v-if="!isLoadingRequest && request">
-          <span class="status-badge" :class="statusColorClass">{{ request.status }}</span>
+          <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="btn btn--outline" type="button" @click="handleDownloadPdf">
             <AssetIcon name="download" />
             <span>Download PDF</span>
@@ -79,13 +79,24 @@
         <div class="summary-item">
           <span class="summary-label">Priority</span>
           <span class="status-badge status-badge--sm" :class="priorityColorClass">
-            {{ request.priority || '—' }}
+            {{ priorityLabel }}
           </span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Current Status</span>
           <span class="status-badge status-badge--sm" :class="statusColorClass">
-            {{ request.status }}
+            {{ statusText }}
+          </span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Source</span>
+          <span class="summary-value">{{ request.source_label || 'Blood Bank Portal' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Fulfilled</span>
+          <span class="summary-value">
+            {{ request.fulfilled_quantity ?? 0 }} of {{ request.quantity ?? 0 }}
+            <template v-if="request.received_count"> · {{ request.received_count }} received</template>
           </span>
         </div>
         <div class="summary-item">
@@ -107,7 +118,18 @@
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Hospital</span>
-                <span class="info-value">{{ request.hospital || '—' }}</span>
+                <span class="info-value">{{ request.requesting_facility?.name || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Blood Center</span>
+                <span class="info-value">{{ request.target_facility?.name || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Submitted By</span>
+                <span class="info-value">
+                  {{ request.requester_name
+                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : '—') }}
+                </span>
               </div>
               <div class="info-item">
                 <span class="info-label">Department</span>
@@ -130,6 +152,25 @@
                 <span class="info-value">{{ request.notes || 'No additional notes.' }}</span>
               </div>
             </div>
+          </section>
+
+          <!--
+            WALK-IN: a watcher took this request straight to the blood center,
+            which confirmed it with this blood bank by phone before recording
+            it. The request is still this hospital's.
+          -->
+          <section v-if="request.walk_in" class="card">
+            <h2 class="section-title">Walk-in &amp; Confirmation</h2>
+            <WalkInDetailsCard
+              :walk-in="request.walk_in"
+              :centre-name="request.target_facility?.name || ''"
+              :recorder-name="request.recorder_name || ''"
+            />
+          </section>
+
+          <section v-if="request.parent || request.follow_ups?.length" class="card">
+            <h2 class="section-title">Linked Requests</h2>
+            <RequestChain :parent="request.parent" :follow-ups="request.follow_ups" link-base="/hospital/bloodrequests/" />
           </section>
 
           <!-- SECTION 2: BLOOD DETAILS -->
@@ -183,12 +224,7 @@
               <tbody>
                 <tr v-for="item in request.items" :key="item.id">
                   <td>{{ item.component?.name || '—' }}</td>
-                  <td class="num">
-                    {{ item.quantity }}
-                    <span v-if="item.allocated_count !== undefined" class="items-table__held">
-                      ({{ item.allocated_count }} held)
-                    </span>
-                  </td>
+                  <td class="num">{{ item.quantity }}</td>
                   <td>
                     <template v-if="item.indication_code">
                       <strong>{{ item.indication_label }}</strong> — {{ item.indication_text }}
@@ -198,6 +234,38 @@
                 </tr>
               </tbody>
             </table>
+          </section>
+
+          <!--
+            FULFILMENT: what the blood center provided, per component, beside
+            what was requested. A remainder can be closed as no longer needed,
+            or — if the center could not supply it — sourced from another
+            facility through a follow-up.
+          -->
+          <section id="request-fulfilment" class="card">
+            <div class="fulfilment-head">
+              <h2 class="section-title">Fulfilment</h2>
+              <button
+                v-if="canForward"
+                class="btn btn--primary btn--sm"
+                type="button"
+                @click="showFollowUp = true"
+              >
+                <AssetIcon name="route" :size="16" />
+                <span>Source remaining from another facility</span>
+              </button>
+            </div>
+            <p v-if="canForward" class="fulfilment-hint">
+              {{ request.forwardable_quantity }} unit{{ request.forwardable_quantity === 1 ? '' : 's' }} can still be
+              asked of another blood service facility.
+            </p>
+            <RequestFulfilmentTable
+              :request="request"
+              :closable="request.is_open !== false"
+              close-label="No longer needed"
+              :busy-item-id="closingLine ? lineToClose?.id ?? null : null"
+              @close-line="openCloseLine"
+            />
           </section>
 
           <!-- SECTION: BILLING & PAYMENT -->
@@ -400,32 +468,19 @@
             <p v-if="!timeline.length" class="documents-empty">Timeline data is not available yet.</p>
           </section>
 
-          <!-- SECTION 5: REQUEST HISTORY -->
+          <!--
+            SECTION 5: REQUEST HISTORY — the request's own event log. Each entry
+            names who acted, from which facility, and every line's figures at
+            that moment.
+          -->
           <section class="card">
             <h2 class="section-title">Request History</h2>
-            <div class="table-wrapper">
-              <table class="history-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Activity</th>
-                    <th>Performed By</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="entry in history" :key="entry.id">
-                    <td>{{ formatDateTime(entry.date) }}</td>
-                    <td>{{ entry.activity }}</td>
-                    <td>{{ entry.performed_by || '—' }}</td>
-                    <td>{{ entry.remarks || '—' }}</td>
-                  </tr>
-                  <tr v-if="!history.length">
-                    <td colspan="4" class="table-empty">No history entries yet for this request.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <RequestHistoryTimeline
+              :events="history"
+              :loading="isLoadingHistory"
+              :error="historyError || ''"
+              link-base="/hospital/bloodrequests/"
+            />
           </section>
         </div>
 
@@ -505,8 +560,8 @@
             <h2 class="section-title">Units on their way</h2>
             <p class="receipt-sub">
               {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
-              they physically arrive — this is what closes the request, and only your facility
-              can assert it.
+              they physically arrive — only your facility can assert it, and it completes the
+              chain of custody for each unit.
             </p>
           </div>
         </div>
@@ -577,14 +632,37 @@
           Edit
         </NuxtLink>
       </div>
+
+      <CloseLineDialog
+        v-if="lineToClose"
+        :row="lineToClose"
+        side="hospital"
+        :busy="closingLine"
+        :error="closeLineError"
+        @close="closeCloseLine"
+        @confirm="confirmCloseLine"
+      />
+
+      <FollowUpRequestDialog
+        v-if="showFollowUp"
+        :request="request"
+        @close="showFollowUp = false"
+        @created="onFollowUpCreated"
+      />
     </template>
   </div>
 </template>
 
 <script setup>
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { PRIORITY_LABELS } from '~/types/bloodRequest'
+import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
+import RequestChain from '~/components/common/RequestChain.vue'
+import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
+import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
+import FollowUpRequestDialog from '~/components/Hospital/FollowUpRequestDialog.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -617,10 +695,13 @@ const {
   progressPercent,
   isLoadingRequest,
   isLoadingAvailability,
+  isLoadingHistory,
   requestError,
+  historyError,
   fetchRequest,
   fetchAvailability,
   confirmReceipt,
+  closeLine,
 } = useBloodRequestDetails(requestId)
 
 const {
@@ -731,28 +812,82 @@ function showToast(msg) {
   toastTimer = setTimeout(() => { toastMessage.value = '' }, 3000)
 }
 
-const statusColorMap = {
-  Pending: 'warning',
-  Approved: 'success',
-  Processing: 'warning',
-  'Ready for Pickup': 'info',
-  Completed: 'success',
-  Rejected: 'danger',
-  Cancelled: 'danger',
+/*
+ * Keyed on the stored status through the shared tone map. The map this page
+ * carried was keyed on Title Case values ("Ready for Pickup", "Completed") the
+ * API has never sent, so every badge fell through to neutral.
+ */
+const TONE_BADGES = {
+  info: 'info',
+  progress: 'info',
+  warning: 'warning',
+  success: 'success',
+  danger: 'danger',
+  muted: 'neutral',
 }
 
 const statusColorClass = computed(() => {
-  const s = request.value?.status
-  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
+  const tone = REQUEST_STATUS_TONES[request.value?.status]
+  return `badge--${TONE_BADGES[tone] ?? 'neutral'}`
 })
 
-const priorityColorClass = computed(() => {
-  const p = request.value?.priority
-  if (!p) return 'badge--neutral'
-  if (p.toLowerCase() === 'urgent' || p.toLowerCase() === 'critical') return 'badge--danger'
-  if (p.toLowerCase() === 'high') return 'badge--warning'
-  return 'badge--neutral'
-})
+/** "Partially Fulfilled (Closed)" once every remainder was closed or forwarded. */
+const statusText = computed(() => (request.value ? requestStatusLabel(request.value) : '—'))
+
+const priorityColorClass = computed(() =>
+  request.value?.urgency_level === 'emergency' ? 'badge--danger' : 'badge--neutral',
+)
+
+/* CLOSE A LINE — a remainder this blood bank no longer needs */
+const lineToClose = ref(null)
+const closingLine = ref(false)
+const closeLineError = ref('')
+
+function openCloseLine(row) {
+  lineToClose.value = row
+  closeLineError.value = ''
+}
+
+function closeCloseLine() {
+  if (closingLine.value) return
+  lineToClose.value = null
+}
+
+async function confirmCloseLine(note) {
+  if (!lineToClose.value) return
+
+  closingLine.value = true
+  closeLineError.value = ''
+
+  try {
+    await closeLine(lineToClose.value.id, note)
+    showToast(`The rest of ${lineToClose.value.component} is recorded as no longer needed.`)
+    lineToClose.value = null
+  } catch (err) {
+    closeLineError.value = err?.message || 'The remaining quantity could not be closed.'
+  } finally {
+    closingLine.value = false
+  }
+}
+
+/* FOLLOW-UP — source what the blood center could not supply elsewhere */
+const showFollowUp = ref(false)
+
+// Only once the center has supplied or reserved something. A request nothing
+// has happened to is not a remainder — cancel it and raise it elsewhere — and
+// the API refuses to move a whole untouched request as a follow-up.
+const canForward = computed(() =>
+  Boolean(request.value)
+  && !['rejected', 'cancelled', 'fulfilled'].includes(request.value.status)
+  && (request.value.forwardable_quantity ?? 0) > 0
+  && ((request.value.fulfilled_quantity ?? 0) + (request.value.allocated_count ?? 0)) > 0,
+)
+
+async function onFollowUpCreated(response) {
+  showFollowUp.value = false
+  showToast(response?.message || 'Follow-up sent.')
+  await fetchRequest()
+}
 
 const canEdit = computed(() => request.value?.status === 'Pending')
 
@@ -1677,6 +1812,20 @@ function scrollToTimeline() {
     color: var(--rb-text-secondary);
     margin: 4px 0 0;
     max-width: 68ch;
+}
+
+/* ---------- Fulfilment ---------- */
+.fulfilment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fulfilment-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
 }
 .receipt-table {
     width: 100%;

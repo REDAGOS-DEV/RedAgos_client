@@ -46,9 +46,9 @@
       <ul v-else class="queue">
         <li v-for="row in queue" :key="row.donation_id" class="queue__row">
           <div class="queue__main">
-            <p class="queue__name">{{ row.donor?.full_name || 'Unknown donor' }}</p>
+            <p class="queue__name">{{ donorTitle(row.donor, row.segment_number, row.donation_id) }}</p>
             <p class="queue__meta">
-              Donation #{{ row.donation_id }} · {{ row.donor?.donor_code || '—' }} ·
+              Donation #{{ row.donation_id }} · {{ donorReference(row.donor) }} ·
               {{ row.donor?.blood_type || 'type unknown' }} · {{ formatDate(row.donation_date) }}
             </p>
           </div>
@@ -67,11 +67,15 @@
     <template v-else>
       <section class="unit-bar">
         <div class="unit-bar__identity">
-          <span class="unit-bar__avatar">{{ initials }}</span>
+          <!-- A bag, not a person, for the roles that work blind. -->
+          <span class="unit-bar__avatar">
+            <AssetIcon v-if="selected.donor?.blinded" name="droplets" :size="16" />
+            <template v-else>{{ initials }}</template>
+          </span>
           <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ selected.donor?.full_name || 'Unknown donor' }}</p>
+            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.segment_number, selected.donation_id) }}</p>
             <p class="unit-bar__sub">
-              Donation #{{ selected.donation_id }} · {{ selected.donor?.donor_code || '—' }} ·
+              Donation #{{ selected.donation_id }} · {{ donorReference(selected.donor) }} ·
               {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
             </p>
           </div>
@@ -212,6 +216,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 
 /**
  * Booking a cleared donation's bags onto the shelf.
@@ -267,11 +272,7 @@ const unconfigured = computed(() => (selected.value?.components ?? [])
 const canAddRow = computed(() => unitRows.value.length < MAX_PER_REQUEST
   && unitRows.value.length < (selected.value?.outstanding_units ?? 0))
 
-const initials = computed(() => {
-  const name = selected.value?.donor?.full_name || ''
-
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '—'
-})
+const initials = computed(() => donorInitials(selected.value?.donor) || '—')
 
 /**
  * How many of a component are still owed once this batch is counted.
@@ -445,7 +446,7 @@ async function submit() {
 
   const count = res.units?.length ?? units.length
 
-  notice.value = `${count} bag(s) shelved against donation #${selected.value.donation_id}.`
+  notice.value = `${count} bag(s) booked into quarantine against donation #${selected.value.donation_id}. They are released once testing clears the donation.`
 
   // Re-read rather than adjusting the counts here: the server is what decides
   // how much is still outstanding, and it has just changed.

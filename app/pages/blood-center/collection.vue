@@ -51,8 +51,13 @@
 
     <BloodCenterPriorDeferralNotice v-if="priorDeferral" :deferral="priorDeferral" />
 
+    <!--
+      The donor's declared health answers are the physician's to read. The
+      receptionist and the chair see that the visit exists, not what the donor
+      declared.
+    -->
     <BloodCenterDonorQuestionnaireSummary
-      v-if="donor"
+      v-if="donor && canReadQuestionnaire"
       :meta="questionnaireMeta"
       :flagged-count="flaggedCount"
       :loading="questionnaireLoading"
@@ -63,7 +68,7 @@
     <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireError }}</p>
 
     <BloodCenterDonorQuestionnaire
-      v-if="questionnaireOpen && questionnaire"
+      v-if="canReadQuestionnaire && questionnaireOpen && questionnaire"
       :data="questionnaire"
       :intake="intakeForm"
       :can-edit-intake="Boolean(donation)"
@@ -140,7 +145,7 @@
           Check in
         </button>
 
-        <button type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
+        <button v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
           {{ busy ? 'Working…' : 'Open donation' }}
         </button>
 
@@ -148,11 +153,36 @@
           Mark no-show
         </button>
       </div>
+
+      <p v-if="!canRegister" class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donation is opened at the reception desk. Send the donor there first.
+      </p>
+    </section>
+
+    <!-- STAGE 3, for anyone but the physician — waiting to be screened. -->
+    <section v-else-if="stage === 'screening' && !canScreen" class="card">
+      <h2 class="card__title">Awaiting screening</h2>
+      <p class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donation is open. The screening physician examines the donor and accepts or defers them before
+        anything else can be recorded.
+      </p>
+      <div class="actions">
+        <button type="button" class="btn" @click="finishVisit">Next donor</button>
+      </div>
     </section>
 
     <!-- STAGE 3 — screening and pre-donation assessment -->
-    <section v-else-if="stage === 'screening'" class="card">
-      <h2 class="card__title">Screening &amp; pre-donation assessment</h2>
+    <section v-else-if="stage === 'screening' || correcting === 'screening'" class="card">
+      <h2 class="card__title">
+        {{ correcting === 'screening' ? 'Correct the screening' : 'Screening & pre-donation assessment' }}
+      </h2>
+      <p v-if="correcting === 'screening'" class="handoff" role="status">
+        <AssetIcon name="pencil" :size="14" />
+        This screening is already saved. Change what was entered wrongly; the corrected record goes to the Center
+        Admin to approve.
+      </p>
       <p class="card__hint">
         Record what the attending professional found. RedAgos stores this assessment — it does not perform or
         judge it, and no value here decides the outcome.
@@ -287,7 +317,7 @@
           :disabled="busy"
           @click="submitScreening('accepted')"
         >
-          {{ busy ? 'Saving…' : 'Accepted — continue' }}
+          {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accepted — continue' }}
         </button>
 
         <button v-if="!deferring" type="button" class="btn btn--danger" :disabled="busy" @click="deferring = true">
@@ -305,12 +335,37 @@
           </button>
           <button type="button" class="btn" :disabled="busy" @click="deferring = false">Back</button>
         </template>
+
+        <button v-if="correcting === 'screening'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+          Cancel correction
+        </button>
+      </div>
+    </section>
+
+    <!-- STAGE 4, for anyone but the chair — accepted and waiting to be bled. -->
+    <section v-else-if="stage === 'collection' && !canCollect" class="card">
+      <h2 class="card__title">Accepted — awaiting collection</h2>
+      <p class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donor has been accepted. The phlebotomist records the bag, segment and times at the chair.
+      </p>
+      <div class="actions">
+        <button type="button" class="btn" @click="finishVisit">Next donor</button>
+        <button v-if="canScreen && donation?.screening" type="button" class="btn" @click="startScreeningCorrection">
+          <AssetIcon name="pencil" :size="13" />
+          Correct the screening
+        </button>
       </div>
     </section>
 
     <!-- STAGE 4 — the collection: Section II, "For Phlebotomist Use Only" -->
-    <section v-else-if="stage === 'collection'" class="card">
-      <h2 class="card__title">Record the collection</h2>
+    <section v-else-if="stage === 'collection' || correcting === 'collection'" class="card">
+      <h2 class="card__title">{{ correcting === 'collection' ? 'Correct the collection record' : 'Record the collection' }}</h2>
+      <p v-if="correcting === 'collection'" class="handoff" role="status">
+        <AssetIcon name="pencil" :size="14" />
+        This record is already saved. Change what was entered wrongly; the corrected record goes to the Donor
+        Screening Physician to approve.
+      </p>
       <p class="card__hint">
         The phlebotomist's box on the form. Recording it finishes the donor's visit and hands the donation to the
         Testing department.
@@ -386,11 +441,15 @@
 
       <div class="actions">
         <button type="button" class="btn btn--primary" :disabled="busy" @click="submitCollection">
-          {{ busy ? 'Saving…' : 'Complete donation' }}
+          {{ busy ? 'Saving…' : correcting === 'collection' ? 'Request correction' : 'Complete donation' }}
         </button>
 
-        <button type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
+        <button v-if="canClose && correcting !== 'collection'" type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
           Collection unsuccessful
+        </button>
+
+        <button v-if="correcting === 'collection'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+          Cancel correction
         </button>
       </div>
     </section>
@@ -402,6 +461,7 @@
         <div>
           <h2 class="card__title">{{ isDeferred ? 'Donor deferred' : 'Donation recorded' }}</h2>
           <p class="card__hint">
+            <!-- The reason is only served to the physician. -->
             <template v-if="isDeferred">
               {{ donation?.rejection_reason || 'The donor was not able to donate today.' }}
             </template>
@@ -422,8 +482,28 @@
       <div class="actions">
         <button type="button" class="btn btn--primary" @click="finishVisit">Next donor</button>
         <NuxtLink to="/blood-center/appointments" class="btn">Back to the queue</NuxtLink>
+        <button
+          v-if="canCollect && !isDeferred && donation?.collection"
+          type="button"
+          class="btn"
+          @click="startCollectionCorrection"
+        >
+          <AssetIcon name="pencil" :size="13" />
+          Request a correction
+        </button>
       </div>
     </section>
+
+    <!-- A saved record is never saved over: the corrected values go for approval. -->
+    <BloodCenterCorrectionRequestDialog
+      v-if="correction && donation"
+      :donation-id="donation.id"
+      :subject="correction.subject"
+      :changes="correction.changes"
+      :previous="correction.previous"
+      @close="correction = null"
+      @submitted="onCorrectionSent"
+    />
   </div>
 </template>
 
@@ -434,6 +514,7 @@ import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestio
 import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
 import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferralNotice.vue'
 import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { atTimeOn, normalizeSegmentNumber, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
 
@@ -449,10 +530,21 @@ import { atTimeOn, normalizeSegmentNumber, phlebotomyProblems, timeNow } from '~
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'donations.record',
+  // Any one of COLLECTION_ABILITIES in useBloodCenterNav — spelled out because
+  // the page meta is extracted before imports resolve.
+  requires: ['donations.register', 'donations.screen', 'donations.collect'],
 })
 
-const { user } = useUser()
+const { user, can } = useUser()
+
+// One page, three roles. Each stage renders its form only for the role that
+// performs it, and a hand-off card for everyone else; the server refuses the
+// write regardless.
+const canRegister = computed(() => can('donations.register'))
+const canScreen = computed(() => can('donations.screen'))
+const canCollect = computed(() => can('donations.collect'))
+const canClose = computed(() => can('donations.close'))
+const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))
 const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 
 const service = bloodCenterService
@@ -678,6 +770,12 @@ async function submitScreening(outcome) {
   // Any of the three deferrals carries a reason; only Accepted has none.
   if (outcome !== 'accepted') payload.deferral_reason = screeningForm.deferral_reason.trim()
 
+  if (correcting.value === 'screening') {
+    correction.value = { subject: 'screening', changes: payload, previous: donation.value?.screening ?? null }
+    deferring.value = false
+    return
+  }
+
   await recordScreening(payload)
   deferring.value = false
 }
@@ -687,16 +785,85 @@ async function submitCollection() {
 
   if (collectionProblems.value.length) return
 
-  // The draw happens during the visit, so the two times are on today's date.
-  const today = new Date()
+  // The draw happens during the visit, so the two times are on today's date —
+  // or, for a correction, on the day it was drawn.
+  const saved = donation.value?.collection
+  const day = correcting.value === 'collection' && saved?.started_at ? new Date(saved.started_at) : new Date()
 
-  await recordCollection({
+  const payload = {
     volume_ml: Number(collectionForm.volume_ml),
     blood_bag_type: collectionForm.blood_bag_type,
     segment_number: normalizeSegmentNumber(collectionForm.segment_number),
-    started_at: atTimeOn(today, collectionForm.started_time),
-    ended_at: atTimeOn(today, collectionForm.ended_time),
+    started_at: atTimeOn(day, collectionForm.started_time),
+    ended_at: atTimeOn(day, collectionForm.ended_time),
+  }
+
+  if (correcting.value === 'collection') {
+    correction.value = {
+      subject: 'collection',
+      changes: payload,
+      previous: saved ? {
+        volume_ml: donation.value.volume_ml,
+        blood_bag_type: saved.blood_bag_type,
+        segment_number: saved.segment_number,
+        started_at: saved.started_at,
+        ended_at: saved.ended_at,
+      } : null,
+    }
+    return
+  }
+
+  await recordCollection(payload)
+}
+
+// --- corrections ----------------------------------------------------------------
+//
+// Once saved, the screening and the collection box are never saved over. The
+// same form reopens, and what it would have saved goes as a correction request.
+
+const correcting = ref(null)
+const correction = ref(null)
+
+function hhmm(iso) {
+  if (!iso) return ''
+
+  const date = new Date(iso)
+
+  return Number.isNaN(date.getTime())
+    ? ''
+    : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function startScreeningCorrection() {
+  const saved = donation.value?.screening ?? {}
+
+  for (const key of Object.keys(screeningForm)) {
+    if (key in saved && saved[key] !== undefined) screeningForm[key] = saved[key] ?? (typeof screeningForm[key] === 'string' ? '' : null)
+  }
+
+  deferring.value = false
+  correcting.value = 'screening'
+}
+
+function startCollectionCorrection() {
+  const saved = donation.value?.collection ?? {}
+
+  Object.assign(collectionForm, {
+    blood_bag_type: saved.blood_bag_type ?? '',
+    segment_number: saved.segment_number ?? '',
+    started_time: hhmm(saved.started_at),
+    ended_time: hhmm(saved.ended_at),
+    volume_ml: donation.value?.volume_ml ?? 450,
   })
+
+  collectionAttempted.value = false
+  correcting.value = 'collection'
+}
+
+function onCorrectionSent(response) {
+  correction.value = null
+  correcting.value = null
+  notice.value = response?.message ?? 'Correction requested.'
 }
 
 async function abandonCollection() {
@@ -717,6 +884,8 @@ async function abandonCollection() {
 
 function finishVisit() {
   reset()
+  correcting.value = null
+  correction.value = null
   manualOpen.value = false
   deferring.value = false
   lookupValue.value = ''
@@ -749,6 +918,20 @@ function finishVisit() {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+}
+
+.handoff {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 
 .collection__header {

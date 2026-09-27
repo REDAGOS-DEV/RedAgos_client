@@ -5,8 +5,8 @@
         <p class="staff__eyebrow">Administration</p>
         <h1 class="staff__title">Staff Accounts</h1>
         <p class="staff__subtitle">
-          Add colleagues, assign them to a department, and manage the management level.
-          A department decides what a staff member can do.
+          Add colleagues, place them in a department and give them a role. A role picked from the list carries its own
+          permissions; a typed one gets its department's. The privileges you tick cap either.
         </p>
       </div>
 
@@ -28,8 +28,8 @@
 
       <select v-model="departmentFilter" class="select" @change="load">
         <option value="">All departments</option>
-        <option v-for="option in DEPARTMENTS" :key="option.value" :value="option.value">
-          {{ option.label }}
+        <option v-for="group in departments" :key="group.department" :value="group.department">
+          {{ group.label }}
         </option>
       </select>
 
@@ -48,7 +48,8 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th>Department</th>
+            <th>Role</th>
+            <th>Privileges</th>
             <th>Level</th>
             <th>Status</th>
             <th>Employee ID</th>
@@ -61,7 +62,23 @@
               <p class="cell-strong">{{ row.full_name }}</p>
               <p class="cell-sub">{{ row.email }}</p>
             </td>
-            <td>{{ row.department_label || '—' }}</td>
+            <td>
+              <p class="cell-strong">
+                {{ row.role_label || '—' }}
+                <span v-if="row.custom_role" class="tag">custom</span>
+              </p>
+              <p class="cell-sub">
+                <template v-if="row.position">{{ row.position }} · </template>{{ row.department_label || 'No department' }}
+              </p>
+            </td>
+            <td>
+              <span v-if="row.is_supervisor" class="cell-sub">All (supervisor)</span>
+              <span v-else class="privs">
+                <span v-for="p in PRIVILEGE_ORDER" :key="p" class="priv" :class="{ 'priv--on': row.staff_privileges?.includes(p) }">
+                  {{ p[0].toUpperCase() }}
+                </span>
+              </span>
+            </td>
             <td>
               <span v-if="row.is_supervisor" class="pill pill--supervisor">Supervisor</span>
               <span v-else class="pill">Staff</span>
@@ -112,17 +129,22 @@
               <em v-if="errors.email">{{ errors.email[0] }}</em>
             </label>
 
-            <label class="form__field">
-              <span>Temporary password</span>
-              <input v-model="form.password" type="password" required >
-              <small>At least 8 characters, with upper and lower case and a number. They will be asked to verify their email address.</small>
-              <em v-if="errors.password">{{ errors.password[0] }}</em>
-            </label>
-
-            <label class="form__field">
-              <span>Confirm password</span>
-              <input v-model="form.password_confirmation" type="password" required >
-            </label>
+            <div class="form__row">
+              <label class="form__field">
+                <span>Temporary password</span>
+                <input v-model="form.password" type="text" autocomplete="new-password" required >
+                <em v-if="errors.password">{{ errors.password[0] }}</em>
+              </label>
+              <label class="form__field">
+                <span>Confirm password</span>
+                <input v-model="form.password_confirmation" type="text" autocomplete="new-password" required >
+              </label>
+            </div>
+            <p class="form__hint">
+              At least 8 characters, with upper and lower case and a number. Share it with them directly; they will be
+              asked to verify their email address.
+              <button type="button" class="link-btn" @click="generatePassword">Generate a password</button>
+            </p>
           </template>
 
           <div class="form__row">
@@ -138,25 +160,67 @@
             </label>
           </div>
 
+          <!-- Title: pick RMT or RN, or type any other. A label only. -->
           <label class="form__field">
-            <span>Position</span>
-            <input v-model="form.position" type="text" placeholder="e.g. Medical Technologist" >
+            <span>Title</span>
+            <input v-model="form.position" type="text" list="staff-titles" maxlength="100" placeholder="Choose or type, e.g. RMT" >
+            <datalist id="staff-titles">
+              <option v-for="title in titles" :key="title" :value="title" />
+            </datalist>
+            <em v-if="errors.position">{{ errors.position[0] }}</em>
           </label>
 
           <label class="form__field">
             <span>Department</span>
             <select v-model="form.department">
-              <option value="">No department</option>
-              <option v-for="option in DEPARTMENTS" :key="option.value" :value="option.value">
-                {{ option.label }}
+              <option value="">Select a department</option>
+              <option v-for="group in departments" :key="group.department" :value="group.department">
+                {{ group.label }}
               </option>
             </select>
-            <small>
-              A supervisor holds every permission whether or not they sit in a department.
-              Anyone else needs one, or they can sign in but reach nothing.
-            </small>
             <em v-if="errors.department">{{ errors.department[0] }}</em>
           </label>
+
+          <!-- Role: pick one of the department's roles, or type a custom one. -->
+          <label class="form__field">
+            <span>Role</span>
+            <input
+              v-model="form.role"
+              type="text"
+              list="staff-roles"
+              maxlength="100"
+              :placeholder="form.department ? 'Choose or type a role' : 'Choose a department first'"
+              :disabled="!form.department && !form.role"
+            >
+            <datalist id="staff-roles">
+              <option v-for="role in departmentRoles" :key="role.key" :value="role.label" />
+            </datalist>
+            <small v-if="matchedRole">{{ matchedRole.description }}</small>
+            <small v-else-if="form.role.trim()">
+              A custom role: it can do what the {{ departmentLabel }} department does, within the privileges ticked below.
+            </small>
+            <small v-else>
+              A supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
+            </small>
+            <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
+            <em v-if="errors.custom_role">{{ errors.custom_role[0] }}</em>
+            <em v-if="catalogueError">{{ catalogueError }}</em>
+          </label>
+
+          <fieldset class="form__field privileges">
+            <legend>Privileges</legend>
+            <div class="privileges__grid">
+              <label v-for="privilege in privileges" :key="privilege.key" class="privilege">
+                <input v-model="form.staff_privileges" type="checkbox" :value="privilege.key" >
+                <span>
+                  <strong>{{ privilege.label }}</strong>
+                  <small>{{ privilege.description }}</small>
+                </span>
+              </label>
+            </div>
+            <small>They cap the role: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
+            <em v-if="errors.staff_privileges">{{ errors.staff_privileges[0] }}</em>
+          </fieldset>
 
           <label class="toggle toggle--block">
             <input v-model="form.is_supervisor" type="checkbox" >
@@ -199,13 +263,79 @@ definePageMeta({
 
 useHead({ title: 'Staff Accounts · RedAgos' })
 
-const DEPARTMENTS = [
-  { value: 'collection', label: 'Collection' },
-  { value: 'testing', label: 'Testing' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'issuance', label: 'Issuance' },
-  { value: 'billing', label: 'Billing / Payment' },
-]
+const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
+
+/**
+ * Departments and their roles, the privileges and the title suggestions,
+ * served by the server so the form describes each role in the same words its
+ * permission matrix enforces.
+ */
+const departments = ref([])
+const privileges = ref([])
+const titles = ref(['RMT', 'RN'])
+const catalogueError = ref('')
+
+const departmentRoles = computed(() => departments.value.find((group) => group.department === form.department)?.roles ?? [])
+const departmentLabel = computed(() => departments.value.find((group) => group.department === form.department)?.label ?? 'chosen')
+
+/** The predefined role the typed text names, if any — matched on its title. */
+const matchedRole = computed(() => {
+  const typed = form.role.trim().toLowerCase()
+
+  if (!typed) return null
+
+  return departments.value
+    .flatMap((group) => group.roles)
+    .find((role) => role.label.toLowerCase() === typed || role.key === typed) ?? null
+})
+
+async function loadCatalogue() {
+  try {
+    const response = await bloodCenterService.staffRoles()
+    departments.value = response?.data?.departments ?? []
+    privileges.value = response?.data?.privileges ?? []
+    if (response?.data?.titles?.length) titles.value = response.data.titles
+  } catch (error) {
+    catalogueError.value = error?.message || 'Could not load the list of roles.'
+  }
+}
+
+/** A predefined role is sent as its key; anything else as a custom role. */
+function rolePayload() {
+  const typed = form.role.trim()
+
+  if (!typed) return { staff_role: null, custom_role: null }
+
+  return matchedRole.value
+    ? { staff_role: matchedRole.value.key, custom_role: null }
+    : { staff_role: null, custom_role: typed }
+}
+
+/*
+ * Password::min(8)->mixedCase()->numbers() is the server rule, so the
+ * generated value is built to satisfy it — the same generator as the super
+ * admin's account form.
+ */
+function generatePassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnopqrstuvwxyz'
+  const digits = '23456789'
+  const pool = upper + lower + digits
+
+  const pick = (set) => set[Math.floor(Math.random() * set.length)]
+  const chars = [pick(upper), pick(lower), pick(digits), pick(digits)]
+
+  while (chars.length < 12) chars.push(pick(pool))
+
+  // Shuffle so the guaranteed characters are not always in the same positions.
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+
+  form.password = chars.join('')
+  form.password_confirmation = form.password
+}
 
 const rows = ref([])
 const loading = ref(true)
@@ -221,18 +351,27 @@ const formError = ref('')
 const banner = ref('')
 const bannerKind = ref('success')
 
-const form = reactive({
-  first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
-  phone: '', employee_id: '', position: '', department: '', is_supervisor: false,
-  account_status: 'active',
+function blankForm() {
+  return {
+    first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
+    phone: '', employee_id: '', position: '', department: '', role: '',
+    staff_privileges: [...PRIVILEGE_ORDER], is_supervisor: false,
+    account_status: 'active',
+  }
+}
+
+const form = reactive(blankForm())
+
+// Picking a predefined role from another department moves the department to it.
+watch(matchedRole, (role) => {
+  if (role) {
+    const home = departments.value.find((group) => group.roles.some((r) => r.key === role.key))
+    if (home) form.department = home.department
+  }
 })
 
 function resetForm() {
-  Object.assign(form, {
-    first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
-    phone: '', employee_id: '', position: '', department: '', is_supervisor: false,
-    account_status: 'active',
-  })
+  Object.assign(form, blankForm())
   errors.value = {}
   formError.value = ''
 }
@@ -269,6 +408,8 @@ function openEdit(row) {
     employee_id: row.employee_id || '',
     position: row.position || '',
     department: row.department || '',
+    role: row.role_label || '',
+    staff_privileges: [...(row.staff_privileges ?? PRIVILEGE_ORDER)],
     is_supervisor: row.is_supervisor,
     account_status: row.account_status === 'pending_verification' ? 'active' : row.account_status,
   })
@@ -285,8 +426,10 @@ async function submit() {
       const payload = {
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position || null,
+        position: form.position.trim() || null,
         department: form.department || null,
+        ...rolePayload(),
+        staff_privileges: [...form.staff_privileges],
         is_supervisor: form.is_supervisor,
       }
 
@@ -299,12 +442,16 @@ async function submit() {
       await bloodCenterService.updateStaff(editing.value.uuid, payload)
       showBanner('Account updated.', 'success')
     } else {
+      const { role: _role, ...fields } = form
+
       await bloodCenterService.createStaff({
-        ...form,
+        ...fields,
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position || null,
+        position: form.position.trim() || null,
         department: form.department || null,
+        ...rolePayload(),
+        staff_privileges: [...form.staff_privileges],
       })
       showBanner('Staff account created. A verification email has been sent.', 'success')
     }
@@ -369,7 +516,7 @@ function statusClass(row) {
   return 'pill--success'
 }
 
-onMounted(load)
+onMounted(() => Promise.all([load(), loadCatalogue()]))
 </script>
 
 <style scoped>
@@ -647,5 +794,102 @@ onMounted(load)
 .ghost-btn:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
+}
+
+.form__hint {
+  margin: -4px 0 0;
+  font-size: 11px;
+  color: var(--rb-text-secondary);
+}
+
+.link-btn {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rb-primary-text);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.privileges {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.privileges legend {
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.privileges__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.privilege {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--rb-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.privilege strong {
+  display: block;
+  font-size: 12px;
+}
+
+.privilege small {
+  display: block;
+  font-size: 11px;
+  color: var(--rb-text-secondary);
+}
+
+.privs {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.priv {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--rb-surface-hover);
+  color: var(--rb-text-secondary);
+  opacity: 0.45;
+}
+
+.priv--on {
+  background: rgba(var(--rb-primary-rgb), 0.12);
+  color: var(--rb-primary-text);
+  opacity: 1;
+}
+
+.tag {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--rb-surface-hover);
+  color: var(--rb-text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .privileges__grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

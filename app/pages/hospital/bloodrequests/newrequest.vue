@@ -147,6 +147,28 @@
               <p v-if="errors.patient_sex" class="field-error">{{ errors.patient_sex }}</p>
             </div>
           </div>
+
+          <!--
+            A watcher may already have taken this patient's request straight to
+            a blood center, which then recorded it here after you confirmed it
+            by phone. Raising another would ask twice for the same need.
+          -->
+          <div v-if="patientMatches.length" class="dup-warning" role="status">
+            <AssetIcon name="triangle-alert" :size="16" />
+            <div>
+              <p class="dup-warning__title">This patient already has an active request</p>
+              <ul class="dup-warning__list">
+                <li v-for="match in patientMatches" :key="match.id">
+                  <NuxtLink :to="`/hospital/bloodrequests/${match.id}`" class="dup-warning__ref">{{ match.reference_number }}</NuxtLink>
+                  · {{ match.facility?.name || '—' }} · {{ match.source_label }} · {{ match.status_label }}
+                </li>
+              </ul>
+              <p class="dup-warning__hint">
+                Open it instead if it covers the same need. If a center could only supply part of it, source the rest
+                from that request's page.
+              </p>
+            </div>
+          </div>
         </section>
 
         <!-- DESTINATION + BLOOD TYPE + PRIORITY -->
@@ -398,6 +420,42 @@ function emptyLine() {
 }
 
 const requiresPatient = computed(() => form.request_purpose === 'patient_transfusion')
+
+/*
+ * Active requests this blood bank already has for the patient being typed —
+ * including one a blood center recorded here after a walk-in. A warning only:
+ * a second request can be legitimate, and the decision is the requester's.
+ */
+const patientMatches = ref([])
+let matchTimer = null
+
+watch(
+  () => [form.request_purpose, form.patient_surname, form.patient_first_name, form.blood_type_id],
+  () => {
+    clearTimeout(matchTimer)
+
+    if (!requiresPatient.value || !form.patient_surname || !form.patient_first_name) {
+      patientMatches.value = []
+      return
+    }
+
+    matchTimer = setTimeout(async () => {
+      try {
+        const response = await hospitalService.patientMatches({
+          patient_surname: form.patient_surname,
+          patient_first_name: form.patient_first_name,
+          blood_type_id: form.blood_type_id || null,
+        })
+        patientMatches.value = response?.matches ?? []
+      } catch {
+        // The check is advisory; a failed lookup must not block the form.
+        patientMatches.value = []
+      }
+    }, 500)
+  },
+)
+
+onUnmounted(() => clearTimeout(matchTimer))
 const canAddLine = computed(() => form.items.length < components.value.length && form.items.length < 6)
 const totalUnits = computed(() =>
   form.items.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0),
@@ -681,6 +739,23 @@ function startAnother() {
 .input--error { border-color: var(--rb-accent); }
 .input::placeholder { color: var(--rb-placeholder); }
 .field-error { font-size: 11.5px; color: var(--rb-accent-text); margin: 0; }
+
+.dup-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(var(--rb-warning-rgb), .12);
+  color: var(--rb-warning-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.dup-warning__title { margin: 0; font-weight: 700; }
+.dup-warning__list { margin: 4px 0; padding-left: 18px; color: var(--rb-text-primary); }
+.dup-warning__ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
+.dup-warning__hint { margin: 0; color: var(--rb-text-secondary); }
 .field-error--block { margin-bottom: 10px; }
 .field-hint { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 

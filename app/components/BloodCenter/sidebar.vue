@@ -155,7 +155,7 @@ const {
 
 const route = useRoute()
 const router = useRouter()
-const { user, ensureUser } = useUser()
+const { user, ensureUser, can } = useUser()
 
 // --- Dark mode awareness ---
 const isDark = ref(false)
@@ -251,7 +251,7 @@ const sidebarShadow = computed(() =>
 const portalLabel = computed(() => user.value?.facility?.facility_name || 'Blood Center')
 
 // // Dev note: pending/urgent counts naka-fetch sa blood center dashboard summary endpoint
-const badgeCounts = ref({ pending: 0, urgent: 0, notifications: 0 })
+const badgeCounts = ref({ pending: 0, urgent: 0, notifications: 0, corrections: 0 })
 
 const badgeStyle = (badge) => {
   const urgent = badge === 'urgent'
@@ -300,6 +300,12 @@ const loadUser = async () => {
       badgeCounts.value.pending = summary.pending_requests || 0
       badgeCounts.value.urgent = summary.urgent_requests || 0
       badgeCounts.value.notifications = summary.unread_notifications || 0
+    }
+
+    // Corrections waiting on this user's decision.
+    if (can('corrections.approve')) {
+      const review = await bloodCenterService.corrections({ scope: 'review', status: 'pending', per_page: 1 })
+      badgeCounts.value.corrections = review?.total ?? 0
     }
   } catch (err) {
     console.error(err)

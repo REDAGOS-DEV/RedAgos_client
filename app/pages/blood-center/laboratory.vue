@@ -59,9 +59,9 @@
       <ul v-else class="queue">
         <li v-for="row in queue" :key="row.id" class="queue__row">
           <div class="queue__main">
-            <p class="queue__name">{{ row.donor?.full_name || 'Unknown donor' }}</p>
+            <p class="queue__name">{{ donorTitle(row.donor, row.collection?.segment_number, row.id) }}</p>
             <p class="queue__meta">
-              Donation #{{ row.id }} · {{ row.donor?.donor_code || '—' }} ·
+              Donation #{{ row.id }} · {{ donorReference(row.donor) }} ·
               {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} ·
               {{ formatDate(row.donation_date) }}
             </p>
@@ -83,11 +83,15 @@
     <template v-else>
       <section class="unit-bar">
         <div class="unit-bar__identity">
-          <span class="unit-bar__avatar">{{ initials }}</span>
+          <!-- A bag, not a person, for the roles that work blind. -->
+          <span class="unit-bar__avatar">
+            <AssetIcon v-if="selected.donor?.blinded" name="droplets" :size="16" />
+            <template v-else>{{ initials }}</template>
+          </span>
           <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ selected.donor?.full_name || 'Unknown donor' }}</p>
+            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.segment_number, selected.id) }}</p>
             <p class="unit-bar__sub">
-              Donation #{{ selected.id }} · {{ selected.donor?.donor_code || '—' }} ·
+              Donation #{{ selected.id }} · {{ donorReference(selected.donor) }} ·
               {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
             </p>
           </div>
@@ -127,11 +131,12 @@
           <AssetIcon :name="selected.status === 'completed' ? 'circle-check-big' : 'circle-alert'" :size="26" />
           <div>
             <h2 class="card__title">
-              {{ selected.status === 'completed' ? 'Cleared for issue' : 'Donation rejected' }}
+              {{ selected.status === 'completed' ? 'Processing complete' : 'Donation rejected' }}
             </h2>
             <p class="card__hint">
               <template v-if="selected.status === 'completed'">
-                Issuance may now record this unit's components as stock.
+                Issuance books its bags into quarantine. They leave quarantine once TTI Testing and Immunohematology
+                have both cleared the donation.
               </template>
               <template v-else>
                 {{ selected.rejection_reason || 'No reason was recorded.' }}
@@ -161,9 +166,20 @@
           <section class="card">
             <h2 class="card__title">Testing</h2>
             <p class="card__hint">
-              Recorded by the Testing department. Only a donation that passed both immunohematology and all five
-              serology markers can be cleared for issue.
+              Recorded by TTI Testing and Immunohematology. You do not wait for them: the bags go into quarantine,
+              and each department's clearance is what releases them.
             </p>
+
+            <div class="clearances" aria-label="Clearances">
+              <span class="clearance" :class="{ 'clearance--done': selected.clearances?.tti }">
+                <AssetIcon v-if="selected.clearances?.tti" name="check" :size="11" />
+                TTI cleared
+              </span>
+              <span class="clearance" :class="{ 'clearance--done': selected.clearances?.immunohematology }">
+                <AssetIcon v-if="selected.clearances?.immunohematology" name="check" :size="11" />
+                ABO/Rh cleared
+              </span>
+            </div>
 
             <div class="recorded">
               <div class="fact">
@@ -208,7 +224,7 @@
             </p>
 
             <NuxtLink v-if="canRecordResult" :to="`/blood-center/testing?donation=${selected.id}`" class="btn btn--link">
-              Open on the Testing page
+              Open on the TTI Testing page
             </NuxtLink>
           </section>
 
@@ -284,19 +300,22 @@
                   :disabled="busy || !validComponents"
                   @click="submitComponents"
                 >
-                  {{ selected.components?.length ? 'Update breakdown' : 'Record components' }}
+                  {{ selected.components?.length ? 'Request correction' : 'Record components' }}
                 </button>
               </div>
+              <p v-if="selected.components?.length" class="card__hint">
+                A saved breakdown changes only with the component technologist's approval.
+              </p>
             </template>
           </section>
         </div>
 
         <!-- LABELING AND THE FINAL DECISION -->
         <section class="card">
-          <h2 class="card__title">Labeling &amp; release</h2>
+          <h2 class="card__title">Labeling &amp; hand-over</h2>
           <p class="card__hint">
-            Once the unit is labelled at the bench, record where it goes. Clearing it for issue is what lets
-            inventory take it as stock, so it is the last thing done and it cannot be undone here.
+            Once the bags are labelled at the bench, complete the donation to hand them to Issuance. They are booked
+            in quarantined, so completing does not make anything issuable — testing's clearances do.
           </p>
 
           <ul v-if="blockers.length" class="blockers">
@@ -307,7 +326,7 @@
           </ul>
 
           <p v-if="!canUpdateStatus" class="card__hint">
-            The Processing department clears this unit for issue or rejects it.
+            The component technologist completes or rejects this donation.
           </p>
 
           <div v-else-if="rejecting" class="defer">
@@ -325,7 +344,7 @@
 
           <div v-else class="actions">
             <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submitRelease">
-              {{ busy ? 'Saving…' : 'Clear for issue' }}
+              {{ busy ? 'Saving…' : 'Complete processing' }}
             </button>
             <button type="button" class="btn btn--danger" :disabled="busy" @click="rejecting = true">
               Reject this unit
@@ -334,12 +353,23 @@
         </section>
       </template>
     </template>
+    <BloodCenterCorrectionRequestDialog
+      v-if="correction"
+      :donation-id="selected.id"
+      subject="components"
+      :changes="correction"
+      :previous="previousBreakdown"
+      @close="correction = null"
+      @submitted="onCorrectionSent"
+    />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 
 /**
  * The Processing department's side of a donation.
@@ -364,7 +394,8 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 
 // Processing records the breakdown and makes the final call. A supervisor
 // holds every ability, so can also jump across to the Testing page.
-const canRecordResult = computed(() => can('lab.record_result'))
+// Either testing section: both are recorded on the TTI Testing page.
+const canRecordResult = computed(() => can(['lab.record_serology', 'lab.record_immunohematology']))
 const canRecordComponents = computed(() => can('lab.record_components'))
 const canUpdateStatus = computed(() => can('lab.update_status'))
 
@@ -409,7 +440,6 @@ function bagLabel(bag) {
 // Testing is finished once the donation has an outcome under the five-marker
 // panel. A legacy result — recorded before the panel existed — does not count.
 const hasResult = computed(() => Boolean(selected.value?.test_result) && !selected.value?.test_result?.is_legacy)
-const resultPassed = computed(() => Boolean(selected.value?.test_result?.clears_for_issue))
 
 /** Which Testing sections are still missing, in words. */
 const testingOutstanding = computed(() => {
@@ -423,11 +453,7 @@ const testingOutstanding = computed(() => {
 const hasComponents = computed(() => Boolean(selected.value?.components?.length))
 const isFinal = computed(() => ['completed', 'rejected'].includes(selected.value?.status))
 
-const initials = computed(() => {
-  const name = selected.value?.donor?.full_name || ''
-
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '—'
-})
+const initials = computed(() => donorInitials(selected.value?.donor) || '—')
 
 // Every row complete, not just one: a half-filled row would otherwise be
 // dropped silently, and a bag would go unrecorded.
@@ -435,22 +461,14 @@ const validComponents = computed(() => componentRows.value.length > 0
   && componentRows.value.every(isCompleteBag))
 
 /**
- * What still stands between this unit and issuable stock.
+ * What still stands between this donation and completion.
  *
- * Mirrors the server's guardReadyToComplete so the button is refused here for
- * the same reasons it would be refused there, with the reason on screen rather
- * than in a 409.
+ * Mirrors the server's guardReadyToComplete: only the component breakdown.
+ * Test results are not a condition — the bags go into quarantine, and the
+ * clearances are what release them.
  */
 const blockers = computed(() => {
   const list = []
-
-  if (selected.value?.test_result?.is_legacy) {
-    list.push('Serology has not been recorded under the five-marker panel. The Testing department must record it.')
-  } else if (!hasResult.value) {
-    list.push(`The Testing department has not recorded ${testingOutstanding.value}.`)
-  } else if (!resultPassed.value) {
-    list.push('This result cannot be cleared for issue. Reject the unit instead.')
-  }
 
   if (!hasComponents.value) list.push('The component breakdown has not been recorded.')
 
@@ -625,10 +643,27 @@ function addComponentRow() {
   componentRows.value.push({ component_id: null, volume_ml: null })
 }
 
+const correction = ref(null)
+
+const previousBreakdown = computed(() => (selected.value?.components?.length
+  ? { components: selected.value.components.map((c) => ({ component_id: c.component_id, volume_ml: c.volume_ml })) }
+  : null))
+
+function onCorrectionSent(response) {
+  correction.value = null
+  notice.value = response?.message ?? 'Correction requested.'
+}
+
 async function submitComponents() {
   const payload = componentRows.value
     .filter(isCompleteBag)
     .map((row) => ({ component_id: row.component_id, volume_ml: Number(row.volume_ml) }))
+
+  // A saved breakdown is never saved over: it becomes a correction request.
+  if (selected.value.components?.length) {
+    correction.value = { components: payload }
+    return
+  }
 
   const res = await run(() => service.declareComponents(selected.value.id, { components: payload }))
 
@@ -754,6 +789,30 @@ onMounted(async () => {
 
 /* The two bench branches sit side by side: they are worked in parallel, and
    stacking them would suggest one waits on the other more than it does. */
+.clearances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.clearance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--rb-text-secondary);
+}
+
+.clearance--done {
+  border-color: transparent;
+  background: rgba(var(--rb-success-rgb), 0.14);
+  color: var(--rb-success-text);
+}
+
 .lab-grid {
   display: grid;
   gap: 1.1rem;

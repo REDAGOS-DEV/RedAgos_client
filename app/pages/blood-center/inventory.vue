@@ -3,9 +3,7 @@
     <!-- Skeleton loading state -->
     <div v-if="loading" class="inv-inner">
       <div class="skeleton skeleton--header" />
-      <div class="type-grid">
-        <div class="skeleton skeleton--type" v-for="n in 8" :key="n" />
-      </div>
+      <div class="skeleton skeleton--panel" style="height:300px" />
       <div class="skeleton skeleton--toolbar" />
       <div class="stats-grid">
         <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
@@ -64,30 +62,105 @@
         </div>
       </div>
 
-      <!-- ============ INTERACTIVE BLOOD TYPE SUMMARY ============ -->
-      <div class="type-grid">
-        <button
-          v-for="bt in bloodTypeSummary"
-          :key="bt.blood_type"
-          type="button"
-          class="type-card"
-          :class="{ 'type-card--active': activeBloodType === bt.blood_type }"
-          @click="toggleBloodTypeFilter(bt.blood_type)"
-        >
-          <div class="type-card__top">
-            <span class="type-card__type">{{ bt.blood_type }}</span>
-            <span class="health-badge" :class="`health-badge--${bt.health}`">{{ healthLabel(bt.health) }}</span>
+      <!-- ============ QUARANTINE ============ -->
+      <!-- Booked in, not yet cleared. Released per donation on both clearances. -->
+      <BloodCenterQuarantinePanel @released="loadDashboard" />
+
+      <!-- ============ AVAILABLE UNITS BY BLOOD TYPE ============ -->
+      <!-- One series, so one colour and no legend: the title names it. Every
+           column carries its value on the cap, so the axis needs no ticks. -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Available Units by Blood Type</h2>
+            <p class="panel-subtitle">
+              {{ bloodTypeTotal }} unit{{ bloodTypeTotal !== 1 ? 's' : '' }} available. Click a column to filter the records below.
+            </p>
           </div>
-          <p class="type-card__units">{{ bt.total_units }} <span class="type-card__units-label">units</span></p>
-          <div class="progress-track">
-            <div
-              class="progress-fill"
-              :class="`progress-fill--${bt.health}`"
-              :style="{ transform: `scaleX(${Math.min(100, Math.max(0, Number(bt.progress) || 0)) / 100})` }"
-            />
+          <div class="segmented-control" role="group" aria-label="Show blood types as">
+            <button
+              v-for="view in bloodTypeViews"
+              :key="view.value"
+              type="button"
+              class="segmented-control__btn"
+              :class="{ 'segmented-control__btn--active': bloodTypeView === view.value }"
+              :aria-pressed="bloodTypeView === view.value"
+              @click="bloodTypeView = view.value"
+            >
+              {{ view.label }}
+            </button>
           </div>
-          <p class="type-card__updated">Updated {{ bt.last_updated || '—' }}</p>
-        </button>
+        </div>
+
+        <div v-if="!bloodTypeSummary.length" class="empty-state">
+          <AssetIcon name="droplets" :size="36" style="color: var(--rb-border-strong)" />
+          <p>No blood types to show yet</p>
+        </div>
+
+        <div v-else-if="bloodTypeView === 'chart'" class="bt-chart">
+          <div class="bt-chart__plot">
+            <button
+              v-for="(bt, i) in bloodTypeSummary"
+              :key="bt.blood_type"
+              type="button"
+              class="bt-col"
+              :class="{
+                'bt-col--active': activeBloodType === bt.blood_type,
+                'bt-col--dim': activeBloodType && activeBloodType !== bt.blood_type,
+              }"
+              :style="{ '--h': bt.height / 100 }"
+              :aria-pressed="activeBloodType === bt.blood_type"
+              :aria-label="`${bt.blood_type}: ${bt.total_units} available unit${bt.total_units !== 1 ? 's' : ''}, ${healthLabel(bt.health)}`"
+              @click="toggleBloodTypeFilter(bt.blood_type)"
+              @pointerenter="hoveredBloodType = bt.blood_type"
+              @pointerleave="hoveredBloodType = null"
+              @focus="hoveredBloodType = bt.blood_type"
+              @blur="hoveredBloodType = null"
+            >
+              <span class="bt-col__track">
+                <span v-if="bt.total_units > 0" class="bt-col__clip"><span class="bt-col__bar" /></span>
+                <span class="bt-col__value">{{ bt.total_units }}</span>
+                <span
+                  v-if="hoveredBloodType === bt.blood_type"
+                  class="bt-tooltip"
+                  :class="{ 'bt-tooltip--start': i < 2, 'bt-tooltip--end': i >= bloodTypeSummary.length - 2 }"
+                  aria-hidden="true"
+                >
+                  <span class="bt-tooltip__value">{{ bt.total_units }} unit{{ bt.total_units !== 1 ? 's' : '' }}</span>
+                  <span class="bt-tooltip__label">{{ bt.blood_type }} &middot; {{ healthLabel(bt.health) }}</span>
+                  <span class="bt-tooltip__hint">{{ activeBloodType === bt.blood_type ? 'Click to clear the filter' : 'Click to filter records' }}</span>
+                </span>
+              </span>
+              <span class="bt-col__label">{{ bt.blood_type }}</span>
+              <!-- Status never rides on colour alone: icon and word. Healthy
+                   is the quiet default, so only the exception is marked. -->
+              <span v-if="bt.health !== 'healthy'" class="bt-col__status" :class="`bt-col__status--${bt.health}`">
+                <AssetIcon name="alert-triangle" :size="11" />
+                {{ healthLabel(bt.health) }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- The same numbers without the chart, for screen readers and exact reading. -->
+        <div v-else class="inventory-table-wrap">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>Blood Type</th>
+                <th>Available Units</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="bt in bloodTypeSummary" :key="bt.blood_type">
+                <td><span class="type-pill">{{ bt.blood_type }}</span></td>
+                <td>{{ bt.total_units }}</td>
+                <td><span class="health-badge" :class="`health-badge--${bt.health}`">{{ healthLabel(bt.health) }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- ============ SEARCH & FILTER BAR ============ -->
@@ -873,6 +946,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -1007,7 +1081,14 @@ const paginatedBatches = computed(() => {
   return filteredBatches.value.slice(start, start + pageSize)
 })
 
-// --- Blood type summary cards ---
+// --- Available units by blood type (column chart) ---
+const bloodTypeViews = [
+  { label: 'Chart', value: 'chart' },
+  { label: 'Table', value: 'table' },
+]
+const bloodTypeView = ref('chart')
+const hoveredBloodType = ref(null)
+
 const bloodTypeSummary = computed(() => {
   // Counted by the server rather than re-derived from the rows on this page:
   // those rows are one page of units, so summing them would report a page
@@ -1016,9 +1097,14 @@ const bloodTypeSummary = computed(() => {
     (inventorySummaryData.value?.by_blood_type ?? []).map(row => [row.code, row.available])
   )
 
-  return bloodTypeOptions.value.map(code => {
-    const total = available.get(code) ?? 0
+  const totals = bloodTypeOptions.value.map(code => [code, Number(available.get(code)) || 0])
 
+  // Scaled to the tallest column rather than a fixed ceiling: there is no
+  // configured capacity per type to measure against, so the chart compares
+  // the types with each other and nothing else.
+  const max = Math.max(0, ...totals.map(([, total]) => total))
+
+  return totals.map(([code, total]) => {
     // Only the two ends are claimed. Grading "low" needs a per-type minimum
     // that nothing in this system configures, and inventing a threshold here
     // would put a stock-level judgement on screen that nobody has made. The
@@ -1026,12 +1112,11 @@ const bloodTypeSummary = computed(() => {
     // statuses at all, so every card reported "Healthy" regardless.
     const health = total === 0 ? 'critical' : 'healthy'
 
-    const maxRef = 120
-    const progress = Math.min(100, Math.round((total / maxRef) * 100))
-
-    return { blood_type: code, total_units: total, health, progress, last_updated: null }
+    return { blood_type: code, total_units: total, health, height: max ? (total / max) * 100 : 0 }
   })
 })
+
+const bloodTypeTotal = computed(() => bloodTypeSummary.value.reduce((sum, bt) => sum + bt.total_units, 0))
 
 function healthLabel(h) {
   const map = { healthy: 'Healthy', low: 'Low', critical: 'Critical' }
@@ -1574,14 +1659,13 @@ onMounted(loadDashboard)
 }
 .skeleton--crumb { height: 16px; max-width: 180px; }
 .skeleton--header { height: 44px; max-width: 340px; margin-top: 8px; }
-.skeleton--type { height: 110px; border-radius: 14px; }
 .skeleton--toolbar { height: 96px; }
 .skeleton--card { height: 108px; }
 .skeleton--panel { border-radius: 14px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .stat-card, .quick-action-card, .type-card, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
+  .skeleton, .stat-card, .quick-action-card, .bt-col, .bt-col__bar, .bt-col__value, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
 }
 
 .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -1640,42 +1724,76 @@ onMounted(loadDashboard)
 }
 .alert-banner__dismiss:hover { background: rgba(var(--rb-warning-rgb), 0.12); }
 
-/* Blood type summary cards */
-/* auto-fit, not a fixed count: the content column now changes width
-   when the rail expands, so the grid has to answer to its container
-   rather than to a viewport breakpoint that no longer describes it. */
-.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
-.type-card {
-  display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px;
-  border-radius: 14px; background: var(--rb-surface); border: 1px solid var(--rb-border);
-  cursor: pointer; font-family: inherit; transition: border-color 0.15s ease, background 0.15s ease;
+/* Available units by blood type — column chart */
+/* One series colour. Dark mode takes a lighter step of the same blue so the
+   columns keep 3:1 against the dark card; #1565C0 alone falls short there. */
+.bt-chart { --bt-bar: var(--rb-primary); padding: 16px 18px 14px; }
+:global(.dark) .bt-chart { --bt-bar: #1E88E5; }
+/* Columns share the width equally and touch, so each one's hit target is its
+   whole band — the bar itself stays thin. */
+.bt-chart__plot { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.bt-col {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  min-width: 0; padding: 0 0 4px; border: none; border-radius: 10px; background: transparent;
+  font-family: inherit; cursor: pointer; transition: background 0.15s ease;
 }
-.type-card:hover { border-color: var(--rb-border-hover); background: var(--rb-surface-hover); }
-.type-card--active { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.05); box-shadow: 0 0 0 1px var(--rb-primary); }
-.type-card__top { display: flex; align-items: center; justify-content: space-between; }
-.type-card__type { font-size: 15px; font-weight: 800; color: var(--rb-accent-text); }
-.type-card__units { font-size: 19px; font-weight: 800; color: var(--rb-text-primary); margin: 0; }
-.type-card__units-label { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
-.type-card__updated { font-size: 10.5px; color: var(--rb-text-secondary); margin: 0; }
+.bt-col:hover { background: var(--rb-surface-hover); }
+.bt-col:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+/* The plot: room above the tallest column for its value, a hairline baseline
+   under all of them (each band draws its own piece, and the bands touch). */
+/* --h is the column's share of the tallest, 0 to 1; --rise is that share in
+   pixels, which every piece riding the column moves by. */
+.bt-col__track {
+  --track: 150px; --rise: calc(var(--h) * var(--track));
+  position: relative; align-self: stretch; height: var(--track); margin-top: 22px;
+  border-bottom: 1px solid var(--rb-border-strong);
+}
+/* The bar is always full height and slides up out of a clipping box, so a
+   change animates as a transform: no relayout per frame, and the rounded top
+   is never squashed the way a scaleY would squash it. */
+.bt-col__clip { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bt-col__bar {
+  position: absolute; top: 0; left: 50%; width: 24px; max-width: calc(100% - 8px); height: 100%;
+  transform: translate(-50%, calc(var(--track) - max(2px, var(--rise))));
+  background: var(--bt-bar); border-radius: 4px 4px 0 0;
+  transition: transform 0.35s ease, opacity 0.15s ease, filter 0.15s ease;
+}
+.bt-col:hover .bt-col__bar, .bt-col:focus-visible .bt-col__bar { filter: brightness(1.15); }
+.bt-col__value {
+  position: absolute; left: 0; right: 0; bottom: 4px; text-align: center;
+  transform: translateY(calc(-1 * var(--rise)));
+  font-size: 12px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums;
+  transition: transform 0.35s ease;
+}
+.bt-col__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); }
+.bt-col__status {
+  display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; line-height: 1.2; text-align: center;
+}
+.bt-col__status--low { color: var(--rb-warning-text); }
+.bt-col__status--critical { color: var(--rb-accent-text); }
+/* A filter picks one type: it keeps full ink, the rest step back. */
+.bt-col--active .bt-col__label { color: var(--rb-primary-text); }
+.bt-col--dim .bt-col__bar { opacity: 0.3; }
+.bt-col--dim .bt-col__value { color: var(--rb-text-muted); }
+
+.bt-tooltip {
+  position: absolute; left: 50%; bottom: calc(var(--rise) + 26px); transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px;
+  background: var(--rb-text-primary); color: var(--rb-surface); text-align: left; white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.18); pointer-events: none; z-index: 2;
+}
+/* The outer columns anchor their tooltip inward, or it would run off the card. */
+.bt-tooltip--start { left: 0; transform: none; }
+.bt-tooltip--end { left: auto; right: 0; transform: none; }
+.bt-tooltip__value { font-size: 13px; font-weight: 700; }
+.bt-tooltip__label { font-size: 11px; opacity: 0.8; }
+.bt-tooltip__hint { font-size: 10.5px; opacity: 0.65; }
 
 .health-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
 .health-badge--healthy { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
 .health-badge--low { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
 .health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-
-.progress-track { height: 5px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
-/* Full width, scaled from the left: a transform animates on the compositor,
-   where animating `width` would re-lay out the card on every frame. */
-.progress-fill {
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  transform-origin: left center;
-  transition: transform 0.4s ease;
-}
-.progress-fill--healthy { background: var(--rb-success); }
-.progress-fill--low { background: var(--rb-warning); }
-.progress-fill--critical { background: var(--rb-accent); }
 
 /* Toolbar */
 .toolbar { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }

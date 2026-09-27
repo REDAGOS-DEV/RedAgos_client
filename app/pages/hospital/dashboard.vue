@@ -365,6 +365,9 @@ const statusMap = {
   pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
   approved: { label: 'Approved', bg: '#2E7D3214', color: '#2E7D32' },
   processing: { label: 'Processing', bg: '#1565C014', color: '#1565C0' },
+  // The two fulfilment states the API sends once units are released.
+  partial: { label: 'Partially Fulfilled', bg: '#B4530914', color: '#B45309' },
+  fulfilled: { label: 'Fulfilled', bg: '#2E7D3214', color: '#2E7D32' },
   ready: { label: 'Ready for Pickup', bg: '#5E35B114', color: '#5E35B1' },
   completed: { label: 'Completed', bg: '#2E7D3214', color: '#2E7D32' },
   rejected: { label: 'Rejected', bg: '#D32F2F14', color: '#D32F2F' },

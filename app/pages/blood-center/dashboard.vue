@@ -771,12 +771,12 @@ const systemActivity = ref([])
 // ang makaabot ani nga page karon, ang shortcut dili gyud mo-offer og aksyon
 // nga i-refuse ra sa server.
 const ALL_QUICK_ACTIONS = [
-  { label: 'Record Donation', description: 'Open the donation counter', icon: 'droplets', kind: 'link', to: '/blood-center/collection', requires: 'donations.record' },
+  { label: 'Record Donation', description: 'Open the donation counter', icon: 'droplets', kind: 'link', to: '/blood-center/collection', requires: COLLECTION_ABILITIES },
   { label: 'Manage Inventory', description: 'Update stock levels and units', icon: 'package', kind: 'link', to: '/blood-center/inventory', requires: 'inventory.view' },
   { label: 'Process Requests', description: 'Review and fulfill hospital requests', icon: 'clipboard-list', kind: 'link', to: '/blood-center/bloodrequests', requires: 'requests.view' },
   { label: 'Generate Reports', description: 'Export operational summaries', icon: 'file-text', kind: 'export', requires: 'reports.view_own' },
-  { label: 'Manage Donors', description: 'View and update donor records', icon: 'users', kind: 'link', to: '/blood-center/donors', requires: 'donors.view' },
-  { label: 'Manage Staff', description: 'Add colleagues and assign departments', icon: 'user-check', kind: 'link', to: '/blood-center/staff', requires: 'staff.manage' },
+  { label: 'Manage Donors', description: 'View and update donor records', icon: 'users', kind: 'link', to: '/blood-center/donors', requires: 'donors.view_contact' },
+  { label: 'Manage Staff', description: 'Add colleagues and assign roles', icon: 'user-check', kind: 'link', to: '/blood-center/staff', requires: 'staff.manage' },
 ]
 
 const quickActions = computed(() => ALL_QUICK_ACTIONS.filter((action) => can(action.requires)))

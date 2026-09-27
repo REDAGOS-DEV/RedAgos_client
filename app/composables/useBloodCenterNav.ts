@@ -16,8 +16,12 @@ export interface BloodCenterNavItem {
   icon: string
   /** Key into the sidebar's badge counts, when the item shows one. */
   badge?: string
-  /** Ability needed to see this item. Omitted means everyone in the portal. */
-  requires?: string
+  /**
+   * Ability needed to see this item — or a list, any one of which will do.
+   * Omitted means everyone in the portal. Must match the page's own
+   * `definePageMeta({ requires })`, or the link would bounce.
+   */
+  requires?: string | readonly string[]
   /** Extra terms the ⌘F search should match on. */
   keywords?: string
 }
@@ -28,17 +32,55 @@ export interface BloodCenterNavGroup {
 }
 
 /**
- * Where each department lands after signing in.
+ * The abilities that open the collection page, any one of which will do.
  *
- * A supervisor who also works in a department lands in that department; the
- * overview stays one click away in the sidebar. A management-only supervisor
- * lands on the overview.
+ * The counter is one page worked by three roles: the receptionist opens the
+ * donation, the physician screens, the chair collects. Shared by the nav item
+ * and the page's own meta so the two cannot disagree.
+ */
+export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const
+
+/**
+ * The abilities that open the testing page, which TTI Testing and
+ * Immunohematology share: each works its own card on it.
+ */
+export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohematology'] as const
+
+
+/**
+ * Where each staff role lands after signing in.
+ *
+ * Checked before the department, because roles in one department do different
+ * work: a receptionist starts at the appointment list, a physician at the
+ * counter. A supervisor who also holds a role lands where that role does; the
+ * overview stays one click away in the sidebar.
+ */
+const ROLE_HOME: Record<string, string> = {
+  screening_physician: '/blood-center/collection',
+  phlebotomist: '/blood-center/collection',
+  apheresis_specialist: '/blood-center/collection',
+  medical_receptionist: '/blood-center/appointments',
+  component_technologist: '/blood-center/laboratory',
+  processing_assistant: '/blood-center/laboratory',
+  serology_technologist: '/blood-center/testing',
+  lab_supervisor: '/blood-center/testing',
+  inventory_control_officer: '/blood-center/storage',
+  dispatch_coordinator: '/blood-center/fulfillment',
+  it_data_clerk: '/blood-center/inventory',
+  billing_clerk: '/blood-center/billing',
+}
+
+/**
+ * Where each department lands, for an account holding a custom role.
+ *
+ * Every predefined role is in ROLE_HOME; a typed role has no entry there, so
+ * its department decides.
  */
 const DEPARTMENT_HOME: Record<string, string> = {
   collection: '/blood-center/collection',
-  // Each laboratory department has its own page. Testing records
-  // immunohematology and serology and works its referral list; Processing
-  // separates the unit and clears or rejects it.
+  // Each laboratory department has its own page. TTI Testing records the
+  // serology panel and works its referral list; Processing separates the
+  // unit and completes or rejects it.
   testing: '/blood-center/testing',
   processing: '/blood-center/laboratory',
   issuance: '/blood-center/storage',
@@ -58,7 +100,8 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
     return BLOOD_CENTER_OVERVIEW
   }
 
-  const home = user.department ? DEPARTMENT_HOME[user.department] : undefined
+  const home = (user.staff_role ? ROLE_HOME[user.staff_role] : undefined)
+    ?? (user.department ? DEPARTMENT_HOME[user.department] : undefined)
 
   if (home) {
     return home
@@ -77,11 +120,11 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
 
       // Each department dashboard is gated on an ability distinctive to that
       // department, never on a shared read. inventory.view, for instance, is
-      // held by Collection, Testing and Processing too, so gating Issuance on
-      // it would have shown them a dashboard that is not theirs. Testing and
-      // Processing share lab.view, so each is gated on its own write instead.
-      { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: 'donors.manage', keywords: 'donor collection donation' },
-      { label: 'Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: 'lab.record_result', keywords: 'lab laboratory testing immunohematology serology abo rh hiv hbsag hcv syphilis malaria referral counselling segment' },
+      // held by Processing and Recruitment too, so gating Issuance on it would
+      // have shown them a dashboard that is not theirs. The laboratory
+      // departments share lab.view, so each is gated on its own write instead.
+      { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
+      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling segment' },
       { label: 'Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
       { label: 'Billing Dashboard', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.create', keywords: 'billing payment finance' },
@@ -97,16 +140,22 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Issuance prepares and signs the daily sheet, so it carries Issuance's
       // own ability rather than the inventory.view every lab department holds.
       { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.create', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
-      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests' },
-      { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.process', keywords: 'allocate release dispatch' },
+      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
+      // requests.release, the same as the page: dispatch holds it without
+      // requests.process, which only the Inventory Control Officer holds.
+      { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
     ],
   },
   {
     label: 'Operations',
     items: [
       { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
+      // Every role that saves a correctable record holds corrections.request,
+      // and every approver does too, so one ability opens the page.
+      { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
       { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
-      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view', keywords: 'donor profile history' },
+      // donors.view_contact: Recruitment reaches the page as a contact list.
+      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donor profile history contact recruitment' },
     ],
   },
   {

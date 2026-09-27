@@ -79,7 +79,7 @@ describe('the fulfilment table', () => {
 
   it('derives a line status the same way the API does when none was sent', () => {
     const request = scenario()
-    request.items = request.items.map(({ line_status, line_status_label, ...rest }) => rest)
+    request.items = request.items.map((item) => ({ ...item, line_status: undefined, line_status_label: undefined }))
 
     expect(fulfilmentRows(request).map((row) => row.status)).toEqual(['fulfilled', 'partial', 'unfulfilled'])
   })

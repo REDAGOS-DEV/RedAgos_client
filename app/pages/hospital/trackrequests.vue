@@ -98,8 +98,9 @@
           <div>
             <span class="hero-ref">{{ request.reference_number }}</span>
             <div class="hero-badges">
-              <span class="status-badge status-badge--anim" :class="statusColorClass">{{ request.status }}</span>
-              <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ request.priority || '—' }} priority</span>
+              <span class="status-badge status-badge--anim" :class="statusColorClass">{{ statusText }}</span>
+              <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ priorityText }} priority</span>
+              <span v-if="request.is_walk_in" class="status-badge status-badge--sm badge--info">Walk-in</span>
               <span v-if="hasAttentionFlag" class="attention-chip">
                 <AssetIcon name="circle-alert" />
                 Needs attention
@@ -149,6 +150,22 @@
             <span class="stepper-label">{{ step.label }}</span>
           </li>
         </ol>
+      </section>
+
+      <!-- REQUESTED VERSUS FULFILLED, PER COMPONENT -->
+      <section class="card">
+        <h2 class="section-title">Requested vs Fulfilled</h2>
+        <RequestFulfilmentTable :request="request" />
+      </section>
+
+      <!-- WHERE IT CAME FROM, AND WHERE THE REST WENT -->
+      <section v-if="request.is_walk_in || request.parent || request.follow_ups?.length" class="card">
+        <h2 class="section-title">Source &amp; Linked Requests</h2>
+        <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
+          A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
+          it after your blood bank confirmed it by phone.
+        </p>
+        <RequestChain :parent="request.parent" :follow-ups="request.follow_ups" link-base="/hospital/bloodrequests/" />
       </section>
 
       <div class="content-grid">
@@ -371,6 +388,9 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import RequestChain from '~/components/common/RequestChain.vue'
+import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 /**
  * /hospital/track-requests
  * Tracking-only page (NOT a management page) for Hospital Blood Bank staff.
@@ -420,31 +440,24 @@ onMounted(() => {
   }
 })
 
-const statusColorMap = {
-  Pending: 'warning',
-  Approved: 'success',
-  Processing: 'warning',
-  'Ready for Pickup': 'info',
-  Completed: 'success',
-  Rejected: 'danger',
-  Cancelled: 'danger',
-}
+/*
+ * Keyed on the stored status through the shared tone map. The map this page
+ * carried was keyed on Title Case values the API has never sent, so every badge
+ * fell through to neutral and a rejection never raised the attention flag.
+ */
+const TONE_BADGES = { info: 'info', progress: 'info', warning: 'warning', success: 'success', danger: 'danger', muted: 'neutral' }
 
-const statusColorClass = computed(() => {
-  const s = request.value?.status
-  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
-})
+const statusColorClass = computed(() => `badge--${TONE_BADGES[REQUEST_STATUS_TONES[request.value?.status]] ?? 'neutral'}`)
 
-const priorityColorClass = computed(() => {
-  const p = request.value?.priority
-  if (!p) return 'badge--neutral'
-  const lower = p.toLowerCase()
-  if (lower === 'urgent' || lower === 'critical') return 'badge--danger'
-  if (lower === 'high') return 'badge--warning'
-  return 'badge--neutral'
-})
+const statusText = computed(() => (request.value ? requestStatusLabel(request.value) : '—'))
 
-const hasAttentionFlag = computed(() => request.value?.status === 'Rejected')
+const priorityText = computed(() => (request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—'))
+
+const priorityColorClass = computed(() =>
+  request.value?.urgency_level === 'emergency' ? 'badge--danger' : 'badge--neutral',
+)
+
+const hasAttentionFlag = computed(() => request.value?.status === 'rejected')
 
 // Progress circle geometry
 const circleRadius = 42
@@ -1007,6 +1020,7 @@ function contactBloodCenter() {
 .notif-time { font-size: 11px; color: #94a3b8; }
 
 .empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
+.track-walk-in { margin-bottom: 10px; color: var(--rb-text-secondary); }
 
 /* ---------- Documents ---------- */
 .documents-table { display: flex; flex-direction: column; gap: 10px; }

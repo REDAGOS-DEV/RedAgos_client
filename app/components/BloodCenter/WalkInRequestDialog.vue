@@ -867,16 +867,16 @@ function formatDate(value) {
 .match {
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--rb-border);
-  border-left-width: 4px;
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
-.match--here { border-left-color: var(--rb-primary); }
-.match--follow_up { border-left-color: var(--rb-success); }
-.match--duplicate { border-left-color: var(--rb-warning); }
+/* The relation is named in the chip; the tint only groups it at a glance. */
+.match--here { background: rgba(var(--rb-primary-rgb), 0.05); border-color: rgba(var(--rb-primary-rgb), 0.25); }
+.match--follow_up { background: rgba(var(--rb-success-rgb), 0.06); border-color: rgba(var(--rb-success-rgb), 0.3); }
+.match--duplicate { background: rgba(var(--rb-warning-rgb), 0.07); border-color: rgba(var(--rb-warning-rgb), 0.35); }
 
 .match__head {
   display: flex;

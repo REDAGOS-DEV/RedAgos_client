@@ -3,8 +3,12 @@ import type {
   AvailabilityResult,
   BloodRequest,
   BloodRequestFilters,
+  BloodRequestStatus,
   CreateBloodRequestPayload,
+  CreateFollowUpPayload,
+  RequestEvent,
   RequestReferenceData,
+  RequestSource,
 } from '~/types/bloodRequest'
 
 /**
@@ -95,6 +99,58 @@ class HospitalService extends BaseService {
   trackRequest(reference: string) {
     return this.request<{ request: BloodRequest }>(
       `/hospital/blood-requests/track/${encodeURIComponent(reference)}`,
+    )
+  }
+
+  /**
+   * This blood bank's active requests for a patient, before raising another.
+   *
+   * Includes requests a blood centre recorded here after a walk-in. A POST so
+   * the patient's name stays out of URLs and access logs.
+   */
+  patientMatches(criteria: { patient_surname: string; patient_first_name: string; blood_type_id?: number | null }) {
+    return this.request<{
+      matches: Array<{
+        id: number
+        reference_number: string
+        facility: { id: number; name: string } | null
+        request_source: RequestSource
+        source_label: string
+        status: BloodRequestStatus
+        status_label: string
+        is_open: boolean
+        request_date: string | null
+      }>
+    }>('/hospital/blood-requests/patient-matches', 'POST', criteria)
+  }
+
+  /** Everything that has happened to one of this blood bank's requests. */
+  requestHistory(id: number | string) {
+    return this.request<{ request_id: number; reference_number: string; events: RequestEvent[] }>(
+      `/hospital/blood-requests/${id}/history`,
+    )
+  }
+
+  /**
+   * Close the rest of one line this blood bank no longer needs.
+   *
+   * The line keeps what was requested. A remainder closed as not needed can no
+   * longer be sourced from another facility.
+   */
+  closeRequestLine(id: number | string, itemId: number, note?: string | null) {
+    return this.request<{ message: string; status: BloodRequestStatus; status_label: string; is_open: boolean }>(
+      `/hospital/blood-requests/${id}/items/${itemId}/close`,
+      'POST',
+      note ? { note } : {},
+    )
+  }
+
+  /** Ask another facility for what this request could not get. */
+  createFollowUp(id: number | string, payload: CreateFollowUpPayload) {
+    return this.request<{ message: string; request: BloodRequest }>(
+      `/hospital/blood-requests/${id}/follow-up`,
+      'POST',
+      payload,
     )
   }
 

@@ -72,3 +72,10 @@ export function bloodTypeCodeFor(types: BloodTypeOption[], id: number | null | u
 
   return types.find((type) => type.id === id)?.code ?? null
 }
+
+/**
+ * The ABO group of a stored code, for the forward grouping the typing implies.
+ */
+export function aboOf(code: string | null | undefined): AboGroup | null {
+  return splitBloodTypeCode(code).abo || null
+}

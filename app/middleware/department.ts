@@ -1,5 +1,5 @@
 /**
- * Keep a blood-centre staff member out of pages their department does not cover.
+ * Keep a blood-centre staff member out of pages their role does not cover.
  *
  * This runs after `auth`, which only checks that a token exists. It is
  * presentation, not security: the server refuses the underlying endpoint with
@@ -22,7 +22,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
   }
 
-  const required = to.meta.requires as string | undefined
+  // A list means any one of them: the collection page is shared by three
+  // roles that each hold a different ability.
+  const required = to.meta.requires as string | string[] | undefined
 
   const { ensureUser, can } = useUser()
 

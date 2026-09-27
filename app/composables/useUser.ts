@@ -49,6 +49,11 @@ export function useUser() {
         // nga gate — presentation ra ni.
         department: payload.department ?? null,
         department_label: payload.department_label ?? null,
+        staff_role: payload.staff_role ?? null,
+        staff_role_label: payload.staff_role_label ?? null,
+        custom_role: payload.custom_role ?? null,
+        role_label: payload.role_label ?? null,
+        staff_privileges: Array.isArray(payload.staff_privileges) ? payload.staff_privileges : [],
         is_supervisor: Boolean(payload.is_supervisor),
         // Admin privileges. Sama sa department permissions sa ibabaw: ang
         // server gihapon ang gate, presentation ra ni nga kopya para sa nav.
@@ -91,11 +96,19 @@ export function useUser() {
    *
    * Fail-closed: kung wala pa ma-load ang user o walay permissions, `false`
    * ang balik. Ang mga item nga walay gikinahanglan nga ability kay dayag ra.
+   *
+   * Ang array kay "bisan usa niini" — pananglitan ang collection page, nga
+   * gi-share sa receptionist, physician ug phlebotomist nga lain-lain og
+   * ability.
    */
-  function can(ability?: string): boolean {
-    if (!ability) return true
+  function can(ability?: string | readonly string[]): boolean {
+    if (!ability || (Array.isArray(ability) && ability.length === 0)) return true
 
-    return user.value?.permissions?.includes(ability) ?? false
+    const held = user.value?.permissions ?? []
+
+    return typeof ability === 'string'
+      ? held.includes(ability)
+      : ability.some((one) => held.includes(one))
   }
 
   function updateAvatar(newUrl: string | null): void {

@@ -185,8 +185,28 @@ describe('the serology panel', () => {
 describe('the Testing page', () => {
   const page = source('app/pages/blood-center/testing.vue')
 
-  it('is the Testing department\'s own page', () => {
-    expect(page).toContain("requires: 'lab.record_result'")
+  it('is shared by TTI Testing and Immunohematology, each seeing only its own card', () => {
+    expect(page).toContain("requires: ['lab.record_serology', 'lab.record_immunohematology']")
+    expect(page).toMatch(/<section v-if="canType" class="card">[\s\S]*?Immunohematology/)
+    expect(page).toMatch(/<section v-if="canSerology" class="card">[\s\S]*?Serology/)
+  })
+
+  it('saves a panel straight away, with no run', () => {
+    expect(page).not.toContain('serology_run_id')
+    expect(page).not.toContain('SerologyRun')
+    expect(page).toContain('const panel = serologyPayload(readings, confirmed, markers.value)')
+  })
+
+  it('sends forward and reverse grouping and the antibody screen', () => {
+    expect(page).toContain('forward_group: forwardGroup.value')
+    expect(page).toContain('reverse_group: typingForm.reverse_group')
+    expect(page).toContain('antibody_screen: typingForm.antibody_screen')
+  })
+
+  it('never saves over a saved result: it becomes a correction request', () => {
+    expect(page).toMatch(/if \(selected\.value\.serology\) \{\s*confirmingReactive\.value = false\s*correction\.value = \{ subject: 'serology'/)
+    expect(page).toMatch(/if \(selected\.value\.immunohematology\) \{[\s\S]*?subject: 'immunohematology'/)
+    expect(page).toContain(':subject="correction.subject"')
   })
 
   it('confirms a reactive panel before saving it', () => {
@@ -230,8 +250,8 @@ describe('the counter', () => {
   it('sends the whole phlebotomist box, with the segment normalised', () => {
     expect(page).toContain('blood_bag_type: collectionForm.blood_bag_type')
     expect(page).toContain('segment_number: normalizeSegmentNumber(collectionForm.segment_number)')
-    expect(page).toContain('started_at: atTimeOn(today, collectionForm.started_time)')
-    expect(page).toContain('ended_at: atTimeOn(today, collectionForm.ended_time)')
+    expect(page).toContain('started_at: atTimeOn(day, collectionForm.started_time)')
+    expect(page).toContain('ended_at: atTimeOn(day, collectionForm.ended_time)')
   })
 
   it('never sends a phlebotomist: that is whoever is signed in', () => {
@@ -245,13 +265,119 @@ describe('the counter', () => {
   it('carries the valid-ID lookup\'s deferral into the visit', () => {
     expect(page).toContain('found.prior_deferral ?? null')
   })
+
+  it('opens for any of the three counter roles', () => {
+    expect(page).toContain("requires: ['donations.register', 'donations.screen', 'donations.collect']")
+  })
+
+  it('shows each stage\'s form only to the role that performs it', () => {
+    expect(page).toContain("const canRegister = computed(() => can('donations.register'))")
+    expect(page).toContain("const canScreen = computed(() => can('donations.screen'))")
+    expect(page).toContain("const canCollect = computed(() => can('donations.collect'))")
+    expect(page).toContain('v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation"')
+    expect(page).toContain(`v-else-if="stage === 'screening' && !canScreen"`)
+    expect(page).toContain(`v-else-if="stage === 'collection' && !canCollect"`)
+  })
+
+  it('keeps the questionnaire with the physician', () => {
+    expect(page).toContain("const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))")
+    expect(page).toContain('v-if="donor && canReadQuestionnaire"')
+    expect(page).toContain('v-if="canReadQuestionnaire && questionnaireOpen && questionnaire"')
+  })
 })
 
 describe('navigation', () => {
   const nav = source('app/composables/useBloodCenterNav.ts')
 
-  it('gives Testing and Processing each their own page, gated on their own write', () => {
-    expect(nav).toMatch(/label: 'Testing', path: '\/blood-center\/testing'[^}]*requires: 'lab\.record_result'/)
+  it('gives the laboratory one testing page and Processing its own, each gated on its own write', () => {
+    expect(nav).toContain("export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohematology'] as const")
+    expect(nav).toMatch(/label: 'TTI Testing', path: '\/blood-center\/testing'[^}]*requires: TESTING_ABILITIES/)
+    expect(nav).not.toContain('/blood-center/immunohematology')
     expect(nav).toMatch(/label: 'Processing', path: '\/blood-center\/laboratory'[^}]*requires: 'lab\.record_components'/)
+  })
+
+  it('offers the corrections page to every role that may ask for one', () => {
+    expect(nav).toMatch(/label: 'Corrections', path: '\/blood-center\/corrections'[^}]*requires: 'corrections\.request'/)
+    expect(source('app/pages/blood-center/corrections.vue')).toContain("requires: 'corrections.request'")
+  })
+
+  /*
+   * A nav item gated differently from its page either hides a page the user
+   * may open or offers one that bounces them. Both of these did the latter.
+   */
+  it('gates the collection link exactly as the collection page is gated', () => {
+    expect(nav).toContain("export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const")
+    expect(nav).toMatch(/label: 'Collection Dashboard'[^}]*requires: COLLECTION_ABILITIES/)
+  })
+
+  it('gates the fulfillment link on the ability the fulfillment page requires', () => {
+    const page = source('app/pages/blood-center/fulfillment.vue')
+
+    expect(page).toContain("requires: 'requests.release'")
+    expect(nav).toMatch(/label: 'Requests Fulfillment'[^}]*requires: 'requests\.release'/)
+  })
+
+  it('opens the donor list to Recruitment as a contact list', () => {
+    const page = source('app/pages/blood-center/donors.vue')
+
+    expect(page).toContain("requires: 'donors.view_contact'")
+    expect(nav).toMatch(/label: 'Donor Management'[^}]*requires: 'donors\.view_contact'/)
+    expect(page).toContain("const canViewHistory = computed(() => can('donors.view_clinical'))")
+  })
+})
+
+describe('the incoming request queue', () => {
+  const page = source('app/pages/blood-center/bloodrequests.vue')
+
+  it('offers reserving to whoever allocates and declining to whoever decides', () => {
+    expect(page).toContain("const canAllocate = computed(() => can('requests.process'))")
+    expect(page).toContain("const canDecide = computed(() => can('requests.approve'))")
+    expect(page).not.toMatch(/<button(?![^>]*v-(else-)?if="canAllocate")[^>]*@click="(openMenuId = null; )?requestApprove/)
+    expect(page).not.toMatch(/<button(?![^>]*v-(else-)?if="canDecide")[^>]*@click="(openMenuId = null; )?requestReject/)
+  })
+})
+
+describe('the staff roster', () => {
+  const page = source('app/pages/blood-center/staff.vue')
+
+  it('takes a title, a department, a role and privileges, as the Add Staff use case lists them', () => {
+    expect(page).toContain('bloodCenterService.staffRoles()')
+    expect(page).toContain('list="staff-titles"')
+    expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
+    expect(page).toContain('list="staff-roles"')
+    expect(page).toContain('v-model="form.staff_privileges" type="checkbox"')
+  })
+
+  it('sends a picked role as its key and a typed one as a custom role', () => {
+    expect(page).toContain('? { staff_role: matchedRole.value.key, custom_role: null }')
+    expect(page).toContain(': { staff_role: null, custom_role: typed }')
+  })
+
+  it('can generate the temporary password, like the super admin form', () => {
+    expect(page).toContain('@click="generatePassword"')
+    expect(page).toContain("const chars = [pick(upper), pick(lower), pick(digits), pick(digits)]")
+  })
+})
+
+describe('corrections', () => {
+  const page = source('app/pages/blood-center/corrections.vue')
+  const dialog = source('app/components/BloodCenter/CorrectionRequestDialog.vue')
+
+  it('asks with a reason and the corrected values', () => {
+    expect(dialog).toContain('bloodCenterService.requestCorrection(props.donationId, {')
+    expect(dialog).toContain('reason: reason.value.trim()')
+    expect(dialog).toContain(':disabled="busy || !reason.trim()"')
+  })
+
+  it('lets only the server decide who may decide', () => {
+    expect(page).toContain('v-if="item.can_decide"')
+    expect(page).toContain("bloodCenterService.rejectCorrection(item.id, { note })")
+    expect(page).toContain(":disabled=\"busy === item.id || !(notes[item.id] || '').trim()\"")
+  })
+
+  it('is reached from every page that saves a correctable record', () => {
+    expect(source('app/pages/blood-center/laboratory.vue')).toContain('subject="components"')
+    expect(source('app/pages/blood-center/collection.vue')).toContain('startScreeningCorrection')
+    expect(source('app/pages/blood-center/collection.vue')).toContain('startCollectionCorrection')
   })
 })

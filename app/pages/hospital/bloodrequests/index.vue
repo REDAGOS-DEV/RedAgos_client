@@ -45,10 +45,10 @@
             <div class="stat-card__icon" style="background:#2E7D3214">
               <AssetIcon name="check-circle" :size="18" style="color:#2E7D32" />
             </div>
-            <span class="stat-card__title">Approved Requests</span>
+            <span class="stat-card__title">Processing</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.approved }}</p>
-          <p class="stat-card__helper">Cleared for processing</p>
+          <p class="stat-card__helper">Stock reserved by the blood center</p>
           <span v-if="trends.approved.hasData" class="stat-card__trend" :class="trends.approved.up ? 'up' : 'down'">
             <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="12" />
             {{ trends.approved.label }}
@@ -60,10 +60,10 @@
             <div class="stat-card__icon" style="background:#7C3AED14">
               <AssetIcon name="package-check" :size="18" style="color:#7C3AED" />
             </div>
-            <span class="stat-card__title">Ready for Pickup</span>
+            <span class="stat-card__title">Partially Fulfilled</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.ready }}</p>
-          <p class="stat-card__helper">Units prepared and waiting</p>
+          <p class="stat-card__helper">Some units supplied, the rest outstanding</p>
           <span v-if="trends.ready.hasData" class="stat-card__trend" :class="trends.ready.up ? 'up' : 'down'">
             <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="12" />
             {{ trends.ready.label }}
@@ -75,10 +75,10 @@
             <div class="stat-card__icon" style="background:#1565C014">
               <AssetIcon name="clipboard-check" :size="18" style="color:#1565C0" />
             </div>
-            <span class="stat-card__title">Completed Requests</span>
+            <span class="stat-card__title">Fulfilled</span>
           </div>
           <p class="stat-card__value">{{ animatedCounts.completed }}</p>
-          <p class="stat-card__helper">Fulfilled this month</p>
+          <p class="stat-card__helper">Every requested unit released</p>
           <span v-if="trends.completed.hasData" class="stat-card__trend" :class="trends.completed.up ? 'up' : 'down'">
             <AssetIcon :name="trends.completed.up ? 'trending-up' : 'trending-down'" :size="12" />
             {{ trends.completed.label }}
@@ -113,6 +113,13 @@
             <select v-model="filters.status" class="filter-select">
               <option value="">All statuses</option>
               <option v-for="(v, k) in statusMap" :key="k" :value="k">{{ v.label }}</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="filter-field__label">Source</label>
+            <select v-model="filters.source" class="filter-select">
+              <option value="">All sources</option>
+              <option v-for="(label, value) in REQUEST_SOURCE_LABELS" :key="value" :value="value">{{ label }}</option>
             </select>
           </div>
           <div class="filter-field">
@@ -184,19 +191,23 @@
             </div>
 
             <div v-for="req in pagedRequests" :key="req.id" class="req-row" @click="openDrawer(req)">
-              <span class="req-row__ref" data-label="Reference">{{ req.reference_number }}</span>
+              <span class="req-row__ref" data-label="Reference">
+                {{ req.reference_number }}
+                <span v-if="req.is_walk_in" class="source-chip" title="Brought to the blood center by a watcher and confirmed by your blood bank by phone">Walk-in</span>
+                <span v-if="req.is_follow_up" class="source-chip source-chip--follow" title="Carries the remainder of another request">Follow-up</span>
+              </span>
               <span class="req-row__date" data-label="Date">{{ formatDate(req.request_date) }}</span>
               <span data-label="Blood Type"><span class="type-chip">{{ req.blood_type }}</span></span>
               <span class="req-row__component" data-label="Component">{{ req.component }}</span>
               <span data-label="Units">{{ req.units }}</span>
               <span data-label="Priority">
-                <span class="priority-chip" :style="{ color: priorityMap[req.priority].color, background: priorityMap[req.priority].bg }">
-                  {{ priorityMap[req.priority].label }}
+                <span class="priority-chip" :style="{ color: priorityOf(req.priority).color, background: priorityOf(req.priority).bg }">
+                  {{ priorityOf(req.priority).label }}
                 </span>
               </span>
               <span data-label="Status">
-                <span class="badge" :style="{ background: statusMap[req.status].bg, color: statusMap[req.status].color }">
-                  {{ statusMap[req.status].label }}
+                <span class="badge" :style="{ background: statusOf(req.status).bg, color: statusOf(req.status).color }">
+                  {{ req.status_text }}
                 </span>
               </span>
               <span class="req-row__progress" data-label="Progress">
@@ -217,7 +228,10 @@
                   </button>
                   <div v-if="activeMenuId === req.id" class="action-menu__dropdown" @click.stop>
                     <button type="button" class="action-menu__item" @click="openDrawer(req)">
-                      <AssetIcon name="eye" :size="14" /> View Details
+                      <AssetIcon name="eye" :size="14" /> Quick View
+                    </button>
+                    <button type="button" class="action-menu__item" @click="viewDetails(req)">
+                      <AssetIcon name="file-text" :size="14" /> Full Details &amp; Fulfilment
                     </button>
                     <button type="button" class="action-menu__item" @click="trackRequest(req)">
                       <AssetIcon name="route" :size="14" /> Track Request
@@ -308,11 +322,11 @@
 
         <div class="drawer__body">
           <div class="drawer__status-row">
-            <span class="badge badge--lg" :style="{ background: statusMap[selectedRequest.status].bg, color: statusMap[selectedRequest.status].color }">
-              {{ statusMap[selectedRequest.status].label }}
+            <span class="badge badge--lg" :style="{ background: statusOf(selectedRequest.status).bg, color: statusOf(selectedRequest.status).color }">
+              {{ selectedRequest.status_text }}
             </span>
-            <span class="priority-chip priority-chip--lg" :style="{ color: priorityMap[selectedRequest.priority].color, background: priorityMap[selectedRequest.priority].bg }">
-              {{ priorityMap[selectedRequest.priority].label }} Priority
+            <span class="priority-chip priority-chip--lg" :style="{ color: priorityOf(selectedRequest.priority).color, background: priorityOf(selectedRequest.priority).bg }">
+              {{ priorityOf(selectedRequest.priority).label }} Priority
             </span>
           </div>
 
@@ -320,6 +334,18 @@
             <div class="drawer__field">
               <dt>Hospital Name</dt>
               <dd>{{ selectedRequest.hospital_name }}</dd>
+            </div>
+            <div class="drawer__field">
+              <dt>Blood Center</dt>
+              <dd>{{ selectedRequest.centre_name || '—' }}</dd>
+            </div>
+            <div class="drawer__field">
+              <dt>Source</dt>
+              <dd>{{ selectedRequest.source_label }}</dd>
+            </div>
+            <div class="drawer__field">
+              <dt>Fulfilled</dt>
+              <dd>{{ selectedRequest.fulfilled }} of {{ selectedRequest.units }}</dd>
             </div>
             <div class="drawer__field">
               <dt>Blood Type</dt>
@@ -369,6 +395,9 @@
         </div>
 
         <div class="drawer__footer">
+          <button type="button" class="btn-primary btn-primary--sm" @click="viewDetails(selectedRequest)">
+            <AssetIcon name="file-text" :size="15" /> Full Details
+          </button>
           <button type="button" class="btn-ghost" @click="downloadPdf(selectedRequest)">
             <AssetIcon name="file-down" :size="15" /> Download PDF
           </button>
@@ -383,7 +412,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { componentSummary } from '~/types/bloodRequest'
+import { componentSummary, REQUEST_SOURCE_LABELS, requestStatusLabel } from '~/types/bloodRequest'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -397,42 +426,59 @@ const loading = ref(true)
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelet Concentrate', 'Cryoprecipitate']
 
+/*
+ * Keyed on the six statuses the API actually sends. This map used to carry
+ * approved / ready / completed, which the schema has never had, and lacked
+ * partial and fulfilled — so `statusMap[req.status].bg` threw on the first
+ * partly or fully supplied request and took the whole list down with it.
+ */
 const statusMap = {
   pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
-  approved: { label: 'Approved', bg: '#2E7D3214', color: '#2E7D32' },
   processing: { label: 'Processing', bg: '#1565C014', color: '#1565C0' },
-  ready: { label: 'Ready for Pickup', bg: '#7C3AED14', color: '#7C3AED' },
-  completed: { label: 'Completed', bg: '#0F766E14', color: '#0F766E' },
+  partial: { label: 'Partially Fulfilled', bg: '#B4530914', color: '#B45309' },
+  fulfilled: { label: 'Fulfilled', bg: '#2E7D3214', color: '#2E7D32' },
   rejected: { label: 'Rejected', bg: '#D32F2F14', color: '#D32F2F' },
   cancelled: { label: 'Cancelled', bg: '#64748B14', color: '#64748B' },
 }
 
+const FALLBACK_STYLE = { label: '—', bg: '#64748B14', color: '#64748B' }
+
+// The API speaks routine / emergency; the DOH form prints ROUTINE and STAT.
 const priorityMap = {
-  normal: { label: 'Normal', bg: '#1565C014', color: '#1565C0' },
-  urgent: { label: 'Urgent', bg: '#F57C0014', color: '#F57C00' },
-  emergency: { label: 'Emergency', bg: '#D32F2F14', color: '#D32F2F' },
+  routine: { label: 'Routine', bg: '#1565C014', color: '#1565C0' },
+  emergency: { label: 'STAT', bg: '#D32F2F14', color: '#D32F2F' },
 }
 
-const progressSteps = ['Submitted', 'Approved', 'Preparing', 'Ready for Pickup', 'Completed']
-const detailSteps = ['Submitted', 'Reviewed', 'Approved', 'Preparing Blood Units', 'Ready for Pickup', 'Completed']
+function statusOf(status) {
+  return statusMap[status] ?? { ...FALLBACK_STYLE, label: status ?? '—' }
+}
+
+function priorityOf(priority) {
+  return priorityMap[priority] ?? priorityMap.routine
+}
+
+// Fulfilment is counted at dispatch: released units move a request to
+// Partially Fulfilled, and every requested unit released makes it Fulfilled.
+const progressSteps = ['Submitted', 'Stock reserved', 'Partially fulfilled', 'Fulfilled']
+const detailSteps = ['Submitted', 'Reviewed', 'Stock reserved', 'Units released', 'Fulfilled']
 
 function stepIndex(status) {
-  return { pending: 0, approved: 1, processing: 2, ready: 3, completed: 4, rejected: 0, cancelled: 0 }[status] ?? 0
+  return { pending: 0, processing: 1, partial: 2, fulfilled: 3, rejected: 0, cancelled: 0 }[status] ?? 0
 }
 function isHalted(status) {
   return status === 'rejected' || status === 'cancelled'
 }
 function progressLabel(status) {
-  if (isHalted(status)) return statusMap[status].label
+  if (isHalted(status)) return statusOf(status).label
   return progressSteps[stepIndex(status)]
 }
 function canCancel(status) {
-  return status === 'pending' || status === 'approved'
+  return status === 'pending'
 }
 
 const detailStepIndex = computed(() => {
   if (!selectedRequest.value) return 0
-  const map = { pending: 1, approved: 3, processing: 4, ready: 5, completed: 6, rejected: 1, cancelled: 1 }
+  const map = { pending: 1, processing: 3, partial: 4, fulfilled: 5, rejected: 1, cancelled: 1 }
   return (map[selectedRequest.value.status] ?? 1) - 1
 })
 
@@ -446,7 +492,15 @@ function normalizeRequest(r) {
   return {
     id: r.id,
     reference_number: r.reference_number ?? r.reference_no ?? r.reference,
-    hospital_name: r.hospital_name ?? r.facility_name ?? '',
+    hospital_name: r.requesting_facility?.name ?? r.hospital_name ?? r.facility_name ?? '',
+    centre_name: r.target_facility?.name ?? '',
+    source: r.request_source ?? 'blood_bank_portal',
+    source_label: r.source_label ?? 'Blood Bank Portal',
+    is_walk_in: Boolean(r.is_walk_in),
+    is_follow_up: Boolean(r.parent),
+    // "Partially Fulfilled (Closed)" once every remainder is closed or forwarded.
+    status_text: requestStatusLabel(r),
+    fulfilled: r.fulfilled_quantity ?? 0,
     // blood_type arrives as { id, code }; rendering the object printed
     // "[object Object]" in the table.
     blood_type: r.blood_type?.code ?? r.blood_type ?? '',
@@ -457,7 +511,10 @@ function normalizeRequest(r) {
     priority: r.urgency_level ?? r.priority ?? 'routine',
     status: r.status,
     request_date: r.request_date ? new Date(r.request_date) : (r.created_at ? new Date(r.created_at) : null),
-    requested_by: r.requested_by ?? r.requester_name ?? '',
+    // Nobody at the hospital submitted a walk-in; the blood center recorded
+    // it after this blood bank confirmed it by phone.
+    requested_by: r.requester_name
+      ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : ''),
     reason: r.reason ?? r.remarks ?? '',
   }
 }
@@ -467,6 +524,7 @@ const searchQuery = ref('')
 const filtersOpen = ref(false)
 const filters = reactive({
   status: '',
+  source: '',
   bloodType: '',
   component: '',
   priority: '',
@@ -481,6 +539,7 @@ const hasActiveFilters = computed(() => activeFilterCount.value > 0 || searchQue
 
 function resetFilters() {
   filters.status = ''
+  filters.source = ''
   filters.bloodType = ''
   filters.component = ''
   filters.priority = ''
@@ -497,6 +556,7 @@ const filteredRequests = computed(() => {
       if (!haystack.includes(q)) return false
     }
     if (filters.status && r.status !== filters.status) return false
+    if (filters.source && r.source !== filters.source) return false
     if (filters.bloodType && r.blood_type !== filters.bloodType) return false
     if (filters.component && r.component !== filters.component) return false
     if (filters.priority && r.priority !== filters.priority) return false
@@ -534,11 +594,15 @@ watch(currentPage, (p) => {
 })
 
 // ---------- KPI counts (animated) ----------
+// The card keys are historical; each now counts a status the API really sends.
+// approved → processing (stock reserved), ready → partial, completed → fulfilled.
+const CARD_STATUSES = { pending: 'pending', approved: 'processing', ready: 'partial', completed: 'fulfilled' }
+
 const rawCounts = computed(() => ({
-  pending: allRequests.value.filter(r => r.status === 'pending').length,
-  approved: allRequests.value.filter(r => r.status === 'approved').length,
-  ready: allRequests.value.filter(r => r.status === 'ready').length,
-  completed: allRequests.value.filter(r => r.status === 'completed').length,
+  pending: allRequests.value.filter(r => r.status === CARD_STATUSES.pending).length,
+  approved: allRequests.value.filter(r => r.status === CARD_STATUSES.approved).length,
+  ready: allRequests.value.filter(r => r.status === CARD_STATUSES.ready).length,
+  completed: allRequests.value.filter(r => r.status === CARD_STATUSES.completed).length,
 }))
 
 const animatedCounts = reactive({ pending: 0, approved: 0, ready: 0, completed: 0 })
@@ -580,10 +644,10 @@ function buildTrend(status) {
 }
 
 const trends = computed(() => ({
-  pending: buildTrend('pending'),
-  approved: buildTrend('approved'),
-  ready: buildTrend('ready'),
-  completed: buildTrend('completed'),
+  pending: buildTrend(CARD_STATUSES.pending),
+  approved: buildTrend(CARD_STATUSES.approved),
+  ready: buildTrend(CARD_STATUSES.ready),
+  completed: buildTrend(CARD_STATUSES.completed),
 }))
 
 function animateCounter(key, endValue, duration = 800) {
@@ -625,7 +689,13 @@ function openNewRequest() {
 }
 function trackRequest(req) {
   closeMenu()
-  router.push(`/hospital/track-requests?ref=${req.reference_number}`)
+  // The page is /hospital/trackrequests; the hyphenated path this pushed to
+  // has never existed, so "Track Request" landed on a 404.
+  router.push(`/hospital/trackrequests?ref=${req.reference_number}`)
+}
+function viewDetails(req) {
+  closeMenu()
+  router.push(`/hospital/bloodrequests/${req.id}`)
 }
 /**
  * Download the request as the DOH Blood Request Form.
@@ -652,7 +722,9 @@ function printPage() {
 }
 async function cancelRequest(req) {
   const previousStatus = req.status
+  const previousText = req.status_text
   req.status = 'cancelled' // optimistic update
+  req.status_text = statusOf('cancelled').label
   closeMenu()
   if (selectedRequest.value?.id === req.id) drawerOpen.value = false
   try {
@@ -660,14 +732,15 @@ async function cancelRequest(req) {
   } catch (err) {
     console.error('Failed to cancel request:', err)
     req.status = previousStatus // rollback on failure
+    req.status_text = previousText
   }
 }
 function exportCsv() {
   const rows = [
-    ['Reference', 'Date', 'Blood Type', 'Component', 'Units', 'Priority', 'Status'],
+    ['Reference', 'Date', 'Source', 'Blood Type', 'Component', 'Units', 'Fulfilled', 'Priority', 'Status'],
     ...filteredRequests.value.map(r => [
-      r.reference_number, formatDate(r.request_date), r.blood_type, r.component,
-      r.units, priorityMap[r.priority].label, statusMap[r.status].label,
+      r.reference_number, formatDate(r.request_date), r.source_label, r.blood_type, r.component,
+      r.units, r.fulfilled, priorityOf(r.priority).label, r.status_text,
     ]),
   ]
   const csv = rows.map(row => row.map(v => `"${v}"`).join(',')).join('\n')
@@ -929,6 +1002,21 @@ onUnmounted(() => {
 .req-row:last-child { border-bottom: none; }
 .req-row:hover { background: #f8fafc; }
 .req-row__ref { font-weight: 600; }
+.source-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--rb-purple-rgb), .12);
+  color: var(--rb-purple-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.source-chip--follow {
+  background: rgba(var(--rb-primary-rgb), .12);
+  color: var(--rb-primary-text);
+}
 .req-row__component, .req-row__date { color: var(--text-secondary); }
 
 .type-chip {

@@ -15,8 +15,31 @@
 /** Canonical role names, as stored in the database and checked by `RequireRole`. */
 export type RoleName = 'admin' | 'donor' | 'blood_center' | 'blood_bank'
 
-/** Blood-centre departments, from the server's `Department` enum. */
-export type Department = 'collection' | 'testing' | 'processing' | 'issuance' | 'billing'
+/**
+ * Blood-centre departments, from the server's `Department` enum. A predefined
+ * role decides its own; a custom role is placed in one directly.
+ */
+export type Department = 'collection' | 'processing' | 'testing' | 'issuance' | 'billing'
+
+/** The Read / Write / Update / Delete privileges that cap a staff member's role. */
+export type StaffPrivilege = 'read' | 'write' | 'update' | 'delete'
+
+/**
+ * The predefined blood-centre staff roles, from the server's `StaffRole` enum.
+ */
+export type StaffRole =
+  | 'screening_physician'
+  | 'phlebotomist'
+  | 'apheresis_specialist'
+  | 'medical_receptionist'
+  | 'component_technologist'
+  | 'processing_assistant'
+  | 'serology_technologist'
+  | 'lab_supervisor'
+  | 'inventory_control_officer'
+  | 'dispatch_coordinator'
+  | 'it_data_clerk'
+  | 'billing_clerk'
 
 export interface Facility {
   id: number
@@ -53,6 +76,15 @@ export interface AppUser {
 
   department: Department | null
   department_label: string | null
+  /** Null for donors, admins, blood-bank staff, a custom role and a management-only supervisor. */
+  staff_role: StaffRole | null
+  staff_role_label: string | null
+  /** A typed role, when none of the predefined ones fits. */
+  custom_role: string | null
+  /** The predefined role's title or the custom role — what the roster shows. */
+  role_label: string | null
+  /** The privileges in force; all four for an account that never had them set. */
+  staff_privileges: StaffPrivilege[]
   is_supervisor: boolean
 
   /**

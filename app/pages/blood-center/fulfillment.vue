@@ -18,7 +18,8 @@
           <p class="page-subtitle">
             Dispatch the units held for each request. A bag moves through three states and
             no more: reserved when it is held, released when it leaves, received when the
-            hospital confirms it arrived.
+            hospital confirms it arrived. Releasing is what fulfils a request — it becomes
+            Partially Fulfilled or Fulfilled as units leave.
           </p>
         </div>
         <button class="btn btn-outline" :disabled="loading" @click="load">
@@ -86,7 +87,8 @@
               <div class="request-title">
                 <span class="mono">{{ request.reference_number }}</span>
                 <span v-if="request.is_emergency" class="tag tag--stat">STAT</span>
-                <span class="status" :class="`status--${request.status}`">{{ request.status_label }}</span>
+                <span v-if="request.is_walk_in" class="tag tag--walk-in">Walk-in</span>
+                <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
               </div>
               <p class="request-sub">
                 {{ request.requesting_facility?.name || '—' }}
@@ -97,11 +99,14 @@
 
             <div class="request-counts">
               <span><strong>{{ request.allocated_count }}</strong> held</span>
+              <span><strong>{{ request.fulfilled_quantity ?? 0 }}</strong> fulfilled</span>
               <span><strong>{{ request.received_count }}</strong> received</span>
             </div>
           </header>
 
-          <div v-if="request.items?.length" class="lines">
+          <!-- What was asked for beside what has been provided, per component. -->
+          <RequestFulfilmentTable v-if="request.detail" :request="request.detail" class="request-fulfilment" />
+          <div v-else-if="request.items?.length" class="lines">
             <span v-for="item in request.items" :key="item.id" class="line-chip">
               {{ item.component?.name }} &times;{{ item.quantity }}
             </span>
@@ -212,9 +217,8 @@
           <p class="modal-sub">{{ dispatchFor.reference_number }} · {{ dispatchFor.requesting_facility?.name }}</p>
 
           <p class="modal-desc">
-            This issues {{ dispatchCount }} unit(s) and hands them to the hospital. The units
-            leave your inventory now; the request is only fulfilled once the hospital confirms
-            they arrived.
+            This issues {{ dispatchCount }} unit(s). They leave your inventory now and count as
+            fulfilled on the request; the hospital still confirms each unit's arrival.
           </p>
 
           <ul class="modal-units">
@@ -222,6 +226,24 @@
               {{ unit.unit_id }}<span class="unit-expiry"> · expires {{ unit.expiry_date || '—' }}</span>
             </li>
           </ul>
+
+          <div class="field">
+            <label for="handed-to" class="field-label">
+              Handed to
+              <span v-if="!dispatchFor.is_walk_in" class="field-optional">(optional — courier or transport)</span>
+            </label>
+            <input
+              id="handed-to"
+              v-model.trim="handedTo"
+              type="text"
+              class="input"
+              maxlength="150"
+              :placeholder="dispatchFor.is_walk_in ? 'The watcher collecting the units' : 'Who is taking the units'"
+            >
+            <p v-if="dispatchFor.is_walk_in" class="field-hint">
+              A walk-in's units usually leave with the watcher who presented the request.
+            </p>
+          </div>
 
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
 
@@ -275,7 +297,9 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { requestStatusLabel } from '~/types/bloodRequest'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -327,7 +351,7 @@ async function load() {
     const response = await bloodCenterService.incomingRequests({ [activeTab.value]: 1, per_page: 25 })
     const rows = response?.data ?? []
 
-    requests.value = rows.map((r) => ({ ...r, allocations: [], selected: [], loadingUnits: true, billing: null }))
+    requests.value = rows.map((r) => ({ ...r, allocations: [], selected: [], loadingUnits: true, billing: null, detail: null }))
 
     // The queue projection counts holds but does not carry the bags. Each row
     // is filled in from the review endpoint, which does — and which also
@@ -349,6 +373,9 @@ async function loadUnits(request) {
     ])
 
     request.allocations = review?.request?.allocations ?? []
+    // The detail projection carries every line's fulfilment figures and, for a
+    // walk-in, the watcher the units are likely to be handed to.
+    request.detail = review?.request ?? null
     request.billing = billing?.billing ?? null
   } catch {
     // One row failing to expand must not blank the queue; the card still shows
@@ -447,8 +474,11 @@ const dispatchUnits = computed(() => {
 
 const dispatchCount = computed(() => dispatchUnits.value.length)
 
+const handedTo = ref('')
+
 function openDispatch(request) {
   actionError.value = ''
+  handedTo.value = request.detail?.walk_in?.representative?.name ?? ''
   dispatchFor.value = request
 }
 
@@ -466,10 +496,14 @@ async function confirmDispatch() {
 
   try {
     const ids = request.selected.length ? request.selected : undefined
-    const response = await bloodCenterService.releaseRequest(request.id, ids)
+    const response = await bloodCenterService.releaseRequest(request.id, ids, handedTo.value || null)
 
     const issued = response?.released_units?.length ?? dispatchCount.value
-    toast('Units Dispatched', 'success', `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}.`)
+    toast(
+      'Units Dispatched',
+      'success',
+      `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}${response?.status_label ? ` — ${response.status_label}` : ''}.`,
+    )
     dispatchFor.value = null
     await load()
   } catch (err) {
@@ -566,6 +600,8 @@ onMounted(load)
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 600; }
 .tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
 .tag--stat { background: var(--rb-accent); color: #fff; }
+.tag--walk-in { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
+.request-fulfilment { margin-top: 12px; }
 .blood-pill {
   display: inline-block; padding: 1px 7px; border-radius: 6px; font-weight: 700; font-size: 11.5px;
   background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text);
@@ -654,6 +690,8 @@ onMounted(load)
 
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
+.field-optional { font-weight: 400; color: var(--rb-text-secondary); }
+.field-hint { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 .req { color: var(--rb-accent-text); }
 .input {
   width: 100%; padding: 9px 11px; font-size: 13.5px; font-family: inherit;

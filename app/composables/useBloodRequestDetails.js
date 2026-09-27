@@ -45,9 +45,10 @@ export function statusLabel(status) {
 /**
  * Build the progress timeline from a request and its allocations.
  *
- * Derived, never stored. The API keeps request status deliberately coarse and
- * records dispatch and receipt per allocated unit, so the finer steps here are
- * a reading of those rows rather than a status the server sends.
+ * Derived, never stored. Fulfilment is counted at dispatch, so the request is
+ * fulfilled — or partially fulfilled and closed — once the centre has released
+ * everything it will supply; receipt is the hospital's own confirmation per
+ * unit and comes after it, read from the allocations.
  */
 export function buildTimeline(request) {
   if (!request) return []
@@ -55,13 +56,16 @@ export function buildTimeline(request) {
   const allocations = request.allocations ?? []
   const released = allocations.filter((a) => a.status === 'released')
   const received = allocations.filter((a) => a.received_at)
+  const lastReceived = received.map((a) => a.received_at).sort().at(-1) ?? null
 
   const terminal = ['rejected', 'cancelled'].includes(request.status)
+  const finishedShort = request.status === 'partial' && request.is_open === false
+  const fulfilledQuantity = request.fulfilled_quantity ?? released.length
 
   const steps = [
     {
       key: 'submitted',
-      label: 'Submitted',
+      label: request.is_walk_in ? 'Recorded at blood center — confirmed by phone' : 'Submitted',
       done: true,
       timestamp: request.request_date,
     },
@@ -79,21 +83,21 @@ export function buildTimeline(request) {
     },
     {
       key: 'dispatched',
-      label: 'Dispatched',
+      label: 'Units released',
       done: released.length > 0,
       timestamp: released[0]?.released_at ?? null,
     },
     {
-      key: 'received',
-      label: 'Received',
-      done: received.length > 0,
-      timestamp: received[0]?.received_at ?? null,
+      key: 'completed',
+      label: finishedShort ? 'Partially fulfilled — closed' : 'Fulfilled',
+      done: request.status === 'fulfilled' || finishedShort,
+      timestamp: request.fulfilled_at ?? request.closed_at ?? null,
     },
     {
-      key: 'completed',
-      label: 'Completed',
-      done: request.status === 'fulfilled',
-      timestamp: request.fulfilled_at,
+      key: 'received',
+      label: 'Received by the hospital',
+      done: fulfilledQuantity > 0 && received.length >= fulfilledQuantity,
+      timestamp: lastReceived,
     },
   ]
 
@@ -109,13 +113,16 @@ export function buildTimeline(request) {
 
 export const useBloodRequestDetails = (requestId) => {
   const request = ref(null)
+  // The request's own event log, from GET …/history.
   const history = ref([])
   const bloodAvailability = ref([])
 
   const isLoadingRequest = ref(true)
   const isLoadingAvailability = ref(false)
+  const isLoadingHistory = ref(false)
   const requestError = ref(null)
   const availabilityError = ref(null)
+  const historyError = ref(null)
 
   const timeline = computed(() => buildTimeline(request.value))
 
@@ -136,9 +143,9 @@ export const useBloodRequestDetails = (requestId) => {
     try {
       const response = await hospitalService.showRequest(requestId)
       request.value = response?.request ?? null
-      // The API keeps no separate event log for a request; the timeline above
-      // is built from the request's own timestamps instead.
-      history.value = []
+      // Loaded alongside rather than awaited: a slow history must not hold
+      // up the request itself.
+      if (request.value) fetchHistory()
     } catch (err) {
       requestError.value = err?.message ?? 'Could not load this blood request.'
       request.value = null
@@ -198,6 +205,35 @@ export const useBloodRequestDetails = (requestId) => {
     await fetchRequest()
   }
 
+  /**
+   * Everything that has happened to the request, oldest first — who did it,
+   * from which facility, and each line's figures at that moment.
+   */
+  async function fetchHistory() {
+    isLoadingHistory.value = true
+    historyError.value = null
+
+    try {
+      const response = await hospitalService.requestHistory(requestId)
+      history.value = response?.events ?? []
+    } catch (err) {
+      historyError.value = err?.message ?? 'Could not load the request history.'
+      history.value = []
+    } finally {
+      isLoadingHistory.value = false
+    }
+  }
+
+  /**
+   * Close the rest of one line this blood bank no longer needs, then refresh.
+   */
+  async function closeLine(itemId, note) {
+    const result = await hospitalService.closeRequestLine(requestId, itemId, note)
+    await fetchRequest()
+
+    return result
+  }
+
   async function refresh() {
     await fetchRequest()
     await fetchAvailability()
@@ -212,12 +248,16 @@ export const useBloodRequestDetails = (requestId) => {
     progressPercent,
     isLoadingRequest,
     isLoadingAvailability,
+    isLoadingHistory,
     requestError,
     availabilityError,
+    historyError,
     fetchRequest,
     fetchAvailability,
+    fetchHistory,
     confirmReceipt,
     cancelRequest,
+    closeLine,
     refresh,
   }
 }
