@@ -159,6 +159,17 @@ export const useTrackRequests = () => {
     hasSearched.value = true
 
     try {
+      // A PTR reference is the patient's whole need, split across centres;
+      // it has its own page, which this tracker's single-request view is not.
+      if (/^PTR-/i.test(trimmed)) {
+        const response = await hospitalService.trackTransfusionRequest(trimmed)
+
+        if (response?.request?.id) {
+          await navigateTo(`/hospital/transfusion-requests/${response.request.id}`)
+          return
+        }
+      }
+
       const response = await hospitalService.trackRequest(trimmed)
       trackedData.value = response?.request ?? null
       referenceInput.value = trimmed

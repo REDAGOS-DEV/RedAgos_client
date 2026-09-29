@@ -17,8 +17,13 @@
       <p class="dialog__body">
         <template v-if="side === 'centre'">
           The remaining <strong>{{ row.allocatable }} unit{{ row.allocatable === 1 ? '' : 's' }}</strong> will be recorded as
-          unavailable at this blood center. The request keeps what was asked for, and the hospital can still source the
-          rest from another facility.
+          unavailable at this blood center. The request keeps what was asked for, and the hospital can still ask another
+          facility for the rest.
+        </template>
+        <template v-else-if="side === 'requirement'">
+          The remaining <strong>{{ row.allocatable }} unit{{ row.allocatable === 1 ? '' : 's' }}</strong> will be recorded as
+          no longer needed. Every facility still asked for them stops being asked; units already approved stay the
+          patient's.
         </template>
         <template v-else>
           The remaining <strong>{{ row.allocatable }} unit{{ row.allocatable === 1 ? '' : 's' }}</strong> will be recorded as
@@ -53,7 +58,8 @@
  *
  * Worded per side because the consequence differs: what a centre could not
  * supply may still come from another facility; what a hospital no longer needs
- * may not.
+ * may not; and closing it on a Patient Transfusion Request ("requirement")
+ * stops every facility still asked for it at once.
  */
 
 import { nextTick, onMounted, ref } from 'vue'
@@ -61,7 +67,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 
 defineProps({
   row: { type: Object, required: true },
-  side: { type: String, required: true, validator: (value) => ['centre', 'hospital'].includes(value) },
+  side: { type: String, required: true, validator: (value) => ['centre', 'hospital', 'requirement'].includes(value) },
   busy: { type: Boolean, default: false },
   error: { type: String, default: '' },
 })

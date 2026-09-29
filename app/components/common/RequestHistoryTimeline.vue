@@ -17,6 +17,11 @@
         <div class="history__body">
           <div class="history__head">
             <span class="history__title">{{ event.event_label }}</span>
+            <span v-if="showAllocation && event.allocation" class="history__tag history__tag--allocation">
+              <NuxtLink v-if="allocationLinkBase" :to="`${allocationLinkBase}${event.allocation.id}`">{{ event.allocation.reference_number }}</NuxtLink>
+              <template v-else>{{ event.allocation.reference_number }}</template>
+              <template v-if="event.allocation.facility"> · {{ event.allocation.facility }}</template>
+            </span>
             <span v-if="event.item?.component" class="history__tag">{{ event.item.component }}</span>
             <span
               v-if="event.to_status && event.to_status !== event.from_status"
@@ -49,18 +54,22 @@
               <thead>
                 <tr>
                   <th scope="col">Component</th>
-                  <th scope="col" class="num">Requested</th>
+                  <th scope="col" class="num">{{ isRequirementSnapshot(event) ? 'Required' : 'Requested' }}</th>
+                  <th v-if="isRequirementSnapshot(event)" scope="col" class="num">Approved</th>
                   <th scope="col" class="num">Fulfilled</th>
                   <th scope="col" class="num">Remaining</th>
+                  <th v-if="isRequirementSnapshot(event)" scope="col" class="num">Unallocated</th>
                   <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="line in event.lines" :key="line.request_item_id">
+                <tr v-for="line in event.lines" :key="line.request_item_id ?? line.transfusion_request_item_id">
                   <td>{{ line.component || '—' }}</td>
-                  <td class="num">{{ line.requested }}</td>
+                  <td class="num">{{ line.required ?? line.requested }}</td>
+                  <td v-if="isRequirementSnapshot(event)" class="num">{{ line.approved ?? 0 }}</td>
                   <td class="num">{{ line.fulfilled }}</td>
                   <td class="num">{{ line.remaining }}</td>
+                  <td v-if="isRequirementSnapshot(event)" class="num">{{ line.unallocated ?? 0 }}</td>
                   <td>{{ line.status_label || line.status }}</td>
                 </tr>
               </tbody>
@@ -80,6 +89,11 @@
  * between, and a snapshot of every line at that moment — so the fulfilment of
  * a request can be read back as it stood at each step rather than guessed from
  * timestamps.
+ *
+ * A Patient Transfusion Request's timeline holds its own events — created,
+ * more facilities asked, a component closed, cancelled — beside every event
+ * of every facility allocation; `showAllocation` tags each of the latter with
+ * the allocation and centre it happened to.
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -91,14 +105,20 @@ const props = defineProps({
   error: { type: String, default: '' },
   /** Where a related request opens, e.g. '/hospital/bloodrequests/'. Omit for plain text. */
   linkBase: { type: String, default: '' },
+  /** Tag each event with the facility allocation it happened to — on a Patient Transfusion Request. */
+  showAllocation: { type: Boolean, default: false },
+  /** Where an allocation opens, e.g. '/hospital/bloodrequests/'. Omit for plain text. */
+  allocationLinkBase: { type: String, default: '' },
 })
 
 const ICONS = {
   submitted: 'send',
   walk_in_recorded: 'phone',
-  follow_up_created: 'route',
-  remainder_forwarded: 'route',
-  follow_up_withdrawn: 'refresh-cw',
+  transfusion_created: 'clipboard-plus',
+  allocations_added: 'route',
+  allocation_withdrawn: 'refresh-cw',
+  requirement_closed: 'circle-x',
+  transfusion_cancelled: 'x',
   allocated: 'archive',
   holds_returned: 'refresh-cw',
   hold_expired: 'clock',
@@ -115,12 +135,19 @@ const TONES = {
   line_closed: 'muted',
   hold_expired: 'warning',
   holds_returned: 'warning',
-  follow_up_withdrawn: 'warning',
+  allocation_withdrawn: 'warning',
   released: 'success',
   receipt_confirmed: 'success',
-  remainder_forwarded: 'info',
-  follow_up_created: 'info',
+  allocations_added: 'info',
+  transfusion_created: 'progress',
+  requirement_closed: 'muted',
+  transfusion_cancelled: 'muted',
   walk_in_recorded: 'progress',
+}
+
+/** A requirement-level snapshot carries what the patient needs, not what one centre was asked. */
+function isRequirementSnapshot(event) {
+  return event.lines?.[0]?.required !== undefined
 }
 
 function iconFor(event) {
@@ -211,6 +238,17 @@ function formatDateTime(value) {
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
+}
+
+.history__tag--allocation {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+}
+
+.history__tag--allocation a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .history__meta,

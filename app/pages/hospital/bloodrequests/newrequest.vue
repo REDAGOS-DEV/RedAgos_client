@@ -10,8 +10,8 @@
           </NuxtLink>
           <h1 class="page-title">New Blood Request</h1>
           <p class="page-subtitle">
-            Completing this form produces the DOH Blood Request Form (Adult), which you can
-            download once the request is submitted.
+            Each facility asked receives its own copy of the DOH Blood Request Form (Adult), which you can download from
+            that facility's allocation once the request is sent.
           </p>
         </div>
       </header>
@@ -23,350 +23,482 @@
         <div class="skeleton skeleton--line" style="width:55%" />
       </div>
 
-      <!-- SUCCESS -->
-      <section v-else-if="submitted" class="panel panel--success fade-in">
+      <!-- SUCCESS: PATIENT TRANSFUSION -->
+      <section v-else-if="submitted?.kind === 'transfusion'" class="panel panel--success fade-in">
         <div class="success-icon"><AssetIcon name="check" :size="26" /></div>
-        <h2 class="success-title">Request submitted</h2>
+        <h2 class="success-title">Patient Transfusion Request sent</h2>
         <p class="success-text">
-          Your request has been sent to <strong>{{ submitted.target_facility?.name }}</strong>.
-          Quote reference <strong>{{ submitted.reference_number }}</strong> when you follow it up.
+          Reference <strong>{{ submitted.request.reference_number }}</strong>. Each facility below reviews its own share
+          and approves or rejects it.
+        </p>
+        <ul class="success-list">
+          <li v-for="allocation in submitted.request.allocations ?? []" :key="allocation.id">
+            <strong>{{ allocation.target_facility?.name }}</strong>
+            · <span class="mono">{{ allocation.reference_number }}</span>
+            · {{ allocation.quantity }} unit{{ allocation.quantity === 1 ? '' : 's' }}
+          </li>
+        </ul>
+        <p v-if="submitted.request.totals.unallocated > 0" class="success-note">
+          {{ submitted.request.totals.unallocated }} unit{{ submitted.request.totals.unallocated === 1 ? ' is' : 's are' }}
+          still unallocated. You can ask another facility from the request's page.
         </p>
         <div class="success-actions">
-          <button type="button" class="btn-primary" :disabled="downloading" @click="downloadForm">
-            <AssetIcon name="download" :size="16" />
-            {{ downloading ? 'Preparing…' : 'Download Request Form' }}
-          </button>
-          <NuxtLink :to="`/hospital/bloodrequests/${submitted.id}`" class="btn-secondary">
+          <NuxtLink :to="`/hospital/transfusion-requests/${submitted.request.id}`" class="btn-primary">
             View request
           </NuxtLink>
           <button type="button" class="btn-secondary" @click="startAnother">Raise another</button>
         </div>
       </section>
 
-      <form v-else class="nr-form" @submit.prevent="submitRequest">
+      <!-- SUCCESS: REPLENISHMENT -->
+      <section v-else-if="submitted" class="panel panel--success fade-in">
+        <div class="success-icon"><AssetIcon name="check" :size="26" /></div>
+        <h2 class="success-title">Request submitted</h2>
+        <p class="success-text">
+          Your request has been sent to <strong>{{ submitted.request.target_facility?.name }}</strong>.
+          Quote reference <strong>{{ submitted.request.reference_number }}</strong> when you follow it up.
+        </p>
+        <div class="success-actions">
+          <button type="button" class="btn-primary" :disabled="downloading" @click="downloadForm">
+            <AssetIcon name="download" :size="16" />
+            {{ downloading ? 'Preparing…' : 'Download Request Form' }}
+          </button>
+          <NuxtLink :to="`/hospital/bloodrequests/${submitted.request.id}`" class="btn-secondary">
+            View request
+          </NuxtLink>
+          <button type="button" class="btn-secondary" @click="startAnother">Raise another</button>
+        </div>
+      </section>
+
+      <form v-else class="nr-form" @submit.prevent="onSubmit">
         <!-- BANNER -->
-        <div v-if="submitError" class="banner banner--error">
+        <div v-if="submitError" class="banner banner--error" role="alert">
           <AssetIcon name="triangle-alert" :size="16" />
           <span>{{ submitError }}</span>
         </div>
 
-        <!-- PURPOSE -->
-        <section class="panel fade-in" style="--delay:40ms">
-          <h2 class="panel-title">Request purpose</h2>
-          <p class="panel-hint">
-            A transfusion is for a named patient. A replenishment restocks your own blood bank
-            and carries no patient details.
-          </p>
+        <!-- STEPS (patient transfusion only) -->
+        <ol v-if="requiresPatient" class="steps" aria-label="Request steps">
+          <li
+            v-for="(label, key, index) in STEPS"
+            :key="key"
+            class="steps__item"
+            :class="{ 'steps__item--on': step === key, 'steps__item--done': stepIndex > index }"
+            :aria-current="step === key ? 'step' : undefined"
+          >
+            <span class="steps__no">{{ index + 1 }}</span>
+            {{ label }}
+          </li>
+        </ol>
 
-          <div class="choice-grid">
-            <label
-              v-for="purpose in purposes"
-              :key="purpose.value"
-              class="choice"
-              :class="{ 'choice--on': form.request_purpose === purpose.value }"
-            >
-              <input
-                v-model="form.request_purpose"
-                type="radio"
-                name="request_purpose"
-                :value="purpose.value"
-                class="sr-only"
+        <template v-if="step === 'details'">
+          <!-- PURPOSE -->
+          <section class="panel fade-in" style="--delay:40ms">
+            <h2 class="panel-title">Request purpose</h2>
+            <p class="panel-hint">
+              A transfusion is for a named patient and may be split across several blood centers. A replenishment
+              restocks your own blood bank from one center and carries no patient details.
+            </p>
+
+            <div class="choice-grid">
+              <label
+                v-for="purpose in purposes"
+                :key="purpose.value"
+                class="choice"
+                :class="{ 'choice--on': form.request_purpose === purpose.value }"
               >
-              <span class="choice-title">{{ purpose.label }}</span>
-              <span class="choice-note">
-                {{ purpose.requires_patient
-                  ? 'Blood for a specific patient who needs transfusion.'
-                  : 'Restocking your hospital blood bank inventory.' }}
-              </span>
-            </label>
-          </div>
-        </section>
-
-        <!-- PATIENT -->
-        <section v-if="requiresPatient" class="panel fade-in" style="--delay:60ms">
-          <h2 class="panel-title">Patient information</h2>
-
-          <div class="field-grid">
-            <div class="field field--wide">
-              <label for="p-surname" class="field-label">Surname <span class="req">*</span></label>
-              <input
-                id="p-surname"
-                v-model.trim="form.patient_surname"
-                type="text"
-                class="input"
-                :class="{ 'input--error': errors.patient_surname }"
-                maxlength="100"
-              >
-              <p v-if="errors.patient_surname" class="field-error">{{ errors.patient_surname }}</p>
-            </div>
-
-            <div class="field field--wide">
-              <label for="p-first" class="field-label">First name <span class="req">*</span></label>
-              <input
-                id="p-first"
-                v-model.trim="form.patient_first_name"
-                type="text"
-                class="input"
-                :class="{ 'input--error': errors.patient_first_name }"
-                maxlength="100"
-              >
-              <p v-if="errors.patient_first_name" class="field-error">{{ errors.patient_first_name }}</p>
-            </div>
-
-            <div class="field field--wide">
-              <label for="p-middle" class="field-label">Middle name</label>
-              <input id="p-middle" v-model.trim="form.patient_middle_name" type="text" class="input" maxlength="100">
-            </div>
-
-            <div class="field">
-              <label for="p-age" class="field-label">Age <span class="req">*</span></label>
-              <input
-                id="p-age"
-                v-model.number="form.patient_age"
-                type="number"
-                min="0"
-                max="130"
-                class="input"
-                :class="{ 'input--error': errors.patient_age }"
-              >
-              <p v-if="errors.patient_age" class="field-error">{{ errors.patient_age }}</p>
-            </div>
-
-            <div class="field">
-              <label for="p-sex" class="field-label">Sex <span class="req">*</span></label>
-              <select
-                id="p-sex"
-                v-model="form.patient_sex"
-                class="input"
-                :class="{ 'input--error': errors.patient_sex }"
-              >
-                <option value="">Select…</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-              <p v-if="errors.patient_sex" class="field-error">{{ errors.patient_sex }}</p>
-            </div>
-          </div>
-
-          <!--
-            A watcher may already have taken this patient's request straight to
-            a blood center, which then recorded it here after you confirmed it
-            by phone. Raising another would ask twice for the same need.
-          -->
-          <div v-if="patientMatches.length" class="dup-warning" role="status">
-            <AssetIcon name="triangle-alert" :size="16" />
-            <div>
-              <p class="dup-warning__title">This patient already has an active request</p>
-              <ul class="dup-warning__list">
-                <li v-for="match in patientMatches" :key="match.id">
-                  <NuxtLink :to="`/hospital/bloodrequests/${match.id}`" class="dup-warning__ref">{{ match.reference_number }}</NuxtLink>
-                  · {{ match.facility?.name || '—' }} · {{ match.source_label }} · {{ match.status_label }}
-                </li>
-              </ul>
-              <p class="dup-warning__hint">
-                Open it instead if it covers the same need. If a center could only supply part of it, source the rest
-                from that request's page.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- DESTINATION + BLOOD TYPE + PRIORITY -->
-        <section class="panel fade-in" style="--delay:80ms">
-          <h2 class="panel-title">Request details</h2>
-
-          <div class="field-grid">
-            <div class="field field--full">
-              <label for="target" class="field-label">Send request to <span class="req">*</span></label>
-              <select
-                id="target"
-                v-model.number="form.target_facility_id"
-                class="input"
-                :class="{ 'input--error': errors.target_facility_id }"
-              >
-                <option :value="null">Select a blood centre…</option>
-                <option v-for="f in facilities" :key="f.id" :value="f.id">
-                  {{ f.name }}<template v-if="f.address"> — {{ f.address }}</template>
-                </option>
-              </select>
-              <p v-if="errors.target_facility_id" class="field-error">{{ errors.target_facility_id }}</p>
-            </div>
-
-            <div class="field field--wide">
-              <label for="btype" class="field-label">
-                {{ requiresPatient ? "Patient's blood type" : 'Blood type required' }}
-                <span class="req">*</span>
-              </label>
-              <select
-                id="btype"
-                v-model.number="form.blood_type_id"
-                class="input"
-                :class="{ 'input--error': errors.blood_type_id }"
-              >
-                <option :value="null">Select…</option>
-                <option v-for="t in bloodTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-              </select>
-              <p v-if="errors.blood_type_id" class="field-error">{{ errors.blood_type_id }}</p>
-            </div>
-
-            <div class="field field--wide">
-              <span class="field-label">Priority <span class="req">*</span></span>
-              <div class="priority-row">
-                <label
-                  v-for="p in priorities"
-                  :key="p.value"
-                  class="pill"
-                  :class="{
-                    'pill--on': form.urgency_level === p.value,
-                    'pill--stat': p.value === 'emergency',
-                  }"
+                <input
+                  v-model="form.request_purpose"
+                  type="radio"
+                  name="request_purpose"
+                  :value="purpose.value"
+                  class="sr-only"
                 >
-                  <input v-model="form.urgency_level" type="radio" name="priority" :value="p.value" class="sr-only">
-                  {{ p.label }}
-                </label>
-              </div>
+                <span class="choice-title">{{ purpose.label }}</span>
+                <span class="choice-note">
+                  {{ purpose.requires_patient
+                    ? 'Blood for a specific patient who needs transfusion.'
+                    : 'Restocking your hospital blood bank inventory.' }}
+                </span>
+              </label>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- COMPONENTS -->
-        <section class="panel fade-in" style="--delay:100ms">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title">Components needed</h2>
-              <p class="panel-hint">
-                Each component carries its own indication code and unit count. A component can
-                only be listed once.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="btn-secondary btn-sm"
-              :disabled="!canAddLine"
-              @click="addLine"
-            >
-              <AssetIcon name="plus" :size="14" />
-              Add component
-            </button>
-          </div>
+          <!-- OWN STOCK CHECK -->
+          <section v-if="requiresPatient" class="panel fade-in" style="--delay:50ms">
+            <h2 class="panel-title">Your own stock first</h2>
+            <p class="panel-hint">
+              Check your blood bank's own inventory before asking other facilities. Continue only if it cannot cover
+              this patient.
+            </p>
+            <label class="check" :class="{ 'check--error': errors.stock_confirmed }">
+              <input v-model="form.stock_confirmed" type="checkbox">
+              <span>We checked our own inventory and it cannot cover this patient's need.</span>
+            </label>
+            <p v-if="errors.stock_confirmed" class="field-error">{{ errors.stock_confirmed }}</p>
+          </section>
 
-          <p v-if="errors.items" class="field-error field-error--block">{{ errors.items }}</p>
-
-          <div v-for="(line, index) in form.items" :key="index" class="line">
-            <div class="line-head">
-              <span class="line-no">Component {{ index + 1 }}</span>
-              <button
-                v-if="form.items.length > 1"
-                type="button"
-                class="btn-link btn-link--danger"
-                @click="removeLine(index)"
-              >
-                Remove
-              </button>
-            </div>
+          <!-- PATIENT -->
+          <section v-if="requiresPatient" class="panel fade-in" style="--delay:60ms">
+            <h2 class="panel-title">Patient information</h2>
 
             <div class="field-grid">
               <div class="field field--wide">
-                <label :for="`c-${index}`" class="field-label">Blood component <span class="req">*</span></label>
-                <select
-                  :id="`c-${index}`"
-                  v-model.number="line.component_id"
+                <label for="p-surname" class="field-label">Surname <span class="req">*</span></label>
+                <input
+                  id="p-surname"
+                  v-model.trim="form.patient_surname"
+                  type="text"
                   class="input"
-                  :class="{ 'input--error': lineErrors[index]?.component_id }"
-                  @change="onComponentChange(line)"
+                  :class="{ 'input--error': errors.patient_surname }"
+                  maxlength="100"
                 >
-                  <option :value="null">Select…</option>
-                  <option
-                    v-for="c in components"
-                    :key="c.id"
-                    :value="c.id"
-                    :disabled="isComponentTaken(c.id, index)"
-                  >
-                    {{ c.name }}
-                  </option>
-                </select>
-                <p v-if="lineErrors[index]?.component_id" class="field-error">
-                  {{ lineErrors[index].component_id }}
-                </p>
+                <p v-if="errors.patient_surname" class="field-error">{{ errors.patient_surname }}</p>
+              </div>
+
+              <div class="field field--wide">
+                <label for="p-first" class="field-label">First name <span class="req">*</span></label>
+                <input
+                  id="p-first"
+                  v-model.trim="form.patient_first_name"
+                  type="text"
+                  class="input"
+                  :class="{ 'input--error': errors.patient_first_name }"
+                  maxlength="100"
+                >
+                <p v-if="errors.patient_first_name" class="field-error">{{ errors.patient_first_name }}</p>
+              </div>
+
+              <div class="field field--wide">
+                <label for="p-middle" class="field-label">Middle name</label>
+                <input id="p-middle" v-model.trim="form.patient_middle_name" type="text" class="input" maxlength="100">
               </div>
 
               <div class="field">
-                <label :for="`q-${index}`" class="field-label">No. of units <span class="req">*</span></label>
+                <label for="p-age" class="field-label">Age <span class="req">*</span></label>
                 <input
-                  :id="`q-${index}`"
-                  v-model.number="line.quantity"
+                  id="p-age"
+                  v-model.number="form.patient_age"
                   type="number"
-                  min="1"
-                  max="100"
+                  min="0"
+                  max="130"
                   class="input"
-                  :class="{ 'input--error': lineErrors[index]?.quantity }"
+                  :class="{ 'input--error': errors.patient_age }"
                 >
-                <p v-if="lineErrors[index]?.quantity" class="field-error">
-                  {{ lineErrors[index].quantity }}
-                </p>
+                <p v-if="errors.patient_age" class="field-error">{{ errors.patient_age }}</p>
               </div>
 
-              <div class="field field--full">
-                <label :for="`i-${index}`" class="field-label">
-                  Indication for transfusion
-                  <span v-if="codesFor(line.component_id).length" class="req">*</span>
-                </label>
+              <div class="field">
+                <label for="p-sex" class="field-label">Sex <span class="req">*</span></label>
                 <select
-                  :id="`i-${index}`"
-                  v-model="line.indication_code"
+                  id="p-sex"
+                  v-model="form.patient_sex"
                   class="input"
-                  :class="{ 'input--error': lineErrors[index]?.indication_code }"
-                  :disabled="!line.component_id || !codesFor(line.component_id).length"
+                  :class="{ 'input--error': errors.patient_sex }"
                 >
-                  <option :value="null">
-                    {{ line.component_id ? 'Select an indication…' : 'Choose a component first' }}
-                  </option>
-                  <option v-for="code in codesFor(line.component_id)" :key="code.code" :value="code.code">
-                    {{ code.label }} — {{ code.description }}
-                  </option>
+                  <option value="">Select…</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
                 </select>
-                <p v-if="lineErrors[index]?.indication_code" class="field-error">
-                  {{ lineErrors[index].indication_code }}
-                </p>
+                <p v-if="errors.patient_sex" class="field-error">{{ errors.patient_sex }}</p>
               </div>
+            </div>
 
-              <div v-if="needsExplanation(line)" class="field field--full">
-                <label :for="`o-${index}`" class="field-label">
-                  Please specify <span class="req">*</span>
-                </label>
-                <input
-                  :id="`o-${index}`"
-                  v-model.trim="line.indication_other"
-                  type="text"
-                  class="input"
-                  :class="{ 'input--error': lineErrors[index]?.indication_other }"
-                  maxlength="255"
-                  placeholder="State the clinical indication"
-                >
-                <p class="field-hint">
-                  This code automatically triggers a review of your indication.
-                </p>
-                <p v-if="lineErrors[index]?.indication_other" class="field-error">
-                  {{ lineErrors[index].indication_other }}
+            <!--
+              A watcher may already have taken this patient's request straight to
+              a blood center, which then recorded it here after you confirmed it
+              by phone. Recording another would ask twice for the same need.
+            -->
+            <div v-if="patientMatches.length" class="dup-warning" role="status">
+              <AssetIcon name="triangle-alert" :size="16" />
+              <div>
+                <p class="dup-warning__title">This patient already has an active request</p>
+                <ul class="dup-warning__list">
+                  <li v-for="match in patientMatches" :key="match.id">
+                    <NuxtLink :to="`/hospital/transfusion-requests/${match.id}`" class="dup-warning__ref">{{ match.reference_number }}</NuxtLink>
+                    · {{ match.facilities?.length ? match.facilities.join(', ') : 'No facility yet' }}
+                    · {{ match.source_label }} · {{ match.status_label }}
+                    <template v-if="match.totals?.unallocated"> · {{ match.totals.unallocated }} unallocated</template>
+                  </li>
+                </ul>
+                <p class="dup-warning__hint">
+                  Open it instead if it covers the same need. If some units are still unallocated, ask another facility
+                  for them from that request's page.
                 </p>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div class="total-row">
-            <span>Total units requested</span>
-            <strong>{{ totalUnits }}</strong>
-          </div>
-        </section>
+          <!-- DESTINATION + BLOOD TYPE + PRIORITY -->
+          <section class="panel fade-in" style="--delay:80ms">
+            <h2 class="panel-title">Request details</h2>
 
-        <!-- ACTIONS -->
-        <div class="action-bar">
-          <NuxtLink to="/hospital/bloodrequests" class="btn-secondary">Cancel</NuxtLink>
-          <button type="submit" class="btn-primary" :disabled="submitting">
-            <AssetIcon name="send" :size="16" />
-            {{ submitting ? 'Submitting…' : 'Submit Request' }}
-          </button>
-        </div>
+            <div class="field-grid">
+              <div v-if="!requiresPatient" class="field field--full">
+                <label for="target" class="field-label">Send request to <span class="req">*</span></label>
+                <select
+                  id="target"
+                  v-model.number="form.target_facility_id"
+                  class="input"
+                  :class="{ 'input--error': errors.target_facility_id }"
+                >
+                  <option :value="null">Select a blood centre…</option>
+                  <option v-for="f in facilities" :key="f.id" :value="f.id">
+                    {{ f.name }}<template v-if="f.address"> — {{ f.address }}</template>
+                  </option>
+                </select>
+                <p v-if="errors.target_facility_id" class="field-error">{{ errors.target_facility_id }}</p>
+              </div>
+
+              <div class="field field--wide">
+                <label for="btype" class="field-label">
+                  {{ requiresPatient ? "Patient's blood type" : 'Blood type required' }}
+                  <span class="req">*</span>
+                </label>
+                <select
+                  id="btype"
+                  v-model.number="form.blood_type_id"
+                  class="input"
+                  :class="{ 'input--error': errors.blood_type_id }"
+                >
+                  <option :value="null">Select…</option>
+                  <option v-for="t in bloodTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
+                </select>
+                <p v-if="errors.blood_type_id" class="field-error">{{ errors.blood_type_id }}</p>
+              </div>
+
+              <div class="field field--wide">
+                <span class="field-label">Priority <span class="req">*</span></span>
+                <div class="priority-row">
+                  <label
+                    v-for="p in priorities"
+                    :key="p.value"
+                    class="pill"
+                    :class="{
+                      'pill--on': form.urgency_level === p.value,
+                      'pill--stat': p.value === 'emergency',
+                    }"
+                  >
+                    <input v-model="form.urgency_level" type="radio" name="priority" :value="p.value" class="sr-only">
+                    {{ p.label }}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- COMPONENTS -->
+          <section class="panel fade-in" style="--delay:100ms">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Components needed</h2>
+                <p class="panel-hint">
+                  Each component carries its own indication code and unit count. A component can
+                  only be listed once.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="btn-secondary btn-sm"
+                :disabled="!canAddLine"
+                @click="addLine"
+              >
+                <AssetIcon name="plus" :size="14" />
+                Add component
+              </button>
+            </div>
+
+            <p v-if="errors.items" class="field-error field-error--block">{{ errors.items }}</p>
+
+            <div v-for="(line, index) in form.items" :key="index" class="line">
+              <div class="line-head">
+                <span class="line-no">Component {{ index + 1 }}</span>
+                <button
+                  v-if="form.items.length > 1"
+                  type="button"
+                  class="btn-link btn-link--danger"
+                  @click="removeLine(index)"
+                >
+                  Remove
+                </button>
+              </div>
+
+              <div class="field-grid">
+                <div class="field field--wide">
+                  <label :for="`c-${index}`" class="field-label">Blood component <span class="req">*</span></label>
+                  <select
+                    :id="`c-${index}`"
+                    v-model.number="line.component_id"
+                    class="input"
+                    :class="{ 'input--error': lineErrors[index]?.component_id }"
+                    @change="onComponentChange(line)"
+                  >
+                    <option :value="null">Select…</option>
+                    <option
+                      v-for="c in components"
+                      :key="c.id"
+                      :value="c.id"
+                      :disabled="isComponentTaken(c.id, index)"
+                    >
+                      {{ c.name }}
+                    </option>
+                  </select>
+                  <p v-if="lineErrors[index]?.component_id" class="field-error">
+                    {{ lineErrors[index].component_id }}
+                  </p>
+                </div>
+
+                <div class="field">
+                  <label :for="`q-${index}`" class="field-label">No. of units <span class="req">*</span></label>
+                  <input
+                    :id="`q-${index}`"
+                    v-model.number="line.quantity"
+                    type="number"
+                    min="1"
+                    max="100"
+                    class="input"
+                    :class="{ 'input--error': lineErrors[index]?.quantity }"
+                  >
+                  <p v-if="lineErrors[index]?.quantity" class="field-error">
+                    {{ lineErrors[index].quantity }}
+                  </p>
+                </div>
+
+                <div class="field field--full">
+                  <label :for="`i-${index}`" class="field-label">
+                    Indication for transfusion
+                    <span v-if="codesFor(line.component_id).length" class="req">*</span>
+                  </label>
+                  <select
+                    :id="`i-${index}`"
+                    v-model="line.indication_code"
+                    class="input"
+                    :class="{ 'input--error': lineErrors[index]?.indication_code }"
+                    :disabled="!line.component_id || !codesFor(line.component_id).length"
+                  >
+                    <option :value="null">
+                      {{ line.component_id ? 'Select an indication…' : 'Choose a component first' }}
+                    </option>
+                    <option v-for="code in codesFor(line.component_id)" :key="code.code" :value="code.code">
+                      {{ code.label }} — {{ code.description }}
+                    </option>
+                  </select>
+                  <p v-if="lineErrors[index]?.indication_code" class="field-error">
+                    {{ lineErrors[index].indication_code }}
+                  </p>
+                </div>
+
+                <div v-if="needsExplanation(line)" class="field field--full">
+                  <label :for="`o-${index}`" class="field-label">
+                    Please specify <span class="req">*</span>
+                  </label>
+                  <input
+                    :id="`o-${index}`"
+                    v-model.trim="line.indication_other"
+                    type="text"
+                    class="input"
+                    :class="{ 'input--error': lineErrors[index]?.indication_other }"
+                    maxlength="255"
+                    placeholder="State the clinical indication"
+                  >
+                  <p class="field-hint">
+                    This code automatically triggers a review of your indication.
+                  </p>
+                  <p v-if="lineErrors[index]?.indication_other" class="field-error">
+                    {{ lineErrors[index].indication_other }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="total-row">
+              <span>{{ requiresPatient ? 'Total units required' : 'Total units requested' }}</span>
+              <strong>{{ totalUnits }}</strong>
+            </div>
+          </section>
+
+          <!-- ACTIONS -->
+          <div class="action-bar">
+            <NuxtLink to="/hospital/bloodrequests" class="btn-secondary">Cancel</NuxtLink>
+            <button v-if="requiresPatient" type="button" class="btn-primary" :disabled="planLoading" @click="findFacilities">
+              <AssetIcon name="search" :size="16" />
+              {{ planLoading ? 'Searching…' : 'Find facilities' }}
+            </button>
+            <button v-else type="submit" class="btn-primary" :disabled="submitting">
+              <AssetIcon name="send" :size="16" />
+              {{ submitting ? 'Submitting…' : 'Submit Request' }}
+            </button>
+          </div>
+        </template>
+
+        <!-- SOURCING -->
+        <template v-else-if="step === 'sourcing'">
+          <section class="panel fade-in">
+            <h2 class="panel-title">Choose facilities</h2>
+            <p class="panel-hint">
+              Split the patient's need across facilities. You may ask for less than required and ask another facility
+              later; you cannot ask for more.
+            </p>
+            <SourcingPanel
+              v-model="split"
+              :plan="plan"
+              mode="new"
+              :loading="planLoading"
+              :error="planError"
+              @retry="loadPlan"
+            />
+          </section>
+
+          <div class="action-bar">
+            <button type="button" class="btn-secondary" @click="step = 'details'">Back</button>
+            <button type="button" class="btn-primary" :disabled="!plan || splitProblems.length > 0" @click="step = 'review'">
+              Review request
+            </button>
+          </div>
+        </template>
+
+        <!-- REVIEW -->
+        <template v-else>
+          <section class="panel fade-in">
+            <h2 class="panel-title">Review</h2>
+
+            <dl class="review">
+              <div><dt>Patient</dt><dd>{{ patientName }}, {{ form.patient_age }} · {{ form.patient_sex === 'male' ? 'Male' : 'Female' }}</dd></div>
+              <div><dt>Blood type</dt><dd>{{ bloodTypeLabel }}</dd></div>
+              <div><dt>Priority</dt><dd>{{ priorityLabel }}</dd></div>
+            </dl>
+
+            <h3 class="review__heading">Required, allocated and remaining</h3>
+            <ul class="review__list">
+              <li v-for="total in splitTotals" :key="total.componentId">
+                <strong>{{ total.component }}</strong>
+                — {{ total.required }} required · {{ total.allocated }} allocated
+                <template v-if="total.remaining > 0"> · <span class="review__open">{{ total.remaining }} left unallocated</span></template>
+              </li>
+            </ul>
+
+            <h3 class="review__heading">Facilities asked</h3>
+            <ul class="review__list">
+              <li v-for="share in shares" :key="share.facility_id">
+                <strong>{{ facilityName(share.facility_id) }}</strong>
+                — {{ share.lines.map((line) => `${componentName(line.component_id)} ${line.quantity}`).join(', ') }}
+              </li>
+            </ul>
+
+            <p class="panel-hint review__hint">
+              Selecting a facility is a request, not a reservation. Each facility reviews its own share and reserves units
+              only when it approves.
+            </p>
+          </section>
+
+          <div class="action-bar">
+            <button type="button" class="btn-secondary" :disabled="submitting" @click="step = 'sourcing'">Back</button>
+            <button type="submit" class="btn-primary" :disabled="submitting">
+              <AssetIcon name="send" :size="16" />
+              {{ submitting ? 'Sending…' : 'Send request' }}
+            </button>
+          </div>
+        </template>
       </form>
     </div>
   </div>
@@ -374,23 +506,33 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SourcingPanel from '~/components/Hospital/SourcingPanel.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import {
+  allocationProblems,
+  allocationTotals,
+  buildAllocationShares,
+  buildTransfusionPayload,
+  suggestedSplit,
+} from '~/utils/transfusionSourcing'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 /*
- * This page previously drove a five-step wizard over departments, physicians,
- * attachments, drafts and a submission policy — none of which the API has ever
- * served — and posted a payload the server rejected outright. What is left is
- * the form the DOH Blood Request Form actually needs, in the order it prints:
- * purpose, patient, destination and type, then the components with their
- * indication codes.
+ * Two requests start here. A replenishment is one form sent to one blood
+ * centre. A patient transfusion is a Patient Transfusion Request: staff
+ * confirm their own stock cannot cover the patient, record the need, split it
+ * across the centres that hold matching stock (earliest expiry first, every
+ * quantity editable), review, and send — one facility allocation per centre.
  */
+
+const STEPS = { details: 'Patient & need', sourcing: 'Facilities', review: 'Review' }
 
 const loadingReference = ref(true)
 const submitting = ref(false)
 const downloading = ref(false)
 const submitError = ref('')
+/** { kind: 'transfusion' | 'replenishment', request } once sent. */
 const submitted = ref(null)
 
 const bloodTypes = ref([])
@@ -399,21 +541,34 @@ const purposes = ref([])
 const priorities = ref([])
 const facilities = ref([])
 
-const form = reactive({
-  request_purpose: 'patient_transfusion',
-  patient_surname: '',
-  patient_first_name: '',
-  patient_middle_name: '',
-  patient_age: null,
-  patient_sex: '',
-  target_facility_id: null,
-  blood_type_id: null,
-  urgency_level: 'routine',
-  items: [emptyLine()],
-})
+const step = ref('details')
+const stepIndex = computed(() => Object.keys(STEPS).indexOf(step.value))
+
+const plan = ref(null)
+const planLoading = ref(false)
+const planError = ref('')
+const split = ref({})
+
+const form = reactive(blankForm())
 
 const errors = reactive({})
 const lineErrors = ref([])
+
+function blankForm() {
+  return {
+    request_purpose: 'patient_transfusion',
+    stock_confirmed: false,
+    patient_surname: '',
+    patient_first_name: '',
+    patient_middle_name: '',
+    patient_age: null,
+    patient_sex: '',
+    target_facility_id: null,
+    blood_type_id: null,
+    urgency_level: 'routine',
+    items: [emptyLine()],
+  }
+}
 
 function emptyLine() {
   return { component_id: null, quantity: 1, indication_code: null, indication_other: '' }
@@ -421,10 +576,15 @@ function emptyLine() {
 
 const requiresPatient = computed(() => form.request_purpose === 'patient_transfusion')
 
+watch(() => form.request_purpose, () => {
+  step.value = 'details'
+})
+
 /*
- * Active requests this blood bank already has for the patient being typed —
- * including one a blood center recorded here after a walk-in. A warning only:
- * a second request can be legitimate, and the decision is the requester's.
+ * Active requirements this blood bank already has for the patient being typed
+ * — including one a blood center recorded here after a walk-in. A warning
+ * only: a second request can be legitimate, and the decision is the
+ * requester's.
  */
 const patientMatches = ref([])
 let matchTimer = null
@@ -460,6 +620,14 @@ const canAddLine = computed(() => form.items.length < components.value.length &&
 const totalUnits = computed(() =>
   form.items.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0),
 )
+
+const splitTotals = computed(() => allocationTotals(plan.value, split.value))
+const splitProblems = computed(() => allocationProblems(plan.value, split.value))
+const shares = computed(() => buildAllocationShares(plan.value, split.value))
+
+const patientName = computed(() => [form.patient_surname.toUpperCase() + ',', form.patient_first_name, form.patient_middle_name].filter(Boolean).join(' '))
+const bloodTypeLabel = computed(() => bloodTypes.value.find((t) => t.id === form.blood_type_id)?.label ?? '—')
+const priorityLabel = computed(() => priorities.value.find((p) => p.value === form.urgency_level)?.label ?? form.urgency_level)
 
 onMounted(async () => {
   try {
@@ -513,25 +681,43 @@ function removeLine(index) {
   lineErrors.value.splice(index, 1)
 }
 
+function componentName(id) {
+  return components.value.find((c) => c.id === id)?.name ?? 'Component'
+}
+
+/** A centre's name, from wherever the plan listed it. */
+function facilityName(id) {
+  for (const line of plan.value?.lines ?? []) {
+    const found = line.facilities.find((h) => h.facility.id === id)?.facility
+      ?? line.other_facilities.find((f) => f.id === id)
+
+    if (found) return found.name
+  }
+
+  return facilities.value.find((f) => f.id === id)?.name ?? 'Facility'
+}
+
 /**
- * Check the form before it is sent.
+ * Check the first step before it moves on.
  *
- * Deliberately a mirror of StoreBloodRequestRequest rather than the only
+ * Deliberately a mirror of the server's form requests rather than the only
  * guard: the server refuses the same things, and anything it rejects is shown
- * below through applyServerErrors().
+ * through applyServerErrors().
  */
 function validate() {
   Object.keys(errors).forEach((key) => delete errors[key])
   lineErrors.value = form.items.map(() => ({}))
 
-  if (!form.target_facility_id) errors.target_facility_id = 'Choose the facility this request is being sent to.'
   if (!form.blood_type_id) errors.blood_type_id = 'Select the blood type required.'
 
   if (requiresPatient.value) {
+    if (!form.stock_confirmed) errors.stock_confirmed = "Confirm your own stock cannot cover this patient before asking other facilities."
     if (!form.patient_surname) errors.patient_surname = 'Enter the patient surname.'
     if (!form.patient_first_name) errors.patient_first_name = 'Enter the patient first name.'
     if (form.patient_age === null || form.patient_age === '') errors.patient_age = 'Enter the patient age.'
     if (!form.patient_sex) errors.patient_sex = 'Select the patient sex.'
+  } else if (!form.target_facility_id) {
+    errors.target_facility_id = 'Choose the facility this request is being sent to.'
   }
 
   if (form.items.length === 0) errors.items = 'Add at least one blood component to this request.'
@@ -562,7 +748,7 @@ function validate() {
 function applyServerErrors(bag) {
   Object.entries(bag ?? {}).forEach(([key, messages]) => {
     const message = Array.isArray(messages) ? messages[0] : messages
-    const line = key.match(/^items\.(\d+)\.(\w+)$/)
+    const line = key.match(/^(?:items|lines)\.(\d+)\.(\w+)$/)
 
     if (line) {
       const index = Number(line[1])
@@ -570,41 +756,99 @@ function applyServerErrors(bag) {
       return
     }
 
-    errors[key] = message
+    errors[key === 'internal_stock_confirmed' ? 'stock_confirmed' : key] = message
   })
 }
 
-function buildPayload() {
-  const payload = {
-    target_facility_id: form.target_facility_id,
-    blood_type_id: form.blood_type_id,
-    urgency_level: form.urgency_level,
-    request_purpose: form.request_purpose,
-    items: form.items.map((line) => ({
-      component_id: line.component_id,
-      quantity: Number(line.quantity),
-      indication_code: line.indication_code,
-      ...(line.indication_other ? { indication_other: line.indication_other } : {}),
-    })),
-  }
-
-  // Patient fields are omitted entirely on a restock. The server drops them
-  // anyway, and sending a blank name on a record that has no patient is
-  // noise in a clinical payload.
-  if (requiresPatient.value) {
-    Object.assign(payload, {
-      patient_surname: form.patient_surname,
-      patient_first_name: form.patient_first_name,
-      patient_middle_name: form.patient_middle_name || null,
-      patient_age: form.patient_age,
-      patient_sex: form.patient_sex,
-    })
-  }
-
-  return payload
+function requirementLines() {
+  return form.items.map((line) => ({
+    component_id: line.component_id,
+    quantity: Number(line.quantity),
+    indication_code: line.indication_code,
+    ...(line.indication_other ? { indication_other: line.indication_other } : {}),
+  }))
 }
 
-async function submitRequest() {
+/** Plan the need across the network, then move to the facility step. */
+async function findFacilities() {
+  submitError.value = ''
+
+  if (!validate()) {
+    submitError.value = 'Please correct the highlighted fields.'
+    return
+  }
+
+  step.value = 'sourcing'
+  await loadPlan()
+}
+
+async function loadPlan() {
+  planLoading.value = true
+  planError.value = ''
+
+  try {
+    plan.value = await hospitalService.draftSourcing({
+      blood_type_id: form.blood_type_id,
+      lines: form.items.map((line) => ({ component_id: line.component_id, quantity: Number(line.quantity) })),
+    })
+    split.value = suggestedSplit(plan.value)
+  } catch (err) {
+    planError.value = err?.message || 'Could not search the network. Please try again.'
+  } finally {
+    planLoading.value = false
+  }
+}
+
+async function onSubmit() {
+  if (requiresPatient.value) {
+    if (step.value === 'review') await sendTransfusion()
+    return
+  }
+
+  await sendReplenishment()
+}
+
+async function sendTransfusion() {
+  submitError.value = ''
+
+  if (splitProblems.value.length) {
+    step.value = 'sourcing'
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const draft = {
+      bloodTypeId: form.blood_type_id,
+      urgency: form.urgency_level,
+      patient: {
+        surname: form.patient_surname,
+        firstName: form.patient_first_name,
+        middleName: form.patient_middle_name ?? '',
+        age: form.patient_age,
+        sex: form.patient_sex,
+      },
+      lines: requirementLines(),
+    }
+
+    const response = await hospitalService.createTransfusionRequest(buildTransfusionPayload(draft, plan.value, split.value))
+    submitted.value = { kind: 'transfusion', request: response.request }
+  } catch (err) {
+    const bag = err?.errors ?? {}
+    applyServerErrors(bag)
+    submitError.value = err?.message || 'Could not send the request. Please try again.'
+
+    // Send staff back to wherever the server found the problem.
+    const keys = Object.keys(bag)
+    if (keys.some((key) => key.startsWith('allocations'))) step.value = 'sourcing'
+    else if (keys.length) step.value = 'details'
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function sendReplenishment() {
   submitError.value = ''
 
   if (!validate()) {
@@ -615,8 +859,14 @@ async function submitRequest() {
   submitting.value = true
 
   try {
-    const response = await hospitalService.createRequest(buildPayload())
-    submitted.value = response?.request ?? null
+    const response = await hospitalService.createRequest({
+      target_facility_id: form.target_facility_id,
+      blood_type_id: form.blood_type_id,
+      urgency_level: form.urgency_level,
+      request_purpose: 'replenishment',
+      items: requirementLines(),
+    })
+    submitted.value = { kind: 'replenishment', request: response.request }
   } catch (err) {
     applyServerErrors(err?.errors)
     submitError.value = err?.message || 'Could not submit the request. Please try again.'
@@ -626,16 +876,18 @@ async function submitRequest() {
 }
 
 async function downloadForm() {
-  if (!submitted.value || downloading.value) return
+  const request = submitted.value?.request
+
+  if (!request || downloading.value) return
 
   downloading.value = true
 
   try {
-    const blob = await hospitalService.downloadRequestForm(submitted.value.id)
+    const blob = await hospitalService.downloadRequestForm(request.id)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `BRF-${submitted.value.reference_number}.pdf`
+    link.download = `BRF-${request.reference_number}.pdf`
     link.click()
     URL.revokeObjectURL(url)
   } catch (err) {
@@ -648,20 +900,13 @@ async function downloadForm() {
 function startAnother() {
   submitted.value = null
   submitError.value = ''
+  step.value = 'details'
+  plan.value = null
+  split.value = {}
   Object.keys(errors).forEach((key) => delete errors[key])
   lineErrors.value = []
 
-  Object.assign(form, {
-    request_purpose: 'patient_transfusion',
-    patient_surname: '',
-    patient_first_name: '',
-    patient_middle_name: '',
-    patient_age: null,
-    patient_sex: '',
-    blood_type_id: null,
-    urgency_level: 'routine',
-    items: [emptyLine()],
-  })
+  Object.assign(form, blankForm())
 }
 </script>
 
@@ -849,5 +1094,49 @@ function startAnother() {
   .field--wide, .field--full { grid-column: 1 / -1; }
   .action-bar { flex-direction: column-reverse; }
   .action-bar > * { width: 100%; }
+}
+/* Steps (patient transfusion) */
+.steps {
+  display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; flex-wrap: wrap;
+}
+.steps__item {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 6px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary);
+  background: var(--rb-surface); border: 1px solid var(--rb-border);
+}
+.steps__no {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 11.5px; background: var(--rb-surface-alt); color: var(--rb-text-secondary);
+}
+.steps__item--on { color: var(--rb-primary-text); border-color: var(--rb-primary); }
+.steps__item--on .steps__no { background: var(--rb-primary); color: #fff; }
+.steps__item--done .steps__no { background: rgba(var(--rb-success-rgb), .16); color: var(--rb-success-text); }
+
+/* Own stock confirmation */
+.check {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border: 1.5px solid var(--rb-border-strong); border-radius: 10px;
+  font-size: 13.5px; color: var(--rb-text-primary); cursor: pointer;
+}
+.check input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--rb-primary); }
+.check--error { border-color: var(--rb-accent); }
+
+/* Review */
+.review { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 16px; }
+.review dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--rb-text-secondary); }
+.review dd { margin: 2px 0 0; font-size: 13.5px; color: var(--rb-text-primary); }
+.review__heading { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 14px 0 6px; }
+.review__list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-primary); }
+.review__open { color: var(--rb-warning-text); font-weight: 600; }
+.review__hint { margin: 14px 0 0; }
+
+.success-list { margin: 0 auto 14px; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.7; color: var(--rb-text-primary); }
+.success-note { font-size: 13px; color: var(--rb-warning-text); margin: 0 auto 16px; max-width: 52ch; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+@media (max-width: 720px) {
+  .review { grid-template-columns: 1fr; }
 }
 </style>

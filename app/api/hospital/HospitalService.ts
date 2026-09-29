@@ -1,14 +1,18 @@
 import BaseService from '../BaseService'
 import type {
+  AllocationSharePayload,
   AvailabilityResult,
   BloodRequest,
   BloodRequestFilters,
   BloodRequestStatus,
   CreateBloodRequestPayload,
-  CreateFollowUpPayload,
+  CreateTransfusionRequestPayload,
+  PatientMatch,
   RequestEvent,
   RequestReferenceData,
-  RequestSource,
+  SourcingPlan,
+  TransfusionRequest,
+  TransfusionRequestFilters,
 } from '~/types/bloodRequest'
 
 /**
@@ -21,7 +25,7 @@ import type {
  * Anything not below is not available; add the endpoint before adding a method.
  */
 
-export type { BloodRequestFilters, CreateBloodRequestPayload }
+export type { BloodRequestFilters, CreateBloodRequestPayload, TransfusionRequestFilters }
 
 export interface Paginated<T> {
   data: T[]
@@ -67,6 +71,111 @@ class HospitalService extends BaseService {
     )
   }
 
+  /* ---------------------------------------------------------------- *
+   * Patient Transfusion Requests: the patient's need, split across the
+   * centres asked to supply it. Each share is a facility allocation — a
+   * blood request, served by the methods further down.
+   * ---------------------------------------------------------------- */
+
+  listTransfusionRequests(params: TransfusionRequestFilters = {}) {
+    return this.request<Paginated<TransfusionRequest>>('/hospital/transfusion-requests', 'GET', params)
+  }
+
+  createTransfusionRequest(payload: CreateTransfusionRequestPayload) {
+    return this.request<{ message: string; request: TransfusionRequest }>(
+      '/hospital/transfusion-requests',
+      'POST',
+      payload,
+    )
+  }
+
+  showTransfusionRequest(id: number | string) {
+    return this.request<{ request: TransfusionRequest }>(`/hospital/transfusion-requests/${id}`)
+  }
+
+  /** Track by the PTR reference, or the RQ reference of any of its allocations. */
+  trackTransfusionRequest(reference: string) {
+    return this.request<{ request: TransfusionRequest }>(
+      `/hospital/transfusion-requests/track/${encodeURIComponent(reference)}`,
+    )
+  }
+
+  /**
+   * Suggest how to split a need not yet recorded: centres holding matching
+   * stock, earliest expiry first. Advisory — nothing is held.
+   */
+  draftSourcing(payload: { blood_type_id: number; lines: Array<{ component_id: number; quantity: number }> }) {
+    return this.request<SourcingPlan>('/hospital/transfusion-requests/sourcing', 'POST', payload)
+  }
+
+  /** Suggest where to ask for whatever is still unallocated. */
+  transfusionSourcing(id: number | string) {
+    return this.request<SourcingPlan>(`/hospital/transfusion-requests/${id}/sourcing`)
+  }
+
+  /** Ask more centres for whatever is still unallocated. */
+  addAllocations(id: number | string, allocations: AllocationSharePayload[]) {
+    return this.request<{ message: string; request: TransfusionRequest }>(
+      `/hospital/transfusion-requests/${id}/allocations`,
+      'POST',
+      { allocations },
+    )
+  }
+
+  /** Withdraw a share its centre has not answered. Its units become unallocated again. */
+  withdrawAllocation(id: number | string, allocationId: number, reason?: string | null) {
+    return this.request<{ message: string; request: TransfusionRequest }>(
+      `/hospital/transfusion-requests/${id}/allocations/${allocationId}/withdraw`,
+      'POST',
+      reason ? { reason } : {},
+    )
+  }
+
+  /**
+   * Close the rest of one component the patient no longer needs.
+   *
+   * Approved units are left alone; every centre still asked for this
+   * component stops being asked.
+   */
+  closeTransfusionLine(id: number | string, itemId: number, note?: string | null) {
+    return this.request<{ message: string; request: TransfusionRequest }>(
+      `/hospital/transfusion-requests/${id}/items/${itemId}/close`,
+      'POST',
+      note ? { note } : {},
+    )
+  }
+
+  /** Cancel a request nothing has been approved for. */
+  cancelTransfusionRequest(id: number | string, reason?: string | null) {
+    return this.request<{ message: string; request: TransfusionRequest }>(
+      `/hospital/transfusion-requests/${id}/cancel`,
+      'POST',
+      reason ? { reason } : {},
+    )
+  }
+
+  /** Everything that happened to the request and to each centre's share of it. */
+  transfusionHistory(id: number | string) {
+    return this.request<{ request_id: number; reference_number: string; events: RequestEvent[] }>(
+      `/hospital/transfusion-requests/${id}/history`,
+    )
+  }
+
+  /**
+   * This blood bank's active Patient Transfusion Requests for a patient, before recording another.
+   *
+   * Includes one a blood centre recorded here after a walk-in. A POST so the
+   * patient's name stays out of URLs and access logs.
+   */
+  patientMatches(criteria: { patient_surname: string; patient_first_name: string; blood_type_id?: number | null }) {
+    return this.request<{ matches: PatientMatch[] }>('/hospital/transfusion-requests/patient-matches', 'POST', criteria)
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Blood requests: replenishment orders, and each facility allocation's
+   * own page — receipt, the DOH form and its history live there.
+   * ---------------------------------------------------------------- */
+
   /** This blood bank's own requests. */
   listRequests(params: BloodRequestFilters = {}) {
     return this.request<Paginated<BloodRequest>>('/hospital/blood-requests', 'GET', params)
@@ -102,27 +211,6 @@ class HospitalService extends BaseService {
     )
   }
 
-  /**
-   * This blood bank's active requests for a patient, before raising another.
-   *
-   * Includes requests a blood centre recorded here after a walk-in. A POST so
-   * the patient's name stays out of URLs and access logs.
-   */
-  patientMatches(criteria: { patient_surname: string; patient_first_name: string; blood_type_id?: number | null }) {
-    return this.request<{
-      matches: Array<{
-        id: number
-        reference_number: string
-        facility: { id: number; name: string } | null
-        request_source: RequestSource
-        source_label: string
-        status: BloodRequestStatus
-        status_label: string
-        is_open: boolean
-        request_date: string | null
-      }>
-    }>('/hospital/blood-requests/patient-matches', 'POST', criteria)
-  }
 
   /** Everything that has happened to one of this blood bank's requests. */
   requestHistory(id: number | string) {
@@ -132,10 +220,10 @@ class HospitalService extends BaseService {
   }
 
   /**
-   * Close the rest of one line this blood bank no longer needs.
+   * Close the rest of one replenishment line this blood bank no longer needs.
    *
-   * The line keeps what was requested. A remainder closed as not needed can no
-   * longer be sourced from another facility.
+   * The line keeps what was requested. A facility allocation's line is closed
+   * on its Patient Transfusion Request instead (closeTransfusionLine).
    */
   closeRequestLine(id: number | string, itemId: number, note?: string | null) {
     return this.request<{ message: string; status: BloodRequestStatus; status_label: string; is_open: boolean }>(
@@ -145,14 +233,6 @@ class HospitalService extends BaseService {
     )
   }
 
-  /** Ask another facility for what this request could not get. */
-  createFollowUp(id: number | string, payload: CreateFollowUpPayload) {
-    return this.request<{ message: string; request: BloodRequest }>(
-      `/hospital/blood-requests/${id}/follow-up`,
-      'POST',
-      payload,
-    )
-  }
 
   /** Withdraw a request. Only possible while nothing is held for it. */
   cancelRequest(id: number | string, reason?: string) {

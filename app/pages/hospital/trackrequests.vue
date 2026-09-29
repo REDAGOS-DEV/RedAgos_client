@@ -158,14 +158,18 @@
         <RequestFulfilmentTable :request="request" />
       </section>
 
-      <!-- WHERE IT CAME FROM, AND WHERE THE REST WENT -->
-      <section v-if="request.is_walk_in || request.parent || request.follow_ups?.length" class="card">
-        <h2 class="section-title">Source &amp; Linked Requests</h2>
+      <!-- WHERE IT CAME FROM, AND WHAT IT IS A SHARE OF -->
+      <section v-if="request.is_walk_in || request.transfusion_request" class="card">
+        <h2 class="section-title">Source &amp; Patient Transfusion Request</h2>
         <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
           A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
           it after your blood bank confirmed it by phone.
         </p>
-        <RequestChain :parent="request.parent" :follow-ups="request.follow_ups" link-base="/hospital/bloodrequests/" />
+        <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
+          This is {{ request.target_facility?.name || 'one facility' }}'s share of
+          <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="track-ptr">{{ request.transfusion_request.reference_number }}</NuxtLink>
+          ({{ requestStatusLabel(request.transfusion_request) }}), where every facility asked for this patient is followed.
+        </p>
       </section>
 
       <div class="content-grid">
@@ -388,7 +392,6 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import RequestChain from '~/components/common/RequestChain.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 /**
@@ -1021,6 +1024,7 @@ function contactBloodCenter() {
 
 .empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
 .track-walk-in { margin-bottom: 10px; color: var(--rb-text-secondary); }
+.track-ptr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
 
 /* ---------- Documents ---------- */
 .documents-table { display: flex; flex-direction: column; gap: 10px; }

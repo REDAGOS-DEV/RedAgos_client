@@ -248,7 +248,7 @@
                 </button>
                 {{ r.code }}
                 <span v-if="r.isWalkIn" class="source-badge" title="Recorded at this blood center after the hospital confirmed it by phone">Walk-in</span>
-                <span v-if="r.isFollowUp" class="source-badge source-badge--follow" title="Carries the remainder of another request">Follow-up</span>
+                <span v-if="r.ptrReference" class="source-badge source-badge--share" :title="`One facility's share of Patient Transfusion Request ${r.ptrReference}`">Share of {{ r.ptrReference }}</span>
               </td>
               <td>
                 <div class="hospital-cell">
@@ -438,9 +438,19 @@
               />
             </section>
 
-            <section v-if="activeRequest.raw?.parent || activeRequest.raw?.follow_ups?.length" class="drawer-section">
-              <h3>Linked Requests</h3>
-              <RequestChain :parent="activeRequest.raw.parent" :follow-ups="activeRequest.raw.follow_ups" />
+            <!--
+              The hospital may have split the patient's need across several
+              centres. This centre sees its own share against the whole — never
+              which other centres were asked.
+            -->
+            <section v-if="activeRequest.raw?.transfusion_request" class="drawer-section">
+              <h3>Patient Transfusion Request</h3>
+              <p class="share-note">
+                This request is this center's share of
+                <strong class="mono">{{ activeRequest.raw.transfusion_request.reference_number }}</strong>.
+                The patient needs {{ shareSummary(activeRequest.raw) }} in all; other facilities may be supplying the rest.
+                Approve what you can reserve, or close the rest as unavailable so the hospital can ask elsewhere.
+              </p>
             </section>
 
             <section class="drawer-section">
@@ -678,7 +688,6 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
-import RequestChain from '~/components/common/RequestChain.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
@@ -759,6 +768,25 @@ function formatDateTime(value) {
  * rather than being invented, which is the rule this feature has followed
  * throughout.
  */
+/**
+ * What the patient needs in all, beside this centre's share of it.
+ *
+ * "Packed RBC 5 (you are asked for 1)" — so a reviewer reading a share of one
+ * unit knows it is part of a larger need being met elsewhere.
+ */
+function shareSummary(raw) {
+  const asked = Object.fromEntries((raw?.items ?? []).map((item) => [item.component?.id, item.quantity]))
+
+  return (raw?.transfusion_request?.required ?? [])
+    .map((line) => {
+      const name = line.component ?? 'a component'
+      const mine = asked[line.component_id]
+
+      return mine ? `${name} ${line.quantity} (you are asked for ${mine})` : `${name} ${line.quantity}`
+    })
+    .join(', ') || 'more than this request'
+}
+
 function mapRequest(r) {
   const allocated = r.allocated_count ?? 0
   const units = r.quantity ?? 0
@@ -773,7 +801,7 @@ function mapRequest(r) {
     requestedBy: r.requester_name
       ?? (r.is_walk_in ? `Walk-in · recorded by ${r.recorder_name ?? 'this center'}` : ''),
     isWalkIn: Boolean(r.is_walk_in),
-    isFollowUp: Boolean(r.parent),
+    ptrReference: r.transfusion_request?.reference_number ?? null,
     sourceLabel: r.source_label ?? 'Blood Bank Portal',
     bloodType: r.blood_type?.code ?? '—',
     component: componentSummary(r),
@@ -1658,7 +1686,9 @@ onMounted(() => {
   letter-spacing: 0.02em;
   vertical-align: middle;
 }
-.source-badge--follow { background: #e8f0fc; color: var(--info); }
+.source-badge--share { background: #e8f0fc; color: var(--info); }
+.share-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.share-note .mono { font-size: 12.5px; color: var(--text-primary); }
 
 .pill--source { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -1830,7 +1860,7 @@ onMounted(() => {
 :global(.dark .page .status-fulfilled) { background: #16301c; }
 :global(.dark .page .status-cancelled) { background: #1e2635; }
 :global(.dark .page .source-badge) { background: #2a1f42; }
-:global(.dark .page .source-badge--follow) { background: #16223a; }
+:global(.dark .page .source-badge--share) { background: #16223a; }
 :global(.dark .page .table-row:hover) { background: #1c2536; }
 :global(.dark .page .expanded-content) { background: #141b29; }
 :global(.dark .page .skeleton-row),

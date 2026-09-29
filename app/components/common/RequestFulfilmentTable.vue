@@ -10,7 +10,6 @@
             <th scope="col" class="num">Reserved</th>
             <th scope="col" class="num">Fulfilled</th>
             <th scope="col" class="num">Received</th>
-            <th v-if="totals.forwarded > 0" scope="col" class="num">Forwarded</th>
             <th scope="col" class="num">Remaining</th>
             <th scope="col">Status</th>
             <th v-if="closable" scope="col"><span class="sr-only">Actions</span></th>
@@ -23,7 +22,6 @@
             <td class="num">{{ row.reserved }}</td>
             <td class="num fulfilment__strong">{{ row.fulfilled }}</td>
             <td class="num">{{ row.received }}</td>
-            <td v-if="totals.forwarded > 0" class="num">{{ row.forwarded }}</td>
             <td class="num" :class="{ 'fulfilment__strong': row.remaining > 0 }">{{ row.remaining }}</td>
             <td>
               <span class="fulfilment__chip" :class="`tone--${row.tone}`">{{ row.statusLabel }}</span>
@@ -51,7 +49,6 @@
             <td class="num">{{ totals.reserved }}</td>
             <td class="num fulfilment__strong">{{ totals.fulfilled }}</td>
             <td class="num">{{ totals.received }}</td>
-            <td v-if="totals.forwarded > 0" class="num">{{ totals.forwarded }}</td>
             <td class="num fulfilment__strong">{{ totals.remaining }}</td>
             <td colspan="2" />
           </tr>

@@ -51,9 +51,22 @@ export type RequestSource = 'blood_bank_portal' | 'blood_center_walk_in'
 
 /**
  * How far one line of a request has been met. Derived by the API from what was
- * released, forwarded and closed — never stored.
+ * released and closed — never stored.
  */
-export type LineFulfilmentStatus = 'unfulfilled' | 'partial' | 'fulfilled' | 'forwarded' | 'closed_short'
+export type LineFulfilmentStatus = 'unfulfilled' | 'partial' | 'fulfilled' | 'closed_short'
+
+/**
+ * How far one component of a Patient Transfusion Request has been met, across
+ * every facility asked for it. Derived by the API — never stored.
+ */
+export type TransfusionLineStatus =
+  | 'awaiting_response'
+  | 'needs_allocation'
+  | 'partially_approved'
+  | 'approved'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'closed_short'
 
 /** Why the rest of a line will not be supplied by the facility handling it. */
 export type LineClosureReason = 'unavailable' | 'not_needed'
@@ -111,16 +124,16 @@ export interface RequestAllocation {
  *
  * `quantity` is what was requested and never changes. The fulfilment figures
  * beside it say what was provided: fulfilled is what the centre released,
- * received what the hospital confirmed, forwarded what another facility was
- * asked for instead, and remaining is requested less fulfilled.
+ * received what the hospital confirmed, and remaining is requested less
+ * fulfilled.
  *
  * `allocated_count` and `outstanding_quantity` are only sent when the caller
  * loaded allocations with units — the detail views.
  */
 export interface BloodRequestItem {
   id: number
-  /** On a follow-up: the line of the original request this line carries. */
-  parent_item_id?: number | null
+  /** On a facility allocation: the patient's requirement line this is a share of. */
+  transfusion_request_item_id?: number | null
   component: ComponentStub
   quantity: number
   indication_code: string | null
@@ -136,26 +149,28 @@ export interface BloodRequestItem {
   reserved_quantity?: number
   fulfilled_quantity?: number
   received_quantity?: number
-  forwarded_quantity?: number
   remaining_quantity?: number
   /** What this facility may still hold for the line. */
   allocatable_quantity?: number
-  /** What may still be asked of another facility. */
-  forwardable_quantity?: number
   line_status?: LineFulfilmentStatus
   line_status_label?: string
   allocated_count?: number
   outstanding_quantity?: number
 }
 
-/** The other end of a follow-up link: a reference, where it went, how far it got. */
-export interface RequestStub {
+/**
+ * The Patient Transfusion Request a facility allocation is a share of.
+ *
+ * A stub: a centre sees which requirement, and how much of each component the
+ * patient needs in all — never which other centres were asked.
+ */
+export interface TransfusionRequestStub {
   id: number
   reference_number: string
-  facility: FacilityStub | null
   status: BloodRequestStatus
   status_label: string
   is_open: boolean
+  required: Array<{ transfusion_request_item_id: number; component_id: number; component: string | null; quantity: number }>
 }
 
 /** The watcher who presented a walk-in, and who at the hospital confirmed it. */
@@ -221,7 +236,7 @@ export interface BloodRequest {
   is_emergency?: boolean
   status: BloodRequestStatus
   status_label: string
-  /** False once nothing more may be done: terminal, or partial with every remainder closed or forwarded. */
+  /** False once nothing more may be done: terminal, or partial with every remainder closed. */
   is_open: boolean
   closed_at: string | null
   /** Held units that still lay claim to stock. Counted in SQL, not derived here. */
@@ -233,30 +248,37 @@ export interface BloodRequest {
   fulfilled_quantity: number
   /** Requested less fulfilled. */
   remaining_quantity: number
-  forwarded_quantity: number
-  forwardable_quantity: number
   rejection_reason: string | null
   request_date: string | null
   reviewed_at: string | null
   fulfilled_at: string | null
-  /** The request this follow-up carries a remainder for. */
-  parent: RequestStub | null
-  follow_ups: RequestStub[]
+  /** Set when this request is one facility's share of a Patient Transfusion Request. */
+  transfusion_request: TransfusionRequestStub | null
   walk_in: WalkInDetails | null
   allocations?: RequestAllocation[]
 }
 
-/** One entry of a request's history, as GET …/history returns it. */
+/**
+ * One line of a history snapshot, as GET …/history returns it.
+ *
+ * An allocation's event snapshots its own lines (`request_item_id`,
+ * reserved); a requirement's event snapshots the patient's need
+ * (`transfusion_request_item_id`, required, approved, unallocated). Both carry
+ * requested, fulfilled, received and remaining, so a timeline reads them alike.
+ */
 export interface RequestEventLine {
-  request_item_id: number
+  request_item_id?: number
+  transfusion_request_item_id?: number
   component: string | null
+  required?: number
   requested: number
-  reserved: number
+  reserved?: number
+  approved?: number
   fulfilled: number
   received: number
-  forwarded: number
+  unallocated?: number
   remaining: number
-  status: LineFulfilmentStatus
+  status: LineFulfilmentStatus | TransfusionLineStatus
   status_label: string | null
 }
 
@@ -269,6 +291,8 @@ export interface RequestEvent {
   to_status_label: string | null
   actor: { id: number; name: string } | null
   actor_facility: { id: number; name: string } | null
+  /** Which facility allocation it happened to; null for an event on the requirement itself. */
+  allocation?: { id: number; reference_number: string; facility: string | null } | null
   item: { id: number; component: string | null } | null
   related_request: { id: number; reference_number: string; facility: string | null } | null
   lines: RequestEventLine[]
@@ -280,19 +304,23 @@ export interface RequestEvent {
 }
 
 /**
- * A request the hospital already has for the walk-in's patient.
+ * A Patient Transfusion Request the hospital already has for the walk-in's patient.
  *
- *  - here: already addressed to this centre and open — open it instead.
- *  - follow_up: part-filled at another centre — record this as its follow-up.
+ *  - here: this centre already has an open allocation of it — open that instead.
+ *  - continue: some units are asked of nobody yet — add this centre's share to it.
  *  - duplicate: anything else — a second request, allowed only with a reason.
  */
-export type DuplicateRelation = 'here' | 'follow_up' | 'duplicate'
+export type DuplicateRelation = 'here' | 'continue' | 'duplicate'
 
 export interface DuplicateMatch {
+  /** The Patient Transfusion Request. */
   id: number
   reference_number: string
   relation: DuplicateRelation
-  facility: { id: number; name: string } | null
+  /** This centre's open allocation of it, on a "here" match. */
+  allocation: { id: number; reference_number: string } | null
+  /** The centres asked for it, by name. */
+  facilities: string[]
   request_source: RequestSource
   source_label: string
   status: BloodRequestStatus
@@ -303,14 +331,14 @@ export interface DuplicateMatch {
   urgency_level: UrgencyLevel
   patient: PatientDetails
   lines: Array<{
-    request_item_id: number
+    transfusion_request_item_id: number
     component: ComponentStub
-    requested: number
-    reserved: number
+    required: number
+    approved: number
     fulfilled: number
-    forwardable: number
+    unallocated: number
   }>
-  forwardable_quantity: number
+  unallocated_quantity: number
 }
 
 /** GET /blood-center/blood-requests/walk-in/reference */
@@ -326,7 +354,8 @@ export interface WalkInReference {
 
 export interface CreateWalkInPayload {
   hospital_id: number
-  parent_request_id?: number | null
+  /** Set to add this centre's share to an existing Patient Transfusion Request. */
+  transfusion_request_id?: number | null
   urgency_level: UrgencyLevel
   patient_surname?: string
   patient_first_name?: string
@@ -340,7 +369,7 @@ export interface CreateWalkInPayload {
   patient_record_number?: string | null
   items: Array<{
     component_id?: number
-    parent_item_id?: number
+    transfusion_request_item_id?: number
     quantity: number
     indication_code?: string | null
     indication_other?: string | null
@@ -361,12 +390,6 @@ export interface CreateWalkInPayload {
     notes?: string | null
   }
   duplicate_acknowledgement?: string | null
-}
-
-export interface CreateFollowUpPayload {
-  target_facility_id: number
-  urgency_level?: UrgencyLevel
-  items: Array<{ parent_item_id: number; quantity: number }>
 }
 
 export interface AvailabilityHolding {
@@ -411,18 +434,175 @@ export interface CreateBloodRequestItemPayload {
   indication_other?: string | null
 }
 
+/** POST /hospital/blood-requests — a replenishment order to one centre. */
 export interface CreateBloodRequestPayload {
   target_facility_id: number
   blood_type_id: number
   urgency_level: UrgencyLevel
-  request_purpose: RequestPurpose
-  /** Required for a transfusion, omitted for a replenishment. */
-  patient_surname?: string | null
-  patient_first_name?: string | null
-  patient_middle_name?: string | null
-  patient_age?: number | null
-  patient_sex?: 'male' | 'female' | null
+  request_purpose: 'replenishment'
   items: CreateBloodRequestItemPayload[]
+}
+
+/* ------------------------------------------------------------------ *
+ * Patient Transfusion Requests
+ *
+ * The patient's need is the Patient Transfusion Request (PTR-…); each centre
+ * asked for a share of it has a Facility Allocation (RQ-…), which is an
+ * ordinary BloodRequest; the bags a centre holds for its allocation are
+ * "reserved units" (RequestAllocation). docs/IMPLEMENTATION_DECISIONS.md on
+ * the server keeps the full terminology map.
+ * ------------------------------------------------------------------ */
+
+/**
+ * One component of the patient's need, beside what came of asking for it.
+ *
+ * `quantity` is required and never changes. requested is what was asked of
+ * centres; awaiting what they have still to answer; approved what they hold or
+ * released (approval reserves); remaining is required less approved; and
+ * unallocated what nobody is holding or still considering — what can still be
+ * asked of another centre.
+ */
+export interface TransfusionLine {
+  id: number
+  component: ComponentStub
+  quantity: number
+  indication_code: string | null
+  indication_label: string | null
+  indication_text: string | null
+  requested: number
+  awaiting: number
+  approved: number
+  fulfilled: number
+  received: number
+  remaining: number
+  unallocated: number
+  closed_at: string | null
+  closure_note: string | null
+  line_status: TransfusionLineStatus | null
+  line_status_label: string | null
+}
+
+export interface TransfusionTotals {
+  required: number
+  requested: number
+  awaiting: number
+  approved: number
+  fulfilled: number
+  received: number
+  remaining: number
+  unallocated: number
+}
+
+/** One centre's share, with its status in the words a hospital uses. */
+export type FacilityAllocation = BloodRequest & { allocation_status_label: string }
+
+export interface TransfusionRequest {
+  id: number
+  reference_number: string
+  request_purpose: 'patient_transfusion'
+  purpose_label: string
+  request_source: RequestSource
+  source_label: string
+  is_walk_in: boolean
+  requesting_facility: FacilityStub | null
+  requester_name: string | null
+  recorder_name: string | null
+  patient: PatientDetails
+  blood_type: BloodTypeStub
+  urgency_level: UrgencyLevel
+  urgency_label: string
+  is_emergency: boolean
+  status: BloodRequestStatus
+  status_label: string
+  is_open: boolean
+  /** Some units are asked of nobody — the hospital should search again. */
+  needs_allocation: boolean
+  totals: TransfusionTotals
+  lines: TransfusionLine[]
+  allocation_count: number
+  /** Names of the centres asked, for a listing row. */
+  facilities: string[]
+  internal_stock_checked_at: string | null
+  request_date: string | null
+  fulfilled_at: string | null
+  closed_at: string | null
+  cancelled_at: string | null
+  cancellation_reason: string | null
+  /** Only on the detail view. */
+  allocations?: FacilityAllocation[]
+  walk_in?: WalkInDetails | null
+}
+
+/** One centre holding matching stock, and how much of the need it is suggested for. */
+export interface SourcingHolding {
+  facility: FacilityStub
+  available: number
+  earliest_expiry: string | null
+  suggested: number
+}
+
+export interface SourcingLine {
+  transfusion_request_item_id: number | null
+  component: ComponentStub
+  /** What this plan is for: the need, or what is still unallocated. */
+  quantity: number
+  /** Earliest expiry first — the FEFO rule — then the deepest shelf. */
+  facilities: SourcingHolding[]
+  /** Eligible centres holding none today; they may still be asked. */
+  other_facilities: FacilityStub[]
+  suggested_total: number
+  shortfall: number
+}
+
+/** POST /hospital/transfusion-requests/sourcing and GET …/{id}/sourcing */
+export interface SourcingPlan {
+  blood_type: BloodTypeStub
+  lines: SourcingLine[]
+  /** Always true: a plan holds nothing. */
+  advisory: boolean
+  as_of: string
+}
+
+/** One centre asked for a share: a component and quantity per line. */
+export interface AllocationSharePayload {
+  facility_id: number
+  lines: Array<{ component_id: number; quantity: number }>
+}
+
+export interface CreateTransfusionRequestPayload {
+  internal_stock_confirmed: true
+  blood_type_id: number
+  urgency_level: UrgencyLevel
+  patient_surname: string
+  patient_first_name: string
+  patient_middle_name?: string | null
+  patient_age: number
+  patient_sex: 'male' | 'female'
+  lines: CreateBloodRequestItemPayload[]
+  allocations: AllocationSharePayload[]
+}
+
+/** An active requirement for the patient, before the hospital records another. */
+export interface PatientMatch {
+  id: number
+  reference_number: string
+  request_source: RequestSource
+  source_label: string
+  status: BloodRequestStatus
+  status_label: string
+  is_open: boolean
+  request_date: string | null
+  facilities: string[]
+  totals: TransfusionTotals
+}
+
+export interface TransfusionRequestFilters {
+  status?: BloodRequestStatus
+  urgency_level?: UrgencyLevel
+  request_source?: RequestSource
+  search?: string
+  per_page?: number
+  page?: number
 }
 
 /** GET /hospital/reference-data — what the request form is built from. */
@@ -451,6 +631,7 @@ export interface BloodRequestFilters {
   status?: BloodRequestStatus
   urgency_level?: UrgencyLevel
   request_source?: RequestSource
+  request_purpose?: RequestPurpose
   blood_type_id?: number
   component_id?: number
   search?: string
@@ -508,7 +689,6 @@ export const LINE_STATUS_LABELS: Record<LineFulfilmentStatus, string> = {
   unfulfilled: 'Unfulfilled',
   partial: 'Partially Fulfilled',
   fulfilled: 'Fulfilled',
-  forwarded: 'Forwarded to another facility',
   closed_short: 'Closed — not supplied',
 }
 
@@ -516,7 +696,26 @@ export const LINE_STATUS_TONES: Record<LineFulfilmentStatus, 'info' | 'progress'
   unfulfilled: 'danger',
   partial: 'warning',
   fulfilled: 'success',
-  forwarded: 'info',
+  closed_short: 'muted',
+}
+
+export const TRANSFUSION_LINE_STATUS_LABELS: Record<TransfusionLineStatus, string> = {
+  awaiting_response: 'Awaiting facility response',
+  needs_allocation: 'Needs another facility',
+  partially_approved: 'Partially approved',
+  approved: 'Approved',
+  partially_fulfilled: 'Partially fulfilled',
+  fulfilled: 'Fulfilled',
+  closed_short: 'Closed — no longer needed',
+}
+
+export const TRANSFUSION_LINE_STATUS_TONES: Record<TransfusionLineStatus, 'info' | 'progress' | 'warning' | 'success' | 'danger' | 'muted'> = {
+  awaiting_response: 'info',
+  needs_allocation: 'danger',
+  partially_approved: 'progress',
+  approved: 'progress',
+  partially_fulfilled: 'warning',
+  fulfilled: 'success',
   closed_short: 'muted',
 }
 
@@ -574,11 +773,12 @@ export function componentSummary(request: Pick<BloodRequest, 'items'>): string {
 /**
  * The status as it should read, including whether a partial request is finished.
  *
- * A partially fulfilled request whose every remainder was closed or forwarded
- * keeps the `partial` status — that is what was supplied — but can no longer be
- * filled, so it reads "Partially Fulfilled (Closed)".
+ * A partially fulfilled request whose every remainder was closed keeps the
+ * `partial` status — that is what was supplied — but can no longer be filled,
+ * so it reads "Partially Fulfilled (Closed)". The same holds for a Patient
+ * Transfusion Request.
  */
-export function requestStatusLabel(request: Pick<BloodRequest, 'status' | 'status_label' | 'is_open'>): string {
+export function requestStatusLabel(request: { status: BloodRequestStatus; status_label?: string | null; is_open: boolean }): string {
   const label = request.status_label || REQUEST_STATUS_LABELS[request.status] || request.status
 
   return request.status === 'partial' && request.is_open === false ? `${label} (Closed)` : label

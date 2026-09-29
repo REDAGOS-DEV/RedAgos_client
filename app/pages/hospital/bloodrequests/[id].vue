@@ -168,9 +168,22 @@
             />
           </section>
 
-          <section v-if="request.parent || request.follow_ups?.length" class="card">
-            <h2 class="section-title">Linked Requests</h2>
-            <RequestChain :parent="request.parent" :follow-ups="request.follow_ups" link-base="/hospital/bloodrequests/" />
+          <!--
+            A facility allocation is one centre's share of a patient's need.
+            The need itself — and every other centre asked for it — is followed
+            on the Patient Transfusion Request.
+          -->
+          <section v-if="request.transfusion_request" class="card part-of">
+            <h2 class="section-title">Patient Transfusion Request</h2>
+            <p class="part-of__text">
+              This is {{ request.target_facility?.name || 'this facility' }}'s share of
+              <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="part-of__ref">{{ request.transfusion_request.reference_number }}</NuxtLink>
+              ({{ requestStatusLabel(request.transfusion_request) }}). The patient needs {{ requiredSummary }}; other
+              facilities may be asked for the rest.
+            </p>
+            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="btn btn--outline btn--sm">
+              <span>Open the Patient Transfusion Request</span>
+            </NuxtLink>
           </section>
 
           <!-- SECTION 2: BLOOD DETAILS -->
@@ -238,30 +251,21 @@
 
           <!--
             FULFILMENT: what the blood center provided, per component, beside
-            what was requested. A remainder can be closed as no longer needed,
-            or — if the center could not supply it — sourced from another
-            facility through a follow-up.
+            what was requested. On a replenishment a remainder can be closed as
+            no longer needed here; a facility allocation's remainder is closed
+            on its Patient Transfusion Request, which stops every centre asked.
           -->
           <section id="request-fulfilment" class="card">
             <div class="fulfilment-head">
               <h2 class="section-title">Fulfilment</h2>
-              <button
-                v-if="canForward"
-                class="btn btn--primary btn--sm"
-                type="button"
-                @click="showFollowUp = true"
-              >
-                <AssetIcon name="route" :size="16" />
-                <span>Source remaining from another facility</span>
-              </button>
             </div>
-            <p v-if="canForward" class="fulfilment-hint">
-              {{ request.forwardable_quantity }} unit{{ request.forwardable_quantity === 1 ? '' : 's' }} can still be
-              asked of another blood service facility.
+            <p v-if="request.transfusion_request && request.is_open !== false" class="fulfilment-hint">
+              To stop asking for the rest of a component, close it on
+              <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`">{{ request.transfusion_request.reference_number }}</NuxtLink>.
             </p>
             <RequestFulfilmentTable
               :request="request"
-              :closable="request.is_open !== false"
+              :closable="request.is_open !== false && !request.transfusion_request"
               close-label="No longer needed"
               :busy-item-id="closingLine ? lineToClose?.id ?? null : null"
               @close-line="openCloseLine"
@@ -643,12 +647,6 @@
         @confirm="confirmCloseLine"
       />
 
-      <FollowUpRequestDialog
-        v-if="showFollowUp"
-        :request="request"
-        @close="showFollowUp = false"
-        @created="onFollowUpCreated"
-      />
     </template>
   </div>
 </template>
@@ -658,11 +656,9 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
-import RequestChain from '~/components/common/RequestChain.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
-import FollowUpRequestDialog from '~/components/Hospital/FollowUpRequestDialog.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -831,7 +827,7 @@ const statusColorClass = computed(() => {
   return `badge--${TONE_BADGES[tone] ?? 'neutral'}`
 })
 
-/** "Partially Fulfilled (Closed)" once every remainder was closed or forwarded. */
+/** "Partially Fulfilled (Closed)" once every remainder was closed. */
 const statusText = computed(() => (request.value ? requestStatusLabel(request.value) : '—'))
 
 const priorityColorClass = computed(() =>
@@ -870,24 +866,15 @@ async function confirmCloseLine(note) {
   }
 }
 
-/* FOLLOW-UP — source what the blood center could not supply elsewhere */
-const showFollowUp = ref(false)
+/** What the patient needs in all, e.g. "Packed RBC 5, Fresh Frozen Plasma 2". */
+const requiredSummary = computed(() => {
+  const required = request.value?.transfusion_request?.required ?? []
+  const names = Object.fromEntries((request.value?.items ?? []).map((item) => [item.component?.id, item.component?.name]))
 
-// Only once the center has supplied or reserved something. A request nothing
-// has happened to is not a remainder — cancel it and raise it elsewhere — and
-// the API refuses to move a whole untouched request as a follow-up.
-const canForward = computed(() =>
-  Boolean(request.value)
-  && !['rejected', 'cancelled', 'fulfilled'].includes(request.value.status)
-  && (request.value.forwardable_quantity ?? 0) > 0
-  && ((request.value.fulfilled_quantity ?? 0) + (request.value.allocated_count ?? 0)) > 0,
-)
-
-async function onFollowUpCreated(response) {
-  showFollowUp.value = false
-  showToast(response?.message || 'Follow-up sent.')
-  await fetchRequest()
-}
+  return required
+    .map((line) => `${line.component ?? names[line.component_id] ?? 'a component'} ${line.quantity}`)
+    .join(', ') || 'what was requested'
+})
 
 const canEdit = computed(() => request.value?.status === 'Pending')
 
@@ -1825,6 +1812,18 @@ function scrollToTimeline() {
 .fulfilment-hint {
   margin: 0 0 12px;
   font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+.fulfilment-hint a,
+.part-of__ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: var(--rb-primary-text);
+}
+.part-of__text {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--rb-text-secondary);
 }
 .receipt-table {

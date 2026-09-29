@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  applyFollowUpMatch,
+  applyContinueMatch,
   blankWalkInForm,
-  buildFollowUpPayload,
   buildWalkInPayload,
   canCloseLine,
-  clearFollowUp,
-  forwardableRows,
+  clearContinuation,
   fulfilmentRows,
   fulfilmentTotals,
   localInputToIso,
@@ -50,9 +48,9 @@ function scenario(overrides: Partial<BloodRequest> = {}): BloodRequest {
     status_label: 'Partially Fulfilled',
     is_open: true,
     items: [
-      { id: 11, component: { id: 1, name: 'Packed RBC' }, quantity: 2, fulfilled_quantity: 2, reserved_quantity: 0, received_quantity: 2, forwarded_quantity: 0, remaining_quantity: 0, allocatable_quantity: 0, forwardable_quantity: 0, line_status: 'fulfilled', line_status_label: 'Fulfilled' },
-      { id: 12, component: { id: 2, name: 'Fresh Frozen Plasma' }, quantity: 2, fulfilled_quantity: 1, reserved_quantity: 0, received_quantity: 0, forwarded_quantity: 0, remaining_quantity: 1, allocatable_quantity: 1, forwardable_quantity: 1, line_status: 'partial', line_status_label: 'Partially Fulfilled' },
-      { id: 13, component: { id: 3, name: 'Platelet Concentrate' }, quantity: 1, fulfilled_quantity: 0, reserved_quantity: 0, received_quantity: 0, forwarded_quantity: 0, remaining_quantity: 1, allocatable_quantity: 1, forwardable_quantity: 1, line_status: 'unfulfilled', line_status_label: 'Unfulfilled' },
+      { id: 11, component: { id: 1, name: 'Packed RBC' }, quantity: 2, fulfilled_quantity: 2, reserved_quantity: 0, received_quantity: 2, remaining_quantity: 0, allocatable_quantity: 0, line_status: 'fulfilled', line_status_label: 'Fulfilled' },
+      { id: 12, component: { id: 2, name: 'Fresh Frozen Plasma' }, quantity: 2, fulfilled_quantity: 1, reserved_quantity: 0, received_quantity: 0, remaining_quantity: 1, allocatable_quantity: 1, line_status: 'partial', line_status_label: 'Partially Fulfilled' },
+      { id: 13, component: { id: 3, name: 'Platelet Concentrate' }, quantity: 1, fulfilled_quantity: 0, reserved_quantity: 0, received_quantity: 0, remaining_quantity: 1, allocatable_quantity: 1, line_status: 'unfulfilled', line_status_label: 'Unfulfilled' },
     ],
     ...overrides,
   } as unknown as BloodRequest
@@ -90,10 +88,6 @@ describe('the fulfilment table', () => {
     expect(rows.map((row) => canCloseLine(row, true))).toEqual([false, true, true])
     expect(rows.map((row) => canCloseLine(row, false))).toEqual([false, false, false])
   })
-
-  it('lists only the lines that can still be sourced elsewhere', () => {
-    expect(forwardableRows(scenario()).map((row) => row.id)).toEqual([12, 13])
-  })
 })
 
 describe('the request status as it reads', () => {
@@ -112,40 +106,35 @@ describe('the request status as it reads', () => {
   })
 })
 
-describe('a follow-up for the remainder', () => {
-  it('asks only for what each line can still forward, dropping lines left at zero', () => {
-    const rows = forwardableRows(scenario())
-
-    expect(buildFollowUpPayload(9, { 12: 5, 13: 0 }, rows)).toEqual({
-      target_facility_id: 9,
-      items: [{ parent_item_id: 12, quantity: 1 }],
-    })
-  })
-
-  it('takes the patient and lines from the original when a walk-in continues it', () => {
+describe('a walk-in continuing a Patient Transfusion Request', () => {
+  it('takes the patient and offers only the unallocated units', () => {
     const match = {
       id: 40,
-      reference_number: 'RQ-4-0012',
-      relation: 'follow_up',
+      reference_number: 'PTR-4-0012',
+      relation: 'continue',
+      allocation: null,
+      facilities: ['Tagum Blood Center'],
       patient: { surname: 'Dela Cruz', first_name: 'Juan', middle_name: null, age: 54, sex: 'male', full_name: 'DELA CRUZ, Juan' },
       blood_type: { id: 7, code: 'O+' },
       urgency_level: 'emergency',
       lines: [
-        { request_item_id: 11, component: { id: 1, name: 'Packed RBC' }, requested: 2, reserved: 0, fulfilled: 2, forwardable: 0 },
-        { request_item_id: 12, component: { id: 2, name: 'Fresh Frozen Plasma' }, requested: 2, reserved: 0, fulfilled: 1, forwardable: 1 },
+        { transfusion_request_item_id: 11, component: { id: 1, name: 'Packed RBC' }, required: 2, approved: 2, fulfilled: 2, unallocated: 0 },
+        { transfusion_request_item_id: 12, component: { id: 2, name: 'Fresh Frozen Plasma' }, required: 2, approved: 1, fulfilled: 1, unallocated: 1 },
       ],
+      unallocated_quantity: 1,
     } as unknown as DuplicateMatch
 
-    const form = applyFollowUpMatch(blankWalkInForm(), match)
+    const form = applyContinueMatch(blankWalkInForm(), match)
 
-    expect(form.parentRequestId).toBe(40)
+    expect(form.transfusionRequestId).toBe(40)
+    expect(form.transfusionReference).toBe('PTR-4-0012')
     expect(form.patient.surname).toBe('Dela Cruz')
     expect(form.bloodTypeId).toBe(7)
     expect(form.lines).toEqual([
-      { componentId: 2, parentItemId: 12, quantity: 1, maxQuantity: 1, indicationCode: '', indicationOther: '' },
+      { componentId: 2, requirementItemId: 12, quantity: 1, maxQuantity: 1, indicationCode: '', indicationOther: '' },
     ])
 
-    expect(clearFollowUp(form).parentRequestId).toBeNull()
+    expect(clearContinuation(form).transfusionRequestId).toBeNull()
   })
 
   it('does not count the request being continued as a duplicate of it', () => {
@@ -165,8 +154,8 @@ describe('the walk-in form', () => {
     form.bloodTypeId = 7
     form.urgency = 'emergency'
     form.lines = [
-      { componentId: 1, parentItemId: null, quantity: '2', maxQuantity: null, indicationCode: 'R-1', indicationOther: '' },
-      { componentId: 2, parentItemId: null, quantity: 2, maxQuantity: null, indicationCode: 'F-1', indicationOther: '' },
+      { componentId: 1, requirementItemId: null, quantity: '2', maxQuantity: null, indicationCode: 'R-1', indicationOther: '' },
+      { componentId: 2, requirementItemId: null, quantity: 2, maxQuantity: null, indicationCode: 'F-1', indicationOther: '' },
     ]
     form.representative = { name: 'Pedro Dela Cruz', relationship: 'Son', contact: '09171234567', idType: '', idNumber: '' }
     form.verification = {
@@ -218,19 +207,19 @@ describe('the walk-in form', () => {
     ])
   })
 
-  it('refuses the same component twice and a follow-up above what is left', () => {
+  it('refuses the same component twice and a continuation above what is unallocated', () => {
     const form = completed()
     form.lines[1].componentId = 1
     form.lines[1].indicationCode = 'R-1'
 
     expect(walkInStepProblems(form, 'details', COMPONENTS)).toContain('Packed RBC is listed twice.')
 
-    const followUp = completed()
-    followUp.parentRequestId = 40
-    followUp.lines = [{ componentId: 2, parentItemId: 12, quantity: 3, maxQuantity: 1, indicationCode: '', indicationOther: '' }]
+    const continuing = completed()
+    continuing.transfusionRequestId = 40
+    continuing.lines = [{ componentId: 2, requirementItemId: 12, quantity: 3, maxQuantity: 1, indicationCode: '', indicationOther: '' }]
 
-    expect(walkInStepProblems(followUp, 'details', COMPONENTS)).toEqual([
-      'Only 1 unit(s) of Fresh Frozen Plasma are left to source.',
+    expect(walkInStepProblems(continuing, 'details', COMPONENTS)).toEqual([
+      'Only 1 unit(s) of Fresh Frozen Plasma are still unallocated.',
     ])
   })
 
@@ -260,18 +249,18 @@ describe('the walk-in form', () => {
       duplicate_acknowledgement: null,
     })
     expect(payload.verification.verified_at).toMatch(/Z$/)
-    expect(payload).not.toHaveProperty('parent_request_id')
+    expect(payload).not.toHaveProperty('transfusion_request_id')
   })
 
-  it('sends a follow-up as parent lines only, leaving the patient to the original', () => {
+  it('sends a continuation as requirement lines only, leaving the patient to the requirement', () => {
     const form = completed()
-    form.parentRequestId = 40
-    form.lines = [{ componentId: 2, parentItemId: 12, quantity: 1, maxQuantity: 1, indicationCode: '', indicationOther: '' }]
+    form.transfusionRequestId = 40
+    form.lines = [{ componentId: 2, requirementItemId: 12, quantity: 1, maxQuantity: 1, indicationCode: '', indicationOther: '' }]
 
     const payload = buildWalkInPayload(form)
 
-    expect(payload.parent_request_id).toBe(40)
-    expect(payload.items).toEqual([{ parent_item_id: 12, quantity: 1 }])
+    expect(payload.transfusion_request_id).toBe(40)
+    expect(payload.items).toEqual([{ transfusion_request_item_id: 12, quantity: 1 }])
     expect(payload).not.toHaveProperty('patient_surname')
     expect(payload).not.toHaveProperty('blood_type_id')
   })

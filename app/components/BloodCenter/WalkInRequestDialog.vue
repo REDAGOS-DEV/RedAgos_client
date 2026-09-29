@@ -51,7 +51,7 @@
           <div class="grid">
             <label class="field field--wide">
               <span class="field__label">Patient's hospital blood bank *</span>
-              <select v-model.number="form.hospitalId" class="field__input" :disabled="isFollowUp">
+              <select v-model.number="form.hospitalId" class="field__input" :disabled="isContinuing">
                 <option :value="null" disabled>Select the hospital</option>
                 <option v-for="hospital in reference.hospitals" :key="hospital.id" :value="hospital.id">
                   {{ hospital.name }}
@@ -64,16 +64,16 @@
 
             <label class="field">
               <span class="field__label">Patient surname *</span>
-              <input v-model="form.patient.surname" class="field__input" maxlength="100" :disabled="isFollowUp" autocomplete="off">
+              <input v-model="form.patient.surname" class="field__input" maxlength="100" :disabled="isContinuing" autocomplete="off">
             </label>
             <label class="field">
               <span class="field__label">Patient first name *</span>
-              <input v-model="form.patient.firstName" class="field__input" maxlength="100" :disabled="isFollowUp" autocomplete="off">
+              <input v-model="form.patient.firstName" class="field__input" maxlength="100" :disabled="isContinuing" autocomplete="off">
             </label>
 
             <label class="field">
               <span class="field__label">Blood type</span>
-              <select v-model.number="form.bloodTypeId" class="field__input" :disabled="isFollowUp">
+              <select v-model.number="form.bloodTypeId" class="field__input" :disabled="isContinuing">
                 <option :value="null">Not known yet</option>
                 <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
               </select>
@@ -94,13 +94,13 @@
             </span>
           </div>
 
-          <div v-if="isFollowUp" class="banner banner--info">
+          <div v-if="isContinuing" class="banner banner--info">
             <AssetIcon name="route" :size="15" />
             <span>
-              Recording as a follow-up of <strong class="mono">{{ form.parentReference }}</strong>. The patient, blood
-              type and components come from that request; only what it still needs can be asked for here.
+              Adding this center's share to <strong class="mono">{{ form.transfusionReference }}</strong>. The patient,
+              blood type and components come from that request; only its unallocated units can be asked for here.
             </span>
-            <button type="button" class="link-btn" @click="undoFollowUp">Record separately instead</button>
+            <button type="button" class="link-btn" @click="undoContinuation">Record separately instead</button>
           </div>
 
           <ul v-if="matches.length" class="matches">
@@ -112,27 +112,33 @@
               </div>
               <p class="match__meta">
                 {{ match.patient.full_name || '—' }} · {{ match.blood_type?.code || '—' }}
-                · {{ match.facility?.name || '—' }} · {{ match.source_label }} · {{ formatDate(match.request_date) }}
+                · {{ match.facilities?.length ? match.facilities.join(', ') : 'No facility yet' }} · {{ match.source_label }}
+                · {{ formatDate(match.request_date) }}
               </p>
               <p class="match__lines">
-                <span v-for="line in match.lines" :key="line.request_item_id">
-                  {{ line.component.name }} {{ line.fulfilled }}/{{ line.requested }}<template v-if="line.forwardable"> ({{ line.forwardable }} left)</template>
+                <span v-for="line in match.lines" :key="line.transfusion_request_item_id">
+                  {{ line.component.name }} {{ line.approved }}/{{ line.required }} approved<template v-if="line.unallocated"> ({{ line.unallocated }} unallocated)</template>
                 </span>
               </p>
               <div class="match__actions">
-                <button v-if="match.relation === 'here'" type="button" class="btn btn--primary btn--sm" @click="$emit('open-existing', match.id)">
-                  Open this request instead
-                </button>
                 <button
-                  v-if="match.relation === 'follow_up' && form.parentRequestId !== match.id"
+                  v-if="match.relation === 'here' && match.allocation"
                   type="button"
                   class="btn btn--primary btn--sm"
-                  @click="useAsFollowUp(match)"
+                  @click="$emit('open-existing', match.allocation.id)"
                 >
-                  Record the remaining {{ match.forwardable_quantity }} unit{{ match.forwardable_quantity === 1 ? '' : 's' }} as a follow-up
+                  Open {{ match.allocation.reference_number }} instead
                 </button>
-                <span v-if="form.parentRequestId === match.id" class="ok-text">
-                  <AssetIcon name="check" :size="14" /> Continuing this request
+                <button
+                  v-if="match.relation === 'continue' && form.transfusionRequestId !== match.id"
+                  type="button"
+                  class="btn btn--primary btn--sm"
+                  @click="useAsContinuation(match)"
+                >
+                  Add this center's share — {{ match.unallocated_quantity }} unallocated unit{{ match.unallocated_quantity === 1 ? '' : 's' }}
+                </button>
+                <span v-if="form.transfusionRequestId === match.id" class="ok-text">
+                  <AssetIcon name="check" :size="14" /> Adding to this request
                 </span>
               </div>
             </li>
@@ -209,8 +215,8 @@
         <section v-show="step === 3" class="step">
           <h3 class="step__heading">Patient</h3>
           <div class="grid">
-            <p v-if="isFollowUp" class="field__hint field--wide">
-              {{ patientName }} · {{ bloodTypeCode || '—' }} — taken from {{ form.parentReference }}.
+            <p v-if="isContinuing" class="field__hint field--wide">
+              {{ patientName }} · {{ bloodTypeCode || '—' }} — taken from {{ form.transfusionReference }}.
             </p>
             <template v-else>
               <label class="field">
@@ -262,7 +268,7 @@
             <div v-for="(line, index) in form.lines" :key="index" class="line">
               <label class="field">
                 <span class="field__label">Component</span>
-                <select v-model.number="line.componentId" class="field__input" :disabled="isFollowUp" @change="line.indicationCode = ''">
+                <select v-model.number="line.componentId" class="field__input" :disabled="isContinuing" @change="line.indicationCode = ''">
                   <option :value="null" disabled>Select</option>
                   <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
                 </select>
@@ -271,7 +277,7 @@
                 <span class="field__label">Units{{ line.maxQuantity !== null ? ` (max ${line.maxQuantity})` : '' }}</span>
                 <input v-model="line.quantity" type="number" min="1" :max="line.maxQuantity ?? 100" class="field__input">
               </label>
-              <template v-if="!isFollowUp">
+              <template v-if="!isContinuing">
                 <label v-if="indicationsFor(line).length" class="field field--grow">
                   <span class="field__label">Indication</span>
                   <select v-model="line.indicationCode" class="field__input">
@@ -285,19 +291,20 @@
                   <span class="field__label">Specify</span>
                   <input v-model="line.indicationOther" class="field__input" maxlength="255">
                 </label>
-                <button
-                  v-if="form.lines.length > 1"
-                  type="button"
-                  class="icon-btn line__remove"
-                  :aria-label="`Remove line ${index + 1}`"
-                  @click="form.lines.splice(index, 1)"
-                >
-                  <AssetIcon name="trash-2" :size="15" />
-                </button>
               </template>
+              <!-- A continuing watcher may carry only some of what is unallocated. -->
+              <button
+                v-if="form.lines.length > 1"
+                type="button"
+                class="icon-btn line__remove"
+                :aria-label="`Remove line ${index + 1}`"
+                @click="form.lines.splice(index, 1)"
+              >
+                <AssetIcon name="trash-2" :size="15" />
+              </button>
             </div>
             <button
-              v-if="!isFollowUp && form.lines.length < reference.components.length && form.lines.length < 6"
+              v-if="!isContinuing && form.lines.length < reference.components.length && form.lines.length < 6"
               type="button"
               class="link-btn"
               @click="form.lines.push(blankLine())"
@@ -344,7 +351,7 @@
             <div><dt>Priority</dt><dd>{{ priorityLabel }}</dd></div>
             <div><dt>Confirmed by</dt><dd>{{ form.verification.verifierName }} ({{ form.verification.verifierPosition }})</dd></div>
             <div><dt>Presented by</dt><dd>{{ form.representative.name }} · {{ form.representative.relationship }}</dd></div>
-            <div v-if="isFollowUp" class="review__wide"><dt>Follow-up of</dt><dd class="mono">{{ form.parentReference }}</dd></div>
+            <div v-if="isContinuing" class="review__wide"><dt>Added to</dt><dd class="mono">{{ form.transfusionReference }}</dd></div>
             <div class="review__wide">
               <dt>Components</dt>
               <dd>
@@ -408,11 +415,11 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { PRIORITY_LABELS, requestStatusLabel } from '~/types/bloodRequest'
 import {
   DUPLICATE_RELATION_LABELS,
-  applyFollowUpMatch,
+  applyContinueMatch,
   blankLine,
   blankWalkInForm,
   buildWalkInPayload,
-  clearFollowUp,
+  clearContinuation,
   matchesNeedingAcknowledgement,
   toLocalInputValue,
   walkInStepProblems,
@@ -442,7 +449,7 @@ const submitError = ref('')
 
 const nowInput = ref(toLocalInputValue(new Date()))
 
-const isFollowUp = computed(() => form.value.parentRequestId !== null)
+const isContinuing = computed(() => form.value.transfusionRequestId !== null)
 const selectedHospital = computed(() => reference.value?.hospitals.find((h) => h.id === form.value.hospitalId) ?? null)
 const bloodTypeCode = computed(() => reference.value?.blood_types.find((t) => t.id === form.value.bloodTypeId)?.code ?? '')
 const priorityLabel = computed(() => PRIORITY_LABELS[form.value.urgency] ?? form.value.urgency)
@@ -461,7 +468,7 @@ const canCheck = computed(() => Boolean(
   && ((form.value.patient.surname.trim() && form.value.patient.firstName.trim()) || form.value.presentedReference.trim()),
 ))
 
-const acknowledgementNeeded = computed(() => matchesNeedingAcknowledgement(matches.value, form.value.parentRequestId))
+const acknowledgementNeeded = computed(() => matchesNeedingAcknowledgement(matches.value, form.value.transfusionRequestId))
 
 const problems = computed(() => {
   if (!reference.value) return []
@@ -483,12 +490,12 @@ const problems = computed(() => {
   return walkInStepProblems(form.value, STEP_KEYS[step.value], reference.value.components)
 })
 
-// A different patient or hospital is a different lookup. A follow-up fills
-// these in itself from the original request, so it is not a reason to re-check.
+// A different patient or hospital is a different lookup. A continuation fills
+// these in itself from the requirement, so it is not a reason to re-check.
 watch(
   () => [form.value.hospitalId, form.value.patient.surname, form.value.patient.firstName, form.value.bloodTypeId, form.value.presentedReference],
   () => {
-    if (!isFollowUp.value) {
+    if (!isContinuing.value) {
       lookupDone.value = false
       matches.value = []
     }
@@ -531,12 +538,12 @@ async function checkDuplicates() {
   }
 }
 
-function useAsFollowUp(match) {
-  form.value = applyFollowUpMatch(form.value, match)
+function useAsContinuation(match) {
+  form.value = applyContinueMatch(form.value, match)
 }
 
-function undoFollowUp() {
-  form.value = clearFollowUp(form.value)
+function undoContinuation() {
+  form.value = clearContinuation(form.value)
 }
 
 function confirmByPhone() {
@@ -875,7 +882,7 @@ function formatDate(value) {
 
 /* The relation is named in the chip; the tint only groups it at a glance. */
 .match--here { background: rgba(var(--rb-primary-rgb), 0.05); border-color: rgba(var(--rb-primary-rgb), 0.25); }
-.match--follow_up { background: rgba(var(--rb-success-rgb), 0.06); border-color: rgba(var(--rb-success-rgb), 0.3); }
+.match--continue { background: rgba(var(--rb-success-rgb), 0.06); border-color: rgba(var(--rb-success-rgb), 0.3); }
 .match--duplicate { background: rgba(var(--rb-warning-rgb), 0.07); border-color: rgba(var(--rb-warning-rgb), 0.35); }
 
 .match__head {

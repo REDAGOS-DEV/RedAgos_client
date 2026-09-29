@@ -14,7 +14,6 @@ import type {
   BloodRequest,
   BloodRequestItem,
   ComponentOption,
-  CreateFollowUpPayload,
   CreateWalkInPayload,
   DuplicateMatch,
   DuplicateRelation,
@@ -36,10 +35,8 @@ export interface FulfilmentRow {
   reserved: number
   fulfilled: number
   received: number
-  forwarded: number
   remaining: number
   allocatable: number
-  forwardable: number
   status: LineFulfilmentStatus
   statusLabel: string
   tone: Tone
@@ -57,10 +54,8 @@ export interface FulfilmentRow {
 export function deriveLineStatus(item: BloodRequestItem): LineFulfilmentStatus {
   const requested = item.quantity ?? 0
   const fulfilled = item.fulfilled_quantity ?? 0
-  const forwarded = item.forwarded_quantity ?? 0
 
   if (fulfilled >= requested && requested > 0) return 'fulfilled'
-  if (fulfilled + forwarded >= requested && requested > 0) return 'forwarded'
   if (item.closed_at && (item.reserved_quantity ?? 0) === 0) return 'closed_short'
   if (fulfilled > 0) return 'partial'
 
@@ -81,10 +76,8 @@ export function fulfilmentRows(request: Pick<BloodRequest, 'items'> | null | und
       reserved: item.reserved_quantity ?? 0,
       fulfilled,
       received: item.received_quantity ?? 0,
-      forwarded: item.forwarded_quantity ?? 0,
       remaining: item.remaining_quantity ?? Math.max(0, requested - fulfilled),
       allocatable: item.allocatable_quantity ?? 0,
-      forwardable: item.forwardable_quantity ?? 0,
       status,
       statusLabel: item.line_status_label ?? LINE_STATUS_LABELS[status],
       tone: LINE_STATUS_TONES[status],
@@ -102,10 +95,9 @@ export function fulfilmentTotals(rows: FulfilmentRow[]) {
       reserved: totals.reserved + row.reserved,
       fulfilled: totals.fulfilled + row.fulfilled,
       received: totals.received + row.received,
-      forwarded: totals.forwarded + row.forwarded,
       remaining: totals.remaining + row.remaining,
     }),
-    { requested: 0, reserved: 0, fulfilled: 0, received: 0, forwarded: 0, remaining: 0 },
+    { requested: 0, reserved: 0, fulfilled: 0, received: 0, remaining: 0 },
   )
 }
 
@@ -113,42 +105,11 @@ export function fulfilmentTotals(rows: FulfilmentRow[]) {
  * Whether the rest of a line may be closed from this screen.
  *
  * Only while the request is open and the line still has something this
- * facility could supply: a line fully held, released or forwarded has nothing
- * left to close, and the API refuses it.
+ * facility could supply: a line fully held or released has nothing left to
+ * close, and the API refuses it.
  */
 export function canCloseLine(row: FulfilmentRow, requestOpen: boolean): boolean {
   return requestOpen && !row.closed && row.allocatable > 0
-}
-
-/** The lines whose remainder may still be asked of another facility. */
-export function forwardableRows(request: Pick<BloodRequest, 'items'> | null | undefined): FulfilmentRow[] {
-  return fulfilmentRows(request).filter((row) => row.forwardable > 0)
-}
-
-/**
- * Build a follow-up from the quantities chosen per line.
- *
- * Lines left at zero are dropped, and nothing is sent above what a line can
- * still forward — the API refuses that anyway, but the form should never ask.
- */
-export function buildFollowUpPayload(
-  targetFacilityId: number,
-  quantities: Record<number, number | string>,
-  rows: FulfilmentRow[],
-  urgency?: UrgencyLevel,
-): CreateFollowUpPayload {
-  const items = rows
-    .map((row) => ({
-      parent_item_id: row.id,
-      quantity: Math.min(row.forwardable, Math.max(0, Math.trunc(Number(quantities[row.id] ?? 0)) || 0)),
-    }))
-    .filter((item) => item.quantity > 0)
-
-  return {
-    target_facility_id: targetFacilityId,
-    ...(urgency ? { urgency_level: urgency } : {}),
-    items,
-  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -157,18 +118,18 @@ export function buildFollowUpPayload(
 
 export const DUPLICATE_RELATION_LABELS: Record<DuplicateRelation, string> = {
   here: 'Already at this blood center',
-  follow_up: 'Part-filled at another blood center',
+  continue: 'Units still unallocated',
   duplicate: 'Open request for the same patient',
 }
 
 /**
  * The matches a new walk-in has to be justified against.
  *
- * A follow-up continues its parent, so the parent is not a duplicate of it.
- * Everything else found for the patient is.
+ * A walk-in that continues a Patient Transfusion Request adds to it, so that
+ * request is not a duplicate of it. Everything else found for the patient is.
  */
-export function matchesNeedingAcknowledgement(matches: DuplicateMatch[], parentRequestId: number | null): DuplicateMatch[] {
-  return matches.filter((match) => match.id !== parentRequestId)
+export function matchesNeedingAcknowledgement(matches: DuplicateMatch[], transfusionRequestId: number | null): DuplicateMatch[] {
+  return matches.filter((match) => match.id !== transfusionRequestId)
 }
 
 /* ------------------------------------------------------------------ *
@@ -177,10 +138,10 @@ export function matchesNeedingAcknowledgement(matches: DuplicateMatch[], parentR
 
 export interface WalkInLine {
   componentId: number | null
-  /** Set when the line carries the remainder of another request's line. */
-  parentItemId: number | null
+  /** Set when the line answers a line of an existing Patient Transfusion Request. */
+  requirementItemId: number | null
   quantity: number | string
-  /** The most a follow-up line may ask for. */
+  /** The most a continuing line may ask for: what is still unallocated. */
   maxQuantity: number | null
   indicationCode: string
   indicationOther: string
@@ -189,8 +150,9 @@ export interface WalkInLine {
 export interface WalkInForm {
   hospitalId: number | null
   presentedReference: string
-  parentRequestId: number | null
-  parentReference: string | null
+  /** The Patient Transfusion Request this walk-in adds this centre's share to. */
+  transfusionRequestId: number | null
+  transfusionReference: string | null
   patient: {
     surname: string
     firstName: string
@@ -225,7 +187,7 @@ export interface WalkInForm {
 }
 
 export function blankLine(): WalkInLine {
-  return { componentId: null, parentItemId: null, quantity: 1, maxQuantity: null, indicationCode: '', indicationOther: '' }
+  return { componentId: null, requirementItemId: null, quantity: 1, maxQuantity: null, indicationCode: '', indicationOther: '' }
 }
 
 /** Render a date as a datetime-local input value, in local time. */
@@ -248,8 +210,8 @@ export function blankWalkInForm(now: Date = new Date()): WalkInForm {
   return {
     hospitalId: null,
     presentedReference: '',
-    parentRequestId: null,
-    parentReference: null,
+    transfusionRequestId: null,
+    transfusionReference: null,
     patient: { surname: '', firstName: '', middleName: '', age: null, sex: '' },
     bloodTypeId: null,
     urgency: 'routine',
@@ -271,17 +233,17 @@ export function blankWalkInForm(now: Date = new Date()): WalkInForm {
 }
 
 /**
- * Turn the form into a follow-up of a request part-filled at another centre.
+ * Turn the form into this centre's share of an existing Patient Transfusion Request.
  *
- * The patient, blood type, components and indications are the original
- * request's — the API copies them from there and ignores anything typed — so
- * the form shows them read-only and offers only what is left to source.
+ * The patient, blood type, components and indications are the requirement's
+ * — the API copies them from there and ignores anything typed — so the form
+ * shows them read-only and offers only what is still unallocated.
  */
-export function applyFollowUpMatch(form: WalkInForm, match: DuplicateMatch): WalkInForm {
+export function applyContinueMatch(form: WalkInForm, match: DuplicateMatch): WalkInForm {
   return {
     ...form,
-    parentRequestId: match.id,
-    parentReference: match.reference_number,
+    transfusionRequestId: match.id,
+    transfusionReference: match.reference_number,
     patient: {
       surname: match.patient.surname ?? '',
       firstName: match.patient.first_name ?? '',
@@ -292,21 +254,21 @@ export function applyFollowUpMatch(form: WalkInForm, match: DuplicateMatch): Wal
     bloodTypeId: match.blood_type?.id ?? form.bloodTypeId,
     urgency: match.urgency_level ?? form.urgency,
     lines: match.lines
-      .filter((line) => line.forwardable > 0)
+      .filter((line) => line.unallocated > 0)
       .map((line) => ({
         componentId: line.component.id,
-        parentItemId: line.request_item_id,
-        quantity: line.forwardable,
-        maxQuantity: line.forwardable,
+        requirementItemId: line.transfusion_request_item_id,
+        quantity: line.unallocated,
+        maxQuantity: line.unallocated,
         indicationCode: '',
         indicationOther: '',
       })),
   }
 }
 
-/** Undo applyFollowUpMatch: an independent walk-in again, with fresh lines. */
-export function clearFollowUp(form: WalkInForm): WalkInForm {
-  return { ...form, parentRequestId: null, parentReference: null, lines: [blankLine()] }
+/** Undo applyContinueMatch: a new requirement again, with fresh lines. */
+export function clearContinuation(form: WalkInForm): WalkInForm {
+  return { ...form, transfusionRequestId: null, transfusionReference: null, lines: [blankLine()] }
 }
 
 export type WalkInStep = 'lookup' | 'verify' | 'details'
@@ -323,12 +285,12 @@ function blank(value: unknown): boolean {
  */
 export function walkInStepProblems(form: WalkInForm, step: WalkInStep, components: ComponentOption[] = []): string[] {
   const problems: string[] = []
-  const followUp = form.parentRequestId !== null
+  const continuing = form.transfusionRequestId !== null
 
   if (step === 'lookup') {
     if (!form.hospitalId) problems.push("Choose the patient's hospital blood bank.")
 
-    if (!followUp) {
+    if (!continuing) {
       if (blank(form.patient.surname)) problems.push('Enter the patient surname.')
       if (blank(form.patient.firstName)) problems.push('Enter the patient first name.')
     }
@@ -359,7 +321,7 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
   }
 
   // details
-  if (!followUp) {
+  if (!continuing) {
     const age = Number(form.patient.age)
 
     if (blank(form.patient.age) || !Number.isInteger(age) || age < 0 || age > 130) problems.push('Enter the patient age.')
@@ -372,7 +334,7 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
   if (blank(form.representative.contact)) problems.push("Enter the watcher's contact number.")
   if (!blank(form.representative.idType) && blank(form.representative.idNumber)) problems.push('Enter the ID number of the ID presented.')
 
-  const lines = form.lines.filter((line) => line.componentId !== null || line.parentItemId !== null)
+  const lines = form.lines.filter((line) => line.componentId !== null || line.requirementItemId !== null)
 
   if (lines.length === 0) problems.push('Add at least one blood component.')
 
@@ -384,15 +346,15 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
     const quantity = Number(line.quantity)
 
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) problems.push(`Enter a quantity of 1 to 100 for ${name}.`)
-    if (line.maxQuantity !== null && quantity > line.maxQuantity) problems.push(`Only ${line.maxQuantity} unit(s) of ${name} are left to source.`)
+    if (line.maxQuantity !== null && quantity > line.maxQuantity) problems.push(`Only ${line.maxQuantity} unit(s) of ${name} are still unallocated.`)
 
     if (line.componentId !== null) {
       if (seen.has(line.componentId)) problems.push(`${name} is listed twice.`)
       seen.add(line.componentId)
     }
 
-    // A follow-up line carries the original line's certified indication.
-    if (followUp || !component) continue
+    // A continuing line carries the requirement's certified indication.
+    if (continuing || !component) continue
 
     const codes = component.indication_codes ?? []
     const chosen = codes.find((code) => code.code === line.indicationCode)
@@ -417,8 +379,8 @@ function optional(value: string | null | undefined): string | null {
  * after the hospital said yes, and a "no" leaves nothing to send.
  */
 export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
-  const followUp = form.parentRequestId !== null
-  const lines = form.lines.filter((line) => line.componentId !== null || line.parentItemId !== null)
+  const continuing = form.transfusionRequestId !== null
+  const lines = form.lines.filter((line) => line.componentId !== null || line.requirementItemId !== null)
 
   const payload: CreateWalkInPayload = {
     hospital_id: Number(form.hospitalId),
@@ -427,8 +389,8 @@ export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
     attending_physician: optional(form.attendingPhysician),
     patient_ward: optional(form.patientWard),
     patient_record_number: optional(form.patientRecordNumber),
-    items: lines.map((line) => followUp
-      ? { parent_item_id: Number(line.parentItemId), quantity: Number(line.quantity) }
+    items: lines.map((line) => continuing
+      ? { transfusion_request_item_id: Number(line.requirementItemId), quantity: Number(line.quantity) }
       : {
           component_id: Number(line.componentId),
           quantity: Number(line.quantity),
@@ -453,8 +415,8 @@ export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
     duplicate_acknowledgement: optional(form.duplicateAcknowledgement),
   }
 
-  if (followUp) {
-    payload.parent_request_id = form.parentRequestId
+  if (continuing) {
+    payload.transfusion_request_id = form.transfusionRequestId
   } else {
     payload.patient_surname = form.patient.surname.trim()
     payload.patient_first_name = form.patient.firstName.trim()
