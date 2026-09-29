@@ -8,7 +8,7 @@ const named = { blinded: false, full_name: 'Rosalinda Magbanua', donor_code: 'DO
 
 describe('donorTitle', () => {
   it('names the bag, not the person, for a blinded donation', () => {
-    expect(donorTitle(blinded, 'SEG-7781', 12)).toBe('Segment SEG-7781')
+    expect(donorTitle(blinded, 'SEG-7781', 12)).toBe('Barcode SEG-7781')
     expect(donorTitle(blinded, null, 12)).toBe('Donation #12')
   })
 

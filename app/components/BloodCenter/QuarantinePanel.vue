@@ -10,6 +10,8 @@
         <p class="quarantine__hint">
           Booked in, not yet issuable. A donation's bags leave quarantine together, and only once TTI Testing and
           Immunohematology have both cleared it.
+          <template v-if="!allowRelease">They are released and given their final labels at Stock Intake.</template>
+          <template v-else>Releasing prints each bag's final label.</template>
         </p>
       </div>
       <button type="button" class="quarantine__refresh" :disabled="loading" @click="load">
@@ -63,7 +65,7 @@
           :title="group.state.releasable ? '' : 'Waiting for testing to clear this donation'"
           @click="release(group)"
         >
-          {{ busy === group.donationId ? 'Releasing…' : 'Release' }}
+          {{ busy === group.donationId ? 'Releasing…' : 'Release & print labels' }}
         </button>
       </li>
     </ul>
@@ -74,19 +76,27 @@
 /**
  * Units booked in but not yet cleared, grouped by the donation they came from.
  *
- * The release is the Inventory Control Officer's act. The server re-checks both
- * clearance tokens for anyone who presses it, supervisors included, so the
- * button being enabled is presentation — `releasable` is what the server
- * computed, not what this component guesses.
+ * The release is the Inventory Control Officer's act, and it happens at Stock
+ * Intake, where the final labels are printed: that page passes
+ * `allow-release`, and the Blood Inventory page shows the same list read-only.
+ * The server re-checks both clearance tokens for anyone who presses it,
+ * supervisors included, so the button being enabled is presentation —
+ * `releasable` is what the server computed, not what this component guesses.
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
+const props = defineProps({
+  allowRelease: { type: Boolean, default: false },
+})
+
+// `released` carries the donation id and the final-label data the server
+// returned with the release, so the page can print straight away.
 const emit = defineEmits(['released'])
 
 const { can } = useUser()
-const canRelease = computed(() => can('inventory.release_quarantine'))
+const canRelease = computed(() => props.allowRelease && can('inventory.release_quarantine'))
 
 const units = ref([])
 const loading = ref(false)
@@ -144,7 +154,7 @@ async function release(group) {
   try {
     const response = await bloodCenterService.releaseQuarantine(group.donationId)
     notice.value = response?.message || 'Released from quarantine.'
-    emit('released', group.donationId)
+    emit('released', group.donationId, response?.labels ?? null)
     await load()
   } catch (err) {
     error.value = REFUSALS[err?.data?.code] || err?.message || 'The units could not be released.'

@@ -40,7 +40,7 @@ const stats = computed(() => [
   { label: 'Available Units', value: summary.value?.totals?.available ?? null, caption: 'Ready for allocation', icon: 'droplets', tone: 'var(--rb-primary-text)' },
   { label: 'Expiring Soon', value: summary.value?.near_expiry?.within_7_days ?? null, caption: 'Within 7 days', icon: 'alert', tone: 'var(--rb-warning-text)' },
   { label: 'Reserved', value: summary.value?.totals?.reserved ?? null, caption: 'Allocated to requests', icon: 'package', tone: 'var(--rb-purple-text)' },
-  // Booked in but not yet cleared by testing. Released from the inventory page.
+  // Booked in but not yet cleared by testing. Released, with their final labels, at Stock Intake.
   { label: 'In Quarantine', value: summary.value?.totals?.quarantined ?? null, caption: 'Awaiting testing clearance', icon: 'shield-check', tone: 'var(--rb-warning-text)' },
 ])
 

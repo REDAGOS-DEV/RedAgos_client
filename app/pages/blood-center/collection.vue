@@ -350,7 +350,7 @@
       <h2 class="card__title">Accepted — awaiting collection</h2>
       <p class="handoff" role="status">
         <AssetIcon name="clock" :size="14" />
-        The donor has been accepted. The phlebotomist records the bag, segment and times at the chair.
+        The donor has been accepted. The phlebotomist records the bag, barcode and times at the chair.
       </p>
       <div class="actions">
         <button type="button" class="btn" @click="finishVisit">Next donor</button>
@@ -392,23 +392,26 @@
 
       <div class="vitals">
         <label class="field">
-          <span class="field__label">Segment number</span>
+          <span class="field__label">Donation barcode (sticker)</span>
           <!--
-            A barcode scanner types the number and presses Enter. Enter moves on
-            to the next field rather than submitting half a record.
+            The pre-printed sticker that goes on the form, every bag and tube,
+            and the CUE slip. A barcode scanner types the number and presses
+            Enter; Enter moves on to the next field rather than submitting half
+            a record.
           -->
           <input
-            ref="segmentInput"
-            v-model="collectionForm.segment_number"
+            ref="barcodeInput"
+            v-model="collectionForm.donation_barcode"
             type="text"
             class="field__input field__input--mono"
             autocomplete="off"
             spellcheck="false"
             autocapitalize="characters"
-            maxlength="60"
-            placeholder="Scan or type"
+            maxlength="30"
+            placeholder="Scan the sticker"
             @keydown.enter.prevent="startedInput?.focus()"
           >
+          <span class="field__optional">From the donor's barcode sticker sheet.</span>
         </label>
 
         <label class="field">
@@ -473,8 +476,8 @@
               donor's history and last donation date are updated.
             </template>
           </p>
-          <p v-if="!isDeferred && donation?.collection?.segment_number" class="done-facts">
-            <span>Segment <strong class="mono">{{ donation.collection.segment_number }}</strong></span>
+          <p v-if="!isDeferred && donation?.collection?.donation_barcode" class="done-facts">
+            <span>Barcode <strong class="mono">{{ donation.collection.donation_barcode }}</strong></span>
             <span v-if="donation.collection.blood_bag_type_label">
               {{ donation.collection.blood_bag_type_label }} bag
             </span>
@@ -519,7 +522,7 @@ import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferr
 import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { atTimeOn, normalizeSegmentNumber, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
+import { atTimeOn, normalizeBarcode, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
 
 /**
  * The counter's one continuous donation transaction.
@@ -638,19 +641,19 @@ const screeningForm = reactive({
  * a field at all — it is whoever is signed in.
  */
 function blankCollection() {
-  return { blood_bag_type: '', segment_number: '', started_time: '', ended_time: '', volume_ml: 450 }
+  return { blood_bag_type: '', donation_barcode: '', started_time: '', ended_time: '', volume_ml: 450 }
 }
 
 const collectionForm = reactive(blankCollection())
 const collectionAttempted = ref(false)
 const collectionProblems = computed(() => phlebotomyProblems(collectionForm, new Date()))
 
-const segmentInput = ref(null)
+const barcodeInput = ref(null)
 const startedInput = ref(null)
 
 // Ready for the scanner the moment the collection stage opens.
 watch(stage, (now) => {
-  if (now === 'collection') nextTick(() => segmentInput.value?.focus())
+  if (now === 'collection') nextTick(() => barcodeInput.value?.focus())
 })
 
 const phlebotomistName = computed(() => user.value?.full_name
@@ -796,7 +799,7 @@ async function submitCollection() {
   const payload = {
     volume_ml: Number(collectionForm.volume_ml),
     blood_bag_type: collectionForm.blood_bag_type,
-    segment_number: normalizeSegmentNumber(collectionForm.segment_number),
+    donation_barcode: normalizeBarcode(collectionForm.donation_barcode),
     started_at: atTimeOn(day, collectionForm.started_time),
     ended_at: atTimeOn(day, collectionForm.ended_time),
   }
@@ -808,7 +811,7 @@ async function submitCollection() {
       previous: saved ? {
         volume_ml: donation.value.volume_ml,
         blood_bag_type: saved.blood_bag_type,
-        segment_number: saved.segment_number,
+        donation_barcode: saved.donation_barcode,
         started_at: saved.started_at,
         ended_at: saved.ended_at,
       } : null,
@@ -853,7 +856,7 @@ function startCollectionCorrection() {
 
   Object.assign(collectionForm, {
     blood_bag_type: saved.blood_bag_type ?? '',
-    segment_number: saved.segment_number ?? '',
+    donation_barcode: saved.donation_barcode ?? '',
     started_time: hhmm(saved.started_at),
     ended_time: hhmm(saved.ended_at),
     volume_ml: donation.value?.volume_ml ?? 450,

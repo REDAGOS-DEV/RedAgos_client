@@ -5,8 +5,8 @@
         <p class="intake__eyebrow">Blood Center Portal / Inventory</p>
         <h1 class="intake__title">Stock Intake</h1>
         <p class="intake__subtitle">
-          Book the physical bags from a cleared donation onto the shelf. One row per bag, traceable back
-          to the donation it came from.
+          Book a processed donation's bags into quarantine, then — once testing clears it — release them and
+          print their final labels. Every bag keeps the number Processing gave it.
         </p>
       </div>
 
@@ -19,34 +19,57 @@
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <!-- QUEUE -->
+    <!-- STEP 1: BOOK IN -->
     <section v-if="!selected" class="card">
       <div class="card__head">
         <div>
-          <h2 class="card__title">Cleared donations awaiting intake</h2>
+          <h2 class="card__title">1 · Book in — processed donations</h2>
           <p class="card__hint">
-            A donation appears here once the laboratory clears it for issue, and leaves once every
-            declared bag has been booked in.
+            A donation appears here once Processing hands it over, and leaves once every bag has been booked
+            into quarantine. Scan the barcode sticker on a bag to go straight to its donation.
           </p>
         </div>
 
-        <button type="button" class="btn" :disabled="loadingQueue" @click="loadQueue">
-          <AssetIcon name="refresh-cw" :size="14" />
-          {{ loadingQueue ? 'Loading…' : 'Refresh' }}
-        </button>
+        <div class="card__tools">
+          <form class="scan" @submit.prevent="findByBarcode">
+            <label class="field field--scan">
+              <span class="field__label">Donation barcode</span>
+              <input
+                v-model="barcodeSearch"
+                type="text"
+                class="field__input mono"
+                autocomplete="off"
+                spellcheck="false"
+                autocapitalize="characters"
+                maxlength="30"
+                placeholder="Scan the sticker"
+              >
+            </label>
+            <button type="submit" class="btn" :disabled="loadingQueue">
+              <AssetIcon name="scan-line" :size="14" />
+              Find
+            </button>
+          </form>
+
+          <button type="button" class="btn" :disabled="loadingQueue" @click="clearSearch">
+            <AssetIcon name="refresh-cw" :size="14" />
+            {{ loadingQueue ? 'Loading…' : 'Refresh' }}
+          </button>
+        </div>
       </div>
 
       <p v-if="loadingQueue" class="card__hint">Loading the queue…</p>
 
       <div v-else-if="!queue.length" class="empty">
         <AssetIcon name="package-check" :size="28" />
-        <p>Nothing is waiting to be shelved. Every cleared donation has been booked in.</p>
+        <p v-if="activeBarcode">No donation waiting to be booked in has barcode {{ activeBarcode }}.</p>
+        <p v-else>Nothing is waiting to be booked in. Every processed donation is on the shelf.</p>
       </div>
 
       <ul v-else class="queue">
         <li v-for="row in queue" :key="row.donation_id" class="queue__row">
           <div class="queue__main">
-            <p class="queue__name">{{ donorTitle(row.donor, row.segment_number, row.donation_id) }}</p>
+            <p class="queue__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</p>
             <p class="queue__meta">
               Donation #{{ row.donation_id }} · {{ donorReference(row.donor) }} ·
               {{ row.donor?.blood_type || 'type unknown' }} · {{ formatDate(row.donation_date) }}
@@ -63,6 +86,38 @@
       </ul>
     </section>
 
+    <!-- STEP 2: RELEASE AND FINAL LABELS -->
+    <template v-if="!selected">
+      <div class="step-head">
+        <h2 class="card__title">2 · Release &amp; label</h2>
+        <p class="card__hint">
+          When TTI Testing and Immunohematology have both cleared a donation, release its bags and print their
+          final labels — verified blood type, expiry and clearance codes — then affix them and move the bags to the
+          ready-for-issue shelf.
+        </p>
+      </div>
+
+      <BloodCenterQuarantinePanel allow-release @released="onReleased" />
+
+      <section v-if="released.length" class="card">
+        <h2 class="card__title">Released this session</h2>
+        <p class="card__hint">Reprint a donation's final labels if one was spoiled or did not print.</p>
+
+        <ul class="queue">
+          <li v-for="item in released" :key="item.donationId" class="queue__row">
+            <div class="queue__main">
+              <p class="queue__name">{{ item.barcode ? `Barcode ${item.barcode}` : `Donation #${item.donationId}` }}</p>
+              <p class="queue__meta">{{ item.count }} bag(s): <span class="mono">{{ item.units.join(', ') }}</span></p>
+            </div>
+            <button type="button" class="btn" :disabled="busy" @click="reprint(item.donationId)">
+              <AssetIcon name="file-down" :size="14" />
+              Reprint labels
+            </button>
+          </li>
+        </ul>
+      </section>
+    </template>
+
     <!-- ONE DONATION -->
     <template v-else>
       <section class="unit-bar">
@@ -73,7 +128,7 @@
             <template v-else>{{ initials }}</template>
           </span>
           <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.segment_number, selected.donation_id) }}</p>
+            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.donation_barcode, selected.donation_id) }}</p>
             <p class="unit-bar__sub">
               Donation #{{ selected.donation_id }} · {{ donorReference(selected.donor) }} ·
               {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
@@ -107,7 +162,10 @@
             <span class="declared__name">{{ c.component }}</span>
             <span class="declared__count">{{ c.recorded }} of {{ c.declared }} recorded</span>
             <!-- Each bag still to shelve, in the order units will take them. -->
-            <span v-if="c.outstanding_volumes?.some((v) => v)" class="declared__shelf">
+            <span v-if="c.outstanding_bags?.some((b) => b.bag_number)" class="declared__shelf mono">
+              {{ c.outstanding_bags.map((b) => b.bag_number).filter(Boolean).join(', ') }}
+            </span>
+            <span v-else-if="c.outstanding_volumes?.some((v) => v)" class="declared__shelf">
               Next: {{ c.outstanding_volumes.map((v) => (v ? `${v} mL` : '—')).join(', ') }}
             </span>
             <span v-if="!c.shelf_life_configured" class="declared__flag">
@@ -129,8 +187,12 @@
       <section v-if="shelvable.length" class="card">
         <div class="card__head">
           <div>
-            <h2 class="card__title">Bags to shelve</h2>
-            <p class="card__hint">
+            <h2 class="card__title">Bags to book into quarantine</h2>
+            <p v-if="barcoded" class="card__hint">
+              One row per bag, numbered by Processing from the donation's barcode sticker — the number on its Phase 1
+              label. Set each bag's expiry and shelf. They stay in quarantine until testing clears the donation.
+            </p>
+            <p v-else class="card__hint">
               One row per physical bag. Leave the unit number blank and RedAgos allocates one; type it if
               the bag already carries a printed label.
             </p>
@@ -139,7 +201,16 @@
         </div>
 
         <div v-for="(row, index) in unitRows" :key="index" class="unit-row">
-          <label class="field">
+          <!-- A numbered bag is booked as exactly that bag. -->
+          <div v-if="row.bag_number" class="field bag-fixed">
+            <span class="field__label">Bag</span>
+            <span class="bag-fixed__number mono">{{ row.bag_number }}</span>
+            <span class="bag-fixed__meta">
+              {{ componentName(row.component_id) }}<template v-if="row.volume_ml"> · {{ row.volume_ml }} mL</template>
+            </span>
+          </div>
+
+          <label v-else class="field">
             <span class="field__label">Component</span>
             <select v-model.number="row.component_id" class="field__input" @change="applyExpiry(row)">
               <option :value="null" disabled>Select</option>
@@ -162,16 +233,20 @@
             </select>
           </label>
 
-          <label class="field field--unit">
+          <label v-if="!row.bag_number" class="field field--unit">
             <span class="field__label">Unit no. <span class="field__optional">optional</span></span>
             <input v-model="row.unit_id" type="text" class="field__input" placeholder="Auto" >
           </label>
 
+          <!--
+            Numbered bags are booked in the order Processing numbered them, so
+            only the last row of a batch can be left for later.
+          -->
           <button
             type="button"
             class="btn btn--icon"
-            :disabled="unitRows.length === 1"
-            aria-label="Remove this bag"
+            :disabled="unitRows.length === 1 || (row.bag_number && !isLastOfComponent(index))"
+            aria-label="Leave this bag for a later batch"
             @click="unitRows.splice(index, 1)"
           >
             <AssetIcon name="trash-2" :size="14" />
@@ -186,9 +261,9 @@
         </ul>
 
         <div class="actions">
-          <button type="button" class="btn" :disabled="!canAddRow" @click="addUnitRow">Add bag</button>
+          <button v-if="!barcoded" type="button" class="btn" :disabled="!canAddRow" @click="addUnitRow">Add bag</button>
           <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submit">
-            {{ busy ? 'Saving…' : `Shelve ${unitRows.length} bag(s)` }}
+            {{ busy ? 'Saving…' : `Book ${unitRows.length} bag(s) into quarantine` }}
           </button>
         </div>
       </section>
@@ -210,21 +285,36 @@
         </div>
       </section>
     </template>
+
+    <!-- Hidden until labels are printed. -->
+    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
+import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
+import { normalizeBarcode } from '~/utils/phlebotomy'
+import { finalLabelsFrom } from '~/utils/bagLabels'
 
 /**
- * Booking a cleared donation's bags onto the shelf.
+ * Issuance's two steps with a donation's bags: book them into quarantine, then
+ * release them and print their final labels.
  *
- * This is the other half of the laboratory's handover. `completed` on a
+ * Booking in is the other half of Processing's hand-over. `completed` on a
  * donation only *authorises* stock entry — it does not create anything — and
  * this is where the physical bags become rows in inventory, each one still
- * pointing back at the donation it came from.
+ * pointing back at the donation it came from. A barcoded donation's bags are
+ * booked as the bags Processing numbered (sticker + component), in that order,
+ * so nothing is re-typed.
+ *
+ * Releasing is Phase 2 of labelling: once TTI Testing and Immunohematology have
+ * both cleared the donation, the Inventory Control Officer releases its bags
+ * and prints the final labels — verified blood type, expiry, clearance codes —
+ * to affix before the bags go to the ready-for-issue shelf.
  *
  * Two things are deliberately not on this screen. The blood type, because the
  * server derives it from the donation and refuses it from the client: it is the
@@ -259,6 +349,26 @@ const error = ref(null)
 const notice = ref(null)
 
 const unitRows = ref([])
+
+const barcodeSearch = ref('')
+const activeBarcode = ref('')
+const released = ref([])
+const { print } = useLabelPrint()
+
+/** Whether this donation's bags carry numbers from a barcode sticker. */
+const barcoded = computed(() => (selected.value?.components ?? [])
+  .some((c) => (c.outstanding_bags ?? []).some((bag) => bag.bag_number)))
+
+function componentName(componentId) {
+  return selected.value?.components?.find((c) => c.component_id === componentId)?.component ?? ''
+}
+
+/** Whether a row is the last one of its component in this batch — the only one that may be left out. */
+function isLastOfComponent(index) {
+  const componentId = unitRows.value[index]?.component_id
+
+  return !unitRows.value.slice(index + 1).some((row) => row.component_id === componentId)
+}
 
 /** Components still owed on this donation that can actually be given an expiry. */
 const shelvable = computed(() => (selected.value?.components ?? []).filter(
@@ -337,7 +447,15 @@ function applyExpiry(row) {
 }
 
 function messageFor(err) {
+  const firstValidationError = Object.values(err?.data?.errors ?? {}).flat()[0]
+
+  if (firstValidationError) return firstValidationError
+
   switch (err?.data?.code) {
+    case 'bag_number_taken':
+      return err?.data?.message || 'A bag with this number is already in stock. Check the sticker on the bag.'
+    case 'not_released':
+      return 'These bags have not left quarantine, so they have no final label yet.'
     case 'donation_not_completed':
       return 'The laboratory has not cleared this donation, so its blood cannot enter inventory yet.'
     case 'components_not_declared':
@@ -376,7 +494,7 @@ async function loadQueue() {
   error.value = null
 
   try {
-    const res = await service.inventoryIntakeQueue()
+    const res = await service.inventoryIntakeQueue(activeBarcode.value ? { barcode: activeBarcode.value } : {})
 
     queue.value = res?.data ?? []
   } catch (err) {
@@ -384,6 +502,50 @@ async function loadQueue() {
   } finally {
     loadingQueue.value = false
   }
+}
+
+/**
+ * Find the donation whose bags are on the counter. One match opens it straight
+ * away — the sticker was scanned because those are the bags being booked in.
+ */
+async function findByBarcode() {
+  error.value = null
+  activeBarcode.value = normalizeBarcode(barcodeSearch.value)
+
+  await loadQueue()
+
+  if (activeBarcode.value && queue.value.length === 1) openDonation(queue.value[0])
+}
+
+function clearSearch() {
+  barcodeSearch.value = ''
+  activeBarcode.value = ''
+  loadQueue()
+}
+
+/**
+ * Print the final labels the release returned, and remember the donation for reprints.
+ */
+async function onReleased(donationId, labels) {
+  const printable = finalLabelsFrom(labels)
+
+  released.value = [
+    {
+      donationId,
+      barcode: labels?.donation_barcode ?? null,
+      count: printable.length,
+      units: printable.map((label) => label.unit_id),
+    },
+    ...released.value.filter((item) => item.donationId !== donationId),
+  ]
+
+  if (printable.length) await print(printable, 'final')
+}
+
+async function reprint(donationId) {
+  const res = await run(() => service.bloodLabels(donationId))
+
+  if (res) await print(finalLabelsFrom(res), 'final')
 }
 
 async function loadReference() {
@@ -413,6 +575,30 @@ function openDonation(row) {
   error.value = null
   unitRows.value = []
 
+  // A barcoded donation: one row per numbered bag, in the order Processing
+  // numbered them, which is the order the server books them in.
+  if (barcoded.value) {
+    for (const component of shelvable.value) {
+      for (const bag of component.outstanding_bags ?? []) {
+        if (unitRows.value.length >= MAX_PER_REQUEST) break
+
+        const bagRow = {
+          component_id: component.component_id,
+          bag_number: bag.bag_number,
+          volume_ml: bag.volume_ml,
+          expiry_date: '',
+          storage_location: '',
+          unit_id: '',
+        }
+
+        applyExpiry(bagRow)
+        unitRows.value.push(bagRow)
+      }
+    }
+
+    return
+  }
+
   // Pre-fill the batch with as many bags as are outstanding, up to the
   // per-request cap, since shelving all of them is the normal case.
   const target = Math.min(row.outstanding_units, MAX_PER_REQUEST)
@@ -430,11 +616,13 @@ function backToQueue() {
 }
 
 async function submit() {
+  // A numbered bag never sends a unit number: the server gives it the one on
+  // its Phase 1 label, and refuses any other.
   const units = unitRows.value.map((row) => ({
     component_id: row.component_id,
     expiry_date: row.expiry_date,
     ...(row.storage_location ? { storage_location: row.storage_location } : {}),
-    ...(row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {}),
+    ...(!row.bag_number && row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {}),
   }))
 
   const res = await run(() => service.recordBloodUnits({
@@ -444,9 +632,10 @@ async function submit() {
 
   if (!res) return
 
-  const count = res.units?.length ?? units.length
+  const ids = (res.units ?? []).map((unit) => unit.id)
 
-  notice.value = `${count} bag(s) booked into quarantine against donation #${selected.value.donation_id}. They are released once testing clears the donation.`
+  notice.value = `${ids.length || units.length} bag(s) booked into quarantine${ids.length ? `: ${ids.join(', ')}` : ''}. `
+    + 'Release them under "Release & label" once testing clears the donation.'
 
   // Re-read rather than adjusting the counts here: the server is what decides
   // how much is still outstanding, and it has just changed.
@@ -769,4 +958,20 @@ onMounted(async () => {
 .outcome { display: flex; align-items: flex-start; gap: 0.75rem; }
 .outcome--warning { color: var(--rb-warning-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
+/* --- barcode scan and the two steps --- */
+.card__tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.scan { display: flex; gap: 0.5rem; align-items: flex-end; }
+.field--scan { flex: 0 1 13rem; }
+.mono { font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.02em; }
+.step-head { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
+
+/* A numbered bag, booked as exactly that bag. */
+.bag-fixed { gap: 0.15rem; }
+.bag-fixed__number { font-size: 0.95rem; font-weight: 700; color: var(--rb-text-primary); }
+.bag-fixed__meta { font-size: 0.78rem; color: var(--rb-text-secondary); }
+
+@media (max-width: 640px) {
+  .scan { flex-wrap: wrap; }
+  .field--scan { flex-basis: 100%; }
+}
 </style>

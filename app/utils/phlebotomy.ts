@@ -2,13 +2,16 @@
  * The "For Phlebotomist Use Only" box of Section II of the DOH form.
  *
  * Mirrors the server's rules so the counter can say what is missing before a
- * request is made. The server stays the authority: it normalises the segment
- * number the same way and enforces uniqueness per facility.
+ * request is made. The server stays the authority: it normalises the donation
+ * barcode the same way and enforces uniqueness per facility.
  */
+
+/** What a donation barcode may hold: each bag's unit number is built from it. */
+export const BARCODE_PATTERN = /^[A-Z0-9-]{1,30}$/
 
 export interface PhlebotomyForm {
   blood_bag_type: string
-  segment_number: string
+  donation_barcode: string
   started_time: string
   ended_time: string
   volume_ml: number | string | null
@@ -18,10 +21,12 @@ export interface PhlebotomyForm {
  * Strip what a barcode scanner appends and what a person types differently.
  *
  * Scanners send a trailing carriage return or tab; staff type in either case.
- * Without this a scanned and a typed copy of the same tube would be two
- * different numbers. Matches RecordCollectionRequest on the server.
+ * Without this a scanned and a typed copy of the same sticker would be two
+ * different numbers. Matches RecordCollectionRequest on the server. Anything
+ * else is left in, so a wrong character is refused rather than quietly
+ * turning the number into a different sticker's.
  */
-export function normalizeSegmentNumber(value: string | null | undefined): string {
+export function normalizeBarcode(value: string | null | undefined): string {
   // eslint-disable-next-line no-control-regex
   return (value ?? '').replace(/[\s\u0000-\u001f\u007f]+/g, '').toUpperCase()
 }
@@ -66,7 +71,12 @@ export function phlebotomyProblems(form: PhlebotomyForm, day: Date | string, now
   const problems: string[] = []
 
   if (!form.blood_bag_type) problems.push('Choose the blood bag.')
-  if (!normalizeSegmentNumber(form.segment_number)) problems.push('Scan or type the segment number.')
+  const barcode = normalizeBarcode(form.donation_barcode)
+
+  if (!barcode) problems.push('Scan or type the donation barcode.')
+  else if (!BARCODE_PATTERN.test(barcode)) {
+    problems.push('A donation barcode is up to 30 letters, numbers and dashes.')
+  }
 
   const started = atTimeOn(day, form.started_time)
   const ended = atTimeOn(day, form.ended_time)

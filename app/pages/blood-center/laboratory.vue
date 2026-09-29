@@ -59,7 +59,7 @@
       <ul v-else class="queue">
         <li v-for="row in queue" :key="row.id" class="queue__row">
           <div class="queue__main">
-            <p class="queue__name">{{ donorTitle(row.donor, row.collection?.segment_number, row.id) }}</p>
+            <p class="queue__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</p>
             <p class="queue__meta">
               Donation #{{ row.id }} · {{ donorReference(row.donor) }} ·
               {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} ·
@@ -89,7 +89,7 @@
             <template v-else>{{ initials }}</template>
           </span>
           <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.segment_number, selected.id) }}</p>
+            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) }}</p>
             <p class="unit-bar__sub">
               Donation #{{ selected.id }} · {{ donorReference(selected.donor) }} ·
               {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
@@ -103,8 +103,8 @@
         </div>
 
         <div class="fact">
-          <span class="fact__label">Segment</span>
-          <span class="fact__value mono">{{ selected.collection?.segment_number || '—' }}</span>
+          <span class="fact__label">Barcode</span>
+          <span class="fact__value mono">{{ selected.collection?.donation_barcode || '—' }}</span>
         </div>
 
         <div class="fact">
@@ -135,8 +135,8 @@
             </h2>
             <p class="card__hint">
               <template v-if="selected.status === 'completed'">
-                Issuance books its bags into quarantine. They leave quarantine once TTI Testing and Immunohematology
-                have both cleared the donation.
+                Handed over. Issuance books the bags into quarantine at Stock Intake, and releases them — printing
+                their final labels — once TTI Testing and Immunohematology have both cleared the donation.
               </template>
               <template v-else>
                 {{ selected.rejection_reason || 'No reason was recorded.' }}
@@ -243,7 +243,20 @@
               <div v-for="c in selected.components" :key="c.id ?? c.component_id" class="fact">
                 <span class="fact__label">{{ c.component }}</span>
                 <span class="fact__value">{{ bagLabel(c) }}</span>
+                <!-- The number on the bag's Phase 1 label: the sticker plus what it holds. -->
+                <span v-if="c.bag_number" class="fact__sub mono">{{ c.bag_number }}</span>
               </div>
+            </div>
+
+            <!-- Phase 1 labelling: what the product is and its number. No blood type, no clearance. -->
+            <div v-if="phaseOneLabels.length" class="actions">
+              <button type="button" class="btn" @click="printBaseLabels">
+                <AssetIcon name="file-down" :size="14" />
+                Print bag labels (Phase 1)
+              </button>
+              <span class="card__hint">
+                Base labels: bag number, component and volume, marked "Quarantine — not for issue".
+              </span>
             </div>
 
             <p v-if="!canRecordComponents" class="card__hint">
@@ -310,12 +323,15 @@
           </section>
         </div>
 
-        <!-- LABELING AND THE FINAL DECISION -->
+        <!--
+          THE HAND-OVER. Final labelling is not here: it is Issuance's, at Stock
+          Intake, once testing has cleared the donation.
+        -->
         <section class="card">
-          <h2 class="card__title">Labeling &amp; hand-over</h2>
+          <h2 class="card__title">Hand-over to Issuance</h2>
           <p class="card__hint">
-            Once the bags are labelled at the bench, complete the donation to hand them to Issuance. They are booked
-            in quarantined, so completing does not make anything issuable — testing's clearances do.
+            Complete processing to send the bags to Stock Intake, where they are booked into quarantine. Their final
+            labels — verified blood type, expiry, clearance — are printed there once testing clears the donation.
           </p>
 
           <ul v-if="blockers.length" class="blockers">
@@ -362,14 +378,18 @@
       @close="correction = null"
       @submitted="onCorrectionSent"
     />
+
+    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
+import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
+import { baseLabelsFrom } from '~/utils/bagLabels'
 
 /**
  * The Processing department's side of a donation.
@@ -437,6 +457,15 @@ function bagLabel(bag) {
   return `${bag.quantity} unit${bag.quantity === 1 ? '' : 's'}`
 }
 
+// Phase 1 labelling: the base label for each numbered bag. The final label,
+// with the blood type, is Issuance's to print once testing clears the bags.
+const { print: printLabels } = useLabelPrint()
+const phaseOneLabels = computed(() => baseLabelsFrom(selected.value))
+
+function printBaseLabels() {
+  printLabels(phaseOneLabels.value, 'base')
+}
+
 // Testing is finished once the donation has an outcome under the five-marker
 // panel. A legacy result — recorded before the panel existed — does not count.
 const hasResult = computed(() => Boolean(selected.value?.test_result) && !selected.value?.test_result?.is_legacy)
@@ -485,7 +514,7 @@ const steps = computed(() => {
     {
       key: 'release',
       index: 4,
-      label: 'Labeling & release',
+      label: 'Hand-over',
       state: isFinal.value ? 'step--done' : (blockers.value.length ? '' : 'step--current'),
     },
   ]

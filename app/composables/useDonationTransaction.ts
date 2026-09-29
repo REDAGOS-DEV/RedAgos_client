@@ -67,12 +67,12 @@ export interface PriorDeferral {
  * The "For Phlebotomist Use Only" box of Section II, as the server recorded it.
  *
  * Collections recorded before the box existed carry only who drew the bag and
- * when; their bag, segment and times are null.
+ * when; their bag, barcode and times are null.
  */
 export interface TransactionCollection {
   blood_bag_type: string | null
   blood_bag_type_label: string | null
-  segment_number: string | null
+  donation_barcode: string | null
   started_at: string | null
   ended_at: string | null
   collected_at: string | null
@@ -171,8 +171,8 @@ export function useDonationTransaction() {
 
     // Two counters scanning the same tube, or a mis-scan. The server says it
     // in a validation error rather than a code, from the rule or the index.
-    const segmentError = err?.data?.errors?.segment_number?.[0]
-    if (segmentError) return segmentError
+    const barcodeError = err?.data?.errors?.donation_barcode?.[0]
+    if (barcodeError) return barcodeError
 
     switch (code) {
       case 'qr_invalid':

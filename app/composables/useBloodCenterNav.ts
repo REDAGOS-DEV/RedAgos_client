@@ -124,7 +124,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // have shown them a dashboard that is not theirs. The laboratory
       // departments share lab.view, so each is gated on its own write instead.
       { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
-      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling segment' },
+      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
       { label: 'Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
       { label: 'Billing Dashboard', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.create', keywords: 'billing payment finance' },

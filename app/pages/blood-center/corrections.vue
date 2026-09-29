@@ -57,7 +57,7 @@
           <div>
             <p class="item__title">{{ item.subject_label }} · Donation #{{ item.donation_id }}</p>
             <p class="item__meta">
-              <template v-if="item.segment_number">Segment <span class="mono">{{ item.segment_number }}</span> · </template>
+              <template v-if="item.donation_barcode">Barcode <span class="mono">{{ item.donation_barcode }}</span> · </template>
               Requested by {{ item.requested_by || '—' }} · {{ formatDate(item.requested_at) }}
             </p>
           </div>

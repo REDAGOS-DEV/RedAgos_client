@@ -15,15 +15,15 @@ export interface DonorBlock {
 }
 
 /**
- * The row or unit-bar title: the donor's name, or the bag's segment number.
+ * The row or unit-bar title: the donor's name, or the donation's barcode sticker.
  */
 export function donorTitle(
   donor: DonorBlock | null | undefined,
-  segmentNumber: string | null | undefined,
+  barcode: string | null | undefined,
   donationId: number | string | null | undefined,
 ): string {
   if (donor?.blinded) {
-    if (segmentNumber) return `Segment ${segmentNumber}`
+    if (barcode) return `Barcode ${barcode}`
 
     return donationId ? `Donation #${donationId}` : 'Unlabelled unit'
   }

@@ -236,7 +236,7 @@ describe('BloodCenterService counter endpoints', () => {
     const box = {
       volume_ml: 450,
       blood_bag_type: 'double',
-      segment_number: 'SEG-0001',
+      donation_barcode: 'SEG-0001',
       started_at: '2026-09-26T01:00:00.000Z',
       ended_at: '2026-09-26T01:12:00.000Z',
     }
@@ -512,7 +512,7 @@ describe('a prior deferral at the counter', () => {
     expect(tx.priorDeferral.value).toEqual(DEFERRAL)
   })
 
-  it('names a duplicate segment number in words the counter can act on', async () => {
+  it('names a duplicate donation barcode in words the counter can act on', async () => {
     fetchMock.mockResolvedValueOnce({ data: donation('screening') })
     const tx = useDonationTransaction()
     tx.adoptDonor(DONOR)
@@ -521,11 +521,11 @@ describe('a prior deferral at the counter', () => {
     fetchMock.mockRejectedValueOnce({
       data: {
         message: 'The given data was invalid.',
-        errors: { segment_number: ['This segment number is already recorded at this facility. Scan the bag again.'] },
+        errors: { donation_barcode: ['This barcode is already recorded at this facility. Scan the sticker again.'] },
       },
     })
-    await tx.recordCollection({ segment_number: 'SEG-1' })
+    await tx.recordCollection({ donation_barcode: 'SEG-1' })
 
-    expect(tx.error.value).toBe('This segment number is already recorded at this facility. Scan the bag again.')
+    expect(tx.error.value).toBe('This barcode is already recorded at this facility. Scan the sticker again.')
   })
 })

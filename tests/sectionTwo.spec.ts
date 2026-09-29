@@ -9,7 +9,7 @@ import {
   resolveBloodTypeId,
   splitBloodTypeCode,
 } from '~/utils/bloodType'
-import { atTimeOn, normalizeSegmentNumber, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
+import { atTimeOn, normalizeBarcode, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
 import {
   SEROLOGY_MARKERS,
   blankPanel,
@@ -24,7 +24,7 @@ import {
  * The phlebotomist's box at the counter, and the Testing department's
  * Immunohematology and Serology tables on their own page. What is locked in
  * here is what a quiet refactor could lose: that ABO + Rh resolve to exactly
- * one stored row and never a guess, that a scanned and a typed segment are the
+ * one stored row and never a guess, that a scanned and a typed barcode are the
  * same number, that a reactive panel is never sent without a confirmation, and
  * that the preliminary fingerprick typing never pre-fills the real one.
  */
@@ -84,7 +84,7 @@ describe('the phlebotomist box', () => {
   function box(overrides: Record<string, unknown> = {}) {
     return {
       blood_bag_type: 'double',
-      segment_number: 'SEG-0001',
+      donation_barcode: 'SEG-0001',
       started_time: '09:00',
       ended_time: '09:12',
       volume_ml: 450,
@@ -92,11 +92,11 @@ describe('the phlebotomist box', () => {
     } as any
   }
 
-  it('normalises a scanned segment the way the server stores it', () => {
+  it('normalises a scanned barcode the way the server stores it', () => {
     // A scanner appends a carriage return; staff type in lower case.
-    expect(normalizeSegmentNumber(' abc 123\r')).toBe('ABC123')
-    expect(normalizeSegmentNumber('seg-0001\t')).toBe('SEG-0001')
-    expect(normalizeSegmentNumber(undefined)).toBe('')
+    expect(normalizeBarcode(' abc 123\r')).toBe('ABC123')
+    expect(normalizeBarcode('seg-0001\t')).toBe('SEG-0001')
+    expect(normalizeBarcode(undefined)).toBe('')
   })
 
   it('puts the two times on the visit day', () => {
@@ -125,10 +125,10 @@ describe('the phlebotomist box', () => {
   })
 
   it('names each missing line', () => {
-    const problems = phlebotomyProblems(box({ blood_bag_type: '', segment_number: '  ', started_time: '', ended_time: '' }), day, later)
+    const problems = phlebotomyProblems(box({ blood_bag_type: '', donation_barcode: '  ', started_time: '', ended_time: '' }), day, later)
 
     expect(problems).toContain('Choose the blood bag.')
-    expect(problems).toContain('Scan or type the segment number.')
+    expect(problems).toContain('Scan or type the donation barcode.')
     expect(problems).toContain('Record the time started.')
     expect(problems).toContain('Record the time ended.')
   })
@@ -247,9 +247,9 @@ describe('the Processing page', () => {
 describe('the counter', () => {
   const page = source('app/pages/blood-center/collection.vue')
 
-  it('sends the whole phlebotomist box, with the segment normalised', () => {
+  it('sends the whole phlebotomist box, with the barcode normalised', () => {
     expect(page).toContain('blood_bag_type: collectionForm.blood_bag_type')
-    expect(page).toContain('segment_number: normalizeSegmentNumber(collectionForm.segment_number)')
+    expect(page).toContain('donation_barcode: normalizeBarcode(collectionForm.donation_barcode)')
     expect(page).toContain('started_at: atTimeOn(day, collectionForm.started_time)')
     expect(page).toContain('ended_at: atTimeOn(day, collectionForm.ended_time)')
   })

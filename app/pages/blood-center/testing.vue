@@ -52,17 +52,17 @@
           <div>
             <h2 class="card__title">Units awaiting testing</h2>
             <p class="card__hint">
-              Every drawn donation whose typing or serology is not yet cleared. Scan a tube's segment number to go
+              Every drawn donation whose typing or serology is not yet cleared. Scan the barcode sticker on a tube to go
               straight to its donation.
             </p>
           </div>
 
           <div class="card__tools">
-            <form class="scan" @submit.prevent="findBySegment">
+            <form class="scan" @submit.prevent="findByBarcode">
               <label class="field field--scan">
-                <span class="field__label">Segment number</span>
+                <span class="field__label">Donation barcode</span>
                 <input
-                  v-model="segmentSearch"
+                  v-model="barcodeSearch"
                   type="text"
                   class="field__input mono"
                   autocomplete="off"
@@ -87,17 +87,17 @@
 
         <div v-else-if="!queue.length" class="empty">
           <AssetIcon name="flask-conical" :size="28" />
-          <p v-if="activeSegment">No unit waiting for testing has segment {{ activeSegment }}.</p>
+          <p v-if="activeBarcode">No unit waiting for testing has barcode {{ activeBarcode }}.</p>
           <p v-else>No units are waiting. Donations appear here once the counter records a collection.</p>
         </div>
 
         <ul v-else class="queue">
           <li v-for="row in queue" :key="row.id" class="queue__row">
             <div class="queue__main">
-              <p class="queue__name">{{ donorTitle(row.donor, row.collection?.segment_number, row.id) }}</p>
+              <p class="queue__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</p>
               <p class="queue__meta">
                 Donation #{{ row.id }}
-                <template v-if="row.collection?.segment_number"> · Segment <span class="mono">{{ row.collection.segment_number }}</span></template>
+                <template v-if="row.collection?.donation_barcode"> · Barcode <span class="mono">{{ row.collection.donation_barcode }}</span></template>
                 <template v-if="row.collection?.blood_bag_type_label"> · {{ row.collection.blood_bag_type_label }} bag</template>
                 · {{ formatDate(row.collection?.ended_at || row.donation_date) }}
               </p>
@@ -130,7 +130,7 @@
               <template v-else>{{ initials }}</template>
             </span>
             <div>
-              <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.segment_number, selected.id) }}</p>
+              <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) }}</p>
               <p class="unit-bar__sub">
                 Donation #{{ selected.id }} · {{ donorReference(selected.donor) }}
                 <template v-if="selected.collection?.blood_bag_type_label"> · {{ selected.collection.blood_bag_type_label }} bag</template>
@@ -139,8 +139,8 @@
           </div>
 
           <div class="fact">
-            <span class="fact__label">Segment</span>
-            <span class="fact__value mono">{{ selected.collection?.segment_number || '—' }}</span>
+            <span class="fact__label">Barcode</span>
+            <span class="fact__value mono">{{ selected.collection?.donation_barcode || '—' }}</span>
           </div>
 
           <div class="fact">
@@ -388,7 +388,7 @@
             </span>
             <span class="referral__meta">
               Donation #{{ referral.donation?.id }} · {{ formatDate(referral.donation?.donation_date) }}
-              <template v-if="referral.donation?.segment_number"> · Segment <span class="mono">{{ referral.donation.segment_number }}</span></template>
+              <template v-if="referral.donation?.donation_barcode"> · Barcode <span class="mono">{{ referral.donation.donation_barcode }}</span></template>
             </span>
             <span class="referral__meta">
               Screened by {{ referral.screened_by || '—' }} · {{ formatDate(referral.screened_at) }}
@@ -496,7 +496,7 @@ import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/Correct
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 import { ABO_GROUPS, aboOf, bloodTypeCodeFor } from '~/utils/bloodType'
-import { normalizeSegmentNumber } from '~/utils/phlebotomy'
+import { normalizeBarcode } from '~/utils/phlebotomy'
 import {
   SEROLOGY_MARKERS,
   blankPanel,
@@ -562,15 +562,15 @@ async function loadReference() {
 
 const queue = ref([])
 const loadingQueue = ref(false)
-const segmentSearch = ref('')
-const activeSegment = ref('')
+const barcodeSearch = ref('')
+const activeBarcode = ref('')
 
 async function loadQueue() {
   loadingQueue.value = true
 
   try {
     const params = { stage: 'testing' }
-    if (activeSegment.value) params.segment_number = activeSegment.value
+    if (activeBarcode.value) params.barcode = activeBarcode.value
 
     const res = await service.laboratoryQueue(params)
 
@@ -586,18 +586,18 @@ async function loadQueue() {
  * Find the tube in hand. One match opens it straight away — the medical
  * technologist scanned it because that is the one they are about to test.
  */
-async function findBySegment() {
+async function findByBarcode() {
   error.value = null
-  activeSegment.value = normalizeSegmentNumber(segmentSearch.value)
+  activeBarcode.value = normalizeBarcode(barcodeSearch.value)
 
   await loadQueue()
 
-  if (activeSegment.value && queue.value.length === 1) await openDonation(queue.value[0].id)
+  if (activeBarcode.value && queue.value.length === 1) await openDonation(queue.value[0].id)
 }
 
 function clearSearch() {
-  segmentSearch.value = ''
-  activeSegment.value = ''
+  barcodeSearch.value = ''
+  activeBarcode.value = ''
   error.value = null
   loadQueue()
 }

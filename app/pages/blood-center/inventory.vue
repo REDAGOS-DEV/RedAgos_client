@@ -63,8 +63,9 @@
       </div>
 
       <!-- ============ QUARANTINE ============ -->
-      <!-- Booked in, not yet cleared. Released per donation on both clearances. -->
-      <BloodCenterQuarantinePanel @released="loadDashboard" />
+      <!-- Booked in, not yet cleared. Read-only here: bags are released, and
+           given their final labels, at Stock Intake. -->
+      <BloodCenterQuarantinePanel />
 
       <!-- ============ AVAILABLE UNITS BY BLOOD TYPE ============ -->
       <!-- One series, so one colour and no legend: the title names it. Every
@@ -374,6 +375,7 @@
                         <p class="expanded-col__title">Inventory Overview</p>
                         <dl class="expanded-dl">
                           <div><dt>Batch Number</dt><dd>{{ row.batch_number || row.batch_id }}</dd></div>
+                          <div><dt>Volume</dt><dd>{{ row.volume_ml ? `${row.volume_ml} mL` : '—' }}</dd></div>
                           <div><dt>Collection Source</dt><dd>{{ row.donation_source || '—' }}</dd></div>
                           <div><dt>Storage Location</dt><dd>{{ row.storage_location || '—' }}</dd></div>
                           <div><dt>Notes</dt><dd>{{ row.notes || '—' }}</dd></div>
@@ -788,8 +790,12 @@
               <AssetIcon name="x" :size="16" />
             </button>
 
-            <h3 class="modal-title modal-title--left">Print Labels</h3>
-            <p class="modal-subtitle modal-subtitle--left">Select batches, set quantity, and preview before printing.</p>
+            <h3 class="modal-title modal-title--left">Reprint Final Labels</h3>
+            <p class="modal-subtitle modal-subtitle--left">
+              For released bags whose label was spoiled or lost. Bags get their first final label at Stock Intake, when
+              they leave quarantine.
+            </p>
+            <p v-if="printError" class="print-error" role="alert">{{ printError }}</p>
 
             <div v-if="!printableBatches.length" class="empty-state">
               <AssetIcon name="printer" :size="32" style="color: var(--rb-border-strong)" />
@@ -804,15 +810,6 @@
                     <p class="print-batch-row__title">{{ b.batch_id }} &middot; {{ b.blood_type }} {{ b.component }}</p>
                     <p class="print-batch-row__meta">Collected {{ formatDate(b.collection_date) }} &middot; Expires {{ formatDate(b.expiry_date) }}</p>
                   </div>
-                  <input
-                    v-if="printSelectedIds.includes(b.id)"
-                    type="number"
-                    min="1"
-                    :max="b.available_units"
-                    v-model.number="printQuantities[b.id]"
-                    class="print-batch-row__qty"
-                    @click.stop
-                  />
                 </label>
               </div>
 
@@ -829,7 +826,6 @@
                     </p>
                     <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.batch_id }}</p>
                     <p class="print-label-card__meta">Exp {{ formatDate(inventoryBatches.find(b => b.id === id)?.expiry_date) }}</p>
-                    <div class="print-label-card__barcode" />
                   </div>
                 </div>
               </div>
@@ -842,7 +838,7 @@
                   @click="submitPrintLabels"
                 >
                   <AssetIcon name="printer" :size="15" />
-                  {{ printSubmitting ? 'Preparing…' : 'Generate & Print' }}
+                  {{ printSubmitting ? 'Preparing…' : 'Print final labels' }}
                 </button>
                 <button type="button" class="btn-outline modal-actions__btn" @click="closePrintLabelsModal" :disabled="printSubmitting">Cancel</button>
               </div>
@@ -941,15 +937,20 @@
         </div>
       </Transition>
     </Teleport>
+
+    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
+import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
+import { useLabelPrint } from '~/composables/useLabelPrint'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { finalLabelsFrom } from '~/utils/bagLabels'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1529,17 +1530,22 @@ async function runManageAction(action) {
   }
 }
 
-// --- Print Labels modal  ---
+// --- Reprint final labels modal ---
+//
+// The same final label Stock Intake prints on release, from the same server
+// data, so a reprint can never say more than the original: verified blood type,
+// expiry, clearance codes, who released it. Released bags only — the server
+// refuses a bag still in quarantine — and never donor information.
 const printModalOpen = ref(false)
 const printSelectedIds = ref([])
-const printQuantities = reactive({})
 const printSubmitting = ref(false)
+const printError = ref(null)
 const printableBatches = computed(() => inventoryBatches.value.filter(b => (b.available_units || 0) > 0))
+const { print: printLabels } = useLabelPrint()
 
 function openPrintLabelsModal(presetBatch = null) {
   printSelectedIds.value = presetBatch ? [presetBatch.id] : []
-  Object.keys(printQuantities).forEach(k => delete printQuantities[k])
-  if (presetBatch) printQuantities[presetBatch.id] = 1
+  printError.value = null
   printModalOpen.value = true
 }
 function closePrintLabelsModal() {
@@ -1548,27 +1554,39 @@ function closePrintLabelsModal() {
 }
 function togglePrintSelection(row) {
   const idx = printSelectedIds.value.indexOf(row.id)
-  if (idx === -1) {
-    printSelectedIds.value.push(row.id)
-    printQuantities[row.id] = 1
-  } else {
-    printSelectedIds.value.splice(idx, 1)
-    delete printQuantities[row.id]
-  }
+  if (idx === -1) printSelectedIds.value.push(row.id)
+  else printSelectedIds.value.splice(idx, 1)
 }
 async function submitPrintLabels() {
   if (!printSelectedIds.value.length) return
   printSubmitting.value = true
+  printError.value = null
   try {
-    // Printed in the browser, from data already on this page. There is no
-    // server endpoint for this and the previous printInventoryLabels?.() call
-    // silently did nothing. Labels carry unit, type, component and dates only —
-    // never donor or patient identifying information.
+    // Label data is per donation, so fetch each selected bag's donation once.
+    const donationIds = [...new Set(printSelectedIds.value
+      .map(id => inventoryBatches.value.find(b => b.id === id)?.donation_id)
+      .filter(Boolean))]
+
+    const labels = []
+
+    for (const donationId of donationIds) {
+      const data = await bloodCenterService.bloodLabels(donationId)
+      labels.push(...finalLabelsFrom(data, printSelectedIds.value))
+    }
+
+    if (!labels.length) {
+      printError.value = 'None of the selected bags has a final label to print.'
+      return
+    }
+
+    // Close the modal first, so only the label sheet is on the page to print.
     printModalOpen.value = false
     await nextTick()
-    window.print()
+    await printLabels(labels, 'final')
   } catch (err) {
-    console.error('Failed to print labels:', err)
+    printError.value = err?.status === 403 || err?.statusCode === 403
+      ? 'Only Issuance prints final labels.'
+      : err?.data?.message || err?.message || 'The labels could not be prepared.'
   } finally {
     printSubmitting.value = false
   }
@@ -2027,13 +2045,12 @@ onMounted(loadDashboard)
 .print-batch-row__info { flex: 1; min-width: 0; }
 .print-batch-row__title { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); margin: 0; }
 .print-batch-row__meta { font-size: 11px; color: var(--rb-text-secondary); margin: 2px 0 0; }
-.print-batch-row__qty { width: 56px; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--rb-border-strong); font-size: 12px; text-align: center; }
+.print-error { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 .print-preview { margin-bottom: 16px; }
 .print-preview__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
 .print-label-card { border: 1px dashed var(--rb-border-strong); border-radius: 10px; padding: 10px; font-size: 10.5px; }
 .print-label-card__type { font-weight: 800; color: var(--rb-accent-text); margin: 0; font-size: 13px; }
 .print-label-card__meta { color: var(--rb-text-secondary); margin: 2px 0 0; }
-.print-label-card__barcode { margin-top: 6px; height: 20px; background: repeating-linear-gradient(90deg, var(--rb-text-primary) 0 2px, transparent 2px 4px); }
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }

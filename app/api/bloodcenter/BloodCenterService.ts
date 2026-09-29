@@ -289,6 +289,15 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory/quarantine/${donationId}/release`, 'POST')
   }
 
+  /**
+   * The final (Phase 2) label data for a donation's released bags — verified
+   * blood type, expiry, clearance codes, who released them. Refused while the
+   * bags are still in quarantine. Issuance only.
+   */
+  async bloodLabels(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/inventory/donations/${donationId}/labels`, 'GET')
+  }
+
   async discardBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory/${unitId}/discard`, 'POST', payload)
   }
