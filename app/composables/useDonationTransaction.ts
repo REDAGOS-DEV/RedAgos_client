@@ -206,14 +206,18 @@ export function useDonationTransaction() {
     }
   }
 
-  async function run<T>(work: () => Promise<T>): Promise<T | null> {
+  /**
+   * `recover` may claim a refusal it can act on; anything it declines is shown
+   * as an error.
+   */
+  async function run<T>(work: () => Promise<T>, recover?: (err: any) => boolean): Promise<T | null> {
     busy.value = true
     error.value = null
 
     try {
       return await work()
     } catch (err: any) {
-      error.value = messageFor(err)
+      if (!recover?.(err)) error.value = messageFor(err)
       return null
     } finally {
       busy.value = false
@@ -392,9 +396,25 @@ export function useDonationTransaction() {
   async function recordCollection(payload: Record<string, unknown>) {
     if (!donation.value) return false
 
-    const result = await run(() => service.recordCollection(donation.value!.id, payload))
+    let alreadyRecorded = false
 
-    if (!result) return false
+    const result = await run(
+      () => service.recordCollection(donation.value!.id, payload),
+      (err) => {
+        // A save retried after its response was lost. The server sends the
+        // donation as recorded, so the drawer moves on to it rather than
+        // leaving staff at a form they can no longer submit.
+        const recorded = err?.data?.code === 'collection_already_recorded' ? err.data.data : null
+        if (!recorded) return false
+
+        adoptDonation(recorded)
+        notice.value = messageFor(err)
+        alreadyRecorded = true
+        return true
+      },
+    )
+
+    if (!result) return alreadyRecorded
 
     adoptDonation(result.data)
     notice.value = result.message ?? null

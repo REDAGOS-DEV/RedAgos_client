@@ -528,4 +528,40 @@ describe('a prior deferral at the counter', () => {
 
     expect(tx.error.value).toBe('This barcode is already recorded at this facility. Scan the sticker again.')
   })
+
+  it('moves on to the saved collection when a lost save is retried', async () => {
+    fetchMock.mockResolvedValueOnce({ data: donation('screening') })
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.openDonation()
+
+    // The first save committed but its response never arrived, so the second
+    // is refused -- with the donation as it was recorded.
+    fetchMock.mockRejectedValueOnce(httpError(409, {
+      code: 'collection_already_recorded',
+      message: 'A collection is already recorded for this donation.',
+      data: donation('collected', { volume_ml: 450, collection: { donation_barcode: 'SEG-1' } }),
+    }))
+    const ok = await tx.recordCollection({ donation_barcode: 'SEG-1' })
+
+    expect(ok).toBe(true)
+    expect(tx.stage.value).toBe('done')
+    expect(tx.donation.value?.collection?.donation_barcode).toBe('SEG-1')
+    expect(tx.error.value).toBeNull()
+    expect(tx.notice.value).toBe('A collection is already recorded for this donation.')
+  })
+
+  it('still reports a refusal that carries no donation', async () => {
+    fetchMock.mockResolvedValueOnce({ data: donation('screening') })
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.openDonation()
+
+    fetchMock.mockRejectedValueOnce(httpError(409, { code: 'collection_already_recorded' }))
+    const ok = await tx.recordCollection({ donation_barcode: 'SEG-1' })
+
+    expect(ok).toBe(false)
+    expect(tx.stage.value).toBe('collection')
+    expect(tx.error.value).toBe('A collection is already recorded for this donation.')
+  })
 })
