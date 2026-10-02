@@ -1103,11 +1103,11 @@ function scrollToTimeline() {
   background: #F0EEE9;
   color: #6B675F;
 }
-:global(.dark .badge--success) { background: #1D2B1E; color: #8FCB94; }
-:global(.dark .badge--warning) { background: #322A12; color: #E4B54B; }
-:global(.dark .badge--danger) { background: #331A19; color: #E58E8B; }
-:global(.dark .badge--info) { background: #122733; color: #7EC1EE; }
-:global(.dark .badge--neutral) { background: #2A2721; color: #B3AEA4; }
+:global(.dark .request-details-page .badge--success) { background: #1D2B1E; color: #8FCB94; }
+:global(.dark .request-details-page .badge--warning) { background: #322A12; color: #E4B54B; }
+:global(.dark .request-details-page .badge--danger) { background: #331A19; color: #E58E8B; }
+:global(.dark .request-details-page .badge--info) { background: #122733; color: #7EC1EE; }
+:global(.dark .request-details-page .badge--neutral) { background: #2A2721; color: #B3AEA4; }
 
 /* ---------- Cards ---------- */
 .card {
@@ -1624,69 +1624,69 @@ function scrollToTimeline() {
 /* .request-details-page / .card / .skeleton already read the warm --rb-*
    tokens redefined near the top of this file, so no hardcoded overrides
    are needed for those here. */
-:global(.dark .page-title),
-:global(.dark .crumb-current),
-:global(.dark .section-title),
-:global(.dark .side-card__title),
-:global(.dark .summary-value),
-:global(.dark .info-value),
-:global(.dark .timeline-label) {
+:global(.dark .request-details-page .page-title),
+:global(.dark .request-details-page .crumb-current),
+:global(.dark .request-details-page .section-title),
+:global(.dark .request-details-page .side-card__title),
+:global(.dark .request-details-page .summary-value),
+:global(.dark .request-details-page .info-value),
+:global(.dark .request-details-page .timeline-label) {
   color: var(--rb-text);
 }
-:global(.dark .page-subtitle),
-:global(.dark .breadcrumb),
-:global(.dark .info-label),
-:global(.dark .summary-label),
-:global(.dark .documents-empty),
-:global(.dark .timeline-timestamp),
-:global(.dark .progress-percent) {
+:global(.dark .request-details-page .page-subtitle),
+:global(.dark .request-details-page .breadcrumb),
+:global(.dark .request-details-page .info-label),
+:global(.dark .request-details-page .summary-label),
+:global(.dark .request-details-page .documents-empty),
+:global(.dark .request-details-page .timeline-timestamp),
+:global(.dark .request-details-page .progress-percent) {
   color: var(--rb-text-muted);
 }
-:global(.dark .btn--outline) {
+:global(.dark .request-details-page .btn--outline) {
   background: var(--rb-surface);
   border-color: var(--rb-border);
   color: #6fa8dc;
 }
-:global(.dark .btn--outline:hover) {
+:global(.dark .request-details-page .btn--outline:hover) {
   background: #262319;
 }
-:global(.dark .history-table th) {
+:global(.dark .request-details-page .history-table th) {
   color: var(--rb-text-muted);
   border-color: var(--rb-border);
 }
-:global(.dark .history-table td) {
+:global(.dark .request-details-page .history-table td) {
   color: var(--rb-text);
   border-color: var(--rb-border);
 }
-:global(.dark .document-chip),
-:global(.dark .availability-item) {
+:global(.dark .request-details-page .document-chip),
+:global(.dark .request-details-page .availability-item) {
   background: #262319;
   border-color: var(--rb-border);
 }
 :global(.dark) .timeline-step::before {
   background: var(--rb-border);
 }
-:global(.dark .timeline-marker) {
+:global(.dark .request-details-page .timeline-marker) {
   background: #262319;
 }
-:global(.dark .billing-gated) {
+:global(.dark .request-details-page .billing-gated) {
   color: var(--rb-text-muted);
 }
-:global(.dark .payment-chip) {
+:global(.dark .request-details-page .payment-chip) {
   background: var(--rb-surface);
   border-color: var(--rb-border);
   color: var(--rb-text);
 }
-:global(.dark .payment-chip--active) {
+:global(.dark .request-details-page .payment-chip--active) {
   border-color: #7EC1EE;
   background: #122733;
   color: #7EC1EE;
 }
-:global(.dark .receipt-block) {
+:global(.dark .request-details-page .receipt-block) {
   background: #1D2B1E;
   color: #8FCB94;
 }
-:global(.dark .toast) {
+:global(.dark .request-details-page .toast) {
   background: var(--rb-surface);
   border-color: var(--rb-border);
   color: var(--rb-text);

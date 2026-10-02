@@ -117,7 +117,7 @@
 
     <!-- Create modal -->
     <Teleport to="body">
-      <div v-if="modalOpen" class="modal-layer" role="dialog" aria-modal="true" aria-label="Add administrator">
+      <div v-if="modalOpen" class="modal-layer admins-modal" role="dialog" aria-modal="true" aria-label="Add administrator">
         <div class="overlay" @click="closeModal" />
 
         <div class="modal">
@@ -1053,31 +1053,52 @@ onActivated(() => {
 
 /* Dark mode */
 :global(.dark .admins),
-:global(.dark .modal-layer) {
+:global(.dark .admins .modal-layer),
+:global(.dark .admins-modal.modal-layer) {
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --border: #334155;
   --card-bg: #1e293b;
 }
 
-:global(.dark .table thead th) { background: #182234; }
-:global(.dark .table tbody tr:hover) { background: #263449; }
-:global(.dark .input) { background: #182234; border-color: #334155; }
-:global(.dark .input:focus) { background: #1e293b; }
-:global(.dark .privilege) { border-color: #334155; }
-:global(.dark .privilege--on) { background: rgba(66, 165, 245, 0.16); }
-:global(.dark .privilege__box) { border-color: #475569; }
-:global(.dark .btn-ghost) { border-color: #334155; }
-:global(.dark .modal__close:hover) { background: #263449; }
-:global(.dark .badge--neutral),
-:global(.dark .privs__more),
-:global(.dark .person__you),
-:global(.dark .empty-state__icon) { background: #334155; color: #94a3b8; }
-:global(.dark .badge--primary) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
-:global(.dark .badge--accent) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
-:global(.dark .badge--success) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
-:global(.dark .badge--info) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
-:global(.dark .banner--success) { background: rgba(76, 175, 80, 0.14); border-color: rgba(76, 175, 80, 0.3); color: #81c784; }
-:global(.dark .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
-:global(.dark .note) { background: rgba(66, 165, 245, 0.12); border-color: rgba(66, 165, 245, 0.3); }
+:global(.dark .admins .table thead th),
+:global(.dark .admins-modal .table thead th) { background: #182234; }
+:global(.dark .admins .table tbody tr:hover),
+:global(.dark .admins-modal .table tbody tr:hover) { background: #263449; }
+:global(.dark .admins .input),
+:global(.dark .admins-modal .input) { background: #182234; border-color: #334155; }
+:global(.dark .admins .input:focus),
+:global(.dark .admins-modal .input:focus) { background: #1e293b; }
+:global(.dark .admins .privilege),
+:global(.dark .admins-modal .privilege) { border-color: #334155; }
+:global(.dark .admins .privilege--on),
+:global(.dark .admins-modal .privilege--on) { background: rgba(66, 165, 245, 0.16); }
+:global(.dark .admins .privilege__box),
+:global(.dark .admins-modal .privilege__box) { border-color: #475569; }
+:global(.dark .admins .btn-ghost),
+:global(.dark .admins-modal .btn-ghost) { border-color: #334155; }
+:global(.dark .admins .modal__close:hover),
+:global(.dark .admins-modal .modal__close:hover) { background: #263449; }
+:global(.dark .admins .badge--neutral),
+:global(.dark .admins-modal .badge--neutral),
+:global(.dark .admins .privs__more),
+:global(.dark .admins-modal .privs__more),
+:global(.dark .admins .person__you),
+:global(.dark .admins-modal .person__you),
+:global(.dark .admins .empty-state__icon),
+:global(.dark .admins-modal .empty-state__icon) { background: #334155; color: #94a3b8; }
+:global(.dark .admins .badge--primary),
+:global(.dark .admins-modal .badge--primary) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
+:global(.dark .admins .badge--accent),
+:global(.dark .admins-modal .badge--accent) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
+:global(.dark .admins .badge--success),
+:global(.dark .admins-modal .badge--success) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+:global(.dark .admins .badge--info),
+:global(.dark .admins-modal .badge--info) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
+:global(.dark .admins .banner--success),
+:global(.dark .admins-modal .banner--success) { background: rgba(76, 175, 80, 0.14); border-color: rgba(76, 175, 80, 0.3); color: #81c784; }
+:global(.dark .admins .banner--error),
+:global(.dark .admins-modal .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
+:global(.dark .admins .note),
+:global(.dark .admins-modal .note) { background: rgba(66, 165, 245, 0.12); border-color: rgba(66, 165, 245, 0.3); }
 </style>

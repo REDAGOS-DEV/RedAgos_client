@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="settings-page scope-blood-center-settings">
     <div v-if="loading" class="loading-wrap">
       <div class="spinner" />
     </div>

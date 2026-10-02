@@ -1,5 +1,5 @@
 <template>
-  <main class="login-screen">
+  <main class="login-screen scope-auth-hospital-login">
     <div class="login-shell">
       <AuthBrandPanel />
 
@@ -658,12 +658,12 @@ input::placeholder {
 
 }
 
-:global(.dark .role-button.donor) {
+:global(.dark .scope-auth-hospital-login .role-button.donor) {
   background: rgba(211, 47, 47, 0.18);
   color: #f2a7a7;
 }
 
-:global(.dark .role-button.blood-center) {
+:global(.dark .scope-auth-hospital-login .role-button.blood-center) {
   color: #64B5F6;
 }
 

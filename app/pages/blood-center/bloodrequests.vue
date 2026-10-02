@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page scope-blood-center-bloodrequests">
     <!-- TOASTS -->
     <div class="toast-stack">
       <transition-group name="toast">
@@ -1831,7 +1831,7 @@ onMounted(() => {
  *    .table-row and friends on every other page in the app the moment this
  *    route's stylesheet was fetched.
  */
-:global(.dark .page) {
+:global(.dark .scope-blood-center-bloodrequests) {
   --bg: #0F172A; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
   /* Only the text family lifts; the -fill tokens keep their deep values so
      white-on-fill buttons and toasts stay legible. */
@@ -1839,42 +1839,42 @@ onMounted(() => {
   --danger: #f87171; --info: #60a5fa; --purple: #a78bfa;
   --primary-fill-hover: #1976d2;
 }
-:global(.dark .page .summary-icon) { background: #1c2a42; }
-:global(.dark .page .summary-icon.is-danger) { background: #3a1f22; }
-:global(.dark .page .emergency-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); }
-:global(.dark .page .retry-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); color: #EF9A9A; }
-:global(.dark .page .blood-pill) { background: #3a1f22; }
-:global(.dark .page .inv-ok) { background: #16301c; }
-:global(.dark .page .inv-low) { background: #3a2c10; }
-:global(.dark .page .inv-insufficient) { background: #3a1f22; }
-:global(.dark .page .inventory-status-line.inv-ok) { background: #16301c; }
-:global(.dark .page .inventory-status-line.inv-low) { background: #3a2c10; }
-:global(.dark .page .inventory-status-line.inv-insufficient) { background: #3a1f22; }
-:global(.dark .page .status-pending) { background: #1e2635; }
-:global(.dark .page .status-under-review) { background: #16223a; }
-:global(.dark .page .status-approved) { background: #16301c; }
-:global(.dark .page .status-rejected) { background: #3a1f22; }
-:global(.dark .page .status-ready-for-fulfillment) { background: #2a1f42; }
-:global(.dark .page .status-processing) { background: #16223a; }
-:global(.dark .page .status-partial) { background: #3a2e12; }
-:global(.dark .page .status-fulfilled) { background: #16301c; }
-:global(.dark .page .status-cancelled) { background: #1e2635; }
-:global(.dark .page .source-badge) { background: #2a1f42; }
-:global(.dark .page .source-badge--share) { background: #16223a; }
-:global(.dark .page .table-row:hover) { background: #1c2536; }
-:global(.dark .page .expanded-content) { background: #141b29; }
-:global(.dark .page .skeleton-row),
-:global(.dark .page .skeleton-card) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
-:global(.dark .page .notes-block),
-:global(.dark .page .batch-row),
-:global(.dark .page .modal-summary),
-:global(.dark .page .field-select),
-:global(.dark .page .field-textarea),
-:global(.dark .page .toolbar-search input),
-:global(.dark .page .toolbar select),
-:global(.dark .page .toolbar input[type="date"]) { background: #1c2536; }
-:global(.dark .page .context-menu),
-:global(.dark .page .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+:global(.dark .scope-blood-center-bloodrequests .summary-icon) { background: #1c2a42; }
+:global(.dark .scope-blood-center-bloodrequests .summary-icon.is-danger) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .emergency-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); }
+:global(.dark .scope-blood-center-bloodrequests .retry-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); color: #EF9A9A; }
+:global(.dark .scope-blood-center-bloodrequests .blood-pill) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .inv-ok) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .inv-low) { background: #3a2c10; }
+:global(.dark .scope-blood-center-bloodrequests .inv-insufficient) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-ok) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-low) { background: #3a2c10; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-insufficient) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .status-pending) { background: #1e2635; }
+:global(.dark .scope-blood-center-bloodrequests .status-under-review) { background: #16223a; }
+:global(.dark .scope-blood-center-bloodrequests .status-approved) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .status-rejected) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .status-ready-for-fulfillment) { background: #2a1f42; }
+:global(.dark .scope-blood-center-bloodrequests .status-processing) { background: #16223a; }
+:global(.dark .scope-blood-center-bloodrequests .status-partial) { background: #3a2e12; }
+:global(.dark .scope-blood-center-bloodrequests .status-fulfilled) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .status-cancelled) { background: #1e2635; }
+:global(.dark .scope-blood-center-bloodrequests .source-badge) { background: #2a1f42; }
+:global(.dark .scope-blood-center-bloodrequests .source-badge--share) { background: #16223a; }
+:global(.dark .scope-blood-center-bloodrequests .table-row:hover) { background: #1c2536; }
+:global(.dark .scope-blood-center-bloodrequests .expanded-content) { background: #141b29; }
+:global(.dark .scope-blood-center-bloodrequests .skeleton-row),
+:global(.dark .scope-blood-center-bloodrequests .skeleton-card) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
+:global(.dark .scope-blood-center-bloodrequests .notes-block),
+:global(.dark .scope-blood-center-bloodrequests .batch-row),
+:global(.dark .scope-blood-center-bloodrequests .modal-summary),
+:global(.dark .scope-blood-center-bloodrequests .field-select),
+:global(.dark .scope-blood-center-bloodrequests .field-textarea),
+:global(.dark .scope-blood-center-bloodrequests .toolbar-search input),
+:global(.dark .scope-blood-center-bloodrequests .toolbar select),
+:global(.dark .scope-blood-center-bloodrequests .toolbar input[type="date"]) { background: #1c2536; }
+:global(.dark .scope-blood-center-bloodrequests .context-menu),
+:global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 
 .btn:focus-visible,
 .icon-btn:focus-visible,

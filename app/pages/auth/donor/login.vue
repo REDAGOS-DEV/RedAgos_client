@@ -1,5 +1,5 @@
 <template>
-  <main class="login-screen">
+  <main class="login-screen scope-auth-donor-login">
     <div class="login-shell">
       <AuthBrandPanel />
 
@@ -736,7 +736,7 @@ input::placeholder {
   Dark mode: tanan selector naka-prefix og .login-screen para dili
   motulo sa ubang pages (global man ni nga rules).
 */
-:global(.dark .login-screen) {
+:global(.dark .scope-auth-donor-login) {
   --text-primary: #F1F5F9;
   --text-body: #E2E8F0;
   --text-secondary: #94A3B8;
@@ -746,49 +746,49 @@ input::placeholder {
   --page-bg: #0F172A;
 }
 
-:global(.dark .login-screen .input-shell) {
+:global(.dark .scope-auth-donor-login .input-shell) {
   box-shadow: none;
 }
 
-:global(.dark .login-screen .input-shell:focus-within) {
+:global(.dark .scope-auth-donor-login .input-shell:focus-within) {
   background: #213049;
   box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.16);
 }
 
-:global(.dark .login-screen .input-shell:focus-within .field-icon),
-:global(.dark .login-screen .link-button),
-:global(.dark .login-screen .signup-text a) {
+:global(.dark .scope-auth-donor-login .input-shell:focus-within .field-icon),
+:global(.dark .scope-auth-donor-login .link-button),
+:global(.dark .scope-auth-donor-login .signup-text a) {
   color: #64B5F6;
 }
 
-:global(.dark .login-screen .link-button:hover),
-:global(.dark .login-screen .signup-text a:hover) {
+:global(.dark .scope-auth-donor-login .link-button:hover),
+:global(.dark .scope-auth-donor-login .signup-text a:hover) {
   color: #90CAF9;
 }
 
-:global(.dark .login-screen .icon-button:hover) {
+:global(.dark .scope-auth-donor-login .icon-button:hover) {
   background: #334155;
 }
 
-:global(.dark .login-screen .back-link:hover) {
+:global(.dark .scope-auth-donor-login .back-link:hover) {
   background: rgba(255, 255, 255, 0.06);
 }
 
-:global(.dark .login-screen .sign-in-button) {
+:global(.dark .scope-auth-donor-login .sign-in-button) {
   box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
 }
 
-:global(.dark .login-screen .hospital) {
+:global(.dark .scope-auth-donor-login .hospital) {
   background: rgba(21, 101, 192, 0.18);
   color: #90CAF9;
 }
 
-:global(.dark .login-screen .blood-center) {
+:global(.dark .scope-auth-donor-login .blood-center) {
   color: #64B5F6;
 }
 
 @media (max-width: 1023px) {
-  :global(.dark .login-screen .back-link:hover) {
+  :global(.dark .scope-auth-donor-login .back-link:hover) {
     background: rgba(255, 255, 255, 0.26);
   }
 }

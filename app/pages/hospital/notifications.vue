@@ -619,7 +619,7 @@ onMounted(() => {
   background: linear-gradient(90deg, var(--np-border) 25%, rgba(255,255,255,0.4) 37%, var(--np-border) 63%);
   background-size: 400% 100%; border-radius: 6px; animation: np-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton-line) {
+:global(.dark .notif-page .skeleton-line) {
   background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
   background-size: 400% 100%;
 }
@@ -630,7 +630,7 @@ onMounted(() => {
   border-radius: 18px;
   animation: np-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton) {
+:global(.dark .notif-page .skeleton) {
   background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
   background-size: 400% 100%;
 }

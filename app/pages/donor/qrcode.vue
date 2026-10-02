@@ -138,20 +138,50 @@
 
         <!-- Right: how to use -->
         <div class="panel steps-panel">
-          <h2 class="steps-panel__title">How to use QR code</h2>
+          <div class="steps-panel__head">
+            <h2 class="steps-panel__title">How to use QR code</h2>
+            <span class="steps-panel__count">{{ stepsDone }} of {{ steps.length }} done</span>
+          </div>
 
-          <div class="steps-list">
-            <div v-for="(step, i) in steps" :key="step.title" class="step-row">
+          <div
+            class="steps-progress"
+            role="progressbar"
+            :aria-valuenow="stepsDone"
+            aria-valuemin="0"
+            :aria-valuemax="steps.length"
+            :aria-label="`${stepsDone} of ${steps.length} steps done`"
+          >
+            <span class="steps-progress__fill" :style="{ width: `${(stepsDone / steps.length) * 100}%` }" />
+          </div>
+
+          <ol class="steps-list">
+            <li
+              v-for="(step, i) in steps"
+              :key="step.title"
+              class="step-row"
+              :class="`step-row--${step.state}`"
+              :aria-current="step.state === 'current' ? 'step' : undefined"
+            >
               <div class="step-row__marker">
-                <span class="step-dot" :class="{ 'step-dot--done': step.done }" />
-                <span v-if="i < steps.length - 1" class="step-line" />
+                <span class="step-dot" :class="`step-dot--${step.state}`">
+                  <AssetIcon v-if="step.state === 'done'" name="check" :size="12" />
+                  <template v-else>{{ i + 1 }}</template>
+                </span>
+                <span
+                  v-if="i < steps.length - 1"
+                  class="step-line"
+                  :class="{ 'step-line--done': step.state === 'done' }"
+                />
               </div>
               <div class="step-row__body">
-                <p class="step-row__title">{{ step.title }}</p>
+                <p class="step-row__title">
+                  {{ step.title }}
+                  <span v-if="step.state === 'current'" class="step-row__badge">Next step</span>
+                </p>
                 <p class="step-row__desc">{{ step.desc }}</p>
               </div>
-            </div>
-          </div>
+            </li>
+          </ol>
 
           <div class="warning-banner">
             <AssetIcon name="alert" :size="16" class="warning-banner__icon" />
@@ -191,7 +221,7 @@ const profile = ref(null)
 // pwede na ba mo-donate. Ang blood center ang mo-desisyon ana, didto sa
 // counter, base sa ilang kaugalingong assessment.
 const questionnaireStatus = ref('not_answered') // 'not_answered' | 'answered' | 'expired'
-const upcomingAppointment = ref(null)
+const appointments = ref([])
 const qrCodeDataUrl = ref('')
 const qrValidUntil = ref(null)
 const qrValidDays = ref(14)
@@ -279,33 +309,76 @@ const statusValueClass = computed(() =>
 )
 
 
-const steps = computed(() => [
+// Ang appointment nga sakop sa karon nga donation cycle:
+//   confirmed -> na-scan na ang QR, naa na sa blood center
+//   scheduled -> naka-book, wala pa niabot
+//   completed -> nahuman na ang donation (sukad sa karon nga screening ra,
+//                para dili maihap ang daan nga donation)
+function byDate(a, b) {
+  return new Date(a.appointment_datetime) - new Date(b.appointment_datetime)
+}
+
+const cycleAppointment = computed(() => {
+  const list = appointments.value
+
+  const confirmed = list.find(a => a.status === 'confirmed')
+  if (confirmed) return confirmed
+
+  const scheduled = list.filter(a => a.status === 'scheduled').sort(byDate)[0]
+  if (scheduled) return scheduled
+
+  const since = profile.value?.screening_date
+  if (questionnaireStatus.value !== 'answered' || !since) return null
+
+  return list
+    .filter(a => a.status === 'completed' && new Date(a.appointment_datetime) >= new Date(since))
+    .sort(byDate)
+    .at(-1) ?? null
+})
+
+const STEP_COPY = [
   {
     title: 'Complete the health questionnaire',
     desc: 'Answer it on the donor portal the day before your appointment. Your QR code is generated as soon as you submit it.',
-    done: questionnaireStatus.value === 'answered',
   },
   {
     title: 'Book your appointment',
     desc: 'Choose a blood center or mobile drive, select your preferred date and time slot, and confirm your booking.',
-    done: !!upcomingAppointment.value,
   },
   {
     title: 'Arrive at the blood center',
     desc: 'Present this QR code to the blood center staff upon arrival. They will scan it to verify your eligibility screening status.',
-    done: false,
   },
   {
     title: 'Proceed to physical screening',
     desc: 'After QR verification, the blood center nurse or med tech will conduct a final on-site physical screening (blood pressure, hemoglobin, weight, etc.).',
-    done: false,
   },
   {
     title: 'Donate blood',
     desc: 'If you pass the physical screening, you will proceed to donation. The staff records your donation in the system.',
-    done: false,
   },
-])
+]
+
+// Ang state sa matag step: 'done', 'current' (ang una nga wala pa nahuman),
+// o 'upcoming'.
+const steps = computed(() => {
+  const status = cycleAppointment.value?.status
+  const done = [
+    questionnaireStatus.value === 'answered',
+    !!cycleAppointment.value,
+    status === 'confirmed' || status === 'completed',
+    status === 'completed',
+    status === 'completed',
+  ]
+  const current = done.indexOf(false)
+
+  return STEP_COPY.map((copy, i) => ({
+    ...copy,
+    state: done[i] ? 'done' : i === current ? 'current' : 'upcoming',
+  }))
+})
+
+const stepsDone = computed(() => steps.value.filter(step => step.state === 'done').length)
 
 function formatDate(value) {
   if (!value) return '-'
@@ -459,8 +532,15 @@ async function load({ silent = false } = {}) {
     }
 
 
-    // Ang upcoming_appointment kay wala gi-serve ani nga endpoint — gikan na
-    // siya sa appointments API, so null sa karon.
+    // Ang appointments kay para ra sa progress sa "How to use" steps. Kung
+    // mapakyas, ang questionnaire step ra ang mahibal-an, dili ma-block ang QR.
+    try {
+      const list = await donorService.appointments()
+      appointments.value = Array.isArray(list) ? list : (list?.data ?? [])
+    } catch (err) {
+      console.error('Failed to load appointments for QR steps:', err)
+      appointments.value = []
+    }
   } catch (err) {
     console.error('Failed to load QR code data:', err)
   } finally {
@@ -657,16 +737,50 @@ onActivated(() => {
 }
 
 /* Steps panel */
+.steps-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .steps-panel__title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 20px;
+  margin: 0;
+}
+
+.steps-panel__count {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.steps-progress {
+  height: 6px;
+  margin: 12px 0 22px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.steps-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .steps-list {
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .step-row {
@@ -682,26 +796,44 @@ onActivated(() => {
 }
 
 .step-dot {
-  width: 14px;
-  height: 14px;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   border: 2px solid #cbd5e1;
   background: white;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .step-dot--done {
   border-color: var(--primary);
   background: var(--primary);
+  color: white;
+}
+
+.step-dot--current {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.14);
 }
 
 .step-line {
   width: 2px;
   flex: 1;
-  min-height: 28px;
+  min-height: 24px;
   background: #e5e7eb;
-  margin: 2px 0;
+  margin: 4px 0;
+  border-radius: 999px;
+}
+
+.step-line--done {
+  background: var(--primary);
 }
 
 .step-row__body {
@@ -709,10 +841,34 @@ onActivated(() => {
 }
 
 .step-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
+  margin: 2px 0 0;
+}
+
+.step-row--upcoming .step-row__title {
+  color: var(--text-secondary);
+}
+
+.step-row__badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(21, 101, 192, 0.1);
+  color: var(--primary);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .steps-progress__fill {
+    transition: none;
+  }
 }
 
 .step-row__desc {
@@ -848,35 +1004,47 @@ onActivated(() => {
     background: #0F172A;
 }
 
-:global(.dark .panel) {
+:global(.dark .qr-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
+:global(.dark .qr-page .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
 
-:global(.dark .qr-image-wrap) { border-color: #334155; }
-:global(.dark .qr-image--placeholder) { background: #172033; }
+:global(.dark .qr-page .qr-image-wrap) { border-color: #334155; }
+:global(.dark .qr-page .qr-image--placeholder) { background: #172033; }
 
-:global(.dark .qr-details) { border-color: #334155; }
-:global(.dark .qr-details__row:nth-child(odd)) { background: #172033; }
+:global(.dark .qr-page .qr-details) { border-color: #334155; }
+:global(.dark .qr-page .qr-details__row:nth-child(odd)) { background: #172033; }
 
-:global(.dark .step-dot) { border-color: #475569; background: #1E293B; }
-:global(.dark .step-line) { background: #334155; }
+/* Ang done/current kay kinahanglan i-override pud dinhi, kay kining
+   .dark .step-dot rule mas lig-on sa scoped .step-dot--done. */
+:global(.dark .qr-page .step-dot) { border-color: #475569; background: #1E293B; color: #94A3B8; }
+:global(.dark .qr-page .step-dot--done) { border-color: #64B5F6; background: #64B5F6; color: #0F172A; }
+:global(.dark .qr-page .step-dot--current) {
+  border-color: #64B5F6;
+  color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.18);
+}
+:global(.dark .qr-page .step-line) { background: #334155; }
+:global(.dark .qr-page .step-line--done) { background: #64B5F6; }
+:global(.dark .qr-page .steps-progress) { background: #334155; }
+:global(.dark .qr-page .steps-progress__fill) { background: #64B5F6; }
+:global(.dark .qr-page .step-row__badge) { background: rgba(100, 181, 246, 0.16); color: #90CAF9; }
 
-:global(.dark .warning-banner) {
+:global(.dark .qr-page .warning-banner) {
     background: rgba(245,124,0,0.10);
     border-color: rgba(245,124,0,0.24);
 }
-:global(.dark .warning-banner__text) { color: #CBD5E1; }
+:global(.dark .qr-page .warning-banner__text) { color: #CBD5E1; }
 
-:global(.dark .btn-outline) {
+:global(.dark .qr-page .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .qr-page .btn-outline:hover:not(:disabled)) { background: #334155; }
 
-:global(.dark .skeleton) {
+:global(.dark .qr-page .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
 }
