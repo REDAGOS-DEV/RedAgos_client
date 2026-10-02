@@ -15,8 +15,9 @@
             </div>
           </div>
 
-          <NuxtLink to="/auth/hospital/login" class="back-link">
-            <AssetIcon name="chevron-left" :size="18" />
+          <NuxtLink to="/auth/hospital/login" class="back-link" aria-label="Back to sign in">
+            <AssetIcon name="chevron-left" :size="16" />
+            <span>Back</span>
           </NuxtLink>
 
           <h1>Forgot Password</h1>
@@ -189,6 +190,7 @@ const submitReset = async () => {
 .back-link {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   color: #64748b;
   font-size: 14px;
   font-weight: 500;

@@ -121,26 +121,55 @@ export function useAuthLogin(portalKey: PortalKey) {
   const resending = ref(false)
   const resendMessage = ref('')
   const resendFailed = ref(false)
+  // True once a fresh link has gone out, so the alert can switch from
+  // "something is wrong" to "check your inbox".
+  const resendSent = ref(false)
+  // The address sign-in was refused for. Captured at failure time so the
+  // alert names the right inbox even if the field is edited afterwards.
+  const verificationEmail = ref('')
+  // Seconds before the resend button unlocks again. The endpoint allows
+  // three sends per ten minutes; without this a few clicks hit the 429.
+  const resendCooldown = ref(0)
+  let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+  function startCooldown(seconds: number) {
+    if (cooldownTimer) clearInterval(cooldownTimer)
+    resendCooldown.value = seconds
+    cooldownTimer = setInterval(() => {
+      resendCooldown.value -= 1
+      if (resendCooldown.value <= 0 && cooldownTimer) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }, 1000)
+  }
+
+  onScopeDispose(() => {
+    if (cooldownTimer) clearInterval(cooldownTimer)
+  })
 
   function goToForgotPassword() {
     return navigateTo(portal.forgotPasswordPath)
   }
 
   async function resendVerification() {
-    if (resending.value) return
+    if (resending.value || resendCooldown.value > 0) return
 
     resending.value = true
     resendMessage.value = ''
     resendFailed.value = false
 
     try {
-      const response = await authService.resendVerificationEmailFor(email.value)
+      const response = await authService.resendVerificationEmailFor(verificationEmail.value || email.value)
       resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
+      resendSent.value = true
+      startCooldown(60)
     } catch (error: any) {
       resendFailed.value = true
       resendMessage.value = error?.status === 429
         ? 'Too many requests. Please wait a few minutes before trying again.'
         : (error?.message || 'Could not send the verification email. Please try again.')
+      if (error?.status === 429) startCooldown(120)
     } finally {
       resending.value = false
     }
@@ -170,6 +199,8 @@ export function useAuthLogin(portalKey: PortalKey) {
     errorMessage.value = ''
     needsVerification.value = false
     resendMessage.value = ''
+    resendFailed.value = false
+    resendSent.value = false
 
     try {
       const response = await authService.login({
@@ -187,6 +218,7 @@ export function useAuthLogin(portalKey: PortalKey) {
       await navigateTo(safeRedirect() ?? await portal.resolveHome(response))
     } catch (error: any) {
       needsVerification.value = error?.data?.code === 'email_not_verified'
+      if (needsVerification.value) verificationEmail.value = email.value.trim()
 
       errorMessage.value = error instanceof Error
         ? error.message
@@ -208,6 +240,9 @@ export function useAuthLogin(portalKey: PortalKey) {
     resending,
     resendMessage,
     resendFailed,
+    resendSent,
+    resendCooldown,
+    verificationEmail,
     login,
     resendVerification,
     goToForgotPassword,

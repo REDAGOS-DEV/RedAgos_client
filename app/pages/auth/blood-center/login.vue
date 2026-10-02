@@ -15,8 +15,9 @@
             </div>
           </div>
 
-          <NuxtLink to="/" class="back-link">
-            <AssetIcon name="chevron-left" :size="18" />
+          <NuxtLink to="/" class="back-link" aria-label="Back to home">
+            <AssetIcon name="chevron-left" :size="16" />
+            <span>Back</span>
           </NuxtLink>
 
           <h1>Welcome, Blood Steward!</h1>
@@ -118,6 +119,9 @@
               :resending="resending"
               :resend-message="resendMessage"
               :resend-failed="resendFailed"
+              :sent="resendSent"
+              :cooldown="resendCooldown"
+              :email="verificationEmail"
               @resend="resendVerification"
             />
 
@@ -145,19 +149,19 @@
             <div class="role-grid">
               <button
                 type="button"
-                class="role-button hospital"
+                class="role-button donor"
                 @click="navigateTo('/auth/donor/login')"
               >
-                <AssetIcon name="users" :size="20" />
+                <AssetIcon name="users" :size="18" />
                 Donor
               </button>
 
               <button
                 type="button"
-                class="role-button blood-center"
+                class="role-button hospital"
                 @click="navigateTo('/auth/hospital/login')"
               >
-                <AssetIcon name="hospital" :size="20" />
+                <AssetIcon name="hospital" :size="18" />
                 Hospital
               </button>
             </div>
@@ -190,6 +194,9 @@ const {
   resending,
   resendMessage,
   resendFailed,
+  resendSent,
+  resendCooldown,
+  verificationEmail,
   login,
   resendVerification,
   goToForgotPassword,
@@ -239,6 +246,7 @@ const {
   margin: -36px -24px 20px;
   padding: 44px 24px 56px;
   background: #1565C0;
+  border-radius: 0 0 50% 50% / 0 0 46px 46px;
   text-align: center;
 }
 
@@ -274,6 +282,7 @@ const {
 .back-link {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   color: #64748b;
   font-size: 14px;
   font-weight: 500;
@@ -520,27 +529,30 @@ input::placeholder {
 .divider {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 44px;
+  gap: 14px;
+  margin-top: 32px;
 }
 
 .divider span {
   height: 1px;
   flex: 1;
-  background: #d5dde7;
+  background: #d9e2ec;
 }
 
 .divider p {
   margin: 0;
-  color: #64748b;
+  color: #5b6b80;
   font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
+/* Parehas sa donor login ang layout; ang Donor button kay pula permi */
 .role-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 44px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .role-button {
@@ -548,34 +560,40 @@ input::placeholder {
   height: 46px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border: 1px solid #d6e0eb;
+  gap: 8px;
+  border: 1px solid transparent;
   border-radius: 12px;
-  background: #ffffff;
+  background: transparent;
   cursor: pointer;
-  font-size: 16px;
-  font-weight: 800;
-  transition: border-color 150ms ease;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 120ms ease;
+}
+
+.role-button:active {
+  transform: scale(0.985);
 }
 
 .role-button svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+}
+
+.donor {
+  background: #fbe9e9;
+  color: #c62828;
+}
+
+.donor:hover {
+  border-color: rgba(211, 47, 47, 0.5);
 }
 
 .hospital {
-  color: #1266c3;
-}
-
-.hospital:hover {
-  border-color: #1266c3;
-}
-
-.blood-center {
   color: #2da1ff;
 }
 
-.blood-center:hover {
+.hospital:hover {
   border-color: #2da1ff;
 }
 
@@ -660,9 +678,6 @@ input::placeholder {
     font-size: 22px;
   }
 
-  .role-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .sign-in-button:focus-visible,
@@ -671,5 +686,20 @@ input::placeholder {
 .link-button:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
+}
+
+:global(.dark .role-button.donor) {
+  background: rgba(211, 47, 47, 0.18);
+  color: #f2a7a7;
+}
+
+:global(.dark .role-button.hospital) {
+  color: #64B5F6;
+}
+
+@media (max-width: 359px) {
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

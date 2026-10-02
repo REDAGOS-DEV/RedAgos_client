@@ -29,7 +29,9 @@
         <button type="button" class="btn-login" @click="navigateTo('/auth/donor/login/')">
           Log In
         </button>
-        <button type="button" class="btn-started" @click="goHome">Get Started</button>
+        <button type="button" class="btn-started" @click="navigateTo('/auth/role-selection/')">
+          Get Started
+        </button>
       </div>
 
       <!-- Mobile hamburger -->
@@ -92,7 +94,7 @@
             <button
               type="button"
               class="btn-started btn-started--mobile"
-              @click="handleMobileAction(goHome)"
+              @click="handleMobileAction(() => navigateTo('/auth/role-selection/'))"
             >
               Get Started
             </button>
