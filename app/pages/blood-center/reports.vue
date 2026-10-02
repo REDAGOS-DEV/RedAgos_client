@@ -1,15 +1,19 @@
 <template>
     <div class="reports-page">
-        <div v-if="initialLoading" class="loading-wrap">
-            <div class="spinner" />
+        <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
+            <div class="skeleton-block page-skeleton__title" />
+            <div class="stats-row">
+                <div v-for="n in 4" :key="'pk-' + n" class="stat-card stat-card--skeleton skeleton-block" />
+            </div>
+            <div class="skeleton-block page-skeleton__panel" />
         </div>
 
         <div v-else class="reports-inner">
             <!-- Header -->
             <div class="header-row">
                 <div>
-                    <h1 class="page-title">Demand Forecasting &amp; Analytical Reports</h1>
-                    <p class="page-subtitle">Monitor blood demand trends, identify potential shortages, and generate operational forecasting reports.</p>
+                    <h1 class="page-title">Reports &amp; Analytics</h1>
+                    <p class="page-subtitle">Projected demand, shortage risks and generated reports.</p>
                 </div>
                 <div class="header-actions">
                     <div class="select-wrap">
@@ -30,11 +34,27 @@
                 </div>
             </div>
 
-            <!-- Global error banner (non blood-type-report errors) -->
-            <div v-if="loadError" class="error-banner">
+            <!--
+                The /bloodcenter/reports endpoints are not built yet (see the
+                note on USE_MOCK_DATA). A missing endpoint is not a failure the
+                user can retry, so it gets one neutral notice instead of a red
+                error in every section.
+            -->
+            <div v-if="notConnected" class="info-banner">
+                <AssetIcon name="info" :size="16" />
+                <div>
+                    <p class="info-banner__title">Forecasting isn't connected yet</p>
+                    <p class="info-banner__body">Numbers, forecasts and reports will appear here once the reports service is live.</p>
+                </div>
+            </div>
+
+            <!-- Page-wide failure only. Each tab shows its own section's errors
+                 next to the section, so a trend failure no longer appears on
+                 the Forecast tab where nothing uses trend data. -->
+            <div v-if="errors.stats" class="error-banner">
                 <AssetIcon name="alert" :size="15" />
-                <span>{{ loadError }}</span>
-                <button type="button" class="btn-link" @click="loadAll">Retry</button>
+                <span>{{ errors.stats }}</span>
+                <button type="button" class="btn-link" @click="loadStats">Retry</button>
             </div>
 
             <!-- KPI cards -->
@@ -48,11 +68,13 @@
                         </div>
                         <div class="stat-card__body">
                             <p class="stat-card__label">Predicted Demand</p>
-                            <p class="stat-card__value">{{ stats.predictedDemand }} units</p>
+                            <p class="stat-card__value" :class="{ 'stat-card__value--empty': !statsReady }">
+                                {{ statsReady ? `${stats.predictedDemand} units` : 'No data' }}
+                            </p>
                             <p class="stat-card__meta">Next {{ horizonFilter }} days</p>
-                            <span class="trend-chip" :class="stats.predictedDemandTrend >= 0 ? 'trend-chip--up' : 'trend-chip--down'">
-                                <AssetIcon :name="stats.predictedDemandTrend >= 0 ? 'arrow-up' : 'arrow-down'" :size="11" />
-                                {{ Math.abs(stats.predictedDemandTrend) }}% vs previous {{ horizonFilter }} days
+                            <span v-if="statsReady" class="trend-chip" :class="trendChipClass(stats.predictedDemandTrend)">
+                                <AssetIcon v-if="stats.predictedDemandTrend" :name="stats.predictedDemandTrend > 0 ? 'arrow-up' : 'arrow-down'" :size="11" />
+                                {{ stats.predictedDemandTrend ? `${Math.abs(stats.predictedDemandTrend)}% vs previous ${horizonFilter} days` : 'No change' }}
                             </span>
                         </div>
                     </div>
@@ -63,9 +85,12 @@
                         </div>
                         <div class="stat-card__body">
                             <p class="stat-card__label">Inventory Coverage</p>
-                            <p class="stat-card__value">{{ stats.coverageDays }} days</p>
+                            <p class="stat-card__value" :class="{ 'stat-card__value--empty': !statsReady }">
+                                {{ statsReady ? `${stats.coverageDays} days` : 'No data' }}
+                            </p>
                             <p class="stat-card__meta">Based on current usage</p>
-                            <span class="trend-chip trend-chip--neutral">Stable</span>
+                            <!-- Was always "Stable", even at 0 days. -->
+                            <span v-if="statsReady" class="trend-chip" :class="coverageChip.class">{{ coverageChip.label }}</span>
                         </div>
                     </div>
 
@@ -75,9 +100,13 @@
                         </div>
                         <div class="stat-card__body">
                             <p class="stat-card__label">Blood Types At Risk</p>
-                            <p class="stat-card__value">{{ stats.criticalTypes }}</p>
-                            <p class="stat-card__meta">{{ stats.criticalTypeLabels }}</p>
-                            <span class="trend-chip trend-chip--danger">Requires monitoring</span>
+                            <p class="stat-card__value" :class="{ 'stat-card__value--empty': !statsReady }">
+                                {{ statsReady ? stats.criticalTypes : 'No data' }}
+                            </p>
+                            <p class="stat-card__meta">{{ stats.criticalTypeLabels || 'All types above threshold' }}</p>
+                            <!-- Red only when something is actually at risk. -->
+                            <span v-if="statsReady && stats.criticalTypes > 0" class="trend-chip trend-chip--danger">Requires monitoring</span>
+                            <span v-else-if="statsReady" class="trend-chip trend-chip--up">None at risk</span>
                         </div>
                     </div>
 
@@ -87,11 +116,14 @@
                         </div>
                         <div class="stat-card__body">
                             <p class="stat-card__label">Fulfillment Rate</p>
-                            <p class="stat-card__value">{{ stats.fulfillmentRate }}%</p>
+                            <p class="stat-card__value" :class="{ 'stat-card__value--empty': !statsReady }">
+                                {{ statsReady ? `${stats.fulfillmentRate}%` : 'No data' }}
+                            </p>
                             <p class="stat-card__meta">Previous {{ horizonFilter }} days</p>
-                            <span class="trend-chip trend-chip--up">
-                                <AssetIcon name="arrow-up" :size="11" />
-                                {{ stats.fulfillmentRateTrend }}%
+                            <!-- Was always an up arrow in green, whatever the sign. -->
+                            <span v-if="statsReady" class="trend-chip" :class="trendChipClass(stats.fulfillmentRateTrend)">
+                                <AssetIcon v-if="stats.fulfillmentRateTrend" :name="stats.fulfillmentRateTrend > 0 ? 'arrow-up' : 'arrow-down'" :size="11" />
+                                {{ stats.fulfillmentRateTrend ? `${Math.abs(stats.fulfillmentRateTrend)}%` : 'No change' }}
                             </span>
                         </div>
                     </div>
@@ -114,68 +146,72 @@
                 <!-- DEMAND FORECAST TAB -->
                 <section v-if="activeTab === 'forecast'" class="tab-content">
 
-                    <!-- Quick forecast controls -->
-                    <div class="quick-controls">
-                        <div class="quick-controls__field">
-                            <label class="form-label">Blood Type</label>
-                            <select v-model="forecastControls.bloodType" class="form-input">
-                                <option value="all">All Blood Types</option>
+                    <!-- What to act on, before the detail behind it -->
+                    <template v-if="loadingForecast || forecastInsights.length">
+                    <p class="section-label">What needs attention</p>
+                    <div class="insights-panel">
+                        <div v-if="loadingForecast" class="insight-row skeleton-block" />
+                        <template v-else>
+                            <div v-for="insight in forecastInsights" :key="insight.id" class="insight-row" :class="'insight-row--' + insight.level">
+                                <AssetIcon :name="insight.icon" :size="16" class="insight-row__icon" />
+                                <p class="insight-row__msg">{{ insight.message }}</p>
+                                <button v-if="insight.action" type="button" class="btn-link" @click="viewInventory">{{ insight.action }}</button>
+                            </div>
+                        </template>
+                    </div>
+                    </template>
+
+                    <!--
+                        One set of filters. Period and facility live in the page
+                        header; blood type and component only shape this chart,
+                        so they sit with it and apply as soon as they change.
+                        (There used to be a second, client-only blood type
+                        select here, and two Generate Forecast buttons.)
+                    -->
+                    <div class="forecast-toolbar">
+                        <div>
+                            <p class="section-label">Stock vs. Predicted Demand by Blood Type</p>
+                            <p class="section-sub">Current inventory against projected demand for the next {{ horizonFilter }} days.</p>
+                        </div>
+                        <div class="forecast-toolbar__filters">
+                            <div class="view-toggle" role="group" aria-label="Show as">
+                                <button type="button" class="view-toggle__btn" :class="{ 'view-toggle__btn--active': forecastView === 'chart' }"
+                                    :aria-pressed="forecastView === 'chart'" @click="forecastView = 'chart'">Chart</button>
+                                <button type="button" class="view-toggle__btn" :class="{ 'view-toggle__btn--active': forecastView === 'table' }"
+                                    :aria-pressed="forecastView === 'table'" @click="forecastView = 'table'">Table</button>
+                            </div>
+                            <select v-model="forecastControls.bloodType" class="form-input filter-select" aria-label="Blood type" @change="loadForecastData">
+                                <option value="all">All blood types</option>
                                 <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
                             </select>
-                        </div>
-                        <div class="quick-controls__field">
-                            <label class="form-label">Blood Component</label>
-                            <select v-model="forecastControls.component" class="form-input">
-                                <option value="all">All Components</option>
+                            <select v-model="forecastControls.component" class="form-input filter-select" aria-label="Blood component" @change="loadForecastData">
+                                <option value="all">All components</option>
                                 <option value="whole_blood">Whole Blood</option>
                                 <option value="plasma">Plasma</option>
                                 <option value="platelets">Platelets</option>
                                 <option value="red_cells">Red Cells</option>
                             </select>
-                        </div>
-                        <div class="quick-controls__field">
-                            <label class="form-label">Forecast Period</label>
-                            <select v-model="horizonFilter" class="form-input" @change="onFilterChange">
-                                <option value="7">Next 7 Days</option>
-                                <option value="14">Next 14 Days</option>
-                                <option value="30">Next 30 Days</option>
-                            </select>
-                        </div>
-                        <div class="quick-controls__field">
-                            <label class="form-label">Facility</label>
-                            <select v-model="facilityFilter" class="form-input" @change="onFilterChange">
-                                <option value="all">All Facilities</option>
-                                <option v-for="f in facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
-                            </select>
-                        </div>
-                        <div class="quick-controls__actions">
-                            <button type="button" class="btn-primary" @click="onFilterChange">
-                                <AssetIcon name="bar-chart" :size="14" />
-                                Generate Forecast
-                            </button>
-                            <button type="button" class="btn-cancel" @click="resetForecastControls">Reset</button>
+                            <button v-if="forecastFiltered" type="button" class="btn-link" @click="resetForecastControls">Reset</button>
                         </div>
                     </div>
 
-                    <div class="forecast-toolbar">
-                        <div>
-                            <p class="section-label">Stock vs. Predicted Demand by Blood Type</p>
-                            <p class="section-sub">Compare current inventory against projected demand for the selected period.</p>
-                        </div>
-                        <select v-model="bloodTypeFilter" class="form-input filter-select">
-                            <option value="all">All Blood Types</option>
-                            <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                        </select>
+                    <div v-if="errors.forecast" class="error-banner error-banner--inline">
+                        <AssetIcon name="alert" :size="15" />
+                        <span>{{ errors.forecast }}</span>
+                        <button type="button" class="btn-link" @click="loadForecastData">Retry</button>
                     </div>
 
                     <!-- Bar chart -->
-                    <div class="chart-card">
+                    <div v-if="forecastView === 'chart'" class="chart-card">
                         <div v-if="loadingForecast" class="chart-skeleton skeleton-block" />
                         <div v-else-if="filteredForecastData.length === 0" class="empty-state">
                             <AssetIcon name="bar-chart" :size="22" />
-                            <p class="empty-state__title">No Forecast Available</p>
-                            <p class="empty-state__body">Select forecasting parameters and generate a forecast to view projected demand.</p>
-                            <button type="button" class="btn-primary" @click="onFilterChange">Generate Forecast</button>
+                            <p class="empty-state__title">{{ unavailable.forecast ? 'Not available yet' : 'No forecast yet' }}</p>
+                            <p class="empty-state__body">
+                                {{ unavailable.forecast
+                                    ? 'The forecast will appear here once the reports service is connected.'
+                                    : 'There is not enough usage history for this period and filter yet.' }}
+                            </p>
                         </div>
                         <div v-else class="chart-plot">
                             <div class="chart-plot__axis">
@@ -219,15 +255,50 @@
                         </div>
                     </div>
 
+                    <!-- Table view of the same forecast -->
+                    <div v-else class="breakdown-table">
+                        <div class="breakdown-row breakdown-row--head">
+                            <span class="sortable" @click="toggleSort('bloodType')">Blood Type <AssetIcon v-if="sortKey==='bloodType'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
+                            <span class="sortable" @click="toggleSort('currentStock')">Current Stock <AssetIcon v-if="sortKey==='currentStock'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
+                            <span>Avg. Daily Usage</span>
+                            <span>{{ horizonFilter }}-Day Forecast</span>
+                            <span class="sortable" @click="toggleSort('balance')">Projected Balance <AssetIcon v-if="sortKey==='balance'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
+                            <span>Status</span>
+                        </div>
+                        <div v-if="loadingForecast" v-for="n in 4" :key="'skb-' + n"
+                            class="breakdown-row skeleton-block" />
+                        <p v-else-if="sortedForecastData.length === 0" class="empty-state empty-state--inline">
+                            No forecast data for the selected filters.
+                        </p>
+                        <div v-else v-for="row in sortedForecastData" :key="'row-' + row.bloodType"
+                            class="breakdown-row">
+                            <span><span class="pill pill--blood">{{ row.bloodType }}</span></span>
+                            <span>{{ row.currentStock }} units</span>
+                            <span>{{ row.avgDailyUsage }} units/day</span>
+                            <span>{{ row.predictedDemand }} units</span>
+                            <span :class="{ 'balance--negative': projectedBalance(row) < 0 }">
+                                {{ projectedBalance(row) >= 0 ? '+' : '' }}{{ projectedBalance(row) }} units
+                            </span>
+                            <span><span class="pill" :class="'pill--status-' + row.status.toLowerCase()">{{
+                                row.status }}</span></span>
+                        </div>
+                    </div>
+
                     <!-- Emergency demand analysis -->
                     <p class="section-label">Emergency Demand Analysis</p>
                     <p class="section-sub">Monitor emergency request spikes and blood types approaching critical shortage levels.</p>
+
+                    <div v-if="errors.alerts" class="error-banner error-banner--inline">
+                        <AssetIcon name="alert" :size="15" />
+                        <span>{{ errors.alerts }}</span>
+                        <button type="button" class="btn-link" @click="loadEmergencyAlerts">Retry</button>
+                    </div>
 
                     <div class="alert-list">
                         <div v-if="loadingAlerts" v-for="n in 3" :key="'ska-' + n"
                             class="alert-card alert-card--skeleton skeleton-block" />
                         <p v-else-if="emergencyAlerts.length === 0" class="empty-state empty-state--inline">
-                            No critical shortages projected for the selected period.
+                            {{ unavailable.alerts ? 'Emergency trends will appear here once the reports service is connected.' : 'No critical shortages projected for the selected period.' }}
                         </p>
                         <template v-else>
                             <div v-for="alert in emergencyAlerts" :key="alert.id" class="alert-card"
@@ -261,58 +332,19 @@
                         <button type="button" class="btn-outline-blue" @click="viewInventory">View Inventory</button>
                     </div>
 
-                    <!-- Breakdown table -->
-                    <p class="section-label">Blood Type Breakdown</p>
-                    <div class="breakdown-table">
-                        <div class="breakdown-row breakdown-row--head">
-                            <span class="sortable" @click="toggleSort('bloodType')">Blood Type <AssetIcon v-if="sortKey==='bloodType'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
-                            <span class="sortable" @click="toggleSort('currentStock')">Current Stock <AssetIcon v-if="sortKey==='currentStock'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
-                            <span>Avg. Daily Usage</span>
-                            <span>{{ horizonFilter }}-Day Forecast</span>
-                            <span class="sortable" @click="toggleSort('balance')">Projected Balance <AssetIcon v-if="sortKey==='balance'" :name="sortAsc ? 'arrow-up' : 'arrow-down'" :size="10" /></span>
-                            <span>Status</span>
-                        </div>
-                        <div v-if="loadingForecast" v-for="n in 4" :key="'skb-' + n"
-                            class="breakdown-row skeleton-block" />
-                        <p v-else-if="sortedForecastData.length === 0" class="empty-state empty-state--inline">
-                            No forecast data for the selected filters.
-                        </p>
-                        <div v-else v-for="row in sortedForecastData" :key="'row-' + row.bloodType"
-                            class="breakdown-row">
-                            <span><span class="pill pill--blood">{{ row.bloodType }}</span></span>
-                            <span>{{ row.currentStock }} units</span>
-                            <span>{{ row.avgDailyUsage }} units/day</span>
-                            <span>{{ row.predictedDemand }} units</span>
-                            <span :class="{ 'balance--negative': projectedBalance(row) < 0 }">
-                                {{ projectedBalance(row) >= 0 ? '+' : '' }}{{ projectedBalance(row) }} units
-                            </span>
-                            <span><span class="pill" :class="'pill--status-' + row.status.toLowerCase()">{{
-                                row.status }}</span></span>
-                        </div>
-                    </div>
-
-                    <!-- Forecast insights -->
-                    <p class="section-label">Forecast Insights</p>
-                    <div class="insights-panel">
-                        <div v-if="loadingForecast" class="insight-row skeleton-block" />
-                        <template v-else>
-                            <div v-for="insight in forecastInsights" :key="insight.id" class="insight-row" :class="'insight-row--' + insight.level">
-                                <AssetIcon :name="insight.icon" :size="16" class="insight-row__icon" />
-                                <p class="insight-row__msg">{{ insight.message }}</p>
-                                <button v-if="insight.action" type="button" class="btn-link" @click="viewInventory">{{ insight.action }}</button>
-                            </div>
-                        </template>
-                    </div>
                 </section>
 
                 <!-- ANALYTICAL REPORTS TAB -->
                 <section v-else class="tab-content">
                     <p class="section-label">Generate Report</p>
 
-                    <div class="report-generator">
+                    <!-- One step: the form here is the whole flow. The modal that
+                         asked for type, blood type and facility a second time is gone;
+                         facility comes from the page header. -->
+                    <form class="report-generator" @submit.prevent="handleGenerateReport">
                         <div class="form-group">
-                            <label class="form-label">Report Type</label>
-                            <select v-model="reportForm.type" class="form-input">
+                            <label class="form-label" for="report-type">Report Type</label>
+                            <select id="report-type" v-model="reportForm.type" class="form-input">
                                 <option value="request_trend">Request Trend Report</option>
                                 <option value="demand_forecast">Blood Demand Forecast Report</option>
                                 <option value="inventory_forecast">Inventory Forecast Report</option>
@@ -327,16 +359,25 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">To</label>
-                            <input v-model="reportForm.dateTo" type="date" class="form-input" />
+                            <input v-model="reportForm.dateTo" type="date" class="form-input" :min="reportForm.dateFrom || undefined" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Blood Type</label>
+                            <select v-model="reportForm.bloodType" class="form-input">
+                                <option value="all">All Blood Types</option>
+                                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
+                            </select>
                         </div>
                         <div class="report-generator__actions">
-                            <button type="button" class="btn-primary" :disabled="!canGenerateReport" @click="openGenerateModal">
+                            <button type="submit" class="btn-primary" :disabled="!canGenerateReport || generatingReport || unavailable.recent">
                                 <AssetIcon name="bar-chart" :size="15" />
-                                Generate Report
+                                {{ generatingReport ? 'Generating...' : 'Generate Report' }}
                             </button>
                             <button type="button" class="btn-cancel" @click="resetReportForm">Reset</button>
                         </div>
-                    </div>
+                    </form>
+                    <p v-if="generateError" class="form-error" role="alert">{{ generateError }}</p>
+                    <p v-else-if="!canGenerateReport" class="form-hint">Pick a date range to generate a report.</p>
 
                     <!-- Weekly trend chart -->
                     <div class="chart-header-row">
@@ -346,8 +387,22 @@
                             <span><strong>{{ averageWeeklyRequests }}</strong> Avg. Weekly Requests</span>
                         </div>
                     </div>
-                    <div class="chart-card">
+                    <div v-if="errors.trend" class="error-banner error-banner--inline">
+                        <AssetIcon name="alert" :size="15" />
+                        <span>{{ errors.trend }}</span>
+                        <button type="button" class="btn-link" @click="loadTrendData">Retry</button>
+                    </div>
+                    <div v-if="!errors.trend" class="chart-card">
                         <div v-if="loadingTrend" class="chart-skeleton skeleton-block" />
+                        <div v-else-if="!trendData.length" class="empty-state">
+                            <AssetIcon name="trending-up" :size="22" />
+                            <p class="empty-state__title">{{ unavailable.trend ? 'Not available yet' : 'No requests yet' }}</p>
+                            <p class="empty-state__body">
+                                {{ unavailable.trend
+                                    ? 'Weekly request volume will appear here once the reports service is connected.'
+                                    : 'Hospital requests will be charted here week by week.' }}
+                            </p>
+                        </div>
                         <svg v-else viewBox="0 0 640 220" class="trend-chart" preserveAspectRatio="none">
                             <defs>
                                 <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
@@ -363,7 +418,7 @@
                                 <text :x="pt.x" :y="pt.y - 14" class="trend-dot__value" text-anchor="middle">{{ trendData[i].requests }}</text>
                             </g>
                         </svg>
-                        <div class="trend-labels">
+                        <div v-if="!loadingTrend && trendData.length" class="trend-labels">
                             <span v-for="week in trendData" :key="week.weekLabel">{{ week.weekLabel }}</span>
                         </div>
                     </div>
@@ -392,8 +447,11 @@
                         <div v-if="loadingRecentReports" v-for="n in 3" :key="'skr-' + n"
                             class="reports-row skeleton-block" />
                         <p v-else-if="recentReports.length === 0" class="empty-state empty-state--inline">
-                            No reports generated yet.
-                            <button type="button" class="btn-outline-blue" @click="openGenerateModal">Generate Report</button>
+                            <template v-if="unavailable.recent">Generated reports will be listed here once the reports service is connected.</template>
+                            <template v-else>
+                                No reports generated yet.
+                                <button type="button" class="btn-outline-blue" @click="focusReportForm">Generate Report</button>
+                            </template>
                         </p>
                         <div v-else v-for="report in recentReports" :key="report.id" class="reports-row">
                             <span class="reports-row__name">{{ report.name }}</span>
@@ -410,66 +468,6 @@
                 </section>
             </div>
         </div>
-
-        <!-- GENERATE REPORT MODAL -->
-        <Transition name="modal">
-            <div v-if="showGenerateModal" class="modal-overlay" @click.self="closeGenerateModal">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Generate Forecasting Report</h2>
-                        <button type="button" class="modal-card__close" @click="closeGenerateModal">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <div class="form-group">
-                            <label class="form-label">Report Type</label>
-                            <select v-model="reportForm.type" class="form-input">
-                                <option value="request_trend">Request Trend Report</option>
-                                <option value="demand_forecast">Blood Demand Forecast Report</option>
-                                <option value="inventory_forecast">Inventory Forecast Report</option>
-                                <option value="emergency_demand">Emergency Demand Report</option>
-                                <option value="blood_type_demand">Blood Type Demand Report</option>
-                                <option value="forecasting_summary">Forecasting Summary Report</option>
-                            </select>
-                        </div>
-                        <div class="form-group form-group--row">
-                            <div>
-                                <label class="form-label">From</label>
-                                <input v-model="reportForm.dateFrom" type="date" class="form-input" />
-                            </div>
-                            <div>
-                                <label class="form-label">To</label>
-                                <input v-model="reportForm.dateTo" type="date" class="form-input" />
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Blood Type</label>
-                            <select v-model="reportForm.bloodType" class="form-input">
-                                <option value="all">All Blood Types</option>
-                                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Facility</label>
-                            <select v-model="facilityFilter" class="form-input">
-                                <option value="all">All Facilities</option>
-                                <option v-for="f in facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
-                            </select>
-                        </div>
-
-                        <p v-if="generateError" class="modal-error">{{ generateError }}</p>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeGenerateModal">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="generatingReport" @click="handleGenerateReport">
-                                {{ generatingReport ? 'Generating...' : 'Generate Report' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Transition>
 
         <!-- REPORT PREVIEW MODAL -->
         <Transition name="modal">
@@ -653,13 +651,23 @@ function mockDelay(ms = 400) {
 
 const initialLoading = ref(true)
 const activeTab = ref('forecast')
-const loadError = ref('')
+// One message per data source, shown beside the section that uses it.
+const errors = reactive({ stats: '', forecast: '', alerts: '', trend: '' })
+// Sources whose endpoint does not exist yet (404/405). Not an error to retry.
+const unavailable = reactive({ stats: false, forecast: false, alerts: false, trend: false, recent: false })
+const notConnected = computed(() => Object.values(unavailable).some(Boolean))
+
+function isNotConnected(err) {
+    const status = err?.statusCode ?? err?.status ?? err?.response?.status
+    return status === 404 || status === 405
+}
+
+const forecastView = ref('chart') // 'chart' | 'table'
 const recentReportsError = ref(false)
 
 const facilityFilter = ref('all')
 const facilities = ref([]) // [{ id, name }]
 const horizonFilter = ref('7')
-const bloodTypeFilter = ref('all')
 const bloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 const forecastControls = reactive({ bloodType: 'all', component: 'all' })
@@ -674,6 +682,24 @@ const stats = reactive({
     fulfillmentRateTrend: 0,
 })
 const loadingStats = ref(false)
+// False until stats arrive. Zeros from a failed or empty load read as real
+// zeros ("0 units", "0%"), so the cards say "No data" instead.
+const statsReady = ref(false)
+
+function trendChipClass(value) {
+    if (!value) return 'trend-chip--neutral'
+    return value > 0 ? 'trend-chip--up' : 'trend-chip--down'
+}
+
+const coverageChip = computed(() => {
+    const days = Number(stats.coverageDays) || 0
+    if (days === 0 && !stats.predictedDemand) return { label: 'No usage yet', class: 'trend-chip--neutral' }
+    if (days <= 3) return { label: 'Critical', class: 'trend-chip--danger' }
+    if (days <= 7) return { label: 'Low', class: 'trend-chip--warning' }
+    return { label: 'Healthy', class: 'trend-chip--up' }
+})
+
+const forecastFiltered = computed(() => forecastControls.bloodType !== 'all' || forecastControls.component !== 'all')
 
 const forecastData = ref([])
 const loadingForecast = ref(false)
@@ -690,7 +716,6 @@ const loadingRecentReports = ref(false)
 const reportForm = reactive({ type: 'request_trend', dateFrom: '', dateTo: '', bloodType: 'all' })
 const generatingReport = ref(false)
 const generateError = ref('')
-const showGenerateModal = ref(false)
 const toastMessage = ref('')
 let toastTimer = null
 
@@ -711,8 +736,8 @@ function projectedBalance(row) {
 }
 
 const filteredForecastData = computed(() => {
-    if (bloodTypeFilter.value === 'all') return forecastData.value
-    return forecastData.value.filter((r) => r.bloodType === bloodTypeFilter.value)
+    if (forecastControls.bloodType === 'all') return forecastData.value
+    return forecastData.value.filter((r) => r.bloodType === forecastControls.bloodType)
 })
 
 const sortedForecastData = computed(() => {
@@ -895,6 +920,7 @@ async function loadFacilities() {
 
 async function loadStats() {
     loadingStats.value = true
+    errors.stats = ''
     try {
         if (USE_MOCK_DATA) {
             await mockDelay()
@@ -903,8 +929,11 @@ async function loadStats() {
             const data = await api.getStats({ facility: facilityFilter.value, horizon: horizonFilter.value })
             Object.assign(stats, data)
         }
+        statsReady.value = true
     } catch (err) {
-        loadError.value = 'Could not load forecast statistics.'
+        statsReady.value = false
+        if (isNotConnected(err)) unavailable.stats = true
+        else errors.stats = 'Could not load forecast statistics.'
         console.error(err)
     } finally {
         loadingStats.value = false
@@ -913,6 +942,7 @@ async function loadStats() {
 
 async function loadForecastData() {
     loadingForecast.value = true
+    errors.forecast = ''
     try {
         if (USE_MOCK_DATA) {
             await mockDelay()
@@ -926,7 +956,8 @@ async function loadForecastData() {
             })
         }
     } catch (err) {
-        loadError.value = 'Could not load demand forecast.'
+        if (isNotConnected(err)) unavailable.forecast = true
+        else errors.forecast = 'Could not load the demand forecast.'
         console.error(err)
     } finally {
         loadingForecast.value = false
@@ -935,6 +966,7 @@ async function loadForecastData() {
 
 async function loadEmergencyAlerts() {
     loadingAlerts.value = true
+    errors.alerts = ''
     try {
         if (USE_MOCK_DATA) {
             await mockDelay()
@@ -943,7 +975,8 @@ async function loadEmergencyAlerts() {
             emergencyAlerts.value = await api.getEmergencyAlerts({ facility: facilityFilter.value, horizon: horizonFilter.value })
         }
     } catch (err) {
-        loadError.value = 'Could not load emergency demand alerts.'
+        if (isNotConnected(err)) unavailable.alerts = true
+        else errors.alerts = 'Could not load emergency demand alerts.'
         console.error(err)
     } finally {
         loadingAlerts.value = false
@@ -952,6 +985,7 @@ async function loadEmergencyAlerts() {
 
 async function loadTrendData() {
     loadingTrend.value = true
+    errors.trend = ''
     try {
         if (USE_MOCK_DATA) {
             await mockDelay()
@@ -960,7 +994,8 @@ async function loadTrendData() {
             trendData.value = await api.getRequestTrend({ facility: facilityFilter.value })
         }
     } catch (err) {
-        loadError.value = 'Could not load request trend data.'
+        if (isNotConnected(err)) unavailable.trend = true
+        else errors.trend = 'Could not load request trend data.'
         console.error(err)
     } finally {
         loadingTrend.value = false
@@ -978,7 +1013,8 @@ async function loadRecentReports() {
             recentReports.value = await api.getRecentReports()
         }
     } catch (err) {
-        recentReportsError.value = true
+        if (isNotConnected(err)) unavailable.recent = true
+        else recentReportsError.value = true
         console.error(err)
     } finally {
         loadingRecentReports.value = false
@@ -986,7 +1022,6 @@ async function loadRecentReports() {
 }
 
 async function loadAll() {
-    loadError.value = ''
     await Promise.all([
         loadFacilities(),
         loadStats(),
@@ -1006,9 +1041,7 @@ function onFilterChange() {
 function resetForecastControls() {
     forecastControls.bloodType = 'all'
     forecastControls.component = 'all'
-    horizonFilter.value = '7'
-    facilityFilter.value = 'all'
-    onFilterChange()
+    loadForecastData()
 }
 
 function resetReportForm() {
@@ -1023,18 +1056,11 @@ function viewInventory() {
     navigateTo('/blood-center/inventory')
 }
 
-function openGenerateModal() {
-    if (!canGenerateReport.value) {
-        generateError.value = 'Please select a date range.'
-        return
-    }
-    generateError.value = ''
-    showGenerateModal.value = true
-}
-
-function closeGenerateModal() {
-    showGenerateModal.value = false
-    generateError.value = ''
+/** Takes the "Generate Report" empty-state button to the form above. */
+function focusReportForm() {
+    const field = document.getElementById('report-type')
+    field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    field?.focus({ preventScroll: true })
 }
 
 async function handleGenerateReport() {
@@ -1066,7 +1092,6 @@ async function handleGenerateReport() {
             })
         }
         recentReports.value = [newReport, ...recentReports.value]
-        showGenerateModal.value = false
         showToast('Report generated successfully.')
     } catch (err) {
         generateError.value = 'Could not generate report. Please try again.'
@@ -1197,21 +1222,51 @@ onMounted(async () => {
 }
 
 .reports-page {
-    max-width: 1152px;
+    max-width: var(--rb-content-max, 1600px);
     background: var(--rf-bg);
     margin: 0 auto;
-    padding: 24px 32px 40px;
+    padding: 24px var(--rb-gutter, 24px) 40px;
     font-family: var(--rb-font-sans);
     color: var(--rf-text);
 }
 
 /* Loading */
-.loading-wrap {
+.page-skeleton { display: flex; flex-direction: column; gap: 20px; }
+.page-skeleton__title { height: 44px; max-width: 360px; border-radius: 12px; }
+.page-skeleton__panel { height: 420px; border-radius: 16px; }
+
+/* Not-connected notice: informative, not alarming */
+.info-banner {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 60vh;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(var(--rb-primary-rgb), 0.22);
+    background: rgba(var(--rb-primary-rgb), 0.06);
+    color: var(--rb-primary-text);
 }
+.info-banner__title { margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+.info-banner__body { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+
+/* Chart | Table switch */
+.view-toggle { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
+.view-toggle__btn {
+    padding: 5px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rb-text-secondary);
+    cursor: pointer;
+}
+.view-toggle__btn--active { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
+.view-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.form-error { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-accent-text); }
+.form-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .spinner {
     width: 32px;
@@ -1417,10 +1472,6 @@ onMounted(async () => {
 
 .stat-card--skeleton { min-height: 96px; border: none; box-shadow: none; }
 
-.stat-card:hover {
-   
-}
-
 .stat-card__icon {
     width: 42px;
     height: 42px;
@@ -1475,6 +1526,9 @@ onMounted(async () => {
 .trend-chip--up { color: var(--rf-success); background: var(--rf-success-soft); }
 .trend-chip--down { color: var(--rf-danger); background: var(--rf-danger-soft); }
 .trend-chip--danger { color: var(--rf-danger); background: var(--rf-danger-soft); }
+.trend-chip--warning { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
+.stat-card__value--empty { font-size: 16px !important; font-weight: 600 !important; color: var(--rf-text-secondary, var(--rb-text-secondary)) !important; }
+.forecast-toolbar__filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .trend-chip--neutral { color: var(--rf-text-secondary); background: var(--rf-border); }
 
 /* Panel */
@@ -1552,30 +1606,8 @@ onMounted(async () => {
 }
 
 /* Quick forecast controls */
-.quick-controls {
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 16px;
-    border: 1px solid var(--rf-border);
-    border-radius: 14px;
-    background: var(--rf-bg);
-    margin-bottom: 24px;
-}
 
-.quick-controls__field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 140px;
-}
 
-.quick-controls__actions {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-}
 
 /* Forecast toolbar */
 .forecast-toolbar {
@@ -2256,7 +2288,6 @@ onMounted(async () => {
 /* Responsive */
 @media (max-width: 900px) {
     .report-generator { grid-template-columns: 1fr 1fr; }
-    .quick-controls__actions { margin-left: 0; width: 100%; }
 }
 
 @media (max-width: 640px) {
@@ -2264,7 +2295,6 @@ onMounted(async () => {
     .header-row { flex-direction: column; align-items: stretch; }
     .header-actions { flex-direction: column; align-items: stretch; }
     .select-wrap { width: 100%; }
-    .quick-controls { flex-direction: column; align-items: stretch; }
     .breakdown-row, .reports-row { grid-template-columns: 1fr; gap: 4px; }
     .report-generator { grid-template-columns: 1fr; }
     .chart-card { overflow-x: auto; }

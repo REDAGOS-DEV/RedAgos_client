@@ -11,27 +11,37 @@
       that both reserves the space and reflows the children inside it, which is
       what keeps the widened sidebar beside the page rather than over it.
     -->
+    <!-- Sentinel sa pinakataas sa document: kung dili na makita, naka-scroll na -->
+    <div ref="scrollSentinel" class="absolute top-0 left-0 h-px w-px pointer-events-none" aria-hidden="true" />
+
     <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
       <!-- Top bar -->
+      <!--
+        Same canvas as the sidebar and the page (--rb-page-bg), so the chrome
+        reads as one frame and only the white cards stand out. Once the page
+        has scrolled it turns translucent with a blur and a hairline shadow,
+        so it still reads as sitting above the content.
+      -->
       <header
-        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b"
-        :class="railExpanded ? 'lg:left-64' : 'lg:left-20'"
-        :style="{ borderColor: headerBorderColor, boxShadow: headerShadow }">
+        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
+        :class="[railExpanded ? 'lg:left-64' : 'lg:left-20', { 'topbar--scrolled': isScrolled }]"
+        :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
 
         <!--
           The bar spans the full width — it carries the background and the
           divider — but its contents sit in the same centred 1152px column the
           donor pages use, with the same 16/32px gutters, so the breadcrumb
           lines up with the page title directly beneath it instead of drifting
-          as the rail reflows the column.
+          as the rail reflows the column. The donor pages are 1400px wide, so
+          the bar is too: at 1152px the greeting sat far in from the title.
         -->
-        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1152px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1400px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
 
         <!-- Left Cluster: Mobile Menu Toggle + Titles -->
         <div class="flex items-center gap-2 min-w-0">
           <!-- Mobile menu toggle -->
           <button @click="openMobile"
-            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
             aria-label="Open menu">
             <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
           </button>
@@ -43,7 +53,7 @@
 
           <!-- Breadcrumb + Greeting (Desktop & Tablet view) -->
           <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
-            <span class="hidden lg:block text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight">
+            <span class="hidden lg:block text-[11px] font-medium text-[#64748b] dark:text-slate-400 leading-tight">
               {{ breadcrumb }}
             </span>
 
@@ -64,7 +74,7 @@
 
         <!-- Search Bar (Desktop) -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white transition-colors px-3 py-2 relative"
+          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[#1565C0]/40 focus-within:ring-2 focus-within:ring-[#1565C0]/10 transition-colors px-3 py-2 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
@@ -77,8 +87,8 @@
             @focus="showSearchResults = true" @keydown.enter="goToTopResult" @keydown.esc="handleEscSearch"
             @keydown.down.prevent="moveHighlight(1)" @keydown.up.prevent="moveHighlight(-1)" />
           <span v-if="!searchQuery"
-            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-white dark:bg-slate-700 text-[#94a3b8] dark:text-slate-300 border border-[#eef1f5] dark:border-slate-600 flex-shrink-0">
-            ⌘F
+            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-[#F1F5F9] dark:bg-slate-700 text-[#64748b] dark:text-slate-300 border border-[#E2E8F0] dark:border-slate-600 flex-shrink-0">
+            {{ searchShortcutLabel }}
           </span>
           <button v-else @click="clearSearch"
             class="text-[#94a3b8] dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 flex-shrink-0"
@@ -119,24 +129,25 @@
         <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <!-- Mobile Search Trigger -->
           <button @click="openMobileSearch"
-            class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
             aria-label="Open search">
             <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
           <!-- Dark/Light Theme Switcher -->
           <button @click="toggleTheme"
-            class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
             :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
             <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
           <!-- Notifications -->
           <NuxtLink to="/donor/notifications"
-            class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
+            :aria-label="unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'"
+            class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]">
             <AssetIcon name="bell" :size="18" class="text-[#64748b] dark:text-slate-300" />
             <span v-if="unreadCount > 0"
-              class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-white dark:ring-slate-900"
+              class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
               style="background:#D32F2F">
               {{ unreadCount > 9 ? '9+' : unreadCount }}
             </span>
@@ -147,17 +158,18 @@
             no screens, so `hidden xs:block` compiled to `hidden` and this
             divider never rendered at any width. sm is the real first step up.
           -->
-          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
+          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#E2E8F0] dark:bg-[#334155]" />
 
           <!-- Profile Menu Dropdown -->
           <div class="relative">
             <button @click="showUserMenu = !showUserMenu"
-              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800">
+              :aria-expanded="showUserMenu ? 'true' : 'false'" aria-haspopup="menu" aria-label="Account menu"
+              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]">
 
               <!-- Outer Avatar Container -->
               <div class="relative flex-shrink-0">
                 <div
-                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-white dark:ring-slate-900"
+                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
                   style="background:#1565C0;">
                   <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                   <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
@@ -175,14 +187,21 @@
                   <AssetIcon name="badge-check" :size="14" class="text-[#0052FF] dark:text-white" />
                 </div>
 
+                <!--
+                  Bottom-right, the usual place for a status dot. Top-right is
+                  where the bell's unread badge sits, so a dot there read as a
+                  second notification.
+                -->
                 <span v-else-if="identityStatus === 'pending'"
-                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white dark:ring-slate-900 z-10"
+                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-[#F7F8FA] dark:ring-[#0F172A] z-10"
                   title="ID under review">
+                  <span class="sr-only">ID under review</span>
                 </span>
 
                 <span v-else
-                  class="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10"
+                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-[#F7F8FA] dark:ring-[#0F172A] z-10"
                   title="Valid ID needed">
+                  <span class="sr-only">Valid ID needed</span>
                 </span>
               </div>
 
@@ -265,7 +284,7 @@
 
         <!-- Mobile search close button -->
         <button v-if="searchOpenMobile" @click="closeMobileSearch"
-          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
           aria-label="Close search">
           <AssetIcon name="x" :size="18" class="text-[#64748b] dark:text-slate-300" />
         </button>
@@ -309,6 +328,24 @@ const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
  * box-shadow:…}` on <html>, so the header lost its shadow and the document
  * root picked up a slate-600 background it was never meant to have.
  */
+// Naka-scroll na ba ang page? IntersectionObserver sa sentinel, dili scroll
+// listener, aron walay trabaho matag scroll frame.
+const scrollSentinel = ref(null)
+const isScrolled = ref(false)
+let sentinelObserver = null
+
+onMounted(() => {
+  if (!scrollSentinel.value || typeof IntersectionObserver === 'undefined') return
+  sentinelObserver = new IntersectionObserver(([entry]) => {
+    isScrolled.value = !entry.isIntersecting
+  })
+  sentinelObserver.observe(scrollSentinel.value)
+})
+
+onUnmounted(() => {
+  sentinelObserver?.disconnect()
+})
+
 const headerShadow = computed(() => (
   isDark.value
     ? '0 1px 3px rgba(0,0,0,0.30), 0 1px 2px -1px rgba(0,0,0,0.30)'
@@ -461,6 +498,10 @@ function goToTopResult() {
   searchOpenMobile.value = false
 }
 
+// ⌘ ra sa Mac; sa Windows/Linux kay Ctrl ang tinuod nga key. Gi-set sa
+// onMounted kay walay navigator sa SSR.
+const searchShortcutLabel = ref('Ctrl F')
+
 function handleGlobalKeydown(e) {
   const isCmdF = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f'
   if (isCmdF) {
@@ -472,6 +513,8 @@ function handleGlobalKeydown(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  const platform = navigator.userAgentData?.platform || navigator.platform || ''
+  if (/mac|iphone|ipad/i.test(platform)) searchShortcutLabel.value = '⌘F'
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
@@ -493,6 +536,24 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+.topbar {
+  background-color: var(--rb-page-bg, #F7F8FA);
+}
+
+.topbar--scrolled {
+  background-color: rgba(247, 248, 250, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  backdrop-filter: saturate(180%) blur(10px);
+}
+
+:global(.dark .topbar--scrolled) {
+  background-color: rgba(15, 23, 42, 0.82);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar--scrolled { background-color: var(--rb-page-bg, #F7F8FA); }
+}
+
 /*
  * badge-check is an outline glyph on a 24 viewBox. Rendered at 14px its
  * authored stroke-width of 2 scales down to ~1.2px, which reads as a hairline

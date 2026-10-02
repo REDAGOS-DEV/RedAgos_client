@@ -74,9 +74,9 @@ defineProps({
 <style scoped>
 .dept {
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   background: var(--rb-page-bg);
   transition: background-color 0.2s ease;
 }

@@ -627,32 +627,32 @@ a.contact-row__value:hover {
     background: #0F172A;
 }
 
-:global(.dark .topic-card),
-:global(.dark .panel) {
+:global(.dark .help-page .topic-card),
+:global(.dark .help-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .topic-card:hover) {
+:global(.dark .help-page .topic-card:hover) {
     border-color: #42A5F5;
 }
 
-:global(.dark .topic-card__icon--primary) { background: rgba(66,165,245,0.16); }
-:global(.dark .topic-card__icon--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .topic-card__icon--warning) { background: rgba(255,167,38,0.16); }
-:global(.dark .topic-card__icon--danger) { background: rgba(239,83,80,0.16); }
+:global(.dark .help-page .topic-card__icon--primary) { background: rgba(66,165,245,0.16); }
+:global(.dark .help-page .topic-card__icon--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .help-page .topic-card__icon--warning) { background: rgba(255,167,38,0.16); }
+:global(.dark .help-page .topic-card__icon--danger) { background: rgba(239,83,80,0.16); }
 
-:global(.dark .panel-header--simple),
-:global(.dark .faq-item) {
+:global(.dark .help-page .panel-header--simple),
+:global(.dark .help-page .faq-item) {
     border-color: #334155;
 }
 
-:global(.dark .contact-row__icon) { background: rgba(66,165,245,0.16); }
+:global(.dark .help-page .contact-row__icon) { background: rgba(66,165,245,0.16); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .help-page .skeleton) {
     background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 

@@ -740,10 +740,10 @@ onMounted(async () => {
     --purple: #5e35b1;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: var(--rb-content-max, 1600px);
     background: var(--rb-page-bg);
     margin: 0 auto;
-    padding: 24px 32px 40px;
+    padding: 24px var(--rb-gutter, 24px) 40px;
     font-family: var(--rb-font-sans);
     color: var(--text-primary);
 }
@@ -834,7 +834,7 @@ onMounted(async () => {
     gap: 6px;
     padding: 9px 14px;
     border-radius: 10px;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
     background: #f3f4f6;
     color: #374151;

@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="settings-page scope-hospital-settings">
     <!-- ===================== LOADING SKELETON ===================== -->
     <div v-if="loading" class="page-inner">
       <div class="skeleton skeleton--title" />
@@ -684,7 +684,7 @@ onMounted(() => {
   position: relative;
 }
 
-:global(.dark .settings-page) {
+:global(.dark .scope-hospital-settings) {
   --sp-bg: #0F172A;
   --sp-card: #1E293B;
   --sp-border: #2A3447;
@@ -925,7 +925,7 @@ onMounted(() => {
   background: linear-gradient(90deg, var(--sp-border) 25%, rgba(255,255,255,0.4) 37%, var(--sp-border) 63%);
   background-size: 400% 100%; border-radius: 18px; animation: sp-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton) {
+:global(.dark .scope-hospital-settings .skeleton) {
   background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
   background-size: 400% 100%;
 }

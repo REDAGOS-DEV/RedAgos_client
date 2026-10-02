@@ -1,12 +1,30 @@
 import { reportUnauthorized } from "./unauthorized";
 
+/**
+ * Ang base URL sa Laravel API.
+ *
+ * Kung walay API_BASE_URL nga gi-set, kuhaon nato ang host gikan sa browser
+ * mismo — mao ni ang nagserve sa page, so sakto siya bisan unsa nga LAN IP
+ * ang gamiton. Sa SSR walay `window`, so localhost ang fallback.
+ *
+ * Usa ra ni ka kopya: ang useUser kaniadto naggamit sa apiBaseURL nga walay
+ * fallback, so ang /user moadto sa Nuxt server, mapakyas, ug mahimong null
+ * ang user (walay permissions, walay ngalan) bisan molihok ang ubang API.
+ */
+export function resolveApiBaseURL(): string {
+  const configured = useRuntimeConfig().public.apiBaseURL as string;
+
+  return configured || (import.meta.client
+    ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+    : "http://127.0.0.1:8000/api");
+}
+
 export class BaseService {
   async request<T>(
     url: string,
     method = "GET",
     params: object = {},
   ): Promise<T> {
-    const runtimeConfig = useRuntimeConfig();
     const token = import.meta.client ? localStorage.getItem("_token") : null;
     const isFormData = import.meta.client && params instanceof FormData;
  
@@ -24,14 +42,7 @@ export class BaseService {
       headers.Authorization = `Bearer ${token}`;
     }
  
-    const configured = runtimeConfig.public.apiBaseURL;
-
-    // Kung walay API_BASE_URL nga gi-set, kuhaon nato ang host gikan sa browser
-    // mismo — mao ni ang nagserve sa page, so sakto siya bisan unsa nga LAN IP
-    // ang gamiton. Sa SSR walay `window`, so localhost ang fallback.
-    const baseURL = configured || (import.meta.client
-      ? `${window.location.protocol}//${window.location.hostname}:8000/api`
-      : "http://127.0.0.1:8000/api");
+    const baseURL = resolveApiBaseURL();
 
     const config: any = {
       baseURL,
@@ -115,7 +126,6 @@ export class BaseService {
    * render the blob.
    */
   async requestBlob(url: string): Promise<Blob> {
-    const runtimeConfig = useRuntimeConfig();
     const token = import.meta.client ? localStorage.getItem("_token") : null;
 
     const headers: Record<string, string> = {};
@@ -124,10 +134,7 @@ export class BaseService {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const configured = runtimeConfig.public.apiBaseURL;
-    const baseURL = configured || (import.meta.client
-      ? `${window.location.protocol}//${window.location.hostname}:8000/api`
-      : "http://127.0.0.1:8000/api");
+    const baseURL = resolveApiBaseURL();
 
     try {
       return await $fetch<Blob>(url, {

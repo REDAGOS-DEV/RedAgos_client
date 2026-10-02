@@ -1,5 +1,5 @@
 <template>
-    <div class="settings-page">
+    <div class="settings-page scope-donor-settings">
         <!-- Skeleton loading state -->
         <div v-if="loading" class="skeleton-wrap">
             <div class="skeleton skeleton--header" />
@@ -271,7 +271,7 @@
         <!-- Delete account confirmation -->
         <Teleport to="body">
             <Transition name="modal-fade">
-                <div v-if="confirmDeleteOpen" class="modal-backdrop" @click.self="confirmDeleteOpen = false">
+                <div v-if="confirmDeleteOpen" class="modal-backdrop settings-modal" @click.self="confirmDeleteOpen = false">
                     <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="delete-title">
                         <div class="modal-check modal-check--danger">
                             <AssetIcon name="alert" :size="24" />
@@ -1204,52 +1204,75 @@ function splitFullName(fullName) {
 }
 
 /* ============ Dark mode ============ */
-:global(.dark .settings-page) {
+/*
+ * Tanang dark rule naka-anchor sa .scope-donor-settings (ang .settings-page kay
+ * gigamit pud sa blood-center ug hospital settings) ug sa .settings-modal (ang mga modal kay
+ * gi-Teleport sa <body>, gawas sa page). `:global(…)` mogawas sa scope
+ * system, so ang bare `:global(.dark .form-input)` kaniadto kay mo-match sa
+ * .form-input sa TANANG page human ma-load ni nga stylesheet: mao ang
+ * ngitngit nga inputs ug ang asul nga toggle sa profile.
+ */
+
+:global(.dark .scope-donor-settings) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
     background: #0F172A;
 }
 
-:global(.dark .panel) {
+:global(.dark .scope-donor-settings .panel),
+:global(.dark .settings-modal .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .panel-header--simple) { border-color: #334155; }
+:global(.dark .scope-donor-settings .panel-header--simple),
+:global(.dark .settings-modal .panel-header--simple) { border-color: #334155; }
 
-:global(.dark .avatar) { background: rgba(66,165,245,0.16); }
+:global(.dark .scope-donor-settings .avatar),
+:global(.dark .settings-modal .avatar) { background: rgba(66,165,245,0.16); }
 
-:global(.dark .form-input) {
+:global(.dark .scope-donor-settings .form-input),
+:global(.dark .settings-modal .form-input) {
     background: #0F172A;
     border-color: #334155;
     color: #F1F5F9;
 }
 
-:global(.dark .password-toggle:hover) { color: #F1F5F9; background: #263449; }
+:global(.dark .scope-donor-settings .password-toggle:hover),
+:global(.dark .settings-modal .password-toggle:hover) { color: #F1F5F9; background: #263449; }
 
-:global(.dark .toggle-row) { border-color: #263449; }
-:global(.dark .toggle-switch) { background: #1565c0; }
+:global(.dark .scope-donor-settings .toggle-row),
+:global(.dark .settings-modal .toggle-row) { border-color: #263449; }
+:global(.dark .scope-donor-settings .toggle-switch) { background: #475569; }
+:global(.dark .scope-donor-settings .toggle-switch--on) { background: #1565c0; }
 
-:global(.dark .account-action) { border-color: #263449; }
+:global(.dark .scope-donor-settings .account-action),
+:global(.dark .settings-modal .account-action) { border-color: #263449; }
 
-:global(.dark .btn-outline) {
+:global(.dark .scope-donor-settings .btn-outline),
+:global(.dark .settings-modal .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .scope-donor-settings .btn-outline:hover:not(:disabled)),
+:global(.dark .settings-modal .btn-outline:hover:not(:disabled)) { background: #334155; }
 
-:global(.dark .modal-card) {
+:global(.dark .scope-donor-settings .modal-card),
+:global(.dark .settings-modal .modal-card) {
     background: #1E293B;
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
 }
-:global(.dark .modal-check) { background: rgba(102,187,106,0.16); }
-:global(.dark .modal-check--danger) { background: rgba(239,83,80,0.16); }
+:global(.dark .scope-donor-settings .modal-check),
+:global(.dark .settings-modal .modal-check) { background: rgba(102,187,106,0.16); }
+:global(.dark .scope-donor-settings .modal-check--danger),
+:global(.dark .settings-modal .modal-check--danger) { background: rgba(239,83,80,0.16); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .scope-donor-settings .skeleton),
+:global(.dark .settings-modal .skeleton) {
     background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 

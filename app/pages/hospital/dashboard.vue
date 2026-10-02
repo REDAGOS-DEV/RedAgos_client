@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard scope-hospital-dashboard">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="dashboard-inner">
       <div class="skeleton skeleton--header" />
@@ -1243,7 +1243,7 @@ onMounted(async () => {
 }
 
 /* ============ Dark mode ============ */
-:global(.dark .dashboard) {
+:global(.dark .scope-hospital-dashboard) {
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
@@ -1252,34 +1252,34 @@ onMounted(async () => {
   --bg: #0F172A;
   background: #0F172A;
 }
-:global(.dark .stat-card),
-:global(.dark .panel),
-:global(.dark .quick-card),
-:global(.dark .icon-btn) {
+:global(.dark .scope-hospital-dashboard .stat-card),
+:global(.dark .scope-hospital-dashboard .panel),
+:global(.dark .scope-hospital-dashboard .quick-card),
+:global(.dark .scope-hospital-dashboard .icon-btn) {
   background: #1E293B;
   border-color: #334155;
 }
-:global(.dark .icon-btn__dot) { border-color: #1E293B; }
-:global(.dark .segmented) { background: #263449; }
-:global(.dark .segmented__btn--active) { background: #1E293B; }
-:global(.dark .panel-header) { border-color: #334155; }
-:global(.dark .request-row) { border-color: #334155; }
-:global(.dark .request-row:hover) { background: #263449; }
-:global(.dark .trend-stat) { background: #263449; border-color: #334155; }
-:global(.dark .trend-grid) { stroke: #334155; }
-:global(.dark .trend-area) { fill: rgba(66, 165, 245, 0.12); }
-:global(.dark .trend-dot) { fill: #1E293B; }
-:global(.dark .trend-tooltip) { background: #0B1220; }
-:global(.dark .progress-track) { background: #263449; }
-:global(.dark .notif-row:hover) { background: #263449; }
-:global(.dark .type-chip) { background: rgba(66,165,245,0.14); }
-:global(.dark .status-dot--healthy) { background: rgba(102,187,106,0.16); }
-:global(.dark .status-dot--low) { background: rgba(255,167,38,0.16); }
-:global(.dark .status-dot--critical) { background: rgba(239,83,80,0.16); }
+:global(.dark .scope-hospital-dashboard .icon-btn__dot) { border-color: #1E293B; }
+:global(.dark .scope-hospital-dashboard .segmented) { background: #263449; }
+:global(.dark .scope-hospital-dashboard .segmented__btn--active) { background: #1E293B; }
+:global(.dark .scope-hospital-dashboard .panel-header) { border-color: #334155; }
+:global(.dark .scope-hospital-dashboard .request-row) { border-color: #334155; }
+:global(.dark .scope-hospital-dashboard .request-row:hover) { background: #263449; }
+:global(.dark .scope-hospital-dashboard .trend-stat) { background: #263449; border-color: #334155; }
+:global(.dark .scope-hospital-dashboard .trend-grid) { stroke: #334155; }
+:global(.dark .scope-hospital-dashboard .trend-area) { fill: rgba(66, 165, 245, 0.12); }
+:global(.dark .scope-hospital-dashboard .trend-dot) { fill: #1E293B; }
+:global(.dark .scope-hospital-dashboard .trend-tooltip) { background: #0B1220; }
+:global(.dark .scope-hospital-dashboard .progress-track) { background: #263449; }
+:global(.dark .scope-hospital-dashboard .notif-row:hover) { background: #263449; }
+:global(.dark .scope-hospital-dashboard .type-chip) { background: rgba(66,165,245,0.14); }
+:global(.dark .scope-hospital-dashboard .status-dot--healthy) { background: rgba(102,187,106,0.16); }
+:global(.dark .scope-hospital-dashboard .status-dot--low) { background: rgba(255,167,38,0.16); }
+:global(.dark .scope-hospital-dashboard .status-dot--critical) { background: rgba(239,83,80,0.16); }
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .scope-hospital-dashboard .skeleton) {
   background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>

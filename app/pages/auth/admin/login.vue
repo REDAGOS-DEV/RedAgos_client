@@ -15,8 +15,9 @@
             </div>
           </div>
 
-          <NuxtLink to="/" class="back-link">
-            <AssetIcon name="chevron-left" :size="18" />
+          <NuxtLink to="/" class="back-link" aria-label="Back to home">
+            <AssetIcon name="chevron-left" :size="16" />
+            <span>Back</span>
           </NuxtLink>
 
           <h1>Administrator Sign In</h1>
@@ -98,6 +99,9 @@
               :resending="resending"
               :resend-message="resendMessage"
               :resend-failed="resendFailed"
+              :sent="resendSent"
+              :cooldown="resendCooldown"
+              :email="verificationEmail"
               @resend="resendVerification"
             />
 
@@ -141,6 +145,9 @@ const {
   resending,
   resendMessage,
   resendFailed,
+  resendSent,
+  resendCooldown,
+  verificationEmail,
   login,
   resendVerification,
   goToForgotPassword,
@@ -228,6 +235,7 @@ const {
 .back-link {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   color: #64748b;
   font-size: 14px;
   font-weight: 500;

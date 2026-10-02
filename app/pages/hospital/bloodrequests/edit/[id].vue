@@ -951,27 +951,27 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 
 /* ---------- dark mode ---------- */
 :global(.dark .eb-page) { background: #0f1420; color: #e6eaf2; }
-:global(.dark .eb-card) { background: #161d2c; border-color: var(--eb-border-dark); box-shadow: none; }
-:global(.dark .eb-change-card) { border-color: #2c4a70; }
-:global(.dark .eb-input) { background: #131a27; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-subtitle),
-:global(.dark .eb-label),
-:global(.dark .eb-side-label),
-:global(.dark .eb-doc-size),
-:global(.dark .eb-hint),
-:global(.dark .eb-empty-inline),
-:global(.dark .eb-audit-date),
-:global(.dark .eb-audit-by),
-:global(.dark .eb-rules-list),
-:global(.dark .eb-availability-type),
-:global(.dark .eb-change-label) { color: #8b95a8; }
-:global(.dark .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
-:global(.dark .eb-side-row),
-:global(.dark .eb-change-row) { border-color: var(--eb-border-dark); }
-:global(.dark .eb-availability-bar-track) { background: #232c3f; }
-:global(.dark .eb-action-bar) { background: #161d2c; border-color: var(--eb-border-dark); }
-:global(.dark .eb-audit-item::before) { background: var(--eb-border-dark); }
-:global(.dark .eb-locked-banner) { background: #2a2314; border-color: #4a3a12; }
+:global(.dark .eb-page .eb-card) { background: #161d2c; border-color: var(--eb-border-dark); box-shadow: none; }
+:global(.dark .eb-page .eb-change-card) { border-color: #2c4a70; }
+:global(.dark .eb-page .eb-input) { background: #131a27; border-color: var(--eb-border-dark); color: #e6eaf2; }
+:global(.dark .eb-page .eb-subtitle),
+:global(.dark .eb-page .eb-label),
+:global(.dark .eb-page .eb-side-label),
+:global(.dark .eb-page .eb-doc-size),
+:global(.dark .eb-page .eb-hint),
+:global(.dark .eb-page .eb-empty-inline),
+:global(.dark .eb-page .eb-audit-date),
+:global(.dark .eb-page .eb-audit-by),
+:global(.dark .eb-page .eb-rules-list),
+:global(.dark .eb-page .eb-availability-type),
+:global(.dark .eb-page .eb-change-label) { color: #8b95a8; }
+:global(.dark .eb-page .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
+:global(.dark .eb-page .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-side-row),
+:global(.dark .eb-page .eb-change-row) { border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-availability-bar-track) { background: #232c3f; }
+:global(.dark .eb-page .eb-action-bar) { background: #161d2c; border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-audit-item::before) { background: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-locked-banner) { background: #2a2314; border-color: #4a3a12; }
 :global(.dark fieldset.eb-card:disabled) { background: #12182a; }
 </style>

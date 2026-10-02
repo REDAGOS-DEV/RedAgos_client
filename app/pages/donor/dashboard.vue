@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard scope-donor-dashboard">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="dashboard-inner">
       <div class="skeleton skeleton--header" />
@@ -1326,13 +1326,57 @@ watch(() => route.path, (path) => {
     gap: 8px;
   }
 
+  .skeleton--card { height: 96px; }
+
+  /* 2x2 nga gagmay nga cards imbes upat ka taas nga card */
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px 12px 12px 14px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+
+  .stat-card__top { gap: 6px; }
+
+  .stat-card__label {
+    min-width: 0;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stat-card__badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
+
+  .stat-card__value { font-size: 21px; }
+
+  .stat-card__value-group { gap: 6px; }
+
+  .blood-type-tag {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+
+  .stat-chip {
+    font-size: 10.5px;
+    padding: 2px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
 /* High-Contrast Dark Mode Enhancements */
-:global(.dark .dashboard) {
+:global(.dark .scope-donor-dashboard) {
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --border: #334155;
@@ -1340,49 +1384,49 @@ watch(() => route.path, (path) => {
   background: #0f172a;
 }
 
-:global(.dark .panel-header) {
+:global(.dark .scope-donor-dashboard .panel-header) {
   background: #1e293b;
 }
 
-:global(.dark .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
-:global(.dark .stat-card:hover) { border-color: #475569; }
+:global(.dark .scope-donor-dashboard .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+:global(.dark .scope-donor-dashboard .stat-card:hover) { border-color: #475569; }
 
-:global(.dark .banner--success) {
+:global(.dark .scope-donor-dashboard .banner--success) {
   background: rgba(76, 175, 80, 0.10);
   border-color: rgba(76, 175, 80, 0.24);
   color: #81c784;
 }
 
-:global(.dark .banner--success .banner-text) { color: #CBD5E1; }
-:global(.dark .banner--success .banner-link) { color: #81c784; }
+:global(.dark .scope-donor-dashboard .banner--success .banner-text) { color: #CBD5E1; }
+:global(.dark .scope-donor-dashboard .banner--success .banner-link) { color: #81c784; }
 
-:global(.dark .banner--warning) { color: #FFB74D; }
-:global(.dark .banner--warning .banner-text) { color: #CBD5E1; }
-:global(.dark .text-success) { color: #4caf50 !important; }
+:global(.dark .scope-donor-dashboard .banner--warning) { color: #FFB74D; }
+:global(.dark .scope-donor-dashboard .banner--warning .banner-text) { color: #CBD5E1; }
+:global(.dark .scope-donor-dashboard .text-success) { color: #4caf50 !important; }
 
-:global(.dark .stat-chip--success) {
+:global(.dark .scope-donor-dashboard .stat-chip--success) {
   background: rgba(76, 175, 80, 0.2);
   color: #81c784;
 }
 
-:global(.dark .stat-chip--neutral),
-:global(.dark .blood-type-tag),
-:global(.dark .trend-empty__icon),
-:global(.dark .empty-state__icon) {
+:global(.dark .scope-donor-dashboard .stat-chip--neutral),
+:global(.dark .scope-donor-dashboard .blood-type-tag),
+:global(.dark .scope-donor-dashboard .trend-empty__icon),
+:global(.dark .scope-donor-dashboard .empty-state__icon) {
   background: #334155;
   color: #94a3b8;
 }
 
-:global(.dark .chart__track) { background: rgba(15, 23, 42, 0.6); }
-:global(.dark .chart__col:hover .chart__track) { background: rgba(51, 65, 85, 0.8); }
-:global(.dark .chart__bar) { background: #475569; }
-:global(.dark .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
-:global(.dark .quick-action:hover) { background: #334155; }
-:global(.dark .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
+:global(.dark .scope-donor-dashboard .chart__track) { background: rgba(15, 23, 42, 0.6); }
+:global(.dark .scope-donor-dashboard .chart__col:hover .chart__track) { background: rgba(51, 65, 85, 0.8); }
+:global(.dark .scope-donor-dashboard .chart__bar) { background: #475569; }
+:global(.dark .scope-donor-dashboard .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
+:global(.dark .scope-donor-dashboard .quick-action:hover) { background: #334155; }
+:global(.dark .scope-donor-dashboard .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
+:global(.dark .scope-donor-dashboard .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 
 .btn-primary:focus-visible,
 .btn-danger:focus-visible {

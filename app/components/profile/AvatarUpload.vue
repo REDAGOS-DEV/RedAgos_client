@@ -101,7 +101,7 @@ async function handleFileChange(e) {
   height: 96px;
   border-radius: 999px;
   overflow: hidden;
-  background: #1565C0;
+  background: var(--primary, #1565C0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,6 +121,7 @@ async function handleFileChange(e) {
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .avatar-upload__overlay {
@@ -154,10 +155,10 @@ async function handleFileChange(e) {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: white;
-  border: 2px solid white;
+  background: var(--surface, #FFFFFF);
+  border: 2px solid var(--surface, #FFFFFF);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
-  color: #1565C0;
+  color: var(--primary-text, #1565C0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -167,7 +168,7 @@ async function handleFileChange(e) {
 }
 
 .avatar-upload__badge:hover:not(:disabled) {
-  background: #E3F2FD;
+  background: var(--primary-soft, #E3EEFA);
 }
 
 .avatar-upload__badge:disabled {
@@ -182,7 +183,7 @@ async function handleFileChange(e) {
 
 .avatar-upload__error {
   font-size: 12px;
-  color: #D32F2F;
+  color: var(--danger-fg, #B42318);
   margin: 0;
 }
 </style>

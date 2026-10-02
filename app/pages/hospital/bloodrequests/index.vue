@@ -1274,13 +1274,13 @@ onUnmounted(() => {
   --border: #2A3447; --surface: #1E293B; --bg: #0F172A;
   background: #0F172A;
 }
-:global(.dark .stat-card), :global(.dark .panel), :global(.dark .filter-panel),
-:global(.dark .icon-btn), :global(.dark .btn-ghost), :global(.dark .filter-select),
-:global(.dark .filter-toggle), :global(.dark .drawer), :global(.dark .action-menu__dropdown),
-:global(.dark .pagination__btn) { background: #1E293B; border-color: #2A3447; }
-:global(.dark .search-bar) { background: #1E293B; border-color: #2A3447; }
-:global(.dark .search-bar:focus-within) { background: #263449; }
-:global(.dark .req-row:hover), :global(.dark .action-menu__item:hover), :global(.dark .pagination__page:hover) { background: #263449; }
-:global(.dark .empty-state__icon) { background: #263449; }
-:global(.dark .type-chip) { background: rgba(66,165,245,0.14); }
+:global(.dark .requests-page .stat-card), :global(.dark .requests-page .panel), :global(.dark .requests-page .filter-panel),
+:global(.dark .requests-page .icon-btn), :global(.dark .requests-page .btn-ghost), :global(.dark .requests-page .filter-select),
+:global(.dark .requests-page .filter-toggle), :global(.dark .requests-page .drawer), :global(.dark .requests-page .action-menu__dropdown),
+:global(.dark .requests-page .pagination__btn) { background: #1E293B; border-color: #2A3447; }
+:global(.dark .requests-page .search-bar) { background: #1E293B; border-color: #2A3447; }
+:global(.dark .requests-page .search-bar:focus-within) { background: #263449; }
+:global(.dark .requests-page .req-row:hover), :global(.dark .requests-page .action-menu__item:hover), :global(.dark .requests-page .pagination__page:hover) { background: #263449; }
+:global(.dark .requests-page .empty-state__icon) { background: #263449; }
+:global(.dark .requests-page .type-chip) { background: rgba(66,165,245,0.14); }
 </style>

@@ -3,7 +3,6 @@
     <!-- Skeleton loading state -->
     <div v-if="loading" class="appointment-page-inner">
       <div class="skeleton skeleton--header" />
-      <div class="skeleton skeleton--steps" />
       <div class="skeleton skeleton--grid">
         <div class="skeleton skeleton--card" v-for="n in 2" :key="n" />
       </div>
@@ -12,8 +11,20 @@
 
     <div v-else class="appointment-page-inner">
       <div class="header-row">
-        <h1 class="page-title">Plan your next donation!</h1>
-        <p class="page-subtitle">Schedule your next blood donation by choosing your preferred date, time, and donation center.</p>
+        <h1 class="page-title">Book a donation</h1>
+        <p class="page-subtitle">Pick a blood center and time, or join a mobile blood drive.</p>
+      </div>
+
+      <!--
+        Ang server mo-reject sa slot nga una sa next eligible date
+        (below_min_interval). Gipakita na daan imbes mahibal-an ra inig Confirm.
+      -->
+      <div v-if="showBookingWizard && eligibleLater" class="eligible-banner" role="status">
+        <AssetIcon name="calendar" :size="16" class="eligible-banner__icon" />
+        <p class="eligible-banner__text">
+          You can donate again from <strong>{{ formatDate(nextEligibleDate) }}</strong>.
+          Earlier dates are not available to book.
+        </p>
       </div>
 
       <!-- Your upcoming appointment -->
@@ -31,23 +42,29 @@
         </div>
 
         <div v-else class="my-appointment-list">
-          <div v-for="appointment in activeAppointments" :key="appointment.id" class="panel my-appointment-card">
+          <div v-for="appointment in activeAppointments" :key="appointment.id" class="panel my-appointment-card"
+            :class="{ 'my-appointment-card--rescheduling': reschedulingId === appointment.id }">
+            <p v-if="reschedulingId === appointment.id" class="my-appointment-card__flag">
+              Rescheduling this appointment
+            </p>
             <div class="my-appointment-card__top">
               <div>
                 <p class="my-appointment-card__name">
                   {{ appointment.drive_name || appointment.facility_name || 'Blood center' }}
                 </p>
                 <p class="my-appointment-card__meta">
-                  {{ formatDate(appointment.date) }} · {{ appointment.time }} ·
+                  {{ formatDate(appointment.date) }} · {{ formatTime(appointment.time) }} ·
                   {{ appointment.appointment_type === 'mobile' ? 'Mobile drive' : 'Walk-in' }}
                 </p>
               </div>
-              <span class="badge" :class="appointmentStatusClass(appointment.status)">{{ appointment.status }}</span>
+              <span class="badge" :class="appointmentStatusClass(appointment.status)">
+                {{ appointment.status_label || appointment.status }}
+              </span>
             </div>
             <p class="my-appointment-card__note">
               {{ appointment.can_cancel
-                ? 'You can still cancel or reschedule this appointment.'
-                : 'The 24-hour window for changing this appointment has passed.' }}
+                ? 'You can cancel or reschedule this any time before it starts.'
+                : 'This appointment can no longer be changed.' }}
             </p>
 
             <!--
@@ -77,8 +94,24 @@
           </div>
         </div>
           <p v-if="appointmentActionError" class="my-appointment-error">{{ appointmentActionError }}</p>
+          <!-- Ang Reschedule kay mogawas ra kung can_cancel (gikan sa server; naka-config ang window) -->
+          <p v-if="!showBookingWizard" class="one-booking-note">
+            <template v-if="activeAppointments.some(a => a.can_cancel)">
+              You can have one upcoming appointment at a time. Use Reschedule if you need a different date or time.
+            </template>
+            <template v-else>
+              You can have one upcoming appointment at a time. If you can no longer make it, please contact the
+              blood center directly.
+            </template>
+          </p>
       </div>
 
+      <!--
+        Ang booking wizard. Gitago kung naa nay upcoming appointment (gawas kung
+        nag-reschedule): ang server mo-reject sa ikaduha (duplicate_appointment),
+        so ayaw na papunon sa donor ang tibuok form para ma-reject ra sa katapusan.
+      -->
+      <template v-if="showBookingWizard">
       <!-- Reschedule mode: ang wizard sa ubos mao gihapon ang gamiton, PATCH ra
            imbes POST ang i-send sa Confirm. -->
       <div v-if="reschedulingId" class="reschedule-banner">
@@ -86,26 +119,6 @@
           Pick a new slot below, then confirm to move your appointment.
         </p>
         <button type="button" class="btn-outline" @click="cancelReschedule">Keep current</button>
-      </div>
-
-      <!-- Step indicator -->
-      <div class="step-indicator">
-        <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 1 }">
-          <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 1 }">1</span>
-          <span class="step-indicator__label">Type</span>
-        </div>
-        <div class="step-indicator__line" :class="{ 'step-indicator__line--active': activeStepNum >= 2 }" />
-        <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 2 }">
-          <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 2 }">2</span>
-          <span class="step-indicator__label">{{ appointmentType === 'walkin' ? 'Center' : 'Drive' }}</span>
-        </div>
-        <template v-if="appointmentType === 'walkin'">
-          <div class="step-indicator__line" :class="{ 'step-indicator__line--active': activeStepNum >= 3 }" />
-          <div class="step-indicator__item" :class="{ 'step-indicator__item--active': activeStepNum >= 3 }">
-            <span class="step-indicator__circle" :class="{ 'step-indicator__circle--filled': activeStepNum >= 3 }">3</span>
-            <span class="step-indicator__label">Date &amp; Time</span>
-          </div>
-        </template>
       </div>
 
       <!-- Step 1: Select type -->
@@ -165,7 +178,6 @@
               <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
             </span>
             <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
-            <span class="badge badge--success">{{ center.status }}</span>
           </button>
         </div>
 
@@ -187,9 +199,15 @@
           <p>Loading blood drives...</p>
         </div>
 
+        <div v-else-if="drivesError" class="drive-state">
+          <p>{{ drivesError }}</p>
+          <button type="button" class="btn-outline" @click="fetchBloodDrives">Try again</button>
+        </div>
+
         <div v-else-if="bloodDrives.length" class="drive-list">
           <button v-for="drive in bloodDrives" :key="drive.id" type="button" class="drive-card"
-            :class="{ 'drive-card--active': selectedDriveId === drive.id }" :disabled="driveSlotsLeft(drive) === 0"
+            :class="{ 'drive-card--active': selectedDriveId === drive.id }"
+            :disabled="driveSlotsLeft(drive) === 0 || driveTooEarly(drive)"
             @click="selectedDriveId = drive.id">
             <div class="drive-card__top">
               <div>
@@ -206,11 +224,14 @@
               <span>{{ drive.registered }} registered</span>
               <span>{{ driveSlotsLeft(drive) }} slots left</span>
             </div>
+            <p v-if="driveTooEarly(drive)" class="drive-card__note">
+              Before your next eligible date ({{ formatDate(nextEligibleDate) }})
+            </p>
           </button>
         </div>
 
         <div v-else class="drive-state">
-          <AssetIcon name="truck" :size="32" style="color:#e5e7eb" />
+          <AssetIcon name="truck" :size="32" class="drive-state__icon" />
           <p>No blood drives posted yet.</p>
           <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
         </div>
@@ -224,10 +245,31 @@
         </h2>
         <div class="panel">
           <div class="form-body">
-            <label class="form-label">Date</label>
-            <input v-model="selectedDate" :min="todayValue" type="date" class="form-input form-input--lg">
+            <p class="form-label" id="date-chips-label">Date</p>
+            <!-- Sunod 14 ka adlaw isip chips; ang "Other date" para sa mas layo -->
+            <div class="date-chips" role="radiogroup" aria-labelledby="date-chips-label">
+              <button
+                v-for="chip in dateChips"
+                :key="chip.value"
+                type="button"
+                role="radio"
+                class="date-chip"
+                :class="{ 'date-chip--active': selectedDate === chip.value }"
+                :aria-checked="selectedDate === chip.value ? 'true' : 'false'"
+                @click="selectedDate = chip.value"
+              >
+                <span class="date-chip__dow">{{ chip.weekday }}</span>
+                <span class="date-chip__day">{{ chip.day }}</span>
+                <span class="date-chip__month">{{ chip.month }}</span>
+              </button>
+            </div>
+            <label class="date-other">
+              <span>Other date</span>
+              <input v-model="selectedDate" :min="minBookingDate" type="date" class="form-input date-other__input"
+                :class="{ 'date-other__input--active': !selectedIsChip }">
+            </label>
 
-            <p class="slots-heading">Available time slots: {{ formattedSelectedDate }}</p>
+            <p class="slots-heading">Available times · {{ formattedSelectedDate }}</p>
 
             <div v-if="slotsLoading" class="drive-state">
               <div class="spinner" />
@@ -238,71 +280,162 @@
               <p>{{ slotsError }}</p>
             </div>
 
-            <div v-else-if="timeSlots.length" class="slots-grid">
-              <button v-for="slot in timeSlots" :key="slot.time" type="button" class="slot-btn"
-                :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
-                :disabled="slot.available === 0" @click="selectedTimeSlot = slot.time">
-                <span class="slot-btn__time">{{ slot.time }}</span>
-                <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} of ${slot.total}
-                  available` }}</span>
-              </button>
+            <div v-else-if="timeSlots.length" class="slot-groups">
+              <div v-for="group in slotGroups" :key="group.label" class="slot-group">
+                <p v-if="slotGroups.length > 1" class="slot-group__label">{{ group.label }}</p>
+                <div class="slots-grid">
+                  <button v-for="slot in group.slots" :key="slot.time" type="button" class="slot-btn"
+                    :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
+                    :disabled="slot.available === 0" :aria-pressed="selectedTimeSlot === slot.time ? 'true' : 'false'"
+                    @click="selectedTimeSlot = slot.time">
+                    <span class="slot-btn__time">{{ formatTime(slot.time) }}</span>
+                    <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} left` }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div v-else class="drive-state">
-              <AssetIcon name="calendar" :size="32" style="color:#e5e7eb" />
+              <AssetIcon name="calendar" :size="32" class="drive-state__icon" />
               <p>No time slots set for this date.</p>
-              <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet â€” try another date.</p>
+              <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet. Try another date.</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="continue-row">
-        <button type="button" class="btn-primary" :disabled="!canContinue" @click="openSummary">
+      <!-- Sticky: makita permi ang gipili ug ang Continue, bisan taas ang lista -->
+      <div class="booking-bar">
+        <p class="booking-bar__summary" aria-live="polite">
+          <span v-if="selectionSummary" class="booking-bar__text">{{ selectionSummary }}</span>
+          <span v-else class="booking-bar__hint">{{ selectionHint }}</span>
+        </p>
+        <button type="button" class="btn-primary booking-bar__btn" :disabled="!canContinue" @click="openSummary">
           Continue
           <AssetIcon name="arrow-right" :size="15" />
         </button>
       </div>
+      </template>
     </div>
 
     <!-- Booking summary modal -->
-    <div v-if="showSummary" class="modal-overlay" @click.self="showSummary = false">
-      <div class="modal-card">
-        <h3 class="modal-title">{{ reschedulingId ? "Reschedule Summary" : "Booking Summary" }}</h3>
-        <div class="summary-list">
-          <div class="summary-row"><span>Type</span><span>{{ typeLabel }}</span></div>
-          <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
-          <div class="summary-row"><span>Date</span><span>{{ summaryDateLabel }}</span></div>
-          <div v-if="appointmentType === 'walkin'" class="summary-row"><span>Time slot</span><span>{{ selectedTimeSlot
-              }}</span></div>
+    <div v-if="showSummary" class="modal-overlay" @click.self="closeSummary">
+      <div class="modal-card modal-card--summary" role="dialog" aria-modal="true" aria-labelledby="summary-title"
+        v-focus-trap @dialog-escape="closeSummary">
+        <div class="summary-head">
+          <div>
+            <h3 id="summary-title" class="modal-title summary-head__title">
+              {{ reschedulingId ? 'Review your new slot' : 'Review your booking' }}
+            </h3>
+            <p class="summary-head__sub">Check the details before you confirm.</p>
+          </div>
+          <button type="button" class="summary-close" aria-label="Close" :disabled="confirming" @click="closeSummary">
+            <AssetIcon name="x" :size="18" />
+          </button>
         </div>
-        <p v-if="confirmError" class="confirm-error">{{ confirmError }}</p>
-        <button type="button" class="btn-primary btn-block" :disabled="confirming" @click="handleConfirm">
-          <span>{{ confirming ? 'Confirming...' : (reschedulingId ? 'Reschedule Appointment' : 'Confirm Appointment') }}</span>
-          <AssetIcon name="arrow-right" :size="16" />
-        </button>
-        <p class="modal-note">You can cancel or reschedule up to 24 hours before your appointment.</p>
+
+        <dl class="summary-card">
+          <div class="summary-item">
+            <dt><AssetIcon :name="appointmentType === 'walkin' ? 'building-2' : 'truck'" :size="15" /> Location</dt>
+            <dd>
+              {{ locationLabel }}
+              <span class="summary-item__sub">{{ typeLabel }}</span>
+            </dd>
+          </div>
+          <div class="summary-item">
+            <dt><AssetIcon name="calendar" :size="15" /> Date</dt>
+            <dd>{{ summaryDateLabel }}</dd>
+          </div>
+          <div v-if="appointmentType === 'walkin'" class="summary-item">
+            <dt><AssetIcon name="clock" :size="15" /> Time</dt>
+            <dd>{{ formatTime(selectedTimeSlot) }}</dd>
+          </div>
+        </dl>
+
+        <!--
+          Ang error kay naay kaugalingong sunod nga lakang. Ang mga dili na
+          molampos kung i-retry (duplicate, interval, ...) kay dili na
+          magpakita og Confirm nga button.
+        -->
+        <div v-if="confirmError" class="confirm-error" role="alert">
+          <AssetIcon name="circle-alert" :size="16" class="confirm-error__icon" />
+          <span>{{ confirmError }}</span>
+        </div>
+
+        <div class="summary-actions">
+          <template v-if="confirmErrorCode === 'duplicate_appointment'">
+            <button type="button" class="btn-outline" @click="closeSummary">Close</button>
+            <button type="button" class="btn-primary" @click="goToMyAppointment">View my appointment</button>
+          </template>
+          <template v-else-if="confirmErrorCode === 'slot_unavailable' || confirmErrorCode === 'drive_full'">
+            <button type="button" class="btn-outline" @click="closeSummary">Close</button>
+            <button type="button" class="btn-primary" @click="chooseAnother">
+              {{ confirmErrorCode === 'drive_full' ? 'Choose another drive' : 'Choose another time' }}
+            </button>
+          </template>
+          <template v-else-if="confirmBlocked">
+            <button type="button" class="btn-primary" @click="closeSummary">Close</button>
+          </template>
+          <template v-else>
+            <button type="button" class="btn-outline" :disabled="confirming" @click="closeSummary">Back</button>
+            <button type="button" class="btn-primary" :disabled="confirming" @click="handleConfirm">
+              <span>{{ confirming ? 'Confirming...' : (reschedulingId ? 'Confirm new slot' : 'Confirm booking') }}</span>
+              <AssetIcon v-if="!confirming" name="arrow-right" :size="16" />
+            </button>
+          </template>
+        </div>
+
+        <p class="modal-note">You can cancel or reschedule any time before your appointment.</p>
+      </div>
+    </div>
+
+    <!-- Cancel dialog (imbes window.confirm) -->
+    <div v-if="cancelTarget" class="modal-overlay" @click.self="closeCancelDialog">
+      <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="cancel-title"
+        aria-describedby="cancel-desc" v-focus-trap @dialog-escape="closeCancelDialog">
+        <h3 id="cancel-title" class="modal-title">Cancel this appointment?</h3>
+        <p id="cancel-desc" class="cancel-desc">
+          {{ cancelTarget.drive_name || cancelTarget.facility_name || 'Blood center' }},
+          {{ formatDate(cancelTarget.date) }} at {{ formatTime(cancelTarget.time) }}.
+          You will need to book again if you change your mind.
+        </p>
+        <p v-if="appointmentActionError" class="confirm-error">{{ appointmentActionError }}</p>
+        <div class="confirm-actions">
+          <button type="button" class="btn-outline" :disabled="appointmentActionId !== null" @click="closeCancelDialog">
+            Keep it
+          </button>
+          <button type="button" class="btn-danger" :disabled="appointmentActionId !== null" @click="confirmCancel">
+            {{ appointmentActionId !== null ? 'Cancelling...' : 'Cancel appointment' }}
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Confirmation modal -->
     <div v-if="showConfirmation" class="modal-overlay">
-      <div class="modal-card modal-card--confirm">
+      <div class="modal-card modal-card--confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title"
+        v-focus-trap @dialog-escape="showConfirmation = false">
         <div class="confirm-icon">
           <AssetIcon name="check" :size="22" class="confirm-icon__svg" />
         </div>
-        <h3 class="modal-title modal-title--center">{{ wasRescheduled ? "Appointment Updated!" : "Appointment Confirmed!" }}</h3>
+        <h3 id="confirm-title" class="modal-title modal-title--center">{{ wasRescheduled ? "Appointment Updated!" : "Appointment Confirmed!" }}</h3>
         <p class="modal-sub">
           {{ wasRescheduled ? "Your appointment has been updated." : "Your appointment has been booked, and the details are on their way to your email." }}
-          Remember to bring your QR code when you arrive.
+          {{ bookedScreening.hint }}
         </p>
         <div class="summary-list">
-          <div class="summary-row"><span>Location</span><span>{{ locationLabel }}</span></div>
-          <div class="summary-row"><span>Date &amp; Time</span><span>{{ confirmDateTimeLabel }}</span></div>
-          <div class="summary-row"><span>QR code</span><span class="valid-text">Valid</span></div>
+          <div class="summary-row"><span>Location</span><span>{{ bookedLocationLabel }}</span></div>
+          <div class="summary-row"><span>Date &amp; Time</span><span>{{ bookedDateTimeLabel }}</span></div>
+          <div class="summary-row">
+            <span>Health questionnaire</span>
+            <span :class="`summary-value--${bookedScreening.tone}`">{{ bookedScreening.label }}</span>
+          </div>
         </div>
         <div class="confirm-actions">
-          <button type="button" class="btn-outline" @click="viewQr">View QR Code</button>
+          <button v-if="bookedScreening.cta" type="button" class="btn-outline" @click="goEligibility">
+            {{ bookedScreening.cta }}
+          </button>
+          <button v-else type="button" class="btn-outline" @click="viewQr">View QR Code</button>
           <button type="button" class="btn-primary" @click="goDashboard">Go to Dashboard</button>
         </div>
       </div>
@@ -324,7 +457,7 @@ import { donorService } from '~/api/donor/DonorService'
 
 const router = useRouter()
 
-// Page-level loading state â€” shows the skeleton on first mount while we
+// Page-level loading state: shows the skeleton on first mount while we
 // fetch whatever's needed before the form is interactive.
 const loading = ref(true)
 
@@ -350,6 +483,8 @@ const showSummary = ref(false)
 const showConfirmation = ref(false)
 const confirming = ref(false)
 const confirmError = ref('')
+// Ang `code` sa napakyas nga booking, para mapili ang sunod nga lakang sa modal.
+const confirmErrorCode = ref('')
 const bookedAppointment = ref(null)
 const reschedulingId = ref(null)
 const wasRescheduled = ref(false)
@@ -367,16 +502,6 @@ function selectType(type) {
   selectedTimeSlot.value = null
 }
 
-// Step indicator progress: 1 = type chosen, 2 = center/drive chosen, 3 = time slot chosen (walk-in only)
-const activeStepNum = computed(() => {
-  if (appointmentType.value === 'walkin') {
-    if (selectedTimeSlot.value) return 3
-    if (selectedCenterId.value) return 2
-    return 1
-  }
-  if (selectedDriveId.value) return 2
-  return 1
-})
 
 const bloodCenters = ref([])
 const centersLoading = ref(false)
@@ -460,7 +585,7 @@ let loadedOnce = false
 async function load({ silent = false } = {}) {
   if (!silent) loading.value = true
   try {
-    await Promise.allSettled([fetchBloodCenters(), fetchAppointments()])
+    await Promise.allSettled([fetchBloodCenters(), fetchAppointments(), fetchNextEligible()])
     if (appointmentType.value === 'walkin') {
       await fetchTimeSlots().catch(err => console.error(err))
     }
@@ -546,6 +671,16 @@ watch(appointmentType, (type) => {
   }
 })
 
+// "13:30" (H:i gikan sa server) -> "1:30 PM". Display ra; ang payload kay H:i gihapon.
+function formatTime(value) {
+  if (!value) return '-'
+  const [h, m] = String(value).split(':').map(Number)
+  if (Number.isNaN(h)) return value
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 === 0 ? 12 : h % 12
+  return `${hour}:${String(m || 0).padStart(2, '0')} ${suffix}`
+}
+
 function formatDate(value) {
   if (!value) return '-'
   const d = new Date(value)
@@ -558,6 +693,34 @@ const appointmentsLoading = ref(false)
 const appointmentsError = ref('')
 
 const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'confirmed']
+
+// Gikan sa GET /api/donors/eligibility. Ang server mo-reject sa slot nga una
+// niini (below_min_interval), so gamiton ra sa client para dili na ipili.
+const nextEligibleDate = ref(null)
+
+async function fetchNextEligible() {
+  try {
+    const status = await donorService.eligibilityStatus()
+    nextEligibleDate.value = status?.next_eligible_date ?? null
+  } catch (err) {
+    // Informational ra: kung mapakyas, ang server gihapon ang mo-guard.
+    console.error('Failed to load eligibility status:', err)
+  }
+}
+
+const eligibleLater = computed(() => !!nextEligibleDate.value && nextEligibleDate.value > todayValue)
+
+const minBookingDate = computed(() => (eligibleLater.value ? nextEligibleDate.value : todayValue))
+
+// Kung ang pinili nga petsa kay una sa min (e.g. bag-o lang na-load ang
+// eligibility), i-abante ngadto sa min.
+watch(minBookingDate, (min) => {
+  if (selectedDate.value < min) selectedDate.value = min
+})
+
+function driveTooEarly(drive) {
+  return eligibleLater.value && String(drive.date ?? '').slice(0, 10) < nextEligibleDate.value
+}
 
 const APPOINTMENT_STATUS_CLASS = {
   scheduled: 'badge--info',
@@ -602,6 +765,45 @@ const activeAppointments = computed(() =>
 
 const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
 
+// Sunod 14 ka adlaw gikan sa unang ma-book nga petsa. Local time, dili UTC.
+const DATE_CHIP_COUNT = 14
+const dateChips = computed(() => {
+  const [y, m, d] = minBookingDate.value.split('-').map(Number)
+  const start = new Date(y, m - 1, d)
+  return Array.from({ length: DATE_CHIP_COUNT }, (_, i) => {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+    const value = toDateInputValue(date)
+    return {
+      value,
+      weekday: value === todayValue ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }),
+      day: date.getDate(),
+      month: date.toLocaleDateString('en-US', { month: 'short' }),
+    }
+  })
+})
+
+const selectedIsChip = computed(() => dateChips.value.some(chip => chip.value === selectedDate.value))
+
+// Morning (una sa 12:00) ug Afternoon. Ang `time` kay H:i gikan sa server.
+const slotGroups = computed(() => {
+  const morning = timeSlots.value.filter(slot => Number(String(slot.time).split(':')[0]) < 12)
+  const afternoon = timeSlots.value.filter(slot => Number(String(slot.time).split(':')[0]) >= 12)
+  return [
+    { label: 'Morning', slots: morning },
+    { label: 'Afternoon', slots: afternoon },
+  ].filter(group => group.slots.length)
+})
+
+// Usa ra ka upcoming appointment matag donor (duplicate_appointment sa server).
+// Kung na-load ang lista ug naa nay usa, ang wizard kay para ra sa reschedule.
+// Kung napakyas ang pag-load, ipakita gihapon ang wizard: ang server gihapon
+// ang mo-guard.
+const showBookingWizard = computed(() =>
+  reschedulingId.value !== null
+  || !!appointmentsError.value
+  || activeAppointments.value.length === 0
+)
+
 const selectedDrive = computed(() => bloodDrives.value.find(d => d.id === selectedDriveId.value) || null)
 const selectedCenter = computed(() => bloodCenters.value.find(c => c.id === selectedCenterId.value) || null)
 
@@ -614,6 +816,22 @@ const canContinue = computed(() => {
   }
   return false
 })
+
+// Para sa sticky bar: unsa na ang napili, o unsa pa ang kulang.
+const selectionSummary = computed(() => {
+  if (appointmentType.value === 'walkin') {
+    if (!selectedCenter.value) return ''
+    const parts = [selectedCenter.value.name, formattedSelectedDate.value]
+    if (selectedTimeSlot.value) parts.push(formatTime(selectedTimeSlot.value))
+    return parts.join(' · ')
+  }
+  if (!selectedDrive.value) return ''
+  return `${selectedDrive.value.name} · ${formatDate(selectedDrive.value.date)}`
+})
+
+const selectionHint = computed(() =>
+  appointmentType.value === 'walkin' ? 'Choose a blood center, date and time.' : 'Choose a blood drive.'
+)
 
 const typeLabel = computed(() => appointmentType.value === 'walkin' ? 'Walk-in at blood center' : 'Register for mobile drive')
 
@@ -628,7 +846,7 @@ const summaryDateLabel = computed(() => {
 })
 
 const confirmDateTimeLabel = computed(() => {
-  if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${selectedTimeSlot.value}`
+  if (appointmentType.value === 'walkin') return `${formattedSelectedDate.value} - ${formatTime(selectedTimeSlot.value)}`
   // Walay oras ang mobile drives — date ra ang naa sa event_date, so ang
   // dangling "- —" gikuha na.
   return formatDate(selectedDrive.value?.date)
@@ -645,7 +863,35 @@ const bookedLocationLabel = computed(() =>
 const bookedDateTimeLabel = computed(() => {
   const booked = bookedAppointment.value
   if (!booked) return confirmDateTimeLabel.value
-  return `${formatDate(booked.date)} - ${booked.time}`
+  return `${formatDate(booked.date)} - ${formatTime(booked.time)}`
+})
+
+// Ang tinuod nga kahimtang sa questionnaire para sa bag-ong booking, gikan sa
+// 201 response. Kaniadto hardcoded og "QR code: Valid", bisan ang booking kay
+// dili na manginahanglan og questionnaire, so ang bag-ong donor walay QR pa.
+const bookedScreening = computed(() => {
+  const booked = bookedAppointment.value
+  switch (booked?.screening_status) {
+    case 'answered':
+      return { label: 'Done', tone: 'success', hint: 'Bring your QR code when you arrive.', cta: null }
+    case 'due':
+    case 'missed':
+      return {
+        label: 'Due now',
+        tone: 'warning',
+        hint: 'Answer your health questionnaire now so your visit starts with a scan.',
+        cta: 'Answer questionnaire',
+      }
+    case 'not_due':
+      return {
+        label: `Opens ${formatDate(booked.screening_window_opens_on)}`,
+        tone: 'muted',
+        hint: "You'll answer a short health questionnaire the day before. We'll email you a reminder.",
+        cta: null,
+      }
+    default:
+      return { label: '-', tone: 'muted', hint: '', cta: null }
+  }
 })
 
 
@@ -709,9 +955,14 @@ function bookingErrorMessage(err) {
   }
 }
 
+// Mga error nga dili molampos bisan i-retry ang parehas nga pinili.
+const BLOCKING_BOOKING_CODES = ['duplicate_appointment', 'below_min_interval', 'appointment_not_active', 'email_unverified', 'cancellation_window_passed']
+const confirmBlocked = computed(() => BLOCKING_BOOKING_CODES.includes(confirmErrorCode.value))
+
 async function handleConfirm() {
   confirming.value = true
   confirmError.value = ''
+  confirmErrorCode.value = ''
 
   try {
     // POST /api/donors/appointments
@@ -749,13 +1000,44 @@ async function handleConfirm() {
   } catch (err) {
     console.error('Failed to confirm appointment:', err)
     confirmError.value = bookingErrorMessage(err)
+    confirmErrorCode.value = err?.data?.code || ''
+
+    // Stale ang page (e.g. na-book sa laing tab): i-refresh ang lista aron
+    // makita na ang appointment ug matago ang wizard.
+    if (confirmErrorCode.value === 'duplicate_appointment') {
+      fetchAppointments()
+    }
   } finally {
     confirming.value = false
   }
 }
 
+function closeSummary() {
+  if (confirming.value) return
+  showSummary.value = false
+}
+
+function goToMyAppointment() {
+  showSummary.value = false
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Nakuha na sa uban ang slot o napuno ang drive: kuhaa ang bag-ong lista ug
+// papilia pag-usab.
+function chooseAnother() {
+  showSummary.value = false
+  if (appointmentType.value === 'walkin') {
+    selectedTimeSlot.value = null
+    fetchTimeSlots()
+  } else {
+    selectedDriveId.value = null
+    fetchBloodDrives()
+  }
+}
+
 function openSummary() {
   confirmError.value = ''
+  confirmErrorCode.value = ''
   showSummary.value = true
 }
 
@@ -778,11 +1060,22 @@ function cancelReschedule() {
   confirmError.value = ''
 }
 
-async function handleCancel(appointment) {
-  const confirmed = window.confirm(
-    'Cancel this appointment? You will need to book again if you change your mind.'
-  )
-  if (!confirmed) return
+// Ang appointment nga gipangutana sa cancel dialog.
+const cancelTarget = ref(null)
+
+function handleCancel(appointment) {
+  appointmentActionError.value = ''
+  cancelTarget.value = appointment
+}
+
+function closeCancelDialog() {
+  if (appointmentActionId.value !== null) return
+  cancelTarget.value = null
+}
+
+async function confirmCancel() {
+  const appointment = cancelTarget.value
+  if (!appointment) return
 
   appointmentActionId.value = appointment.id
   appointmentActionError.value = ''
@@ -799,12 +1092,17 @@ async function handleCancel(appointment) {
     }
 
     await fetchAppointments()
+    cancelTarget.value = null
   } catch (err) {
     console.error('Failed to cancel appointment:', err)
     appointmentActionError.value = bookingErrorMessage(err)
   } finally {
     appointmentActionId.value = null
   }
+}
+
+function goEligibility() {
+  router.push('/donor/eligibility')
 }
 
 function viewQr() {
@@ -834,15 +1132,143 @@ function goDashboard() {
 }
 
 .confirm-error {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #FDF1F1;
-  border: 1px solid #F2D2D2;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #FEF3F2;
+  border: 1px solid #FECDCA;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
-  color: #C62828;
+  color: #7A271A;
+}
+
+.confirm-error__icon {
+  flex: none;
+  margin-top: 1px;
+  color: #B42318;
+}
+
+/* Booking summary modal */
+.modal-card.modal-card--summary {
+  max-width: 440px;
+  padding: 22px 22px 18px;
+  gap: 0;
+}
+
+.summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-head .summary-head__title {
+  margin: 0;
+}
+
+.summary-head__sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.summary-close {
+  display: inline-flex;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  margin: -6px -8px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.summary-close:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.summary-close:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 16px;
+  padding: 4px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.summary-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-item dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.summary-item dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.summary-item__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.summary-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.summary-actions .btn-outline,
+.summary-actions .btn-primary {
+  flex: 1;
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+
+.summary-actions .btn-outline {
+  flex: 0 0 auto;
+  min-width: 96px;
+}
+
+.summary-actions .btn-primary:only-child {
+  flex: 1;
 }
 
 .my-appointment-list {
@@ -973,7 +1399,6 @@ function goDashboard() {
 }
 
 .skeleton--header { height: 52px; max-width: 340px; }
-.skeleton--steps { height: 40px; max-width: 420px; }
 .skeleton--grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .skeleton--card { height: 84px; border-radius: 12px; }
 .skeleton--panel { height: 220px; border-radius: 14px; }
@@ -981,64 +1406,6 @@ function goDashboard() {
 @keyframes shimmer {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
-}
-
-/* Step indicator */
-.step-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.step-indicator__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.55;
-  transition: opacity 0.2s ease;
-}
-
-.step-indicator__item--active {
-  opacity: 1;
-}
-
-.step-indicator__circle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.step-indicator__circle--filled {
-  background: var(--primary);
-  color: white;
-}
-
-.step-indicator__label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.step-indicator__line {
-  flex: 1;
-  max-width: 48px;
-  height: 2px;
-  background: #e5e7eb;
-  transition: background 0.2s ease;
-}
-
-.step-indicator__line--active {
-  background: var(--primary);
 }
 
 .step-section {
@@ -1315,9 +1682,11 @@ function goDashboard() {
 }
 
 .slot-btn--full {
-  background: #f3f4f6;
+  background: transparent;
+  border-style: dashed;
   color: var(--text-secondary);
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .slot-btn__time {
@@ -1443,13 +1812,192 @@ function goDashboard() {
   color: var(--text-secondary);
 }
 
-/* Continue button row */
-.continue-row {
-  display: flex;
-  justify-content: flex-end;
+/* Sticky booking bar */
+.booking-bar {
   position: sticky;
   bottom: 16px;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 12px 12px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+}
+
+.booking-bar__summary {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.booking-bar__text {
+  display: block;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.booking-bar__hint {
+  color: var(--text-secondary);
+}
+
+.booking-bar__btn {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .booking-bar {
+    bottom: 12px;
+    padding: 10px 10px 10px 14px;
+  }
+
+  .booking-bar__btn {
+    padding: 12px 18px;
+  }
+}
+
+/* Date chips */
+.date-chips {
+  display: flex;
+  gap: 8px;
+  margin: 0 -22px;
+  padding: 2px 22px 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.date-chip {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 64px;
+  padding: 10px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.date-chip:hover:not(.date-chip--active) {
+  border-color: #b9d3ef;
+}
+
+.date-chip--active {
+  border-color: var(--primary);
+  background: #eaf3fc;
+}
+
+.date-chip__dow,
+.date-chip__month {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.date-chip__day {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.date-chip--active .date-chip__dow,
+.date-chip--active .date-chip__month,
+.date-chip--active .date-chip__day {
+  color: var(--primary);
+}
+
+.date-chip:focus-visible {
+  outline: 2px solid var(--rb-primary, #1565C0);
+  outline-offset: 2px;
+}
+
+.date-other {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.date-other__input {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.date-other__input--active {
+  border-color: var(--primary);
+}
+
+/* Time slot groups */
+.slot-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.slot-group__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Cancel dialog */
+.cancel-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #c62828;
+  color: white;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b71c1c;
+}
+
+.btn-danger:disabled,
+.btn-outline:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid #c62828;
+  outline-offset: 2px;
+}
+
+.confirm-actions .btn-danger {
+  flex: 1;
 }
 
 /* Buttons */
@@ -1570,8 +2118,63 @@ function goDashboard() {
   border-bottom: none;
 }
 
-.valid-text {
-  color: var(--success) !important;
+.summary-row .summary-value--success { color: var(--success); }
+.summary-row .summary-value--warning { color: #B45309; }
+.summary-row .summary-value--muted { color: var(--text-secondary); }
+
+/* Next eligible date banner */
+.eligible-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #EFF4FB;
+  border: 1px solid #D6E4F5;
+}
+
+.eligible-banner__icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--primary);
+}
+
+.eligible-banner__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.one-booking-note {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.my-appointment-card--rescheduling {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
+}
+
+.my-appointment-card__flag {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.drive-card__note {
+  margin: -4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #B45309;
+}
+
+.drive-state__icon {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .modal-note {
@@ -1635,13 +2238,16 @@ function goDashboard() {
   .appointment-page {
     padding: 16px 16px 40px;
   }
-
-  .step-indicator__label {
-    display: none;
-  }
 }
 
 /* ============ Dark mode ============ */
+/*
+ * Tanan naka-anchor sa .appointment-page. `:global(…)` mogawas sa scope
+ * system, so ang `:global(.dark .form-input)` kaniadto kay mo-match sa
+ * .form-input sa TANANG page human ma-load ni nga stylesheet (mao ang hinungdan
+ * sa ngitngit nga inputs sa profile). Ang mga modal diri kay sulod sa
+ * .appointment-page (walay Teleport), so ok ra ang anchor.
+ */
 :global(.dark .appointment-page) {
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
@@ -1649,78 +2255,125 @@ function goDashboard() {
   background: #0F172A;
 }
 
-:global(.dark .type-card),
-:global(.dark .center-card),
-:global(.dark .drive-card),
-:global(.dark .drive-state),
-:global(.dark .panel),
-:global(.dark .slot-btn),
-:global(.dark .modal-card) {
+:global(.dark .appointment-page .type-card),
+:global(.dark .appointment-page .center-card),
+:global(.dark .appointment-page .drive-card),
+:global(.dark .appointment-page .drive-state),
+:global(.dark .appointment-page .panel),
+:global(.dark .appointment-page .slot-btn),
+:global(.dark .appointment-page .modal-card) {
   background: #1E293B;
   border-color: #334155;
 }
 
-:global(.dark .confirm-error) {
-  background: rgba(239, 83, 80, 0.14);
-  border-color: rgba(239, 83, 80, 0.3);
-  color: #EF9A9A;
+:global(.dark .appointment-page .confirm-error) {
+  background: rgba(240, 68, 56, 0.10);
+  border-color: rgba(240, 68, 56, 0.28);
+  color: #FECDCA;
 }
+:global(.dark .appointment-page .confirm-error__icon) { color: #F97066; }
+:global(.dark .appointment-page .summary-card) {
+  background: #172033;
+  border-color: #334155;
+}
+:global(.dark .appointment-page .summary-item) { border-bottom-color: #334155; }
+:global(.dark .appointment-page .summary-close:hover:not(:disabled)) { background: #263449; }
 
-:global(.dark .type-card--active),
-:global(.dark .center-card--active),
-:global(.dark .drive-card--active),
-:global(.dark .slot-btn--active) {
+:global(.dark .appointment-page .type-card--active),
+:global(.dark .appointment-page .center-card--active),
+:global(.dark .appointment-page .drive-card--active),
+:global(.dark .appointment-page .slot-btn--active) {
   background: rgba(66,165,245,0.14);
 }
 
-:global(.dark .type-card__icon) { background: rgba(66,165,245,0.16); }
-:global(.dark .type-card--active .type-card__icon) { background: var(--primary); }
+:global(.dark .appointment-page .type-card__icon) { background: rgba(66,165,245,0.16); }
+:global(.dark .appointment-page .type-card--active .type-card__icon) { background: var(--primary); }
 
-:global(.dark .step-label__num) { background: rgba(66,165,245,0.16); }
+:global(.dark .appointment-page .step-label__num) { background: rgba(66,165,245,0.16); }
 
-:global(.dark .step-indicator__circle) { background: #263449; color: #94a3b8; }
-:global(.dark .step-indicator__line) { background: #263449; }
 
-:global(.dark .form-input) {
+:global(.dark .appointment-page .form-input) {
   background: #0F172A;
   border-color: #334155;
   color: #F1F5F9;
 }
 
-:global(.dark .slot-btn--full) { background: #263449; }
-:global(.dark .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: #263449; border-color: #3f5878; }
+:global(.dark .appointment-page .slot-btn--full) { background: #263449; }
+:global(.dark .appointment-page .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: #263449; border-color: #3f5878; }
 
-:global(.dark .badge--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
-:global(.dark .badge--full) { background: #263449; }
+:global(.dark .appointment-page .badge--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .appointment-page .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
+:global(.dark .appointment-page .badge--full) { background: #263449; }
 
-:global(.dark .reschedule-banner) {
+:global(.dark .appointment-page .reschedule-banner) {
   background: rgba(66, 165, 245, 0.10);
   border-color: rgba(66, 165, 245, 0.24);
 }
 
-:global(.dark .reschedule-banner__text) { color: #CBD5E1; }
+:global(.dark .appointment-page .reschedule-banner__text) { color: #CBD5E1; }
 
-:global(.dark .my-appointment-card__cancel:hover:not(:disabled)) {
+:global(.dark .appointment-page .my-appointment-card__cancel:hover:not(:disabled)) {
   background: rgba(239, 83, 80, 0.16);
 }
 
-:global(.dark .progress-track) { background: #334155; }
-:global(.dark .progress-fill--full) { background: #475569; }
+:global(.dark .appointment-page .progress-track) { background: #334155; }
+:global(.dark .appointment-page .progress-fill--full) { background: #475569; }
 
-:global(.dark .btn-outline) {
+:global(.dark .appointment-page .btn-outline) {
   background: #263449;
   color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover) { background: #334155; }
+:global(.dark .appointment-page .btn-outline:hover) { background: #334155; }
 
-:global(.dark .summary-row) { border-color: #263449; }
+:global(.dark .appointment-page .summary-row) { border-color: #263449; }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .appointment-page .skeleton) {
   background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+}
+
+:global(.dark .appointment-page .booking-bar) {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+:global(.dark .appointment-page .date-chip) {
+  background: #1E293B;
+  border-color: #334155;
+}
+:global(.dark .appointment-page .date-chip:hover:not(.date-chip--active)) { border-color: #3f5878; }
+:global(.dark .appointment-page .date-chip--active) {
+  background: rgba(66, 165, 245, 0.14);
+  border-color: #64B5F6;
+}
+:global(.dark .appointment-page .date-chip--active .date-chip__dow),
+:global(.dark .appointment-page .date-chip--active .date-chip__month),
+:global(.dark .appointment-page .date-chip--active .date-chip__day) { color: #90CAF9; }
+:global(.dark .appointment-page .slot-btn--full) { background: transparent; }
+:global(.dark .appointment-page .eligible-banner) {
+  background: rgba(66, 165, 245, 0.10);
+  border-color: rgba(66, 165, 245, 0.24);
+}
+:global(.dark .appointment-page .eligible-banner__icon),
+:global(.dark .appointment-page .my-appointment-card__flag) { color: #64B5F6; }
+:global(.dark .appointment-page .eligible-banner__text) { color: #CBD5E1; }
+:global(.dark .appointment-page .my-appointment-card--rescheduling) {
+  border-color: #64B5F6;
+  box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.18);
+}
+:global(.dark .appointment-page .drive-card__note),
+:global(.dark .appointment-page .summary-row .summary-value--warning) { color: #FFB74D; }
+:global(.dark .appointment-page .screening-notice--info) {
+  background: rgba(66, 165, 245, 0.10);
+  border-color: rgba(66, 165, 245, 0.24);
+  color: #90CAF9;
+}
+:global(.dark .appointment-page .screening-notice--warn) {
+  background: rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.30);
+  color: #FCD34D;
 }
 
 .btn-primary:focus-visible,

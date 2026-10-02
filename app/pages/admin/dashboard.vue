@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard scope-admin-dashboard">
     <div class="dashboard-inner">
       <!-- Header -->
       <div class="header-row">
@@ -747,24 +747,24 @@ onActivated(() => {
 }
 
 /* Dark mode */
-:global(.dark .dashboard) {
+:global(.dark .scope-admin-dashboard) {
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --border: #334155;
   --card-bg: #1e293b;
 }
 
-:global(.dark .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
-:global(.dark .stat-card:hover) { border-color: #475569; }
-:global(.dark .queue-item:hover) { background: #263449; }
-:global(.dark .btn-ghost) { border-color: #334155; }
-:global(.dark .stat-chip--neutral),
-:global(.dark .empty-state__icon) { background: #334155; color: #94a3b8; }
-:global(.dark .stat-chip--success) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
-:global(.dark .stat-chip--warning),
-:global(.dark .badge--warning) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
-:global(.dark .badge--info) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
-:global(.dark .missing) { color: #ffb74d; }
-:global(.dark .panel-link) { color: #64b5f6; }
-:global(.dark .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
+:global(.dark .scope-admin-dashboard .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+:global(.dark .scope-admin-dashboard .stat-card:hover) { border-color: #475569; }
+:global(.dark .scope-admin-dashboard .queue-item:hover) { background: #263449; }
+:global(.dark .scope-admin-dashboard .btn-ghost) { border-color: #334155; }
+:global(.dark .scope-admin-dashboard .stat-chip--neutral),
+:global(.dark .scope-admin-dashboard .empty-state__icon) { background: #334155; color: #94a3b8; }
+:global(.dark .scope-admin-dashboard .stat-chip--success) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+:global(.dark .scope-admin-dashboard .stat-chip--warning),
+:global(.dark .scope-admin-dashboard .badge--warning) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .scope-admin-dashboard .badge--info) { background: rgba(66, 165, 245, 0.16); color: #64b5f6; }
+:global(.dark .scope-admin-dashboard .missing) { color: #ffb74d; }
+:global(.dark .scope-admin-dashboard .panel-link) { color: #64b5f6; }
+:global(.dark .scope-admin-dashboard .banner--error) { background: rgba(239, 83, 80, 0.14); border-color: rgba(239, 83, 80, 0.3); color: #ef9a9a; }
 </style>

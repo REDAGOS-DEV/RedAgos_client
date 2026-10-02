@@ -2,6 +2,9 @@
   <div>
     <BloodCenterSidebar />
 
+    <!-- Sentinel sa pinakataas sa document: kung dili na makita, naka-scroll na -->
+    <div ref="scrollSentinel" class="absolute top-0 left-0 h-px w-px pointer-events-none" aria-hidden="true" />
+
     <!--
       The content column tracks the rail's width instead of a fixed lg:pl-64.
       Padding — not a margin or a transform — because it is the one property
@@ -10,23 +13,34 @@
     -->
     <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
       <header
-        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b transition-colors duration-150"
-        :class="railExpanded ? 'lg:left-64' : 'lg:left-20'"
-        :style="{ borderColor: headerBorderColor, boxShadow: headerShadow }">
+        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
+        :class="[railExpanded ? 'lg:left-64' : 'lg:left-20', { 'topbar--scrolled': isScrolled }]"
+        :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
+        <!--
+          Same as the donor portal: the bar shares the page and sidebar canvas
+          (--rb-page-bg) so only the white cards stand out, and turns
+          translucent with a hairline shadow once the page scrolls.
+        -->
 
         <!--
           The bar spans the full width — it carries the background and the
-          divider — but its contents sit in the same centred 1152px column the
+          divider — but its contents sit in the same centred --rb-content-max column the
           pages use, with the same 16/32px gutters. Left full-width, the
           breadcrumb started ~46px inside of the page title directly beneath it
           and the avatar overhung the right edge of the content by about as
           much, so the chrome and the page it framed were on two different
           grids.
         -->
-        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1152px] items-center gap-2 sm:gap-3 px-4 sm:px-8">
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[var(--rb-content-max)] items-center gap-2 sm:gap-3 px-4 sm:px-6">
 
         <!-- Left cluster: drawer toggle + titles -->
-        <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0">
+        <!--
+          The search is absolutely centred on lg+, so this cluster does not
+          know where it ends. Capping it at half the bar minus half the search
+          (plus a 1rem gap) makes a long breadcrumb truncate before it slides
+          under the search box.
+        -->
+        <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0 lg:max-w-[calc(50%-13rem)] xl:max-w-[calc(50%-15rem)]">
           <button
             class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
             aria-label="Open menu"
@@ -39,8 +53,8 @@
             {{ pageLabel }}
           </span>
 
-          <div class="hidden sm:flex flex-col justify-center min-w-0 lg:min-w-[180px] flex-shrink">
-            <span class="hidden lg:block text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight truncate">
+          <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink" :title="breadcrumb">
+            <span class="hidden lg:block text-[11px] text-[#64748b] dark:text-slate-400 leading-tight truncate">
               {{ breadcrumb }}
             </span>
             <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight truncate">
@@ -52,12 +66,12 @@
         <div
           v-show="searchOpenMobile || true"
           v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800 border border-transparent focus-within:border-[#1565C0]/30 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors px-3 py-2 relative"
+          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[#1565C0]/40 focus-within:ring-2 focus-within:ring-[#1565C0]/10 transition-colors px-3 py-2 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-sm xl:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]"
         >
           <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
@@ -77,7 +91,7 @@
             v-if="!searchQuery"
             class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-white dark:bg-slate-700 text-[#94a3b8] dark:text-slate-300 border border-[#eef1f5] dark:border-slate-600 flex-shrink-0"
           >
-            ⌘F
+            {{ shortcutLabel }}
           </span>
           <button
             v-else
@@ -160,12 +174,22 @@
               @click="showUserMenu = !showUserMenu"
             >
               <div
-                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
+                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
                 style="background:#1565C0"
               >
                 <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                <span v-else>{{ user?.full_name?.charAt(0) || 'B' }}</span>
+                <span v-else>{{ initials }}</span>
               </div>
+              <!-- Who is signed in, and at what level: on a shared counter PC
+                   this is the first thing to check before recording anything. -->
+              <span class="hidden xl:flex flex-col items-start min-w-0 max-w-[160px] pl-1.5 text-left leading-tight">
+                <span class="text-[13px] font-semibold text-gray-800 dark:text-slate-100 truncate max-w-full capitalize">
+                  {{ displayName }}
+                </span>
+                <span v-if="roleLabel" class="text-[11px] text-[#64748b] dark:text-slate-400 truncate max-w-full">
+                  {{ roleLabel }}
+                </span>
+              </span>
               <AssetIcon
                 name="chevron-down"
                 :size="14"
@@ -187,11 +211,19 @@
                     style="background:#1565C0"
                   >
                     <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                    <span v-else>{{ user?.full_name?.charAt(0) || 'B' }}</span>
+                    <span v-else>{{ initials }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">{{ user?.full_name || 'Blood Center' }}</p>
+                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100 capitalize">{{ displayName }}</p>
                     <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
+                    <p v-if="roleLabel || facilityName" class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span v-if="roleLabel" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#1565C0]/10 text-[#1565C0] dark:bg-sky-400/15 dark:text-sky-300">
+                        {{ roleLabel }}
+                      </span>
+                      <span v-if="facilityName" class="text-[11px] text-gray-500 dark:text-slate-400 truncate max-w-full">
+                        {{ facilityName }}
+                      </span>
+                    </p>
                   </div>
                 </div>
 
@@ -265,7 +297,7 @@ const { user, ensureUser, logout } = useUser()
 // Ang nav kay usa ra ka source — parehas sa sidebar, sa ⌘F search ug sa
 // profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
 // ra sa server.
-const { searchablePages, userMenuItems, labelForPath } = useBloodCenterNav()
+const { navGroups, searchablePages, userMenuItems, labelForPath } = useBloodCenterNav()
 const { isDark, toggleTheme } = useDarkMode()
 const { railExpanded, openMobile } = useSidebar('blood-center')
 
@@ -286,12 +318,62 @@ onMounted(() => {
 })
 
 const pageLabel = computed(() => labelForPath(route.path) || 'Blood Center')
-const breadcrumb = computed(() => `Blood Center Portal / ${labelForPath(route.path)}`)
+
+const facilityName = computed(() =>
+  user.value?.facility?.facility_name || user.value?.facility?.name || ''
+)
+
+// The sidebar is grouped by department, so the breadcrumb says which one the
+// page belongs to: "Davao Blood Center / Issuance / Blood Inventory".
+const sectionLabel = computed(() =>
+  navGroups.value.find(group => group.items.some(item => item.path === route.path))?.label || ''
+)
+
+const breadcrumb = computed(() =>
+  [facilityName.value || 'Blood Center Portal', sectionLabel.value, labelForPath(route.path)]
+    .filter(Boolean)
+    .join(' / ')
+)
+
+const nameParts = computed(() => {
+  const parts = [user.value?.first_name, user.value?.last_name].map(v => (v || '').trim()).filter(Boolean)
+  return parts.length ? parts : (user.value?.full_name || '').trim().split(/\s+/).filter(Boolean)
+})
+
+const displayName = computed(() => user.value?.full_name?.trim() || nameParts.value.join(' ') || 'Blood Center')
+
+const initials = computed(() => {
+  const parts = nameParts.value
+  if (!parts.length) return 'B'
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0][0]
+  return letters.toUpperCase()
+})
+
+// "Supervisor", "Lab Supervisor", "Supervisor · Phlebotomist", or the
+// department when nothing more specific is set.
+const roleLabel = computed(() => {
+  const u = user.value
+  if (!u) return ''
+  const role = u.staff_role_label || u.role_label || u.custom_role || ''
+  const parts = [u.is_supervisor ? 'Supervisor' : '', role].filter(Boolean)
+  const unique = parts.filter((part, i) => parts.findIndex(p => p.toLowerCase() === part.toLowerCase()) === i)
+  return unique.join(' · ') || u.department_label || ''
+})
+
+// Set after mount so the server render and the first client render agree.
+const shortcutLabel = ref('Ctrl F')
+onMounted(() => {
+  if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+    shortcutLabel.value = '⌘F'
+  }
+})
 
 const greeting = computed(() => {
   const h = new Date().getHours()
   const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-  const first = user.value?.full_name?.split(' ')[0] || 'Blood Center'
+  // Names are stored as typed ("maria"), so capitalise for the greeting.
+  const raw = nameParts.value[0] || ''
+  const first = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Blood Center'
   return `${time}, ${first}`
 })
 
@@ -376,6 +458,24 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
 
+// Naka-scroll na ba ang page? IntersectionObserver sa sentinel, dili scroll
+// listener, aron walay trabaho matag scroll frame. Same as the donor layout.
+const scrollSentinel = ref(null)
+const isScrolled = ref(false)
+let sentinelObserver = null
+
+onMounted(() => {
+  if (!scrollSentinel.value || typeof IntersectionObserver === 'undefined') return
+  sentinelObserver = new IntersectionObserver(([entry]) => {
+    isScrolled.value = !entry.isIntersecting
+  })
+  sentinelObserver.observe(scrollSentinel.value)
+})
+
+onUnmounted(() => {
+  sentinelObserver?.disconnect()
+})
+
 const vClickOutside = {
   mounted(el, binding) {
     el._clickOutside = (event) => {
@@ -407,8 +507,23 @@ const handleLogout = async () => {
 }
 
 .topbar {
-  transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
+  background-color: var(--rb-page-bg, #F7F8FA);
+  transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
   will-change: left;
+}
+
+.topbar--scrolled {
+  background-color: rgba(247, 248, 250, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  backdrop-filter: saturate(180%) blur(10px);
+}
+
+:global(.dark .topbar--scrolled) {
+  background-color: rgba(15, 23, 42, 0.82);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar--scrolled { background-color: var(--rb-page-bg, #F7F8FA); }
 }
 
 main {

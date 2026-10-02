@@ -373,14 +373,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.identity {
-  --primary: var(--primary, #1565c0);
-  --accent: var(--accent, #d32f2f);
-  --success: var(--success, #2e7d32);
-  --warning: var(--warning, #f57c00);
-  --text-primary: var(--text-primary, #1f2937);
-  --text-secondary: var(--text-secondary, #9ca3af);
-}
+/*
+  Ang mga kolor kay gikan sa tokens sa .profile-page (light ug dark), nga
+  ma-inherit diri. Kaniadto naay `--primary: var(--primary, …)` dinhi: ang
+  custom property nga nag-refer sa iyang kaugalingon kay cycle, so invalid
+  ang tanan ug wala gyud mogana ang fallback.
+*/
 
 /* ── Header (matches .panel-header--simple / .panel-title in Profile.vue) ── */
 .identity__header {
@@ -389,9 +387,9 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.panel-title {
+.identity .panel-title {
   font-weight: 700;
   font-size: 14px;
   color: var(--text-primary);
@@ -409,13 +407,13 @@ onUnmounted(() => {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.identity__badge--unsubmitted { background: #f1f5f9; color: var(--text-secondary); }
-.identity__badge--pending { background: #fff7ed; color: var(--warning); }
-.identity__badge--verified { background: #ecfdf5; color: var(--success); }
-.identity__badge--rejected { background: #fef2f2; color: var(--accent); }
+.identity__badge--unsubmitted { background: var(--surface-muted); color: var(--text-muted); }
+.identity__badge--pending { background: var(--warning-bg); color: var(--warning-fg); }
+.identity__badge--verified { background: var(--success-bg); color: var(--success-fg); }
+.identity__badge--rejected { background: var(--danger-bg); color: var(--danger-fg); }
 
 /* ── Body (matches .form-body / .form-grid / .form-field / .form-label / .form-input) ── */
-.form-body { padding: 20px; }
+.identity .form-body { padding: 20px; }
 .identity__lead {
   margin: 0 0 16px;
   font-size: 12.5px;
@@ -430,49 +428,56 @@ onUnmounted(() => {
   margin: 0 0 16px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--accent);
+  color: var(--danger-text);
 }
 .identity__reason svg { flex-shrink: 0; margin-top: 1px; }
 
 /* Verified summary reuses Profile.vue's status-list / status-row pattern */
 .identity__summary { padding: 0; }
-.status-row {
+.identity .status-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid #f9fafb;
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 13px;
 }
-.status-row:last-child { border-bottom: none; }
-.status-row__label { color: var(--text-secondary); }
-.status-row__value { font-weight: 700; color: var(--text-primary); }
+.identity .status-row:last-child { border-bottom: none; }
+.identity .status-row__label { color: var(--text-secondary); }
+.identity .status-row__value { font-weight: 700; color: var(--text-primary); }
 
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.form-field { display: flex; flex-direction: column; gap: 6px; }
-.form-field--full { grid-column: 1 / -1; }
-.form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-.form-input {
+.identity .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.identity .form-field { display: flex; flex-direction: column; gap: 6px; }
+.identity .form-field--full { grid-column: 1 / -1; }
+.identity .form-label { font-size: 12px; font-weight: 600; color: var(--text-body); }
+.identity .form-input {
   width: 100%;
   padding: 9px 12px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: white;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 13px;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  color-scheme: light;
 }
 
-.form-input:focus {
+.identity .form-input:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
-select.form-input {
+.identity .form-input:disabled {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.identity select.form-input {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -483,31 +488,31 @@ select.form-input {
   padding-right: 34px;
 }
 
-.form-actions { display: flex; gap: 10px; margin-top: 18px; align-items: center; flex-wrap: wrap; }
-.form-status { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--success); }
-.form-status--error { color: var(--accent); }
+.identity .form-actions { display: flex; gap: 10px; margin-top: 18px; align-items: center; flex-wrap: wrap; }
+.identity .form-status { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--success-fg); }
+.identity .form-status--error { color: var(--danger-fg); }
 
 .identity__actions { flex-direction: column; align-items: stretch; }
-.btn-block { width: 100%; }
+.identity .btn-block { width: 100%; }
 
-.btn-primary {
+.identity .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 700;
-  color: white; background: var(--primary); border: none; cursor: pointer;
-  transition: opacity 0.15s ease;
+  color: #FFFFFF; background: var(--primary); border: none; cursor: pointer;
+  transition: background-color 0.15s ease;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.92; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.identity .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.identity .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.btn-outline {
+.identity .btn-outline {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 6px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
   color: white; background: rgba(15, 23, 42, 0.72); border: none; cursor: pointer;
   backdrop-filter: blur(2px);
   transition: background 0.15s ease;
 }
-.btn-outline:hover:not(:disabled) { background: rgba(15, 23, 42, 0.88); }
-.btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
+.identity .btn-outline:hover:not(:disabled) { background: rgba(15, 23, 42, 0.88); }
+.identity .btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Dropzone / preview ── */
 
@@ -532,21 +537,21 @@ select.form-input {
   width: 100%;
   padding: 24px 16px;
   margin-top: 6px;
-  border: 1.5px dashed #93c5fd;
+  border: 1.5px dashed var(--primary-border);
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--surface-subtle);
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease;
 }
-.identity__dropzone:hover:not(:disabled) { border-color: var(--primary); background: #eff6ff; }
+.identity__dropzone:hover:not(:disabled) { border-color: var(--primary-text); background: var(--primary-soft); }
 .identity__dropzone:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .identity__dropzone-icon {
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; border-radius: 999px;
-  background: #e3f2fd; color: var(--primary);
+  background: var(--primary-soft); color: var(--primary-text);
 }
-.identity__dropzone-text { font-size: 13px; font-weight: 700; color: var(--primary); }
+.identity__dropzone-text { font-size: 13px; font-weight: 700; color: var(--primary-text); }
 .identity__dropzone-sub { font-size: 11px; color: var(--text-secondary); }
 
 .identity__preview-wrap {
@@ -554,10 +559,10 @@ select.form-input {
   margin-top: 6px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
 }
-.identity__preview { width: 100%; max-height: 180px; object-fit: contain; display: block; background: #f8fafc; }
+.identity__preview { width: 100%; max-height: 180px; object-fit: contain; display: block; background: var(--surface-subtle); }
 .identity__change {
   position: absolute;
   right: 8px;
@@ -575,52 +580,35 @@ select.form-input {
   align-items: flex-start;
   gap: 6px;
   font-weight: 600;
-  color: var(--warning);
+  color: var(--warning-fg);
 }
 .identity__hint--wanted svg { flex-shrink: 0; margin-top: 1px; }
 
 /* Points at the field the prompt just sent them to, so the focus ring is not
    the only thing tying the two together. */
-.form-input--wanted { border-color: var(--warning); }
+.identity .form-input--wanted { border-color: var(--warning-fg); }
 
 @media (max-width: 420px) {
-  .form-grid { grid-template-columns: 1fr; }
+  .identity .form-grid { grid-template-columns: 1fr; }
   .identity__choices { grid-template-columns: 1fr; }
   .identity__dropzone { padding: 18px 16px; }
 }
 
-/* ============ Dark mode ============ */
-:global(.dark .identity__header) { border-color: #334155; }
-:global(.dark .identity__badge--unsubmitted) { background: #334155; color: #cbd5e1; }
-:global(.dark .identity__badge--pending) { background: rgba(194, 65, 12, 0.2); color: #fdba74; }
-:global(.dark .identity__badge--verified) { background: rgba(4, 120, 87, 0.2); color: #6ee7b7; }
-:global(.dark .identity__badge--rejected) { background: rgba(185, 28, 28, 0.2); color: #fca5a5; }
-:global(.dark .identity__reason) { background: rgba(185, 28, 28, 0.12); border-color: rgba(185, 28, 28, 0.35); }
-/*
- * The generic names below are anchored on .identity. `:global(…)` leaves the
- * scope system, so `:global(.dark .form-input)` was matching .form-input on
- * every page in the app once this component's stylesheet had loaded — and the
- * blood-centre pages use that class too.
+/* ============ Dark mode ============
+ * Ang kolor kay gikan sa .profile-page tokens. Ang nahibilin kay ang dili
+ * ma-token: color-scheme (native controls) ug ang chevron sa select.
  *
- * The select rule was the one that showed: it set background-image alone and
- * inherited repeat/position/size from the *scoped* `select.form-input` rule
- * above, which does not match on a foreign page. The chevron then tiled across
- * the whole control at its intrinsic size.
+ * Anchored on .identity: `:global(…)` leaves the scope system, so a bare
+ * `:global(.dark .form-input)` would match .form-input on every page in the
+ * app once this stylesheet had loaded, and the blood-centre pages use that
+ * class too. The select rule sets repeat/position/size itself for the same
+ * reason: on a foreign page the scoped `select.form-input` does not match.
  */
-:global(.dark .identity .status-row) { border-color: #263449; }
-:global(.dark .identity .form-input) { background: #0f172a; border-color: #334155; color-scheme: dark; }
-:global(.dark .identity .form-input--wanted) { border-color: #fdba74; }
-:global(.dark .identity__hint--wanted) { color: #fdba74; }
-:global(.dark .identity .form-input:disabled) { background: #1e293b; }
+:global(.dark .identity .form-input) { color-scheme: dark; }
 :global(.dark .identity select.form-input) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 16px;
 }
-:global(.dark .identity__dropzone) { border-color: #334155; background: #0f172a; }
-:global(.dark .identity__dropzone:hover:not(:disabled)) { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
-:global(.dark .identity__dropzone-icon) { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-:global(.dark .identity__dropzone-text) { color: #60a5fa; }
-:global(.dark .identity__preview-wrap) { border-color: #334155; background: #0f172a; }
 </style>

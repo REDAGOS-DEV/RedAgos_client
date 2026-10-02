@@ -1842,7 +1842,7 @@ const donutSegments = computed(() => {
   border-radius: 6px;
   animation: ba-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton-line) {
+:global(.dark .ba-page .skeleton-line) {
   background: linear-gradient(
     90deg,
     #2A3447 25%,
