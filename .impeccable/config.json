@@ -47,6 +47,15 @@
         ],
         "createdAt": "2026-09-21T02:58:27.259Z",
         "reason": "Claude: progress-bar width animation is the literal domain-appropriate use and is the house pattern in 9 files (donor/appointments.vue, blood-center/inventory.vue, hospital/dashboard.vue, ...); pre-existing code untouched by this change"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/pages/hospital/bloodrequests/[id].vue"
+        ],
+        "createdAt": "2026-10-02T03:17:56.955Z",
+        "reason": "Claude: the only match is .progress-bar__fill, a progress bar whose width IS the quantity shown (house pattern, same as drives.vue/appointments.vue ignores); pre-existing since 4a7a0135, untouched by this change, which only edited the receipt toast text"
       }
     ]
   }

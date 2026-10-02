@@ -14,6 +14,16 @@ import type {
   TransfusionRequest,
   TransfusionRequestFilters,
 } from '~/types/bloodRequest'
+import type {
+  HospitalInventoryFilters,
+  HospitalInventorySummary,
+  HospitalUnit,
+  TagEventFilters,
+  TagUnitPayload,
+  UnitActionResult,
+  UnitTag,
+  UnitTagEvent,
+} from '~/types/hospitalInventory'
 
 /**
  * The requester side of the API: a hospital blood bank's own requests.
@@ -265,11 +275,68 @@ class HospitalService extends BaseService {
    * delivery arrived short and only part of it should be confirmed.
    */
   confirmReceipt(id: number | string, allocationIds?: number[]) {
-    return this.request<{ message: string; status: string; status_label: string }>(
+    return this.request<{ message: string; status: string; status_label: string; stocked_count?: number }>(
       `/hospital/blood-requests/${id}/confirm-receipt`,
       'POST',
       allocationIds ? { allocation_ids: allocationIds } : {},
     )
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The blood bank's own stock: bags it confirmed receipt of, and the
+   * patient tags placed on them. `unit` is always the bag number.
+   * ---------------------------------------------------------------- */
+
+  /** This blood bank's bags, first-expiring-first. */
+  inventory(params: HospitalInventoryFilters = {}) {
+    return this.request<Paginated<HospitalUnit>>('/hospital/inventory', 'GET', params)
+  }
+
+  /** Counts per status, available stock per blood type, and lapsed tags the sweep has not reached. */
+  inventorySummary() {
+    return this.request<HospitalInventorySummary>('/hospital/inventory/summary')
+  }
+
+  /** One bag, with every tag ever placed on it. */
+  inventoryUnit(unit: string) {
+    return this.request<{ unit: HospitalUnit; tags: UnitTag[]; as_of: string }>(
+      `/hospital/inventory/${encodeURIComponent(unit)}`,
+    )
+  }
+
+  /** Tags that ended — untagged or transfused — newest first. */
+  tagEvents(params: TagEventFilters = {}) {
+    return this.request<Paginated<UnitTagEvent>>('/hospital/inventory/tag-events', 'GET', params)
+  }
+
+  /** Tag an available bag to a patient: Tag Assigned, 24 hours to crossmatch. */
+  tagUnit(unit: string, payload: TagUnitPayload) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/tag`, 'POST', payload)
+  }
+
+  /** Record the crossmatch: the bag leaves storage, 24 hours to transfuse. */
+  crossmatchUnit(unit: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/crossmatch`, 'POST')
+  }
+
+  /** Record the transfusion. The bag never returns to stock. */
+  transfuseUnit(unit: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/transfuse`, 'POST')
+  }
+
+  /** Release an active tag before its deadline. A reason is required. */
+  releaseTag(unit: string, reason: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/release`, 'POST', { reason })
+  }
+
+  /** Confirm a bag pending return is back in storage. */
+  confirmUnitReturn(unit: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/return`, 'POST')
+  }
+
+  /** Record that a bag left the shelf for disposal. A reason is required. */
+  discardUnit(unit: string, reason: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/discard`, 'POST', { reason })
   }
 
   listNotifications(params: { category?: string; read?: boolean; per_page?: number } = {}) {

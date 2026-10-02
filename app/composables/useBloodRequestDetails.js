@@ -195,9 +195,12 @@ export const useBloodRequestDetails = (requestId) => {
   /**
    * Confirm that dispatched units arrived, then refresh.
    */
+  /** Confirm receipt, returning the API's answer — including how many bags went onto the shelf. */
   async function confirmReceipt(allocationIds) {
-    await hospitalService.confirmReceipt(requestId, allocationIds)
+    const response = await hospitalService.confirmReceipt(requestId, allocationIds)
     await fetchRequest()
+
+    return response
   }
 
   async function cancelRequest(reason) {

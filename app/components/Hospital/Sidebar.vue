@@ -192,6 +192,12 @@ const navGroups = [
       { label: 'Track Requests', path: '/hospital/trackrequests', icon: 'route' }
     ]
   },
+  {
+    label: 'Inventory',
+    items: [
+      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package' }
+    ]
+  },
   // Ang Finance group (billing, transactions) ug ang Help & Support kay
   // gitangtang: walay page files para nila, so 404 ang tanan. Ibalik ni kung
   // naa nay backend + page — tan-awa ang Phase P sa audit plan.

@@ -133,6 +133,38 @@
           <p v-else class="panel-hint">No facility has been asked yet.</p>
         </section>
 
+        <!-- THE PATIENT'S BAGS IN THE BLOOD BANK -->
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Bags in your blood bank</h2>
+              <p class="panel-hint">
+                Bags received for this patient, and bags from your own stock tagged to them. Tag, crossmatch and
+                transfuse them from Blood Bank Inventory.
+              </p>
+            </div>
+            <NuxtLink to="/hospital/inventory?tab=tagged" class="btn">
+              <AssetIcon name="package" :size="15" />
+              Blood Bank Inventory
+            </NuxtLink>
+          </div>
+
+          <p v-if="bagsError" class="panel-hint">{{ bagsError }}</p>
+          <p v-else-if="!bags.length" class="panel-hint">No bag for this patient has reached your blood bank yet.</p>
+          <ul v-else class="bags">
+            <li v-for="bag in bags" :key="bag.id" class="bag">
+              <span class="mono">{{ bag.unit_id }}</span>
+              <span class="bag__meta">{{ bag.blood_type?.code || '—' }} · {{ bag.component?.name || '—' }}</span>
+              <span class="status-chip status-chip--sm" :class="`tone--${HOSPITAL_UNIT_STATUS_TONES[bag.status]}`">
+                {{ HOSPITAL_UNIT_STATUS_LABELS[bag.status] || bag.status_label }}
+              </span>
+              <span v-if="bag.active_tag" class="bag__meta">
+                {{ bag.active_tag.description }} · due {{ formatDateTime(bag.active_tag.deadline_at) }}
+              </span>
+            </li>
+          </ul>
+        </section>
+
         <!-- WALK-IN -->
         <section v-if="request.walk_in" class="panel">
           <h2 class="panel-title">Walk-in</h2>
@@ -246,6 +278,7 @@ import SourcingPanel from '~/components/Hospital/SourcingPanel.vue'
 import TransfusionRequirementTable from '~/components/Hospital/TransfusionRequirementTable.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { PRIORITY_LABELS, REQUEST_STATUS_TONES } from '~/types/bloodRequest'
+import { HOSPITAL_UNIT_STATUS_LABELS, HOSPITAL_UNIT_STATUS_TONES } from '~/types/hospitalInventory'
 import {
   allocationProblems,
   buildAllocationShares,
@@ -267,6 +300,9 @@ const actionError = ref('')
 const events = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
+
+const bags = ref([])
+const bagsError = ref('')
 
 const allocating = ref(false)
 const plan = ref(null)
@@ -328,6 +364,7 @@ async function load() {
     const response = await hospitalService.showTransfusionRequest(requestId.value)
     request.value = response.request
     loadHistory()
+    loadBags()
   } catch (err) {
     loadError.value = err?.status === 404
       ? 'This Patient Transfusion Request could not be found.'
@@ -348,6 +385,18 @@ async function loadHistory() {
     historyError.value = err?.message || 'Could not load the history.'
   } finally {
     historyLoading.value = false
+  }
+}
+
+/** The patient's bags in this blood bank: received for them, or tagged to them from the shelf. */
+async function loadBags() {
+  bagsError.value = ''
+
+  try {
+    const response = await hospitalService.inventory({ transfusion_request_id: Number(requestId.value), per_page: 100 })
+    bags.value = response.data ?? []
+  } catch {
+    bagsError.value = 'Could not load this patient\'s bags.'
   }
 }
 
@@ -513,6 +562,15 @@ function formatDateTime(value) {
 .allocate__actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 .allocations { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+.bags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bag {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 0; border-top: 1px solid var(--rb-surface-alt); font-size: 13px; color: var(--rb-text-primary);
+}
+.bag:first-child { border-top: none; }
+.bag__meta { font-size: 12.5px; color: var(--rb-text-secondary); }
+.status-chip--sm { padding: 0.2rem 0.6rem; font-size: 11.5px; }
 
 .details { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 0; }
 .details dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--rb-text-secondary); }

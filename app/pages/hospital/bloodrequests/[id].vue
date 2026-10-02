@@ -787,9 +787,14 @@ async function handleConfirmReceipt() {
   try {
     // An empty selection means the whole delivery, which is what the API does
     // with an omitted allocation_ids.
-    await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
+    const response = await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
     receiptSelection.value = []
-    showToast('Receipt confirmed. Thank you.')
+
+    // Receipt is what puts the bags on the blood bank's own shelf.
+    const stocked = response?.stocked_count ?? 0
+    showToast(stocked > 0
+      ? `Receipt confirmed. ${stocked} bag${stocked === 1 ? ' is' : 's are'} now in Blood Bank Inventory.`
+      : 'Receipt confirmed. Thank you.')
   } catch (err) {
     receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'
   } finally {

@@ -212,6 +212,7 @@ const pageLabels = {
   '/hospital/bloodrequests/edit' : 'Blood Requests / Edit / ',
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
+  '/hospital/inventory': 'Blood Bank Inventory',
   '/hospital/notifications': 'Notifications',
   '/hospital/settings': 'Settings',
 }
@@ -263,6 +264,7 @@ const searchablePages = [
   { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
+  { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password' },
 ]
