@@ -1486,9 +1486,9 @@ onMounted(() => {
   font-family: var(--rb-font-sans);
   /* Same column as every other blood-centre page, so a user moving between
      them does not see the content jump width and the gutters change. */
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   display: flex;
   flex-direction: column;
   gap: 24px;

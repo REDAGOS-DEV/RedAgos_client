@@ -917,9 +917,9 @@ function finishVisit() {
    * blood-centre page sat in a centred 1152px column with 32px gutters.
    */
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   background: var(--rb-page-bg);
   display: flex;
   flex-direction: column;

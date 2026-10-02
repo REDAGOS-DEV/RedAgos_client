@@ -1,94 +1,139 @@
 <template>
   <div class="corrections">
     <header class="corrections__header">
-      <div>
-        <p class="corrections__eyebrow">Blood Center Portal / Quality</p>
-        <h1 class="corrections__title">Corrections</h1>
-        <p class="corrections__subtitle">
-          A saved record is never changed directly. Whoever entered it asks for a correction; the department's approver
-          or the Center Admin decides, and an approved correction is applied under the same rules as the original.
-        </p>
-      </div>
+      <h1 class="corrections__title">Corrections</h1>
+      <p class="corrections__subtitle">
+        Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
+        approver or the Center Admin decides. An approved correction is applied under the same rules as the original.
+      </p>
     </header>
 
-    <div class="tabs" role="tablist" aria-label="Corrections">
-      <button
-        v-if="canApprove"
-        type="button"
-        role="tab"
-        class="tab"
-        :class="{ 'tab--on': scope === 'review' }"
-        :aria-selected="scope === 'review'"
-        @click="switchScope('review')"
-      >
-        To review
-        <span v-if="pendingReview" class="tab__badge">{{ pendingReview }}</span>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="tab"
-        :class="{ 'tab--on': scope === 'mine' }"
-        :aria-selected="scope === 'mine'"
-        @click="switchScope('mine')"
-      >
-        My requests
-      </button>
+    <div class="toolbar">
+      <div class="tabs" role="tablist" aria-label="Corrections">
+        <button
+          v-if="canApprove"
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ 'tab--on': scope === 'review' }"
+          :aria-selected="scope === 'review'"
+          @click="switchScope('review')"
+        >
+          To review
+          <span v-if="pendingReview" class="tab__badge">{{ pendingReview }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ 'tab--on': scope === 'mine' }"
+          :aria-selected="scope === 'mine'"
+          @click="switchScope('mine')"
+        >
+          My requests
+        </button>
+      </div>
 
-      <select v-model="statusFilter" class="status-filter" aria-label="Status" @change="load">
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
-        <option value="">All</option>
-      </select>
+      <!-- Status as chips: the current choice is visible without opening anything. -->
+      <div class="chips" role="group" aria-label="Status">
+        <button
+          v-for="option in STATUS_FILTERS"
+          :key="option.value"
+          type="button"
+          class="chip"
+          :class="{ 'chip--on': statusFilter === option.value }"
+          :aria-pressed="statusFilter === option.value"
+          @click="setStatus(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
     </div>
 
-    <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
-    <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
+    <div v-if="error" class="alert alert--error" role="alert">
+      <AssetIcon name="circle-alert" :size="16" />
+      <span>{{ error }}</span>
+    </div>
+    <div v-else-if="notice" class="alert alert--notice" role="status">
+      <AssetIcon name="circle-check-big" :size="16" />
+      <span>{{ notice }}</span>
+    </div>
 
-    <p v-if="loading" class="empty">Loading…</p>
-    <p v-else-if="!items.length" class="empty">
-      {{ scope === 'review' ? 'Nothing is waiting for your decision.' : 'You have not requested any corrections.' }}
-    </p>
+    <!-- Loading: cards shaped like the real ones -->
+    <ul v-if="loading" class="list" aria-busy="true">
+      <li v-for="n in 3" :key="n" class="item item--skeleton">
+        <span class="skeleton skeleton--title" />
+        <span class="skeleton skeleton--line" />
+        <span class="skeleton skeleton--block" />
+      </li>
+    </ul>
+
+    <div v-else-if="!items.length" class="empty">
+      <span class="empty__icon">
+        <AssetIcon :name="scope === 'review' ? 'circle-check-big' : 'pencil'" :size="20" />
+      </span>
+      <p class="empty__title">{{ emptyCopy.title }}</p>
+      <p class="empty__text">{{ emptyCopy.text }}</p>
+    </div>
 
     <ul v-else class="list">
-      <li v-for="item in items" :key="item.id" class="item">
+      <li v-for="item in items" :key="item.id" class="item" :class="`item--${item.status}`">
         <div class="item__head">
-          <div>
-            <p class="item__title">{{ item.subject_label }} · Donation #{{ item.donation_id }}</p>
+          <div class="item__heading">
+            <p class="item__title">{{ item.subject_label }} <span class="item__ref">Donation #{{ item.donation_id }}</span></p>
             <p class="item__meta">
               <template v-if="item.donation_barcode">Barcode <span class="mono">{{ item.donation_barcode }}</span> · </template>
-              Requested by {{ item.requested_by || '—' }} · {{ formatDate(item.requested_at) }}
+              Requested by {{ item.requested_by || 'Unknown' }} · {{ formatDate(item.requested_at) }}
             </p>
           </div>
           <span class="pill" :class="`pill--${item.status}`">{{ statusLabel(item.status) }}</span>
         </div>
 
-        <p class="item__reason">“{{ item.reason }}”</p>
+        <div class="reason">
+          <p class="reason__label">Reason</p>
+          <p class="reason__text">{{ item.reason }}</p>
+        </div>
 
-        <table v-if="item.changed_fields.length" class="diff">
-          <thead>
-            <tr><th>Field</th><th>Saved</th><th>Corrected</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="field in item.changed_fields" :key="field">
-              <td>{{ field.replace(/_/g, ' ') }}</td>
-              <td class="diff__before">{{ display(item.previous?.[field]) }}</td>
-              <td class="diff__after">{{ display(item.changes?.[field]) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-if="item.changed_fields.length" class="diff" role="table" aria-label="Changes">
+          <div class="diff__row diff__row--head" role="row">
+            <span role="columnheader">Field</span>
+            <span role="columnheader">Saved</span>
+            <span aria-hidden="true" />
+            <span role="columnheader">Corrected</span>
+          </div>
+          <div v-for="field in item.changed_fields" :key="field" class="diff__row" role="row">
+            <span class="diff__field" role="cell">{{ field.replace(/_/g, ' ') }}</span>
+            <span class="diff__before" role="cell">
+              <template v-if="isEmpty(item.previous?.[field])"><i class="diff__empty">empty</i></template>
+              <template v-else>{{ display(item.previous?.[field]) }}</template>
+            </span>
+            <AssetIcon name="arrow-right" :size="14" class="diff__arrow" aria-hidden="true" />
+            <span class="diff__after" role="cell">
+              <template v-if="isEmpty(item.changes?.[field])"><i class="diff__empty">empty</i></template>
+              <template v-else>{{ display(item.changes?.[field]) }}</template>
+            </span>
+          </div>
+        </div>
         <p v-else class="item__meta">No field differs from the saved record.</p>
 
-        <p v-if="item.reviewed_by" class="item__meta">
-          {{ item.status === 'approved' ? 'Approved' : 'Rejected' }} by {{ item.reviewed_by }} · {{ formatDate(item.reviewed_at) }}
-          <template v-if="item.review_note"> — “{{ item.review_note }}”</template>
+        <p v-if="item.reviewed_by" class="decision">
+          <AssetIcon :name="item.status === 'approved' ? 'circle-check-big' : 'circle-x'" :size="14" />
+          <span>
+            {{ item.status === 'approved' ? 'Approved' : 'Rejected' }} by {{ item.reviewed_by }} · {{ formatDate(item.reviewed_at) }}
+            <template v-if="item.review_note"><br><span class="decision__note">Note: {{ item.review_note }}</span></template>
+          </span>
         </p>
 
         <div v-if="item.can_decide" class="item__decide">
           <label class="field">
-            <span class="field__label">Note <span class="field__optional">required to reject</span></span>
-            <textarea v-model="notes[item.id]" class="field__input" rows="2" maxlength="1000" />
+            <span class="field__label">Note <span class="field__optional">optional to approve, required to reject</span></span>
+            <textarea
+              v-model="notes[item.id]"
+              class="field__input"
+              rows="2"
+              maxlength="1000"
+              placeholder="Why you are approving or rejecting this correction"
+            />
           </label>
           <div class="actions">
             <button type="button" class="btn btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
@@ -102,6 +147,7 @@
             >
               Reject
             </button>
+            <span v-if="!(notes[item.id] || '').trim()" class="actions__hint">Add a note to reject.</span>
           </div>
         </div>
       </li>
@@ -110,6 +156,7 @@
 </template>
 
 <script setup>
+import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
@@ -145,12 +192,44 @@ const pendingReview = ref(0)
 
 const STATUS = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }
 
+const STATUS_FILTERS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: '', label: 'All' },
+]
+
+function setStatus(value) {
+  if (statusFilter.value === value) return
+  statusFilter.value = value
+  notice.value = null
+  load()
+}
+
+const emptyCopy = computed(() => {
+  const status = statusFilter.value ? STATUS[statusFilter.value].toLowerCase() : ''
+
+  if (scope.value === 'review') {
+    return statusFilter.value === 'pending'
+      ? { title: 'Nothing is waiting for your decision', text: 'New correction requests from your department will appear here.' }
+      : { title: `No ${status} corrections`, text: 'Try another status to see the rest.' }
+  }
+
+  return statusFilter.value === 'pending' || !statusFilter.value
+    ? { title: 'You have not requested any corrections', text: 'To fix a saved record, open it and choose Request correction. Your request will be listed here.' }
+    : { title: `No ${status} requests`, text: 'Try another status to see the rest.' }
+})
+
+function isEmpty(value) {
+  return value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)
+}
+
 function statusLabel(status) {
   return STATUS[status] ?? status
 }
 
 function display(value) {
-  if (value === null || value === undefined || value === '') return '—'
+  if (isEmpty(value)) return ''
   if (Array.isArray(value)) return value.map((row) => (typeof row === 'object' ? Object.values(row).join(' / ') : row)).join('; ')
   if (typeof value === 'object') return JSON.stringify(value)
 
@@ -158,11 +237,11 @@ function display(value) {
 }
 
 function formatDate(value) {
-  if (!value) return '—'
+  if (!value) return 'unknown date'
 
   const date = new Date(value)
 
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return Number.isNaN(date.getTime()) ? 'unknown date' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 async function load() {
@@ -228,264 +307,398 @@ onMounted(load)
 <style scoped>
 .corrections {
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
   color: var(--rb-text-primary);
 }
 
-.corrections__eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
-}
-
 .corrections__title {
-  margin: 0.2rem 0;
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .corrections__subtitle {
-  margin: 0;
-  max-width: 72ch;
-  font-size: 0.88rem;
+  margin: 4px 0 0;
+  max-width: 76ch;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--rb-text-secondary);
 }
 
-.tabs {
+/* Tabs + status chips */
+.toolbar {
   display: flex;
-  gap: 0.4rem;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--rb-border);
+  border-bottom: 1px solid var(--rb-border-strong);
 }
 
+.tabs { display: flex; gap: 4px; }
+
 .tab {
-  padding: 0.55rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
+
+.tab:hover { color: var(--rb-text-primary); }
 
 .tab--on {
   border-bottom-color: var(--rb-primary);
-  color: var(--rb-text-primary);
+  color: var(--rb-primary-text);
 }
 
 .tab__badge {
-  margin-left: 0.3rem;
-  padding: 0 0.4rem;
+  min-width: 20px;
+  padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(var(--rb-warning-rgb), 0.18);
+  background: rgba(var(--rb-warning-rgb), 0.16);
   color: var(--rb-warning-text);
-  font-size: 0.72rem;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
 }
 
-.status-filter {
-  margin-left: auto;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
+.chips { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
+
+.chip {
+  padding: 5px 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 999px;
   background: var(--rb-surface);
-  color: var(--rb-text-primary);
-}
-
-.alert {
-  margin: 0;
-  padding: 0.6rem 0.8rem;
-  border-radius: 10px;
-  font-size: 0.86rem;
-}
-
-.alert--error {
-  background: rgba(var(--rb-accent-rgb), 0.12);
-  color: var(--rb-accent-text);
-}
-
-.alert--notice {
-  background: rgba(var(--rb-success-rgb), 0.12);
-  color: var(--rb-success-text);
-}
-
-.empty {
-  margin: 0;
   color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+.chip:hover { border-color: var(--rb-border-hover); color: var(--rb-text-primary); }
+
+.chip--on {
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+}
+
+/* Alerts */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.alert--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.alert--notice { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+
+/* Empty */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 24px;
+  border: 1px dashed var(--rb-border-strong);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  text-align: center;
+}
+
+.empty__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+}
+
+.empty__title { margin: 4px 0 0; font-size: 14px; font-weight: 700; }
+.empty__text { margin: 0; max-width: 46ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* List */
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .item {
-  padding: 1rem 1.1rem;
+  padding: 16px 18px;
   border: 1px solid var(--rb-border);
   border-radius: 14px;
   background: var(--rb-surface);
+  box-shadow: inset 3px 0 0 var(--item-accent, transparent), 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 12px;
 }
+
+.item--pending { --item-accent: var(--rb-warning); }
+.item--approved { --item-accent: var(--rb-success); }
+.item--rejected { --item-accent: var(--rb-accent); }
 
 .item__head {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 16px;
   align-items: flex-start;
 }
 
-.item__title {
-  margin: 0;
-  font-weight: 700;
+.item__heading { min-width: 0; }
+
+.item__title { margin: 0; font-size: 14px; font-weight: 700; }
+
+.item__ref {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
 }
 
 .item__meta {
-  margin: 0.15rem 0 0;
-  font-size: 0.8rem;
+  margin: 3px 0 0;
+  font-size: 12px;
   color: var(--rb-text-secondary);
 }
 
-.item__reason {
+.reason {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+}
+
+.reason__label {
   margin: 0;
-  font-size: 0.88rem;
-  font-style: italic;
-}
-
-.diff {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
-
-.diff th {
-  text-align: left;
-  font-size: 0.7rem;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--rb-text-secondary);
-  padding: 0 0.5rem 0.35rem 0;
-  border-bottom: 1px solid var(--rb-border);
 }
 
-.diff td {
-  padding: 0.35rem 0.5rem 0.35rem 0;
-  border-bottom: 1px solid var(--rb-border);
-  text-transform: none;
+.reason__text { margin: 3px 0 0; font-size: 13px; line-height: 1.5; }
+
+/* Saved -> Corrected */
+.diff {
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
 }
 
-.diff td:first-child {
-  text-transform: capitalize;
-  font-weight: 600;
+.diff__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.4fr) 20px minmax(0, 1.4fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--rb-border);
 }
+
+.diff__row:first-child { border-top: 0; }
+
+.diff__row--head {
+  padding: 7px 12px;
+  background: var(--rb-surface-alt);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.diff__field { font-weight: 600; text-transform: capitalize; }
 
 .diff__before {
   color: var(--rb-text-secondary);
   text-decoration: line-through;
+  overflow-wrap: anywhere;
 }
 
 .diff__after {
   font-weight: 600;
+  color: var(--rb-success-text);
+  overflow-wrap: anywhere;
 }
 
+.diff__arrow { color: var(--rb-text-secondary); }
+
+.diff__empty {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+}
+
+.decision {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+}
+
+.decision :deep(svg) { flex-shrink: 0; margin-top: 1px; }
+.decision__note { color: var(--rb-text-primary); }
+
+/* Decide */
 .item__decide {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--rb-border);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rb-border);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
+.field { display: flex; flex-direction: column; gap: 6px; }
 
-.field__label {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
+.field__label { font-size: 12px; font-weight: 600; }
 
 .field__optional {
-  font-weight: 400;
+  margin-left: 4px;
+  font-weight: 500;
   color: var(--rb-text-secondary);
 }
 
 .field__input {
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field__input::placeholder { color: var(--rb-placeholder); }
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--rb-primary);
+  box-shadow: var(--rb-focus-ring);
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
+.actions__hint { font-size: 12px; color: var(--rb-text-secondary); }
+
 .btn {
-  padding: 0.5rem 0.95rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
   color: var(--rb-text-primary);
-  font-weight: 600;
-  font-size: 0.84rem;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.btn--primary {
-  border-color: transparent;
-  background: var(--rb-primary);
-  color: #fff;
-}
+.btn--primary { border-color: transparent; background: var(--rb-primary); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: #0D47A1; }
 
-.btn--danger {
-  border-color: transparent;
-  background: rgba(var(--rb-accent-rgb), 0.14);
-  color: var(--rb-accent-text);
-}
+.btn--danger { border-color: rgba(var(--rb-accent-rgb), 0.35); color: var(--rb-accent-text); }
+.btn--danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.06); }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn:focus-visible,
+.tab:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--rb-primary-text);
+  outline-offset: 2px;
 }
 
 .pill {
-  padding: 0.15rem 0.6rem;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
-.pill--pending { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
-.pill--approved { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
-.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.14); color: var(--rb-accent-text); }
+.pill--pending { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
+.pill--approved { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
+.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Skeleton */
+.item--skeleton { gap: 10px; }
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: corrections-shimmer 1.4s ease infinite;
+}
+
+.skeleton--title { width: 40%; height: 14px; }
+.skeleton--line { width: 65%; }
+.skeleton--block { height: 56px; border-radius: 10px; }
+
+@keyframes corrections-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 @media (max-width: 640px) {
-  .corrections {
-    padding: 16px;
-  }
+  .corrections { padding: 16px; }
+  .toolbar { align-items: stretch; }
+  .item__head { flex-direction: column-reverse; gap: 8px; }
+
+  /* Each change stacks: field, then saved over corrected */
+  .diff__row--head { display: none; }
+  .diff__row { grid-template-columns: 1fr; gap: 2px; }
+  .diff__arrow { display: none; }
+  .diff__before::before { content: 'Saved: '; text-decoration: none; display: inline-block; margin-right: 4px; font-weight: 600; }
+  .diff__after::before { content: 'Corrected: '; font-weight: 600; color: var(--rb-text-secondary); margin-right: 4px; }
 }
 </style>

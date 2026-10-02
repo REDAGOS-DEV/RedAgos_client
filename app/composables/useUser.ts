@@ -1,4 +1,5 @@
 import { authService } from '~/api/auth/AuthService'
+import { resolveApiBaseURL } from '~/api/BaseService'
 import type { AppUser } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
@@ -16,10 +17,9 @@ export function useUser() {
   async function fetchUser(): Promise<void> {
     loading.value = true
     try {
-      const runtimeConfig = useRuntimeConfig()
       const token = import.meta.client ? localStorage.getItem('_token') : null
       const res = await $fetch<any>('/user', {
-        baseURL: runtimeConfig.public.apiBaseURL,
+        baseURL: resolveApiBaseURL(),
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
 

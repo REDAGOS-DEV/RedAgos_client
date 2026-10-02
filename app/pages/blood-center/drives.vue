@@ -400,10 +400,10 @@ onMounted(loadDrives)
   --text-secondary: var(--rb-text-secondary);
   font-family: var(--rb-font-sans);
   color: var(--text-primary);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   transition: background-color 0.2s ease;
 }
 

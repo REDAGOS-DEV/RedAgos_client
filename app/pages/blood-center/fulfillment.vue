@@ -559,12 +559,12 @@ onMounted(load)
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css. */
-.fx-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px 32px 40px; }
-.fx-inner { max-width: 1152px; margin: 0 auto; }
+.fx-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.fx-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
-.page-title { font-size: 23px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
 
 .legend { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; font-size: 12.5px; color: var(--rb-text-secondary); flex-wrap: wrap; }
 .legend-step { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--rb-text-primary); }

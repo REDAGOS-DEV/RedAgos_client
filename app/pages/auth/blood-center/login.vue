@@ -20,11 +20,13 @@
             <span>Back</span>
           </NuxtLink>
 
-          <h1>Welcome, Blood Steward!</h1>
+          <header class="form-header">
+            <h1>Welcome, Blood Steward!</h1>
 
-          <p class="form-subtitle">
-            Sign in to your blood center account
-          </p>
+            <p class="form-subtitle">
+              Sign in to your blood center account
+            </p>
+          </header>
 
           <form
             class="login-form"
@@ -51,8 +53,18 @@
               </div>
             </div>
 
-            <div class="field-group password-group">
-              <label for="password">Password</label>
+            <div class="field-group">
+              <div class="label-row">
+                <label for="password">Password</label>
+
+                <button
+                  type="button"
+                  class="link-button"
+                  @click="goToForgotPassword"
+                >
+                  Forgot password?
+                </button>
+              </div>
 
               <div class="input-shell">
                 <span class="field-icon">
@@ -81,7 +93,7 @@
               </div>
             </div>
 
-            <div class="field-group license-group">
+            <div class="field-group">
               <label for="license-number">DOH License Number</label>
 
               <div class="input-shell">
@@ -97,19 +109,15 @@
                   :class="{ typed: typed.licenseNumber }"
                   placeholder="e.g. DOH-BC-00123"
                   required
+                  aria-describedby="license-hint"
                 >
               </div>
+
+              <p id="license-hint" class="field-hint">
+                Your blood center's license, printed on its DOH certificate.
+              </p>
             </div>
 
-            <div class="forgot-row">
-              <button
-                type="button"
-                class="link-button"
-                @click="goToForgotPassword"
-              >
-                Forgot password?
-              </button>
-            </div>
 
             <SessionExpiredNotice />
 
@@ -126,18 +134,19 @@
             />
 
             <button
+              type="submit"
               class="sign-in-button"
               :disabled="loading"
             >
-              <AssetIcon name="log-in" :size="24" />
+              <AssetIcon :name="loading ? 'loader' : 'log-in'" :size="20" :class="{ 'btn-spinner': loading }" />
               {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
 
-            <!-- No self-registration link: facility accounts are created by
-                 a RedAgos administrator, so there is nothing to sign up for
-                 here. -->
+            <!-- No self-registration link: a RedAgos administrator creates the
+                 facility and its supervisor, and the supervisor adds staff
+                 from Staff Accounts. So staff are pointed at their supervisor. -->
             <p class="signup-text">
-              Need an account? Contact your RedAgos administrator.
+              No account yet? Ask your blood center supervisor to add you.
             </p>
 
             <div class="divider">
@@ -208,155 +217,223 @@ const {
   box-sizing: border-box;
 }
 
+/*
+  Shape rule: inputs, buttons ug role tiles kay 12px ang radius;
+  ang back link ra ang pill. Ayaw na sagola.
+*/
 .login-screen {
+  --primary: var(--rb-primary, #1565C0);
+  --primary-hover: #0D47A1;
+  --primary-rgb: var(--rb-primary-rgb, 21, 101, 192);
+  --danger: #D32F2F;
+  --success: #2E7D32;
+  --text-primary: var(--rb-text-primary, #1F2937);
+  --text-body: #334155;
+  --text-secondary: var(--rb-text-secondary, #64748B);
+  --border: #d9e2ec;
+  --border-strong: #c3cfdc;
+  --field-bg: #ffffff;
+  --page-bg: #eef4fb;
+  --radius: var(--rb-radius-md, 12px);
+  --ease-out: var(--rb-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
   min-height: 100vh;
-  background: #eef4fb;
-  color: #1f2937;
+  min-height: 100dvh;
+  background: var(--page-bg);
+  color: var(--text-primary);
   font-family: var(--rb-font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
- .login-shell {
+.login-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 540px 1fr;
+  min-height: 100dvh;
+  grid-template-columns: minmax(420px, 540px) 1fr;
 }
 
 .form-panel {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
   justify-content: flex-start;
-  padding: 0;
+  padding: 48px clamp(32px, 7vw, 128px);
 }
 
 .form-card {
   width: 100%;
-  max-width: 460px;
-  margin-top: 62px;
-  margin-left: 140px;
+  max-width: 400px;
 }
 
-/* ── MOBILE BRAND — hidden on desktop ── */
+@media (prefers-reduced-motion: no-preference) {
+  .form-card {
+    animation: card-enter 520ms var(--ease-out) both;
+  }
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* ── MOBILE BRAND ── */
 .mobile-brand {
   display: none;
 }
 
 .mobile-brand-curve {
   position: relative;
-  width: calc(100% + 48px);
-  margin: -36px -24px 20px;
-  padding: 44px 24px 56px;
-  background: #1565C0;
+  width: calc(100% + 54px);
+  margin: 0 -24px 28px;
+  padding: 56px 24px 52px;
+  /* Elliptical radius: usa ka hapsay nga arko sa tibuok ubos, dili lang kanto */
   border-radius: 0 0 50% 50% / 0 0 46px 46px;
+  background: var(--primary);
   text-align: center;
 }
 
 .mobile-logo {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
   display: block;
-  margin: 0 auto 10px;
+  margin: 0 auto 12px;
 }
 
 .mobile-brand .brand-name {
   color: #ffffff;
   font-size: 20px;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   margin: 0;
 }
 
 .mobile-brand .brand-name span {
-  color: #eb3535;
+  color: #ff5a76;
 }
 
 .mobile-brand .brand-subtitle {
   color: rgba(255, 255, 255, 0.82);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  margin: 4px 0 0;
+  margin: 6px 0 0;
 }
 
+/* ── HEADER ── */
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #64748b;
-  font-size: 14px;
-  font-weight: 500;
+  margin-left: -10px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
   text-decoration: none;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .back-link:hover {
-  color: #334155;
+  color: var(--text-primary);
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.form-header {
+  margin-top: 28px;
 }
 
 h1 {
-  margin: 46px 0 0;
-  color: #1f2937;
-  font-size: 36px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(28px, 2.4vw, 34px);
   font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1.18;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
 }
 
 .form-subtitle {
-  margin: 16px 0 0;
-  color: #64748b;
-  font-size: 16px;
-  line-height: 1.5;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.55;
 }
 
+/* ── FORM ── */
 .login-form {
-  margin-top: 54px;
+  display: grid;
+  gap: 20px;
+  margin-top: 36px;
 }
 
 .field-group {
+  display: grid;
+  gap: 8px;
   margin: 0;
 }
 
-.password-group,
-.license-group {
-  margin-top: 19px;
+.field-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 label {
   display: block;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.2;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .input-shell {
   display: flex;
-  height: 52px;
+  height: 50px;
   align-items: center;
-  margin-top: 12px;
-  padding: 0 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: #f8fafc;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  box-shadow: 0 1px 2px rgba(15, 27, 45, 0.04);
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
+.input-shell:hover {
+  border-color: var(--border-strong);
+}
+
 .input-shell:focus-within {
-  border-color: #2563EB;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12);
 }
 
 .field-icon {
   display: flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
-  color: #64748b;
+  margin-right: 10px;
+  color: var(--text-secondary);
+  transition: color 150ms ease;
+}
+
+.input-shell:focus-within .field-icon {
+  color: var(--primary);
 }
 
 svg {
@@ -366,38 +443,41 @@ svg {
 
 input {
   width: 100%;
+  height: 100%;
   min-width: 0;
   flex: 1;
+  padding-right: 8px;
   border: 0;
   outline: 0;
   background: transparent;
-  color: #334155;
+  color: var(--text-body);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 input::placeholder {
-  color: #64748b;
+  color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 .icon-button {
   display: flex;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   align-items: center;
   justify-content: center;
-  margin-left: 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .icon-button:hover {
   background: #f1f5f9;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .icon-button svg {
@@ -405,154 +485,128 @@ input::placeholder {
   height: 18px;
 }
 
-.forgot-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 22px;
-}
-
-.forgot-row a,
-.signup-text a {
-  color: #1266c3;
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.forgot-row a:hover,
-.signup-text a:hover {
-  color: #0d4f9c;
-}
-
 .link-button {
   border: 0;
   background: transparent;
   cursor: pointer;
-  padding: 0;
-  color: #1266c3;
-  font-size: 14px;
-  font-weight: 800;
+  padding: 2px 4px;
+  margin-right: -4px;
+  border-radius: 6px;
+  color: var(--primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 150ms ease;
 }
 
 .link-button:hover {
-  color: #0d4f9c;
+  color: var(--primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .sign-in-button {
   display: flex;
   width: 100%;
-  height: 52px;
+  height: 50px;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 6px;
   border: 0;
-  border-radius: 999px;
-  background: var(--rb-primary, #1565C0);
+  border-radius: var(--radius);
+  background: var(--primary);
   color: #ffffff;
   cursor: pointer;
-  font-size: 16px;
-  font-weight: 800;
-  transition: background-color 150ms ease;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.2), 0 6px 16px -6px rgba(var(--primary-rgb), 0.45);
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 120ms var(--ease-out);
 }
 
-.sign-in-button:hover {
-  background: #0D47A1;
+.sign-in-button:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.2), 0 10px 22px -8px rgba(var(--primary-rgb), 0.55);
 }
 
-.sign-in-button:active {
-  transform: translateY(0);
+.sign-in-button:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
 .sign-in-button:disabled {
   cursor: not-allowed;
   opacity: 0.72;
+  box-shadow: none;
 }
 
 .sign-in-button svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
-.error-message {
-  margin: 16px 0 0;
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
+.btn-spinner {
+  animation: spin 900ms linear infinite;
 }
 
-.verify-prompt {
-  margin-top: 12px;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: #f8fafc;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.verify-resend-button {
-  width: 100%;
-  height: 42px;
-  border: 1px solid #1266c3;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #1266c3;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
+/* Ang form grid na ang naghatag og spacing, so i-zero ang margin sa alerts */
+.login-form > .login-alert,
+.login-form > .session-notice {
+  margin: 0;
 }
-
-.verify-resend-button:hover { background: #eef4fb; }
-
-.verify-resend-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-
-.verify-resend-note {
-  margin: 10px 0 0;
-  color: #166534;
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.verify-resend-note--error { color: #dc2626; }
 
 .signup-text {
-  margin: 24px 0 0;
-  color: #64748b;
+  margin: 0;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: center;
 }
 
+.signup-text a {
+  margin-left: 2px;
+  border-radius: 4px;
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.signup-text a:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── OTHER PORTALS ── */
 .divider {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 32px;
+  margin-top: 12px;
 }
 
 .divider span {
   height: 1px;
   flex: 1;
-  background: #d9e2ec;
+  background: var(--border);
 }
 
 .divider p {
   margin: 0;
-  color: #5b6b80;
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
 
-/* Parehas sa donor login ang layout; ang Donor button kay pula permi */
 .role-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 20px;
 }
 
 .role-button {
@@ -562,13 +616,12 @@ input::placeholder {
   justify-content: center;
   gap: 8px;
   border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
+  border-radius: var(--radius);
   cursor: pointer;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  transition: border-color 150ms ease, background-color 150ms ease, transform 120ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 120ms var(--ease-out);
 }
 
 .role-button:active {
@@ -597,6 +650,26 @@ input::placeholder {
   border-color: #2da1ff;
 }
 
+.back-link:focus-visible,
+.link-button:focus-visible,
+.icon-button:focus-visible,
+.sign-in-button:focus-visible,
+.role-button:focus-visible,
+.signup-text a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner,
+  .sign-in-button,
+  .role-button {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ── TABLET / MOBILE ── */
 @media (max-width: 1023px) {
   .login-shell {
     display: block;
@@ -608,13 +681,14 @@ input::placeholder {
 
   .form-panel {
     position: relative;
+    align-items: flex-start;
     justify-content: center;
-    padding: 0 24px 56px;
+    padding: 0 24px 48px;
   }
 
   .form-card {
-    margin: 0;
-    text-align: center;
+    max-width: 440px;
+    margin: 0 auto;
   }
 
   .mobile-brand {
@@ -624,13 +698,11 @@ input::placeholder {
   .back-link {
     position: absolute;
     top: 16px;
-    left: 18px;
-    z-index: 5;
+    left: 16px;
+    z-index: 1;
+    margin: 0;
     color: #ffffff;
     background: rgba(255, 255, 255, 0.16);
-    padding: 6px 12px 6px 8px;
-    border-radius: 999px;
-    font-size: 13px;
   }
 
   .back-link:hover {
@@ -638,68 +710,115 @@ input::placeholder {
     background: rgba(255, 255, 255, 0.26);
   }
 
-  .mobile-brand-curve {
-    padding-top: 56px;
+  .form-header {
+    margin-top: 0;
+    text-align: center;
   }
 
   h1 {
-    margin-top: 22px;
-    font-size: 24px;
-    line-height: 1.25;
+    font-size: 26px;
   }
 
   .form-subtitle {
-    margin-top: 8px;
-    font-size: 14px;
+    margin-top: 6px;
+    font-size: 14.5px;
   }
 
   .login-form {
-    text-align: left;
-    margin-top: 32px;
+    margin-top: 28px;
   }
 
-  .forgot-row {
-    justify-content: right;
+  /* 16px para dili mo-zoom ang iOS Safari inig focus */
+  input {
+    font-size: 16px;
   }
 }
 
 @media (max-width: 520px) {
   .form-panel {
-    padding: 0 18px 40px;
+    padding: 0 18px 36px;
   }
 
   .mobile-brand-curve {
     width: calc(100% + 36px);
-    margin: -20px -18px 18px;
-    padding: 52px 18px 48px;
+    margin: 0 -18px 24px;
+    padding: 56px 18px 48px;
+    border-radius: 0 0 50% 50% / 0 0 46px 46px;
   }
 
   h1 {
-    font-size: 22px;
+    font-size: 23px;
   }
 
-}
-
-.sign-in-button:focus-visible,
-.role-button:focus-visible,
-.icon-button:focus-visible,
-.link-button:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
-}
-
-:global(.dark .scope-auth-blood-center-login .role-button.donor) {
-  background: rgba(211, 47, 47, 0.18);
-  color: #f2a7a7;
-}
-
-:global(.dark .scope-auth-blood-center-login .role-button.hospital) {
-  color: #64B5F6;
+  .login-form {
+    gap: 18px;
+  }
 }
 
 @media (max-width: 359px) {
   .role-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/*
+  Dark mode: tanan selector naka-prefix og .login-screen para dili
+  motulo sa ubang pages (global man ni nga rules).
+*/
+:global(.dark .scope-auth-blood-center-login) {
+  --text-primary: #F1F5F9;
+  --text-body: #E2E8F0;
+  --text-secondary: #94A3B8;
+  --border: #334155;
+  --border-strong: #475569;
+  --field-bg: #1b2638;
+  --page-bg: #0F172A;
+}
+
+:global(.dark .scope-auth-blood-center-login .input-shell) {
+  box-shadow: none;
+}
+
+:global(.dark .scope-auth-blood-center-login .input-shell:focus-within) {
+  background: #213049;
+  box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.16);
+}
+
+:global(.dark .scope-auth-blood-center-login .input-shell:focus-within .field-icon),
+:global(.dark .scope-auth-blood-center-login .link-button),
+:global(.dark .scope-auth-blood-center-login .signup-text a) {
+  color: #64B5F6;
+}
+
+:global(.dark .scope-auth-blood-center-login .link-button:hover),
+:global(.dark .scope-auth-blood-center-login .signup-text a:hover) {
+  color: #90CAF9;
+}
+
+:global(.dark .scope-auth-blood-center-login .icon-button:hover) {
+  background: #334155;
+}
+
+:global(.dark .scope-auth-blood-center-login .back-link:hover) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:global(.dark .scope-auth-blood-center-login .sign-in-button) {
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+}
+
+:global(.dark .scope-auth-blood-center-login .donor) {
+  background: rgba(211, 47, 47, 0.18);
+  color: #f2a7a7;
+}
+
+:global(.dark .scope-auth-blood-center-login .hospital) {
+  color: #64B5F6;
+}
+
+@media (max-width: 1023px) {
+  :global(.dark .scope-auth-blood-center-login .back-link:hover) {
+    background: rgba(255, 255, 255, 0.26);
   }
 }
 </style>

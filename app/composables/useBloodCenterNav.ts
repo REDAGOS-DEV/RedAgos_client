@@ -110,29 +110,60 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
   return user.is_supervisor ? BLOOD_CENTER_OVERVIEW : '/blood-center/settings'
 }
 
+/*
+ * Grouped by department, so a supervisor — who sees every page — can tell
+ * whose work each one is. A department member sees only the group(s) their
+ * abilities open, which is usually just their own department.
+ *
+ * Every `requires` below is unchanged from the old feature-based grouping;
+ * only the headings moved. Labels follow Department::label() on the server.
+ */
 const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
-    label: 'Main',
+    label: 'Management',
     items: [
       // Gated on reports.view_all, which only the management level holds — the
       // overview spans every department, so it is not a department's own view.
       { label: 'Overview', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall' },
-
-      // Each department dashboard is gated on an ability distinctive to that
-      // department, never on a shared read. inventory.view, for instance, is
-      // held by Processing and Recruitment too, so gating Issuance on it would
-      // have shown them a dashboard that is not theirs. The laboratory
-      // departments share lab.view, so each is gated on its own write instead.
-      { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
-      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
-      { label: 'Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
-      { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
-      { label: 'Billing Dashboard', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.create', keywords: 'billing payment finance' },
+      { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
+      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
+      // Every role that saves a correctable record holds corrections.request,
+      // and every approver does too, so one ability opens the page.
+      { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
     ],
   },
   {
-    label: 'Blood Management',
+    label: 'Donor / Collection',
     items: [
+      // Each department dashboard is gated on an ability distinctive to that
+      // department, never on a shared read. inventory.view, for instance, is
+      // held by Processing and Recruitment too, so gating Issuance on it would
+      // have shown them a dashboard that is not theirs.
+      { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
+      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
+      // donors.view_contact: Recruitment reaches the page as a contact list.
+      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donor profile history contact recruitment' },
+      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
+    ],
+  },
+  {
+    label: 'Testing',
+    items: [
+      // The laboratory departments share lab.view, so each is gated on its own
+      // write instead.
+      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
+    ],
+  },
+  {
+    label: 'Processing',
+    items: [
+      { label: 'Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
+    ],
+  },
+  {
+    label: 'Issuance',
+    items: [
+      { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
       // inventory.create rather than inventory.view: Collection, Testing and
       // Processing all read stock, but only Issuance books it in.
@@ -147,33 +178,12 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     ],
   },
   {
-    label: 'Operations',
+    label: 'Billing',
     items: [
-      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
-      // Every role that saves a correctable record holds corrections.request,
-      // and every approver does too, so one ability opens the page.
-      { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
-      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
-      // donors.view_contact: Recruitment reaches the page as a contact list.
-      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donor profile history contact recruitment' },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.view', keywords: 'invoice receipt gcash cash' },
-    ],
-  },
-  {
-    label: 'Reports',
-    items: [
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
-    ],
-  },
-  {
-    label: 'Administration',
-    items: [
-      { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
+      // One entry: "Billing Dashboard" and "Billing and Payments" were the same
+      // page under two names. billing.view, matching the page's own meta, so
+      // the link never bounces.
+      { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.view', keywords: 'billing payment finance invoice receipt gcash cash' },
     ],
   },
   {

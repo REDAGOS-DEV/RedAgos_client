@@ -467,12 +467,12 @@ onMounted(load)
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css. */
-.bl-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px 32px 40px; }
-.bl-inner { max-width: 1152px; margin: 0 auto; }
+.bl-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.bl-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-.page-title { font-size: 23px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 70ch; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 70ch; }
 
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden; }
 

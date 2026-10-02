@@ -684,10 +684,10 @@ onMounted(async () => {
   --indigo: var(--rb-primary-text);
   --text-primary: var(--rb-text-primary);
   --text-secondary: var(--rb-text-secondary);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   font-family: var(--rb-font-sans);
   color: var(--text-primary);
 }
@@ -880,7 +880,7 @@ onMounted(async () => {
 .panel-icon-badge--indigo { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--indigo); }
 
 .panel-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   margin: 0;
 }
@@ -1172,7 +1172,7 @@ onMounted(async () => {
   gap: 6px;
   padding: 8px 14px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   background: var(--rb-surface-hover);
   color: var(--text-primary);
