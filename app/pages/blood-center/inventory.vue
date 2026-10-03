@@ -27,11 +27,90 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': syncing }" />
               {{ syncing ? 'Syncing…' : 'Sync Inventory' }}
             </button>
+
+            <!-- The page-level actions that used to sit in a Quick Actions
+                 panel at the bottom of the page. -->
+            <div class="more-menu" @focusout="onMoreMenuFocusOut">
+              <button
+                type="button"
+                class="btn-outline"
+                aria-haspopup="menu"
+                :aria-expanded="moreMenuOpen"
+                @click="moreMenuOpen = !moreMenuOpen"
+              >
+                More
+                <AssetIcon name="chevron-down" :size="14" />
+              </button>
+              <div v-if="moreMenuOpen" class="more-menu__list" role="menu">
+                <button
+                  v-for="action in secondaryQuickActions"
+                  :key="action.label"
+                  type="button"
+                  role="menuitem"
+                  class="more-menu__item"
+                  @click="moreMenuOpen = false; handleQuickAction(action)"
+                >
+                  <AssetIcon :name="action.icon" :size="15" />
+                  <span>
+                    <strong>{{ action.label }}</strong>
+                    <small>{{ action.description }}</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
               <AssetIcon name="plus" :size="15" />
-              Record Stock
+              Stock Intake
             </NuxtLink>
           </div>
+        </div>
+      </div>
+
+      <!-- ============ KPI CARDS (first, as on every other page) ============ -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Total Inventory</p>
+            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
+              <AssetIcon name="database" :size="14" style="color: var(--rb-primary-text)" />
+            </div>
+          </div>
+          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalInventoryUnits === null }">{{ totalInventoryUnits ?? 'No data' }}</p>
+          <span class="stat-chip stat-chip--neutral">Units on hand</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Healthy Inventory</p>
+            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
+              <AssetIcon name="shield-check" :size="14" style="color: var(--rb-success-text)" />
+            </div>
+          </div>
+          <p class="stat-card__value">{{ healthyBatchCount }}</p>
+          <span class="stat-chip stat-chip--neutral">Batches at safe levels</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Reserved Inventory</p>
+            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-purple-rgb), 0.08)' }">
+              <AssetIcon name="lock" :size="14" style="color: var(--rb-purple-text)" />
+            </div>
+          </div>
+          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalReservedUnits === null }">{{ totalReservedUnits ?? 'No data' }}</p>
+          <span class="stat-chip stat-chip--neutral">Units held for hospitals</span>
+        </div>
+
+        <div class="stat-card" :class="{ 'stat-card--emphasized': expiringSoonCount > 0 }">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Expiring Soon</p>
+            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
+              <AssetIcon name="clock" :size="14" style="color: var(--rb-warning-text)" />
+            </div>
+          </div>
+          <p class="stat-card__value" :style="expiringSoonCount ? { color: 'var(--rb-warning)' } : {}">{{ expiringSoonCount }}</p>
+          <span class="stat-chip stat-chip--neutral">Within 7 days</span>
         </div>
       </div>
 
@@ -55,17 +134,12 @@
           </div>
         </div>
         <div class="alert-banner__actions">
-          <button type="button" class="btn-primary btn-primary--sm" @click="scrollToNearExpiry">View Expiring Inventory</button>
+          <button type="button" class="btn-primary btn-primary--sm" @click="showExpiringInRecords">Show these units</button>
           <button type="button" class="alert-banner__dismiss" @click="expiryAlert.visible = false">
             <AssetIcon name="x" :size="15" />
           </button>
         </div>
       </div>
-
-      <!-- ============ QUARANTINE ============ -->
-      <!-- Booked in, not yet cleared. Read-only here: bags are released, and
-           given their final labels, at Stock Intake. -->
-      <BloodCenterQuarantinePanel />
 
       <!-- ============ AVAILABLE UNITS BY BLOOD TYPE ============ -->
       <!-- One series, so one colour and no legend: the title names it. Every
@@ -164,255 +238,239 @@
         </div>
       </div>
 
-      <!-- ============ SEARCH & FILTER BAR ============ -->
-      <div class="panel toolbar">
-        <div class="toolbar__row">
-          <div class="search-box search-box--lg">
-            <AssetIcon name="search" :size="14" class="search-box__icon" />
-            <input v-model="filters.search" type="text" placeholder="Search inventory…" class="search-box__input" />
-          </div>
-
-          <select v-model="filters.bloodType" class="filter-select">
-            <option value="">Blood Type</option>
-            <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-          </select>
-
-          <select v-model="filters.component" class="filter-select">
-            <option value="">Component</option>
-            <option v-for="c in componentOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
-          </select>
-
-          <select v-model="filters.status" class="filter-select">
-            <option value="">Inventory Status</option>
-            <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-
-          <select v-model="filters.storageLocation" class="filter-select">
-            <option value="">Storage Location</option>
-            <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
-          </select>
-
-          <select v-model="filters.expiryStatus" class="filter-select">
-            <option value="">Expiry Status</option>
-            <option value="expired">Expired</option>
-            <option value="today">Expiring Today</option>
-            <option value="3days">Within 3 Days</option>
-            <option value="7days">Within 7 Days</option>
-            <option value="ok">Not Near Expiry</option>
-          </select>
-
-          <select v-model="filters.sortBy" class="filter-select">
-            <option value="last_updated">Sort: Last Updated</option>
-            <option value="expiry_date">Sort: Expiry Date</option>
-            <option value="blood_type">Sort: Blood Type</option>
-            <option value="available_units">Sort: Available Units</option>
-          </select>
-        </div>
-
-        <div class="toolbar__row toolbar__row--end">
-          <button type="button" class="btn-outline btn-outline--sm" @click="resetFilters">Reset Filters</button>
-          <button type="button" class="btn-primary btn-primary--sm" @click="applyFilters">Apply Filters</button>
-        </div>
-
-        <p class="toolbar__summary">
-          Showing {{ filteredBatches.length }} inventory record{{ filteredBatches.length !== 1 ? 's' : '' }}
-          <span v-if="lastSyncedLabel"> &middot; Updated {{ lastSyncedLabel }}</span>
-          <span v-if="activeFilterCount"> &middot; {{ activeFilterCount }} active filter{{ activeFilterCount !== 1 ? 's' : '' }}</span>
-        </p>
-      </div>
-
-      <!-- ============ INVENTORY HEALTH SUMMARY ============ -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Total Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
-              <AssetIcon name="database" :size="14" style="color: var(--rb-primary-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value">{{ totalInventoryUnits === null ? '—' : totalInventoryUnits }}</p>
-          <span class="stat-chip stat-chip--neutral">Units on hand</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Healthy Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
-              <AssetIcon name="shield-check" :size="14" style="color: var(--rb-success-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value">{{ healthyBatchCount }}</p>
-          <span class="stat-chip stat-chip--neutral">Batches at safe levels</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Reserved Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-purple-rgb), 0.08)' }">
-              <AssetIcon name="lock" :size="14" style="color: var(--rb-purple-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value">{{ totalReservedUnits === null ? '—' : totalReservedUnits }}</p>
-          <span class="stat-chip stat-chip--neutral">Units held for hospitals</span>
-        </div>
-
-        <div class="stat-card" :class="{ 'stat-card--emphasized': expiringSoonCount > 0 }">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Expiring Soon</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
-              <AssetIcon name="clock" :size="14" style="color: var(--rb-warning-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :style="expiringSoonCount ? { color: 'var(--rb-warning)' } : {}">{{ expiringSoonCount }}</p>
-          <span class="stat-chip stat-chip--neutral">Within 7 days</span>
-        </div>
-      </div>
-
       <!-- ============ MAIN INVENTORY TABLE ============ -->
       <div ref="inventoryTableSection" class="panel">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Inventory Records</h2>
-            <p class="panel-subtitle">Batch-level view of every unit currently tracked.</p>
+            <p class="panel-subtitle">
+              {{ filteredBatches.length }} record{{ filteredBatches.length !== 1 ? 's' : '' }}
+              <span v-if="lastSyncedLabel"> &middot; Updated {{ lastSyncedLabel }}</span>
+            </p>
+          </div>
+          <label class="sort-select">
+            <span class="sort-select__label">Sort by</span>
+            <select v-model="filters.sortBy" class="filter-select" @change="applyFilters">
+              <option value="last_updated">Last updated</option>
+              <option value="expiry_date">Expiry date</option>
+              <option value="blood_type">Blood type</option>
+              <option value="available_units">Available units</option>
+            </select>
+          </label>
+        </div>
+
+        <!--
+          Filters sit with the table they filter. Each select's first option
+          names the filter ("All blood types"), so a chosen value never loses
+          its label, and the chips below say what is applied. Filtering was
+          already live; changing one just returns to page 1, as Apply did.
+        -->
+        <div class="records-filters">
+          <div class="records-filters__row">
+            <div class="search-box search-box--lg">
+              <AssetIcon name="search" :size="14" class="search-box__icon" />
+              <input
+                v-model="filters.search"
+                type="text"
+                placeholder="Search batch, type, component or location"
+                aria-label="Search inventory"
+                class="search-box__input"
+                @input="applyFilters"
+              />
+            </div>
+
+            <select v-model="filters.bloodType" class="filter-select" aria-label="Blood type" @change="onBloodTypeSelect">
+              <option value="">All blood types</option>
+              <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
+            </select>
+
+            <select v-model="filters.component" class="filter-select" aria-label="Component" @change="applyFilters">
+              <option value="">All components</option>
+              <option v-for="c in componentOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+
+            <select v-model="filters.status" class="filter-select" aria-label="Status" @change="applyFilters">
+              <option value="">All statuses</option>
+              <option v-for="st in statusOptions" :key="st.value" :value="st.value">{{ st.label }}</option>
+            </select>
+
+            <button
+              type="button"
+              class="btn-outline btn-outline--sm"
+              :aria-expanded="showMoreFilters"
+              @click="showMoreFilters = !showMoreFilters"
+            >
+              <AssetIcon name="sliders-horizontal" :size="13" />
+              {{ showMoreFilters ? 'Fewer filters' : 'More filters' }}
+            </button>
+          </div>
+
+          <div v-if="showMoreFilters" class="records-filters__row">
+            <select v-model="filters.storageLocation" class="filter-select" aria-label="Storage location" @change="applyFilters">
+              <option value="">All storage locations</option>
+              <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
+            </select>
+
+            <select v-model="filters.expiryStatus" class="filter-select" aria-label="Expiry" @change="applyFilters">
+              <option value="">Any expiry</option>
+              <option value="expired">Expired</option>
+              <option value="today">Expiring today</option>
+              <option value="3days">Within 3 days</option>
+              <option value="7days">Within 7 days</option>
+              <option value="ok">Not near expiry</option>
+            </select>
+          </div>
+
+          <div v-if="activeFilterChips.length" class="filter-chips">
+            <button
+              v-for="chip in activeFilterChips"
+              :key="chip.key"
+              type="button"
+              class="filter-chip"
+              :aria-label="`Remove filter ${chip.label}`"
+              @click="clearFilter(chip.key)"
+            >
+              {{ chip.label }}
+              <AssetIcon name="x" :size="12" />
+            </button>
+            <button type="button" class="filter-chips__clear" @click="resetFilters">Clear all</button>
           </div>
         </div>
 
         <div v-if="!paginatedBatches.length" class="empty-state">
           <AssetIcon name="inbox" :size="40" style="color: var(--rb-border-strong)" />
-          <p class="empty-state__title">No Inventory Found</p>
-          <p class="empty-state__desc">No blood inventory matches your current filters.</p>
-          <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
+          <p class="empty-state__title">{{ activeFilterCount ? 'No units match these filters' : 'No units in stock yet' }}</p>
+          <p class="empty-state__desc">
+            {{ activeFilterCount ? 'Remove a filter to see more.' : 'Units appear here once they are booked in at Stock Intake.' }}
+          </p>
+          <button v-if="activeFilterCount" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
+          <NuxtLink v-else to="/blood-center/inventory-intake" class="btn-primary">
             <AssetIcon name="plus" :size="14" />
-            Record Stock
+            Stock Intake
           </NuxtLink>
         </div>
 
+        <!--
+          Seven columns instead of twelve. Batch and component share a cell,
+          available and reserved share a cell, and the expiry date carries how
+          close it is. Last updated, collection date and the rest are in the
+          details drawer, which a row click now opens (the inline expansion
+          showed the same information a second way).
+        -->
         <div v-else class="inventory-table-wrap">
-          <table class="inventory-table">
+          <table class="inventory-table records-table">
             <thead>
               <tr>
-                <th class="expand-col" />
-                <th>Batch ID</th>
-                <th>Blood Type</th>
-                <th>Component</th>
-                <th>Available</th>
-                <th>Reserved</th>
-                <th>Collection Date</th>
-                <th>Expiry Date</th>
-                <th>Storage Location</th>
+                <th>Batch</th>
+                <th>
+                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'blood_type' }" @click="sortBy('blood_type')">
+                    Blood type
+                    <AssetIcon v-if="filters.sortBy === 'blood_type'" name="chevron-up" :size="12" />
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'available_units' }" @click="sortBy('available_units')">
+                    Units
+                    <AssetIcon v-if="filters.sortBy === 'available_units'" name="chevron-down" :size="12" />
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'expiry_date' }" @click="sortBy('expiry_date')">
+                    Expires
+                    <AssetIcon v-if="filters.sortBy === 'expiry_date'" name="chevron-up" :size="12" />
+                  </button>
+                </th>
+                <th>Location</th>
                 <th>Status</th>
-                <th>Last Updated</th>
-                <th class="actions-col">Actions</th>
+                <th class="actions-col"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="row in paginatedBatches" :key="row.id">
-                <tr class="inventory-row" @click="toggleExpand(row.id)">
-                  <td class="expand-col">
-                    <AssetIcon :name="expandedRowId === row.id ? 'chevron-down' : 'chevron-right'" :size="14" style="color: var(--rb-text-secondary)" />
-                  </td>
-                  <td class="mono-cell">{{ row.batch_id }}</td>
-                  <td><span class="type-pill">{{ row.blood_type }}</span></td>
-                  <td>{{ row.component }}</td>
-                  <td>{{ row.available_units }}</td>
-                  <td>{{ row.reserved_units }}</td>
-                  <td>{{ formatDate(row.collection_date) }}</td>
-                  <td>{{ formatDate(row.expiry_date) }}</td>
-                  <td>{{ row.storage_location || '—' }}</td>
-                  <td>
-                    <span class="status-pill" :class="`status-pill--${row.status}`">
-                      <span class="status-pill__dot" />
-                      {{ statusLabel(row.status) }}
-                    </span>
-                  </td>
-                  <td>{{ row.last_updated || '—' }}</td>
-                  <td class="actions-col" @click.stop>
-                    <div class="row-menu">
-                      <button type="button" class="row-menu__trigger" @click="toggleRowMenu(row.id)">
-                        <AssetIcon name="move-vertical" :size="16" />
+              <tr
+                v-for="row in paginatedBatches"
+                :key="row.id"
+                class="inventory-row"
+                tabindex="0"
+                :aria-label="`${row.blood_type} ${row.component}, batch ${row.batch_id}. Open details`"
+                @click="openDetailsDrawer(row)"
+                @keydown.enter.self="openDetailsDrawer(row)"
+              >
+                <td data-label="Batch">
+                  <p class="cell-main mono-cell">{{ row.batch_id }}</p>
+                  <p class="cell-sub">{{ row.component }}</p>
+                </td>
+                <td data-label="Blood type"><span class="type-pill">{{ row.blood_type }}</span></td>
+                <td data-label="Units">
+                  <p class="cell-main">{{ row.available_units }}</p>
+                  <p v-if="row.reserved_units" class="cell-sub">{{ row.reserved_units }} reserved</p>
+                </td>
+                <td data-label="Expires">
+                  <p class="cell-main">{{ formatDate(row.expiry_date) }}</p>
+                  <span class="expiry-badge" :class="`expiry-badge--${expiryBadge(row).tone}`">{{ expiryBadge(row).label }}</span>
+                </td>
+                <td data-label="Location">
+                  <span :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</span>
+                </td>
+                <td data-label="Status">
+                  <span class="status-pill" :class="`status-pill--${row.status}`">
+                    <span class="status-pill__dot" />
+                    {{ statusLabel(row.status) }}
+                  </span>
+                </td>
+                <td class="actions-col" @click.stop>
+                  <div class="row-menu">
+                    <button
+                      type="button"
+                      class="row-menu__trigger"
+                      :aria-label="`Actions for batch ${row.batch_id}`"
+                      aria-haspopup="menu"
+                      :aria-expanded="openMenuId === row.id"
+                      @click="toggleRowMenu(row.id)"
+                    >
+                      <AssetIcon name="move-vertical" :size="16" />
+                    </button>
+                    <!-- Grouped by what the action touches; the destructive ones last, apart. -->
+                    <div v-if="openMenuId === row.id" class="row-menu__dropdown" role="menu" @click.stop>
+                      <p class="row-menu__group">This unit</p>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('view', row)">
+                        <AssetIcon name="eye" :size="13" /> View details
                       </button>
-                      <div v-if="openMenuId === row.id" class="row-menu__dropdown" @click.stop>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('view', row)">
-                          <AssetIcon name="eye" :size="13" /> View Details
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('edit', row)">
-                          <AssetIcon name="pencil" :size="13" /> Edit Inventory
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('reserve', row)">
-                          <AssetIcon name="lock" :size="13" /> Reserve Units
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('release', row)">
-                          <AssetIcon name="unlock" :size="13" /> Release Units
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('transfer', row)">
-                          <AssetIcon name="send" :size="13" /> Transfer Inventory
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('print', row)">
-                          <AssetIcon name="printer" :size="13" /> Print Label
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('history', row)">
-                          <AssetIcon name="history" :size="13" /> View Movement History
-                        </button>
-                        <button type="button" class="row-menu__item" @click="handleRowAction('mark-expiring', row)">
-                          <AssetIcon name="alert-triangle" :size="13" /> Mark as Expiring
-                        </button>
-                        <div class="row-menu__divider" />
-                        <button type="button" class="row-menu__item row-menu__item--danger" @click="handleRowAction('archive', row)">
-                          <AssetIcon name="archive" :size="13" /> Archive Inventory
-                        </button>
-                        <button type="button" class="row-menu__item row-menu__item--danger" @click="handleRowAction('discard', row)">
-                          <AssetIcon name="trash-2" :size="13" /> Discard Inventory
-                        </button>
-                      </div>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('edit', row)">
+                        <AssetIcon name="pencil" :size="13" /> Edit unit
+                      </button>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('print', row)">
+                        <AssetIcon name="printer" :size="13" /> Print label
+                      </button>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('history', row)">
+                        <AssetIcon name="history" :size="13" /> Movement history
+                      </button>
+                      <!-- Opens the edit form: expiry comes from the unit's date, there is no flag to set. -->
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('mark-expiring', row)">
+                        <AssetIcon name="clock" :size="13" /> Change expiry date
+                      </button>
+
+                      <p class="row-menu__group">Stock</p>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('reserve', row)">
+                        <AssetIcon name="lock" :size="13" /> Reserve units
+                      </button>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('release', row)">
+                        <AssetIcon name="unlock" :size="13" /> Release units
+                      </button>
+                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('transfer', row)">
+                        <AssetIcon name="send" :size="13" /> Transfer units
+                      </button>
+
+                      <div class="row-menu__divider" />
+                      <button type="button" role="menuitem" class="row-menu__item row-menu__item--danger" @click="handleRowAction('archive', row)">
+                        <AssetIcon name="archive" :size="13" /> Archive
+                      </button>
+                      <button type="button" role="menuitem" class="row-menu__item row-menu__item--danger" @click="handleRowAction('discard', row)">
+                        <AssetIcon name="trash-2" :size="13" /> Discard
+                      </button>
                     </div>
-                  </td>
-                </tr>
-
-                <tr v-if="expandedRowId === row.id" class="expanded-row">
-                  <td :colspan="12">
-                    <div class="expanded-panel">
-                      <div class="expanded-col">
-                        <p class="expanded-col__title">Inventory Overview</p>
-                        <dl class="expanded-dl">
-                          <div><dt>Batch Number</dt><dd>{{ row.batch_number || row.batch_id }}</dd></div>
-                          <div><dt>Volume</dt><dd>{{ row.volume_ml ? `${row.volume_ml} mL` : '—' }}</dd></div>
-                          <div><dt>Collection Source</dt><dd>{{ row.donation_source || '—' }}</dd></div>
-                          <div><dt>Storage Location</dt><dd>{{ row.storage_location || '—' }}</dd></div>
-                          <div><dt>Notes</dt><dd>{{ row.notes || '—' }}</dd></div>
-                        </dl>
-                      </div>
-                      <div class="expanded-col">
-                        <p class="expanded-col__title">Expiry Timeline</p>
-                        <p class="expanded-timeline">
-                          <span>{{ formatDate(row.collection_date) }}</span>
-                          <span class="expanded-timeline__bar" />
-                          <span>{{ formatDate(row.expiry_date) }}</span>
-                        </p>
-                        <p class="expanded-col__note">{{ daysRemainingLabel(row.expiry_date) }}</p>
-
-                        <p class="expanded-col__title expanded-col__title--spaced">Reserved History</p>
-                        <div v-if="row.reserved_history?.length" class="expanded-list">
-                          <p v-for="(h, i) in row.reserved_history" :key="i" class="expanded-list__row">{{ h.hospital }} &middot; {{ h.units }} units &middot; {{ h.date }}</p>
-                        </div>
-                        <p v-else class="expanded-col__note">No reservation history</p>
-                      </div>
-                      <div class="expanded-col">
-                        <p class="expanded-col__title">Hospital Allocation</p>
-                        <div v-if="row.hospital_allocation?.length" class="expanded-list">
-                          <p v-for="(a, i) in row.hospital_allocation" :key="i" class="expanded-list__row">{{ a.hospital }} &middot; {{ a.units }} units</p>
-                        </div>
-                        <p v-else class="expanded-col__note">No current allocations</p>
-
-                        <p class="expanded-col__title expanded-col__title--spaced">Movement Timeline</p>
-                        <div v-if="row.movement_history?.length" class="expanded-list">
-                          <p v-for="(m, i) in row.movement_history" :key="i" class="expanded-list__row">{{ m.action }} &middot; {{ m.date }}</p>
-                        </div>
-                        <p v-else class="expanded-col__note">No recorded movement yet</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </template>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -424,6 +482,43 @@
             <button type="button" class="btn-outline btn-outline--sm" :disabled="page >= totalPages" @click="page++">Next</button>
           </div>
         </div>
+      </div>
+
+      <!-- ============ QUARANTINE + RECENT ACTIVITY ============ -->
+      <div class="side-grid">
+      <!-- ============ QUARANTINE ============ -->
+      <!-- Booked in, not yet cleared. Read-only here: bags are released, and
+           given their final labels, at Stock Intake. -->
+        <BloodCenterQuarantinePanel />
+
+
+      <!-- ============ RECENT INVENTORY ACTIVITY ============ -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Recent Inventory Activity</h2>
+        </div>
+
+        <div v-if="!activityLog.length" class="empty-state">
+          <AssetIcon name="activity" :size="36" style="color: var(--rb-border-strong)" />
+          <p>No recent activity</p>
+        </div>
+
+        <div v-else class="timeline">
+          <div v-for="item in activityLog" :key="item.id" class="timeline-item">
+            <div class="timeline-item__marker" :style="{ background: `rgba(var(--rb-${item.tone || 'primary'}-rgb), 0.08)` }">
+              <AssetIcon :name="item.icon" :size="13" :style="{ color: `var(--rb-${item.tone || 'primary'})` }" />
+            </div>
+            <div class="timeline-item__body">
+              <p class="timeline-item__name">{{ item.title }}</p>
+              <p class="timeline-item__meta">{{ item.description }}</p>
+            </div>
+            <div class="timeline-item__right">
+              <p class="activity-feed__time">{{ item.time }}</p>
+              <p class="timeline-item__user">{{ item.user || 'System' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
 
       <!-- ============ INVENTORY INSIGHTS ============ -->
@@ -557,125 +652,8 @@
           </div>
         </div>
       </div>
-
-      <!-- ============ NEAR EXPIRY INVENTORY ============ -->
-      <div ref="nearExpirySection" class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Expiring Soon</h2>
-        </div>
-
-        <div v-if="!nearExpiryBatches.length" class="empty-state">
-          <AssetIcon name="clock" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No units nearing expiry</p>
-        </div>
-
-        <div v-else class="inventory-table-wrap">
-          <table class="inventory-table">
-            <thead>
-              <tr>
-                <th>Blood Type</th>
-                <th>Component</th>
-                <th>Batch ID</th>
-                <th>Remaining Units</th>
-                <th>Expiry Date</th>
-                <th>Days Remaining</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in nearExpiryBatches" :key="row.id" class="inventory-row" :class="`expiry-row--${expiryTier(row.days_remaining)}`">
-                <td><span class="type-pill">{{ row.blood_type }}</span></td>
-                <td>{{ row.component }}</td>
-                <td class="mono-cell">{{ row.batch_id }}</td>
-                <td>{{ row.available_units }}</td>
-                <td>{{ formatDate(row.expiry_date) }}</td>
-                <td>{{ row.days_remaining <= 0 ? 'Today' : `${row.days_remaining} day${row.days_remaining !== 1 ? 's' : ''}` }}</td>
-                <td>
-                  <button type="button" class="link-btn" @click="openBatchDetail(row)">
-                    <AssetIcon name="eye" :size="13" /> View Inventory
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ============ RECENT INVENTORY ACTIVITY ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Recent Inventory Activity</h2>
-        </div>
-
-        <div v-if="!activityLog.length" class="empty-state">
-          <AssetIcon name="activity" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No recent activity</p>
-        </div>
-
-        <div v-else class="timeline">
-          <div v-for="item in activityLog" :key="item.id" class="timeline-item">
-            <div class="timeline-item__marker" :style="{ background: `rgba(var(--rb-${item.tone || 'primary'}-rgb), 0.08)` }">
-              <AssetIcon :name="item.icon" :size="13" :style="{ color: `var(--rb-${item.tone || 'primary'})` }" />
-            </div>
-            <div class="timeline-item__body">
-              <p class="timeline-item__name">{{ item.title }}</p>
-              <p class="timeline-item__meta">{{ item.description }}</p>
-            </div>
-            <div class="timeline-item__right">
-              <p class="activity-feed__time">{{ item.time }}</p>
-              <p class="timeline-item__user">{{ item.user || '—' }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ QUICK ACTIONS ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Quick Actions</h2>
-        </div>
-
-        <div class="quick-actions-body">
-          <div class="quick-actions-group">
-            <p class="quick-actions-group__label">Primary Operations</p>
-            <div class="quick-actions-grid quick-actions-grid--primary">
-              <button
-                v-for="action in primaryQuickActions"
-                :key="action.label"
-                type="button"
-                class="quick-action-card quick-action-card--primary"
-                @click="handleQuickAction(action)"
-              >
-                <div class="quick-action-card__icon quick-action-card__icon--primary">
-                  <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary-text)" />
-                </div>
-                <p class="quick-action-card__label">{{ action.label }}</p>
-                <p class="quick-action-card__desc">{{ action.description }}</p>
-              </button>
-            </div>
-          </div>
-
-          <div class="quick-actions-group">
-            <p class="quick-actions-group__label">Secondary Operations</p>
-            <div class="quick-actions-grid quick-actions-grid--secondary">
-              <button
-                v-for="action in secondaryQuickActions"
-                :key="action.label"
-                type="button"
-                class="quick-action-card"
-                @click="handleQuickAction(action)"
-              >
-                <div class="quick-action-card__icon">
-                  <AssetIcon :name="action.icon" :size="18" style="color: var(--rb-text-secondary)" />
-                </div>
-                <p class="quick-action-card__label">{{ action.label }}</p>
-                <p class="quick-action-card__desc">{{ action.description }}</p>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
+
 
     <!-- ============ ADD / EDIT INVENTORY BATCH MODAL ============ -->
     <Teleport to="body">
@@ -876,7 +854,9 @@
                   <div><dt>Collection Source</dt><dd>{{ drawerBatch.donation_source || '—' }}</dd></div>
                   <div><dt>Storage Location</dt><dd>{{ drawerBatch.storage_location || '—' }}</dd></div>
                   <div><dt>Collection Date</dt><dd>{{ formatDate(drawerBatch.collection_date) }}</dd></div>
-                  <div><dt>Expiry Date</dt><dd>{{ formatDate(drawerBatch.expiry_date) }}</dd></div>
+                  <div><dt>Expiry Date</dt><dd>{{ formatDate(drawerBatch.expiry_date) }} <span class="drawer-note">{{ daysRemainingLabel(drawerBatch.expiry_date) }}</span></dd></div>
+                  <div><dt>Last Updated</dt><dd>{{ drawerBatch.last_updated || 'Not recorded' }}</dd></div>
+                  <div class="drawer-info-grid__wide"><dt>Notes</dt><dd>{{ drawerBatch.notes || 'No notes' }}</dd></div>
                   <div>
                     <dt>Inventory Status</dt>
                     <dd>
@@ -1022,6 +1002,48 @@ function resetFilters() {
 }
 function applyFilters() {
   page.value = 1
+}
+
+// The column chart and the select drive the same filter; keep them in step.
+function onBloodTypeSelect() {
+  activeBloodType.value = filters.bloodType
+  applyFilters()
+}
+
+const showMoreFilters = ref(false)
+
+const EXPIRY_LABELS = {
+  expired: 'Expired', today: 'Expiring today', '3days': 'Within 3 days', '7days': 'Within 7 days', ok: 'Not near expiry',
+}
+
+/** What is applied, worded so each chip reads on its own. */
+const activeFilterChips = computed(() => {
+  const chips = []
+  if (filters.search.trim()) chips.push({ key: 'search', label: `"${filters.search.trim()}"` })
+  if (filters.bloodType) chips.push({ key: 'bloodType', label: filters.bloodType })
+  if (filters.component) {
+    const label = componentOptions.value.find((c) => c.value === filters.component)?.label || filters.component
+    chips.push({ key: 'component', label })
+  }
+  if (filters.status) {
+    const label = statusOptions.value.find((st) => st.value === filters.status)?.label || filters.status
+    chips.push({ key: 'status', label })
+  }
+  if (filters.storageLocation) chips.push({ key: 'storageLocation', label: filters.storageLocation })
+  if (filters.expiryStatus) chips.push({ key: 'expiryStatus', label: EXPIRY_LABELS[filters.expiryStatus] || filters.expiryStatus })
+  return chips
+})
+
+function clearFilter(key) {
+  filters[key] = ''
+  if (key === 'bloodType') activeBloodType.value = ''
+  applyFilters()
+}
+
+// --- Header "More" menu ---
+const moreMenuOpen = ref(false)
+function onMoreMenuFocusOut(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) moreMenuOpen.value = false
 }
 
 function daysRemaining(expiryDate) {
@@ -1172,23 +1194,29 @@ const expiringBatches = computed(() =>
     return d !== null && d >= 0 && d <= 3
   })
 )
-const nearExpirySection = ref(null)
-function scrollToNearExpiry() {
-  nearExpirySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+function showExpiringInRecords() {
+  filters.expiryStatus = '3days'
+  filters.sortBy = 'expiry_date'
+  showMoreFilters.value = true
+  applyFilters()
+  inventoryTableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// --- Near expiry table (within 7 days) ---
-const nearExpiryBatches = computed(() =>
-  inventoryBatches.value
-    .map(r => ({ ...r, days_remaining: daysRemaining(r.expiry_date) }))
-    .filter(r => r.days_remaining !== null && r.days_remaining <= 7)
-    .sort((a, b) => a.days_remaining - b.days_remaining)
-)
+// --- Records table helpers ---
+function sortBy(key) {
+  filters.sortBy = key
+  applyFilters()
+}
 
-// --- Row expansion (inline "Inventory Detail Expansion") ---
-const expandedRowId = ref(null)
-function toggleExpand(id) {
-  expandedRowId.value = expandedRowId.value === id ? null : id
+/** "Expired", "Today", "In 3 days"... with a tone for the badge. */
+function expiryBadge(row) {
+  const d = daysRemaining(row.expiry_date)
+  if (d === null) return { label: 'No date', tone: 'muted' }
+  if (d < 0) return { label: 'Expired', tone: 'critical' }
+  if (d === 0) return { label: 'Today', tone: 'critical' }
+  if (d <= 3) return { label: `In ${d} day${d !== 1 ? 's' : ''}`, tone: 'critical' }
+  if (d <= 7) return { label: `In ${d} days`, tone: 'low' }
+  return { label: `In ${d} days`, tone: 'ok' }
 }
 
 // --- Row action menu ---
@@ -1395,7 +1423,6 @@ const quickActions = [
     tier: 'secondary',
   },
 ]
-const primaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'primary'))
 const secondaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'secondary'))
 
 function handleQuickAction(action) {
@@ -1814,13 +1841,152 @@ onMounted(loadDashboard)
 .health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 
 /* Toolbar */
-.toolbar { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-.toolbar__row { display: flex; flex-wrap: wrap; gap: 10px; }
-.toolbar__row--end { justify-content: flex-end; }
-.toolbar__summary { font-size: 12px; color: var(--rb-text-secondary); margin: 0; }
+/* Records table */
+.records-table td { vertical-align: middle; }
+.records-table .inventory-row { cursor: pointer; }
+.records-table .inventory-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.cell-main { margin: 0; font-weight: 600; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.cell-sub { margin: 2px 0 0; font-size: 11.5px; color: var(--rb-text-secondary); }
+.cell-muted { color: var(--rb-text-secondary); }
+
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.th-sort:hover,
+.th-sort--on { color: var(--rb-primary-text); }
+.th-sort:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; border-radius: 4px; }
+
+.expiry-badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.expiry-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
+.expiry-badge--low { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
+.expiry-badge--ok { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.expiry-badge--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+.row-menu__group {
+  margin: 6px 0 2px;
+  padding: 0 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+.row-menu__group:first-child { margin-top: 2px; }
+
+.drawer-note { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.drawer-info-grid__wide { grid-column: 1 / -1; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Filters inside the records panel */
+.records-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  border-bottom: 1px solid var(--rb-border);
+}
+.records-filters__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.sort-select { display: inline-flex; align-items: center; gap: 8px; }
+.sort-select__label { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
+
+.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 11px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.3);
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.07);
+  color: var(--rb-primary-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filter-chip:hover { background: rgba(var(--rb-primary-rgb), 0.12); }
+.filter-chip:focus-visible,
+.filter-chips__clear:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.filter-chips__clear {
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Header "More" menu */
+.more-menu { position: relative; }
+.more-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: 280px;
+  padding: 6px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 12px;
+  background: var(--rb-surface);
+  box-shadow: 0 12px 32px -12px rgba(var(--rb-shadow-rgb), 0.3);
+}
+.more-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.more-menu__item:hover,
+.more-menu__item:focus-visible { background: var(--rb-surface-hover); outline: none; }
+.more-menu__item :deep(svg) { margin-top: 2px; flex-shrink: 0; }
+.more-menu__item strong { display: block; font-size: 13px; color: var(--rb-text-primary); }
+.more-menu__item small { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
+
+/* Quarantine + recent activity */
+.side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+
+.stat-card__value--empty { font-size: 15px !important; font-weight: 600 !important; color: var(--rb-text-secondary) !important; }
 
 .search-box { position: relative; flex-shrink: 0; width: 200px; }
-.search-box--lg { width: 260px; flex: 1; min-width: 200px; }
+.search-box--lg { width: 260px; flex: 1; min-width: 220px; max-width: 420px; }
 .search-box__icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
 .search-box__input {
   width: 100%; padding: 8px 10px 8px 30px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
@@ -1863,7 +2029,6 @@ onMounted(loadDashboard)
   position: sticky; top: 0; z-index: 1; text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--rb-text-secondary); padding: 10px 16px; background: var(--rb-surface-alt); white-space: nowrap;
 }
-.expand-col { width: 34px; }
 .actions-col { width: 48px; text-align: right; }
 .inventory-table tbody td { padding: 12px 16px; border-top: 1px solid var(--rb-surface-alt); color: var(--rb-text-primary); white-space: nowrap; }
 .inventory-row { cursor: pointer; transition: background-color 0.12s ease; }
@@ -1911,15 +2076,8 @@ onMounted(loadDashboard)
 .row-menu__divider { height: 1px; background: var(--rb-border); margin: 4px 2px; }
 
 /* Expanded row */
-.expanded-row td { padding: 0; border-top: none; }
-.expanded-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; padding: 18px 20px; background: var(--rb-surface-alt); white-space: normal; }
 .expanded-col__title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0 0 8px; }
 .expanded-col__title--spaced { margin-top: 14px; }
-.expanded-dl { display: flex; flex-direction: column; gap: 6px; margin: 0; }
-.expanded-dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
-.expanded-dl dt { color: var(--rb-text-secondary); }
-.expanded-dl dd { margin: 0; color: var(--rb-text-primary); font-weight: 600; text-align: right; }
-.expanded-timeline { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 .expanded-timeline__bar { flex: 1; height: 2px; background: var(--rb-border-strong); border-radius: 999px; }
 .expanded-col__note { font-size: 12px; color: var(--rb-text-secondary); margin: 4px 0 0; }
 .expanded-list { display: flex; flex-direction: column; gap: 4px; }
@@ -1977,24 +2135,6 @@ onMounted(loadDashboard)
 .activity-feed__time { font-size: 11px; color: var(--rb-text-secondary); margin: 0; white-space: nowrap; }
 
 /* Quick actions */
-.quick-actions-body { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
-.quick-actions-group__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); margin: 0 0 10px; }
-.quick-actions-grid { display: grid; gap: 12px; }
-.quick-actions-grid--primary { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.quick-actions-grid--secondary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.quick-action-card {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; border-radius: 12px;
-  border: 1px solid var(--rb-border); background: var(--rb-surface-alt); cursor: pointer; text-align: left; font-family: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.quick-action-card:hover { border-color: var(--rb-border-hover); background: var(--rb-surface); }
-.quick-action-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.quick-action-card--primary { background: rgba(var(--rb-primary-rgb), 0.04); border-color: rgba(var(--rb-primary-rgb), 0.18); }
-.quick-action-card--primary:hover { background: rgba(var(--rb-primary-rgb), 0.07); border-color: var(--rb-primary); }
-.quick-action-card__icon { width: 38px; height: 38px; border-radius: 10px; background: var(--rb-surface); border: 1px solid var(--rb-border); display: flex; align-items: center; justify-content: center; }
-.quick-action-card__icon--primary { background: rgba(var(--rb-primary-rgb), 0.08); border-color: transparent; }
-.quick-action-card__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 2px 0 0; }
-.quick-action-card__desc { font-size: 11px; color: var(--rb-text-secondary); margin: 0; line-height: 1.35; }
 
 /* Empty state */
 .empty-state { padding: 40px 24px; text-align: center; color: var(--rb-text-secondary); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -2076,6 +2216,10 @@ onMounted(loadDashboard)
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .side-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 1024px) {
   .insights-grid { grid-template-columns: 1fr; }
 }
@@ -2085,8 +2229,6 @@ onMounted(loadDashboard)
   .header-actions { justify-content: space-between; }
   .panel-header { flex-direction: column; align-items: stretch; }
   .search-box--lg { width: 100%; }
-  .toolbar__row--end { justify-content: stretch; }
-  .toolbar__row--end .btn-outline, .toolbar__row--end .btn-primary { flex: 1; }
   .form-row { grid-template-columns: 1fr; }
   .donut-body { flex-direction: column; }
   .detail-drawer { width: 100%; }

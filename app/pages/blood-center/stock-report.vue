@@ -2,16 +2,16 @@
   <div class="stock">
     <header class="stock__header">
       <div>
-        <p class="stock__eyebrow">Blood Center Portal / Issuance</p>
         <h1 class="stock__title">Daily Stock Report</h1>
-        <p class="stock__subtitle">
-          Issuable stock right now, laid out as the Daily Blood Stock Inventory sheet. Download it to print or send.
-        </p>
+        <p class="stock__subtitle">Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.</p>
       </div>
 
       <div class="stock__actions">
+        <span v-if="report" class="stock__stamp">
+          As of {{ report.as_of_time }}<template v-if="updatedAgo"> · updated {{ updatedAgo }}</template>
+        </span>
         <button type="button" class="btn" :disabled="loading" @click="load">
-          <AssetIcon name="refresh-cw" :size="14" />
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
           {{ loading ? 'Loading…' : 'Refresh' }}
         </button>
         <button type="button" class="btn btn--primary" :disabled="downloading || !report" @click="download">
@@ -21,18 +21,78 @@
       </div>
     </header>
 
-    <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
+    <div v-if="error" class="alert alert--error" role="alert">
+      <AssetIcon name="circle-alert" :size="16" />
+      <span>{{ error }}</span>
+    </div>
 
-    <p v-if="loading && !report" class="stock__loading">Loading the report…</p>
+    <!-- Loading: a summary row and a sheet-shaped page -->
+    <template v-if="loading && !report">
+      <div class="summary" aria-busy="true">
+        <div v-for="n in 4" :key="n" class="summary__item summary__item--skeleton" />
+      </div>
+      <div class="canvas">
+        <div class="paper paper--skeleton">
+          <span class="skeleton skeleton--head" />
+          <span class="skeleton skeleton--title" />
+          <span class="skeleton skeleton--table" />
+          <span class="skeleton skeleton--table" />
+        </div>
+      </div>
+    </template>
 
     <template v-if="report">
-      <!-- Needs attention first: what expires before tomorrow ends, and what cannot be dated. -->
+      <!-- The answers first: how much can go out, what expires, what is out. -->
+      <div class="summary">
+        <div class="summary__item">
+          <span class="summary__label">Issuable units</span>
+          <span class="summary__value">{{ totalIssuable }}</span>
+          <span class="summary__note">Available, not past expiry</span>
+        </div>
+        <div class="summary__item" :class="{ 'summary__item--critical': report.near_expiry.today }">
+          <span class="summary__label">Expire today</span>
+          <span class="summary__value">{{ report.near_expiry.today }}</span>
+          <span class="summary__note">{{ report.near_expiry.today ? 'Issue these first' : 'None' }}</span>
+        </div>
+        <div class="summary__item" :class="{ 'summary__item--warning': report.near_expiry.tomorrow }">
+          <span class="summary__label">Expire tomorrow</span>
+          <span class="summary__value">{{ report.near_expiry.tomorrow }}</span>
+          <span class="summary__note">{{ report.near_expiry.tomorrow ? 'Plan to issue next' : 'None' }}</span>
+        </div>
+        <div class="summary__item" :class="{ 'summary__item--critical': outOfStock.length && totalIssuable }">
+          <span class="summary__label">Out of stock</span>
+          <span class="summary__value">{{ outOfStock.length }}</span>
+          <!-- Every type, always in the same place: red has none, grey has stock.
+               Fixed size, so the card never grows or wraps. -->
+          <span class="type-strip" role="list" :aria-label="outOfStock.length ? `Out of stock: ${outOfStock.join(', ')}` : 'Every blood type has stock'">
+            <span
+              v-for="t in typeTotals"
+              :key="t.type"
+              role="listitem"
+              class="type-strip__cell"
+              :class="{ 'type-strip__cell--out': t.total === 0 }"
+              :title="t.total === 0 ? `${t.type}: none issuable` : `${t.type}: ${t.total} issuable`"
+            >{{ t.type }}</span>
+          </span>
+          <span class="summary__note">
+            {{ !outOfStock.length ? 'Every type has stock' : outOfStock.length === typeTotals.length ? 'No blood type has stock' : `${outOfStock.length} of ${typeTotals.length} types have none` }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Nothing to issue at all: say so plainly; the zero sheet still prints. -->
+      <div v-if="!totalIssuable" class="callout callout--info" role="status">
+        <AssetIcon name="info" :size="16" />
+        <p>No issuable stock right now. Units appear here once they are released at Stock Intake.</p>
+      </div>
+
       <div v-if="report.near_expiry.today || report.near_expiry.tomorrow" class="callout callout--warn" role="status">
         <AssetIcon name="triangle-alert" :size="16" />
         <p>
-          <strong>{{ report.near_expiry.today }}</strong> unit(s) expire today and
-          <strong>{{ report.near_expiry.tomorrow }}</strong> tomorrow. They are boxed in red below.
+          <strong>{{ report.near_expiry.today }}</strong> unit{{ report.near_expiry.today === 1 ? '' : 's' }} expire today and
+          <strong>{{ report.near_expiry.tomorrow }}</strong> tomorrow. They are boxed in red on the sheet.
         </p>
+        <button type="button" class="callout__action" @click="showSoon">Show them</button>
       </div>
 
       <div v-if="report.unconfigured.length" class="callout">
@@ -43,7 +103,9 @@
         </p>
       </div>
 
-      <article class="sheet" aria-label="Daily Blood Stock Inventory">
+      <!-- A print preview: white paper whatever the theme, because this is what prints. -->
+      <div class="canvas">
+      <article ref="sheetEl" class="sheet paper" :class="{ 'sheet--flash': flashSoon }" aria-label="Daily Blood Stock Inventory">
         <div class="sheet__head">
           <div class="sheet__logo">
             <img v-if="sealVisible" :src="SEAL_SRC" alt="Department of Health" @error="sealVisible = false" >
@@ -62,9 +124,12 @@
         </h2>
         <p class="sheet__legend">
           Issuable units only (available, not past expiry). Components with a shelf life of
-          {{ report.reference.shelf_life_days }} days or less are listed by expiry date<template
-            v-if="report.reference.is_fallback"> — {{ report.reference.component }} has no shelf life set, so this is
-            the default</template>.
+          {{ report.reference.shelf_life_days }} days or less are listed by expiry date.&#32;<template
+            v-if="report.reference.is_fallback"> {{ report.reference.component }} has no shelf life set, so this is
+            the default.</template>
+        </p>
+        <p class="sheet__key">
+          <span class="sheet__key-box" aria-hidden="true" /> Expires today or tomorrow
         </p>
 
         <div v-for="table in report.tables" :key="table.key" class="grid-wrap">
@@ -154,6 +219,7 @@
 
         <p class="sheet__by">BY: <strong>{{ report.prepared_by }}</strong></p>
       </article>
+      </div>
     </template>
   </div>
 </template>
@@ -189,6 +255,56 @@ const { can } = useUser()
 const canConfigure = computed(() => can('center.configure'))
 
 const report = ref(null)
+
+/* --- summary, derived from the tables the server already built --- */
+
+// The sheet's tables never overlap (Rh+ red cells, Rh-, Rh+ other components,
+// extras), so their totals add up to the facility's issuable stock.
+const totalIssuable = computed(() =>
+  (report.value?.tables ?? []).reduce((sum, table) => sum + (Number(table.total) || 0), 0)
+)
+
+/** Every blood type with its total across all tables, in sheet order. */
+const typeTotals = computed(() => {
+  const totals = new Map()
+  for (const table of report.value?.tables ?? []) {
+    for (const row of table.rows ?? []) {
+      const rowTotal = Object.values(row.cells ?? {}).reduce((sum, cell) => sum + (Number(cell?.total) || 0), 0)
+      totals.set(row.blood_type, (totals.get(row.blood_type) ?? 0) + rowTotal)
+    }
+  }
+  return [...totals.entries()].map(([type, total]) => ({ type, total }))
+})
+
+const outOfStock = computed(() => typeTotals.value.filter((t) => t.total === 0).map((t) => t.type))
+
+/* --- "updated N min ago" --- */
+const now = ref(Date.now())
+let clock = null
+onMounted(() => { clock = setInterval(() => { now.value = Date.now() }, 30_000) })
+onBeforeUnmount(() => clearInterval(clock))
+
+const updatedAgo = computed(() => {
+  const at = report.value?.as_of ? new Date(report.value.as_of).getTime() : NaN
+  if (Number.isNaN(at)) return ''
+  const minutes = Math.max(0, Math.round((now.value - at) / 60000))
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  return `${hours} hour${hours === 1 ? '' : 's'} ago`
+})
+
+/* --- "Show them": scroll to the sheet and pulse the red boxes --- */
+const sheetEl = ref(null)
+const flashSoon = ref(false)
+function showSoon() {
+  sheetEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  flashSoon.value = false
+  requestAnimationFrame(() => {
+    flashSoon.value = true
+    setTimeout(() => { flashSoon.value = false }, 2400)
+  })
+}
 const loading = ref(false)
 const downloading = ref(false)
 const error = ref('')
@@ -205,6 +321,7 @@ async function load() {
 
   try {
     report.value = await bloodCenterService.stockReport()
+    now.value = Date.now()
   } catch (err) {
     error.value = err?.status === 403
       ? 'Only Issuance staff and supervisors can prepare the stock report.'
@@ -259,14 +376,6 @@ onMounted(load)
   justify-content: space-between;
 }
 
-.stock__eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
-}
 
 .stock__title {
   margin: 0.15rem 0 0;
@@ -278,9 +387,113 @@ onMounted(load)
 
 .stock__subtitle { margin: 0.3rem 0 0; max-width: 62ch; font-size: 13px; color: var(--rb-text-secondary); }
 
-.stock__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.stock__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.stock__stamp { margin-right: 6px; font-size: 12px; color: var(--rb-text-secondary); }
 
-.stock__loading { margin: 0; font-size: 0.85rem; color: var(--rb-text-secondary); }
+/* --- summary --- */
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  box-shadow: inset 3px 0 0 var(--accent, transparent);
+}
+.summary__item--critical { --accent: var(--rb-accent); }
+.summary__item--warning { --accent: var(--rb-warning); }
+.summary__item--skeleton {
+  height: 92px;
+  border: 0;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: stock-shimmer 1.4s ease infinite;
+}
+.summary__label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.summary__value { font-size: 26px; font-weight: 800; line-height: 1.1; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.summary__item--critical .summary__value { color: var(--rb-accent-text); }
+.summary__item--warning .summary__value { color: var(--rb-warning-text); }
+.summary__note { font-size: 12px; color: var(--rb-text-secondary); }
+.type-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; margin: 2px 0; }
+.type-strip__cell {
+  padding: 3px 0;
+  border-radius: 5px;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.type-strip__cell--out { background: rgba(var(--rb-accent-rgb), 0.14); color: var(--rb-accent-text); }
+
+/* --- the print preview canvas --- */
+.canvas {
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+}
+.paper {
+  max-width: 1120px;
+  margin: 0 auto;
+  /* Light on purpose, in both themes: this is the page that prints. */
+  --rb-text-primary: #1F2937;
+  --rb-text-secondary: #475569;
+  --rb-border-strong: #CBD5E1;
+  --rb-surface-alt: #F1F5F9;
+  --rb-accent-text: #B91C1C;
+  background: #ffffff !important;
+  color: #1F2937;
+  border: 0 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px -12px rgba(15, 23, 42, 0.28);
+  padding: 36px 40px !important;
+}
+.paper--skeleton { display: flex; flex-direction: column; gap: 14px; min-height: 520px; }
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #EEF1F5 25%, #F6F8FA 37%, #EEF1F5 63%);
+  background-size: 400% 100%;
+  animation: stock-shimmer 1.4s ease infinite;
+}
+.skeleton--head { height: 64px; width: 60%; margin: 0 auto; }
+.skeleton--title { height: 18px; width: 50%; margin: 0 auto; }
+.skeleton--table { height: 160px; }
+
+@keyframes stock-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.sheet__key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: -6px 0 0;
+  font-size: 11.5px;
+  color: var(--rb-text-secondary);
+}
+.sheet__key-box { width: 14px; height: 12px; border: 2px solid #DC2626; border-radius: 2px; }
+
+/* "Show them": pulse the red boxes once */
+.sheet--flash :deep(.grid__soon) { animation: stock-flash 0.8s ease 3; }
+@keyframes stock-flash {
+  50% { background: rgba(220, 38, 38, 0.22); }
+}
+
+.spin { animation: stock-spin 0.9s linear infinite; }
+@keyframes stock-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .summary__item--skeleton, .skeleton, .spin, .sheet--flash :deep(.grid__soon) { animation: none; }
+}
+
+
 
 /* --- callouts --- */
 .callout {
@@ -296,7 +509,24 @@ onMounted(load)
 }
 
 .callout p { margin: 0; line-height: 1.5; }
-.callout--warn { border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.06); color: var(--rb-accent-text); }
+.callout--warn { border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.06); color: var(--rb-accent-text); align-items: center; }
+.callout--info { border-color: rgba(var(--rb-primary-rgb), 0.25); background: rgba(var(--rb-primary-rgb), 0.06); color: var(--rb-primary-text); }
+.callout--info p { color: var(--rb-text-primary); }
+.callout__action {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.4);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-accent-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.callout__action:hover { background: rgba(var(--rb-accent-rgb), 0.06); }
+.callout__action:focus-visible { outline: 2px solid var(--rb-accent-text); outline-offset: 2px; }
 .callout__link { margin-left: 0.35rem; font-weight: 600; color: var(--rb-primary-text); }
 
 /* --- the sheet --- */
@@ -342,7 +572,12 @@ onMounted(load)
 /* Wide tables scroll inside their own box, never the page. */
 .grid-wrap { overflow-x: auto; }
 
+/* "grid" is also a Tailwind utility (display: grid), which turned this table
+   into a CSS grid: every row sized to its own content and nothing lined up.
+   Pinned back to a table here. */
 .grid {
+  display: table;
+  table-layout: auto;
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;

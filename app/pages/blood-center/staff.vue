@@ -249,14 +249,17 @@
               </div>
 
               <!-- Title: pick RMT or RN, or type any other. A label only. -->
-              <label class="form__field">
-                <span>Title <i>optional</i></span>
-                <input v-model="form.position" type="text" list="staff-titles" maxlength="100" placeholder="Choose or type, e.g. RMT" >
-                <datalist id="staff-titles">
-                  <option v-for="title in titles" :key="title" :value="title" />
-                </datalist>
+              <div class="form__field">
+                <label for="staff-title" class="form__label">Title <i>optional</i></label>
+                <ComboInput
+                  id="staff-title"
+                  v-model="form.position"
+                  :options="titles"
+                  maxlength="100"
+                  placeholder="Choose or type, e.g. RMT"
+                />
                 <em v-if="errors.position">{{ errors.position[0] }}</em>
-              </label>
+              </div>
             </section>
 
             <section class="form__section">
@@ -274,23 +277,22 @@
                 </label>
 
                 <!-- Role: pick one of the department's roles, or type a custom one. -->
-                <label class="form__field">
-                  <span>Role</span>
-                  <input
+                <!-- A div, not a label: a click on a suggestion would otherwise
+                     refocus the field and reopen the list. -->
+                <div class="form__field">
+                  <label for="staff-role" class="form__label">Role</label>
+                  <ComboInput
+                    id="staff-role"
                     v-model="form.role"
-                    type="text"
-                    list="staff-roles"
+                    :options="departmentRoles.map((role) => role.label)"
                     maxlength="100"
                     :placeholder="form.department ? 'Choose or type a role' : 'Choose a department first'"
                     :disabled="!form.department && !form.role"
-                  >
-                  <datalist id="staff-roles">
-                    <option v-for="role in departmentRoles" :key="role.key" :value="role.label" />
-                  </datalist>
+                  />
                   <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
                   <em v-if="errors.custom_role">{{ errors.custom_role[0] }}</em>
                   <em v-if="catalogueError">{{ catalogueError }}</em>
-                </label>
+                </div>
               </div>
               <p class="form__hint form__hint--role">
                 <template v-if="matchedRole">{{ matchedRole.description }}</template>
@@ -353,6 +355,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
@@ -1132,13 +1135,15 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
 
 .form__field { display: flex; flex-direction: column; gap: 5px; }
 
-.form__field > span {
+.form__field > span,
+.form__field > .form__label {
   font-size: 12px;
   font-weight: 600;
   color: var(--rb-text-primary);
 }
 
-.form__field > span i {
+.form__field > span i,
+.form__field > .form__label i {
   margin-left: 4px;
   font-style: normal;
   font-weight: 500;

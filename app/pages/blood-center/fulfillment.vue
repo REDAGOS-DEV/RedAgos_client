@@ -16,10 +16,8 @@
         <div>
           <h1 class="page-title">Fulfillment</h1>
           <p class="page-subtitle">
-            Dispatch the units held for each request. A bag moves through three states and
-            no more: reserved when it is held, released when it leaves, received when the
-            hospital confirms it arrived. Releasing is what fulfils a request — it becomes
-            Partially Fulfilled or Fulfilled as units leave.
+            Dispatch the units held for each request. Releasing them is what fulfils it, partly or fully; the
+            hospital then confirms each unit arrived.
           </p>
         </div>
         <button class="btn btn-outline" :disabled="loading" @click="load">
@@ -28,33 +26,40 @@
         </button>
       </header>
 
-      <!-- STATE LEGEND -->
-      <div class="legend fade-in" style="--delay:40ms">
-        <span class="legend-step"><span class="dot dot--allocated" />Reserved</span>
-        <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
-        <span class="legend-step"><span class="dot dot--released" />Released</span>
-        <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
-        <span class="legend-step"><span class="dot dot--received" />Received</span>
-        <span class="legend-note">Receipt is confirmed by the hospital, not here.</span>
-      </div>
-
       <div v-if="error" class="banner banner--error">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ error }}</span>
         <button class="btn btn-outline btn-sm" @click="load">Retry</button>
       </div>
 
-      <!-- TABS -->
-      <div class="pills fade-in" style="--delay:70ms">
-        <button
-          v-for="tab in tabs"
-          :key="tab.value"
-          class="pill"
-          :class="{ 'pill--on': activeTab === tab.value }"
-          @click="activeTab = tab.value"
-        >
-          {{ tab.label }}
-        </button>
+      <!-- TABS on the left, the three unit states on the right -->
+      <div class="tabbar fade-in" style="--delay:40ms">
+        <div class="tabs" role="tablist" aria-label="Fulfillment queue">
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            type="button"
+            role="tab"
+            class="tab"
+            :class="{ 'tab--on': activeTab === tab.value }"
+            :aria-selected="activeTab === tab.value"
+            @click="activeTab = tab.value"
+          >
+            {{ tab.label }}
+            <span v-if="activeTab === tab.value && !loading" class="tab__count">{{ requests.length }}</span>
+          </button>
+        </div>
+
+        <div class="legend" aria-label="Unit states">
+          <span class="legend-step"><span class="dot dot--allocated" />Reserved</span>
+          <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
+          <span class="legend-step"><span class="dot dot--released" />Released</span>
+          <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
+          <span class="legend-step"><span class="dot dot--received" />Received</span>
+          <span class="legend-note" title="Receipt is confirmed by the hospital, not here.">
+            <AssetIcon name="info" :size="13" />
+          </span>
+        </div>
       </div>
 
       <!-- LIST -->
@@ -66,7 +71,7 @@
 
       <div v-else-if="requests.length === 0" class="card">
         <div class="empty">
-          <AssetIcon name="inbox" :size="36" />
+          <span class="empty__icon"><AssetIcon :name="activeTab === 'awaiting_release' ? 'truck' : 'inbox'" :size="20" /></span>
           <h3>{{ activeTab === 'awaiting_release' ? 'Nothing to dispatch' : 'Nothing awaiting confirmation' }}</h3>
           <p>
             {{ activeTab === 'awaiting_release'
@@ -81,6 +86,7 @@
           v-for="request in requests"
           :key="request.id"
           class="card request-card fade-in"
+          :class="{ 'request-card--stat': request.is_emergency }"
         >
           <header class="request-head">
             <div>
@@ -91,16 +97,26 @@
                 <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
               </div>
               <p class="request-sub">
-                {{ request.requesting_facility?.name || '—' }}
-                · <span class="blood-pill">{{ request.blood_type?.code || '—' }}</span>
-                · {{ request.quantity }} unit(s) requested
+                <span class="request-facility">{{ request.requesting_facility?.name || 'Hospital not recorded' }}</span>
+                <span class="blood-pill">{{ request.blood_type?.code || '?' }}</span>
+                <span>{{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested</span>
               </p>
             </div>
 
+            <!-- The same three states as the legend, in its colours. -->
             <div class="request-counts">
-              <span><strong>{{ request.allocated_count }}</strong> held</span>
-              <span><strong>{{ request.fulfilled_quantity ?? 0 }}</strong> fulfilled</span>
-              <span><strong>{{ request.received_count }}</strong> received</span>
+              <span class="count count--allocated">
+                <span class="dot dot--allocated" />
+                <strong>{{ request.allocated_count }}</strong> held
+              </span>
+              <span class="count count--released">
+                <span class="dot dot--released" />
+                <strong>{{ request.fulfilled_quantity ?? 0 }}</strong> released
+              </span>
+              <span class="count count--received">
+                <span class="dot dot--received" />
+                <strong>{{ request.received_count }}</strong> received
+              </span>
             </div>
           </header>
 
@@ -161,9 +177,9 @@
                   <td class="mono">{{ allocation.unit_id }}</td>
                   <td>{{ componentFor(request, allocation) }}</td>
                   <td :class="{ expiring: isExpiringSoon(allocation.expiry_date) }">
-                    {{ allocation.expiry_date || '—' }}
+                    {{ allocation.expiry_date || 'Not set' }}
                   </td>
-                  <td>{{ allocation.storage_location || '—' }}</td>
+                  <td :class="{ muted: !allocation.storage_location }">{{ allocation.storage_location || 'Not set' }}</td>
                   <td>
                     <span class="alloc" :class="`alloc--${allocation.status}`">
                       <span class="dot" :class="`dot--${allocation.received_at ? 'received' : allocation.status}`" />
@@ -181,8 +197,8 @@
           <footer v-if="activeTab === 'awaiting_release'" class="request-actions">
             <span class="selection-note">
               {{ selectedCount(request) > 0
-                ? `${selectedCount(request)} unit(s) selected`
-                : 'Nothing selected — Dispatch sends every reserved unit.' }}
+                ? `${selectedCount(request)} unit${selectedCount(request) === 1 ? '' : 's'} selected`
+                : 'Nothing selected. Dispatch sends every reserved unit.' }}
             </span>
             <button
               class="btn btn-outline btn-sm"
@@ -196,12 +212,14 @@
               :disabled="busyId === request.id || reservedCount(request) === 0 || !gateFor(request).ok"
               @click="openDispatch(request)"
             >
+              <AssetIcon v-if="busyId !== request.id" name="truck" :size="14" />
               {{ busyId === request.id ? 'Working…' : 'Dispatch' }}
             </button>
           </footer>
 
           <footer v-else class="request-actions">
             <span class="selection-note">
+              <AssetIcon name="clock" :size="13" />
               Waiting on {{ request.requesting_facility?.name || 'the hospital' }} to confirm receipt.
             </span>
           </footer>
@@ -217,20 +235,20 @@
           <p class="modal-sub">{{ dispatchFor.reference_number }} · {{ dispatchFor.requesting_facility?.name }}</p>
 
           <p class="modal-desc">
-            This issues {{ dispatchCount }} unit(s). They leave your inventory now and count as
-            fulfilled on the request; the hospital still confirms each unit's arrival.
+            This issues {{ dispatchCount }} unit{{ dispatchCount === 1 ? '' : 's' }}. They leave your inventory now and
+            count as fulfilled on the request. The hospital still confirms each unit's arrival.
           </p>
 
           <ul class="modal-units">
             <li v-for="unit in dispatchUnits" :key="unit.id" class="mono">
-              {{ unit.unit_id }}<span class="unit-expiry"> · expires {{ unit.expiry_date || '—' }}</span>
+              {{ unit.unit_id }}<span class="unit-expiry"> · expires {{ unit.expiry_date || 'date not set' }}</span>
             </li>
           </ul>
 
           <div class="field">
             <label for="handed-to" class="field-label">
               Handed to
-              <span v-if="!dispatchFor.is_walk_in" class="field-optional">(optional — courier or transport)</span>
+              <span v-if="!dispatchFor.is_walk_in" class="field-optional">optional: courier or transport</span>
             </label>
             <input
               id="handed-to"
@@ -265,8 +283,8 @@
           <p class="modal-sub">{{ returnFor.reference_number }} · {{ returnFor.requesting_facility?.name }}</p>
 
           <p class="modal-desc">
-            This gives up the hold and makes {{ returnCount }} unit(s) available to other
-            requests. If nothing is left held, the request returns to Pending for review.
+            This gives up the hold and makes {{ returnCount }} unit{{ returnCount === 1 ? '' : 's' }} available to
+            other requests. If nothing is left held, the request returns to Pending for review.
           </p>
 
           <div class="field">
@@ -403,15 +421,15 @@ function gateFor(request) {
     return {
       ok: true,
       message: billing.is_subsidised
-        ? 'Met by the government subsidy — cleared for release.'
-        : 'Statement settled — cleared for release.',
+        ? 'Met by the government subsidy. Cleared for release.'
+        : 'Statement settled. Cleared for release.',
     }
   }
 
   const owed = Number(billing.total_amount ?? 0) - Number(billing.collected ?? 0)
   return {
     ok: false,
-    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding — blood cannot be released until this is settled or subsidised.`,
+    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until this is settled or subsidised.`,
   }
 }
 
@@ -562,14 +580,26 @@ onMounted(load)
 .fx-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .fx-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
 
-.legend { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; font-size: 12.5px; color: var(--rb-text-secondary); flex-wrap: wrap; }
+/* tabs + legend */
+.tabbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.tabs { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; border: 1px solid var(--rb-border); background: var(--rb-surface); }
+.tab {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--rb-text-secondary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.tab:hover { color: var(--rb-text-primary); }
+.tab--on { background: var(--rb-primary); color: #fff; }
+.tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.tab__count { min-width: 20px; padding: 0 7px; border-radius: 999px; background: #fff; color: var(--rb-primary); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+
+.legend { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--rb-text-secondary); flex-wrap: wrap; }
 .legend-step { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--rb-text-primary); }
 .legend-arrow { color: var(--rb-text-muted); }
-.legend-note { margin-left: 6px; font-style: italic; }
+.legend-note { display: inline-flex; margin-left: 2px; color: var(--rb-text-secondary); cursor: help; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot--allocated { background: var(--rb-warning); }
 .dot--released { background: var(--rb-primary); }
@@ -589,13 +619,16 @@ onMounted(load)
 
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; }
 .request-list { display: flex; flex-direction: column; gap: 14px; }
-.request-card { padding: 16px 18px; }
+.request-card { padding: 16px 18px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); }
+.request-card--stat { border-color: rgba(var(--rb-accent-rgb), 0.35); box-shadow: inset 3px 0 0 var(--rb-accent); }
 
 .request-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .request-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.request-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 4px 0 0; }
-.request-counts { display: flex; gap: 16px; font-size: 12px; color: var(--rb-text-secondary); }
-.request-counts strong { font-size: 15px; color: var(--rb-text-primary); }
+.request-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--rb-text-secondary); margin: 5px 0 0; }
+.request-facility { font-weight: 600; color: var(--rb-text-primary); }
+.request-counts { display: flex; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); }
+.count { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
+.count strong { font-size: 14px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 600; }
 .tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
@@ -633,6 +666,7 @@ onMounted(load)
   color: var(--rb-text-secondary); padding: 0 10px 6px; border-bottom: 1px solid var(--rb-border-strong);
 }
 .units-table td { padding: 8px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); }
+.units-table td.muted { color: var(--rb-text-secondary); }
 .units-table tr:last-child td { border-bottom: none; }
 .units-table .pick { width: 30px; }
 .units-empty { font-size: 12.5px; color: var(--rb-text-muted); margin: 0; }
@@ -644,9 +678,10 @@ onMounted(load)
 .alloc--cancelled { color: var(--rb-text-muted); }
 
 .request-actions { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rb-border); flex-wrap: wrap; }
-.selection-note { flex: 1; font-size: 12px; color: var(--rb-text-secondary); min-width: 180px; }
+.selection-note { flex: 1; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); min-width: 180px; }
 
-.empty { text-align: center; padding: 46px 20px; color: var(--rb-text-secondary); }
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 40px 20px; color: var(--rb-text-secondary); }
+.empty__icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
 .empty h3 { font-size: 15px; color: var(--rb-text-primary); margin: 10px 0 4px; }
 .empty p { font-size: 13px; margin: 0; }
 
@@ -661,15 +696,16 @@ onMounted(load)
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 15px; font-size: 13px; font-weight: 600; font-family: inherit;
-  border-radius: 8px; cursor: pointer; white-space: nowrap;
+  height: 38px; padding: 0 16px; font-size: 13px; font-weight: 700; font-family: inherit;
+  border-radius: 10px; cursor: pointer; white-space: nowrap; transition: background-color .15s ease, border-color .15s ease;
 }
+.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .btn-primary { background: var(--rb-primary); color: #fff; border: 1px solid var(--rb-primary); }
-.btn-primary:hover:not(:disabled) { background: #10509c; }
+.btn-primary:hover:not(:disabled) { background: #0D47A1; }
 .btn-outline { background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong); }
 .btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-sm { height: 34px; padding: 0 14px; font-size: 12.5px; }
 
 .modal-overlay {
   position: fixed; inset: 0; z-index: 90; background: var(--rb-overlay);
