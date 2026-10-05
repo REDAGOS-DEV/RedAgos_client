@@ -151,7 +151,10 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       // The laboratory departments share lab.view, so each is gated on its own
       // write instead.
-      { label: 'TTI Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing tti serology immunohematology typing abo rh forward reverse antibody screen hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
+      // One page, two views: each department's queue is its own link, gated
+      // on that department's write, so a role holding one sees only its own.
+      { label: 'Immunohematology', path: '/blood-center/testing?test=typing', icon: 'droplets', requires: 'lab.record_immunohematology', keywords: 'lab laboratory testing immunohematology typing abo rh forward reverse antibody screen barcode sticker' },
+      { label: 'Serology (TTI)', path: '/blood-center/testing?test=serology', icon: 'flask-conical', requires: 'lab.record_serology', keywords: 'lab laboratory testing tti serology hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
     ],
   },
   {
@@ -207,15 +210,52 @@ const USER_MENU_PATHS = [
   '/blood-center/staff',
 ]
 
-export function useBloodCenterNav() {
-  const { can } = useUser()
+/** Each department's own nav group, so a member's group can be put first. */
+const DEPARTMENT_GROUP: Record<string, string> = {
+  collection: 'Donor / Collection',
+  testing: 'Testing',
+  processing: 'Processing',
+  issuance: 'Issuance',
+  billing: 'Billing',
+}
 
-  /** Groups the current user may see, with empty groups dropped. */
-  const navGroups = computed<BloodCenterNavGroup[]>(() =>
-    NAV_GROUPS
+/** At or under this many links, headings add nothing: show one plain list. */
+const FLAT_LIST_MAX = 6
+
+export function useBloodCenterNav() {
+  const { can, user } = useUser()
+
+  /**
+   * Groups the current user may see, with empty groups dropped.
+   *
+   * Arranged by role, presentation only (what is visible is still decided by
+   * `requires`). A supervisor keeps the department-by-department layout. Anyone
+   * else sees their own department first, and, with only a handful of links,
+   * one list without headings. System (Settings) stays last either way.
+   */
+  const navGroups = computed<BloodCenterNavGroup[]>(() => {
+    const visible = NAV_GROUPS
       .map((group) => ({ ...group, items: group.items.filter((item) => can(item.requires)) }))
       .filter((group) => group.items.length > 0)
-  )
+
+    if (!user.value || user.value.is_supervisor) return visible
+
+    const home = DEPARTMENT_GROUP[user.value.department ?? '']
+    const system = visible.filter((group) => group.label === 'System')
+    const rest = visible.filter((group) => group.label !== 'System')
+    const ordered = [
+      ...rest.filter((group) => group.label === home),
+      ...rest.filter((group) => group.label !== home),
+      ...system,
+    ]
+
+    const count = ordered.reduce((sum, group) => sum + group.items.length, 0)
+    if (count <= FLAT_LIST_MAX) {
+      return [{ label: null, items: ordered.flatMap((group) => group.items) }]
+    }
+
+    return ordered
+  })
 
   /** Every permitted item, flattened — the ⌘F search index. */
   const searchablePages = computed<BloodCenterNavItem[]>(() =>
@@ -233,12 +273,32 @@ export function useBloodCenterNav() {
    * Look up a nav item's label, for the header breadcrumb.
    */
   function labelForPath(path: string): string {
-    const match = NAV_GROUPS
-      .flatMap((group) => group.items)
-      .find((item) => item.path === path)
+    const items = NAV_GROUPS.flatMap((group) => group.items)
+    const match = items.find((item) => item.path === path)
 
-    return match?.label ?? ''
+    if (match) return match.label
+
+    // A page reached without the query its links carry (e.g. /blood-center/testing
+    // with no ?test=): one link to it gives that label, several give their group's.
+    const base = path.split('?')[0]
+    const sameBase = items.filter((item) => item.path.split('?')[0] === base)
+
+    if (sameBase.length === 1) return sameBase[0]!.label
+    if (sameBase.length > 1) {
+      return NAV_GROUPS.find((group) => group.items.includes(sameBase[0]!))?.label ?? ''
+    }
+
+    return ''
   }
 
-  return { navGroups, searchablePages, userMenuItems, labelForPath, can }
+  /**
+   * The department a page belongs to, for the breadcrumb. Read from the full
+   * list, so it still names the department when the sidebar shows no headings.
+   */
+  function sectionForPath(path: string): string {
+    const base = path.split('?')[0]
+    return NAV_GROUPS.find((group) => group.items.some((item) => item.path.split('?')[0] === base))?.label ?? ''
+  }
+
+  return { navGroups, searchablePages, userMenuItems, labelForPath, sectionForPath, can }
 }

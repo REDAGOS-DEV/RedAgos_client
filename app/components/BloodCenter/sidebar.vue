@@ -318,7 +318,17 @@ const hoveredPath = ref(null)
 
 // Lowercase na ang tanan page file, so exact comparison na. Kaniadto
 // case-insensitive ni tungod sa Dashboard.vue → /blood-center/Dashboard.
-const isActive = (path) => route.path.replace(/\/$/, '') === path.replace(/\/$/, '')
+// A nav path may carry a query (?test=typing): the link is active only when
+// the route has that query too, so the two Testing views highlight separately.
+const isActive = (path) => {
+  const [base, query] = path.split('?')
+  if (route.path.replace(/\/$/, '') !== base.replace(/\/$/, '')) return false
+  if (!query) return true
+  for (const [key, value] of new URLSearchParams(query)) {
+    if (route.query[key] !== value) return false
+  }
+  return true
+}
 
 const navStyle = (path) => {
   const active = isActive(path)

@@ -630,7 +630,7 @@ onMounted(load)
 .count { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
 .count strong { font-size: 14px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 600; }
+.mono { font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 600; }
 .tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
 .tag--stat { background: var(--rb-accent); color: #fff; }
 .tag--walk-in { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }

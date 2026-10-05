@@ -145,12 +145,12 @@ onMounted(() => {
   background: var(--rb-surface);
 }
 
-.logo-card__title { margin: 0; font-size: 1rem; font-weight: 700; color: var(--rb-text-primary); }
+.logo-card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
 .logo-card__hint {
   margin: 0.25rem 0 0;
   max-width: 62ch;
-  font-size: 0.83rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -173,7 +173,7 @@ onMounted(() => {
 .logo-card__preview--empty {
   border-style: dashed;
   background: var(--rb-surface-alt);
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--rb-text-secondary);
 }
 
@@ -192,7 +192,7 @@ onMounted(() => {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -207,7 +207,7 @@ onMounted(() => {
 .logo-btn--primary:hover:not(.logo-btn--busy) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
 
 .logo-card__error,
-.logo-card__notice { margin: 0; font-size: 0.83rem; }
+.logo-card__notice { margin: 0; font-size: 13.5px; }
 .logo-card__error { color: var(--rb-accent-text); }
 .logo-card__notice { color: var(--rb-success-text); }
 </style>

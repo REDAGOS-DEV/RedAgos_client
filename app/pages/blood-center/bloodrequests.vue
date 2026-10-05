@@ -1622,7 +1622,7 @@ onMounted(() => {
 }
 .emergency-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .emergency-title { font-weight: 600; font-size: 15px; color: #C62828; }
-.emergency-id { font-size: 12px; color: var(--text-secondary); font-family: monospace; }
+.emergency-id { font-size: 12px; color: var(--text-secondary); font-family: var(--rb-font-mono); }
 /* auto-fit, not a fixed count: the content column now changes width
    when the rail expands, so the grid has to answer to its container
    rather than to a viewport breakpoint that no longer describes it. */
@@ -1724,7 +1724,7 @@ onMounted(() => {
 .table-row:hover { background: #f4f8fd; border-left-color: var(--primary); }
 .table-row.is-mutating { opacity: 0.6; pointer-events: none; }
 .request-table td { padding: 14px 16px; vertical-align: middle; }
-.mono { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
+.mono { font-family: var(--rb-font-mono); font-size: 12px; color: var(--text-secondary); }
 
 .expand-btn {
   display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;

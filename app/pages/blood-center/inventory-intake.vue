@@ -1199,7 +1199,7 @@ onMounted(async () => {
 .released__meta { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
 
 /* ---------- misc ---------- */
-.mono { font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.02em; }
+.mono { font-family: var(--rb-font-mono); letter-spacing: 0.02em; }
 
 .skeleton {
   display: block;

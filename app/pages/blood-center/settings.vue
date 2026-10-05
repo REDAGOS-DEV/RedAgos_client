@@ -1,17 +1,19 @@
 <template>
   <div class="settings-page scope-blood-center-settings">
-    <div v-if="loading" class="loading-wrap">
-      <div class="spinner" />
+    <div v-if="loading" class="settings-skeleton" aria-busy="true">
+      <div class="skeleton skeleton--title" />
+      <div class="settings-skeleton__layout">
+        <div class="skeleton skeleton--nav" />
+        <div class="skeleton skeleton--panel" />
+      </div>
     </div>
 
     <div v-else class="settings-inner">
       <!-- Header -->
-      <div class="header-banner">
-        <div class="header-banner__content">
-          <h1 class="page-title">Account Settings</h1>
-          <p class="page-subtitle">Manage your profile, security, and preferences</p>
-        </div>
-      </div>
+      <header class="header-row">
+        <h1 class="page-title">Account Settings</h1>
+        <p class="page-subtitle">Manage your profile, security and preferences.</p>
+      </header>
 
       <div class="settings-layout">
         <!-- Nav -->
@@ -22,13 +24,13 @@
             type="button"
             class="nav-item"
             :class="{ 'nav-item--active': activeTab === tab.id }"
-          @click="activeTab = tab.id"
+            :aria-current="activeTab === tab.id ? 'page' : undefined"
+            @click="activeTab = tab.id"
           >
             <span class="nav-item__icon" :class="`nav-item__icon--${tab.id}`">
               <AssetIcon :name="tab.icon" :size="16" />
             </span>
             <span>{{ tab.label }}</span>
-            <span v-if="activeTab === tab.id" class="nav-item__drop" aria-hidden="true" />
           </button>
         </nav>
 
@@ -38,9 +40,6 @@
           <section v-if="activeTab === 'profile'" class="settings-panel">
             <div class="panel-header-row">
               <div class="panel-heading">
-                <span class="panel-icon-badge panel-icon-badge--blue">
-                  <AssetIcon name="user" :size="18" />
-                </span>
                 <div>
                   <h2 class="panel-title">My Profile</h2>
                   <p class="panel-subtitle">Your personal information as it appears across RedAgos.</p>
@@ -130,16 +129,22 @@
               </button>
             </div>
 
-            <!-- Supervisors only; the card hides itself for everyone else. -->
+          </section>
+
+          <!-- BLOOD CENTER: the centre's own settings, for supervisors (center.configure). -->
+          <section v-if="activeTab === 'center'" class="settings-panel">
+            <div class="panel-heading">
+              <div>
+                <h2 class="panel-title">Blood Center</h2>
+                <p class="panel-subtitle">Settings that belong to your centre, not to your account.</p>
+              </div>
+            </div>
             <BloodCenterFacilityLogoCard />
           </section>
 
           <!-- SECURITY -->
           <section v-if="activeTab === 'security'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--red">
-                <AssetIcon name="lock" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Security</h2>
                 <p class="panel-subtitle">Update your password. You'll stay signed in on this device.</p>
@@ -204,9 +209,6 @@
           <!-- NOTIFICATION PREFERENCES -->
           <section v-if="activeTab === 'notifications'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--orange">
-                <AssetIcon name="bell" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Notification Preferences</h2>
                 <p class="panel-subtitle">Choose what you want to be notified about.</p>
@@ -232,9 +234,6 @@
           <!-- SESSION MANAGEMENT -->
           <section v-if="activeTab === 'sessions'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--purple">
-                <AssetIcon name="monitor" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Session Management</h2>
                 <p class="panel-subtitle">Devices currently signed in to your account.</p>
@@ -265,9 +264,6 @@
           <!-- ACCOUNT INFORMATION -->
           <section v-if="activeTab === 'account'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--teal">
-                <AssetIcon name="info" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Account Information</h2>
                 <p class="panel-subtitle">Read-only details about your account.</p>
@@ -290,9 +286,6 @@
           <!-- APPEARANCE -->
           <section v-if="activeTab === 'appearance'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--indigo">
-                <AssetIcon name="palette" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Appearance</h2>
                 <p class="panel-subtitle">Choose how RedAgos looks on this device.</p>
@@ -426,14 +419,19 @@ const api = {
 
 const loading = ref(true)
 
-const tabs = [
+const { can: canDo } = useUser()
+
+// The Blood Center tab holds the centre's logo, which only center.configure
+// may change (the card checks the same ability), so only they see the tab.
+const tabs = computed(() => [
   { id: 'profile', label: 'My Profile', icon: 'user' },
   { id: 'security', label: 'Security', icon: 'lock' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'sessions', label: 'Sessions', icon: 'monitor' },
   { id: 'account', label: 'Account Info', icon: 'info' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
-]
+  ...(canDo('center.configure') ? [{ id: 'center', label: 'Blood Center', icon: 'building-2' }] : []),
+])
 const activeTab = ref('profile')
 
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
@@ -726,31 +724,40 @@ onMounted(async () => {
 }
 
 /* Header banner */
-.header-banner {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--primary);
-  padding: 26px 32px;
-}
-
-.header-banner__content {
-  position: relative;
-  z-index: 1;
-}
+.header-row { display: flex; flex-direction: column; }
 
 .page-title {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
-  color: #fff;
+  color: var(--rb-text-primary);
 }
 
 .page-subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--rb-text-secondary);
   margin: 4px 0 0;
+}
+
+/* Loading */
+.settings-skeleton { display: flex; flex-direction: column; gap: 20px; }
+.settings-skeleton__layout { display: flex; gap: 20px; align-items: flex-start; }
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: settings-shimmer 1.4s ease infinite;
+}
+.skeleton--title { height: 44px; max-width: 320px; }
+.skeleton--nav { width: 218px; height: 300px; flex-shrink: 0; }
+.skeleton--panel { flex: 1; height: 420px; }
+@keyframes settings-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 /* Layout */
@@ -797,9 +804,11 @@ onMounted(async () => {
 }
 
 .nav-item--active {
-  background: rgba(var(--rb-primary-rgb), 0.12);
+  background: rgba(var(--rb-primary-rgb), 0.1);
   color: var(--primary-text);
+  box-shadow: inset 3px 0 0 var(--rb-primary);
 }
+.nav-item:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 .nav-item__icon {
   display: flex;
@@ -1650,7 +1659,6 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .settings-page { padding: 16px 16px 32px; }
-  .header-banner { padding: 20px 20px; }
   .settings-panel { padding: 18px; }
   .panel-header-row { flex-direction: column; align-items: stretch; }
   .avatar-row { flex-direction: column; align-items: flex-start; }

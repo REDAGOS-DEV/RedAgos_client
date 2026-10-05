@@ -504,7 +504,7 @@ onMounted(load)
   border: 1px solid var(--rb-border);
   border-radius: 10px;
   background: var(--rb-surface);
-  font-size: 0.84rem;
+  font-size: 13.5px;
   color: var(--rb-text-primary);
 }
 
@@ -551,21 +551,21 @@ onMounted(load)
 .sheet__logo img { max-width: 64px; max-height: 64px; object-fit: contain; }
 
 .sheet__lines { text-align: center; }
-.sheet__lines p { margin: 0; font-size: 0.8rem; line-height: 1.45; color: var(--rb-text-primary); }
+.sheet__lines p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--rb-text-primary); }
 .sheet__lines .sheet__facility { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 
 .sheet__title {
   margin: 0;
   text-align: center;
-  font-size: 0.98rem;
+  font-size: 16px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--rb-text-primary);
 }
 
-.sheet__legend { margin: -0.4rem 0 0; text-align: center; font-size: 0.75rem; color: var(--rb-text-secondary); }
+.sheet__legend { margin: -0.4rem 0 0; text-align: center; font-size: 12px; color: var(--rb-text-secondary); }
 
-.sheet__by { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--rb-text-primary); }
+.sheet__by { margin: 0.25rem 0 0; font-size: 13.5px; color: var(--rb-text-primary); }
 .sheet__by strong { text-decoration: underline; text-underline-offset: 3px; }
 
 /* --- tables --- */
@@ -580,7 +580,7 @@ onMounted(load)
   table-layout: auto;
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -596,7 +596,7 @@ onMounted(load)
   padding: 0.35rem;
   border: 1px solid var(--rb-border-strong);
   border-bottom: none;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--rb-text-primary);
@@ -606,13 +606,13 @@ onMounted(load)
 .grid__title--negative { background: rgba(244, 114, 182, 0.2); }
 .grid__title--all { background: var(--rb-surface-alt); }
 
-.grid thead th { background: var(--rb-surface-alt); font-size: 0.74rem; font-weight: 700; }
+.grid thead th { background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; }
 .grid .grid__corner { width: 3.5rem; }
-.grid .grid__sub { font-weight: 500; font-size: 0.68rem; color: var(--rb-text-secondary); }
-.grid__flag { display: block; font-weight: 500; font-size: 0.66rem; color: var(--rb-accent-text); }
+.grid .grid__sub { font-weight: 500; font-size: 11px; color: var(--rb-text-secondary); }
+.grid__flag { display: block; font-weight: 500; font-size: 10.5px; color: var(--rb-accent-text); }
 
 .grid .grid__type { font-weight: 700; white-space: nowrap; }
-.grid .grid__date { font-size: 0.68rem; color: var(--rb-text-secondary); white-space: nowrap; }
+.grid .grid__date { font-size: 11px; color: var(--rb-text-secondary); white-space: nowrap; }
 .grid .grid__total { font-weight: 700; }
 .grid .grid__zero { color: var(--rb-text-secondary); font-weight: 400; }
 
@@ -645,7 +645,7 @@ onMounted(load)
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -657,7 +657,7 @@ onMounted(load)
 .btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 .btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
 
-.alert { margin: 0; padding: 0.65rem 0.85rem; border-radius: 10px; font-size: 0.84rem; }
+.alert { margin: 0; padding: 0.65rem 0.85rem; border-radius: 10px; font-size: 13.5px; }
 
 .alert--error {
   background: rgba(var(--rb-accent-rgb), 0.1);

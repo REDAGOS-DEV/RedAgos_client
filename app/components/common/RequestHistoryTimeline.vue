@@ -225,7 +225,7 @@ function formatDateTime(value) {
 }
 
 .history__title {
-  font-size: 0.86rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--rb-text-primary);
 }
@@ -234,14 +234,14 @@ function formatDateTime(value) {
 .history__transition {
   padding: 0.05rem 0.45rem;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
 }
 
 .history__tag--allocation {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--rb-font-mono);
   font-weight: 500;
 }
 
@@ -257,7 +257,7 @@ function formatDateTime(value) {
 .history__empty,
 .history__error {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--rb-text-secondary);
 }
@@ -283,7 +283,7 @@ function formatDateTime(value) {
 
 .history__lines {
   margin-top: 0.25rem;
-  font-size: 0.76rem;
+  font-size: 12px;
 }
 
 .history__lines summary {
@@ -318,7 +318,7 @@ function formatDateTime(value) {
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--rb-font-mono);
 }
 
 .history__loading {
