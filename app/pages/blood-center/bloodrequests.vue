@@ -359,12 +359,10 @@
                     <button @click="openMenuId = null; handleExportPdf(r)">
                       <AssetIcon name="file-text" :size="14" /> Export PDF
                     </button>
-                    <template v-if="canDecide">
-                      <div class="context-menu__divider" />
-                      <button class="danger" :disabled="isMutating(r.id)" @click="openMenuId = null; requestReject(r)">
-                        <AssetIcon name="circle-x" :size="14" /> Reject request
-                      </button>
-                    </template>
+                    <div v-if="canDecide" class="context-menu__divider" />
+                    <button v-if="canDecide" class="danger" :disabled="isMutating(r.id)" @click="openMenuId = null; requestReject(r)">
+                      <AssetIcon name="circle-x" :size="14" /> Reject request
+                    </button>
                   </div>
                 </div>
               </td>
