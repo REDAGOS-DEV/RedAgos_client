@@ -19,6 +19,23 @@ export function resolveApiBaseURL(): string {
     : "http://127.0.0.1:8000/api");
 }
 
+/**
+ * Usa ka path gikan sa API (pananglitan ang signed avatar link) nga andam na
+ * para sa <img src>.
+ *
+ * Relative ang mga signed link sa server, kay ang host nga makita sa Laravel
+ * kay ang gi-rewrite sa dev proxy (127.0.0.1:8000) — dili kana maabot sa
+ * phone sa LAN. Kung relative ang base (`/api`), ang path mismo ra, so moagi
+ * sa samang proxy sa tanan nga API call. Kung absolute, sa origin niini.
+ */
+export function resolveApiAssetURL(path: string | null | undefined): string | null {
+  if (!path) return null;
+
+  const base = resolveApiBaseURL();
+
+  return /^https?:\/\//i.test(base) ? new URL(path, base).toString() : path;
+}
+
 export class BaseService {
   async request<T>(
     url: string,

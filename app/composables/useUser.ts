@@ -1,5 +1,5 @@
 import { authService } from '~/api/auth/AuthService'
-import { resolveApiBaseURL } from '~/api/BaseService'
+import { resolveApiAssetURL, resolveApiBaseURL } from '~/api/BaseService'
 import type { AppUser } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
@@ -62,6 +62,10 @@ export function useUser() {
         admin_role: payload.admin_role ?? null,
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
         blood_type: payload.blood_type ?? null,
+        // Signed URL nga mo-expire sa 30 minutos, bag-o sa matag /user. Kaniadto
+        // ang upload ra ang nag-set ani, so nawala ang photo human sa login,
+        // refresh o pagbalhin og page.
+        avatar: resolveApiAssetURL(payload.avatar_url),
       }
     } catch (err) {
       console.error('Failed to load user:', err)

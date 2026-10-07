@@ -122,8 +122,9 @@ export interface AppUser {
   facility: Facility | null
 
   /**
-   * Not part of `UserResource` — set client-side by `updateAvatar()` after an
-   * upload returns a temporary signed URL. There is no `avatar_url` column yet.
+   * The donor's profile photo, from `UserResource.avatar_url`: a 30-minute
+   * signed URL, never the storage path. Null when there is no photo.
+   * `updateAvatar()` swaps it in place after an upload.
    */
-  avatar?: string | null
+  avatar: string | null
 }

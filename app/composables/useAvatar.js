@@ -1,3 +1,4 @@
+import { resolveApiAssetURL } from '~/api/BaseService'
 import { donorService } from '~/api/donor/DonorService'
 
 export function useAvatar() {
@@ -34,10 +35,10 @@ export function useAvatar() {
     try {
       // POST /api/donors/avatar — multipart, field name "avatar".
       // Response: { message, avatar_url } — ang avatar_url kay temporary signed
-      // URL (30 minutos) padulong sa donors.avatar.show, so dili na kinahanglan
+      // path (30 minutos) padulong sa donors.avatar.show, so dili na kinahanglan
       // og separate nga call para makita ang litrato.
       const res = await donorService.updateAvatar(formData)
-      return res?.avatar_url
+      return resolveApiAssetURL(res?.avatar_url)
     } catch (err) {
       error.value = err?.message || 'Upload failed. Please try again.'
       throw err

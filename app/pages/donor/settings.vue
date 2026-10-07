@@ -310,6 +310,7 @@ definePageMeta({
 })
 
 import { authService } from '~/api/auth/AuthService'
+import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
@@ -557,7 +558,7 @@ function applyProfile(data) {
     profile.occupation = data?.occupation ?? ''
     profile.nationality = data?.nationality ?? ''
     profile.donorId = data?.donor_id ?? ''
-    profile.avatarUrl = data?.avatar_url ?? ''
+    profile.avatarUrl = resolveApiAssetURL(data?.avatar_url) ?? ''
 }
 
 function splitFullName(fullName) {
