@@ -154,7 +154,7 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Donation Trend</h2>
-                <p class="panel-subtitle">Completed donations over the last 12 months</p>
+                <p class="panel-subtitle">Donations given over the last 12 months</p>
               </div>
               <span class="period-pill">Last 12 months</span>
             </div>
@@ -359,7 +359,7 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
 
@@ -426,13 +426,25 @@ const onboardingSteps = computed(() => [
     key: 'screening',
     label: 'Complete eligibility screening',
     path: '/donor/eligibility',
-    done: screeningDone.value,
+    // Recording a collection uses the questionnaire up, so questionnaire_status
+    // reads `expired` right after a donation. A donation still proves this step
+    // was done; the banner and QR card keep reading screeningDone for the next visit.
+    done: screeningDone.value || totalDonations.value > 0,
   },
   {
     key: 'appointment',
     label: 'Book your first appointment',
     path: '/donor/appointments',
     done: !!upcomingAppointment.value || totalDonations.value > 0,
+  },
+  {
+    key: 'check-in',
+    label: 'Check in at blood center',
+    path: '/donor/qrcode',
+    // `confirmed` is what the counter writes when it scans the donor's QR.
+    // Recording the collection then closes the appointment, dropping it out of
+    // upcoming_appointment, so a donation also means the check-in happened.
+    done: upcomingAppointment.value?.status === 'confirmed' || totalDonations.value > 0,
   },
   {
     key: 'donation',
@@ -483,10 +495,16 @@ function formatDate(value, fmt) {
 
 let loadedOnce = false
 
+// Route returns and tab returns can overlap, so only the newest response is
+// applied: a slower, older one must not roll the progress back.
+let latestRequest = 0
+
 async function load({ silent = false } = {}) {
+  const request = ++latestRequest
   if (!silent) loading.value = true
   try {
     const data = await donorService.dashboard()
+    if (request !== latestRequest) return
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
     questionnaireStatus.value = data.questionnaire_status ?? 'not_answered'
@@ -498,12 +516,34 @@ async function load({ silent = false } = {}) {
   } catch (err) {
     console.error('Failed to load donor dashboard data:', err)
   } finally {
-    loading.value = false
-    loadedOnce = true
+    if (request === latestRequest) {
+      loading.value = false
+      loadedOnce = true
+    }
   }
 }
 
-onMounted(() => load())
+function isOnDashboard() {
+  return route.path === '/donor/dashboard'
+}
+
+/*
+ * The same silent refresh when the donor comes back to the tab — say,
+ * unlocking their phone after giving blood with the dashboard still open.
+ * Navigating back is covered by the route watcher below.
+ */
+function onVisibilityChange() {
+  if (!document.hidden && isOnDashboard() && loadedOnce) load({ silent: true })
+}
+
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
 
 /*
  * `route` is the app-wide reactive current route, so this watcher keeps
@@ -513,8 +553,8 @@ onMounted(() => load())
  * another page (screening, booking, profile edits) shows up here the moment
  * the donor navigates back, without a full reload.
  */
-watch(() => route.path, (path) => {
-  if (path === '/donor/dashboard' && loadedOnce) load({ silent: true })
+watch(() => route.path, () => {
+  if (isOnDashboard() && loadedOnce) load({ silent: true })
 })
 </script>
 
@@ -919,7 +959,10 @@ watch(() => route.path, (path) => {
 /* Layout Structure */
 .main-grid {
   display: grid;
-  grid-template-columns: 1.55fr 1fr;
+  /* minmax(0, …), not bare fr: a bare fr track never shrinks below its
+     content, so the 12-column trend chart widened the whole page on phones
+     and the area past the viewport showed through as a strip on the right. */
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: 22px;
 }
 
@@ -963,6 +1006,8 @@ watch(() => route.path, (path) => {
   padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid rgba(21, 101, 192, 0.12);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .panel-link, .panel-link-plain {
@@ -994,7 +1039,7 @@ watch(() => route.path, (path) => {
   width: 20px;
 }
 
-.chart__plot { flex: 1; display: flex; align-items: flex-end; gap: 8px; }
+.chart__plot { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 8px; }
 
 .chart__col {
   position: relative;
@@ -1266,7 +1311,7 @@ watch(() => route.path, (path) => {
 /* Responsive Overrides */
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .main-grid { grid-template-columns: 1fr; }
+  .main-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
@@ -1327,6 +1372,13 @@ watch(() => route.path, (path) => {
   }
 
   .skeleton--card { height: 96px; }
+
+  /* Twelve month columns have to fit a phone-width card once the grid lets
+     them shrink, so tighten only the chart's own gutters and labels here. */
+  .chart { gap: 8px; }
+  .chart__plot { gap: 3px; }
+  .chart__col { min-width: 0; padding: 0; }
+  .chart__label { font-size: 9.5px; }
 
   /* 2x2 nga gagmay nga cards imbes upat ka taas nga card */
   .stats-grid {

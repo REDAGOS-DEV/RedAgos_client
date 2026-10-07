@@ -212,8 +212,10 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { authService } from '~/api/auth/AuthService'
 import QRCode from 'qrcode'
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 
 const loading = ref(true)
 const profile = ref(null)
@@ -344,7 +346,9 @@ const statusValueClass = computed(() =>
 //   confirmed -> na-scan na ang QR, naa na sa blood center
 //   scheduled -> naka-book, wala pa niabot
 //   completed -> nahuman na ang donation (sukad sa karon nga screening ra,
-//                para dili maihap ang daan nga donation)
+//                para dili maihap ang daan nga donation). Dili na kinahanglan
+//                'answered' ang questionnaire: gi-invalidate na siya sa server
+//                pag-record sa collection, pero ang screening_date naa gihapon.
 function byDate(a, b) {
   return new Date(a.appointment_datetime) - new Date(b.appointment_datetime)
 }
@@ -359,7 +363,7 @@ const cycleAppointment = computed(() => {
   if (scheduled) return scheduled
 
   const since = profile.value?.screening_date
-  if (questionnaireStatus.value !== 'answered' || !since) return null
+  if (!since) return null
 
   return list
     .filter(a => a.status === 'completed' && new Date(a.appointment_datetime) >= new Date(since))
@@ -395,7 +399,9 @@ const STEP_COPY = [
 const steps = computed(() => {
   const status = cycleAppointment.value?.status
   const done = [
-    questionnaireStatus.value === 'answered',
+    // Human sa donation 'expired' na ang questionnaire, pero na-answer gihapon
+    // siya para niini nga cycle.
+    questionnaireStatus.value === 'answered' || status === 'completed',
     !!cycleAppointment.value,
     status === 'confirmed' || status === 'completed',
     status === 'completed',
@@ -595,16 +601,7 @@ async function load({ silent = false } = {}) {
       await renderQr(stored.token)
     }
 
-
-    // Ang appointments kay para ra sa progress sa "How to use" steps. Kung
-    // mapakyas, ang questionnaire step ra ang mahibal-an, dili ma-block ang QR.
-    try {
-      const list = await donorService.appointments()
-      appointments.value = Array.isArray(list) ? list : (list?.data ?? [])
-    } catch (err) {
-      console.error('Failed to load appointments for QR steps:', err)
-      appointments.value = []
-    }
+    await loadAppointments()
   } catch (err) {
     console.error('Failed to load QR code data:', err)
   } finally {
@@ -613,9 +610,79 @@ async function load({ silent = false } = {}) {
   }
 }
 
-onMounted(() => load())
+// Ang appointments kay para ra sa progress sa "How to use" steps. Kung
+// mapakyas, ang questionnaire step ra ang mahibal-an, dili ma-block ang QR.
+// Ang request number kay para dili ma-overwrite sa mas daan nga response ang
+// mas bag-o, kay mahimong magdungan ang load() ug ang poll.
+let appointmentsRequest = 0
+
+async function loadAppointments({ keepOnError = false } = {}) {
+  const request = ++appointmentsRequest
+  try {
+    const list = await donorService.appointments()
+    if (request !== appointmentsRequest) return
+    appointments.value = Array.isArray(list) ? list : (list?.data ?? [])
+  } catch (err) {
+    console.error('Failed to load appointments for QR steps:', err)
+    // Sa poll, ayaw i-reset sa [] tungod lang sa usa ka napakyas nga request,
+    // kay mobalik ang progress bisan wala may nausab sa server.
+    if (!keepOnError && request === appointmentsRequest) appointments.value = []
+  }
+}
+
+// Ang pag-scan sa QR sa blood center mo-usab sa appointment gikan sa
+// `scheduled` ngadto sa `confirmed` samtang bukas pa ni nga page sa phone sa
+// donor. I-poll ang GET /donors/appointments para mo-update ang steps nga dili
+// na kinahanglan mobiya ug mobalik. Ang API gihapon ang tinubdan sa status —
+// walay gi-compute dinhi.
+//
+// Mo-poll ra samtang ni nga page ang naa sa screen ug visible ang tab. Ang
+// route ang gibantayan, dili onActivated/onDeactivated — tan-awa ang
+// DashboardPage para sa rason.
+const QR_PAGE_PATH = '/donor/qrcode'
+const APPOINTMENT_POLL_MS = 20_000
+let pollTimer = null
+
+function isPageActive() {
+  return route.path === QR_PAGE_PATH && !document.hidden
+}
+
+function startPolling() {
+  if (pollTimer || !isPageActive()) return
+  pollTimer = setInterval(() => {
+    if (isPageActive()) loadAppointments({ keepOnError: true })
+    else stopPolling()
+  }, APPOINTMENT_POLL_MS)
+}
+
+function stopPolling() {
+  clearInterval(pollTimer)
+  pollTimer = null
+}
+
+// Pagbalik sa tab (e.g. gi-unlock ang phone), i-refresh dayon kay basin
+// na-scan na samtang naka-hide.
+function onVisibilityChange() {
+  if (!isPageActive()) return stopPolling()
+  loadAppointments({ keepOnError: true })
+  startPolling()
+}
+
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  startPolling()
+})
 onActivated(() => {
   if (loadedOnce) load({ silent: true })
+})
+watch(() => route.path, (path) => {
+  if (path === QR_PAGE_PATH) startPolling()
+  else stopPolling()
+})
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 </script>
