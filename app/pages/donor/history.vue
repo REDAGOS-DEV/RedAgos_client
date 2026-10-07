@@ -19,7 +19,7 @@
             <div v-if="donations.length > 0" class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-card__icon stat-card__icon--primary">
-                        <AssetIcon name="droplet" :size="18" />
+                        <AssetIcon name="droplets" :size="18" />
                     </div>
                     <div>
                         <p class="stat-card__value">{{ stats.totalDonations }}</p>
