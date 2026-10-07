@@ -68,11 +68,19 @@
             </div>
 
             <div class="form-grid">
+              <!-- First and last name are stored apart, so they are edited apart. -->
               <div class="form-group">
-                <label class="form-label">Full Name</label>
+                <label class="form-label" for="bc-first-name">First Name</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="user" :size="15" class="input-icon" />
-                  <input v-model="profileForm.fullName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input id="bc-first-name" v-model="profileForm.firstName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bc-last-name">Last Name</label>
+                <div class="input-icon-wrap">
+                  <AssetIcon name="user" :size="15" class="input-icon" />
+                  <input id="bc-last-name" v-model="profileForm.lastName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
                 </div>
               </div>
               <div class="form-group">
@@ -89,32 +97,40 @@
                   <input :value="profileForm.bloodCenter" type="text" class="form-input form-input--icon" disabled />
                 </div>
               </div>
+              <!-- The role (and what it may do) is set by a supervisor in Staff
+                   Accounts; the title is the person's own label, e.g. RMT. -->
               <div class="form-group">
-                <label class="form-label">Position / Role</label>
+                <label class="form-label">Role</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="briefcase" :size="15" class="input-icon" />
-                  <select
-                    v-model="profileForm.position"
-                    class="form-input form-input--icon form-select"
-                    :disabled="!editingProfile"
-                  >
-                    <option v-for="opt in positionOptions" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                  <AssetIcon name="chevron-down" :size="15" class="select-caret" />
+                  <input :value="roleText" type="text" class="form-input form-input--icon" disabled />
                 </div>
               </div>
+              <div class="form-group">
+                <label class="form-label" for="bc-title">Title <span class="form-optional">optional</span></label>
+                <ComboInput
+                  id="bc-title"
+                  v-model="profileForm.position"
+                  :options="TITLE_OPTIONS"
+                  maxlength="100"
+                  placeholder="e.g. RMT"
+                  :disabled="!editingProfile"
+                />
+              </div>
+              <!-- Read-only: the sign-in address is changed by a supervisor, not here. -->
               <div class="form-group">
                 <label class="form-label">Email Address</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="mail" :size="15" class="input-icon" />
-                  <input v-model="profileForm.email" type="email" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input :value="profileForm.email" type="email" class="form-input form-input--icon" disabled />
                 </div>
+                <p v-if="editingProfile" class="form-hint">Ask your supervisor to change your sign-in email.</p>
               </div>
               <div class="form-group">
                 <label class="form-label">Contact Number</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="phone" :size="15" class="input-icon" />
-                  <input v-model="profileForm.contactNumber" type="tel" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input v-model="profileForm.contactNumber" type="tel" class="form-input form-input--icon" placeholder="09XXXXXXXXX" :disabled="!editingProfile" />
                 </div>
               </div>
             </div>
@@ -350,6 +366,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
@@ -419,7 +436,7 @@ const api = {
 
 const loading = ref(true)
 
-const { can: canDo } = useUser()
+const { can: canDo, user: sessionUser, fetchUser } = useUser()
 
 // The Blood Center tab holds the centre's logo, which only center.configure
 // may change (the card checks the same ability), so only they see the tab.
@@ -451,6 +468,8 @@ function initials(name) {
 const profile = reactive({
   avatarUrl: '',
   fullName: '',
+  firstName: '',
+  lastName: '',
   employeeId: '',
   bloodCenter: '',
   position: '',
@@ -464,18 +483,16 @@ const savingProfile = ref(false)
 const profileError = ref('')
 const profileSuccess = ref('')
 
-// this is temporary lang since di pa ems sure unsa ang mga role/position sa tao
-const BASE_POSITION_OPTIONS = [
-  'Administrator',
-  'Medical Technologist',
-  'Registered Nurse',
-  'Mobile Drive Coordinator',
-]
+// Suggestions for the title, as on the Add Staff form; any other is typed.
+const TITLE_OPTIONS = ['RMT', 'RN']
 
-const positionOptions = computed(() => {
-  const opts = [...BASE_POSITION_OPTIONS]
-  if (profileForm.position && !opts.includes(profileForm.position)) opts.unshift(profileForm.position)
-  return opts
+// The person's role, as a supervisor set it in Staff Accounts. Shown, not edited.
+const roleText = computed(() => {
+  const u = sessionUser.value
+  if (!u) return ''
+  const role = u.staff_role_label || u.role_label || u.custom_role || ''
+  const parts = [u.is_supervisor ? 'Supervisor' : '', role].filter(Boolean)
+  return parts.join(' · ') || u.department_label || 'No role yet'
 })
 
 const avatarColor = computed(() => {
@@ -511,20 +528,25 @@ async function saveProfile() {
   profileError.value = ''
   profileSuccess.value = ''
   try {
+    // The fields PATCH /blood-center/profile accepts, in its names. Email and
+    // employee ID are not changed from here.
     const updated = await api.updateProfile({
-      fullName: profileForm.fullName,
-      email: profileForm.email,
-      contactNumber: profileForm.contactNumber,
-      avatarUrl: profileForm.avatarUrl,
+      first_name: profileForm.firstName.trim(),
+      last_name: profileForm.lastName.trim(),
+      phone: profileForm.contactNumber.trim() || undefined,
+      position: profileForm.position.trim() || null,
     })
-    Object.assign(profile, updated)
-    Object.assign(profileForm, updated)
+    applyServerData(updated)
+    // The header shows the name from the session; refresh it so it matches.
+    fetchUser()
     editingProfile.value = false
     profileSuccess.value = 'Profile updated successfully.'
   } catch (err) {
     // kay wala pa may live nga endpoint karon, so mag-fail ni nga call sa dev/UI stage.
-    console.error('Failed to save profile (expected while backend is not yet wired up):', err)
-    profileError.value = 'Could not save changes. Please try again.'
+    console.error('Failed to save profile:', err)
+    profileError.value = Object.values(err?.data?.errors ?? {}).flat()[0]
+      || err?.data?.message
+      || 'Could not save changes. Please try again.'
   } finally {
     savingProfile.value = false
   }
@@ -642,22 +664,56 @@ async function selectTheme(value) {
 }
 
 /* ------------ LOAD --------------- */
+
+const ACCOUNT_STATUS = { active: 'Active', pending_verification: 'Pending verification', suspended: 'Suspended', deactivated: 'Deactivated' }
+
+function formatDateTime(value) {
+  if (!value) return 'Not recorded'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/**
+ * GET/PATCH /blood-center/profile answer { profile, facility, account } in the
+ * server's names (full_name, phone, …). The form uses its own, so map here;
+ * assigning the response as-is left every field blank.
+ */
+function applyServerData(data) {
+  const p = data?.profile ?? {}
+  const mapped = {
+    firstName: p.first_name ?? '',
+    lastName: p.last_name ?? '',
+    fullName: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' '),
+    employeeId: p.employee_id ?? '',
+    position: p.position ?? '',
+    email: p.email ?? '',
+    contactNumber: p.phone ?? '',
+    bloodCenter: data?.facility?.name ?? '',
+    avatarUrl: sessionUser.value?.avatar ?? profile.avatarUrl ?? '',
+  }
+  Object.assign(profile, mapped)
+  Object.assign(profileForm, mapped)
+
+  const account = data?.account ?? {}
+  Object.assign(accountInfo, {
+    username: account.username || 'Not set',
+    role: roleText.value,
+    bloodCenter: data?.facility?.name || 'Not linked',
+    createdAt: formatDateTime(account.created_at),
+    lastLogin: accountInfo.lastLogin || 'Not recorded',
+    status: ACCOUNT_STATUS[account.account_status] || account.account_status || 'Unknown',
+  })
+}
+
 onMounted(async () => {
   try {
     const data = await api.getSettings()
-    if (data?.profile) {
-      Object.assign(profile, data.profile)
-      Object.assign(profileForm, data.profile)
-    }
-    if (data?.accountInfo) Object.assign(accountInfo, data.accountInfo)
+    applyServerData(data)
     if (data?.currentSession) Object.assign(currentSession, data.currentSession)
     if (data?.notificationPrefs) notificationPrefs.value = data.notificationPrefs
     if (data?.theme) theme.value = data.theme
   } catch (err) {
-    // sa dev/UI stage pa lang ni, wala pay live nga /api/bloodcenter/settings endpoint,
-    // so mag-fail gyud ni nga call. Gi-ano ra sa default/empty values, para
-    // mag-display ug blangko/placeholder nga fields imbes mag-crash o mag-display ug fake data.
-    console.error('Failed to load settings (expected while backend is not yet wired up):', err)
+    console.error('Failed to load settings:', err)
   } finally {
     loading.value = false
   }
@@ -1672,4 +1728,7 @@ onMounted(async () => {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+.form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+.form-hint { margin: 4px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
 </style>

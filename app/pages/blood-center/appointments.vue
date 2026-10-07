@@ -1,210 +1,272 @@
 <template>
   <div class="appointments-page">
-    <div v-if="initialLoading" class="loading-wrap">
-      <div class="spinner" />
+    <!-- Skeleton loading state, the same as the other pages -->
+    <div v-if="initialLoading" class="appointments-inner" aria-busy="true" aria-label="Loading appointments">
+      <div class="skeleton-head">
+        <div class="skeleton skeleton--header" />
+        <div class="skeleton skeleton--sub" />
+      </div>
+      <div class="stats-row">
+        <div v-for="n in 4" :key="'skc-' + n" class="skeleton skeleton--card" />
+      </div>
+      <div class="skeleton skeleton--panel" style="height: 460px" />
     </div>
 
     <div v-else class="appointments-inner">
       <!-- Header -->
-      <div class="header-row">
-        <div>
-          <h1 class="page-title">Donor Appointments</h1>
-          <p class="page-subtitle">Manage walk-ins, booking slots, and blood drive registrations from one place.</p>
+      <header class="header-row">
+        <div class="header-copy">
+          <h1 class="page-title">Appointments</h1>
+          <p class="page-subtitle">{{ headerSummary }}</p>
         </div>
+
         <div class="header-actions">
-          <div class="date-filter-wrap">
-            <input type="date" v-model="datePickerValue" class="date-filter" @change="onDateFilterChange" />
-            <AssetIcon name="calendar" :size="16" class="form-input-icon__icon" />
+          <div class="date-control">
+            <span class="date-control__chip" :class="{ 'date-control__chip--today': isToday }">
+              {{ isToday ? 'Today' : 'Viewing' }}
+            </span>
+            <div class="date-filter-wrap">
+              <input type="date" v-model="datePickerValue" class="date-filter" aria-label="Appointment date"
+                @change="onDateFilterChange" />
+              <AssetIcon name="calendar" :size="16" class="form-input-icon__icon" />
+            </div>
           </div>
-          <button v-if="!isToday" type="button" class="btn-clear-date" @click="resetToToday">
-            <AssetIcon name="x" :size="12" />
-            Today
+
+          <button v-if="!isToday" type="button" class="btn-outline" @click="resetToToday">
+            Back to today
           </button>
-          <button type="button" class="btn-primary" @click="openManageSlots">
-            <AssetIcon name="clock" :size="16" />
-            Manage Time Slots
+
+          <!-- The slot list is read-only, so this opens a view, not an editor. -->
+          <button type="button" class="btn-outline" @click="openManageSlots">
+            <AssetIcon name="clock" :size="14" />
+            Time Slots
           </button>
-          <!--
-            The bell that stood here linked to /blood-center/notifications,
-            which has no page: the link 404'd. Removed until the page exists,
-            the same call useBloodCenterNav made for Help & Support.
-          -->
         </div>
-      </div>
+      </header>
 
       <!-- Error banner -->
-      <div v-if="loadError" class="error-banner">
-        {{ loadError }}
-        <button type="button" class="btn-link" @click="loadAll">Retry</button>
+      <div v-if="loadError" class="error-banner" role="alert">
+        <span>{{ loadError }}</span>
+        <button type="button" class="error-banner__retry" @click="loadAll">Retry</button>
       </div>
 
       <!-- Stat cards -->
       <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-card__icon stat-card__icon--blue">
-            <AssetIcon name="user-check" :size="18" />
+        <div v-for="card in statCards" :key="card.key" class="stat-card" :class="`stat-card--${card.tone}`">
+          <div class="stat-card__top">
+            <p class="stat-card__label">{{ card.label }}</p>
+            <span class="stat-card__icon">
+              <AssetIcon :name="card.icon" :size="14" />
+            </span>
           </div>
-          <div class="stat-card__body">
-            <p class="stat-card__label">Today's Walk-ins</p>
-            <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.todayWalkIns }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__icon stat-card__icon--orange">
-            <AssetIcon name="check-circle" :size="18" />
-          </div>
-          <div class="stat-card__body">
-            <p class="stat-card__label">In Progress</p>
-            <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.inProgress }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__icon stat-card__icon--green">
-            <AssetIcon name="droplets" :size="18" />
-          </div>
-          <div class="stat-card__body">
-            <p class="stat-card__label">Collected Today</p>
-            <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.collectedToday }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__icon stat-card__icon--red">
-            <AssetIcon name="user-x" :size="18" />
-          </div>
-          <div class="stat-card__body">
-            <p class="stat-card__label">No-shows</p>
-            <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-              stats.noShows }}</p>
-          </div>
+          <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' : card.value }}</p>
+          <span class="stat-card__hint">{{ loadingStats ? '\u00A0' : card.hint }}</span>
         </div>
       </div>
 
       <!-- Main panel -->
       <div class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">Appointment Overview</h2>
+          <div>
+            <h2 class="panel-title">Appointment Overview</h2>
+            <p class="panel-subtitle">{{ selectedDateLabel }}</p>
+          </div>
         </div>
-        <div class="tabs">
-          <button type="button" class="tab" :class="{ 'tab--active': activeTab === 'walkin' }"
-            @click="activeTab = 'walkin'">
-            Walk-in Appointments ({{ walkInAppointments.length }})
+
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" class="tab" :class="{ 'tab--active': activeTab === 'walkin' }"
+            :aria-selected="activeTab === 'walkin'" @click="activeTab = 'walkin'">
+            Walk-in Appointments
+            <span class="tab-count">{{ walkInAppointments.length }}</span>
           </button>
-          <button type="button" class="tab" :class="{ 'tab--active': activeTab === 'drives' }"
-            @click="activeTab = 'drives'">
-            Blood Drive Registrations ({{ bloodDrives.length }})
+          <button type="button" role="tab" class="tab" :class="{ 'tab--active': activeTab === 'drives' }"
+            :aria-selected="activeTab === 'drives'" @click="activeTab = 'drives'">
+            Blood Drive Registrations
+            <span class="tab-count">{{ bloodDrives.length }}</span>
           </button>
         </div>
 
         <!-- WALK-IN APPOINTMENTS TAB -->
         <section v-if="activeTab === 'walkin'" class="tab-content">
-          <p class="section-label">Time slots &middot; {{ selectedDateLabel }}</p>
-
-          <div class="time-slot-grid">
-            <div v-if="loadingSlots" v-for="n in 4" :key="'sk-' + n"
-              class="time-slot-card skeleton-block" />
-            <button v-for="slot in timeSlots" v-else :key="slot.id" type="button" class="time-slot-card"
-              :class="{ 'time-slot-card--full': (slotBookings[slot.time] || 0) >= slot.capacity, 'time-slot-card--selected': selectedSlotId === slot.id }"
-              @click="selectedSlotId = slot.id">
-              <span class="slot-time">{{ slot.time }}</span>
-              <span class="slot-count"
-                :class="{ 'slot-count--full': (slotBookings[slot.time] || 0) >= slot.capacity }">
-                {{ slotBookings[slot.time] || 0 }}/{{ slot.capacity }}
-                {{ (slotBookings[slot.time] || 0) >= slot.capacity ? 'Full' : 'booked' }}
-              </span>
-            </button>
-            <p v-if="!loadingSlots && timeSlots.length === 0" class="empty-state empty-state--inline">
-              This centre has no bookable time slots configured.
-            </p>
+          <div class="section-head">
+            <div>
+              <p class="section-label">Time slots</p>
+              <p v-if="slotSummary" class="section-hint">{{ slotSummary }}</p>
+            </div>
+            <div class="section-head__right">
+              <div class="slot-legend" aria-hidden="true">
+                <span class="legend-item"><i class="legend-dot legend-dot--open" />Open</span>
+                <span class="legend-item"><i class="legend-dot legend-dot--busy" />Filling up</span>
+                <span class="legend-item"><i class="legend-dot legend-dot--full" />Full</span>
+              </div>
+              <button v-if="selectedSlotId" type="button" class="btn-link" @click="selectedSlotId = null">
+                Show all slots
+              </button>
+            </div>
           </div>
 
-          <div class="filters-row">
-            <select v-model="statusFilter" class="form-input filter-select">
-              <option value="all">All Status</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="in-progress">In progress</option>
-              <option value="collected">Collected</option>
-              <option value="deferred">Deferred</option>
-              <option value="no-show">No-show</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <select v-model="bloodTypeFilter" class="form-input filter-select">
-              <option value="all">All Blood Types</option>
-              <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-            </select>
+          <div v-if="loadingSlots" class="time-slot-grid">
+            <div v-for="n in 6" :key="'sk-' + n" class="time-slot-card skeleton-block" />
+          </div>
+
+          <div v-else-if="timeSlots.length === 0" class="empty-state empty-state--inline">
+            <span class="empty-state__icon"><AssetIcon name="clock" :size="18" /></span>
+            <p class="empty-state__title">No time slots</p>
+            <p class="empty-state__text">This centre has no bookable time slots configured.</p>
+          </div>
+
+          <!-- Morning and afternoon apart: how the counter plans its day. -->
+          <div v-else class="slot-periods">
+            <div v-for="period in slotPeriods" :key="period.key" class="slot-period">
+              <p class="slot-period__head">
+                <span class="slot-period__name">{{ period.label }}</span>
+                <span class="slot-period__meta">{{ period.booked }}/{{ period.capacity }} booked</span>
+              </p>
+
+              <div class="time-slot-grid">
+                <button v-for="slot in period.slots" :key="slot.id" type="button" class="time-slot-card"
+                  :class="[
+                    `time-slot-card--${slot.level}`,
+                    {
+                      'time-slot-card--selected': selectedSlotId === slot.id,
+                      'time-slot-card--past': slot.past,
+                      'time-slot-card--now': slot.current,
+                    },
+                  ]"
+                  :aria-pressed="selectedSlotId === slot.id" @click="toggleSlot(slot.id)">
+                  <span class="slot-head">
+                    <span class="slot-time">
+                      <i class="legend-dot" :class="`legend-dot--${slot.level}`" aria-hidden="true" />
+                      {{ slot.label }}
+                    </span>
+                    <span v-if="slot.current" class="slot-tag slot-tag--now">Now</span>
+                    <span v-else-if="slot.past" class="slot-tag">Past</span>
+                  </span>
+                  <span class="slot-meter">
+                    <span class="slot-meter__fill" :style="{ width: slot.pct + '%' }" />
+                  </span>
+                  <span class="slot-count">
+                    <strong>{{ slot.booked }}</strong>/{{ slot.capacity }}
+                    {{ slot.level === 'full' ? 'Full' : 'booked' }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <div class="filters-row">
+              <select v-model="statusFilter" class="form-input filter-select" aria-label="Filter by status">
+                <option value="all">All Status</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="in-progress">In progress</option>
+                <option value="collected">Collected</option>
+                <option value="deferred">Deferred</option>
+                <option value="no-show">No-show</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <select v-model="bloodTypeFilter" class="form-input filter-select" aria-label="Filter by blood type">
+                <option value="all">All Blood Types</option>
+                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
+              </select>
+              <button v-if="selectedSlotId" type="button" class="filter-chip" @click="selectedSlotId = null">
+                Slot: {{ formatSlotTime(selectedSlotId) }}
+                <AssetIcon name="x" :size="12" />
+              </button>
+            </div>
+
+            <div class="toolbar-meta">
+              <span v-if="!loadingAppointments" class="result-count">
+                Showing <strong>{{ filteredAppointments.length }}</strong> of {{ walkInAppointments.length }}
+              </span>
+              <button v-if="hasActiveFilters" type="button" class="btn-link" @click="clearFilters">
+                Clear filters
+              </button>
+            </div>
           </div>
 
           <div class="appointment-list">
-            <div v-if="loadingAppointments" v-for="n in 4" :key="'skap-' + n"
-              class="appointment-card skeleton-block" />
+            <template v-if="loadingAppointments">
+              <div v-for="n in 4" :key="'skap-' + n" class="appointment-card skeleton-block" />
+            </template>
 
-            <p v-else-if="walkInAppointments.length === 0" class="empty-state">
-              No appointments booked at this centre on {{ selectedDateLabel }}.
-            </p>
-
-            <p v-else-if="filteredAppointments.length === 0" class="empty-state">
-              No appointments match the current filters.
-            </p>
-
-            <div v-else v-for="appt in filteredAppointments" :key="appt.id"
-              class="appointment-card">
-              <div class="appt-date-badge">
-                <span class="appt-day">{{ appt.dateDay }}</span>
-                <span class="appt-month">{{ appt.dateMonth }}</span>
-              </div>
-
-              <div class="appt-info">
-                <div class="appt-name-row">
-                  <span class="appt-name">{{ appt.donorName }}</span>
-                  <span class="pill pill--blood">{{ appt.bloodType }}</span>
-                </div>
-                <p class="appt-meta">{{ appt.donorCode }} &middot; {{ appt.kind }} &middot; {{
-                  appt.slotTime }} slot</p>
-                <p v-if="appt.phone" class="appt-screening">{{ appt.phone }}</p>
-              </div>
-
-              <div class="appt-status-col">
-                <span class="pill" :class="'pill--' + appt.statusKey">{{ appt.status }}</span>
-
-                <div class="appt-actions">
-                  <button
-                    v-if="appt.canCheckIn"
-                    type="button"
-                    class="row-action row-action--primary"
-                    :disabled="rowBusyId === appt.id"
-                    @click="checkInAppointment(appt)"
-                  >
-                    {{ rowBusyId === appt.id ? 'Working…' : 'Check in' }}
-                  </button>
-
-                  <NuxtLink
-                    v-else-if="appt.canOpenCounter"
-                    to="/blood-center/collection"
-                    class="row-action row-action--primary"
-                  >
-                    Open counter
-                  </NuxtLink>
-
-                  <button
-                    v-if="appt.canMarkNoShow"
-                    type="button"
-                    class="row-action"
-                    :disabled="rowBusyId === appt.id"
-                    @click="markNoShow(appt)"
-                  >
-                    No-show
-                  </button>
-                </div>
-              </div>
+            <div v-else-if="walkInAppointments.length === 0" class="empty-state">
+              <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
+              <p class="empty-state__title">No appointments on {{ selectedDateLabel }}</p>
+              <p class="empty-state__text">Bookings made in the donor portal for this centre will appear here.</p>
             </div>
+
+            <div v-else-if="filteredAppointments.length === 0" class="empty-state">
+              <span class="empty-state__icon"><AssetIcon name="user-x" :size="20" /></span>
+              <p class="empty-state__title">No matches</p>
+              <p class="empty-state__text">No appointments match the current filters.</p>
+              <button type="button" class="btn-outline btn-outline--sm" @click="clearFilters">Clear filters</button>
+            </div>
+
+            <template v-else>
+              <article v-for="appt in filteredAppointments" :key="appt.id" class="appointment-card"
+                :class="[`appointment-card--${appt.statusKey}`, { 'appointment-card--next': appt.id === nextUpId }]">
+                <div class="appt-time">
+                  <span class="appt-time__clock">{{ appt.slotTime.split(' ')[0] }}</span>
+                  <span class="appt-time__period">{{ appt.slotTime.split(' ')[1] }}</span>
+                </div>
+
+                <span class="appt-avatar" aria-hidden="true">{{ initials(appt.donorName) }}</span>
+
+                <div class="appt-info">
+                  <div class="appt-name-row">
+                    <span class="appt-name">{{ appt.donorName }}</span>
+                    <span class="pill pill--blood">{{ appt.bloodType }}</span>
+                    <span v-if="appt.id === nextUpId" class="next-tag">Up next</span>
+                  </div>
+                  <div class="appt-meta">
+                    <span class="appt-code">{{ appt.donorCode }}</span>
+                    <span class="meta-sep" aria-hidden="true">&middot;</span>
+                    <span class="kind-tag" :class="`kind-tag--${appt.kindKey}`">{{ appt.kind }}</span>
+                    <template v-if="appt.phone">
+                      <span class="meta-sep" aria-hidden="true">&middot;</span>
+                      <a :href="`tel:${appt.phone}`" class="appt-phone">{{ appt.phone }}</a>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="appt-status-col">
+                  <span class="pill pill--status" :class="'pill--' + appt.statusKey">
+                    <span class="status-dot" />
+                    {{ appt.status }}
+                  </span>
+
+                  <div class="appt-actions">
+                    <button v-if="appt.canMarkNoShow" type="button" class="row-action row-action--ghost"
+                      :disabled="rowBusyId === appt.id" @click="markNoShow(appt)">
+                      No-show
+                    </button>
+
+                    <button v-if="appt.canCheckIn" type="button" class="row-action row-action--primary"
+                      :disabled="rowBusyId === appt.id" @click="checkInAppointment(appt)">
+                      <span v-if="rowBusyId === appt.id" class="btn-spinner" />
+                      {{ rowBusyId === appt.id ? 'Working…' : 'Check in' }}
+                    </button>
+
+                    <NuxtLink v-else-if="appt.canOpenCounter" to="/blood-center/collection"
+                      class="row-action row-action--primary">
+                      Open counter
+                      <AssetIcon name="arrow-right" :size="12" />
+                    </NuxtLink>
+                  </div>
+                </div>
+              </article>
+            </template>
           </div>
         </section>
 
         <!-- BLOOD DRIVE REGISTRATIONS TAB -->
         <section v-else class="tab-content">
           <div class="drives-header">
+            <div>
+              <p class="section-label">Mobile blood drives</p>
+              <p class="section-hint">Registrations donors made through the portal.</p>
+            </div>
             <!-- KEPT YANNIE'S VERSION – simplified path -->
             <NuxtLink to="/blood-center/drives" class="btn-outline-blue">
               Go to Mobile Drives
@@ -212,112 +274,127 @@
             </NuxtLink>
           </div>
 
-          <div v-if="loadingDrives" v-for="n in 2" :key="'skd-' + n" class="drive-card skeleton-block"
-            style="height: 220px" />
+          <template v-if="loadingDrives">
+            <div v-for="n in 2" :key="'skd-' + n" class="drive-card skeleton-block" style="height: 200px" />
+          </template>
 
-          <p v-else-if="bloodDrives.length === 0" class="empty-state">No blood drive registrations found.</p>
+          <div v-else-if="bloodDrives.length === 0" class="empty-state">
+            <span class="empty-state__icon"><AssetIcon name="droplets" :size="20" /></span>
+            <p class="empty-state__title">No upcoming drives</p>
+            <p class="empty-state__text">Drives this centre schedules in Donation Drives will show their registrations here.</p>
+          </div>
 
-          <div v-else v-for="drive in bloodDrives" :key="drive.id" class="drive-card">
-            <div class="drive-card__top">
-              <div>
-                <p class="drive-card__title">{{ drive.name }}</p>
-                <p class="drive-card__meta">{{ drive.dateLabel }}</p>
+          <div v-else class="drive-grid">
+            <div v-for="drive in bloodDrives" :key="drive.id" class="drive-card">
+              <div class="drive-card__top">
+                <div>
+                  <p class="drive-card__title">{{ drive.name }}</p>
+                  <p class="drive-card__meta">{{ drive.dateLabel }}</p>
+                </div>
+                <span class="status-badge" :class="`status-badge--${drive.statusKey}`">{{ drive.status || '—' }}</span>
               </div>
-              <span class="status-badge" :class="`status-badge--${drive.status.toLowerCase()}`">{{
-                drive.status }}</span>
-            </div>
 
-            <p class="drive-progress-label">Registered donors</p>
-            <div class="progress-track">
-              <div class="progress-fill"
-                :class="{ 'progress-fill--full': driveProgressPct(drive) >= 100 }"
-                :style="{ width: driveProgressPct(drive) + '%' }" />
-            </div>
-            <div class="progress-meta">
-              <span>{{ drive.registered }} registered</span>
-              <span>{{ drive.capacity }} capacity</span>
-            </div>
-
-            <p v-if="drive.status === 'Open'" class="drive-note">Registration still open &mdash; donors can
-              book via the portal.</p>
-
-            <template v-if="drive.previewDonors.length">
-              <p class="preview-label">Registered Donors (Preview)</p>
-              <div class="donor-preview-list">
-                <div v-for="(donor, di) in drive.previewDonors" :key="donor.id" class="donor-row">
-                  <span class="donor-row__avatar" :style="{ background: avatarColor(di) }">{{
-                    initials(donor.name) }}</span>
-                  <div class="donor-row__info">
-                    <p class="donor-row__name">{{ donor.name }}</p>
-                    <p class="donor-row__meta">{{ donor.bloodType }} &middot; Registered {{
-                      donor.registeredDate }} &middot; Screening: {{ donor.screeningStatus }}</p>
-                  </div>
-                  <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status
-                  }}</span>
+              <div class="drive-progress">
+                <div class="drive-progress__head">
+                  <span class="drive-progress-label">Registered donors</span>
+                  <span v-if="drive.capacity" class="drive-progress__pct">{{ driveProgressPct(drive) }}%</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" :class="{ 'progress-fill--full': driveProgressPct(drive) >= 100 }"
+                    :style="{ width: driveProgressPct(drive) + '%' }" />
+                </div>
+                <div class="progress-meta">
+                  <span><strong>{{ drive.registered }}</strong> registered</span>
+                  <span>{{ drive.capacity ? `${drive.capacity} capacity` : 'No limit set' }}</span>
                 </div>
               </div>
-            </template>
 
-            <p v-if="!drive.previewDonors.length" class="drive-note">Per-drive donor lists need a
-              backend endpoint that does not exist yet.</p>
+              <p v-if="drive.status === 'Open'" class="drive-note drive-note--open">
+                Registration is open. Donors can book in the portal.
+              </p>
 
-            <div class="drive-card__actions">
-              <button type="button" class="btn-outline" disabled
-                title="Listing the donors on one drive needs a backend endpoint that does not exist yet."
-                @click="openViewDonors(drive)">View all {{ drive.registered }} donors</button>
-              <button type="button" class="btn-outline-blue" disabled
-                title="Drive management has no backend yet."
-                @click="openManageDrive(drive)">Manage Drive &amp; Attendance</button>
+              <template v-if="drive.previewDonors.length">
+                <p class="preview-label">Registered Donors (Preview)</p>
+                <div class="donor-preview-list">
+                  <div v-for="donor in drive.previewDonors" :key="donor.id" class="donor-row">
+                    <span class="donor-row__avatar" :style="{ background: colorFor(donor.name) }">{{
+                      initials(donor.name) }}</span>
+                    <div class="donor-row__info">
+                      <p class="donor-row__name">{{ donor.name }}</p>
+                      <p class="donor-row__meta">{{ donor.bloodType }} &middot; Registered {{
+                        donor.registeredDate }} &middot; Screening: {{ donor.screeningStatus }}</p>
+                    </div>
+                    <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <p v-else class="drive-note">The donor list for each drive is not available yet.</p>
+
+              <div class="drive-card__actions">
+                <button type="button" class="btn-outline btn-outline--sm" disabled title="Not available yet"
+                  @click="openViewDonors(drive)">View all {{ drive.registered }} donors</button>
+                <button type="button" class="btn-outline-blue" disabled title="Not available yet"
+                  @click="openManageDrive(drive)">Manage Drive &amp; Attendance</button>
+              </div>
             </div>
           </div>
         </section>
       </div>
     </div>
 
-    <!-- MANAGE TIME SLOTS MODAL -->
+    <!-- TIME SLOTS MODAL (read-only) -->
     <Transition name="modal">
       <div v-if="showManageSlotsModal" class="modal-overlay" @click.self="closeManageSlots">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="slots-modal-title">
           <div class="modal-card__header">
-            <h2 class="modal-card__title">Manage Time Slots</h2>
-            <button type="button" class="modal-card__close" @click="closeManageSlots">
+            <h2 id="slots-modal-title" class="modal-card__title">Time Slots</h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeManageSlots">
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
 
           <div class="modal-form">
-            <p class="modal-subtitle">The slots donors choose from when booking via the portal.
-              Read-only for now &mdash; capacity is configured on the facility record, and there is no
-              endpoint yet to change it from here.</p>
+            <div class="info-note">
+              These are the slots donors choose from when booking in the portal. View only: hours and
+              capacity are set by the system administrator.
+            </div>
 
             <div class="form-group">
-              <label class="form-label">Date</label>
+              <label class="form-label" for="slots-date">Date</label>
               <div class="form-input-icon">
-                <input v-model="slotsForm.date" type="date" class="form-input"
+                <input id="slots-date" v-model="slotsForm.date" type="date" class="form-input"
                   @change="fetchSlotsForForm" />
                 <AssetIcon name="calendar" :size="14" class="form-input-icon__icon" />
               </div>
             </div>
 
-            <label class="form-label">Time slots &amp; capacity</label>
-
-            <div v-if="loadingSlotForm" class="slots-form-grid">
-              <div v-for="n in 6" :key="'skf-' + n" class="slot-input skeleton-block" />
+            <div class="slot-readout-head">
+              <span class="form-label">Time slots &amp; capacity</span>
+              <span v-if="!loadingSlotForm && slotsForm.slots.length" class="slot-readout-total">
+                {{ slotsFormTotal }} donors / day
+              </span>
             </div>
-            <div v-else class="slots-form-grid">
-              <div v-for="slot in slotsForm.slots" :key="slot.id" class="slot-input">
-                <label class="form-label form-label--muted">{{ slot.time }} - max donors</label>
-                <div class="stepper">
-                  <input v-model.number="slot.capacity" type="number" min="0" disabled
-                    class="form-input stepper__input" />
-                </div>
+
+            <div v-if="loadingSlotForm" class="slot-readout">
+              <div v-for="n in 5" :key="'skf-' + n" class="slot-readout__row skeleton-block" />
+            </div>
+            <div v-else-if="slotsForm.slots.length" class="slot-readout">
+              <div v-for="slot in slotsForm.slots" :key="slot.id" class="slot-readout__row">
+                <span class="slot-readout__time">
+                  <AssetIcon name="clock" :size="14" />
+                  {{ formatSlotTime(slot.time) }}
+                </span>
+                <span class="slot-readout__cap"><strong>{{ slot.capacity }}</strong> max donors</span>
               </div>
             </div>
+            <p v-else-if="!saveSlotsError" class="modal-empty">No slots are configured for this date.</p>
+
+            <p v-if="saveSlotsError" class="modal-error">{{ saveSlotsError }}</p>
 
             <div class="modal-actions">
-              <button type="button" class="btn-cancel" @click="closeManageSlots">Close</button>
+              <button type="button" class="btn-outline" @click="closeManageSlots">Close</button>
             </div>
-            <p v-if="saveSlotsError" class="modal-error">{{ saveSlotsError }}</p>
           </div>
         </div>
       </div>
@@ -326,10 +403,10 @@
     <!-- VIEW DONORS MODAL (Blood Drive) -->
     <Transition name="modal">
       <div v-if="showDonorsModal" class="modal-overlay" @click.self="closeViewDonors">
-        <div class="modal-card modal-card--wide">
+        <div class="modal-card modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="donors-modal-title">
           <div class="modal-card__header">
-            <h2 class="modal-card__title">{{ selectedDrive?.name }} &mdash; Registered Donors</h2>
-            <button type="button" class="modal-card__close" @click="closeViewDonors">
+            <h2 id="donors-modal-title" class="modal-card__title">{{ selectedDrive?.name }} &middot; Registered Donors</h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeViewDonors">
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
@@ -339,25 +416,22 @@
               <div v-for="n in 5" :key="'skdd-' + n" class="donor-row skeleton-block" />
             </div>
             <div v-else class="donor-list">
-              <p v-if="driveDonors.length === 0" class="empty-state">Listing the donors registered to
-                one drive needs a backend endpoint that does not exist yet.</p>
-              <div v-for="(donor, di) in driveDonors" :key="donor.id" class="donor-row">
-                <span class="donor-row__avatar" :style="{ background: avatarColor(di) }">{{
-                  initials(donor.name)
-                }}</span>
+              <p v-if="driveDonors.length === 0" class="modal-empty">The donor list for this drive is not
+                available yet.</p>
+              <div v-for="donor in driveDonors" :key="donor.id" class="donor-row">
+                <span class="donor-row__avatar" :style="{ background: colorFor(donor.name) }">{{
+                  initials(donor.name) }}</span>
                 <div class="donor-row__info">
                   <p class="donor-row__name">{{ donor.name }}</p>
                   <p class="donor-row__meta">{{ donor.bloodType }} &middot; Registered {{
-                    donor.registeredDate
-                  }} &middot; Screening: {{ donor.screeningStatus }}</p>
+                    donor.registeredDate }} &middot; Screening: {{ donor.screeningStatus }}</p>
                 </div>
-                <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status
-                }}</span>
+                <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status }}</span>
               </div>
             </div>
 
             <div class="modal-actions">
-              <button type="button" class="btn-cancel" @click="closeViewDonors">Close</button>
+              <button type="button" class="btn-outline" @click="closeViewDonors">Close</button>
             </div>
           </div>
         </div>
@@ -368,7 +442,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 
@@ -404,7 +478,7 @@ definePageMeta({
  * -------------------------------------------------------------------------
  */
 
-const { user } = useUser()
+const { user, can } = useUser()
 
 // Ang /time-slots kay donor-facing, so kinahanglan gyud og center_id. Ang
 // queue dili — gikuha na niya ang facility gikan sa token.
@@ -435,6 +509,15 @@ function displayStatus(row) {
 // ang mo-hawid og slot. Ang cancelled ug no_show mo-libre pagbalik sa lugar.
 const HOLDS_A_SLOT = ['scheduled', 'confirmed']
 
+// A slot reads "Filling up" from this share of its capacity onward.
+const BUSY_THRESHOLD = 75
+
+// Slots carry only a start time. Until the API returns a duration, a slot is
+// treated as an hour long when deciding whether it is already past.
+const ASSUMED_SLOT_MINUTES = 60
+
+const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
+
 function todayIso() {
   const d = new Date()
   const pad = (n) => String(n).padStart(2, '0')
@@ -446,6 +529,21 @@ function slotKeyOf(date) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/** "HH:MM" minutes since midnight, or null when the string isn't a time. */
+function minutesOf(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+
+/** "13:30" -> "1:30 PM". Anything unexpected passes through untouched. */
+function formatSlotTime(hhmm) {
+  const total = minutesOf(hhmm)
+  if (total === null) return hhmm
+  const h = Math.floor(total / 60)
+  const mm = String(total % 60).padStart(2, '0')
+  return `${h % 12 || 12}:${mm} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 /**
  * Ang queue mo-return og server field names; lahi ang gidahom sa template.
  * Usa ra ka lugar ang mo-tabok aron dili magkatag ang mapping.
@@ -453,6 +551,7 @@ function slotKeyOf(date) {
 function mapAppointment(row) {
   const at = new Date(row.appointment_datetime)
   const status = displayStatus(row)
+  const isWalkIn = row.event_id === null
 
   return {
     id: row.id,
@@ -462,7 +561,8 @@ function mapAppointment(row) {
     donorCode: row.donor?.donor_code || '—',
     bloodType: row.donor?.blood_type || '—',
     phone: row.donor?.phone || '',
-    kind: row.event_id === null ? 'Walk-in' : 'Mobile drive',
+    kind: isWalkIn ? 'Walk-in' : 'Mobile drive',
+    kindKey: isWalkIn ? 'walkin' : 'drive',
     slotKey: slotKeyOf(at),
     slotTime: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     dateDay: at.getDate(),
@@ -516,7 +616,7 @@ const loadingAppointments = ref(false)
 const bloodDrives = ref([])
 const loadingDrives = ref(false)
 
-// Manage Time Slots modal
+// Time Slots modal
 const showManageSlotsModal = ref(false)
 const loadingSlotForm = ref(false)
 const saveSlotsError = ref('')
@@ -528,7 +628,9 @@ const loadingDriveDonors = ref(false)
 const selectedDrive = ref(null)
 const driveDonors = ref([])
 
-const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
+// Ticks once a minute so slots fade to "Past" while the page stays open.
+const now = ref(new Date())
+let clockTimer = null
 
 // Ang queue kay usa ka adlaw ra ang gi-serve niya, so wala nay 'all dates'
 // diri — mo-default ta karong adlawa, sama sa server pag walay `date`.
@@ -548,10 +650,12 @@ function resetToToday() {
   onDateFilterChange()
 }
 
+// `new Date('YYYY-MM-DD')` parses as UTC midnight, which lands on the previous
+// day in any timezone west of UTC. Appending a time makes it local.
 const selectedDateLabel = computed(() => {
-  const d = new Date(selectedDateFilter.value)
+  const d = new Date(`${selectedDateFilter.value}T00:00:00`)
   if (isNaN(d.getTime())) return selectedDateFilter.value
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 })
 
 /**
@@ -571,13 +675,149 @@ const slotBookings = computed(() => {
   return counts
 })
 
+/** Slots with everything the card needs to draw itself. */
+const decoratedSlots = computed(() => {
+  const nowMinutes = now.value.getHours() * 60 + now.value.getMinutes()
+  // A slot lasts until the next one starts; the list is evenly spaced.
+  const firstTwo = timeSlots.value.slice(0, 2).map((s) => minutesOf(s.time))
+  const step = firstTwo.length === 2 && firstTwo[1] > firstTwo[0] ? firstTwo[1] - firstTwo[0] : ASSUMED_SLOT_MINUTES
+
+  return timeSlots.value.map((slot) => {
+    const booked = slotBookings.value[slot.time] || 0
+    const capacity = slot.capacity || 0
+    const isFull = booked >= capacity
+    const pct = capacity ? Math.min(100, Math.round((booked / capacity) * 100)) : 100
+    const start = minutesOf(slot.time)
+
+    return {
+      ...slot,
+      booked,
+      pct,
+      level: isFull ? 'full' : pct >= BUSY_THRESHOLD ? 'busy' : 'open',
+      label: formatSlotTime(slot.time),
+      past: isToday.value && start !== null && start + step <= nowMinutes,
+      current: isToday.value && start !== null && start <= nowMinutes && nowMinutes < start + step,
+    }
+  })
+})
+
+/** The slots split at noon, each half with its own tally. */
+const slotPeriods = computed(() => {
+  const periods = [
+    { key: 'morning', label: 'Morning', slots: decoratedSlots.value.filter((s) => (minutesOf(s.time) ?? 0) < 12 * 60) },
+    { key: 'afternoon', label: 'Afternoon', slots: decoratedSlots.value.filter((s) => (minutesOf(s.time) ?? 0) >= 12 * 60) },
+  ]
+
+  return periods
+    .filter((period) => period.slots.length)
+    .map((period) => ({
+      ...period,
+      booked: period.slots.reduce((sum, s) => sum + s.booked, 0),
+      capacity: period.slots.reduce((sum, s) => sum + (s.capacity || 0), 0),
+    }))
+})
+
+const slotSummary = computed(() => {
+  if (loadingSlots.value || !decoratedSlots.value.length) return ''
+  const booked = decoratedSlots.value.reduce((sum, s) => sum + s.booked, 0)
+  const capacity = decoratedSlots.value.reduce((sum, s) => sum + (s.capacity || 0), 0)
+  const open = decoratedSlots.value.filter((s) => s.level !== 'full' && !s.past).length
+  return `${booked} of ${capacity} seats booked · ${open} slot${open === 1 ? '' : 's'} still open`
+})
+
 const filteredAppointments = computed(() => {
   return walkInAppointments.value.filter((appt) => {
     const statusOk = statusFilter.value === 'all' || appt.statusKey === statusFilter.value
     const bloodOk = bloodTypeFilter.value === 'all' || appt.bloodType === bloodTypeFilter.value
-    return statusOk && bloodOk
+    // A picked slot card narrows the list to its donors.
+    const slotOk = !selectedSlotId.value || appt.slotKey === selectedSlotId.value
+    return statusOk && bloodOk && slotOk
   })
 })
+
+/**
+ * The scheduled donor the counter should expect next: the earliest booking,
+ * today, whose slot has not ended. Display only.
+ */
+const nextUpId = computed(() => {
+  if (!isToday.value) return null
+  const open = new Set(decoratedSlots.value.filter((s) => !s.past).map((s) => s.time))
+  const next = walkInAppointments.value
+    .filter((a) => a.statusKey === 'scheduled' && open.has(a.slotKey))
+    .sort((x, y) => x.slotKey.localeCompare(y.slotKey))[0]
+  return next?.id ?? null
+})
+
+/** One line under the title: the day at a glance. */
+const headerSummary = computed(() => {
+  const rows = walkInAppointments.value
+  const booked = rows.filter((r) => r.statusKey !== 'cancelled').length
+  const day = isToday.value ? 'today' : `on ${selectedDateLabel.value}`
+  const parts = [`${booked} donor${booked === 1 ? '' : 's'} booked ${day}`]
+  const next = rows.find((r) => r.id === nextUpId.value)
+  if (next) parts.push(`next at ${next.slotTime}`)
+  else if (isToday.value && booked && !stats.inProgress) parts.push('no one waiting')
+  return parts.join(' · ')
+})
+
+const hasActiveFilters = computed(
+  () => statusFilter.value !== 'all' || bloodTypeFilter.value !== 'all' || !!selectedSlotId.value,
+)
+
+function clearFilters() {
+  statusFilter.value = 'all'
+  bloodTypeFilter.value = 'all'
+  selectedSlotId.value = null
+}
+
+function toggleSlot(id) {
+  selectedSlotId.value = selectedSlotId.value === id ? null : id
+}
+
+const statCards = computed(() => {
+  const rows = walkInAppointments.value
+  const live = rows.filter((r) => r.statusKey !== 'cancelled').length
+  const collectedPct = live ? Math.round((stats.collectedToday / live) * 100) : 0
+
+  return [
+    {
+      key: 'walkins',
+      label: isToday.value ? "Today's Walk-ins" : 'Walk-ins',
+      value: stats.todayWalkIns,
+      icon: 'user-check',
+      tone: 'blue',
+      hint: `${rows.length} appointment${rows.length === 1 ? '' : 's'} in total`,
+    },
+    {
+      key: 'progress',
+      label: 'In Progress',
+      value: stats.inProgress,
+      icon: 'clock',
+      tone: 'orange',
+      hint: stats.inProgress ? 'Checked in, at the counter' : 'Nobody at the counter',
+    },
+    {
+      key: 'collected',
+      label: isToday.value ? 'Collected Today' : 'Collected',
+      value: stats.collectedToday,
+      icon: 'droplets',
+      tone: 'green',
+      hint: live ? `${collectedPct}% of booked donors` : 'No bookings yet',
+    },
+    {
+      key: 'noshows',
+      label: 'No-shows',
+      value: stats.noShows,
+      icon: 'user-x',
+      tone: 'red',
+      hint: stats.noShows ? 'Their slots were released' : 'Everyone showed up so far',
+    },
+  ]
+})
+
+const slotsFormTotal = computed(() =>
+  slotsForm.slots.reduce((sum, s) => sum + (Number(s.capacity) || 0), 0),
+)
 
 function driveProgressPct(drive) {
   if (!drive.capacity) return 0
@@ -595,8 +835,14 @@ function initials(name) {
     .toUpperCase()
 }
 
-function avatarColor(index) {
-  return AVATAR_COLORS[index % AVATAR_COLORS.length]
+/**
+ * Same person, same colour — keyed on the donor rather than the row index, so
+ * an avatar doesn't change colour every time a filter reorders the list.
+ */
+function colorFor(seed) {
+  let h = 0
+  for (const ch of String(seed || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
 }
 
 /**
@@ -655,28 +901,42 @@ async function loadTimeSlots() {
   }
 }
 
+/**
+ * This centre's own drives, from the same facility-scoped list the Donation
+ * Drives page reads. The donor-facing /blood-drives is every centre's
+ * catalogue, which is why other centres' drives showed up here.
+ */
 async function loadBloodDrives() {
+  if (!can('drives.view')) {
+    bloodDrives.value = []
+    return
+  }
+
   loadingDrives.value = true
 
   try {
-    const rows = await bookingCatalogService.bloodDrives()
+    const data = await bloodCenterService.drives()
 
-    bloodDrives.value = (rows ?? []).map((drive) => ({
-      id: drive.id,
-      name: drive.name,
-      location: drive.location,
-      dateLabel: [
-        drive.date
-          ? new Date(drive.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : null,
-        drive.location,
-      ].filter(Boolean).join(' · '),
-      status: drive.status,
-      registered: drive.registered,
-      capacity: drive.total_slots,
-      // Walay endpoint pa nga mo-list sa mga donor kada drive.
-      previewDonors: [],
-    }))
+    bloodDrives.value = (data?.drives ?? [])
+      // Registrations only matter for drives that have not happened yet.
+      .filter((drive) => drive.status !== 'Completed')
+      .sort((x, y) => String(x.event_date).localeCompare(String(y.event_date)))
+      .map((drive) => ({
+        id: drive.id,
+        name: drive.name,
+        location: drive.location,
+        dateLabel: [
+          drive.event_date
+            ? new Date(`${drive.event_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : null,
+          drive.location,
+        ].filter(Boolean).join(' · '),
+        status: drive.status,
+        statusKey: String(drive.status || 'closed').toLowerCase(),
+        registered: drive.registered_count ?? 0,
+        capacity: drive.capacity ?? null,
+        previewDonors: drive.donor_preview ?? [],
+      }))
   } catch (err) {
     bloodDrives.value = []
     loadError.value = err?.message || 'Could not load blood drive registrations.'
@@ -740,9 +1000,8 @@ async function markNoShow(appt) {
 async function openManageSlots() {
   showManageSlotsModal.value = true
   saveSlotsError.value = ''
-  // Pre-fill with the currently selected date filter, when it's a real date
-  // (the filter dropdown's values are already YYYY-MM-DD strings, matching
-  // what <input type="date"> expects, so this binds correctly).
+  // Pre-fill with the date the page is showing (already YYYY-MM-DD, which is
+  // what <input type="date"> expects).
   slotsForm.date = selectedDateFilter.value
   await fetchSlotsForForm()
 }
@@ -796,26 +1055,41 @@ function closeViewDonors() {
 }
 
 function openManageDrive(drive) {
-  // Placeholder: tan-awa ang viewAppointment sa ibabaw.
+  // Placeholder: wala pay backend para sa drive attendance.
   if (import.meta.dev) {
     console.warn('[Appointments] openManageDrive is not wired up yet', drive.id)
   }
 }
 
+// ESC closes whichever modal is open, same as the backdrop click.
+function onKeydown(e) {
+  if (e.key !== 'Escape') return
+  if (showDonorsModal.value) closeViewDonors()
+  else if (showManageSlotsModal.value) closeManageSlots()
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
+  clockTimer = setInterval(() => { now.value = new Date() }, 60_000)
   await loadAll()
   initialLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  clearInterval(clockTimer)
 })
 </script>
 
 <style scoped>
 .appointments-page {
-  --primary: #1565c0;
-  --accent: #d32f2f;
-  --success: #2e7d32;
-  --warning: #f57c00;
-  --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  /* Local names kept; the values are the shared tokens, as on every other page. */
+  --primary: var(--rb-primary);
+  --accent: var(--rb-accent);
+  --success: var(--rb-success);
+  --warning: var(--rb-warning);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
   max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
@@ -824,48 +1098,33 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-/* Loading */
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
+/* ---------- Loading ---------- */
+.btn-spinner {
+  width: 11px;
+  height: 11px;
   border-radius: 999px;
-  border: 4px solid #e3ebf6;
-  border-top-color: var(--primary);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  
-  .spinner {
-    animation: none !important;
-  }
+  to { transform: rotate(360deg); }
 }
 
 .appointments-inner {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 22px;
 }
 
-/* Header */
+/* ---------- Header ---------- */
 .header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 24px;
+  flex-wrap: wrap;
 }
 
 .page-title {
@@ -877,10 +1136,9 @@ onMounted(async () => {
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  margin: 4px 0 0;
-  line-height: 1.5;
+  margin: 6px 0 0;
 }
 
 .header-actions {
@@ -890,6 +1148,37 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
+.date-control {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 12px;
+  background: var(--rb-surface);
+  padding-left: 5px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.date-control:focus-within {
+  border-color: var(--primary);
+  box-shadow: var(--rb-focus-ring);
+}
+
+.date-control__chip {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--rb-surface-alt);
+  color: var(--text-secondary);
+}
+
+.date-control__chip--today {
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
 
 .date-filter-wrap {
   position: relative;
@@ -898,22 +1187,26 @@ onMounted(async () => {
 
 .date-filter {
   width: 100%;
-  height: 42px;
-  padding: 0 42px 0 14px;
+  height: 38px;
+  padding: 0 40px 0 10px;
   appearance: none;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  background: #fff;
+  border: none;
+  background: transparent;
+  color: var(--rb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .date-filter:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.15);
 }
 
-.date-filter::-webkit-calendar-picker-indicator {
+/* Our calendar icon is drawn beside these; the browser's own would double it.
+   It stays clickable, stretched invisibly over the whole field. */
+.date-filter::-webkit-calendar-picker-indicator,
+.form-input-icon input[type='date']::-webkit-calendar-picker-indicator {
   opacity: 0;
   position: absolute;
   right: 0;
@@ -923,204 +1216,216 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.btn-clear-date {
+/* ---------- Buttons ---------- */
+.btn-outline {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
-
-.btn-clear-date:hover {
-  background: #e5e7eb;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 10px 16px;
-  border-radius: 10px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 700;
-  color: #fff;
-  background: var(--primary);
-  border: none;
+  line-height: 1.2;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  border: 1px solid var(--rb-border-strong);
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-.btn-primary:hover {
-  opacity: 0.92;
+.btn-outline:hover:not(:disabled) {
+  background: var(--rb-surface-hover);
+  border-color: var(--rb-border-hover);
 }
 
-.btn-primary:disabled {
-  opacity: 0.6;
+.btn-outline:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-outline:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.btn-outline {
-  padding: 8px 14px;
+.btn-outline--sm {
+  height: 34px;
+  padding: 0 14px;
   border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-
-.btn-outline:hover {
-  background: #e5e7eb;
+  font-size: 12.5px;
 }
 
 .btn-outline-blue {
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
   border-radius: 10px;
-  font-size: 12px;
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 700;
-  background: #e3f2fd;
-  color: var(--primary);
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
   border: none;
   cursor: pointer;
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
+  white-space: nowrap;
   transition: background 0.15s ease;
 }
 
-.btn-outline-blue:hover {
-  background: #d3e6fa;
+.btn-outline-blue:hover:not(:disabled) {
+  background: rgba(var(--rb-primary-rgb), 0.15);
+}
+
+.btn-outline-blue:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-link {
   background: none;
   border: none;
-  color: var(--primary);
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.btn-cancel {
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-size: 13px;
+  padding: 0;
+  color: var(--rb-primary-text);
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 700;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
   cursor: pointer;
-  transition: background 0.15s ease;
+  white-space: nowrap;
 }
 
-.btn-cancel:hover {
-  background: #e5e7eb;
+.btn-link:hover {
+  text-decoration: underline;
 }
 
+/* ---------- Error banner ---------- */
 .error-banner {
   background: #FDF1F1;
   color: #C62828;
   border: 1px solid #F2D2D2;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-left: 4px solid #D32F2F;
+  border-radius: 12px;
+  padding: 12px 16px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
-/* Stat cards */
-/* auto-fit, not a fixed count: the content column now changes width
-   when the rail expands, so the grid has to answer to its container
-   rather than to a viewport breakpoint that no longer describes it. */
+.error-banner__retry {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.error-banner__retry:hover {
+  background: rgba(211, 47, 47, 0.08);
+}
+
+/* ---------- Stat cards ---------- */
+/* auto-fit, not a fixed count: the content column changes width when the
+   rail expands, so the grid answers to its container, not the viewport. */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 16px;
-}
-
-.stat-card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #eef0f3;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  padding: 20px 22px;
-  display: flex;
-  align-items: flex-start;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
 }
 
-.stat-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.stat-card {
+  --tone-rgb: var(--rb-primary-rgb);
+  --tone-text: var(--rb-primary-text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--rb-surface);
+  border-radius: 14px;
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+  padding: 16px;
+}
+
+/* Coloured cap so the four numbers read as four different things at a glance. */
+.stat-card--blue { --tone: var(--rb-primary); --tone-rgb: var(--rb-primary-rgb); --tone-text: var(--rb-primary-text); }
+.stat-card--orange { --tone: var(--rb-warning); --tone-rgb: var(--rb-warning-rgb); --tone-text: var(--rb-warning-text); }
+.stat-card--green { --tone: var(--rb-success); --tone-rgb: var(--rb-success-rgb); --tone-text: var(--rb-success-text); }
+.stat-card--red { --tone: var(--rb-accent); --tone-rgb: var(--rb-accent-rgb); --tone-text: var(--rb-accent-text); }
+
+.stat-card__top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-card__icon--blue {
-  background: #E3F2FD;
-  color: var(--primary);
-}
-
-.stat-card__icon--orange {
-  background: #f3e1d2;
-  color: var(--warning);
-}
-
-.stat-card__icon--green {
-  background: #E8F5E9;
-  color: var(--success);
-}
-
-.stat-card__icon--red {
-  background: #FDEAEA;
-  color: var(--accent);
-}
-
-.stat-card__body {
-  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .stat-card__label {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--text-secondary);
   margin: 0;
 }
 
-.stat-card__value {
-  font-size: 28px;
-  font-weight: 800;
-  margin: 4px 0 0;
-  color: var(--text-primary);
-  line-height: 1.1;
+.stat-card__icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(var(--tone-rgb), 0.08);
+  color: var(--tone-text);
 }
 
-/* Panel */
+.stat-card__value {
+  min-height: 24px;
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-card__value.skeleton {
+  width: 48px;
+}
+
+/* The chip under the number, as on Inventory. */
+.stat-card__hint {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  color: var(--text-secondary);
+}
+
+/* ---------- Panel ---------- */
 .panel {
-  background: #fff;
+  background: var(--rb-surface);
   border-radius: 14px;
-  border: 1px solid #eef0f3;
-  padding: 8px 0 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rb-border);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
   overflow: hidden;
 }
 
@@ -1128,48 +1433,50 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 28px 10px;
+  padding: 18px 22px 14px;
 }
 
 .panel-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   margin: 0;
   color: var(--text-primary);
 }
 
-/*
- * The panel's bands share one 28px gutter: the header, the tab labels, the
- * underline beneath the active one, the section label and the first slot card
- * all start on the same line.
- *
- * This strip was `justify-content: center` with a hardcoded `gap: 75px`, so
- * the tabs sat wherever those two labels happened to centre. Putting the
- * gutter on the strip and taking the horizontal padding off the tab is what
- * lets the label and its underline land on the same 28px — with padding on
- * the tab, only one of the two can.
- */
+.panel-subtitle {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 3px 0 0;
+}
+
+/* Tabs share the panel's 22px gutter: label and underline land on one line. */
 .tabs {
   display: flex;
   justify-content: flex-start;
   gap: 28px;
-  border-bottom: 1px solid #f3f4f6;
-  padding: 0 28px;
-  background: #FAFBFC;
+  border-top: 1px solid var(--rb-border);
+  border-bottom: 1px solid var(--rb-border);
+  padding: 0 22px;
+  background: var(--rb-surface-alt);
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: none;
   border: none;
-  padding: 14px 0;
+  padding: 14px 0 12px;
+  font-family: inherit;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1182,98 +1489,320 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-/*
- * Colour plus an underline, not a raised block. A padded block cannot share a
- * gutter with the text inside it, so its left edge was the one thing in this
- * panel that lined up with nothing. Same treatment as donors.vue.
- */
 .tab--active {
   color: var(--primary);
-  border-bottom: 2px solid var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-count {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rb-border);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tab--active .tab-count {
+  background: var(--primary);
+  color: #fff;
 }
 
 .tab-content {
-  padding: 28px;
+  padding: 22px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+
+.section-head__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .section-label {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   color: var(--text-primary);
-  margin: 0 0 12px;
+  margin: 0;
 }
 
-/* Time slots */
+.section-hint {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.slot-legend {
+  display: flex;
+  gap: 12px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.legend-dot--open { background: var(--rb-success); }
+.legend-dot--busy { background: var(--rb-warning); }
+.legend-dot--full { background: var(--rb-accent); }
+
+/* ---------- Time slots ---------- */
 .time-slot-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.slot-periods {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.slot-period__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.slot-period__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.slot-period__meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-time .legend-dot {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Open slots show their colour too, not only once someone books. */
+.time-slot-card--open {
+  border-color: rgba(var(--rb-success-rgb), 0.3);
+}
+
+.time-slot-card--busy {
+  border-color: rgba(var(--rb-warning-rgb), 0.45);
 }
 
 .time-slot-card {
-  border: 1.5px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 16px;
-  background: #fff;
-  text-align: center;
+  --meter: var(--rb-success);
+  position: relative;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--rb-surface);
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  gap: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .time-slot-card:hover {
-  border-color: #bcd7f2;
-  background: #FAFCFF;
+  border-color: rgba(var(--rb-primary-rgb), 0.5);
+  background: var(--rb-surface-hover);
 }
 
-.time-slot-card--selected {
-  border-color: var(--primary);
-  background: #E3F2FD;
-  box-shadow: 0 0 0 1px var(--primary);
+/* The slot the counter is in right now. */
+.time-slot-card--now {
+  border-color: rgba(var(--rb-primary-rgb), 0.55);
 }
+
+.time-slot-card:focus-visible {
+  outline: none;
+  box-shadow: var(--rb-focus-ring);
+}
+
+.time-slot-card--busy { --meter: var(--rb-warning); }
 
 .time-slot-card--full {
-  border-color: #f3c1c1;
-  background: #fdeaea;
-  cursor: not-allowed;
+  --meter: var(--rb-accent);
+  border-color: rgba(var(--rb-accent-rgb), 0.35);
+  background: rgba(var(--rb-accent-rgb), 0.05);
+}
+
+.time-slot-card--past {
+  opacity: 0.6;
+}
+
+.time-slot-card--selected,
+.time-slot-card--selected:hover {
+  opacity: 1;
+  border-color: var(--primary);
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  box-shadow: none;
+}
+
+.time-slot-grid .skeleton-block {
+  min-height: 78px;
+}
+
+.slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .slot-time {
-  font-weight: 700;
+  font-weight: 800;
   font-size: 14px;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--rb-surface-alt);
+  color: var(--text-secondary);
+}
+
+.slot-tag--now {
+  background: var(--rb-primary);
+  color: #fff;
+}
+
+.slot-meter {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  overflow: hidden;
+}
+
+.slot-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--meter);
+  transition: width 0.4s ease;
 }
 
 .slot-count {
   font-size: 11.5px;
   color: var(--text-secondary);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.slot-count--full {
-  color: var(--accent);
-  font-weight: 700;
+.slot-count strong {
+  color: var(--text-primary);
+  font-weight: 800;
 }
 
-/* Filters */
+.time-slot-card--full .slot-count,
+.time-slot-card--full .slot-count strong {
+  color: var(--rb-accent-text);
+  font-weight: 800;
+}
+
+/* ---------- Toolbar / filters ---------- */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+}
+
 .filters-row {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.result-count {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.result-count strong {
+  color: var(--text-primary);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.35);
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-chip:hover {
+  background: rgba(var(--rb-primary-rgb), 0.16);
 }
 
 .form-input {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--rb-border-strong);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
-  background: #fafbfc;
+  background: var(--rb-surface);
   font-family: inherit;
   transition: border-color 0.15s ease;
 }
@@ -1281,28 +1810,26 @@ onMounted(async () => {
 .form-input:focus {
   outline: none;
   border-color: var(--primary);
-  background: #fff;
+  box-shadow: var(--rb-focus-ring);
 }
 
 /*
- * One caret, drawn by us. These were bare native selects while the dashboard
- * and inventory selects carried a custom chevron, so the same control looked
- * different depending on which blood-centre page you were on.
- *
- * The `background` shorthand is deliberate, and so is repeating it in the dark
- * rule: a later `background: <colour>` anywhere in the cascade resets
+ * One caret, drawn by us. The `background` shorthand is deliberate, and so is
+ * repeating it in the dark rule: a later `background: <colour>` resets
  * background-image to none, and the dark override for .form-input is exactly
- * such a rule. Spelling the whole shorthand out in both themes makes the caret
- * immune to that ordering. #94a3b8 reads on both surfaces, so the glyph itself
- * does not need to change.
+ * such a rule.
  */
 .filter-select {
-  flex: 1;
+  flex: 0 0 190px;
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-weight: 600;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: #fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
   background-size: 10px 6px;
   padding-right: 32px;
 }
@@ -1314,6 +1841,7 @@ onMounted(async () => {
 }
 
 .form-input-icon .form-input {
+  width: 100%;
   padding-right: 32px;
 }
 
@@ -1326,57 +1854,117 @@ onMounted(async () => {
   color: #6b7280;
 }
 
-/* Appointment cards */
+/* ---------- Appointment rows ---------- */
 .appointment-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 4px;
 }
 
+/*
+ * The status stripe is an inset shadow rather than a border-left so the card
+ * keeps its radius; the hover rule repeats it because box-shadow doesn't stack
+ * across rules.
+ */
 .appointment-card {
+  --stripe: var(--rb-border-strong);
   display: flex;
   align-items: center;
-  gap: 16px;
-  border: 1px solid #eef0f3;
-  border-radius: 14px;
-  padding: 16px 18px;
-  background: #fff;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  gap: 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
+  padding: 12px 16px 12px 20px;
+  background: var(--rb-surface);
+  box-shadow: inset 4px 0 0 var(--stripe);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .appointment-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border-color: #e3ecf6;
+  border-color: var(--rb-border-strong);
+  box-shadow:
+    inset 4px 0 0 var(--stripe),
+    0 1px 3px rgba(var(--rb-shadow-rgb), 0.06),
+    0 10px 22px -14px rgba(var(--rb-shadow-rgb), 0.3);
 }
 
-.appt-date-badge {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: #E3F2FD;
-  color: var(--primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.appointment-card--scheduled { --stripe: var(--rb-warning); }
+.appointment-card--in-progress { --stripe: var(--rb-primary); }
+.appointment-card--collected { --stripe: var(--rb-success); }
+.appointment-card--deferred,
+.appointment-card--no-show { --stripe: var(--rb-accent); }
+.appointment-card--cancelled { --stripe: var(--rb-border-strong); }
+
+/* The donor the counter should expect next. */
+.appointment-card--next {
+  border-color: rgba(var(--rb-primary-rgb), 0.45);
+  background: rgba(var(--rb-primary-rgb), 0.03);
 }
 
-.appt-day {
-  display: block;
-  font-weight: 800;
-  font-size: 17px;
-  line-height: 1;
-}
-
-.appt-month {
-  display: block;
-  font-size: 9.5px;
+.next-tag {
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-top: 3px;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--rb-primary);
+  color: #fff;
+}
+
+.appointment-card--cancelled .appt-name,
+.appointment-card--no-show .appt-name {
+  color: var(--text-secondary);
+}
+
+.appointment-card--cancelled .appt-name {
+  text-decoration: line-through;
+}
+
+.appointment-list .skeleton-block {
+  min-height: 78px;
+  box-shadow: none;
+}
+
+.appt-time {
+  width: 64px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-right: 14px;
+  border-right: 1px solid var(--rb-border);
+}
+
+.appt-time__clock {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.appt-time__period {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+.appt-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .appt-info {
@@ -1388,86 +1976,97 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .appt-name {
-  font-weight: 700;
+  font-weight: 800;
   font-size: 14.5px;
+  text-transform: capitalize;
   color: var(--text-primary);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .appt-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-secondary);
-  margin: 3px 0 0;
-}
-
-.appt-screening {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
   margin: 5px 0 0;
 }
 
-.screening-status {
+.appt-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.meta-sep {
+  opacity: 0.6;
+}
+
+.kind-tag {
+  font-size: 11px;
   font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 6px;
 }
 
-.screening-status--passed {
-  color: var(--success);
+.kind-tag--walkin {
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
 }
 
-.screening-status--failed {
-  color: var(--accent);
+.kind-tag--drive {
+  background: rgba(var(--rb-success-rgb), 0.1);
+  color: var(--rb-success-text);
 }
 
-.screening-status--pending {
-  color: var(--warning);
+.appt-phone {
+  color: inherit;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.appt-phone:hover {
+  color: var(--rb-primary-text);
+  text-decoration: underline;
 }
 
 .appt-status-col {
-  min-width: 100px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  align-items: center;
+  gap: 14px;
   flex-shrink: 0;
-}
-
-.view-link {
-  font-size: 12px;
-  color: var(--primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.view-link:hover {
-  text-decoration: underline;
 }
 
 .appt-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
 .row-action {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 92px;
   border: 1px solid var(--rb-border-strong);
   background: var(--rb-surface);
   color: var(--rb-text-primary);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .row-action:hover:not(:disabled) {
@@ -1480,137 +2079,234 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
+.row-action--ghost {
+  min-width: 0;
+  color: var(--text-secondary);
+}
+
+.row-action--ghost:hover:not(:disabled) {
+  color: var(--rb-accent-text);
+  border-color: rgba(var(--rb-accent-rgb), 0.4);
+  background: rgba(var(--rb-accent-rgb), 0.06);
+}
+
 .row-action--primary {
   background: var(--rb-primary);
   border-color: var(--rb-primary);
   color: #fff;
+  box-shadow: 0 4px 10px -6px rgba(var(--rb-primary-rgb), 0.8);
 }
 
 .row-action--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
-  border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  background: color-mix(in srgb, var(--rb-primary) 86%, #000);
+  border-color: color-mix(in srgb, var(--rb-primary) 86%, #000);
+  color: #fff;
 }
 
-/* Pills / badges */
+/* ---------- Pills ---------- */
 .pill {
-  font-size: 10.5px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
 }
 
-.pill--blood {
-  background: #fdeaea;
-  color: var(--accent);
+.pill--status {
+  min-width: 104px;
+  justify-content: center;
+  padding: 6px 12px;
 }
 
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.pill--in-progress .status-dot {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+.pill--blood { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 .pill--in-progress,
-.pill--confirmed {
-  background: #e3f2fd;
-  color: var(--primary);
-}
-
-.pill--collected {
-  background: #e8f5e9;
-  color: var(--success);
-}
-
+.pill--confirmed,
+.pill--attended { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.pill--collected { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .pill--no-show,
-.pill--deferred {
-  background: #fdeaea;
-  color: var(--accent);
-}
-
+.pill--deferred { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 .pill--pending,
-.pill--scheduled {
-  background: #fff3e0;
-  color: var(--warning);
+.pill--scheduled { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
+.pill--cancelled { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+/* ---------- Empty states ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 36px 16px;
+  border: 1px dashed var(--rb-border-strong);
+  border-radius: 14px;
 }
 
-.pill--cancelled {
-  background: #f3f4f6;
-  color: #6b7280;
+.empty-state--inline {
+  grid-column: 1 / -1;
+  padding: 22px 16px;
 }
 
-.pill--attended {
-  background: #e3f2fd;
-  color: var(--primary);
+.empty-state__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
 }
 
-/* Blood drives */
+.empty-state__title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.empty-state__text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+  max-width: 360px;
+}
+
+/* ---------- Blood drives ---------- */
 .drives-header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.drive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 14px;
 }
 
 .drive-card {
-  border: 1px solid #eef0f3;
-  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
   padding: 18px 20px;
-  margin-bottom: 16px;
+  background: var(--rb-surface);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.drive-card:hover {
+  border-color: var(--rb-border-strong);
+  box-shadow: 0 10px 22px -14px rgba(var(--rb-shadow-rgb), 0.3);
 }
 
 .drive-card__top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   gap: 12px;
 }
 
+.drive-card__heading {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.drive-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--rb-accent-rgb), 0.1);
+  color: var(--rb-accent-text);
+}
+
 .drive-card__title {
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 15px;
   margin: 0;
+  color: var(--text-primary);
 }
 
 .drive-card__meta {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   margin: 4px 0 0;
 }
 
 .status-badge {
   font-size: 10.5px;
-  font-weight: 700;
-  padding: 4px 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 5px 10px;
   border-radius: 999px;
   flex-shrink: 0;
   white-space: nowrap;
 }
 
-.status-badge--upcoming {
-  background: #e3f2fd;
-  color: var(--primary);
+.status-badge--upcoming { background: #e3f2fd; color: var(--primary); }
+.status-badge--open { background: #e8f5e9; color: var(--success); }
+.status-badge--closed { background: #f3f4f6; color: #6b7280; }
+.status-badge--full { background: #fdeaea; color: var(--accent); }
+
+.drive-progress {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
 }
 
-.status-badge--open {
-  background: #e8f5e9;
-  color: var(--success);
-}
-
-.status-badge--closed {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.status-badge--full {
-  background: #fdeaea;
-  color: var(--accent);
+.drive-progress__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
 }
 
 .drive-progress-label {
   font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
-  margin: 0 0 6px;
+}
+
+.drive-progress__pct {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-track {
-  height: 6px;
+  height: 10px;
   border-radius: 999px;
-  background: #eef0f3;
+  background: var(--rb-border);
   overflow: hidden;
 }
 
@@ -1618,7 +2314,7 @@ onMounted(async () => {
   height: 100%;
   border-radius: 999px;
   background: var(--primary);
-  transition: width 0.4s ease;
+  transition: width 0.5s ease;
 }
 
 .progress-fill--full {
@@ -1628,25 +2324,37 @@ onMounted(async () => {
 .progress-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-secondary);
-  margin: 6px 0 10px;
+  margin: 8px 0 0;
+}
+
+.progress-meta strong {
+  color: var(--text-primary);
 }
 
 .drive-note {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
-  margin: 8px 0 14px;
+  margin: 14px 0 0;
+}
+
+.drive-note--open {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(var(--rb-success-rgb), 0.08);
+  color: var(--rb-success-text);
+  font-weight: 600;
 }
 
 .preview-label {
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
-  margin: 4px 0 10px;
-  border-top: 1px solid #f3f4f6;
+  margin: 16px 0 10px;
+  border-top: 1px solid var(--rb-border);
   padding-top: 14px;
 }
 
@@ -1665,8 +2373,8 @@ onMounted(async () => {
 }
 
 .donor-row__avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   flex-shrink: 0;
   display: flex;
@@ -1674,7 +2382,7 @@ onMounted(async () => {
   justify-content: center;
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .donor-row__info {
@@ -1697,29 +2405,17 @@ onMounted(async () => {
 .drive-card__actions {
   display: flex;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: auto;
   padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
   flex-wrap: wrap;
 }
 
-.empty-state {
-  color: var(--text-secondary);
-  font-size: 13px;
-  padding: 20px 0;
-  text-align: center;
-}
-
-.empty-state--inline {
-  grid-column: 1 / -1;
-  padding: 12px 0;
-}
-
-/* Modals */
+/* ---------- Modals ---------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1728,13 +2424,13 @@ onMounted(async () => {
 }
 
 .modal-card {
-  background: #fff;
-  border-radius: 14px;
+  background: var(--rb-surface);
+  border-radius: 18px;
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.35);
 }
 
 .modal-card--wide {
@@ -1746,12 +2442,29 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.modal-card__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-card__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
 }
 
 .modal-card__title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   margin: 0;
 }
 
@@ -1760,13 +2473,15 @@ onMounted(async () => {
   border: none;
   cursor: pointer;
   color: var(--text-secondary);
-  padding: 4px;
+  padding: 6px;
+  border-radius: 8px;
   display: flex;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
 .modal-card__close:hover {
   color: var(--text-primary);
+  background: var(--rb-surface-hover);
 }
 
 .modal-form {
@@ -1776,10 +2491,14 @@ onMounted(async () => {
   gap: 14px;
 }
 
-.modal-subtitle {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
+.info-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--rb-primary-text);
+  background: rgba(var(--rb-primary-rgb), 0.07);
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.18);
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 
 .form-group {
@@ -1790,61 +2509,77 @@ onMounted(async () => {
 
 .form-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
-.form-label--muted {
-  text-transform: none;
-  font-weight: 600;
-  font-size: 12px;
-  color: #374151;
-  letter-spacing: 0;
-}
-
-.slots-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.slot-input {
+.slot-readout-head {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stepper {
-  position: relative;
-  display: flex;
+  justify-content: space-between;
   align-items: center;
 }
 
-.stepper__input {
-  padding-right: 32px;
+.slot-readout-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rb-primary-text);
 }
 
-.stepper__controls {
-  position: absolute;
-  right: 4px;
+.slot-readout {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.stepper__btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 1px 6px;
+.slot-readout__row {
   display: flex;
-  transition: color 0.15s ease;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  font-size: 13px;
 }
 
-.stepper__btn:hover {
-  color: var(--primary);
+.slot-readout__row + .slot-readout__row {
+  border-top: 1px solid var(--rb-border);
+}
+
+.slot-readout__row:nth-child(even) {
+  background: var(--rb-surface-alt);
+}
+
+.slot-readout .skeleton-block {
+  min-height: 42px;
+  border-radius: 0;
+}
+
+.slot-readout__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-readout__cap {
+  color: var(--text-secondary);
+}
+
+.slot-readout__cap strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.modal-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 18px 0;
+  margin: 0;
 }
 
 .modal-actions {
@@ -1858,7 +2593,7 @@ onMounted(async () => {
 .modal-error {
   color: #C62828;
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -1867,19 +2602,36 @@ onMounted(async () => {
   transition: opacity 0.2s ease;
 }
 
+.modal-enter-active .modal-card,
+.modal-leave-active .modal-card {
+  transition: transform 0.2s ease;
+}
+
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
 }
 
-/* Loading skeletons */
+.modal-enter-from .modal-card,
+.modal-leave-to .modal-card {
+  transform: translateY(12px) scale(0.98);
+}
+
+/* ---------- Skeletons (the same page skeleton as Inventory) ---------- */
+.skeleton-head { display: flex; flex-direction: column; gap: 8px; }
+.skeleton--header { height: 28px; max-width: 220px; border-radius: 8px; }
+.skeleton--sub { height: 14px; max-width: 320px; border-radius: 6px; }
+.skeleton--card { height: 108px; border-radius: 14px; }
+.skeleton--panel { border-radius: 14px; }
+
 .skeleton,
 .skeleton-block {
-  background: linear-gradient(90deg, #eceff3 25%, #f5f7fb 37%, #eceff3 63%);
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   animation: skeleton-loading 1.4s ease infinite;
   border-radius: 8px;
   color: transparent;
+  border-color: transparent;
 }
 
 .skeleton-block {
@@ -1887,43 +2639,18 @@ onMounted(async () => {
 }
 
 @keyframes skeleton-loading {
-  0% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0 50%;
-  }
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
-/* Responsive */
-@media (max-width: 900px) {
-  .time-slot-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner,
+  .pill--in-progress .status-dot,
+  .skeleton,
+  .skeleton-block {
+    animation: none !important;
   }
-}
 
-@media (max-width: 640px) {
-  .appointments-page {
-    padding: 16px 16px 32px;
-  }
-  .header-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .header-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .filters-row {
-    flex-direction: column;
-  }
-  .appointment-card {
-    flex-wrap: wrap;
-  }
-  .drive-card__actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }
 
 /* ============ DARK MODE ============ */
@@ -1935,15 +2662,14 @@ onMounted(async () => {
 
 :global(.dark .appointments-page .stat-card),
 :global(.dark .appointments-page .panel),
-:global(.dark .appointments-page .time-slot-card),
 :global(.dark .appointments-page .appointment-card),
 :global(.dark .appointments-page .drive-card),
 :global(.dark .appointments-page .modal-card),
-:global(.dark .appointments-page .date-filter),
+:global(.dark .appointments-page .date-control),
+:global(.dark .appointments-page .time-slot-card),
 :global(.dark .appointments-page .form-input),
-:global(.dark .appointments-page .btn-cancel),
 :global(.dark .appointments-page .btn-outline),
-:global(.dark .appointments-page .btn-outline-blue) {
+:global(.dark .appointments-page .row-action:not(.row-action--primary)) {
   background: #1E293B;
   border-color: #334155;
 }
@@ -1957,48 +2683,86 @@ onMounted(async () => {
   color: #F1F5F9;
 }
 
+:global(.dark .appointments-page .btn-outline),
+:global(.dark .appointments-page .row-action:not(.row-action--primary)),
+:global(.dark .appointments-page .date-filter) {
+  color: #F1F5F9;
+}
+
+:global(.dark .appointments-page .btn-outline:hover:not(:disabled)),
+:global(.dark .appointments-page .row-action:not(.row-action--primary):hover:not(:disabled)) {
+  background: #263449;
+  border-color: #475569;
+}
+
+:global(.dark .appointments-page .row-action--ghost) {
+  color: #94A3B8;
+}
+
+:global(.dark .appointments-page .row-action--ghost:hover:not(:disabled)) {
+  color: #F87171;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+:global(.dark .appointments-page .row-action--primary) {
+  background: #2563EB;
+  border-color: #2563EB;
+  box-shadow: none;
+}
+
+:global(.dark .appointments-page .row-action--primary:hover:not(:disabled)) {
+  background: #1D4ED8;
+  border-color: #1D4ED8;
+}
+
 :global(.dark .appointments-page .stat-card__value),
 :global(.dark .appointments-page .page-title),
 :global(.dark .appointments-page .panel-title),
 :global(.dark .appointments-page .section-label),
 :global(.dark .appointments-page .slot-time),
+:global(.dark .appointments-page .slot-count strong),
 :global(.dark .appointments-page .appt-name),
+:global(.dark .appointments-page .appt-time__clock),
 :global(.dark .appointments-page .drive-card__title),
+:global(.dark .appointments-page .drive-progress__pct),
 :global(.dark .appointments-page .donor-row__name),
 :global(.dark .appointments-page .modal-card__title),
-:global(.dark .appointments-page .form-label--muted) {
+:global(.dark .appointments-page .empty-state__title),
+:global(.dark .appointments-page .slot-readout__time),
+:global(.dark .appointments-page .slot-readout__cap strong),
+:global(.dark .appointments-page .result-count strong),
+:global(.dark .appointments-page .progress-meta strong) {
   color: #F1F5F9;
 }
 
 :global(.dark .appointments-page .stat-card__label),
+:global(.dark .appointments-page .stat-card__hint),
 :global(.dark .appointments-page .page-subtitle),
+:global(.dark .appointments-page .panel-subtitle),
+:global(.dark .appointments-page .section-hint),
 :global(.dark .appointments-page .appt-meta),
-:global(.dark .appointments-page .appt-screening),
+:global(.dark .appointments-page .appt-time__period),
 :global(.dark .appointments-page .drive-card__meta),
 :global(.dark .appointments-page .drive-progress-label),
 :global(.dark .appointments-page .progress-meta),
 :global(.dark .appointments-page .drive-note),
 :global(.dark .appointments-page .preview-label),
 :global(.dark .appointments-page .donor-row__meta),
-:global(.dark .appointments-page .empty-state),
-:global(.dark .appointments-page .modal-subtitle),
-:global(.dark .appointments-page .form-label) {
+:global(.dark .appointments-page .empty-state__text),
+:global(.dark .appointments-page .modal-empty),
+:global(.dark .appointments-page .form-label),
+:global(.dark .appointments-page .result-count),
+:global(.dark .appointments-page .legend-item),
+:global(.dark .appointments-page .loading-text) {
   color: #94A3B8;
 }
 
-:global(.dark .appointments-page .stat-card__icon--blue) { background: #1E3A5F; color: #60A5FA; }
-:global(.dark .appointments-page .stat-card__icon--orange) { background: #3E2C1A; color: #FBBF24; }
-:global(.dark .appointments-page .stat-card__icon--green) { background: #1A3A2A; color: #34D399; }
-:global(.dark .appointments-page .stat-card__icon--red) { background: #3A1A1A; color: #F87171; }
-
-
-:global(.dark .appointments-page .panel) {
-  border-color: #334155;
-}
-
-:global(.dark .appointments-page .tabs) {
+:global(.dark .appointments-page .tabs),
+:global(.dark .appointments-page .toolbar),
+:global(.dark .appointments-page .drive-progress) {
   background: #0F172A;
-  border-bottom-color: #334155;
+  border-color: #334155;
 }
 
 :global(.dark .appointments-page .tab) {
@@ -2011,33 +2775,42 @@ onMounted(async () => {
   color: #60A5FA;
   border-bottom-color: #60A5FA;
 }
-
-:global(.dark .appointments-page .time-slot-card) {
-  border-color: #334155;
-  background: #1E293B;
+:global(.dark .appointments-page .tab-count) {
+  background: #334155;
+  color: #CBD5E1;
 }
-:global(.dark .appointments-page .time-slot-card:hover) {
-  border-color: #60A5FA;
-  background: #263449;
+:global(.dark .appointments-page .tab--active .tab-count) {
+  background: #60A5FA;
+  color: #0F172A;
+}
+
+:global(.dark .appointments-page .date-control__chip) {
+  background: #0F172A;
+  color: #94A3B8;
+}
+:global(.dark .appointments-page .date-control__chip--today) {
+  background: #1A3A5F;
+  color: #60A5FA;
+}
+
+:global(.dark .appointments-page .time-slot-card--full) {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.35);
 }
 :global(.dark .appointments-page .time-slot-card--selected) {
-  border-color: #60A5FA;
   background: #1A3A5F;
-  box-shadow: 0 0 0 1px #60A5FA;
+  border-color: #60A5FA;
+  box-shadow: none;
 }
-:global(.dark .appointments-page .time-slot-card--full) {
-  border-color: #F87171;
-  background: #2D1A1A;
-}
-:global(.dark .appointments-page .slot-count--full) {
+:global(.dark .appointments-page .time-slot-card--full .slot-count),
+:global(.dark .appointments-page .time-slot-card--full .slot-count strong) {
   color: #F87171;
 }
-
-:global(.dark .appointments-page .form-input) {
-  background: #1E293B;
-  color: #F1F5F9;
-  border-color: #334155;
+:global(.dark .appointments-page .slot-meter),
+:global(.dark .appointments-page .slot-tag) {
+  background: #0F172A;
 }
+
 :global(.dark .appointments-page .form-input:focus) {
   border-color: #60A5FA;
   background: #263449;
@@ -2046,22 +2819,23 @@ onMounted(async () => {
   color: #94A3B8;
 }
 
-:global(.dark .appointments-page .appointment-card) {
-  border-color: #334155;
-  background: #1E293B;
-}
-:global(.dark .appointments-page .appointment-card:hover) {
-  border-color: #60A5FA;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+:global(.dark .appointments-page .appt-time) {
+  border-right-color: #334155;
 }
 
-:global(.dark .appointments-page .appt-date-badge) {
+:global(.dark .appointments-page .filter-chip) {
+  background: #1A3A5F;
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #60A5FA;
+}
+
+:global(.dark .appointments-page .kind-tag--walkin) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-
-:global(.dark .appointments-page .view-link) {
-  color: #60A5FA;
+:global(.dark .appointments-page .kind-tag--drive) {
+  background: #1A3A2A;
+  color: #34D399;
 }
 
 :global(.dark .appointments-page .pill--blood) {
@@ -2087,19 +2861,24 @@ onMounted(async () => {
   background: rgba(156, 163, 175, 0.16);
   color: #d1d5db;
 }
-
 :global(.dark .appointments-page .pill--pending),
 :global(.dark .appointments-page .pill--scheduled) {
   background: #3E2C1A;
   color: #FBBF24;
 }
 
-:global(.dark .appointments-page .screening-status--passed) { color: #34D399; }
-:global(.dark .appointments-page .screening-status--failed) { color: #F87171; }
-:global(.dark .appointments-page .screening-status--pending) { color: #FBBF24; }
-
-:global(.dark .appointments-page .drive-card) {
+:global(.dark .appointments-page .empty-state) {
   border-color: #334155;
+}
+:global(.dark .appointments-page .empty-state__icon),
+:global(.dark .appointments-page .modal-card__icon) {
+  background: #1A3A5F;
+  color: #60A5FA;
+}
+
+:global(.dark .appointments-page .drive-card__icon) {
+  background: #2D1A1A;
+  color: #F87171;
 }
 
 :global(.dark .appointments-page .status-badge--upcoming) {
@@ -2111,8 +2890,12 @@ onMounted(async () => {
   color: #34D399;
 }
 :global(.dark .appointments-page .status-badge--closed) {
-  background: #1E293B;
+  background: #0F172A;
   color: #94A3B8;
+}
+:global(.dark .appointments-page .status-badge--full) {
+  background: #2D1A1A;
+  color: #F87171;
 }
 
 :global(.dark .appointments-page .progress-track) {
@@ -2125,49 +2908,25 @@ onMounted(async () => {
   background: #34D399;
 }
 
-:global(.dark .appointments-page .preview-label),
-:global(.dark .appointments-page .drive-card__actions) {
+:global(.dark .appointments-page .drive-note--open) {
+  background: #1A3A2A;
+  color: #34D399;
+}
+
+:global(.dark .appointments-page .preview-label) {
   border-top-color: #334155;
 }
 
-:global(.dark .appointments-page .donor-row__avatar) {
-  color: #fff;
-}
-
-:global(.dark .appointments-page .btn-primary) {
-  background: #60A5FA;
-  color: #0F172A;
-}
-:global(.dark .appointments-page .btn-primary:hover) {
-  opacity: 0.9;
-}
-:global(.dark .appointments-page .btn-cancel) {
-  background: #263449;
-  color: #F1F5F9;
-}
-:global(.dark .appointments-page .btn-cancel:hover) {
-  background: #334155;
-}
-:global(.dark .appointments-page .btn-outline) {
-  background: #263449;
-  color: #F1F5F9;
-}
-:global(.dark .appointments-page .btn-outline:hover) {
-  background: #334155;
-}
 :global(.dark .appointments-page .btn-outline-blue) {
   background: #1A3A5F;
   color: #60A5FA;
 }
-:global(.dark .appointments-page .btn-outline-blue:hover) {
+:global(.dark .appointments-page .btn-outline-blue:hover:not(:disabled)) {
   background: #1E4A7A;
 }
-:global(.dark .appointments-page .btn-clear-date) {
-  background: #263449;
-  color: #F1F5F9;
-}
-:global(.dark .appointments-page .btn-clear-date:hover) {
-  background: #334155;
+
+:global(.dark .appointments-page .btn-link) {
+  color: #60A5FA;
 }
 
 :global(.dark .appointments-page .modal-overlay) {
@@ -2181,6 +2940,22 @@ onMounted(async () => {
 }
 :global(.dark .appointments-page .modal-card__close:hover) {
   color: #F1F5F9;
+  background: #263449;
+}
+:global(.dark .appointments-page .info-note) {
+  background: #1A3A5F;
+  border-color: rgba(96, 165, 250, 0.3);
+  color: #93C5FD;
+}
+:global(.dark .appointments-page .slot-readout),
+:global(.dark .appointments-page .slot-readout__row + .slot-readout__row) {
+  border-color: #334155;
+}
+:global(.dark .appointments-page .slot-readout__row:nth-child(even)) {
+  background: #0F172A;
+}
+:global(.dark .appointments-page .slot-readout-total) {
+  color: #60A5FA;
 }
 :global(.dark .appointments-page .modal-error) {
   color: #F87171;
@@ -2190,35 +2965,17 @@ onMounted(async () => {
   background: rgba(239, 83, 80, 0.10);
   color: #EF9A9A;
   border-color: rgba(239, 83, 80, 0.24);
+  border-left-color: #EF5350;
 }
 
-:global(.dark .appointments-page .stepper__btn) {
-  color: #94A3B8;
-}
-:global(.dark .appointments-page .stepper__btn:hover) {
-  color: #60A5FA;
-}
-
-:global(.dark .appointments-page .skeleton-block) {
-  background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
-  background-size: 400% 100%;
-  animation: skeleton-loading-dark 1.4s ease infinite;
-}
-
-@keyframes skeleton-loading-dark {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
-}
-
-:global(.dark .appointments-page .btn-link) {
-  color: #60A5FA;
-}
-
-.btn-primary:focus-visible,
+/* ---------- Focus rings ---------- */
 .btn-outline:focus-visible,
 .btn-outline-blue:focus-visible,
-.btn-cancel:focus-visible,
-.btn-link:focus-visible {
+.btn-link:focus-visible,
+.row-action:focus-visible,
+.filter-chip:focus-visible,
+.error-banner__retry:focus-visible,
+.modal-card__close:focus-visible {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }

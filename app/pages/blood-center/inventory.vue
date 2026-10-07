@@ -1537,7 +1537,7 @@ async function runManageAction(action) {
   if (action !== 'discard') {
     manageModalOpen.value = false
     manageActionNote.value = action === 'reserve' || action === 'release'
-      ? 'Units are reserved and released by allocating them to a hospital request, under Requests Fulfillment.'
+      ? 'Units are reserved and released by allocating them to a hospital request, under Request Fulfillment.'
       : `There is no "${action}" action for a blood unit. Discard it if it can no longer be issued.`
     return
   }
