@@ -2,16 +2,10 @@
   <div class="collection">
     <header class="collection__header">
       <div>
-        <p class="collection__eyebrow">Donor / Collection</p>
         <h1 class="collection__title">Donation Counter</h1>
         <p class="collection__subtitle">
-          Scan the donor once on arrival, then work through the visit without asking them to identify themselves again.
+          Scan the donor once on arrival. The rest of the visit carries on from that scan.
         </p>
-      </div>
-
-      <div v-if="facilityLabel" class="collection__facility">
-        <AssetIcon name="building-2" :size="14" />
-        {{ facilityLabel }}
       </div>
     </header>
 
@@ -49,6 +43,33 @@
       </button>
     </section>
 
+    <BloodCenterPriorDeferralNotice v-if="priorDeferral" :deferral="priorDeferral" />
+
+    <!--
+      The donor's declared health answers are the physician's to read. The
+      receptionist and the chair see that the visit exists, not what the donor
+      declared.
+    -->
+    <BloodCenterDonorQuestionnaireSummary
+      v-if="donor && canReadQuestionnaire"
+      :meta="questionnaireMeta"
+      :flagged-count="flaggedCount"
+      :loading="questionnaireLoading"
+      @open="openQuestionnaire"
+      @refresh="refreshQuestionnaire"
+    />
+
+    <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireErrorText }}</p>
+
+    <BloodCenterDonorQuestionnaire
+      v-if="canReadQuestionnaire && questionnaireOpen && questionnaire"
+      :data="questionnaire"
+      :intake="intakeForm"
+      :can-edit-intake="Boolean(donation)"
+      @close="questionnaireOpen = false"
+      @update-intake="(key, value) => { intakeForm[key] = value }"
+    />
+
     <!-- Progress through the one continuous transaction. -->
     <ol v-if="donor" class="steps" aria-label="Visit progress">
       <li v-for="step in steps" :key="step.key" class="step" :class="step.state">
@@ -63,43 +84,74 @@
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <!-- STAGE 1 — the single scan -->
-    <section v-if="stage === 'scan'" class="card">
-      <h2 class="card__title">Verify the donor</h2>
-      <p class="card__hint">
-        One scan confirms who they are, which appointment they hold, and that it belongs to this facility.
-      </p>
+    <!-- STAGE 1: the single scan. QR on the left, the ID lookup always beside it. -->
+    <div v-if="stage === 'scan'" class="checkin">
+      <section class="card checkin__panel">
+        <div class="checkin__head">
+          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="qr-code" :size="18" /></span>
+          <div>
+            <h2 class="card__title">Scan the donor's QR</h2>
+            <p class="card__hint">The fastest way in, for booked donors and walk-ins alike.</p>
+          </div>
+        </div>
 
-      <div class="scan-grid">
         <BloodCenterQrScanner
           ref="scannerRef"
           :busy="busy"
+          :show-manual="false"
           @scanned="onScanned"
-          @manual="manualOpen = true"
+          @manual="focusLookup"
         />
+      </section>
 
-        <div v-if="manualOpen" class="lookup">
-          <h3 class="lookup__title">Look up by valid ID</h3>
-          <p class="card__hint">Use this when the donor has no QR code, or the camera is unavailable.</p>
+      <section class="card checkin__panel">
+        <div class="checkin__head">
+          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="id-card" :size="18" /></span>
+          <div>
+            <h2 class="card__title">Or look up by valid ID</h2>
+            <p class="card__hint">For a donor without a QR code, or when the camera is unavailable.</p>
+          </div>
+        </div>
 
+        <form class="lookup" @submit.prevent="!busy && lookupValue.trim() && lookupDonor()">
           <label class="field">
             <span class="field__label">Valid ID number</span>
-            <input v-model="lookupValue" type="text" class="field__input" placeholder="e.g. PH-DL-12345" >
+            <input
+              ref="lookupInput"
+              v-model="lookupValue"
+              type="text"
+              class="field__input"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="e.g. PH-DL-12345"
+            >
           </label>
 
-          <button type="button" class="btn btn--primary" :disabled="busy || !lookupValue.trim()" @click="lookupDonor">
+          <button type="submit" class="btn btn--primary" :disabled="busy || !lookupValue.trim()">
             {{ busy ? 'Searching…' : 'Find donor' }}
           </button>
-          <p v-if="lookupError" class="alert alert--error">{{ lookupError }}</p>
+        </form>
+        <p v-if="lookupError" class="alert alert--error" role="alert">{{ lookupError }}</p>
+
+        <div class="checkin__checks">
+          <p class="checkin__checks-title">Either way, the counter confirms</p>
+          <ul>
+            <li><AssetIcon name="check" :size="14" /> Who the donor is</li>
+            <li><AssetIcon name="check" :size="14" /> Which appointment they hold today, if any</li>
+            <li><AssetIcon name="check" :size="14" /> That it belongs to this facility</li>
+          </ul>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <!-- STAGE 2 — check in and open the transaction -->
-    <section v-else-if="stage === 'verified'" class="card">
+    <section v-if="stage === 'verified'" class="card">
       <h2 class="card__title">Start the donation</h2>
       <p class="card__hint">
-        <template v-if="appointment">
+        <template v-if="appointment?.status === 'confirmed'">
+          The donor is checked in. Open their donation record to continue.
+        </template>
+        <template v-else-if="appointment">
           Mark the donor as arrived, then open their donation record.
         </template>
         <template v-else>
@@ -118,7 +170,7 @@
           Check in
         </button>
 
-        <button type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
+        <button v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
           {{ busy ? 'Working…' : 'Open donation' }}
         </button>
 
@@ -126,14 +178,55 @@
           Mark no-show
         </button>
       </div>
+
+      <p v-if="!canRegister" class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donation is opened at the reception desk. Send the donor there first.
+      </p>
+    </section>
+
+    <!-- STAGE 3, for anyone but the physician — waiting to be screened. -->
+    <section v-else-if="stage === 'screening' && !canScreen" class="card">
+      <h2 class="card__title">Awaiting screening</h2>
+      <p class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donation is open. The screening physician examines the donor and accepts or defers them before
+        anything else can be recorded.
+      </p>
+      <div class="actions">
+        <button type="button" class="btn" @click="finishVisit">Next donor</button>
+      </div>
     </section>
 
     <!-- STAGE 3 — screening and pre-donation assessment -->
-    <section v-else-if="stage === 'screening'" class="card">
-      <h2 class="card__title">Screening &amp; pre-donation assessment</h2>
+    <section v-else-if="stage === 'screening' || correcting === 'screening'" class="card">
+      <h2 class="card__title">
+        {{ correcting === 'screening' ? 'Correct the screening' : 'Screening & pre-donation assessment' }}
+      </h2>
+      <p v-if="correcting === 'screening'" class="handoff" role="status">
+        <AssetIcon name="pencil" :size="14" />
+        This screening is already saved. Change what was entered wrongly; the corrected record goes to the Center
+        Admin to approve.
+      </p>
       <p class="card__hint">
         Record what the attending professional found. RedAgos stores this assessment — it does not perform or
         judge it, and no value here decides the outcome.
+      </p>
+      <p class="card__hint">
+        This is your assessment. What the donor declared is under
+        <strong>Review questionnaire</strong> above.
+      </p>
+
+      <!--
+        Sleep, Meal, Meds and Allergies are not here. They are printed in the
+        top margin of the donor's questionnaire sheet, so that is where staff
+        fill them in — inside the drawer under Review questionnaire, which is
+        the only part of that document the counter writes. They still travel to
+        the server with this form, because they describe the visit it records.
+      -->
+      <p class="card__hint">
+        Sleep, meal, meds and allergies are at the top of
+        <strong>Review questionnaire</strong> above, where the form prints them.
       </p>
 
       <div class="vitals">
@@ -163,14 +256,68 @@
         </label>
       </div>
 
+      <!--
+        Section II's small Hemoglobin / Blood Type table: both are fingerprick
+        readings taken here, before the donor is bled. The blood type is
+        preliminary — the Testing department's typing is the one that counts,
+        and this never pre-fills it or reaches the donor's record.
+      -->
+      <fieldset class="exam">
+        <legend class="exam__legend">Fingerprick blood type <span class="field__optional">optional</span></legend>
+        <BloodCenterBloodTypePicker
+          v-model="screeningForm.fingerprick_blood_type_id"
+          :blood-types="bloodTypes"
+          optional
+        />
+        <p class="exam__hint">
+          Preliminary. The Testing department confirms the typing; this does not change the donor's blood type on record.
+        </p>
+      </fieldset>
+
+      <!-- Observed, in the order the form prints them. -->
+      <fieldset class="exam">
+        <legend class="exam__legend">On examination</legend>
+        <div class="vitals">
+          <label class="field">
+            <span class="field__label">General appearance</span>
+            <input v-model="screeningForm.general_appearance" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Skin</span>
+            <input v-model="screeningForm.skin" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">HEENT</span>
+            <input v-model="screeningForm.heent" type="text" class="field__input" maxlength="255" >
+          </label>
+          <label class="field">
+            <span class="field__label">Heart and lungs</span>
+            <input v-model="screeningForm.heart_and_lungs" type="text" class="field__input" maxlength="255" >
+          </label>
+        </div>
+      </fieldset>
+
       <label class="field">
         <span class="field__label">Notes <span class="field__optional">optional</span></span>
         <textarea v-model="screeningForm.notes" class="field__input" rows="2" maxlength="500" />
       </label>
 
       <div v-if="deferring" class="defer">
+        <!--
+          Which of the form's three deferral boxes. They behave identically in
+          the workflow; what differs is what the donor is told afterwards, so
+          the choice has to be explicit rather than inferred.
+        -->
+        <fieldset class="defer__options">
+          <legend class="field__label">Deferral</legend>
+          <label v-for="option in deferralOptions" :key="option.value" class="defer__option">
+            <input v-model="screeningForm.outcome" type="radio" :value="option.value" >
+            <span>{{ option.label }}</span>
+          </label>
+        </fieldset>
+
         <label class="field">
-          <span class="field__label">Reason for deferral</span>
+          <span class="field__label">Reason</span>
           <input
             v-model="screeningForm.deferral_reason"
             type="text"
@@ -179,7 +326,12 @@
             placeholder="What the donor should be told"
           >
         </label>
+
         <p class="card__hint">The donor's visit ends here and their appointment closes.</p>
+        <p v-if="isBlockingChoice" class="card__hint card__hint--warn">
+          The donor will not be invited to book again, and the next counter to scan
+          them will see this deferral.
+        </p>
       </div>
 
       <div class="actions">
@@ -188,9 +340,9 @@
           type="button"
           class="btn btn--primary"
           :disabled="busy"
-          @click="submitScreening('qualified')"
+          @click="submitScreening('accepted')"
         >
-          {{ busy ? 'Saving…' : 'Qualified — continue' }}
+          {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accepted — continue' }}
         </button>
 
         <button v-if="!deferring" type="button" class="btn btn--danger" :disabled="busy" @click="deferring = true">
@@ -202,36 +354,130 @@
             type="button"
             class="btn btn--danger"
             :disabled="busy || !screeningForm.deferral_reason.trim()"
-            @click="submitScreening('deferred')"
+            @click="submitScreening(screeningForm.outcome)"
           >
-            {{ busy ? 'Saving…' : 'Confirm deferral' }}
+            {{ busy ? 'Saving…' : `Confirm — ${selectedDeferralLabel}` }}
           </button>
           <button type="button" class="btn" :disabled="busy" @click="deferring = false">Back</button>
         </template>
+
+        <button v-if="correcting === 'screening'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+          Cancel correction
+        </button>
       </div>
     </section>
 
-    <!-- STAGE 4 — the collection -->
-    <section v-else-if="stage === 'collection'" class="card">
-      <h2 class="card__title">Record the collection</h2>
+    <!-- STAGE 4, for anyone but the chair — accepted and waiting to be bled. -->
+    <section v-else-if="stage === 'collection' && !canCollect" class="card">
+      <h2 class="card__title">Accepted — awaiting collection</h2>
+      <p class="handoff" role="status">
+        <AssetIcon name="clock" :size="14" />
+        The donor has been accepted. The phlebotomist records the bag, barcode and times at the chair.
+      </p>
+      <div class="actions">
+        <button type="button" class="btn" @click="finishVisit">Next donor</button>
+        <button v-if="canScreen && donation?.screening" type="button" class="btn" @click="startScreeningCorrection">
+          <AssetIcon name="pencil" :size="13" />
+          Correct the screening
+        </button>
+      </div>
+    </section>
+
+    <!-- STAGE 4 — the collection: Section II, "For Phlebotomist Use Only" -->
+    <section v-else-if="stage === 'collection' || correcting === 'collection'" class="card">
+      <h2 class="card__title">{{ correcting === 'collection' ? 'Correct the collection record' : 'Record the collection' }}</h2>
+      <p v-if="correcting === 'collection'" class="handoff" role="status">
+        <AssetIcon name="pencil" :size="14" />
+        This record is already saved. Change what was entered wrongly; the corrected record goes to the Donor
+        Screening Physician to approve.
+      </p>
       <p class="card__hint">
-        Recording the collection finishes the donor's visit. Clearing the blood for issue is a separate
-        laboratory decision made later.
+        The phlebotomist's box on the form. Recording it finishes the donor's visit and hands the donation to the
+        Testing department.
       </p>
 
-      <label class="field field--narrow">
-        <span class="field__label">Volume collected</span>
-        <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
-        <span class="field__optional">A whole-blood bag is nominally 450 mL.</span>
-      </label>
+      <fieldset class="exam">
+        <legend class="exam__legend">Blood bag</legend>
+        <div class="bags" role="radiogroup" aria-label="Blood bag">
+          <label
+            v-for="bag in bagTypes"
+            :key="bag.value"
+            class="bag"
+            :class="{ 'bag--on': collectionForm.blood_bag_type === bag.value }"
+          >
+            <input v-model="collectionForm.blood_bag_type" type="radio" name="blood_bag_type" :value="bag.value" class="bag__radio" >
+            <span class="bag__code" aria-hidden="true">{{ bag.code }}</span>
+            <span class="bag__label">{{ bag.label }}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="vitals">
+        <label class="field">
+          <span class="field__label">Donation barcode (sticker)</span>
+          <!--
+            The pre-printed sticker that goes on the form, every bag and tube,
+            and the CUE slip. A barcode scanner types the number and presses
+            Enter; Enter moves on to the next field rather than submitting half
+            a record.
+          -->
+          <input
+            ref="barcodeInput"
+            v-model="collectionForm.donation_barcode"
+            type="text"
+            class="field__input field__input--mono"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="characters"
+            maxlength="30"
+            placeholder="Scan the sticker"
+            @keydown.enter.prevent="startedInput?.focus()"
+          >
+          <span class="field__optional">From the donor's barcode sticker sheet.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Time started</span>
+          <span class="time-row">
+            <input ref="startedInput" v-model="collectionForm.started_time" type="time" class="field__input" >
+            <button type="button" class="btn btn--small" @click="collectionForm.started_time = timeNow()">Now</button>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Time ended</span>
+          <span class="time-row">
+            <input v-model="collectionForm.ended_time" type="time" class="field__input" >
+            <button type="button" class="btn btn--small" @click="collectionForm.ended_time = timeNow()">Now</button>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Volume collected</span>
+          <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
+          <span class="field__optional">A whole-blood bag is nominally 450 mL.</span>
+        </label>
+      </div>
+
+      <p class="card__hint">
+        Phlebotomist: <strong>{{ phlebotomistName }}</strong> — recorded from your sign-in.
+      </p>
+
+      <ul v-if="collectionAttempted && collectionProblems.length" class="problems" role="alert">
+        <li v-for="problem in collectionProblems" :key="problem">{{ problem }}</li>
+      </ul>
 
       <div class="actions">
-        <button type="button" class="btn btn--primary" :disabled="busy || !validVolume" @click="submitCollection">
-          {{ busy ? 'Saving…' : 'Complete donation' }}
+        <button type="button" class="btn btn--primary" :disabled="busy" @click="submitCollection">
+          {{ busy ? 'Saving…' : correcting === 'collection' ? 'Request correction' : 'Complete donation' }}
         </button>
 
-        <button type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
+        <button v-if="canClose && correcting !== 'collection'" type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
           Collection unsuccessful
+        </button>
+
+        <button v-if="correcting === 'collection'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+          Cancel correction
         </button>
       </div>
     </section>
@@ -243,13 +489,20 @@
         <div>
           <h2 class="card__title">{{ isDeferred ? 'Donor deferred' : 'Donation recorded' }}</h2>
           <p class="card__hint">
+            <!-- The reason is only served to the physician. -->
             <template v-if="isDeferred">
               {{ donation?.rejection_reason || 'The donor was not able to donate today.' }}
             </template>
             <template v-else>
-              {{ donation?.volume_ml }} mL recorded. The donation is now with the laboratory, and the donor's
-              history and last donation date are updated.
+              {{ donation?.volume_ml }} mL recorded. The donation is now with the Testing department, and the
+              donor's history and last donation date are updated.
             </template>
+          </p>
+          <p v-if="!isDeferred && donation?.collection?.donation_barcode" class="done-facts">
+            <span>Barcode <strong class="mono">{{ donation.collection.donation_barcode }}</strong></span>
+            <span v-if="donation.collection.blood_bag_type_label">
+              {{ donation.collection.blood_bag_type_label }} bag
+            </span>
           </p>
         </div>
       </div>
@@ -257,15 +510,41 @@
       <div class="actions">
         <button type="button" class="btn btn--primary" @click="finishVisit">Next donor</button>
         <NuxtLink to="/blood-center/appointments" class="btn">Back to the queue</NuxtLink>
+        <button
+          v-if="canCollect && !isDeferred && donation?.collection"
+          type="button"
+          class="btn"
+          @click="startCollectionCorrection"
+        >
+          <AssetIcon name="pencil" :size="13" />
+          Request a correction
+        </button>
       </div>
     </section>
+
+    <!-- A saved record is never saved over: the corrected values go for approval. -->
+    <BloodCenterCorrectionRequestDialog
+      v-if="correction && donation"
+      :donation-id="donation.id"
+      :subject="correction.subject"
+      :changes="correction.changes"
+      :previous="correction.previous"
+      @close="correction = null"
+      @submitted="onCorrectionSent"
+    />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQrScanner from '~/components/BloodCenter/QrScanner.vue'
+import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
+import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
+import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferralNotice.vue'
+import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { atTimeOn, normalizeBarcode, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
 
 /**
  * The counter's one continuous donation transaction.
@@ -279,42 +558,164 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'donations.record',
+  // Any one of COLLECTION_ABILITIES in useBloodCenterNav — spelled out because
+  // the page meta is extracted before imports resolve.
+  requires: ['donations.register', 'donations.screen', 'donations.collect'],
 })
 
-const { user } = useUser()
-const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+const { user, can } = useUser()
+
+// One page, three roles. Each stage renders its form only for the role that
+// performs it, and a hand-off card for everyone else; the server refuses the
+// write regardless.
+const canRegister = computed(() => can('donations.register'))
+const canScreen = computed(() => can('donations.screen'))
+const canCollect = computed(() => can('donations.collect'))
+const canClose = computed(() => can('donations.close'))
+const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))
 
 const service = bloodCenterService
 
 const {
   donor, appointment, donation, stage, busy, error, notice, isDeferred,
+  priorDeferral, intakeForm,
+  questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
+  loadQuestionnaire,
   verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
 } = useDonationTransaction()
 
+const flaggedCount = computed(() => questionnaire.value?.flagged_codes?.length ?? 0)
+
+/**
+ * Fetch on first open and keep it for the visit.
+ *
+ * Nothing is requested until a staff member asks for it, which is why the scan
+ * carries only metadata: the answers are fetched once, from an endpoint that
+ * records who read them.
+ */
+async function openQuestionnaire() {
+  const ok = await loadQuestionnaire()
+
+  if (ok) questionnaireOpen.value = true
+}
+
+/**
+ * Re-fetch for the donor who is filling it in on their phone at the counter.
+ *
+ * Without this, a donor who arrives having never answered would have to be
+ * re-scanned before staff could see what they just submitted.
+ */
+async function refreshQuestionnaire() {
+  const ok = await loadQuestionnaire(true)
+
+  if (ok) questionnaireOpen.value = true
+}
+
 const scannerRef = ref(null)
+const lookupInput = ref(null)
 const manualOpen = ref(false)
+
+function focusLookup() {
+  lookupInput.value?.focus()
+}
+
+/**
+ * Display only. A server that cannot decrypt the stored answers says
+ * "The MAC is invalid", which means nothing at the counter.
+ */
+const questionnaireErrorText = computed(() => {
+  const message = questionnaireError.value || ''
+
+  return /MAC is invalid|payload is invalid/i.test(message)
+    ? "The donor's questionnaire answers can't be read right now. Ask your administrator to check the server's encryption key."
+    : message
+})
 const lookupValue = ref('')
 const lookupError = ref(null)
 const deferring = ref(false)
 
+/**
+ * The form's three deferral boxes. Accepted is the primary action rather than
+ * an option here, because it is the outcome that does not end the visit.
+ */
+const deferralOptions = [
+  { value: 'temporarily_deferred', label: 'Temporarily Deferred' },
+  { value: 'permanently_deferred', label: 'Permanently Deferred' },
+  { value: 'indefinite_deferral', label: 'Indefinite Deferral' },
+]
+
+const BLOCKING_OUTCOMES = ['permanently_deferred', 'indefinite_deferral']
+
+const isBlockingChoice = computed(() => BLOCKING_OUTCOMES.includes(screeningForm.outcome))
+
+const selectedDeferralLabel = computed(() =>
+  deferralOptions.find((o) => o.value === screeningForm.outcome)?.label ?? 'deferral')
+
 const screeningForm = reactive({
+  // Section I-D. The outcome lives on the form rather than being a bare
+  // argument, now that there are four of them and three end the visit.
+  outcome: 'temporarily_deferred',
+  general_appearance: '',
+  skin: '',
+  heent: '',
+  heart_and_lungs: '',
   systolic_bp: null,
   diastolic_bp: null,
   pulse_bpm: null,
   temperature_c: null,
   weight_kg: null,
   haemoglobin_g_dl: null,
+  // Section II's fingerprick table. Preliminary; never adopted onto the donor.
+  fingerprick_blood_type_id: null,
   notes: '',
   deferral_reason: '',
 })
 
-const collectionForm = reactive({ volume_ml: 450 })
+/**
+ * Section II, "For Phlebotomist Use Only".
+ *
+ * No bag is pre-selected: single, double and triple decide what the bag can be
+ * separated into, so it has to be a deliberate choice. The phlebotomist is not
+ * a field at all — it is whoever is signed in.
+ */
+function blankCollection() {
+  return { blood_bag_type: '', donation_barcode: '', started_time: '', ended_time: '', volume_ml: 450 }
+}
 
-const validVolume = computed(() => {
-  const v = Number(collectionForm.volume_ml)
+const collectionForm = reactive(blankCollection())
+const collectionAttempted = ref(false)
+const collectionProblems = computed(() => phlebotomyProblems(collectionForm, new Date()))
 
-  return Number.isFinite(v) && v >= 100 && v <= 1000
+const barcodeInput = ref(null)
+const startedInput = ref(null)
+
+// Ready for the scanner the moment the collection stage opens.
+watch(stage, (now) => {
+  if (now === 'collection') nextTick(() => barcodeInput.value?.focus())
+})
+
+const phlebotomistName = computed(() => user.value?.full_name
+  || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ')
+  || 'You')
+
+// From the reference data, with the form's three boxes as the fallback so the
+// counter still works if that request fails.
+const bloodTypes = ref([])
+const bagTypes = ref([
+  { value: 'single', label: 'Single', code: 'S' },
+  { value: 'double', label: 'Double', code: 'D' },
+  { value: 'triple', label: 'Triple', code: 'T' },
+])
+
+onMounted(async () => {
+  try {
+    const reference = await service.referenceData()
+
+    bloodTypes.value = reference?.blood_types ?? []
+    if (reference?.blood_bag_types?.length) bagTypes.value = reference.blood_bag_types
+  } catch {
+    // The fingerprick picker stays empty and optional; nothing else depends on it.
+  }
 })
 
 const initials = computed(() => (donor.value?.full_name || '?')
@@ -370,7 +771,7 @@ async function lookupDonor() {
       full_name: found.full_name,
       blood_type: found.blood_type ?? null,
       phone: found.phone ?? null,
-    })
+    }, null, found.prior_deferral ?? null)
 
     manualOpen.value = false
     lookupValue.value = ''
@@ -392,15 +793,121 @@ async function submitScreening(outcome) {
     if (screeningForm[key] !== null && screeningForm[key] !== '') payload[key] = screeningForm[key]
   }
 
+  // Section I-D free text: send only what was actually written, so a field the
+  // officer tabbed past stays absent rather than becoming an empty string.
+  for (const key of ['general_appearance', 'skin', 'heent', 'heart_and_lungs']) {
+    if (screeningForm[key].trim()) payload[key] = screeningForm[key].trim()
+  }
+
+  // Filled in the questionnaire drawer, where the form prints them, and
+  // carried here because they belong to the screening this call records.
+  for (const key of ['sleep', 'meal', 'meds', 'allergies']) {
+    if (intakeForm[key].trim()) payload[key] = intakeForm[key].trim()
+  }
+
   if (screeningForm.notes.trim()) payload.notes = screeningForm.notes.trim()
-  if (outcome === 'deferred') payload.deferral_reason = screeningForm.deferral_reason.trim()
+
+  if (screeningForm.fingerprick_blood_type_id) {
+    payload.fingerprick_blood_type_id = screeningForm.fingerprick_blood_type_id
+  }
+
+  // Any of the three deferrals carries a reason; only Accepted has none.
+  if (outcome !== 'accepted') payload.deferral_reason = screeningForm.deferral_reason.trim()
+
+  if (correcting.value === 'screening') {
+    correction.value = { subject: 'screening', changes: payload, previous: donation.value?.screening ?? null }
+    deferring.value = false
+    return
+  }
 
   await recordScreening(payload)
   deferring.value = false
 }
 
 async function submitCollection() {
-  await recordCollection({ volume_ml: Number(collectionForm.volume_ml) })
+  collectionAttempted.value = true
+
+  if (collectionProblems.value.length) return
+
+  // The draw happens during the visit, so the two times are on today's date —
+  // or, for a correction, on the day it was drawn.
+  const saved = donation.value?.collection
+  const day = correcting.value === 'collection' && saved?.started_at ? new Date(saved.started_at) : new Date()
+
+  const payload = {
+    volume_ml: Number(collectionForm.volume_ml),
+    blood_bag_type: collectionForm.blood_bag_type,
+    donation_barcode: normalizeBarcode(collectionForm.donation_barcode),
+    started_at: atTimeOn(day, collectionForm.started_time),
+    ended_at: atTimeOn(day, collectionForm.ended_time),
+  }
+
+  if (correcting.value === 'collection') {
+    correction.value = {
+      subject: 'collection',
+      changes: payload,
+      previous: saved ? {
+        volume_ml: donation.value.volume_ml,
+        blood_bag_type: saved.blood_bag_type,
+        donation_barcode: saved.donation_barcode,
+        started_at: saved.started_at,
+        ended_at: saved.ended_at,
+      } : null,
+    }
+    return
+  }
+
+  await recordCollection(payload)
+}
+
+// --- corrections ----------------------------------------------------------------
+//
+// Once saved, the screening and the collection box are never saved over. The
+// same form reopens, and what it would have saved goes as a correction request.
+
+const correcting = ref(null)
+const correction = ref(null)
+
+function hhmm(iso) {
+  if (!iso) return ''
+
+  const date = new Date(iso)
+
+  return Number.isNaN(date.getTime())
+    ? ''
+    : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function startScreeningCorrection() {
+  const saved = donation.value?.screening ?? {}
+
+  for (const key of Object.keys(screeningForm)) {
+    if (key in saved && saved[key] !== undefined) screeningForm[key] = saved[key] ?? (typeof screeningForm[key] === 'string' ? '' : null)
+  }
+
+  deferring.value = false
+  correcting.value = 'screening'
+}
+
+function startCollectionCorrection() {
+  const saved = donation.value?.collection ?? {}
+
+  Object.assign(collectionForm, {
+    blood_bag_type: saved.blood_bag_type ?? '',
+    donation_barcode: saved.donation_barcode ?? '',
+    started_time: hhmm(saved.started_at),
+    ended_time: hhmm(saved.ended_at),
+    volume_ml: donation.value?.volume_ml ?? 450,
+  })
+
+  collectionAttempted.value = false
+  correcting.value = 'collection'
+}
+
+function onCorrectionSent(response) {
+  correction.value = null
+  correcting.value = null
+  notice.value = response?.message ?? 'Correction requested.'
 }
 
 async function abandonCollection() {
@@ -421,16 +928,22 @@ async function abandonCollection() {
 
 function finishVisit() {
   reset()
+  correcting.value = null
+  correction.value = null
   manualOpen.value = false
   deferring.value = false
   lookupValue.value = ''
   lookupError.value = null
   Object.assign(screeningForm, {
+    outcome: 'temporarily_deferred',
+    general_appearance: '', skin: '', heent: '', heart_and_lungs: '',
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
+    fingerprick_blood_type_id: null,
     notes: '', deferral_reason: '',
   })
-  collectionForm.volume_ml = 450
+  Object.assign(collectionForm, blankCollection())
+  collectionAttempted.value = false
 }
 </script>
 
@@ -442,13 +955,27 @@ function finishVisit() {
    * blood-centre page sat in a centred 1152px column with 32px gutters.
    */
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   background: var(--rb-page-bg);
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+}
+
+.handoff {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+  font-size: 13.5px;
+  line-height: 1.45;
 }
 
 .collection__header {
@@ -457,15 +984,6 @@ function finishVisit() {
   gap: 1rem;
   align-items: flex-start;
   justify-content: space-between;
-}
-
-.collection__eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
 }
 
 .collection__title {
@@ -483,17 +1001,6 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-.collection__facility {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 999px;
-  background: var(--rb-surface);
-  font-size: 0.78rem;
-  color: var(--rb-text-secondary);
-}
 
 /* --- verified donor bar --- */
 /*
@@ -529,20 +1036,20 @@ function finishVisit() {
   border-radius: 50%;
   background: rgba(var(--rb-primary-rgb), 0.12);
   color: var(--rb-primary-text);
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .donor-bar__name {
   margin: 0;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 15px;
   color: var(--rb-text-primary);
 }
 
 .donor-bar__meta {
   margin: 0.1rem 0 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -555,20 +1062,20 @@ function finishVisit() {
 .fact { display: flex; flex-direction: column; gap: 0.25rem; }
 
 .fact__label {
-  font-size: 0.68rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rb-text-secondary);
 }
 
-.fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
+.fact__value { font-size: 13.5px; color: var(--rb-text-primary); }
 
 .pill {
   display: inline-block;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
@@ -592,7 +1099,7 @@ function finishVisit() {
   list-style: none;
 }
 
-.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
+.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; }
 
 .step__dot {
   display: grid;
@@ -600,7 +1107,7 @@ function finishVisit() {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-size: 0.7rem;
+  font-size: 11px;
   font-weight: 700;
   border: 1px solid var(--rb-border-strong);
   color: var(--rb-text-secondary);
@@ -623,44 +1130,85 @@ function finishVisit() {
   background: var(--rb-surface);
 }
 
-.card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
+.card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
 .card__hint {
   margin: 0;
   max-width: 68ch;
-  font-size: 0.83rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
 
-.scan-grid {
+/* --- stage 1: check-in --- */
+.checkin {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
 }
 
-@media (min-width: 820px) {
-  .scan-grid { grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); align-items: start; }
+.checkin__panel { gap: 16px; }
+
+.checkin__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-@media (max-width: 640px) {
-  .collection {
-    padding: 16px 16px 32px;
-  }
+.checkin__head .card__hint { margin-top: 2px; }
+
+.checkin__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rb-primary) 12%, transparent);
+  color: var(--rb-primary-text);
 }
 
 .lookup {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
   align-items: flex-start;
-  padding: 0.9rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
+  gap: 12px;
 }
 
-.lookup__title { margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--rb-text-primary); }
+.checkin__checks {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--rb-border);
+}
+
+.checkin__checks-title {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.checkin__checks ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkin__checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.checkin__checks li :deep(svg) { color: var(--rb-success); flex-shrink: 0; }
 
 /* --- forms --- */
 .vitals {
@@ -673,12 +1221,12 @@ function finishVisit() {
 .field--narrow { max-width: 14rem; }
 
 .field__label {
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   color: var(--rb-text-primary);
 }
 
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }
+.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 11.5px; }
 
 .field__input {
   width: 100%;
@@ -688,7 +1236,7 @@ function finishVisit() {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .field__input:focus-visible {
@@ -719,7 +1267,7 @@ function finishVisit() {
   color: var(--rb-text-primary);
   border-radius: 10px;
   padding: 0.5rem 0.95rem;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -746,7 +1294,7 @@ function finishVisit() {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
-  font-size: 0.84rem;
+  font-size: 13.5px;
 }
 
 .alert--error {
@@ -765,4 +1313,163 @@ function finishVisit() {
 .outcome--success { color: var(--rb-success-text); }
 .outcome--deferred { color: var(--rb-warning-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
+
+/* --- Section I-D groupings --- */
+/*
+ * Grouped rather than run together, so an officer working from the paper finds
+ * the spoken answers, the readings and the findings where the form puts them.
+ */
+.exam {
+  margin: 0;
+  padding: 0.85rem 0.9rem 0.9rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.exam__legend {
+  padding: 0 0.35rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.exam__hint {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--rb-text-secondary);
+}
+
+.defer__options {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.defer__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 13.5px;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+
+.card__hint--warn {
+  color: var(--rb-accent-text);
+  font-weight: 600;
+}
+
+/* --- Section II, phlebotomist's box --- */
+/*
+ * The bag is a three-way choice printed on the form as (S) (D) (T), so it is
+ * shown as three large targets carrying those letters rather than a dropdown.
+ */
+.bags {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bag {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.bag:hover { border-color: var(--rb-border-hover); }
+
+.bag--on {
+  border-color: var(--rb-primary);
+  background: rgba(var(--rb-primary-rgb), 0.06);
+}
+
+/* Visually hidden but still the focusable control, so keyboard users get the ring below. */
+.bag__radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bag:has(.bag__radio:focus-visible) {
+  outline: 2px solid var(--rb-primary);
+  outline-offset: 1px;
+}
+
+.bag__code {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rb-text-secondary);
+}
+
+.bag--on .bag__code {
+  background: var(--rb-primary);
+  border-color: var(--rb-primary);
+  color: #fff;
+}
+
+.bag__label { font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); }
+
+.time-row { display: flex; gap: 0.4rem; align-items: stretch; }
+.time-row .field__input { min-width: 0; }
+
+.btn--small { padding: 0.35rem 0.6rem; font-size: 12.5px; border-radius: 8px; }
+
+.field__input--mono,
+.mono {
+  font-family: var(--rb-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.problems {
+  margin: 0;
+  padding: 0.6rem 0.85rem 0.6rem 1.9rem;
+  border-radius: 10px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+  color: var(--rb-accent-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.done-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.45rem 0 0;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+
+.done-facts strong { color: var(--rb-text-primary); }
+
+@media (max-width: 480px) {
+  .bags { grid-template-columns: minmax(0, 1fr); }
+}
+
 </style>

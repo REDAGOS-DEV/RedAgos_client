@@ -1,150 +1,232 @@
 <template>
   <div class="drives-page">
-    <div v-if="loading" class="loading-wrap">
-      <div class="spinner" />
+    <!-- Skeleton loading state, the same as the other pages -->
+    <div v-if="loading" class="drives-inner" aria-busy="true" aria-label="Loading drives">
+      <div class="skeleton-head">
+        <div class="skeleton skeleton--header" />
+        <div class="skeleton skeleton--sub" />
+      </div>
+      <div class="stats-row">
+        <div v-for="n in 3" :key="'skc-' + n" class="skeleton skeleton--card" />
+      </div>
+      <div class="skeleton skeleton--panel" style="height: 420px" />
     </div>
 
     <div v-else class="drives-inner">
       <!-- Header -->
-      <div class="header-row">
+      <header class="header-row">
         <div>
-          <h1 class="page-title">Mobile Drives</h1>
-          <p class="page-subtitle">Create, publish, and manage mobile donation drive events.</p>
+          <h1 class="page-title">Donation Drives</h1>
+          <p class="page-subtitle">{{ headerSummary }}</p>
         </div>
         <button type="button" class="btn-primary" @click="openCreateModal">
-          <AssetIcon name="plus" :size="16" />
-          Create Drive
+          <AssetIcon name="plus" :size="15" />
+          Create drive
         </button>
-      </div>
+      </header>
 
-      <!-- Summary stats -->
+      <!-- KPI cards, as on Inventory -->
       <div class="stats-row">
-        <div class="stat-card stat-card--blue">
-          <div class="stat-card__icon">
-            <AssetIcon name="calendar" :size="20" />
-          </div>
-          <div class="stat-card__body">
+        <div class="stat-card">
+          <div class="stat-card__top">
             <p class="stat-card__label">Upcoming Drives</p>
-            <p class="stat-card__value">{{ upcomingDrivesCount }}</p>
-            <p class="stat-card__caption">Scheduled across all venues</p>
+            <span class="stat-card__badge stat-card__badge--primary"><AssetIcon name="calendar" :size="14" /></span>
           </div>
+          <p class="stat-card__value">{{ upcomingDrivesCount }}</p>
+          <span class="stat-chip">{{ nextDriveLabel }}</span>
         </div>
 
-        <div class="stat-card stat-card--violet">
-          <div class="stat-card__icon">
-            <AssetIcon name="users" :size="20" />
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Registered Donors</p>
+            <span class="stat-card__badge stat-card__badge--purple"><AssetIcon name="users" :size="14" /></span>
           </div>
-          <div class="stat-card__body">
-            <p class="stat-card__label">Total Registered</p>
-            <p class="stat-card__value">{{ totalRegistered }}</p>
-            <p class="stat-card__caption">Donors signed up</p>
-          </div>
+          <p class="stat-card__value">{{ totalRegistered }}</p>
+          <span class="stat-chip">Across upcoming drives</span>
         </div>
 
-        <div class="stat-card stat-card--green">
-          <div class="stat-card__icon">
-            <AssetIcon name="droplets" :size="20" />
-          </div>
-          <div class="stat-card__body">
+        <div class="stat-card">
+          <div class="stat-card__top">
             <p class="stat-card__label">Units Collected</p>
-            <p class="stat-card__value">{{ unitsCollectedMonth }}</p>
-            <p class="stat-card__caption">This month</p>
+            <span class="stat-card__badge stat-card__badge--success"><AssetIcon name="droplets" :size="14" /></span>
           </div>
+          <p class="stat-card__value">{{ unitsCollectedMonth }}</p>
+          <span class="stat-chip">At drives this month</span>
         </div>
       </div>
 
       <!-- Drive list -->
-      <div v-if="drives.length" class="drive-list">
-        <div v-for="drive in drives" :key="drive.id" class="drive-card">
-          <div class="drive-card__top">
-            <div>
-              <p class="drive-card__title">{{ drive.facility_name }} · {{ drive.location }}</p>
-              <p class="drive-card__meta">
-                {{ formatDateRange(drive.event_date, drive.start_time, drive.end_time) }} · Capacity {{ drive.capacity }}
-              </p>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Drives</h2>
+            <p class="panel-subtitle">Every drive this centre has scheduled.</p>
+          </div>
+
+          <div class="seg" role="tablist" aria-label="Show drives">
+            <button
+              v-for="tab in TABS"
+              :key="tab.value"
+              type="button"
+              role="tab"
+              class="seg__btn"
+              :class="{ 'seg__btn--on': view === tab.value }"
+              :aria-selected="view === tab.value"
+              @click="view = tab.value"
+            >
+              {{ tab.label }}
+              <span class="seg__count">{{ countFor(tab.value) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="loadError" class="empty-state" role="alert">
+          <span class="empty-state__icon empty-state__icon--error"><AssetIcon name="circle-alert" :size="20" /></span>
+          <p class="empty-state__title">Could not load the drives</p>
+          <p class="empty-state__text">{{ loadError }}</p>
+          <button type="button" class="btn-outline" @click="loadDrives">Try again</button>
+        </div>
+
+        <div v-else-if="!drives.length" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon name="truck" :size="20" /></span>
+          <p class="empty-state__title">No drives yet</p>
+          <p class="empty-state__text">Schedule a drive and donors can register for it in the donor portal.</p>
+          <button type="button" class="btn-primary" @click="openCreateModal">
+            <AssetIcon name="plus" :size="15" />
+            Create drive
+          </button>
+        </div>
+
+        <div v-else-if="!visibleDrives.length" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
+          <p class="empty-state__title">{{ view === 'completed' ? 'No completed drives' : 'No upcoming drives' }}</p>
+          <p class="empty-state__text">
+            {{ view === 'completed' ? 'Drives move here once their date has passed.' : 'Create one to open registrations for donors.' }}
+          </p>
+        </div>
+
+        <ul v-else class="drive-list">
+          <li
+            v-for="drive in visibleDrives"
+            :key="drive.id"
+            class="drive"
+            :class="{ 'drive--done': drive.status === 'Completed', 'drive--today': drive.status === 'Open' }"
+          >
+            <!-- Calendar block: the date is what a drive is planned around. -->
+            <div class="drive__date" aria-hidden="true">
+              <span class="drive__month">{{ dateParts(drive.event_date).month }}</span>
+              <span class="drive__day">{{ dateParts(drive.event_date).day }}</span>
+              <span class="drive__weekday">{{ dateParts(drive.event_date).weekday }}</span>
             </div>
-            <span class="status-badge" :class="`status-badge--${drive.status}`">{{ statusLabel(drive.status) }}</span>
-          </div>
 
-          <div class="progress-track">
-            <div class="progress-fill" :class="{ 'progress-fill--full': fillPercent(drive) >= 100 }"
-              :style="{ width: `${Math.min(fillPercent(drive), 100)}%` }" />
-          </div>
-          <div class="progress-meta">
-            <span>{{ drive.registered_count }} registered donors</span>
-            <span>{{ drive.status === 'open' ? 'Registration open' : `${fillPercent(drive)}% full` }}</span>
-          </div>
-
-          <template v-if="drive.donor_preview?.length">
-            <p class="preview-label">Registered Donors (Preview)</p>
-            <div class="donor-preview-list">
-              <div v-for="(donor, di) in drive.donor_preview" :key="donor.id" class="donor-row">
-                <div class="donor-row__avatar" :style="{ background: avatarColor(di) }">
-                  {{ initials(donor.full_name) }}
-                </div>
-                <div class="donor-row__info">
-                  <p class="donor-row__name">{{ donor.full_name }}</p>
-                  <p class="donor-row__meta">
-                    {{ donor.blood_type }} · Registered {{ formatDate(donor.registered_at) }} · Screening: {{ donor.screening_status }}
-                  </p>
-                </div>
-                <span class="donor-badge" :class="`donor-badge--${donor.attendance_status}`">
-                  {{ donorStatusLabel(donor.attendance_status) }}
+            <div class="drive__body">
+              <div class="drive__title-row">
+                <p class="drive__title">{{ drive.name }}</p>
+                <span class="status-badge" :class="`status-badge--${String(drive.status).toLowerCase()}`">
+                  {{ drive.status === 'Open' ? 'Today' : drive.status }}
                 </span>
               </div>
+
+              <p class="drive__facts">
+                <span class="drive__fact">
+                  <AssetIcon name="map-pin" :size="13" />
+                  {{ drive.location }}
+                </span>
+                <span v-if="drive.start_time && drive.end_time" class="drive__fact">
+                  <AssetIcon name="clock" :size="13" />
+                  {{ timeLabel(drive.start_time) }} to {{ timeLabel(drive.end_time) }}
+                </span>
+                <span v-if="drive.assigned_staff" class="drive__fact">
+                  <AssetIcon name="users" :size="13" />
+                  {{ drive.assigned_staff }}
+                </span>
+              </p>
+
+              <p v-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
             </div>
-          </template>
 
-          <!--
-            Three dead links used to sit here. None of /blood-center/drives/:id,
-            /:id/Donors or /:id/Attendance has a page — there is no
-            app/pages/blood-center/drives/ directory at all — and the third was
-            written `-/blood-center/drives/…` with a stray leading hyphen, so it
-            did not even resolve to that. All three 404'd on click. Restore the
-            row together with the drive detail screens, the same call
-            useBloodCenterNav made for Help & Support.
-          -->
-        </div>
-      </div>
+            <!-- Registrations against capacity -->
+            <div class="drive__fill">
+              <p class="drive__fill-head">
+                <strong>{{ drive.registered_count ?? 0 }}</strong>
+                <span>{{ drive.capacity ? `of ${drive.capacity} registered` : 'registered' }}</span>
+              </p>
+              <div class="progress-track">
+                <div
+                  class="progress-fill"
+                  :class="`progress-fill--${fillLevel(drive)}`"
+                  :style="{ width: `${Math.min(fillPercent(drive), 100)}%` }"
+                />
+              </div>
+              <p class="drive__fill-foot">
+                {{ drive.capacity ? `${Math.min(fillPercent(drive), 100)}% full` : 'No capacity limit' }}
+              </p>
+            </div>
 
-      <div v-else class="empty-state">
-        <AssetIcon name="truck" :size="40" style="color: var(--rb-border-hover)" />
-        <p>No mobile drives scheduled yet</p>
-        <button type="button" class="btn-primary btn-primary--sm" @click="openCreateModal">Create your first drive</button>
-      </div>
+            <!-- Staff manage their own drives. Both open their dialog; saving waits on the server. -->
+            <div class="drive__actions">
+              <template v-if="drive.status !== 'Completed'">
+                <button type="button" class="btn-small" @click="openEditModal(drive)">
+                  <AssetIcon name="pencil" :size="13" />
+                  Edit
+                </button>
+                <button type="button" class="btn-ghost-danger" @click="openCancelDialog(drive)">Cancel</button>
+              </template>
+            </div>
+          </li>
+        </ul>
+      </section>
     </div>
 
-    <!-- Create Mobile Drive modal -->
+    <!-- Create drive modal -->
     <Transition name="modal">
       <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreateModal">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-drive-title">
           <div class="modal-card__header">
-            <h2 class="modal-card__title">Create Mobile Drive</h2>
-            <button type="button" class="modal-card__close" @click="closeCreateModal">
+            <div>
+              <h2 id="create-drive-title" class="modal-card__title">{{ editingDrive ? 'Edit drive' : 'Create drive' }}</h2>
+              <p class="modal-card__subtitle">
+                {{ editingDrive
+                  ? 'Registered donors keep their place; tell them if the date or venue changes.'
+                  : 'Donors see the name, venue, date and time when they book.' }}
+              </p>
+            </div>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeCreateModal">
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
 
           <form class="modal-form" @submit.prevent="handleCreateDrive">
+            <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+            <p v-if="editingDrive" class="form-notice">
+              <AssetIcon name="info" :size="14" />
+              <span>Saving changes is not connected yet. The server needs a route to update a drive.</span>
+            </p>
+
             <div class="form-group">
-              <label class="form-label">Venue</label>
-              <input v-model="driveForm.venue" type="text" class="form-input" placeholder="Venue name and address" required>
+              <label class="form-label" for="drive-name">Drive name</label>
+              <input id="drive-name" v-model="driveForm.name" type="text" class="form-input" placeholder="e.g. UM Matina Bloodletting Drive" maxlength="150" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="drive-venue">Venue</label>
+              <input id="drive-venue" v-model="driveForm.location" type="text" class="form-input" placeholder="Venue name and address" maxlength="150" required>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Date</label>
-                <input v-model="driveForm.date" type="date" class="form-input" required>
+                <label class="form-label" for="drive-date">Date</label>
+                <input id="drive-date" v-model="driveForm.event_date" type="date" class="form-input" :min="todayIso" required>
               </div>
               <div class="form-group">
-                <label class="form-label">Capacity</label>
+                <label class="form-label" for="drive-capacity">Max donors</label>
                 <div class="stepper">
-                  <input v-model.number="driveForm.capacity" type="number" min="1" class="form-input stepper__input" placeholder="Max Donors" required>
+                  <input id="drive-capacity" v-model.number="driveForm.max_capacity" type="number" min="1" class="form-input stepper__input" required>
                   <div class="stepper__controls">
-                    <button type="button" class="stepper__btn" @click="driveForm.capacity = (driveForm.capacity || 0) + 1">
+                    <button type="button" class="stepper__btn" aria-label="More" @click="driveForm.max_capacity = (driveForm.max_capacity || 0) + 1">
                       <AssetIcon name="chevron-up" :size="10" />
                     </button>
-                    <button type="button" class="stepper__btn" @click="driveForm.capacity = Math.max(1, (driveForm.capacity || 1) - 1)">
+                    <button type="button" class="stepper__btn" aria-label="Fewer" @click="driveForm.max_capacity = Math.max(1, (driveForm.max_capacity || 1) - 1)">
                       <AssetIcon name="chevron-down" :size="10" />
                     </button>
                   </div>
@@ -154,32 +236,92 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Start time</label>
-                <input v-model="driveForm.start_time" type="time" class="form-input" required>
+                <label class="form-label" for="drive-start">Starts</label>
+                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required>
               </div>
               <div class="form-group">
-                <label class="form-label">End time</label>
-                <input v-model="driveForm.end_time" type="time" class="form-input" required>
+                <label class="form-label" for="drive-end">Ends</label>
+                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required>
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Assigned staff</label>
-              <input v-model="driveForm.assigned_staff" type="text" class="form-input" placeholder="Staff names...">
+              <label class="form-label" for="drive-staff">Assigned staff <span class="form-optional">optional</span></label>
+              <input id="drive-staff" v-model="driveForm.assigned_staff" type="text" class="form-input" placeholder="Who will run the drive">
             </div>
 
             <div class="form-group">
-              <label class="form-label">Announcement message</label>
-              <textarea v-model="driveForm.announcement" class="form-textarea" rows="3" placeholder="Message for donors..." />
+              <label class="form-label" for="drive-note">Message for donors <span class="form-optional">optional</span></label>
+              <textarea id="drive-note" v-model="driveForm.announcement" class="form-textarea" rows="3" placeholder="e.g. Bring a valid ID and eat before donating." />
             </div>
 
             <div class="modal-actions">
-              <button type="button" class="btn-cancel" @click="closeCreateModal">Cancel Drive</button>
-              <button type="submit" class="btn-primary" :disabled="submitting">
-                {{ submitting ? 'Saving...' : 'Save Changes' }}
+              <button type="button" class="btn-outline" @click="closeCreateModal">Discard</button>
+              <button
+                type="submit"
+                class="btn-primary"
+                :disabled="submitting || Boolean(editingDrive)"
+                :title="editingDrive ? 'Not connected yet: the server has no route for this.' : undefined"
+              >
+                {{ editingDrive ? 'Save changes' : submitting ? 'Creating…' : 'Create drive' }}
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Cancel drive -->
+    <Transition name="modal">
+      <div v-if="cancelTarget" class="modal-overlay" @click.self="closeCancelDialog">
+        <div class="modal-card modal-card--narrow" role="alertdialog" aria-modal="true" aria-labelledby="cancel-drive-title">
+          <div class="modal-card__header">
+            <div>
+              <h2 id="cancel-drive-title" class="modal-card__title">Cancel this drive?</h2>
+              <p class="modal-card__subtitle">
+                {{ cancelTarget.name }} &middot; {{ dateParts(cancelTarget.event_date).weekday }},
+                {{ dateParts(cancelTarget.event_date).month }} {{ dateParts(cancelTarget.event_date).day }}
+              </p>
+            </div>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeCancelDialog">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <div class="modal-form">
+            <div class="cancel-impact">
+              <AssetIcon name="circle-alert" :size="16" />
+              <p>
+                <strong>{{ cancelTarget.registered_count ?? 0 }} donor{{ (cancelTarget.registered_count ?? 0) === 1 ? '' : 's' }}</strong>
+                registered. The drive closes to new registrations, and the donors who signed up need to be told.
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="cancel-reason">Reason</label>
+              <textarea
+                id="cancel-reason"
+                v-model="cancelReason"
+                class="form-textarea"
+                rows="3"
+                maxlength="255"
+                placeholder="e.g. Venue unavailable because of the weather advisory"
+              />
+              <p class="form-hint">Shown to the registered donors.</p>
+            </div>
+
+            <p class="form-notice">
+              <AssetIcon name="info" :size="14" />
+              <span>Cancelling is not connected yet. The server needs a route to cancel a drive.</span>
+            </p>
+
+            <div class="modal-actions">
+              <button type="button" class="btn-outline" @click="closeCancelDialog">Keep drive</button>
+              <button type="button" class="btn-danger" disabled title="Not connected yet: the server has no route for this.">
+                Cancel drive
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -188,7 +330,9 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -199,57 +343,116 @@ definePageMeta({
 const loading = ref(true)
 const submitting = ref(false)
 const showCreateModal = ref(false)
+const loadError = ref('')
 
+// Ang mga key dinhi kay pareho gyud sa mga column sa `mobile_events`, dili ang
+// UI labels ('venue', 'capacity'). Usa ra ka vocabulary sa tibuok wire, so
+// walay translation layer nga pwede mag-drift sa server.
 const driveForm = reactive({
-  venue: '',
-  date: '',
-  capacity: 50,
+  name: '',
+  location: '',
+  event_date: '',
+  max_capacity: 50,
   start_time: '08:00',
   end_time: '16:00',
   assigned_staff: '',
   announcement: '',
 })
 
+const formError = ref('')
+
+const todayIso = computed(() => new Date().toISOString().slice(0, 10))
+
 function resetDriveForm() {
-  driveForm.venue = ''
-  driveForm.date = ''
-  driveForm.capacity = 50
+  driveForm.name = ''
+  driveForm.location = ''
+  driveForm.event_date = ''
+  driveForm.max_capacity = 50
   driveForm.start_time = '08:00'
   driveForm.end_time = '16:00'
   driveForm.assigned_staff = ''
   driveForm.announcement = ''
+  formError.value = ''
 }
 
+// The drive being edited, or null when the modal creates one.
+const editingDrive = ref(null)
+
 function openCreateModal() {
+  editingDrive.value = null
+  resetDriveForm()
+  showCreateModal.value = true
+}
+
+/** The same form, filled with the drive's current values. */
+function openEditModal(drive) {
+  editingDrive.value = drive
+  formError.value = ''
+  Object.assign(driveForm, {
+    name: drive.name ?? '',
+    location: drive.location ?? '',
+    event_date: String(drive.event_date ?? '').slice(0, 10),
+    max_capacity: drive.capacity ?? 50,
+    start_time: String(drive.start_time ?? '08:00').slice(0, 5),
+    end_time: String(drive.end_time ?? '16:00').slice(0, 5),
+    assigned_staff: drive.assigned_staff ?? '',
+    announcement: drive.announcement ?? '',
+  })
   showCreateModal.value = true
 }
 
 function closeCreateModal() {
   showCreateModal.value = false
+  editingDrive.value = null
   resetDriveForm()
 }
 
+// Cancel dialog
+const cancelTarget = ref(null)
+const cancelReason = ref('')
+
+function openCancelDialog(drive) {
+  cancelTarget.value = drive
+  cancelReason.value = ''
+}
+
+function closeCancelDialog() {
+  cancelTarget.value = null
+  cancelReason.value = ''
+}
+
 async function handleCreateDrive() {
+  // Editing has no server route yet; the button is disabled, this is the backstop.
+  if (editingDrive.value) return
+
   submitting.value = true
+  formError.value = ''
   try {
-    // Backend contract: POST /api/bloodcenter/mobile-drives
-    // Body: { venue, date, capacity, start_time, end_time, assigned_staff, announcement }
-    // Response: the newly created drive record, same shape as items in `drives`
-    const newDrive = await $fetch('/api/bloodcenter/mobile-drives', {
-      method: 'POST',
-      body: { ...driveForm },
-    })
+    // POST /api/blood-center/drives — ang facility_id ug created_by kay gikan sa
+    // token, dili sa payload, so wala tay ipadala nga facility dinhi.
+    const newDrive = await bloodCenterService.createDrive({ ...driveForm })
     drives.value = [newDrive, ...drives.value]
     upcomingDrivesCount.value += 1
+    totalRegistered.value += newDrive.registered_count ?? 0
+    view.value = 'upcoming'
     closeCreateModal()
   } catch (err) {
-    // NOTE: wala pay live nga endpoint karon, so mag-fail ni nga call sa dev/UI stage.
-    // Wala tay ipakita nga fake/optimistic drive card aron dili mag-mismatch sa tinuod nga data
-    // sa higayon nga naka-connect na ang backend.
-    console.error('Failed to create mobile drive (expected while backend is not yet wired up):', err)
+    // Ang BaseService nagbutang sa message sa server sa `err.message` ug sa
+    // per-field nga 422 sa `err.errors`. Ipakita gyud — kaniadto console ra ni,
+    // mao nga ang "Save Changes" morag walay gibuhat.
+    formError.value = firstFieldError(err) || err?.message || 'Could not create this drive. Please try again.'
   } finally {
     submitting.value = false
   }
+}
+
+// Ang una nga field error mao ang labing tino nga rason sa 422; ang top-level
+// nga message sa Laravel kay generic ra ("The given data was invalid.").
+function firstFieldError(err) {
+  const errors = err?.errors
+  if (!errors) return ''
+  const first = Object.values(errors)[0]
+  return Array.isArray(first) ? first[0] : first
 }
 
 // All values start empty/zero — populated only from the API response.
@@ -258,142 +461,114 @@ const totalRegistered = ref(0)
 const unitsCollectedMonth = ref(0)
 const drives = ref([])
 // drive shape: {
-//   id, facility_name, location, event_date, start_time, end_time, capacity,
-//   registered_count, status: 'planning' | 'open' | 'upcoming' | 'completed',
-//   donor_preview: [{ id, full_name, blood_type, registered_at, screening_status, attendance_status }]
+//   id, name, facility_name, location, event_date, start_time, end_time,
+//   capacity, registered_count, assigned_staff, announcement,
+//   status: 'Completed' | 'Full' | 'Open' | 'Upcoming',   // capitalized, server-computed
+//   donor_preview: []   // always empty for now: no endpoint lists a drive's donors
 // }
 
-const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
+/* ---------- display: which drives, and how each reads ---------- */
 
-function avatarColor(index) {
-  return AVATAR_COLORS[index % AVATAR_COLORS.length]
+const TABS = [
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'all', label: 'All' },
+]
+
+const view = ref('upcoming')
+
+const isDone = (drive) => drive.status === 'Completed'
+
+function countFor(value) {
+  if (value === 'upcoming') return drives.value.filter((d) => !isDone(d)).length
+  if (value === 'completed') return drives.value.filter(isDone).length
+  return drives.value.length
 }
 
-function initials(fullName) {
-  if (!fullName) return '?'
-  return fullName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase())
-    .join('')
+// Upcoming soonest first; completed most recent first.
+const visibleDrives = computed(() => {
+  const byDate = (x, y) => String(x.event_date).localeCompare(String(y.event_date))
+  if (view.value === 'upcoming') return drives.value.filter((d) => !isDone(d)).sort(byDate)
+  if (view.value === 'completed') return drives.value.filter(isDone).sort((x, y) => byDate(y, x))
+  return [...drives.value].sort((x, y) => byDate(y, x))
+})
+
+const nextDrive = computed(() =>
+  drives.value.filter((d) => !isDone(d)).sort((x, y) => String(x.event_date).localeCompare(String(y.event_date)))[0])
+
+const nextDriveLabel = computed(() => {
+  if (!nextDrive.value) return 'None scheduled'
+  const { month, day } = dateParts(nextDrive.value.event_date)
+  return `Next on ${month.charAt(0)}${month.slice(1).toLowerCase()} ${day}`
+})
+
+const headerSummary = computed(() => {
+  const upcoming = countFor('upcoming')
+  if (!drives.value.length) return 'Schedule mobile drives and let donors register in the portal.'
+  return `${upcoming} upcoming drive${upcoming === 1 ? '' : 's'} · ${totalRegistered.value} donor${totalRegistered.value === 1 ? '' : 's'} registered`
+})
+
+function dateParts(value) {
+  const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return { month: '', day: '—', weekday: '' }
+  return {
+    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+    day: d.getDate(),
+    weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
+  }
+}
+
+// Ang TIME nga column mo-balik ug 'HH:MM:SS'. "13:30:00" -> "1:30 PM"
+function timeLabel(value) {
+  const [h, m] = String(value).split(':').map(Number)
+  if (Number.isNaN(h)) return String(value)
+  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 
 function fillPercent(drive) {
   if (!drive.capacity) return 0
-  return Math.round((drive.registered_count / drive.capacity) * 100)
+  return Math.round(((drive.registered_count ?? 0) / drive.capacity) * 100)
 }
 
-function statusLabel(status) {
-  const map = {
-    planning: 'Planning',
-    open: 'Open',
-    upcoming: 'Upcoming',
-    completed: 'Completed',
-  }
-  return map[status] ?? status
+// The same three levels as the appointment slots: open, filling up, full.
+function fillLevel(drive) {
+  const pct = fillPercent(drive)
+  if (pct >= 100) return 'full'
+  if (pct >= 75) return 'busy'
+  return 'open'
 }
 
-function donorStatusLabel(status) {
-  const map = {
-    confirmed: 'Confirmed',
-    pending: 'Pending',
-    attended: 'Attended',
-    no_show: 'No Show',
-  }
-  return map[status] ?? status
-}
-
-// Lightweight date formatter for tokens used in this page: 'MMM D, YYYY' and short date range
-function formatDate(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  const day = d.getDate()
-  const monthShort = d.toLocaleDateString('en-US', { month: 'short' })
-  return `${monthShort} ${day}`
-}
-
-function formatDateRange(eventDate, startTime, endTime) {
-  if (!eventDate) return '—'
-  const d = new Date(eventDate)
-  if (Number.isNaN(d.getTime())) return '—'
-  const day = d.getDate()
-  const monthShort = d.toLocaleDateString('en-US', { month: 'short' })
-  const year = d.getFullYear()
-  const timeRange = startTime && endTime ? ` · ${startTime} – ${endTime}` : ''
-  return `${monthShort} ${day}, ${year}${timeRange}`
-}
-
-onMounted(async () => {
+async function loadDrives() {
+  loadError.value = ''
   try {
-    // Backend contract: GET /api/bloodcenter/mobile-drives
-    // Response fields:
+    // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman na.
     // { upcoming_drives_count, total_registered, units_collected_month, drives: [...] }
-    const data = await $fetch('/api/bloodcenter/mobile-drives')
+    const data = await bloodCenterService.drives()
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
     totalRegistered.value = data.total_registered ?? 0
     unitsCollectedMonth.value = data.units_collected_month ?? 0
     drives.value = data.drives ?? []
   } catch (err) {
-    // NOTE: sa dev/UI stage pa lang, wala pay live nga /api/bloodcenter/mobile-drives endpoint,
-    // so mag-fail gyud ni nga call. Nagpabilin ra sa default nga 0/empty values,
-    // so mag-display ug empty state ang UI imbes mag-crash o mag-display ug fake data.
-    console.error('Failed to load mobile drives (expected while backend is not yet wired up):', err)
+    // Ipakita ang kapakyasan imbes mo-render ug empty state: managlahi ang
+    // "walay drive pa" ug "wala ma-load ang mga drive".
+    loadError.value = err?.message || 'Could not load mobile drives. Please try again.'
+    drives.value = []
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadDrives)
 </script>
 
 <style scoped>
 .drives-page {
-  /*
-   * Fills stay dark in both themes because white text sits on them; the -text
-   * variants are what the page paints words and icons with. Everything else
-   * here reads a shared token, so the whole page follows the theme instead of
-   * staying white on a dark background.
-   */
-  --primary: var(--rb-primary);
-  --primary-text: var(--rb-primary-text);
-  --accent: var(--rb-accent-text);
-  --success: var(--rb-success-text);
-  --warning: var(--rb-warning-text);
-  --purple: var(--rb-purple-text);
-  --text-primary: var(--rb-text-primary);
-  --text-secondary: var(--rb-text-secondary);
   font-family: var(--rb-font-sans);
-  color: var(--text-primary);
-  max-width: 1152px;
+  color: var(--rb-text-primary);
+  max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
-  transition: background-color 0.2s ease;
-}
-
-/* Loading */
-.loading-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  border: 4px solid var(--rb-border-strong);
-  border-top-color: var(--primary-text);
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spinner { animation: none !important; }
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
 
 .drives-inner {
@@ -402,7 +577,25 @@ onMounted(async () => {
   gap: 20px;
 }
 
-/* Header */
+/* ---------- Skeletons (the same page skeleton as Inventory) ---------- */
+.skeleton {
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  border-radius: 14px;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton-head { display: flex; flex-direction: column; gap: 8px; }
+.skeleton--header { height: 28px; max-width: 220px; border-radius: 8px; }
+.skeleton--sub { height: 14px; max-width: 320px; border-radius: 6px; }
+.skeleton--card { height: 108px; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* ---------- Header ---------- */
 .header-row {
   display: flex;
   align-items: flex-start;
@@ -410,186 +603,346 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.page-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
-.page-subtitle {
+/* ---------- Buttons (as on Inventory) ---------- */
+.btn-primary,
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-family: inherit;
   font-size: 13px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .btn-primary {
+  color: #fff;
+  background: var(--rb-primary);
+  border: none;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
+}
+
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-outline {
+  color: var(--rb-text-primary);
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border-strong);
+}
+
+.btn-outline:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+
+.btn-small {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-small:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
   border-radius: 10px;
+  border: none;
+  background: var(--rb-accent);
+  color: #fff;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 700;
-  color: white;
-  background: var(--primary);
-  border: none;
   cursor: pointer;
-  text-decoration: none;
-  transition: opacity 0.15s ease;
-  flex-shrink: 0;
 }
 
-.btn-primary:hover { background: #0D47A1; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-primary:disabled:hover { background: var(--primary); }
-
-.btn-primary--sm {
-  padding: 8px 14px;
-  font-size: 12px;
+.btn-ghost-danger {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+  background: transparent;
+  color: var(--rb-accent-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-/* Stats row */
-/* auto-fit, not a fixed count: the content column now changes width
-   when the rail expands, so the grid has to answer to its container
-   rather than to a viewport breakpoint that no longer describes it. */
+.btn-ghost-danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.06); }
+.btn-ghost-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-ghost-danger:focus-visible,
+.btn-small:focus-visible,
+.btn-danger:focus-visible,
+.seg__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--rb-focus-ring);
+}
+
+/* ---------- KPI cards (as on Inventory) ---------- */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .stat-card {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
   background: var(--rb-surface);
-  border-radius: 14px;
   border: 1px solid var(--rb-border);
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
-  padding: 18px 20px;
-  transition: box-shadow 0.2s ease;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
 }
 
-.stat-card:hover {
-  box-shadow: 0 2px 6px rgba(var(--rb-shadow-rgb), 0.08);
+.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
+.stat-card__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0; }
+.stat-card__badge { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-card__badge--primary { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.stat-card__badge--purple { background: rgba(var(--rb-purple-rgb), 0.08); color: var(--rb-purple-text); }
+.stat-card__badge--success { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.stat-card__value { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 0; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat-chip { display: inline-flex; align-items: center; align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+/* ---------- Panel ---------- */
+.panel {
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+  overflow: hidden;
 }
 
-.stat-card__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.panel-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-card--blue .stat-card__icon { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
-.stat-card--violet .stat-card__icon { background: rgba(var(--rb-purple-rgb), 0.12); color: var(--purple); }
-.stat-card--green .stat-card__icon { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
-
-
-.stat-card__body {
-  min-width: 0;
-}
-
-.stat-card__label {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.stat-card__value {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--text-primary);
-  line-height: 1.1;
-  margin: 4px 0 2px;
-}
-
-.stat-card__caption {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-/* Drive cards */
-.drive-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.drive-card {
-  position: relative;
-  background: var(--rb-surface);
-  border-radius: 14px;
-  border: 1px solid var(--rb-border);
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.04);
-  padding: 18px 20px;
-  overflow: hidden;
-  transition: border-color 0.2s ease;
-}
-
-.drive-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--primary-text);
-}
-
-.drive-card:focus-within {
-  border-color: var(--rb-border-hover);
-}
-
-.drive-card:hover {
-  border-color: var(--rb-border-hover);
-}
-
-.drive-card__top {
-  display: flex;
-  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rb-border);
 }
 
-.drive-card__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
+.panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
+.panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
+
+/* Segmented view switch */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+}
+
+.seg__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.seg__btn:hover { color: var(--rb-text-primary); }
+
+.seg__btn--on {
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08);
+}
+
+.seg__count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--rb-border);
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.seg__btn--on .seg__count { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+
+/* ---------- Drive rows ---------- */
+.drive-list {
+  list-style: none;
   margin: 0;
+  padding: 0;
 }
 
-.drive-card__meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 4px 0 0;
+.drive {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 220px 150px;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 18px;
+  transition: background 0.15s ease;
+}
+
+.drive + .drive { border-top: 1px solid var(--rb-border); }
+.drive:hover { background: var(--rb-surface-hover); }
+
+.drive__date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64px;
+  padding: 6px 0 8px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 12px;
+  background: var(--rb-surface);
+  overflow: hidden;
+}
+
+.drive__month {
+  align-self: stretch;
+  margin: -6px 0 4px;
+  padding: 3px 0;
+  background: var(--rb-primary);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.drive__day {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--rb-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.drive__weekday {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+}
+
+.drive--today .drive__month { background: var(--rb-success); }
+.drive--done .drive__month { background: var(--rb-text-muted); }
+.drive--done .drive__title,
+.drive--done .drive__day { color: var(--rb-text-secondary); }
+
+.drive__body { min-width: 0; }
+
+.drive__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drive__title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drive__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+}
+
+.drive__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+
+.drive__note {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--rb-border-strong);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--rb-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .status-badge {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
   flex-shrink: 0;
   white-space: nowrap;
 }
 
-.status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
-.status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
-.status-badge--planning { background: var(--rb-surface-hover); color: var(--text-secondary); }
-.status-badge--completed { background: var(--rb-surface-hover); color: var(--text-secondary); }
+.status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
+.status-badge--full { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
+.status-badge--completed { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
 
-/* Progress bar */
+/* Registrations */
+.drive__fill-head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+}
+
+.drive__fill-head strong {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--rb-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 .progress-track {
-  margin-top: 14px;
   height: 6px;
   border-radius: 999px;
   background: var(--rb-border-strong);
@@ -599,108 +952,53 @@ onMounted(async () => {
 .progress-fill {
   height: 100%;
   border-radius: 999px;
-  /* The lifted blue, not the fill blue: at 2.3:1 against the dark track the
-     base #1565C0 bar was effectively invisible in dark mode. */
-  background: var(--primary-text);
   transition: width 0.4s ease;
 }
 
-.progress-fill--full {
-  background: var(--rb-success);
-}
+.progress-fill--open { background: var(--rb-success); }
+.progress-fill--busy { background: var(--rb-warning); }
+.progress-fill--full { background: var(--rb-accent); }
 
-.progress-meta {
-  display: flex;
-  justify-content: space-between;
+.drive__fill-foot {
+  margin: 5px 0 0;
   font-size: 11.5px;
-  color: var(--text-secondary);
-  margin-top: 6px;
+  color: var(--rb-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Donor preview */
-.preview-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-secondary);
-  margin: 18px 0 8px;
-  border-top: 1px solid var(--rb-border);
-  padding-top: 14px;
-}
-
-.donor-preview-list {
+.drive__actions {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
-.donor-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.donor-row__avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.donor-row__info {
-  flex: 1;
-  min-width: 0;
-}
-
-.donor-row__name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.donor-row__meta {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
-
-.donor-badge {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.donor-badge--confirmed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--success); }
-.donor-badge--pending { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--warning); }
-.donor-badge--attended { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--primary-text); }
-.donor-badge--no_show { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--accent); }
-
-
-/* Empty state */
+/* ---------- Empty states ---------- */
 .empty-state {
-  background: var(--rb-surface);
-  border-radius: 14px;
-  border: 1px solid var(--rb-border);
   padding: 48px 24px;
   text-align: center;
-  color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
-/* Modal */
+.empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
+}
+
+.empty-state__icon--error { color: var(--rb-accent-text); }
+.empty-state__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.empty-state__text { margin: 0 0 8px; max-width: 44ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* ---------- Modal ---------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -714,9 +1012,9 @@ onMounted(async () => {
 
 .modal-card {
   background: var(--rb-surface);
-  border-radius: 14px;
+  border-radius: 16px;
   width: 100%;
-  max-width: 500px;
+  max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.28);
@@ -724,32 +1022,27 @@ onMounted(async () => {
 
 .modal-card__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   padding: 18px 20px;
   border-bottom: 1px solid var(--rb-border);
 }
 
-.modal-card__title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
+.modal-card__title { font-size: 16px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.modal-card__subtitle { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .modal-card__close {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--rb-text-secondary);
   padding: 4px;
   display: flex;
-  transition: color 0.15s ease;
+  border-radius: 8px;
 }
 
-.modal-card__close:hover {
-  color: var(--text-primary);
-}
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
 
 .modal-form {
   padding: 18px 20px 20px;
@@ -771,11 +1064,63 @@ onMounted(async () => {
 }
 
 .form-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rb-text-primary);
+}
+
+.form-hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* "Not connected yet": calm, not an error. */
+.form-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--rb-text-secondary);
+}
+
+.form-notice :deep(svg) { flex-shrink: 0; margin-top: 1px; }
+
+.cancel-impact {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.25);
+  background: rgba(var(--rb-accent-rgb), 0.05);
+  color: var(--rb-accent-text);
+}
+
+.cancel-impact p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rb-text-primary);
+}
+
+.cancel-impact :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+
+.modal-card--narrow { max-width: 440px; }
+
+.form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 8px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  color: var(--rb-accent-text);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 /*
@@ -792,8 +1137,8 @@ onMounted(async () => {
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13px;
-  color: var(--text-primary);
-  background: var(--rb-surface-alt);
+  color: var(--rb-text-primary);
+  background: var(--rb-surface);
   font-family: inherit;
   transition: border-color 0.15s ease;
 }
@@ -801,9 +1146,8 @@ onMounted(async () => {
 .drives-page .form-input:focus,
 .drives-page .form-textarea:focus {
   outline: none;
-  border-color: var(--primary-text);
-  background: var(--rb-surface);
-  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.14);
+  border-color: var(--rb-primary);
+  box-shadow: var(--rb-focus-ring);
 }
 
 .drives-page .form-input::placeholder,
@@ -813,7 +1157,7 @@ onMounted(async () => {
 
 .drives-page .form-textarea {
   resize: vertical;
-  min-height: 64px;
+  min-height: 72px;
 }
 
 .stepper {
@@ -824,17 +1168,14 @@ onMounted(async () => {
 
 .stepper__input {
   padding-right: 32px;
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .stepper__input::-webkit-inner-spin-button,
 .stepper__input::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-.stepper__input {
-  -moz-appearance: textfield;
-  appearance: textfield;
 }
 
 .stepper__controls {
@@ -848,15 +1189,12 @@ onMounted(async () => {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--rb-text-secondary);
   padding: 1px 6px;
   display: flex;
-  transition: color 0.15s ease;
 }
 
-.stepper__btn:hover {
-  color: var(--primary-text);
-}
+.stepper__btn:hover { color: var(--rb-primary-text); }
 
 .modal-actions {
   display: flex;
@@ -864,28 +1202,6 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
-}
-
-.btn-cancel {
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  background: var(--rb-surface-hover);
-  color: var(--text-primary);
-  border: 1px solid var(--rb-border-strong);
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.btn-cancel:hover {
-  background: var(--rb-surface-alt);
-  border-color: var(--rb-border-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .modal-enter-active,
@@ -898,21 +1214,7 @@ onMounted(async () => {
   opacity: 0;
 }
 
-/* Responsive */
-@media (max-width: 900px) {
-  .form-row { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 640px) {
-  .drives-page { padding: 16px 16px 32px; }
-  .modal-actions { flex-direction: column-reverse; align-items: stretch; }
-  .modal-actions .btn-primary, .modal-actions .btn-cancel { width: 100%; }
-  .header-row { flex-direction: column; align-items: stretch; }
-}
-
-.btn-primary:focus-visible,
-.btn-cancel:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none !important; }
 }
 </style>

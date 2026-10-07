@@ -1,22 +1,20 @@
 /**
  * Shared dashboard-sidebar state.
  *
- * `namespace` keeps one portal's rail from driving another's. The donor and
- * admin builds were written against a single unnamespaced set of keys, so
- * 'donor' stays the default and their behaviour is unchanged; the blood centre
- * asks for its own bucket because its layout *reflows* on hover and must not
- * inherit a hover the donor drawer latched.
+ * `namespace` keeps one portal's rail from driving another's. Every portal now
+ * *reflows* its content column on hover, so a bucket shared across two of them
+ * would let a hover latched in one move the page in the other. 'donor' stays
+ * the default only because that build was written against the unnamespaced
+ * keys; blood-centre and admin name their own.
  */
 export function useSidebar(namespace = 'donor') {
   /*
    * `collapsed` is the persistent desktop rail state. It defaults to true: the
    * desktop sidebar sits collapsed and widens on hover instead of on a click,
-   * so there is no expand button to remember a choice from.
-   *
-   * `hoverExpanded` is the transient widening. It is kept apart from
-   * `collapsed` so each portal can decide what may follow it — the donor rail
-   * floats the widened sidebar over the page, the blood centre reflows the
-   * content beside it.
+   * so there is no expand button to remember a choice from. Nothing sets it to
+   * false today, which makes `railExpanded` effectively `hoverExpanded` — it
+   * stays separate so a pinned-open rail can be added without touching the
+   * layouts that track it.
    */
   const collapsed = useState(`${namespace}-sidebar-collapsed`, () => true)
   const hoverExpanded = useState(`${namespace}-sidebar-hover-expanded`, () => false)

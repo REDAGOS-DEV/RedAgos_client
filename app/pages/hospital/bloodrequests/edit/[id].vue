@@ -449,7 +449,7 @@ onMounted(() => {
 const isEditable = computed(() => originalRequest.value?.status === 'Pending')
 
 const statusMeta = {
-  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F59E0B' },
+  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F57C00' },
   Approved:           { bg: '#E8F0FE', fg: '#1565C0', dot: '#1565C0' },
   Processing:         { bg: '#EDE7F6', fg: '#5E35B1', dot: '#5E35B1' },
   'Ready for Pickup': { bg: '#E3F2FD', fg: '#0277BD', dot: '#0277BD' },
@@ -604,11 +604,11 @@ function formatDateTime(iso) {
 
 <style scoped>
 .eb-page {
-  --eb-primary: #1565c0;
+  --eb-primary: var(--rb-primary, #1565c0);
   --eb-primary-hover: #0d47a1;
-  --eb-warning: #f59e0b;
-  --eb-success: #2e7d32;
-  --eb-danger: #d32f2f;
+  --eb-warning: var(--rb-warning, #F57C00);
+  --eb-success: var(--rb-success, #2e7d32);
+  --eb-danger: var(--rb-accent, #d32f2f);
   --eb-bg: #f7f9fc;
   --eb-card: #ffffff;
   --eb-border: #e5eaf0;
@@ -951,27 +951,27 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 
 /* ---------- dark mode ---------- */
 :global(.dark .eb-page) { background: #0f1420; color: #e6eaf2; }
-:global(.dark .eb-card) { background: #161d2c; border-color: var(--eb-border-dark); box-shadow: none; }
-:global(.dark .eb-change-card) { border-color: #2c4a70; }
-:global(.dark .eb-input) { background: #131a27; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-subtitle),
-:global(.dark .eb-label),
-:global(.dark .eb-side-label),
-:global(.dark .eb-doc-size),
-:global(.dark .eb-hint),
-:global(.dark .eb-empty-inline),
-:global(.dark .eb-audit-date),
-:global(.dark .eb-audit-by),
-:global(.dark .eb-rules-list),
-:global(.dark .eb-availability-type),
-:global(.dark .eb-change-label) { color: #8b95a8; }
-:global(.dark .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
-:global(.dark .eb-side-row),
-:global(.dark .eb-change-row) { border-color: var(--eb-border-dark); }
-:global(.dark .eb-availability-bar-track) { background: #232c3f; }
-:global(.dark .eb-action-bar) { background: #161d2c; border-color: var(--eb-border-dark); }
-:global(.dark .eb-audit-item::before) { background: var(--eb-border-dark); }
-:global(.dark .eb-locked-banner) { background: #2a2314; border-color: #4a3a12; }
+:global(.dark .eb-page .eb-card) { background: #161d2c; border-color: var(--eb-border-dark); box-shadow: none; }
+:global(.dark .eb-page .eb-change-card) { border-color: #2c4a70; }
+:global(.dark .eb-page .eb-input) { background: #131a27; border-color: var(--eb-border-dark); color: #e6eaf2; }
+:global(.dark .eb-page .eb-subtitle),
+:global(.dark .eb-page .eb-label),
+:global(.dark .eb-page .eb-side-label),
+:global(.dark .eb-page .eb-doc-size),
+:global(.dark .eb-page .eb-hint),
+:global(.dark .eb-page .eb-empty-inline),
+:global(.dark .eb-page .eb-audit-date),
+:global(.dark .eb-page .eb-audit-by),
+:global(.dark .eb-page .eb-rules-list),
+:global(.dark .eb-page .eb-availability-type),
+:global(.dark .eb-page .eb-change-label) { color: #8b95a8; }
+:global(.dark .eb-page .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
+:global(.dark .eb-page .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-side-row),
+:global(.dark .eb-page .eb-change-row) { border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-availability-bar-track) { background: #232c3f; }
+:global(.dark .eb-page .eb-action-bar) { background: #161d2c; border-color: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-audit-item::before) { background: var(--eb-border-dark); }
+:global(.dark .eb-page .eb-locked-banner) { background: #2a2314; border-color: #4a3a12; }
 :global(.dark fieldset.eb-card:disabled) { background: #12182a; }
 </style>

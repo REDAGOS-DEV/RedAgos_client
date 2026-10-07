@@ -16,8 +16,12 @@ export interface BloodCenterNavItem {
   icon: string
   /** Key into the sidebar's badge counts, when the item shows one. */
   badge?: string
-  /** Ability needed to see this item. Omitted means everyone in the portal. */
-  requires?: string
+  /**
+   * Ability needed to see this item — or a list, any one of which will do.
+   * Omitted means everyone in the portal. Must match the page's own
+   * `definePageMeta({ requires })`, or the link would bounce.
+   */
+  requires?: string | readonly string[]
   /** Extra terms the ⌘F search should match on. */
   keywords?: string
 }
@@ -28,16 +32,58 @@ export interface BloodCenterNavGroup {
 }
 
 /**
- * Where each department lands after signing in.
+ * The abilities that open the collection page, any one of which will do.
  *
- * A supervisor who also works in a department lands in that department; the
- * overview stays one click away in the sidebar. A management-only supervisor
- * lands on the overview.
+ * The counter is one page worked by three roles: the receptionist opens the
+ * donation, the physician screens, the chair collects. Shared by the nav item
+ * and the page's own meta so the two cannot disagree.
+ */
+export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const
+
+/**
+ * The abilities that open the testing page, which TTI Testing and
+ * Immunohematology share: each works its own card on it.
+ */
+export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohematology'] as const
+
+
+/**
+ * Where each staff role lands after signing in.
+ *
+ * Checked before the department, because roles in one department do different
+ * work: a receptionist starts at the appointment list, a physician at the
+ * counter. A supervisor who also holds a role lands where that role does; the
+ * overview stays one click away in the sidebar.
+ */
+const ROLE_HOME: Record<string, string> = {
+  screening_physician: '/blood-center/collection',
+  phlebotomist: '/blood-center/collection',
+  apheresis_specialist: '/blood-center/collection',
+  medical_receptionist: '/blood-center/appointments',
+  component_technologist: '/blood-center/laboratory',
+  processing_assistant: '/blood-center/laboratory',
+  serology_technologist: '/blood-center/testing',
+  lab_supervisor: '/blood-center/testing',
+  inventory_control_officer: '/blood-center/storage',
+  dispatch_coordinator: '/blood-center/fulfillment',
+  it_data_clerk: '/blood-center/inventory',
+  billing_clerk: '/blood-center/billing',
+}
+
+/**
+ * Where each department lands, for an account holding a custom role.
+ *
+ * Every predefined role is in ROLE_HOME; a typed role has no entry there, so
+ * its department decides.
  */
 const DEPARTMENT_HOME: Record<string, string> = {
   collection: '/blood-center/collection',
-  laboratory: '/blood-center/laboratory',
-  inventory: '/blood-center/storage',
+  // Each laboratory department has its own page. TTI Testing records the
+  // serology panel and works its referral list; Processing separates the
+  // unit and completes or rejects it.
+  testing: '/blood-center/testing',
+  processing: '/blood-center/laboratory',
+  issuance: '/blood-center/storage',
   billing: '/blood-center/billing',
 }
 
@@ -54,7 +100,8 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
     return BLOOD_CENTER_OVERVIEW
   }
 
-  const home = user.department ? DEPARTMENT_HOME[user.department] : undefined
+  const home = (user.staff_role ? ROLE_HOME[user.staff_role] : undefined)
+    ?? (user.department ? DEPARTMENT_HOME[user.department] : undefined)
 
   if (home) {
     return home
@@ -63,68 +110,77 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
   return user.is_supervisor ? BLOOD_CENTER_OVERVIEW : '/blood-center/settings'
 }
 
+/*
+ * Main first: every department's dashboard, so each person starts from their
+ * own. Then each department's working pages, then management, then Account
+ * (Settings) at the very bottom.
+ *
+ * Every `requires` is unchanged; only the grouping moved. Group labels for the
+ * departments follow Department::label() on the server.
+ */
 const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'Main',
     items: [
-      // Gated on reports.view_all, which only the management level holds — the
-      // overview spans every department, so it is not a department's own view.
-      { label: 'Overview', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall' },
-
-      // Each department dashboard is gated on an ability distinctive to that
-      // department, never on a shared read. inventory.view, for instance, is
-      // held by Collection and Laboratory too, so gating Storage on it would
-      // have shown them a dashboard that is not theirs.
-      { label: 'Collection Dashboard', path: '/blood-center/collection', icon: 'heart', requires: 'donors.manage', keywords: 'donor collection donation' },
-      { label: 'Laboratory Dashboard', path: '/blood-center/laboratory', icon: 'flask-conical', requires: 'lab.view', keywords: 'lab processing screening testing' },
-      { label: 'Storage Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'storage stock units' },
-      { label: 'Billing Dashboard', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.create', keywords: 'billing payment finance' },
+      // Every department's dashboard first: where each person starts their day.
+      { label: 'Center Overview', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall' },
+      { label: 'Collection', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
+      { label: 'Issuance', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
     ],
   },
   {
-    label: 'Blood Management',
+    label: 'Donor / Collection',
+    items: [
+      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
+      { label: 'Donors', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donor profile history contact recruitment' },
+      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
+    ],
+  },
+  {
+    label: 'Testing',
+    items: [
+      // One page, two views: each department's queue is its own link, gated
+      // on that department's write, so a role holding one sees only its own.
+      { label: 'Immunohematology', path: '/blood-center/testing?test=typing', icon: 'droplets', requires: 'lab.record_immunohematology', keywords: 'lab laboratory testing immunohematology typing abo rh forward reverse antibody screen barcode sticker' },
+      { label: 'Serology (TTI)', path: '/blood-center/testing?test=serology', icon: 'flask-conical', requires: 'lab.record_serology', keywords: 'lab laboratory testing tti serology hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
+    ],
+  },
+  {
+    label: 'Processing',
+    items: [
+      { label: 'Component Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
+    ],
+  },
+  {
+    label: 'Issuance',
     items: [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
-      // inventory.create rather than inventory.view: Collection and Laboratory
-      // both read stock, but only Inventory books it in.
       { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
-      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests' },
-      { label: 'Requests Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.process', keywords: 'allocate release dispatch' },
+      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.create', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
+      { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
+      { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
     ],
   },
   {
-    label: 'Operations',
+    label: 'Billing',
     items: [
-      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
-      { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
-      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view', keywords: 'donor profile history' },
+      { label: 'Billing & Payments', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.view', keywords: 'billing payment finance invoice receipt gcash cash' },
     ],
   },
   {
-    label: 'Finance',
-    items: [
-      { label: 'Billing and Payments', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.view', keywords: 'invoice receipt gcash cash' },
-    ],
-  },
-  {
-    label: 'Reports',
-    items: [
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
-    ],
-  },
-  {
-    label: 'Administration',
+    label: 'Management',
     items: [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
+      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
+      { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
+      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'center.configure', keywords: 'shelf life expiry price component settings' },
     ],
   },
   {
-    label: 'System',
+    label: 'Account',
     items: [
-      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'center.configure', keywords: 'shelf life expiry price component settings' },
+      // Always last, for everyone.
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
-      // Help & Support removed: /blood-center/support has no page, so the link
-      // 404'd. Restore it together with the page, not before.
     ],
   },
 ]
@@ -139,15 +195,47 @@ const USER_MENU_PATHS = [
   '/blood-center/staff',
 ]
 
-export function useBloodCenterNav() {
-  const { can } = useUser()
+/** Each department's own nav group, so a member's group can be put first. */
+const DEPARTMENT_GROUP: Record<string, string> = {
+  collection: 'Donor / Collection',
+  testing: 'Testing',
+  processing: 'Processing',
+  issuance: 'Issuance',
+  billing: 'Billing',
+}
 
-  /** Groups the current user may see, with empty groups dropped. */
-  const navGroups = computed<BloodCenterNavGroup[]>(() =>
-    NAV_GROUPS
+
+export function useBloodCenterNav() {
+  const { can, user } = useUser()
+
+  /**
+   * Groups the current user may see, with empty groups dropped.
+   *
+   * Arranged by role, presentation only (what is visible is still decided by
+   * `requires`). A supervisor sees the groups in their fixed order; anyone
+   * else sees their own department right after Main.
+   */
+  const navGroups = computed<BloodCenterNavGroup[]>(() => {
+    const visible = NAV_GROUPS
       .map((group) => ({ ...group, items: group.items.filter((item) => can(item.requires)) }))
       .filter((group) => group.items.length > 0)
-  )
+
+    if (!user.value || user.value.is_supervisor) return visible
+
+    // Main (dashboards) first and Account (Settings) last for everyone; between
+    // them, a staff member's own department comes before the rest.
+    const home = DEPARTMENT_GROUP[user.value.department ?? '']
+    const main = visible.filter((group) => group.label === 'Main')
+    const other = visible.filter((group) => group.label === 'Account')
+    const middle = visible.filter((group) => group.label !== 'Main' && group.label !== 'Account')
+
+    return [
+      ...main,
+      ...middle.filter((group) => group.label === home),
+      ...middle.filter((group) => group.label !== home),
+      ...other,
+    ]
+  })
 
   /** Every permitted item, flattened — the ⌘F search index. */
   const searchablePages = computed<BloodCenterNavItem[]>(() =>
@@ -165,12 +253,32 @@ export function useBloodCenterNav() {
    * Look up a nav item's label, for the header breadcrumb.
    */
   function labelForPath(path: string): string {
-    const match = NAV_GROUPS
-      .flatMap((group) => group.items)
-      .find((item) => item.path === path)
+    const items = NAV_GROUPS.flatMap((group) => group.items)
+    const match = items.find((item) => item.path === path)
 
-    return match?.label ?? ''
+    if (match) return match.label
+
+    // A page reached without the query its links carry (e.g. /blood-center/testing
+    // with no ?test=): one link to it gives that label, several give their group's.
+    const base = path.split('?')[0]
+    const sameBase = items.filter((item) => item.path.split('?')[0] === base)
+
+    if (sameBase.length === 1) return sameBase[0]!.label
+    if (sameBase.length > 1) {
+      return NAV_GROUPS.find((group) => group.items.includes(sameBase[0]!))?.label ?? ''
+    }
+
+    return ''
   }
 
-  return { navGroups, searchablePages, userMenuItems, labelForPath, can }
+  /**
+   * The department a page belongs to, for the breadcrumb. Read from the full
+   * list, so it still names the department when the sidebar shows no headings.
+   */
+  function sectionForPath(path: string): string {
+    const base = path.split('?')[0]
+    return NAV_GROUPS.find((group) => group.items.some((item) => item.path.split('?')[0] === base))?.label ?? ''
+  }
+
+  return { navGroups, searchablePages, userMenuItems, labelForPath, sectionForPath, can }
 }

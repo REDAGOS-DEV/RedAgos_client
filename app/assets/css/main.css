@@ -19,6 +19,10 @@
  */
 :root {
   --rb-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  /* For barcodes, unit numbers and reference codes. One stack, so a code looks
+     the same on every page; plain `monospace` fell back to Courier New on
+     Windows. */
+  --rb-font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, 'Roboto Mono', Menlo, monospace;
   --rb-primary: #1565C0;
   --rb-primary-rgb: 21, 101, 192;
   --rb-secondary: #42A5F5;
@@ -73,6 +77,53 @@
   --rb-skeleton-b: #F6F8FA;
   --rb-overlay: rgba(15, 23, 42, 0.45);
   --rb-shadow-rgb: 15, 23, 42;
+
+  /*
+   * Shape, spacing and type scale. Colour had one definition but these did
+   * not, so every page picked its own radius and gaps. New and polished
+   * surfaces read these; older pages move over as they are touched.
+   *
+   * Shape rule: controls (inputs, buttons) use --rb-radius-md, cards and
+   * panels --rb-radius-lg, chips and the back link --rb-radius-pill.
+   */
+  --rb-radius-sm: 8px;
+  --rb-radius-md: 12px;
+  --rb-radius-lg: 16px;
+  --rb-radius-pill: 999px;
+
+  /* 4px grid */
+  --rb-space-1: 4px;
+  --rb-space-2: 8px;
+  --rb-space-3: 12px;
+  --rb-space-4: 16px;
+  --rb-space-5: 20px;
+  --rb-space-6: 24px;
+  --rb-space-8: 32px;
+  --rb-space-10: 40px;
+  --rb-space-12: 48px;
+
+  --rb-text-xs: 12px;
+  --rb-text-sm: 13px;
+  --rb-text-base: 14px;
+  --rb-text-md: 15px;
+  --rb-text-lg: 18px;
+  --rb-text-xl: 24px;
+  --rb-text-2xl: 32px;
+
+  /*
+   * Page width. Was a hard-coded 1152px on every blood-centre page, which on a
+   * 1366px laptop left wide empty bands either side of tables that needed the
+   * room. 1600px fills a laptop and still caps line length on a large monitor.
+   * The header reads the same two values so its contents line up with the page.
+   */
+  --rb-content-max: 1600px;
+  --rb-gutter: 24px;
+
+  --rb-control-height: 48px;
+  --rb-shadow-sm: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.05);
+  --rb-shadow-md: 0 1px 3px rgba(var(--rb-shadow-rgb), 0.06), 0 6px 16px -8px rgba(var(--rb-shadow-rgb), 0.12);
+  --rb-focus-ring: 0 0 0 4px rgba(var(--rb-primary-rgb), 0.14);
+  --rb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Dark mode is class-based (tailwind.config.js darkMode: 'class'). */
@@ -195,4 +246,74 @@ transform:translateY(-15px);
 transform:translateY(0);
 }
 
+}
+
+/*
+ * Landing page tokens.
+ *
+ * The landing components each carried their own hex values (#2563eb in four
+ * spellings, three different near-blacks, two reds). They now read from one
+ * set, defined on :root rather than on the page wrapper because the mobile
+ * menu is teleported to <body> and would otherwise lose them.
+ *
+ * Colour roles, which every landing component follows:
+ *   --lp-accent   brand blue. Every interactive fill, link and active state.
+ *   --lp-brand    brand red. The "Red" in the wordmark and blood-type tags
+ *                 only. It never carries a button.
+ */
+:root {
+  --lp-bg: #F6F8FB;
+  --lp-surface: #FCFDFF;
+  --lp-surface-alt: #EDF2FA;
+  --lp-text: #111827;
+  --lp-text-2: #4B5563;
+  --lp-muted: #64748B;
+  --lp-border: #E2E8F0;
+  --lp-accent: #2563EB;
+  --lp-accent-hover: #1D4ED8;
+  --lp-accent-text: #1D4ED8;
+  --lp-accent-soft: rgba(37, 99, 235, 0.08);
+  --lp-on-accent: #FCFDFF;
+  --lp-brand: #D32F2F;
+  --lp-brand-soft: rgba(211, 47, 47, 0.08);
+  --lp-shadow: 0 18px 40px -24px rgba(30, 58, 138, 0.35);
+  --lp-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark {
+  --lp-bg: #0B1220;
+  --lp-surface: #111A2E;
+  --lp-surface-alt: #16213A;
+  --lp-text: #F1F5F9;
+  --lp-text-2: #CBD5E1;
+  --lp-muted: #94A3B8;
+  --lp-border: #24324D;
+  /* The fill keeps its value so white text on it stays above 4.5:1. */
+  --lp-accent-text: #7AB0FF;
+  --lp-accent-soft: rgba(122, 176, 255, 0.1);
+  --lp-brand: #F87171;
+  --lp-brand-soft: rgba(248, 113, 113, 0.12);
+  --lp-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
+/*
+ * `v-reveal` (plugins/reveal.ts) adds .reveal on mount and .is-revealed once
+ * the element scrolls into view. Content is visible in the server render, so
+ * nothing stays hidden if JavaScript never runs.
+ */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s var(--lp-ease), transform 0.6s var(--lp-ease);
+}
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }

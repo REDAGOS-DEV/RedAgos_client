@@ -471,7 +471,7 @@
                   <span class="ba-legend-dot" style="background:#2E7D32;"></span> Healthy
                 </span>
                 <span class="ba-legend-chip badge-low">
-                  <span class="ba-legend-dot" style="background:#F59E0B;"></span> Low
+                  <span class="ba-legend-dot" style="background:#F57C00;"></span> Low
                 </span>
                 <span class="ba-legend-chip badge-critical">
                   <span class="ba-legend-dot" style="background:#D32F2F;"></span> Critical
@@ -550,7 +550,7 @@ const criticalTypesDisplay = ref(0)
 
 // ======================= OPTIONS =======================
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const componentOptions = ['Packed RBC', 'Whole Blood', 'Platelets', 'Fresh Frozen Plasma', 'Cryoprecipitate']
+const componentOptions = ['Packed RBC', 'Whole Blood', 'Platelet Concentrate', 'Fresh Frozen Plasma', 'Cryoprecipitate', 'Cryosupernate']
 const centerOptions = ref([]) // populated from API response
 
 // ======================= RECOMMENDED ACTIONS =======================
@@ -870,18 +870,18 @@ const donutSegments = computed(() => {
 
 <style scoped>
 .ba-page {
-  --ba-primary: #1565C0;
+  --ba-primary: var(--rb-primary, #1565C0);
   --ba-primary-hover: #0D47A1;
   --ba-bg: #F7F9FC;
   --ba-card: #FFFFFF;
   --ba-border: #E5EAF0;
   --ba-text: #1E293B;
-  --ba-text-secondary: #64748B;
-  --ba-text-muted: #94A3B8;
-  --ba-success: #2E7D32;
-  --ba-warning: #F59E0B;
-  --ba-danger: #D32F2F;
-  --ba-purple: #7C3AED;
+  --ba-text-secondary: var(--rb-text-secondary, #64748B);
+  --ba-text-muted: var(--rb-text-muted, #94A3B8);
+  --ba-success: var(--rb-success, #2E7D32);
+  --ba-warning: var(--rb-warning, #F57C00);
+  --ba-danger: var(--rb-accent, #D32F2F);
+  --ba-purple: var(--rb-purple, #7C3AED);
   --ba-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --ba-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
@@ -1842,7 +1842,7 @@ const donutSegments = computed(() => {
   border-radius: 6px;
   animation: ba-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton-line) {
+:global(.dark .ba-page .skeleton-line) {
   background: linear-gradient(
     90deg,
     #2A3447 25%,

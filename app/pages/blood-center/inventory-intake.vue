@@ -1,221 +1,376 @@
 <template>
   <div class="intake">
+    <!-- ================= HEADER: title + the two steps as tabs ================= -->
     <header class="intake__header">
       <div>
-        <p class="intake__eyebrow">Blood Center Portal / Inventory</p>
         <h1 class="intake__title">Stock Intake</h1>
-        <p class="intake__subtitle">
-          Book the physical bags from a cleared donation onto the shelf. One row per bag, traceable back
-          to the donation it came from.
-        </p>
+        <p class="intake__subtitle">Book processed bags into quarantine, then release and label them once testing clears.</p>
       </div>
 
-      <span v-if="facilityLabel" class="intake__facility">
-        <AssetIcon name="building-2" :size="14" />
-        {{ facilityLabel }}
-      </span>
+      <div class="tabs" role="tablist" aria-label="Stock intake steps">
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ 'tab--on': step === 'book' }"
+          :aria-selected="step === 'book'"
+          @click="step = 'book'"
+        >
+          <span class="tab__num">1</span>
+          Book in
+          <span v-if="queue.length" class="tab__count">{{ queue.length }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ 'tab--on': step === 'release' }"
+          :aria-selected="step === 'release'"
+          @click="step = 'release'"
+        >
+          <span class="tab__num">2</span>
+          Release &amp; label
+          <span v-if="released.length" class="tab__count tab__count--done">{{ released.length }}</span>
+        </button>
+      </div>
     </header>
 
-    <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
-    <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
+    <div v-if="error" class="alert alert--error" role="alert">
+      <AssetIcon name="circle-alert" :size="16" />
+      <span>{{ error }}</span>
+    </div>
+    <div v-else-if="notice" class="alert alert--notice" role="status">
+      <AssetIcon name="circle-check-big" :size="16" />
+      <span>{{ notice }}</span>
+      <button v-if="step === 'book'" type="button" class="alert__action" @click="step = 'release'">
+        Go to Release &amp; label
+      </button>
+    </div>
 
-    <!-- QUEUE -->
-    <section v-if="!selected" class="card">
-      <div class="card__head">
-        <div>
-          <h2 class="card__title">Cleared donations awaiting intake</h2>
-          <p class="card__hint">
-            A donation appears here once the laboratory clears it for issue, and leaves once every
-            declared bag has been booked in.
+    <!-- ================= STEP 1: QUEUE + WORKBENCH ================= -->
+    <div v-show="step === 'book'" class="workspace" role="tabpanel">
+      <!-- QUEUE -->
+      <aside class="queue-panel" aria-label="Donations waiting to be booked in">
+        <form class="scan" @submit.prevent="findByBarcode">
+          <AssetIcon name="scan-line" :size="17" class="scan__icon" />
+          <label class="sr-only" for="intake-scan">Donation barcode</label>
+          <input
+            id="intake-scan"
+            ref="scanInput"
+            v-model="barcodeSearch"
+            type="text"
+            class="scan__input mono"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="characters"
+            maxlength="30"
+            placeholder="Scan or type a barcode"
+          >
+          <button type="submit" class="scan__go" :disabled="loadingQueue" aria-label="Find donation">
+            <AssetIcon name="arrow-right" :size="16" />
+          </button>
+        </form>
+
+        <div class="queue-panel__head">
+          <p class="queue-panel__title">
+            Waiting
+            <span class="queue-panel__count">{{ loadingQueue ? '…' : queue.length }}</span>
+          </p>
+          <button
+            type="button"
+            class="icon-btn"
+            :disabled="loadingQueue"
+            :aria-label="activeBarcode ? 'Show all donations' : 'Refresh the queue'"
+            :title="activeBarcode ? 'Show all' : 'Refresh'"
+            @click="clearSearch"
+          >
+            <AssetIcon :name="activeBarcode ? 'x' : 'refresh-cw'" :size="14" :class="{ 'spin': loadingQueue }" />
+          </button>
+        </div>
+
+        <p v-if="activeBarcode && !loadingQueue" class="queue-panel__filter">
+          Barcode <span class="mono">{{ activeBarcode }}</span>
+        </p>
+
+        <ul v-if="loadingQueue" class="queue" aria-busy="true">
+          <li v-for="n in 4" :key="n" class="queue__item queue__item--skeleton">
+            <span class="skeleton skeleton--line" />
+            <span class="skeleton skeleton--short" />
+          </li>
+        </ul>
+
+        <div v-else-if="!queue.length" class="queue-empty">
+          <AssetIcon :name="activeBarcode ? 'search-x' : 'circle-check-big'" :size="18" />
+          <p>
+            <template v-if="activeBarcode">No donation waiting to be booked in has this barcode.</template>
+            <template v-else>All caught up. Every processed donation is on the shelf.</template>
           </p>
         </div>
 
-        <button type="button" class="btn" :disabled="loadingQueue" @click="loadQueue">
-          <AssetIcon name="refresh-cw" :size="14" />
-          {{ loadingQueue ? 'Loading…' : 'Refresh' }}
-        </button>
-      </div>
+        <ul v-else class="queue">
+          <li v-for="row in queue" :key="row.donation_id">
+            <button
+              type="button"
+              class="queue__item"
+              :class="{ 'queue__item--on': selected?.donation_id === row.donation_id }"
+              :aria-current="selected?.donation_id === row.donation_id ? 'true' : undefined"
+              :disabled="busy"
+              @click="openDonation(row)"
+            >
+              <span class="queue__top">
+                <span class="queue__name">{{ donorTitle(row.donor, row.donation_barcode, row.donation_id) }}</span>
+                <span class="type-pill" :class="{ 'type-pill--unknown': !row.donor?.blood_type }">
+                  {{ row.donor?.blood_type || '?' }}
+                </span>
+              </span>
+              <span class="queue__meta">#{{ row.donation_id }} · {{ formatDate(row.donation_date) }}</span>
+              <span class="queue__bottom">
+                <span class="bag-dots" aria-hidden="true">
+                  <span
+                    v-for="n in dotCount(row)"
+                    :key="n"
+                    class="bag-dot"
+                    :class="{ 'bag-dot--in': n <= (row.recorded_units || 0) }"
+                  />
+                </span>
+                <span class="queue__left">{{ row.outstanding_units }} bag{{ row.outstanding_units === 1 ? '' : 's' }} left</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </aside>
 
-      <p v-if="loadingQueue" class="card__hint">Loading the queue…</p>
-
-      <div v-else-if="!queue.length" class="empty">
-        <AssetIcon name="package-check" :size="28" />
-        <p>Nothing is waiting to be shelved. Every cleared donation has been booked in.</p>
-      </div>
-
-      <ul v-else class="queue">
-        <li v-for="row in queue" :key="row.donation_id" class="queue__row">
-          <div class="queue__main">
-            <p class="queue__name">{{ row.donor?.full_name || 'Unknown donor' }}</p>
-            <p class="queue__meta">
-              Donation #{{ row.donation_id }} · {{ row.donor?.donor_code || '—' }} ·
-              {{ row.donor?.blood_type || 'type unknown' }} · {{ formatDate(row.donation_date) }}
-            </p>
-          </div>
-
-          <div class="queue__state">
-            <span class="pill">{{ row.recorded_units }} of {{ row.declared_units }} recorded</span>
-            <span class="queue__next">{{ row.outstanding_units }} bag(s) still to shelve</span>
-          </div>
-
-          <button type="button" class="btn" :disabled="busy" @click="openDonation(row)">Open</button>
-        </li>
-      </ul>
-    </section>
-
-    <!-- ONE DONATION -->
-    <template v-else>
-      <section class="unit-bar">
-        <div class="unit-bar__identity">
-          <span class="unit-bar__avatar">{{ initials }}</span>
-          <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ selected.donor?.full_name || 'Unknown donor' }}</p>
-            <p class="unit-bar__sub">
-              Donation #{{ selected.donation_id }} · {{ selected.donor?.donor_code || '—' }} ·
-              {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
-            </p>
-          </div>
+      <!-- WORKBENCH -->
+      <section class="bench" aria-live="polite">
+        <!-- Nothing open yet -->
+        <div v-if="!selected" class="bench__idle">
+          <span class="bench__idle-icon"><AssetIcon name="scan-line" :size="26" /></span>
+          <p class="bench__idle-title">Scan or type a barcode to start</p>
+          <p class="bench__idle-text">
+            Scan the donation barcode sticker, type it in, or pick a donation from the list. Its bags open here,
+            ready to book into quarantine.
+          </p>
         </div>
 
-        <div class="fact">
-          <span class="fact__label">Blood type</span>
-          <span class="fact__value">{{ selected.donor?.blood_type || '—' }}</span>
-        </div>
-
-        <div class="fact">
-          <span class="fact__label">Progress</span>
-          <span class="fact__value">{{ selected.recorded_units }} of {{ selected.declared_units }}</span>
-        </div>
-
-        <button type="button" class="btn" :disabled="busy" @click="backToQueue">Back to queue</button>
-      </section>
-
-      <!-- What the laboratory declared, and what is left of it -->
-      <section class="card">
-        <h2 class="card__title">Declared by the laboratory</h2>
-        <p class="card__hint">
-          Intake is limited to this breakdown — a bag that was never separated cannot be shelved, and the
-          blood type is taken from the donation rather than typed here.
-        </p>
-
-        <ul class="declared">
-          <li v-for="c in selected.components" :key="c.component_id" class="declared__row">
-            <span class="declared__name">{{ c.component }}</span>
-            <span class="declared__count">{{ c.recorded }} of {{ c.declared }} recorded</span>
-            <span v-if="!c.shelf_life_configured" class="declared__flag">
-              <AssetIcon name="circle-alert" :size="13" />
-              No shelf life set
+        <template v-else>
+          <!-- Identity -->
+          <div class="bench__head">
+            <span class="bench__avatar">
+              <!-- A bag, not a person, for the roles that work blind. -->
+              <AssetIcon v-if="selected.donor?.blinded" name="droplets" :size="18" />
+              <template v-else>{{ initials }}</template>
             </span>
-            <span v-else class="declared__shelf">{{ c.shelf_life_days }}-day shelf life</span>
+            <div class="bench__who">
+              <p class="bench__name">
+                {{ donorTitle(selected.donor, selected.donation_barcode, selected.donation_id) }}
+                <span class="type-pill" :class="{ 'type-pill--unknown': !selected.donor?.blood_type }">
+                  {{ selected.donor?.blood_type || 'Type unknown' }}
+                </span>
+              </p>
+              <p class="bench__sub">
+                Donation #{{ selected.donation_id }} · {{ donorReference(selected.donor) }} ·
+                {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
+              </p>
+            </div>
+            <div class="bench__progress">
+              <span class="bag-dots bag-dots--lg" aria-hidden="true">
+                <span
+                  v-for="n in dotCount(selected)"
+                  :key="n"
+                  class="bag-dot"
+                  :class="{ 'bag-dot--in': n <= (selected.recorded_units || 0) }"
+                />
+              </span>
+              <span class="bench__progress-label">{{ selected.recorded_units }} of {{ selected.declared_units }} booked in</span>
+            </div>
+            <button type="button" class="icon-btn" :disabled="busy" aria-label="Close this donation" title="Close" @click="backToQueue">
+              <AssetIcon name="x" :size="16" />
+            </button>
+          </div>
+
+          <!-- What the laboratory declared -->
+          <div class="bench__section">
+            <p class="section-label">Declared by the laboratory</p>
+            <div class="declared">
+              <div v-for="c in selected.components" :key="c.component_id" class="declared__item">
+                <span class="declared__name">{{ c.component }}</span>
+                <span class="declared__count">{{ c.recorded }}/{{ c.declared }}</span>
+                <span v-if="!c.shelf_life_configured" class="declared__flag">
+                  <AssetIcon name="circle-alert" :size="12" />
+                  No shelf life
+                </span>
+                <span v-else class="declared__life">{{ c.shelf_life_days }}-day life</span>
+              </div>
+            </div>
+            <p class="bench__note">Blood type comes from the donation. Only declared components can be booked in.</p>
+          </div>
+
+          <div v-if="unconfigured.length" class="alert alert--warning">
+            <AssetIcon name="triangle-alert" :size="16" />
+            <span>
+              {{ unconfigured.join(', ') }} {{ unconfigured.length === 1 ? 'has' : 'have' }} no shelf life, so
+              {{ unconfigured.length === 1 ? 'it' : 'they' }} cannot be shelved. A supervisor sets this under Blood Components.
+            </span>
+          </div>
+
+          <!-- The bags -->
+          <div v-if="shelvable.length" class="bench__section">
+            <div class="bench__section-head">
+              <p class="section-label">Bags to book into quarantine</p>
+              <span class="pill">{{ unitRows.length }} of {{ MAX_PER_REQUEST }} per batch</span>
+            </div>
+            <p class="bench__note">
+              <template v-if="barcoded">Numbered by Processing from the barcode sticker. Set each bag's expiry and shelf.</template>
+              <template v-else>One row per bag. Leave the unit number blank and RedAgos allocates one.</template>
+            </p>
+
+            <div class="bags" :class="{ 'bags--manual': !barcoded }">
+              <div class="bags__head" aria-hidden="true">
+                <span>{{ barcoded ? 'Bag' : 'Component' }}</span>
+                <span>Expiry</span>
+                <span>Storage location</span>
+                <span v-if="!barcoded">Unit no. <i>optional</i></span>
+                <span />
+              </div>
+
+              <div v-for="(row, index) in unitRows" :key="index" class="bags__row">
+                <!-- A numbered bag is booked as exactly that bag. -->
+                <div v-if="row.bag_number" class="bag-fixed">
+                  <span class="bag-fixed__number mono">{{ row.bag_number }}</span>
+                  <span class="bag-fixed__meta">
+                    {{ componentName(row.component_id) }}<template v-if="row.volume_ml"> · {{ row.volume_ml }} mL</template>
+                  </span>
+                </div>
+
+                <select
+                  v-else
+                  v-model.number="row.component_id"
+                  class="field__input"
+                  :aria-label="`Bag ${index + 1} component`"
+                  @change="applyExpiry(row)"
+                >
+                  <option :value="null" disabled>Select a component</option>
+                  <option v-for="c in shelvable" :key="c.component_id" :value="c.component_id">
+                    {{ c.component }} ({{ remainingFor(c.component_id) }} left)
+                  </option>
+                </select>
+
+                <input v-model="row.expiry_date" type="date" class="field__input" :aria-label="`Bag ${index + 1} expiry date`">
+
+                <select v-model="row.storage_location" class="field__input" :aria-label="`Bag ${index + 1} storage location`">
+                  <option value="">Not recorded</option>
+                  <option v-for="loc in storageLocations" :key="loc" :value="loc">{{ loc }}</option>
+                </select>
+
+                <input
+                  v-if="!row.bag_number"
+                  v-model="row.unit_id"
+                  type="text"
+                  class="field__input"
+                  placeholder="Auto"
+                  :aria-label="`Bag ${index + 1} unit number (optional)`"
+                >
+
+                <!--
+                  Numbered bags are booked in the order Processing numbered them, so
+                  only the last row of a batch can be left for later.
+                -->
+                <button
+                  type="button"
+                  class="icon-btn icon-btn--row"
+                  :disabled="unitRows.length === 1 || (row.bag_number && !isLastOfComponent(index))"
+                  aria-label="Leave this bag for a later batch"
+                  title="Leave for a later batch"
+                  @click="unitRows.splice(index, 1)"
+                >
+                  <AssetIcon name="x" :size="14" />
+                </button>
+              </div>
+            </div>
+
+            <ul v-if="blockers.length" class="blockers">
+              <li v-for="blocker in blockers" :key="blocker">
+                <AssetIcon name="circle-alert" :size="14" />
+                {{ blocker }}
+              </li>
+            </ul>
+          </div>
+
+          <div v-else class="bench__stuck">
+            <AssetIcon name="triangle-alert" :size="18" />
+            <div>
+              <p class="bench__stuck-title">Nothing can be shelved yet</p>
+              <p class="bench__note">Every outstanding component is missing a shelf life. Ask a supervisor to set them under Blood Components.</p>
+            </div>
+          </div>
+
+          <!-- Stays in reach while a long batch scrolls -->
+          <div v-if="shelvable.length" class="bench__actions">
+            <button v-if="!barcoded" type="button" class="btn" :disabled="!canAddRow" @click="addUnitRow">
+              <AssetIcon name="plus" :size="14" />
+              Add bag
+            </button>
+            <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submit">
+              {{ busy ? 'Saving…' : `Book ${unitRows.length} bag${unitRows.length === 1 ? '' : 's'} into quarantine` }}
+              <AssetIcon v-if="!busy" name="arrow-right" :size="14" />
+            </button>
+          </div>
+        </template>
+      </section>
+    </div>
+
+    <!-- ================= STEP 2: RELEASE AND FINAL LABELS ================= -->
+    <!-- v-show keeps the panel's own state between tabs. -->
+    <div v-show="step === 'release'" class="release" role="tabpanel">
+      <BloodCenterQuarantinePanel allow-release @released="onReleased" />
+
+      <section v-if="released.length" class="released">
+        <p class="section-label">Released this session</p>
+        <ul class="released__list">
+          <li v-for="item in released" :key="item.donationId" class="released__item">
+            <AssetIcon name="circle-check-big" :size="16" class="released__icon" />
+            <div class="released__main">
+              <p class="released__name">{{ item.barcode ? `Barcode ${item.barcode}` : `Donation #${item.donationId}` }}</p>
+              <p class="released__meta">{{ item.count }} bag{{ item.count === 1 ? '' : 's' }}: <span class="mono">{{ item.units.join(', ') }}</span></p>
+            </div>
+            <button type="button" class="btn btn--sm" :disabled="busy" @click="reprint(item.donationId)">
+              <AssetIcon name="printer" :size="14" />
+              Reprint labels
+            </button>
           </li>
         </ul>
-
-        <p v-if="unconfigured.length" class="alert alert--warning">
-          {{ unconfigured.join(', ') }} {{ unconfigured.length === 1 ? 'has' : 'have' }} no shelf life
-          configured, so no expiry date can be derived and {{ unconfigured.length === 1 ? 'it' : 'they' }}
-          cannot be shelved. A supervisor sets this for your centre, under Blood Components.
-        </p>
       </section>
+    </div>
 
-      <!-- THE BAGS -->
-      <section v-if="shelvable.length" class="card">
-        <div class="card__head">
-          <div>
-            <h2 class="card__title">Bags to shelve</h2>
-            <p class="card__hint">
-              One row per physical bag. Leave the unit number blank and RedAgos allocates one; type it if
-              the bag already carries a printed label.
-            </p>
-          </div>
-          <span class="pill">{{ unitRows.length }} of {{ MAX_PER_REQUEST }} per batch</span>
-        </div>
-
-        <div v-for="(row, index) in unitRows" :key="index" class="unit-row">
-          <label class="field">
-            <span class="field__label">Component</span>
-            <select v-model.number="row.component_id" class="field__input" @change="applyExpiry(row)">
-              <option :value="null" disabled>Select</option>
-              <option v-for="c in shelvable" :key="c.component_id" :value="c.component_id">
-                {{ c.component }} ({{ remainingFor(c.component_id) }} left)
-              </option>
-            </select>
-          </label>
-
-          <label class="field field--date">
-            <span class="field__label">Expiry</span>
-            <input v-model="row.expiry_date" type="date" class="field__input" >
-          </label>
-
-          <label class="field">
-            <span class="field__label">Storage location</span>
-            <select v-model="row.storage_location" class="field__input">
-              <option value="">Not recorded</option>
-              <option v-for="loc in storageLocations" :key="loc" :value="loc">{{ loc }}</option>
-            </select>
-          </label>
-
-          <label class="field field--unit">
-            <span class="field__label">Unit no. <span class="field__optional">optional</span></span>
-            <input v-model="row.unit_id" type="text" class="field__input" placeholder="Auto" >
-          </label>
-
-          <button
-            type="button"
-            class="btn btn--icon"
-            :disabled="unitRows.length === 1"
-            aria-label="Remove this bag"
-            @click="unitRows.splice(index, 1)"
-          >
-            <AssetIcon name="trash-2" :size="14" />
-          </button>
-        </div>
-
-        <ul v-if="blockers.length" class="blockers">
-          <li v-for="blocker in blockers" :key="blocker">
-            <AssetIcon name="circle-alert" :size="14" />
-            {{ blocker }}
-          </li>
-        </ul>
-
-        <div class="actions">
-          <button type="button" class="btn" :disabled="!canAddRow" @click="addUnitRow">Add bag</button>
-          <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submit">
-            {{ busy ? 'Saving…' : `Shelve ${unitRows.length} bag(s)` }}
-          </button>
-        </div>
-      </section>
-
-      <section v-else class="card">
-        <div class="outcome outcome--warning">
-          <AssetIcon name="circle-alert" :size="26" />
-          <div>
-            <h2 class="card__title">Nothing can be shelved yet</h2>
-            <p class="card__hint">
-              Every outstanding component on this donation is missing a shelf life, so no expiry date can
-              be derived. Ask a supervisor to set them for your centre, under Blood Components.
-            </p>
-          </div>
-        </div>
-
-        <div class="actions">
-          <button type="button" class="btn" @click="backToQueue">Back to queue</button>
-        </div>
-      </section>
-    </template>
+    <!-- Hidden until labels are printed. -->
+    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
+import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
+import { normalizeBarcode } from '~/utils/phlebotomy'
+import { finalLabelsFrom } from '~/utils/bagLabels'
 
 /**
- * Booking a cleared donation's bags onto the shelf.
+ * Issuance's two steps with a donation's bags: book them into quarantine, then
+ * release them and print their final labels.
  *
- * This is the other half of the laboratory's handover. `completed` on a
+ * Booking in is the other half of Processing's hand-over. `completed` on a
  * donation only *authorises* stock entry — it does not create anything — and
  * this is where the physical bags become rows in inventory, each one still
- * pointing back at the donation it came from.
+ * pointing back at the donation it came from. A barcoded donation's bags are
+ * booked as the bags Processing numbered (sticker + component), in that order,
+ * so nothing is re-typed.
+ *
+ * Releasing is Phase 2 of labelling: once TTI Testing and Immunohematology have
+ * both cleared the donation, the Inventory Control Officer releases its bags
+ * and prints the final labels — verified blood type, expiry, clearance codes —
+ * to affix before the bags go to the ready-for-issue shelf.
  *
  * Two things are deliberately not on this screen. The blood type, because the
  * server derives it from the donation and refuses it from the client: it is the
@@ -235,8 +390,17 @@ definePageMeta({
 // already in, so stopping halfway is safe.
 const MAX_PER_REQUEST = 10
 
-const { user } = useUser()
-const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+// Which of the two steps is on screen while no donation is open.
+const step = ref('book') // 'book' | 'release'
+
+// Bag dots: one per declared bag, capped so a large donation stays one line.
+const MAX_DOTS = 12
+function dotCount(row) {
+  return Math.min(Number(row?.declared_units) || 0, MAX_DOTS)
+}
+
+// The scanner types into whatever has focus, so the scan field takes it on arrival.
+const scanInput = ref(null)
 
 const service = bloodCenterService
 
@@ -251,6 +415,26 @@ const notice = ref(null)
 
 const unitRows = ref([])
 
+const barcodeSearch = ref('')
+const activeBarcode = ref('')
+const released = ref([])
+const { print } = useLabelPrint()
+
+/** Whether this donation's bags carry numbers from a barcode sticker. */
+const barcoded = computed(() => (selected.value?.components ?? [])
+  .some((c) => (c.outstanding_bags ?? []).some((bag) => bag.bag_number)))
+
+function componentName(componentId) {
+  return selected.value?.components?.find((c) => c.component_id === componentId)?.component ?? ''
+}
+
+/** Whether a row is the last one of its component in this batch — the only one that may be left out. */
+function isLastOfComponent(index) {
+  const componentId = unitRows.value[index]?.component_id
+
+  return !unitRows.value.slice(index + 1).some((row) => row.component_id === componentId)
+}
+
 /** Components still owed on this donation that can actually be given an expiry. */
 const shelvable = computed(() => (selected.value?.components ?? []).filter(
   (c) => c.outstanding > 0 && c.shelf_life_configured,
@@ -263,11 +447,7 @@ const unconfigured = computed(() => (selected.value?.components ?? [])
 const canAddRow = computed(() => unitRows.value.length < MAX_PER_REQUEST
   && unitRows.value.length < (selected.value?.outstanding_units ?? 0))
 
-const initials = computed(() => {
-  const name = selected.value?.donor?.full_name || ''
-
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '—'
-})
+const initials = computed(() => donorInitials(selected.value?.donor) || '?')
 
 /**
  * How many of a component are still owed once this batch is counted.
@@ -307,11 +487,11 @@ const blockers = computed(() => {
 })
 
 function formatDate(value) {
-  if (!value) return '—'
+  if (!value) return 'date not recorded'
 
   const date = new Date(value)
 
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
+  return Number.isNaN(date.getTime()) ? 'date not recorded' : date.toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
 /**
@@ -332,7 +512,15 @@ function applyExpiry(row) {
 }
 
 function messageFor(err) {
+  const firstValidationError = Object.values(err?.data?.errors ?? {}).flat()[0]
+
+  if (firstValidationError) return firstValidationError
+
   switch (err?.data?.code) {
+    case 'bag_number_taken':
+      return err?.data?.message || 'A bag with this number is already in stock. Check the sticker on the bag.'
+    case 'not_released':
+      return 'These bags have not left quarantine, so they have no final label yet.'
     case 'donation_not_completed':
       return 'The laboratory has not cleared this donation, so its blood cannot enter inventory yet.'
     case 'components_not_declared':
@@ -371,7 +559,7 @@ async function loadQueue() {
   error.value = null
 
   try {
-    const res = await service.inventoryIntakeQueue()
+    const res = await service.inventoryIntakeQueue(activeBarcode.value ? { barcode: activeBarcode.value } : {})
 
     queue.value = res?.data ?? []
   } catch (err) {
@@ -379,6 +567,50 @@ async function loadQueue() {
   } finally {
     loadingQueue.value = false
   }
+}
+
+/**
+ * Find the donation whose bags are on the counter. One match opens it straight
+ * away — the sticker was scanned because those are the bags being booked in.
+ */
+async function findByBarcode() {
+  error.value = null
+  activeBarcode.value = normalizeBarcode(barcodeSearch.value)
+
+  await loadQueue()
+
+  if (activeBarcode.value && queue.value.length === 1) openDonation(queue.value[0])
+}
+
+function clearSearch() {
+  barcodeSearch.value = ''
+  activeBarcode.value = ''
+  loadQueue()
+}
+
+/**
+ * Print the final labels the release returned, and remember the donation for reprints.
+ */
+async function onReleased(donationId, labels) {
+  const printable = finalLabelsFrom(labels)
+
+  released.value = [
+    {
+      donationId,
+      barcode: labels?.donation_barcode ?? null,
+      count: printable.length,
+      units: printable.map((label) => label.unit_id),
+    },
+    ...released.value.filter((item) => item.donationId !== donationId),
+  ]
+
+  if (printable.length) await print(printable, 'final')
+}
+
+async function reprint(donationId) {
+  const res = await run(() => service.bloodLabels(donationId))
+
+  if (res) await print(finalLabelsFrom(res), 'final')
 }
 
 async function loadReference() {
@@ -408,6 +640,30 @@ function openDonation(row) {
   error.value = null
   unitRows.value = []
 
+  // A barcoded donation: one row per numbered bag, in the order Processing
+  // numbered them, which is the order the server books them in.
+  if (barcoded.value) {
+    for (const component of shelvable.value) {
+      for (const bag of component.outstanding_bags ?? []) {
+        if (unitRows.value.length >= MAX_PER_REQUEST) break
+
+        const bagRow = {
+          component_id: component.component_id,
+          bag_number: bag.bag_number,
+          volume_ml: bag.volume_ml,
+          expiry_date: '',
+          storage_location: '',
+          unit_id: '',
+        }
+
+        applyExpiry(bagRow)
+        unitRows.value.push(bagRow)
+      }
+    }
+
+    return
+  }
+
   // Pre-fill the batch with as many bags as are outstanding, up to the
   // per-request cap, since shelving all of them is the normal case.
   const target = Math.min(row.outstanding_units, MAX_PER_REQUEST)
@@ -425,11 +681,13 @@ function backToQueue() {
 }
 
 async function submit() {
+  // A numbered bag never sends a unit number: the server gives it the one on
+  // its Phase 1 label, and refuses any other.
   const units = unitRows.value.map((row) => ({
     component_id: row.component_id,
     expiry_date: row.expiry_date,
     ...(row.storage_location ? { storage_location: row.storage_location } : {}),
-    ...(row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {}),
+    ...(!row.bag_number && row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {}),
   }))
 
   const res = await run(() => service.recordBloodUnits({
@@ -439,9 +697,11 @@ async function submit() {
 
   if (!res) return
 
-  const count = res.units?.length ?? units.length
+  const ids = (res.units ?? []).map((unit) => unit.id)
 
-  notice.value = `${count} bag(s) shelved against donation #${selected.value.donation_id}.`
+  const count = ids.length || units.length
+  notice.value = `${count} bag${count === 1 ? '' : 's'} booked into quarantine${ids.length ? `: ${ids.join(', ')}` : ''}. `
+    + 'Release them under "Release & label" once testing clears the donation.'
 
   // Re-read rather than adjusting the counts here: the server is what decides
   // how much is still outstanding, and it has just changed.
@@ -454,6 +714,7 @@ async function submit() {
 }
 
 onMounted(async () => {
+  scanInput.value?.focus()
   await loadReference()
   await loadQueue()
 })
@@ -462,306 +723,516 @@ onMounted(async () => {
 <style scoped>
 .intake {
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
-  background: var(--rb-page-bg);
+  padding: 24px var(--rb-gutter, 24px) 40px;
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-}
-
-.intake__header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.intake__eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
-}
-
-.intake__title {
-  margin: 0.15rem 0 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  gap: 16px;
   color: var(--rb-text-primary);
 }
 
-.intake__subtitle {
-  margin: 0.3rem 0 0;
-  max-width: 68ch;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-}
+/* ---------- header + tabs ---------- */
+.intake__header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.intake__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.intake__subtitle { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 
-.intake__facility {
+.tabs {
   display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 999px;
-  background: var(--rb-surface);
-  font-size: 0.78rem;
-  color: var(--rb-text-secondary);
-}
-
-/* --- cards --- */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  padding: 1.1rem;
-  border: 1px solid var(--rb-border);
+  padding: 4px;
+  gap: 4px;
   border-radius: 12px;
-  background: var(--rb-surface);
-}
-
-.card__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
-
-.card__hint {
-  margin: 0;
-  max-width: 68ch;
-  font-size: 0.83rem;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
-
-@media (max-width: 640px) {
-  .intake { padding: 16px 16px 32px; }
-}
-
-/* --- queue --- */
-.empty {
-  display: grid;
-  place-items: center;
-  gap: 0.5rem;
-  padding: 2rem 1rem;
-  text-align: center;
-  color: var(--rb-text-secondary);
-  font-size: 0.85rem;
-}
-
-.queue { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
-
-.queue__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.75rem 0.9rem;
   border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.queue__main { flex: 1 1 16rem; min-width: 0; }
-.queue__name { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--rb-text-primary); }
-.queue__meta { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
-
-.queue__state { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
-.queue__next { font-size: 0.74rem; color: var(--rb-text-secondary); }
-
-/* --- selected donation --- */
-.unit-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  background: var(--rb-surface-alt);
-}
-
-.unit-bar__identity { display: flex; align-items: center; gap: 0.7rem; min-width: 0; flex: 1 1 14rem; }
-
-.unit-bar__avatar {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  background: rgba(var(--rb-primary-rgb), 0.12);
-  color: var(--rb-primary-text);
-  font-size: 0.8rem;
-  font-weight: 700;
+  background: var(--rb-surface);
   flex-shrink: 0;
 }
-
-.unit-bar__names { min-width: 0; }
-.unit-bar__name { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--rb-text-primary); }
-.unit-bar__sub { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
-
-.fact { display: flex; flex-direction: column; gap: 0.25rem; }
-
-.fact__label {
-  font-size: 0.68rem;
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.tab:hover { color: var(--rb-text-primary); }
+.tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.tab--on { background: var(--rb-primary); color: #fff; }
+.tab__num {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+}
+.tab--on .tab__num { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.tab__count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  background: rgba(var(--rb-warning-rgb), 0.16);
+  color: var(--rb-warning-text);
+}
+.tab--on .tab__count { background: #fff; color: var(--rb-primary); }
+.tab__count--done { background: rgba(var(--rb-success-rgb), 0.14); color: var(--rb-success-text); }
+
+/* ---------- feedback ---------- */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.alert :deep(svg) { flex-shrink: 0; }
+.alert--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
+.alert--notice { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), 0.25); }
+.alert--warning { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), 0.3); align-items: flex-start; }
+.alert__action {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- workspace ---------- */
+.workspace {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* queue */
+.queue-panel {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 100px);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  overflow: hidden;
+}
+
+.scan {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--rb-border);
+}
+.scan__icon { position: absolute; left: 24px; color: var(--rb-primary-text); pointer-events: none; }
+.scan__input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px 0 38px;
+  border: 1.5px solid rgba(var(--rb-primary-rgb), 0.35);
+  border-radius: 10px;
+  background: rgba(var(--rb-primary-rgb), 0.04);
+  color: var(--rb-text-primary);
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.scan__input::placeholder { color: var(--rb-placeholder); font-family: var(--rb-font-sans); letter-spacing: 0; }
+.scan__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); box-shadow: var(--rb-focus-ring); }
+.scan__go {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--rb-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.scan__go:hover:not(:disabled) { background: #0D47A1; }
+.scan__go:disabled { opacity: 0.6; cursor: not-allowed; }
+.scan__go:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.queue-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; }
+.queue-panel__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+.queue-panel__count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-primary);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.queue-panel__filter { margin: 0; padding: 0 14px 6px; font-size: 12px; color: var(--rb-text-secondary); }
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.queue__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.queue__item:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.queue__item:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.queue__item--on {
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
+  background: rgba(var(--rb-primary-rgb), 0.07);
+  box-shadow: inset 3px 0 0 var(--rb-primary);
+}
+.queue__item--skeleton { cursor: default; gap: 8px; }
+
+.queue__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.queue__name { font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue__meta { font-size: 12px; color: var(--rb-text-secondary); }
+.queue__bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.queue__left { font-size: 12px; font-weight: 600; color: var(--rb-warning-text); white-space: nowrap; }
+
+.queue-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 6px 14px 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+  color: var(--rb-success-text);
+}
+.queue-empty p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.type-pill {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(var(--rb-accent-rgb), 0.1);
+  color: var(--rb-accent-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.type-pill--unknown { background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-weight: 600; }
+
+/* bag dots */
+.bag-dots { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.bag-dot { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--rb-border-strong); }
+.bag-dot--in { border-color: var(--rb-primary); background: var(--rb-primary); }
+.bag-dots--lg { gap: 4px; }
+.bag-dots--lg .bag-dot { width: 14px; height: 14px; border-radius: 4px; }
+
+/* workbench */
+.bench {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+}
+
+.bench__idle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.bench__idle-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+.bench__idle-title { margin: 6px 0 0; font-size: 15px; font-weight: 700; }
+.bench__idle-text { margin: 0; max-width: 42ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+
+.bench__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rb-border);
+}
+.bench__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bench__who { flex: 1; min-width: 0; }
+.bench__name { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.bench__sub { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.bench__progress { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.bench__progress-label { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
+
+.bench__section { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--rb-border); }
+.bench__section:last-of-type { border-bottom: 0; }
+.bench__section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bench__note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.bench > .alert { margin: 14px 18px 0; }
+
+.section-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--rb-text-secondary);
 }
 
-.fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
-
 .pill {
-  display: inline-block;
-  padding: 0.18rem 0.55rem;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  border: 1px solid var(--rb-border);
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
-  border: 1px solid var(--rb-border);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-/* --- declared breakdown --- */
-.declared { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
-
-.declared__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: var(--rb-surface-alt);
-  font-size: 0.83rem;
-}
-
-.declared__name { font-weight: 600; color: var(--rb-text-primary); flex: 1 1 10rem; }
-.declared__count { color: var(--rb-text-secondary); }
-.declared__shelf { color: var(--rb-text-secondary); font-size: 0.78rem; }
-
-.declared__flag {
+/* declared components as chips */
+.declared { display: flex; flex-wrap: wrap; gap: 8px; }
+.declared__item {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  color: var(--rb-warning-text);
-  font-size: 0.78rem;
-  font-weight: 600;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+  font-size: 13px;
 }
+.declared__name { font-weight: 600; }
+.declared__count { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rb-primary-text); }
+.declared__life { font-size: 12px; color: var(--rb-text-secondary); }
+.declared__flag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--rb-warning-text); }
 
-/* --- bag rows --- */
-.unit-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
+/* bags grid */
+.bags { display: flex; flex-direction: column; gap: 6px; }
+.bags__head,
+.bags__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 160px minmax(0, 1.2fr) 34px;
+  gap: 10px;
+  align-items: center;
+}
+.bags--manual .bags__head,
+.bags--manual .bags__row { grid-template-columns: minmax(0, 1.5fr) 160px minmax(0, 1.2fr) 140px 34px; }
+.bags__head {
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+.bags__head i { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.bags__row { padding: 8px 8px 8px 12px; border: 1px solid var(--rb-border); border-radius: 10px; }
+.bags__row:hover { border-color: var(--rb-border-hover); }
 
-.field { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 10rem; }
-.field--date { max-width: 11rem; }
-.field--unit { max-width: 10rem; }
-
-.field__label { font-size: 0.75rem; font-weight: 600; color: var(--rb-text-primary); }
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }
+.bag-fixed { display: flex; flex-direction: column; min-width: 0; }
+.bag-fixed__number { font-size: 14px; font-weight: 700; }
+.bag-fixed__meta { font-size: 12px; color: var(--rb-text-secondary); }
 
 .field__input {
   width: 100%;
-  padding: 0.5rem 0.65rem;
+  height: 36px;
+  padding: 0 10px;
   border: 1px solid var(--rb-border-strong);
   border-radius: 8px;
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-.field__input:focus-visible {
-  outline: 2px solid var(--rb-primary);
-  outline-offset: 1px;
-  border-color: var(--rb-primary);
-}
+.field__input::placeholder { color: var(--rb-placeholder); }
+.field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 .blockers {
   margin: 0;
-  padding: 0.7rem 0.85rem;
+  padding: 10px 14px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
+  gap: 6px;
   border-radius: 10px;
-  background: rgba(var(--rb-warning-rgb), 0.06);
-  font-size: 0.82rem;
+  background: rgba(var(--rb-warning-rgb), 0.08);
+  font-size: 12.5px;
   color: var(--rb-warning-text);
 }
+.blockers li { display: flex; align-items: center; gap: 7px; }
 
-.blockers li { display: flex; align-items: center; gap: 0.45rem; }
+.bench__stuck { display: flex; gap: 12px; padding: 18px; color: var(--rb-warning-text); }
+.bench__stuck-title { margin: 0 0 3px; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
-/* --- actions --- */
-.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.bench__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+  margin-top: auto;
+  border-top: 1px solid var(--rb-border);
+  border-radius: 0 0 14px 14px;
+  background: var(--rb-surface);
+  box-shadow: 0 -10px 18px -14px rgba(var(--rb-shadow-rgb), 0.35);
+}
 
+/* ---------- buttons ---------- */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
   border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
   background: var(--rb-surface);
   color: var(--rb-text-primary);
-  border-radius: 10px;
-  padding: 0.5rem 0.95rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-
 .btn:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn--icon { padding: 0.5rem 0.6rem; flex: 0 0 auto; }
-
+.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
 .btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
-.btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
-  border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
+.btn--primary:hover:not(:disabled) { background: #0D47A1; border-color: #0D47A1; }
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.icon-btn--row:hover:not(:disabled) { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), 0.08); }
+
+/* ---------- release tab ---------- */
+.release { display: flex; flex-direction: column; gap: 16px; }
+.released { display: flex; flex-direction: column; gap: 10px; }
+.released__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface); overflow: hidden; }
+.released__item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
+.released__item:first-child { border-top: 0; }
+.released__icon { color: var(--rb-success-text); flex-shrink: 0; }
+.released__main { flex: 1; min-width: 0; }
+.released__name { margin: 0; font-size: 13.5px; font-weight: 600; }
+.released__meta { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* ---------- misc ---------- */
+.mono { font-family: var(--rb-font-mono); letter-spacing: 0.02em; }
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: intake-shimmer 1.4s ease infinite;
+}
+.skeleton--line { width: 75%; }
+.skeleton--short { width: 45%; }
+@keyframes intake-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
-/* --- feedback --- */
-.alert {
-  margin: 0;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
-  font-size: 0.84rem;
+.spin { animation: intake-spin 0.9s linear infinite; }
+@keyframes intake-spin { to { transform: rotate(360deg); } }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-.alert--error {
-  background: rgba(var(--rb-accent-rgb), 0.1);
-  color: var(--rb-accent-text);
-  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 300px minmax(0, 1fr); }
 }
 
-.alert--notice {
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
+@media (prefers-reduced-motion: reduce) {
+  .skeleton, .spin { animation: none; }
 }
-
-.alert--warning {
-  background: rgba(var(--rb-warning-rgb), 0.08);
-  color: var(--rb-warning-text);
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.3);
-}
-
-.outcome { display: flex; align-items: flex-start; gap: 0.75rem; }
-.outcome--warning { color: var(--rb-warning-text); }
-.outcome .card__title { color: var(--rb-text-primary); }
 </style>

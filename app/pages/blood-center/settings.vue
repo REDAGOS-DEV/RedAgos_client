@@ -1,17 +1,19 @@
 <template>
-  <div class="settings-page">
-    <div v-if="loading" class="loading-wrap">
-      <div class="spinner" />
+  <div class="settings-page scope-blood-center-settings">
+    <div v-if="loading" class="settings-skeleton" aria-busy="true">
+      <div class="skeleton skeleton--title" />
+      <div class="settings-skeleton__layout">
+        <div class="skeleton skeleton--nav" />
+        <div class="skeleton skeleton--panel" />
+      </div>
     </div>
 
     <div v-else class="settings-inner">
       <!-- Header -->
-      <div class="header-banner">
-        <div class="header-banner__content">
-          <h1 class="page-title">Account Settings</h1>
-          <p class="page-subtitle">Manage your profile, security, and preferences</p>
-        </div>
-      </div>
+      <header class="header-row">
+        <h1 class="page-title">Account Settings</h1>
+        <p class="page-subtitle">Manage your profile, security and preferences.</p>
+      </header>
 
       <div class="settings-layout">
         <!-- Nav -->
@@ -22,13 +24,13 @@
             type="button"
             class="nav-item"
             :class="{ 'nav-item--active': activeTab === tab.id }"
-          @click="activeTab = tab.id"
+            :aria-current="activeTab === tab.id ? 'page' : undefined"
+            @click="activeTab = tab.id"
           >
             <span class="nav-item__icon" :class="`nav-item__icon--${tab.id}`">
               <AssetIcon :name="tab.icon" :size="16" />
             </span>
             <span>{{ tab.label }}</span>
-            <span v-if="activeTab === tab.id" class="nav-item__drop" aria-hidden="true" />
           </button>
         </nav>
 
@@ -38,9 +40,6 @@
           <section v-if="activeTab === 'profile'" class="settings-panel">
             <div class="panel-header-row">
               <div class="panel-heading">
-                <span class="panel-icon-badge panel-icon-badge--blue">
-                  <AssetIcon name="user" :size="18" />
-                </span>
                 <div>
                   <h2 class="panel-title">My Profile</h2>
                   <p class="panel-subtitle">Your personal information as it appears across RedAgos.</p>
@@ -69,11 +68,19 @@
             </div>
 
             <div class="form-grid">
+              <!-- First and last name are stored apart, so they are edited apart. -->
               <div class="form-group">
-                <label class="form-label">Full Name</label>
+                <label class="form-label" for="bc-first-name">First Name</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="user" :size="15" class="input-icon" />
-                  <input v-model="profileForm.fullName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input id="bc-first-name" v-model="profileForm.firstName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="bc-last-name">Last Name</label>
+                <div class="input-icon-wrap">
+                  <AssetIcon name="user" :size="15" class="input-icon" />
+                  <input id="bc-last-name" v-model="profileForm.lastName" type="text" class="form-input form-input--icon" :disabled="!editingProfile" />
                 </div>
               </div>
               <div class="form-group">
@@ -90,32 +97,40 @@
                   <input :value="profileForm.bloodCenter" type="text" class="form-input form-input--icon" disabled />
                 </div>
               </div>
+              <!-- The role (and what it may do) is set by a supervisor in Staff
+                   Accounts; the title is the person's own label, e.g. RMT. -->
               <div class="form-group">
-                <label class="form-label">Position / Role</label>
+                <label class="form-label">Role</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="briefcase" :size="15" class="input-icon" />
-                  <select
-                    v-model="profileForm.position"
-                    class="form-input form-input--icon form-select"
-                    :disabled="!editingProfile"
-                  >
-                    <option v-for="opt in positionOptions" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                  <AssetIcon name="chevron-down" :size="15" class="select-caret" />
+                  <input :value="roleText" type="text" class="form-input form-input--icon" disabled />
                 </div>
               </div>
+              <div class="form-group">
+                <label class="form-label" for="bc-title">Title <span class="form-optional">optional</span></label>
+                <ComboInput
+                  id="bc-title"
+                  v-model="profileForm.position"
+                  :options="TITLE_OPTIONS"
+                  maxlength="100"
+                  placeholder="e.g. RMT"
+                  :disabled="!editingProfile"
+                />
+              </div>
+              <!-- Read-only: the sign-in address is changed by a supervisor, not here. -->
               <div class="form-group">
                 <label class="form-label">Email Address</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="mail" :size="15" class="input-icon" />
-                  <input v-model="profileForm.email" type="email" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input :value="profileForm.email" type="email" class="form-input form-input--icon" disabled />
                 </div>
+                <p v-if="editingProfile" class="form-hint">Ask your supervisor to change your sign-in email.</p>
               </div>
               <div class="form-group">
                 <label class="form-label">Contact Number</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="phone" :size="15" class="input-icon" />
-                  <input v-model="profileForm.contactNumber" type="tel" class="form-input form-input--icon" :disabled="!editingProfile" />
+                  <input v-model="profileForm.contactNumber" type="tel" class="form-input form-input--icon" placeholder="09XXXXXXXXX" :disabled="!editingProfile" />
                 </div>
               </div>
             </div>
@@ -129,14 +144,23 @@
                 {{ savingProfile ? 'Saving...' : 'Save Changes' }}
               </button>
             </div>
+
+          </section>
+
+          <!-- BLOOD CENTER: the centre's own settings, for supervisors (center.configure). -->
+          <section v-if="activeTab === 'center'" class="settings-panel">
+            <div class="panel-heading">
+              <div>
+                <h2 class="panel-title">Blood Center</h2>
+                <p class="panel-subtitle">Settings that belong to your centre, not to your account.</p>
+              </div>
+            </div>
+            <BloodCenterFacilityLogoCard />
           </section>
 
           <!-- SECURITY -->
           <section v-if="activeTab === 'security'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--red">
-                <AssetIcon name="lock" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Security</h2>
                 <p class="panel-subtitle">Update your password. You'll stay signed in on this device.</p>
@@ -201,9 +225,6 @@
           <!-- NOTIFICATION PREFERENCES -->
           <section v-if="activeTab === 'notifications'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--orange">
-                <AssetIcon name="bell" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Notification Preferences</h2>
                 <p class="panel-subtitle">Choose what you want to be notified about.</p>
@@ -229,9 +250,6 @@
           <!-- SESSION MANAGEMENT -->
           <section v-if="activeTab === 'sessions'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--purple">
-                <AssetIcon name="monitor" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Session Management</h2>
                 <p class="panel-subtitle">Devices currently signed in to your account.</p>
@@ -262,9 +280,6 @@
           <!-- ACCOUNT INFORMATION -->
           <section v-if="activeTab === 'account'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--teal">
-                <AssetIcon name="info" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Account Information</h2>
                 <p class="panel-subtitle">Read-only details about your account.</p>
@@ -287,9 +302,6 @@
           <!-- APPEARANCE -->
           <section v-if="activeTab === 'appearance'" class="settings-panel">
             <div class="panel-heading">
-              <span class="panel-icon-badge panel-icon-badge--indigo">
-                <AssetIcon name="palette" :size="18" />
-              </span>
               <div>
                 <h2 class="panel-title">Appearance</h2>
                 <p class="panel-subtitle">Choose how RedAgos looks on this device.</p>
@@ -354,8 +366,10 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 definePageMeta({
@@ -422,14 +436,19 @@ const api = {
 
 const loading = ref(true)
 
-const tabs = [
+const { can: canDo, user: sessionUser, fetchUser } = useUser()
+
+// The Blood Center tab holds the centre's logo, which only center.configure
+// may change (the card checks the same ability), so only they see the tab.
+const tabs = computed(() => [
   { id: 'profile', label: 'My Profile', icon: 'user' },
   { id: 'security', label: 'Security', icon: 'lock' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'sessions', label: 'Sessions', icon: 'monitor' },
   { id: 'account', label: 'Account Info', icon: 'info' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
-]
+  ...(canDo('center.configure') ? [{ id: 'center', label: 'Blood Center', icon: 'building-2' }] : []),
+])
 const activeTab = ref('profile')
 
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
@@ -449,6 +468,8 @@ function initials(name) {
 const profile = reactive({
   avatarUrl: '',
   fullName: '',
+  firstName: '',
+  lastName: '',
   employeeId: '',
   bloodCenter: '',
   position: '',
@@ -462,18 +483,16 @@ const savingProfile = ref(false)
 const profileError = ref('')
 const profileSuccess = ref('')
 
-// this is temporary lang since di pa ems sure unsa ang mga role/position sa tao
-const BASE_POSITION_OPTIONS = [
-  'Administrator',
-  'Medical Technologist',
-  'Registered Nurse',
-  'Mobile Drive Coordinator',
-]
+// Suggestions for the title, as on the Add Staff form; any other is typed.
+const TITLE_OPTIONS = ['RMT', 'RN']
 
-const positionOptions = computed(() => {
-  const opts = [...BASE_POSITION_OPTIONS]
-  if (profileForm.position && !opts.includes(profileForm.position)) opts.unshift(profileForm.position)
-  return opts
+// The person's role, as a supervisor set it in Staff Accounts. Shown, not edited.
+const roleText = computed(() => {
+  const u = sessionUser.value
+  if (!u) return ''
+  const role = u.staff_role_label || u.role_label || u.custom_role || ''
+  const parts = [u.is_supervisor ? 'Supervisor' : '', role].filter(Boolean)
+  return parts.join(' · ') || u.department_label || 'No role yet'
 })
 
 const avatarColor = computed(() => {
@@ -509,20 +528,25 @@ async function saveProfile() {
   profileError.value = ''
   profileSuccess.value = ''
   try {
+    // The fields PATCH /blood-center/profile accepts, in its names. Email and
+    // employee ID are not changed from here.
     const updated = await api.updateProfile({
-      fullName: profileForm.fullName,
-      email: profileForm.email,
-      contactNumber: profileForm.contactNumber,
-      avatarUrl: profileForm.avatarUrl,
+      first_name: profileForm.firstName.trim(),
+      last_name: profileForm.lastName.trim(),
+      phone: profileForm.contactNumber.trim() || undefined,
+      position: profileForm.position.trim() || null,
     })
-    Object.assign(profile, updated)
-    Object.assign(profileForm, updated)
+    applyServerData(updated)
+    // The header shows the name from the session; refresh it so it matches.
+    fetchUser()
     editingProfile.value = false
     profileSuccess.value = 'Profile updated successfully.'
   } catch (err) {
     // kay wala pa may live nga endpoint karon, so mag-fail ni nga call sa dev/UI stage.
-    console.error('Failed to save profile (expected while backend is not yet wired up):', err)
-    profileError.value = 'Could not save changes. Please try again.'
+    console.error('Failed to save profile:', err)
+    profileError.value = Object.values(err?.data?.errors ?? {}).flat()[0]
+      || err?.data?.message
+      || 'Could not save changes. Please try again.'
   } finally {
     savingProfile.value = false
   }
@@ -640,22 +664,56 @@ async function selectTheme(value) {
 }
 
 /* ------------ LOAD --------------- */
+
+const ACCOUNT_STATUS = { active: 'Active', pending_verification: 'Pending verification', suspended: 'Suspended', deactivated: 'Deactivated' }
+
+function formatDateTime(value) {
+  if (!value) return 'Not recorded'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/**
+ * GET/PATCH /blood-center/profile answer { profile, facility, account } in the
+ * server's names (full_name, phone, …). The form uses its own, so map here;
+ * assigning the response as-is left every field blank.
+ */
+function applyServerData(data) {
+  const p = data?.profile ?? {}
+  const mapped = {
+    firstName: p.first_name ?? '',
+    lastName: p.last_name ?? '',
+    fullName: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' '),
+    employeeId: p.employee_id ?? '',
+    position: p.position ?? '',
+    email: p.email ?? '',
+    contactNumber: p.phone ?? '',
+    bloodCenter: data?.facility?.name ?? '',
+    avatarUrl: sessionUser.value?.avatar ?? profile.avatarUrl ?? '',
+  }
+  Object.assign(profile, mapped)
+  Object.assign(profileForm, mapped)
+
+  const account = data?.account ?? {}
+  Object.assign(accountInfo, {
+    username: account.username || 'Not set',
+    role: roleText.value,
+    bloodCenter: data?.facility?.name || 'Not linked',
+    createdAt: formatDateTime(account.created_at),
+    lastLogin: accountInfo.lastLogin || 'Not recorded',
+    status: ACCOUNT_STATUS[account.account_status] || account.account_status || 'Unknown',
+  })
+}
+
 onMounted(async () => {
   try {
     const data = await api.getSettings()
-    if (data?.profile) {
-      Object.assign(profile, data.profile)
-      Object.assign(profileForm, data.profile)
-    }
-    if (data?.accountInfo) Object.assign(accountInfo, data.accountInfo)
+    applyServerData(data)
     if (data?.currentSession) Object.assign(currentSession, data.currentSession)
     if (data?.notificationPrefs) notificationPrefs.value = data.notificationPrefs
     if (data?.theme) theme.value = data.theme
   } catch (err) {
-    // sa dev/UI stage pa lang ni, wala pay live nga /api/bloodcenter/settings endpoint,
-    // so mag-fail gyud ni nga call. Gi-ano ra sa default/empty values, para
-    // mag-display ug blangko/placeholder nga fields imbes mag-crash o mag-display ug fake data.
-    console.error('Failed to load settings (expected while backend is not yet wired up):', err)
+    console.error('Failed to load settings:', err)
   } finally {
     loading.value = false
   }
@@ -680,10 +738,10 @@ onMounted(async () => {
   --indigo: var(--rb-primary-text);
   --text-primary: var(--rb-text-primary);
   --text-secondary: var(--rb-text-secondary);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   font-family: var(--rb-font-sans);
   color: var(--text-primary);
 }
@@ -722,31 +780,40 @@ onMounted(async () => {
 }
 
 /* Header banner */
-.header-banner {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--primary);
-  padding: 26px 32px;
-}
-
-.header-banner__content {
-  position: relative;
-  z-index: 1;
-}
+.header-row { display: flex; flex-direction: column; }
 
 .page-title {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
-  color: #fff;
+  color: var(--rb-text-primary);
 }
 
 .page-subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--rb-text-secondary);
   margin: 4px 0 0;
+}
+
+/* Loading */
+.settings-skeleton { display: flex; flex-direction: column; gap: 20px; }
+.settings-skeleton__layout { display: flex; gap: 20px; align-items: flex-start; }
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: settings-shimmer 1.4s ease infinite;
+}
+.skeleton--title { height: 44px; max-width: 320px; }
+.skeleton--nav { width: 218px; height: 300px; flex-shrink: 0; }
+.skeleton--panel { flex: 1; height: 420px; }
+@keyframes settings-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 /* Layout */
@@ -793,9 +860,11 @@ onMounted(async () => {
 }
 
 .nav-item--active {
-  background: rgba(var(--rb-primary-rgb), 0.12);
+  background: rgba(var(--rb-primary-rgb), 0.1);
   color: var(--primary-text);
+  box-shadow: inset 3px 0 0 var(--rb-primary);
 }
+.nav-item:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 .nav-item__icon {
   display: flex;
@@ -876,7 +945,7 @@ onMounted(async () => {
 .panel-icon-badge--indigo { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--indigo); }
 
 .panel-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   margin: 0;
 }
@@ -1168,7 +1237,7 @@ onMounted(async () => {
   gap: 6px;
   padding: 8px 14px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   background: var(--rb-surface-hover);
   color: var(--text-primary);
@@ -1313,18 +1382,11 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+/* Marked by a tinted outline and the "This device" badge, rather than a
+   coloured bar down one side. */
 .session-card--current {
   background: var(--rb-surface-hover);
-}
-
-.session-card--current::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--primary);
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
 }
 
 .session-card__icon {
@@ -1653,7 +1715,6 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .settings-page { padding: 16px 16px 32px; }
-  .header-banner { padding: 20px 20px; }
   .settings-panel { padding: 18px; }
   .panel-header-row { flex-direction: column; align-items: stretch; }
   .avatar-row { flex-direction: column; align-items: flex-start; }
@@ -1667,4 +1728,7 @@ onMounted(async () => {
   outline: 2px solid var(--rb-primary, #1565C0);
   outline-offset: 2px;
 }
+
+.form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+.form-hint { margin: 4px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
 </style>

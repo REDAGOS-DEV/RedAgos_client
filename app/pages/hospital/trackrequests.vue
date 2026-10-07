@@ -98,8 +98,9 @@
           <div>
             <span class="hero-ref">{{ request.reference_number }}</span>
             <div class="hero-badges">
-              <span class="status-badge status-badge--anim" :class="statusColorClass">{{ request.status }}</span>
-              <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ request.priority || '—' }} priority</span>
+              <span class="status-badge status-badge--anim" :class="statusColorClass">{{ statusText }}</span>
+              <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ priorityText }} priority</span>
+              <span v-if="request.is_walk_in" class="status-badge status-badge--sm badge--info">Walk-in</span>
               <span v-if="hasAttentionFlag" class="attention-chip">
                 <AssetIcon name="circle-alert" />
                 Needs attention
@@ -149,6 +150,26 @@
             <span class="stepper-label">{{ step.label }}</span>
           </li>
         </ol>
+      </section>
+
+      <!-- REQUESTED VERSUS FULFILLED, PER COMPONENT -->
+      <section class="card">
+        <h2 class="section-title">Requested vs Fulfilled</h2>
+        <RequestFulfilmentTable :request="request" />
+      </section>
+
+      <!-- WHERE IT CAME FROM, AND WHAT IT IS A SHARE OF -->
+      <section v-if="request.is_walk_in || request.transfusion_request" class="card">
+        <h2 class="section-title">Source &amp; Patient Transfusion Request</h2>
+        <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
+          A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
+          it after your blood bank confirmed it by phone.
+        </p>
+        <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
+          This is {{ request.target_facility?.name || 'one facility' }}'s share of
+          <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="track-ptr">{{ request.transfusion_request.reference_number }}</NuxtLink>
+          ({{ requestStatusLabel(request.transfusion_request) }}), where every facility asked for this patient is followed.
+        </p>
       </section>
 
       <div class="content-grid">
@@ -371,6 +392,8 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 /**
  * /hospital/track-requests
  * Tracking-only page (NOT a management page) for Hospital Blood Bank staff.
@@ -420,31 +443,24 @@ onMounted(() => {
   }
 })
 
-const statusColorMap = {
-  Pending: 'warning',
-  Approved: 'success',
-  Processing: 'warning',
-  'Ready for Pickup': 'info',
-  Completed: 'success',
-  Rejected: 'danger',
-  Cancelled: 'danger',
-}
+/*
+ * Keyed on the stored status through the shared tone map. The map this page
+ * carried was keyed on Title Case values the API has never sent, so every badge
+ * fell through to neutral and a rejection never raised the attention flag.
+ */
+const TONE_BADGES = { info: 'info', progress: 'info', warning: 'warning', success: 'success', danger: 'danger', muted: 'neutral' }
 
-const statusColorClass = computed(() => {
-  const s = request.value?.status
-  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
-})
+const statusColorClass = computed(() => `badge--${TONE_BADGES[REQUEST_STATUS_TONES[request.value?.status]] ?? 'neutral'}`)
 
-const priorityColorClass = computed(() => {
-  const p = request.value?.priority
-  if (!p) return 'badge--neutral'
-  const lower = p.toLowerCase()
-  if (lower === 'urgent' || lower === 'critical') return 'badge--danger'
-  if (lower === 'high') return 'badge--warning'
-  return 'badge--neutral'
-})
+const statusText = computed(() => (request.value ? requestStatusLabel(request.value) : '—'))
 
-const hasAttentionFlag = computed(() => request.value?.status === 'Rejected')
+const priorityText = computed(() => (request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—'))
+
+const priorityColorClass = computed(() =>
+  request.value?.urgency_level === 'emergency' ? 'badge--danger' : 'badge--neutral',
+)
+
+const hasAttentionFlag = computed(() => request.value?.status === 'rejected')
 
 // Progress circle geometry
 const circleRadius = 42
@@ -1007,6 +1023,8 @@ function contactBloodCenter() {
 .notif-time { font-size: 11px; color: #94a3b8; }
 
 .empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
+.track-walk-in { margin-bottom: 10px; color: var(--rb-text-secondary); }
+.track-ptr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
 
 /* ---------- Documents ---------- */
 .documents-table { display: flex; flex-direction: column; gap: 10px; }
@@ -1104,49 +1122,49 @@ function contactBloodCenter() {
 
 /* ---------- Dark mode ---------- */
 :global(.dark .track-page) { background: #0f1420; }
-:global(.dark .card) { background: #161d2e; border-color: #2a3447; }
-:global(.dark .page-title),
-:global(.dark .section-title),
-:global(.dark .side-card__title),
-:global(.dark .hero-ref),
-:global(.dark .hero-value),
-:global(.dark .info-value),
-:global(.dark .v-timeline-activity),
-:global(.dark .update-desc),
-:global(.dark .notif-desc),
-:global(.dark .documents-row__label),
-:global(.dark .search-input) {
+:global(.dark .track-page .card) { background: #161d2e; border-color: #2a3447; }
+:global(.dark .track-page .page-title),
+:global(.dark .track-page .section-title),
+:global(.dark .track-page .side-card__title),
+:global(.dark .track-page .hero-ref),
+:global(.dark .track-page .hero-value),
+:global(.dark .track-page .info-value),
+:global(.dark .track-page .v-timeline-activity),
+:global(.dark .track-page .update-desc),
+:global(.dark .track-page .notif-desc),
+:global(.dark .track-page .documents-row__label),
+:global(.dark .track-page .search-input) {
   color: #eef1f6;
 }
-:global(.dark .page-subtitle),
-:global(.dark .info-label),
-:global(.dark .hero-label),
-:global(.dark .empty-hint),
-:global(.dark .v-timeline-time),
-:global(.dark .update-time),
-:global(.dark .notif-time),
-:global(.dark .stepper-label) {
+:global(.dark .track-page .page-subtitle),
+:global(.dark .track-page .info-label),
+:global(.dark .track-page .hero-label),
+:global(.dark .track-page .empty-hint),
+:global(.dark .track-page .v-timeline-time),
+:global(.dark .track-page .update-time),
+:global(.dark .track-page .notif-time),
+:global(.dark .track-page .stepper-label) {
   color: #8a93a6;
 }
-:global(.dark .hero-card) {
+:global(.dark .track-page .hero-card) {
   background: linear-gradient(135deg, #161d2e 0%, #1c2438 100%);
 }
-:global(.dark .btn--outline) {
+:global(.dark .track-page .btn--outline) {
   background: #161d2e;
   border-color: #2a3447;
   color: #6fa8dc;
 }
-:global(.dark .btn--outline:hover:not(:disabled)) { background: #1c2438; }
-:global(.dark .search-input) { background: #1c2438; border-color: #2a3447; }
-:global(.dark .recent-dropdown) { background: #161d2e; border-color: #2a3447; }
-:global(.dark .recent-item:hover) { background: #1c2438; }
-:global(.dark .documents-row) { background: #1c2438; border-color: #2a3447; }
-:global(.dark .v-timeline-step::before),
-:global(.dark .stepper-step:not(:last-child)::after) { background: #2a3447; }
-:global(.dark .v-timeline-marker),
-:global(.dark .stepper-marker) { background: #232c40; }
-:global(.dark .progress-circle__track) { stroke: #232c40; }
-:global(.dark .skeleton) {
+:global(.dark .track-page .btn--outline:hover:not(:disabled)) { background: #1c2438; }
+:global(.dark .track-page .search-input) { background: #1c2438; border-color: #2a3447; }
+:global(.dark .track-page .recent-dropdown) { background: #161d2e; border-color: #2a3447; }
+:global(.dark .track-page .recent-item:hover) { background: #1c2438; }
+:global(.dark .track-page .documents-row) { background: #1c2438; border-color: #2a3447; }
+:global(.dark .track-page .v-timeline-step::before),
+:global(.dark .track-page .stepper-step:not(:last-child)::after) { background: #2a3447; }
+:global(.dark .track-page .v-timeline-marker),
+:global(.dark .track-page .stepper-marker) { background: #232c40; }
+:global(.dark .track-page .progress-circle__track) { stroke: #232c40; }
+:global(.dark .track-page .skeleton) {
   background: linear-gradient(90deg, #1c2438 25%, #232c40 37%, #1c2438 63%);
   background-size: 400% 100%;
 }

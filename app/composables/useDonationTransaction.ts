@@ -31,6 +31,54 @@ export interface TransactionAppointment {
   event_id: number | null
 }
 
+/**
+ * What the scan tells the counter about the donor's questionnaire.
+ *
+ * Metadata only. Enough to draw the summary strip and decide whether to warn
+ * about a superseded form or missing consent, with no answers in it -- the
+ * document comes from its own endpoint when staff ask for it.
+ */
+export interface QuestionnaireMeta {
+  available: boolean
+  screening_id: number | null
+  question_version: number | null
+  is_current_version: boolean | null
+  question_count: number | null
+  screened_on: string | null
+  valid_until: string | null
+  consent_captured: boolean
+}
+
+/**
+ * A permanent or indefinite deferral already on this donor's record.
+ *
+ * Carries no reason: what check-in needs is that a decision exists and when it
+ * was made. The reason is clinical detail and lives behind the donor's history.
+ *
+ * It blocks nothing. The officer reads it and decides.
+ */
+export interface PriorDeferral {
+  outcome: string
+  outcome_label: string
+  recorded_on: string | null
+}
+
+/**
+ * The "For Phlebotomist Use Only" box of Section II, as the server recorded it.
+ *
+ * Collections recorded before the box existed carry only who drew the bag and
+ * when; their bag, barcode and times are null.
+ */
+export interface TransactionCollection {
+  blood_bag_type: string | null
+  blood_bag_type_label: string | null
+  donation_barcode: string | null
+  started_at: string | null
+  ended_at: string | null
+  collected_at: string | null
+  phlebotomist: string | null
+}
+
 export interface TransactionDonation {
   id: number
   status: string
@@ -39,6 +87,7 @@ export interface TransactionDonation {
   rejection_reason: string | null
   appointment_id: number | null
   screening: Record<string, unknown> | null
+  collection?: TransactionCollection | null
 }
 
 export function useDonationTransaction() {
@@ -51,6 +100,40 @@ export function useDonationTransaction() {
   const busy = ref(false)
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
+
+  // The questionnaire is held apart from the donation on purpose: it belongs to
+  // the donor and outlives any single visit, and it must stay readable from the
+  // moment they are verified right through to the end of the collection. Staff
+  // compare their own findings against these answers while recording them.
+  const priorDeferral = ref<PriorDeferral | null>(null)
+
+  /**
+   * The four boxes printed at the top of the donor's questionnaire sheet.
+   *
+   * They live here rather than in either component because both touch them:
+   * the questionnaire drawer is where staff fill them in, since that is where
+   * they sit on the paper, and the screening form is what carries them to the
+   * server. Holding them in one place is what stops the two drifting.
+   *
+   * Staff-entered throughout. The donor never fills these in the app — the
+   * officer asks in person and types what they are told, which is why they are
+   * editable in an otherwise read-only document.
+   */
+  const intakeForm = reactive({
+    sleep: '',
+    meal: '',
+    meds: '',
+    allergies: '',
+  })
+
+  function resetIntake() {
+    Object.assign(intakeForm, { sleep: '', meal: '', meds: '', allergies: '' })
+  }
+  const questionnaireMeta = ref<QuestionnaireMeta | null>(null)
+  const questionnaire = ref<Record<string, unknown> | null>(null)
+  const questionnaireOpen = ref(false)
+  const questionnaireError = ref<string | null>(null)
+  const questionnaireLoading = ref(false)
 
   /**
    * Where the visit has got to, derived from the records rather than tracked.
@@ -86,6 +169,11 @@ export function useDonationTransaction() {
   function messageFor(err: any): string {
     const code = err?.data?.code
 
+    // Two counters scanning the same tube, or a mis-scan. The server says it
+    // in a validation error rather than a code, from the rule or the index.
+    const barcodeError = err?.data?.errors?.donation_barcode?.[0]
+    if (barcodeError) return barcodeError
+
     switch (code) {
       case 'qr_invalid':
         return 'That QR code is not valid. Ask for the donor’s valid ID instead.'
@@ -107,19 +195,29 @@ export function useDonationTransaction() {
         return 'The bag has already been drawn, so the screening can no longer be changed.'
       case 'facility_missing':
         return 'This account is not linked to a facility.'
+      case 'donor_not_presented':
+        return 'This donor has not presented here yet. Open their donation first, then review the questionnaire.'
+      case 'questionnaire_not_found':
+        return 'This donor has not completed the health questionnaire in the app.'
+      case 'questionnaire_unavailable':
+        return 'The questionnaire is temporarily unavailable. Try again shortly.'
       default:
         return err?.message || 'Something went wrong. Try again.'
     }
   }
 
-  async function run<T>(work: () => Promise<T>): Promise<T | null> {
+  /**
+   * `recover` may claim a refusal it can act on; anything it declines is shown
+   * as an error.
+   */
+  async function run<T>(work: () => Promise<T>, recover?: (err: any) => boolean): Promise<T | null> {
     busy.value = true
     error.value = null
 
     try {
       return await work()
     } catch (err: any) {
-      error.value = messageFor(err)
+      if (!recover?.(err)) error.value = messageFor(err)
       return null
     } finally {
       busy.value = false
@@ -129,11 +227,36 @@ export function useDonationTransaction() {
   function adoptDonation(payload: any) {
     donation.value = payload ?? null
 
+    // A screening already recorded for this visit carries these, so a staff
+    // member reopening the drawer sees what was entered rather than a blank
+    // set of boxes they would have to fill twice.
+    const screening = payload?.screening
+
+    if (screening) {
+      Object.assign(intakeForm, {
+        sleep: screening.sleep ?? '',
+        meal: screening.meal ?? '',
+        meds: screening.meds ?? '',
+        allergies: screening.allergies ?? '',
+      })
+    }
+
     if (payload?.appointment_id && appointment.value?.id !== payload.appointment_id) return
 
-    // Keep the appointment card in step with the donation that closed it.
+    // Keep the appointment card in step with the donation that closed it. A
+    // deferral closes the booking too, but nothing was collected.
     if (appointment.value && payload && ['collected', 'tested', 'completed', 'rejected'].includes(payload.status)) {
-      appointment.value = { ...appointment.value, status: 'completed', status_label: 'Donated' }
+      appointment.value = {
+        ...appointment.value,
+        status: 'completed',
+        status_label: payload.status === 'rejected' ? 'Deferred' : 'Collected',
+      }
+      return
+    }
+
+    // Opening the donation checks a scheduled booking in on the server.
+    if (appointment.value?.status === 'scheduled' && payload) {
+      appointment.value = { ...appointment.value, status: 'confirmed', status_label: 'In progress' }
     }
   }
 
@@ -148,6 +271,8 @@ export function useDonationTransaction() {
     donor.value = result.data?.donor ?? null
     appointment.value = result.data?.appointment ?? null
     donation.value = result.data?.open_donation ?? null
+    questionnaireMeta.value = result.data?.health_questionnaire ?? null
+    priorDeferral.value = result.data?.prior_deferral ?? null
 
     notice.value = donation.value
       ? `Resuming donation #${donation.value.id} already in progress.`
@@ -161,12 +286,61 @@ export function useDonationTransaction() {
   /**
    * Adopt a donor the staff member found by valid ID instead of a scan.
    */
-  function adoptDonor(found: TransactionDonor, existing: TransactionAppointment | null = null) {
+  function adoptDonor(
+    found: TransactionDonor,
+    existing: TransactionAppointment | null = null,
+    deferral: PriorDeferral | null = null,
+  ) {
     donor.value = found
     appointment.value = existing
     donation.value = null
     error.value = null
     notice.value = null
+
+    // Found by ID rather than scanned, so there is no pinned screening and no
+    // metadata to draw the strip from. The questionnaire is still reachable --
+    // the server resolves which one -- but only once loadQuestionnaire() asks.
+    questionnaireMeta.value = null
+    questionnaire.value = null
+    questionnaireError.value = null
+
+    // The ID lookup carries the same notice the scan does. A donor who left
+    // their phone at home — or one a laboratory result permanently deferred —
+    // must not walk past it. Outcome and date only; the reason stays behind
+    // the donor's history.
+    priorDeferral.value = deferral
+  }
+
+  /**
+   * Fetch the questionnaire, once per visit.
+   *
+   * Cached rather than re-fetched on every open: it cannot change while the
+   * donor stands at the counter, and re-requesting would write another audit
+   * entry each time a staff member closed and reopened the drawer.
+   */
+  async function loadQuestionnaire(force = false) {
+    if (!donor.value) return false
+    if (questionnaire.value && !force) return true
+
+    questionnaireLoading.value = true
+    questionnaireError.value = null
+
+    try {
+      const params: Record<string, number> = {}
+      if (questionnaireMeta.value?.screening_id) {
+        params.screening_id = questionnaireMeta.value.screening_id
+      }
+
+      const result = await service.donorHealthQuestionnaire(donor.value.uuid, params)
+      questionnaire.value = result.data ?? null
+
+      return true
+    } catch (err: any) {
+      questionnaireError.value = messageFor(err)
+      return false
+    } finally {
+      questionnaireLoading.value = false
+    }
   }
 
   async function checkIn() {
@@ -222,9 +396,25 @@ export function useDonationTransaction() {
   async function recordCollection(payload: Record<string, unknown>) {
     if (!donation.value) return false
 
-    const result = await run(() => service.recordCollection(donation.value!.id, payload))
+    let alreadyRecorded = false
 
-    if (!result) return false
+    const result = await run(
+      () => service.recordCollection(donation.value!.id, payload),
+      (err) => {
+        // A save retried after its response was lost. The server sends the
+        // donation as recorded, so the drawer moves on to it rather than
+        // leaving staff at a form they can no longer submit.
+        const recorded = err?.data?.code === 'collection_already_recorded' ? err.data.data : null
+        if (!recorded) return false
+
+        adoptDonation(recorded)
+        notice.value = messageFor(err)
+        alreadyRecorded = true
+        return true
+      },
+    )
+
+    if (!result) return alreadyRecorded
 
     adoptDonation(result.data)
     notice.value = result.message ?? null
@@ -240,6 +430,12 @@ export function useDonationTransaction() {
     donation.value = null
     error.value = null
     notice.value = null
+    questionnaireMeta.value = null
+    questionnaire.value = null
+    questionnaireOpen.value = false
+    questionnaireError.value = null
+    priorDeferral.value = null
+    resetIntake()
   }
 
   return {
@@ -252,6 +448,15 @@ export function useDonationTransaction() {
     notice,
     isDeferred,
     isCollected,
+    priorDeferral,
+    intakeForm,
+    resetIntake,
+    questionnaireMeta,
+    questionnaire,
+    questionnaireOpen,
+    questionnaireError,
+    questionnaireLoading,
+    loadQuestionnaire,
     verifyQr,
     adoptDonor,
     checkIn,

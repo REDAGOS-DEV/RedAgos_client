@@ -6,12 +6,14 @@
       <div class="stats-grid">
         <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
       </div>
-      <div class="skeleton skeleton--panel" style="height:320px" />
+      <div class="focus-grid">
+        <div class="skeleton skeleton--panel" style="height:300px" />
+        <div class="skeleton skeleton--panel" style="height:300px" />
+      </div>
       <div class="insights-grid">
         <div class="skeleton skeleton--panel" style="height:280px" />
         <div class="skeleton skeleton--panel" style="height:280px" />
       </div>
-      <div class="skeleton skeleton--panel" style="height:260px" />
     </div>
 
     <div v-else class="dashboard-inner">
@@ -19,7 +21,7 @@
       <div class="header-row">
         <div>
           <h1 class="page-title">Blood Center Dashboard</h1>
-          <p class="page-subtitle">Monitor blood inventory, manage hospital requests, coordinate donor activities, and oversee daily operations.</p>
+          <p class="page-subtitle">What needs attention today, and how stock is moving.</p>
         </div>
         <div class="header-actions">
           <button type="button" class="btn-outline" @click="exportReport" :disabled="exporting">
@@ -38,38 +40,39 @@
       </div>
 
       <!-- ============ KPI CARDS ============ -->
+      <!-- Each card opens the page that owns the number. -->
       <div class="stats-grid">
-        <div class="stat-card">
+        <NuxtLink to="/blood-center/inventory" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Blood Units</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
               <AssetIcon name="droplets" :size="14" style="color: var(--rb-primary-text)" />
             </div>
           </div>
-          <p class="stat-card__value">{{ totalUnits === null ? '—' : totalUnits }}</p>
+          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalUnits === null }">{{ totalUnits ?? 'No data' }}</p>
           <span class="stat-chip stat-chip--neutral">Across all components</span>
           <span v-if="weeklyChangePercent !== null" class="stat-trend" :class="weeklyChangePercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
             <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
             {{ Math.abs(weeklyChangePercent) }}% this week
           </span>
-        </div>
+        </NuxtLink>
 
-        <div class="stat-card">
+        <NuxtLink to="/blood-center/collection" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Donations Today</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
               <AssetIcon name="trending-up" :size="14" style="color: var(--rb-success-text)" />
             </div>
           </div>
-          <p class="stat-card__value">{{ donationsToday === null ? '—' : donationsToday }}</p>
+          <p class="stat-card__value" :class="{ 'stat-card__value--empty': donationsToday === null }">{{ donationsToday ?? 'No data' }}</p>
           <span class="stat-chip stat-chip--neutral">{{ dailyGoal !== null ? `Goal: ${dailyGoal} units/day` : 'Daily goal not set' }}</span>
           <span v-if="vsYesterdayPercent !== null" class="stat-trend" :class="vsYesterdayPercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
             <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
             {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
           </span>
-        </div>
+        </NuxtLink>
 
-        <div class="stat-card">
+        <NuxtLink to="/blood-center/bloodrequests" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Pending Hospital Requests</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
@@ -77,75 +80,122 @@
             </div>
           </div>
           <p class="stat-card__value">{{ pendingRequestsCount }}</p>
-          <span class="stat-chip stat-chip--neutral">Needs fulfillment</span>
-        </div>
+          <span class="stat-chip stat-chip--neutral">{{ pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting' }}</span>
+        </NuxtLink>
 
-        <div class="stat-card" :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }">
+        <NuxtLink to="/blood-center/inventory" class="stat-card" :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }">
           <div class="stat-card__top">
             <p class="stat-card__label">Critical Blood Types</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-accent-rgb), 0.08)' }">
               <AssetIcon name="alert" :size="14" style="color: var(--rb-accent-text)" />
             </div>
           </div>
-          <p class="stat-card__value" style="color: var(--rb-accent-text)">{{ criticalTypesCount }}</p>
+          <!-- Red only when something is actually critical. -->
+          <p class="stat-card__value" :style="criticalTypesCount ? 'color: var(--rb-accent-text)' : ''">{{ criticalTypesCount }}</p>
           <span class="stat-chip stat-chip--neutral truncate-chip">{{ criticalTypesLabel }}</span>
-        </div>
+        </NuxtLink>
       </div>
 
-      <!-- ============ BLOOD INVENTORY OVERVIEW ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Blood Inventory Overview</h2>
-            <p class="panel-subtitle">Primary operational view of current stock by blood type.</p>
+      <!-- ============ NEEDS ATTENTION + STOCK BY TYPE ============ -->
+      <div class="focus-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Needs attention</h2>
+              <p class="panel-subtitle">Stock, expiry and requests that need action today.</p>
+            </div>
           </div>
-          <div class="search-box">
-            <AssetIcon name="search" :size="14" class="search-box__icon" />
-            <input v-model="inventorySearch" type="text" placeholder="Search blood type" class="search-box__input" />
+
+          <ul v-if="attentionItems.length" class="attention-list">
+            <li v-for="item in attentionItems" :key="item.key" class="attention-item" :class="`attention-item--${item.tone}`">
+              <span class="attention-item__icon">
+                <AssetIcon :name="item.icon" :size="15" />
+              </span>
+              <div class="attention-item__body">
+                <p class="attention-item__title">{{ item.title }}</p>
+                <p class="attention-item__detail">{{ item.detail }}</p>
+              </div>
+              <NuxtLink :to="item.to" class="panel-link attention-item__link">
+                {{ item.action }}
+                <AssetIcon name="chevron-right" :size="13" />
+              </NuxtLink>
+            </li>
+          </ul>
+          <div v-else class="attention-clear">
+            <AssetIcon name="shield-check" :size="20" style="color: var(--rb-success-text)" />
+            <div>
+              <p class="attention-clear__title">All clear</p>
+              <p class="attention-clear__detail">No critical stock, expiring units or urgent requests right now.</p>
+            </div>
           </div>
+
+          <!-- Requests stay actionable here; the full list is Incoming Requests. -->
+          <template v-if="waitingRequests.length">
+            <div class="subsection-header">
+              <p class="subsection-title">Waiting hospital requests</p>
+              <NuxtLink to="/blood-center/bloodrequests" class="panel-link">
+                View all ({{ requests.length }})
+              </NuxtLink>
+            </div>
+            <div class="request-list">
+              <div v-for="req in waitingRequests" :key="req.id" class="request-item">
+                <div class="request-item__left">
+                  <div class="hospital-avatar" :style="{ background: urgencyIconBg(req.urgency), color: urgencyIconColor(req.urgency) }">
+                    {{ initials(req.hospital) }}
+                  </div>
+                  <div class="request-info">
+                    <div class="request-info__row">
+                      <p class="request-hospital">{{ req.hospital }}</p>
+                      <span class="urgency-pill" :class="`urgency-pill--${req.urgency}`">{{ req.urgency }}</span>
+                    </div>
+                    <p class="request-meta">
+                      {{ req.code }} &middot;
+                      <span class="type-pill type-pill--sm">{{ req.blood_type }}</span>
+                      &middot; {{ req.units }} unit{{ req.units !== 1 ? 's' : '' }} &middot; {{ req.time_ago }}
+                    </p>
+                  </div>
+                </div>
+                <div class="request-item__right">
+                  <span class="status-pill status-pill--sm" :class="`status-pill--${req.status}`">
+                    <span class="status-pill__dot" />
+                    {{ req.status }}
+                  </span>
+                  <button type="button" class="btn-primary btn-primary--sm" @click="openConfirmModal(req)">
+                    {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
-        <div class="inventory-table-wrap">
-          <table class="inventory-table">
-            <thead>
-              <tr>
-                <th v-for="col in inventoryColumns" :key="col.key" @click="toggleSort(col.key)" class="sortable-th">
-                  <span class="sortable-th__inner">
-                    {{ col.label }}
-                    <AssetIcon
-                      :name="sortColumn === col.key ? (sortDirection === 'asc' ? 'chevron-up' : 'chevron-down') : 'chevrons-up-down'"
-                      :size="11"
-                      class="sort-icon"
-                      :class="{ 'sort-icon--active': sortColumn === col.key }"
-                    />
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in sortedInventory" :key="row.blood_type" class="inventory-row">
-                <td>
-                  <span class="type-pill">{{ row.blood_type }}</span>
-                </td>
-                <td>{{ row.whole_blood }}</td>
-                <td>{{ row.red_blood_cells }}</td>
-                <td>{{ row.plasma }}</td>
-                <td>{{ row.platelets }}</td>
-                <td class="inventory-table__total">{{ row.total }}</td>
-                <td>
-                  <span class="status-pill" :class="`status-pill--${row.status}`">
-                    <span class="status-pill__dot" />
-                    {{ statusLabel(row.status) }}
-                  </span>
-                </td>
-              </tr>
-              <tr v-if="!sortedInventory.length">
-                <td colspan="7" class="inventory-table__empty">
-                  {{ inventory.length ? `No blood types match "${inventorySearch}"` : 'No inventory data available yet' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Stock by blood type</h2>
+              <p class="panel-subtitle">Total units across components.</p>
+            </div>
+            <NuxtLink to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
+          </div>
+
+          <div v-if="stockTiles.length" class="stock-grid">
+            <NuxtLink
+              v-for="row in stockTiles"
+              :key="row.blood_type"
+              :to="`/blood-center/inventory?type=${encodeURIComponent(row.blood_type)}`"
+              class="stock-tile"
+              :class="`stock-tile--${row.status}`"
+              :title="`${row.blood_type}: ${row.total} units, ${statusLabel(row.status)}`"
+            >
+              <span class="stock-tile__type">{{ row.blood_type }}</span>
+              <span class="stock-tile__value">{{ row.total }}</span>
+              <span class="stock-tile__status">{{ statusLabel(row.status) }}</span>
+            </NuxtLink>
+          </div>
+          <div v-else class="empty-state">
+            <AssetIcon name="droplets" :size="32" style="color: var(--rb-border-strong)" />
+            <p>No inventory recorded yet</p>
+          </div>
         </div>
       </div>
 
@@ -291,142 +341,13 @@
         </div>
       </div>
 
-      <!-- ============ INCOMING HOSPITAL REQUESTS ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Incoming Hospital Requests</h2>
-            <p class="panel-subtitle">New and in-progress requests from partner hospitals.</p>
-          </div>
-          <!-- /blood-center/hospital-requests is the API path, not a page; the
-               screen that lists these is Incoming Requests. -->
-          <NuxtLink to="/blood-center/bloodrequests" class="panel-link">View all</NuxtLink>
-        </div>
-
-        <div v-if="requests.length" class="request-list">
-          <div v-for="req in requests" :key="req.id" class="request-item">
-            <div class="request-item__left">
-              <div class="hospital-avatar" :style="{ background: urgencyIconBg(req.urgency), color: urgencyIconColor(req.urgency) }">
-                {{ initials(req.hospital) }}
-              </div>
-              <div class="request-info">
-                <div class="request-info__row">
-                  <p class="request-hospital">{{ req.hospital }}</p>
-                  <span class="urgency-pill" :class="`urgency-pill--${req.urgency}`">{{ req.urgency }}</span>
-                </div>
-                <p class="request-meta">
-                  {{ req.code }} &middot;
-                  <span class="type-pill type-pill--sm">{{ req.blood_type }}</span>
-                  &middot; {{ req.units }} unit{{ req.units !== 1 ? 's' : '' }} &middot; {{ req.time_ago }}
-                </p>
-              </div>
-            </div>
-            <div class="request-item__right">
-              <span class="status-pill status-pill--sm" :class="`status-pill--${req.status}`">
-                <span class="status-pill__dot" />
-                {{ req.status }}
-              </span>
-              <button type="button" class="btn-primary btn-primary--sm" @click="openConfirmModal(req)">
-                {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-state">
-          <AssetIcon name="clipboard-check" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No pending hospital requests</p>
-        </div>
-      </div>
-
-      <!-- ============ INVENTORY HEALTH SUMMARY ============ -->
-      <div class="health-grid">
-        <div class="health-card health-card--healthy">
-          <div class="health-card__icon">
-            <AssetIcon name="shield-check" :size="18" style="color: var(--rb-success-text)" />
-          </div>
-          <div>
-            <p class="health-card__value">{{ healthSummary.healthy }}</p>
-            <p class="health-card__label">Healthy blood types</p>
-            <p class="health-card__desc">Stock levels within safe range</p>
-          </div>
-        </div>
-        <div class="health-card health-card--low">
-          <div class="health-card__icon">
-            <AssetIcon name="triangle-alert" :size="18" style="color: var(--rb-warning-text)" />
-          </div>
-          <div>
-            <p class="health-card__value">{{ healthSummary.low }}</p>
-            <p class="health-card__label">Low stock types</p>
-            <p class="health-card__desc">Approaching reorder threshold</p>
-          </div>
-        </div>
-        <div class="health-card health-card--critical">
-          <div class="health-card__icon">
-            <AssetIcon name="alert" :size="18" style="color: var(--rb-accent-text)" />
-          </div>
-          <div>
-            <p class="health-card__value">{{ healthSummary.critical }}</p>
-            <p class="health-card__label">Critical types</p>
-            <p class="health-card__desc">Immediate replenishment needed</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ NEAR EXPIRY BLOOD UNITS ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Near Expiry Blood Units</h2>
-            <p class="panel-subtitle">Units approaching their expiration window.</p>
-          </div>
-        </div>
-
-        <div class="inventory-table-wrap">
-          <table class="inventory-table expiry-table">
-            <thead>
-              <tr>
-                <th>Blood Type</th>
-                <th>Component</th>
-                <th>Units</th>
-                <th>Expiry Date</th>
-                <th>Days Remaining</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in nearExpiry" :key="row.id" class="inventory-row" :class="`expiry-row--${expiryStatus(row.days_remaining)}`">
-                <td><span class="type-pill">{{ row.blood_type }}</span></td>
-                <td>{{ row.component }}</td>
-                <td>{{ row.units }}</td>
-                <td>{{ row.expiry_date }}</td>
-                <td>{{ row.days_remaining <= 0 ? 'Today' : `${row.days_remaining} day${row.days_remaining !== 1 ? 's' : ''}` }}</td>
-                <td>
-                  <span class="status-pill" :class="`status-pill--${expiryStatus(row.days_remaining)}`">
-                    <span class="status-pill__dot" />
-                    {{ expiryStatusLabel(row.days_remaining) }}
-                  </span>
-                </td>
-                <td>
-                  <NuxtLink :to="`/blood-center/inventory?type=${row.blood_type}`" class="link-btn">
-                    <AssetIcon name="eye" :size="13" />
-                    View Inventory
-                  </NuxtLink>
-                </td>
-              </tr>
-              <tr v-if="!nearExpiry.length">
-                <td colspan="7" class="inventory-table__empty">No units nearing expiry</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+      <!-- ============ RECENT ACTIVITY ============ -->
+      <div class="activity-grid">
       <!-- ============ RECENT DONATION ACTIVITY ============ -->
       <div class="panel">
         <div class="panel-header">
           <div>
-            <h2 class="panel-title">Recent Donation Activity</h2>
+            <h2 class="panel-title">Recent donations</h2>
             <p class="panel-subtitle">Latest donations recorded at this center.</p>
           </div>
           <!--
@@ -438,7 +359,7 @@
         </div>
 
         <div v-if="donationActivity.length" class="timeline">
-          <div v-for="item in donationActivity" :key="item.id" class="timeline-item">
+          <div v-for="item in donationActivity.slice(0, 5)" :key="item.id" class="timeline-item">
             <div class="timeline-item__marker">
               <AssetIcon name="droplets" :size="13" style="color: var(--rb-primary-text)" />
             </div>
@@ -470,13 +391,13 @@
       <div class="panel">
         <div class="panel-header">
           <div>
-            <h2 class="panel-title">Recent System Activity</h2>
+            <h2 class="panel-title">System activity</h2>
             <p class="panel-subtitle">Audit trail of actions across the system.</p>
           </div>
         </div>
 
         <div v-if="systemActivity.length" class="activity-feed">
-          <div v-for="item in systemActivity" :key="item.id" class="activity-feed__item">
+          <div v-for="item in systemActivity.slice(0, 5)" :key="item.id" class="activity-feed__item">
             <div class="activity-feed__icon" :style="{ background: `rgba(var(--rb-${item.tone}-rgb), 0.08)` }">
               <AssetIcon :name="item.icon" :size="14" :style="{ color: `var(--rb-${item.tone})` }" />
             </div>
@@ -493,26 +414,6 @@
         </div>
       </div>
 
-      <!-- ============ QUICK ACTIONS ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Quick Actions</h2>
-        </div>
-        <div class="quick-actions-grid">
-          <button
-            v-for="action in quickActions"
-            :key="action.label"
-            type="button"
-            class="quick-action-card"
-            @click="handleQuickAction(action)"
-          >
-            <div class="quick-action-card__icon">
-              <AssetIcon :name="action.icon" :size="20" style="color: var(--rb-primary-text)" />
-            </div>
-            <p class="quick-action-card__label">{{ action.label }}</p>
-            <p class="quick-action-card__desc">{{ action.description }}</p>
-          </button>
-        </div>
       </div>
     </div>
 
@@ -577,49 +478,18 @@ const dailyGoal = ref(null)
 const weeklyChangePercent = ref(null)
 const vsYesterdayPercent = ref(null)
 
-// --- Inventory table ---
+// --- Inventory (stock tiles + attention) ---
 const inventory = ref([])
-const inventorySearch = ref('')
-const sortColumn = ref('blood_type')
-const sortDirection = ref('asc')
 
-const inventoryColumns = [
-  { key: 'blood_type', label: 'Blood Type' },
-  { key: 'whole_blood', label: 'Whole Blood' },
-  { key: 'red_blood_cells', label: 'Packed RBC' },
-  { key: 'plasma', label: 'Fresh Frozen Plasma' },
-  { key: 'platelets', label: 'Platelets' },
-  { key: 'total', label: 'Total Units' },
-  { key: 'status', label: 'Availability Status' },
-]
-
-const filteredInventory = computed(() => {
-  const q = inventorySearch.value.trim().toLowerCase()
-  if (!q) return inventory.value
-  return inventory.value.filter(row => row.blood_type.toLowerCase().includes(q))
-})
-
-const sortedInventory = computed(() => {
-  const list = [...filteredInventory.value]
-  const col = sortColumn.value
-  const dir = sortDirection.value === 'asc' ? 1 : -1
-  list.sort((a, b) => {
-    const av = a[col]
-    const bv = b[col]
-    if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv) * dir
-    return (av - bv) * dir
+// Canonical order, so the tiles read the same way every day.
+const BLOOD_TYPE_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const stockTiles = computed(() =>
+  [...inventory.value].sort((a, b) => {
+    const ai = BLOOD_TYPE_ORDER.indexOf(a.blood_type)
+    const bi = BLOOD_TYPE_ORDER.indexOf(b.blood_type)
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
   })
-  return list
-})
-
-function toggleSort(col) {
-  if (sortColumn.value === col) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortColumn.value = col
-    sortDirection.value = 'asc'
-  }
-}
+)
 
 function statusLabel(status) {
   const map = { adequate: 'Adequate', low: 'Low Stock', critical: 'Critical' }
@@ -635,11 +505,7 @@ const criticalTypesLabel = computed(() => {
   return `${criticalTypes.value.join(' and ')} at critical`
 })
 
-const healthSummary = computed(() => ({
-  healthy: inventory.value.filter(r => r.status === 'adequate').length,
-  low: inventory.value.filter(r => r.status === 'low').length,
-  critical: inventory.value.filter(r => r.status === 'critical').length,
-}))
+const lowTypes = computed(() => inventory.value.filter(r => r.status === 'low').map(r => r.blood_type))
 
 // Dev note: reference data (blood types, components) kay gikan sa
 // /blood-center/reference-data endpoint — dili na hardcoded diri.
@@ -747,17 +613,11 @@ const donutSegments = computed(() => {
 
 // --- Near expiry blood units ---
 const nearExpiry = ref([])
-function expiryStatus(days) {
-  if (days <= 0) return 'critical'
-  if (days <= 3) return 'critical'
-  if (days <= 7) return 'low'
-  return 'adequate'
-}
-function expiryStatusLabel(days) {
-  if (days <= 0) return 'Expiring Today'
-  if (days <= 3) return 'Within 3 Days'
-  if (days <= 7) return 'Within 7 Days'
-  return 'Monitor'
+
+function unitsExpiringWithin(days) {
+  return nearExpiry.value
+    .filter(row => row.days_remaining <= days)
+    .reduce((sum, row) => sum + (Number(row.units) || 0), 0)
 }
 
 // --- Recent donation activity ---
@@ -766,28 +626,81 @@ const donationActivity = ref([])
 // --- Recent system activity ---
 const systemActivity = ref([])
 
-// --- Quick actions ---
-// Gi-filter sa parehas nga permissions sa sidebar. Bisan tuod supervisor ra
-// ang makaabot ani nga page karon, ang shortcut dili gyud mo-offer og aksyon
-// nga i-refuse ra sa server.
-const ALL_QUICK_ACTIONS = [
-  { label: 'Record Donation', description: 'Open the donation counter', icon: 'droplets', kind: 'link', to: '/blood-center/collection', requires: 'donations.record' },
-  { label: 'Manage Inventory', description: 'Update stock levels and units', icon: 'package', kind: 'link', to: '/blood-center/inventory', requires: 'inventory.view' },
-  { label: 'Process Requests', description: 'Review and fulfill hospital requests', icon: 'clipboard-list', kind: 'link', to: '/blood-center/bloodrequests', requires: 'requests.view' },
-  { label: 'Generate Reports', description: 'Export operational summaries', icon: 'file-text', kind: 'export', requires: 'reports.view_own' },
-  { label: 'Manage Donors', description: 'View and update donor records', icon: 'users', kind: 'link', to: '/blood-center/donors', requires: 'donors.view' },
-  { label: 'Manage Staff', description: 'Add colleagues and assign departments', icon: 'user-check', kind: 'link', to: '/blood-center/staff', requires: 'staff.manage' },
-]
-
-const quickActions = computed(() => ALL_QUICK_ACTIONS.filter((action) => can(action.requires)))
-
-function handleQuickAction(action) {
-  if (action.kind === 'export') return exportReport()
-  if (action.kind === 'link' && action.to) return navigateTo(action.to)
-}
-
 // --- Hospital requests ---
 const requests = ref([])
+
+const URGENCY_RANK = { emergency: 0, urgent: 1, routine: 2 }
+
+// The three most pressing, so the overview stays short; the rest are one
+// click away on Incoming Requests.
+const waitingRequests = computed(() =>
+  [...requests.value]
+    .sort((a, b) => (URGENCY_RANK[a.urgency] ?? 3) - (URGENCY_RANK[b.urgency] ?? 3))
+    .slice(0, 3)
+)
+
+const urgentRequestsCount = computed(() =>
+  requests.value.filter(r => r.urgency === 'emergency' || r.urgency === 'urgent').length
+)
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/**
+ * What a supervisor should act on today, most severe first. Built only from
+ * data the overview already loads; an empty list renders "All clear".
+ */
+const attentionItems = computed(() => {
+  const items = []
+
+  if (criticalTypesCount.value) {
+    items.push({
+      key: 'critical', tone: 'critical', icon: 'alert',
+      title: `${criticalTypes.value.join(', ')} at critical stock`,
+      detail: 'Immediate replenishment needed.',
+      to: '/blood-center/inventory', action: 'View stock',
+    })
+  }
+
+  const within3 = unitsExpiringWithin(3)
+  if (within3) {
+    items.push({
+      key: 'expiry-3', tone: 'critical', icon: 'clock',
+      title: `${plural(within3, 'unit')} expire within 3 days`,
+      detail: 'Issue these first, or reallocate them.',
+      to: '/blood-center/inventory', action: 'View units',
+    })
+  }
+
+  const within7 = unitsExpiringWithin(7) - within3
+  if (within7 > 0) {
+    items.push({
+      key: 'expiry-7', tone: 'low', icon: 'clock',
+      title: `${plural(within7, 'more unit')} expire within 7 days`,
+      detail: 'Plan to issue these this week.',
+      to: '/blood-center/inventory', action: 'View units',
+    })
+  }
+
+  if (lowTypes.value.length) {
+    items.push({
+      key: 'low', tone: 'low', icon: 'triangle-alert',
+      title: `${lowTypes.value.join(', ')} running low`,
+      detail: 'Approaching the reorder threshold.',
+      to: '/blood-center/inventory', action: 'View stock',
+    })
+  }
+
+  if (urgentRequestsCount.value) {
+    items.push({
+      key: 'urgent', tone: 'critical', icon: 'clipboard-check',
+      title: `${plural(urgentRequestsCount.value, 'urgent hospital request')}`,
+      detail: 'Emergency or urgent priority.',
+      to: '/blood-center/bloodrequests', action: 'Open requests',
+    })
+  }
+
+  return items
+})
 
 const urgencyIconBg = (urgency) => {
   if (urgency === 'emergency') return 'rgba(var(--rb-accent-rgb), 0.08)'
@@ -904,10 +817,10 @@ onMounted(async () => {
 
 .dashboard {
   font-family: var(--rb-font-sans);
-  max-width: 1152px;
+  max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   transition: background-color 0.2s ease;
 }
 
@@ -928,7 +841,7 @@ onMounted(async () => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .stat-card, .quick-action-card { animation: none !important; transition: none !important; }
+  .skeleton, .stat-card, .stock-tile { animation: none !important; transition: none !important; }
 }
 
 .dashboard-inner {
@@ -1054,6 +967,9 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .stat-card__value { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 0; line-height: 1; }
+.stat-card__value--empty { font-size: 15px; font-weight: 600; color: var(--rb-text-secondary); line-height: 24px; }
+a.stat-card { text-decoration: none; color: inherit; }
+a.stat-card:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .stat-chip {
   display: inline-flex;
   align-items: center;
@@ -1094,54 +1010,6 @@ onMounted(async () => {
 .panel-link { font-size: 12px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; flex-shrink: 0; }
 .panel-link:hover { text-decoration: underline; }
 
-.search-box { position: relative; flex-shrink: 0; width: 200px; }
-.search-box__icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
-.search-box__input {
-  width: 100%;
-  padding: 7px 10px 7px 30px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border-strong);
-  font-size: 12.5px;
-  background: var(--rb-surface-alt);
-  color: var(--rb-text-primary);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-
-/* Inventory table */
-.inventory-table-wrap { overflow-x: auto; }
-.inventory-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.inventory-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  text-align: left;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--rb-text-secondary);
-  padding: 10px 18px;
-  background: var(--rb-surface-alt);
-  white-space: nowrap;
-}
-.sortable-th { cursor: pointer; user-select: none; }
-.sortable-th:hover { color: var(--rb-text-primary); }
-.sortable-th__inner { display: inline-flex; align-items: center; gap: 4px; }
-.sort-icon { opacity: 0.5; }
-.sort-icon--active { opacity: 1; color: var(--rb-primary-text); }
-
-.inventory-table tbody td {
-  padding: 12px 18px;
-  border-top: 1px solid var(--rb-surface-alt);
-  color: var(--rb-text-primary);
-  white-space: nowrap;
-}
-.inventory-row { transition: background-color 0.12s ease; }
-.inventory-row:hover { background: var(--rb-surface-hover); }
-.inventory-table__total { font-weight: 700; }
-.inventory-table__empty { text-align: center; color: var(--rb-text-secondary); padding: 28px; white-space: normal; }
-
 .type-pill {
   display: inline-flex;
   align-items: center;
@@ -1172,23 +1040,77 @@ onMounted(async () => {
 .status-pill--pending { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 .status-pill--processing { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
 
-/* Near-expiry row emphasis */
-.expiry-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
-.expiry-row--low td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
+/* Needs attention + stock by type */
+.focus-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
 
-.link-btn {
-  display: inline-flex;
+.attention-list { list-style: none; margin: 0; padding: 6px 0; }
+.attention-item { display: flex; align-items: center; gap: 12px; padding: 10px 18px; }
+.attention-item__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rb-primary-text);
-  text-decoration: none;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.link-btn:hover { text-decoration: underline; }
+.attention-item--critical .attention-item__icon { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.attention-item--low .attention-item__icon { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
+.attention-item__body { flex: 1; min-width: 0; }
+.attention-item__title { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.attention-item__detail { font-size: 11.5px; color: var(--rb-text-secondary); margin: 2px 0 0; }
+.attention-item__link { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+
+.attention-clear { display: flex; align-items: center; gap: 12px; padding: 18px; }
+.attention-clear__title { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.attention-clear__detail { font-size: 12px; color: var(--rb-text-secondary); margin: 2px 0 0; }
+
+.subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px 4px;
+  border-top: 1px solid var(--rb-border);
+}
+.subsection-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rb-text-secondary);
+  margin: 0;
+}
+
+.stock-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 16px 18px 18px; }
+.stock-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  text-decoration: none;
+  box-shadow: inset 3px 0 0 var(--tile-accent, var(--rb-border-strong));
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.stock-tile:hover { border-color: var(--rb-border-hover); background: var(--rb-surface-hover); }
+.stock-tile:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.stock-tile--adequate { --tile-accent: var(--rb-success); }
+.stock-tile--low { --tile-accent: var(--rb-warning); }
+.stock-tile--critical { --tile-accent: var(--rb-accent); background: rgba(var(--rb-accent-rgb), 0.05); }
+.stock-tile__type { font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); }
+.stock-tile__value { font-size: 20px; font-weight: 800; color: var(--rb-text-primary); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stock-tile__status { font-size: 10.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.stock-tile--low .stock-tile__status { color: var(--rb-warning-text); }
+.stock-tile--critical .stock-tile__status { color: var(--rb-accent-text); }
+
+/* Recent activity, side by side */
+.activity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 
 /* Insights (charts) */
-.insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.insights-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
 .insight-card { display: flex; flex-direction: column; }
 
 .segmented-control {
@@ -1295,34 +1217,6 @@ onMounted(async () => {
 
 .empty-state { padding: 28px; text-align: center; color: var(--rb-text-secondary); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
-/* Inventory health summary */
-.health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-.health-card {
-  background: var(--rb-surface);
-  border: 1px solid var(--rb-border);
-  border-radius: 14px;
-  padding: 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.health-card__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: var(--rb-surface-alt);
-}
-.health-card--healthy .health-card__icon { background: rgba(var(--rb-success-rgb), 0.08); }
-.health-card--low .health-card__icon { background: rgba(var(--rb-warning-rgb), 0.08); }
-.health-card--critical .health-card__icon { background: rgba(var(--rb-accent-rgb), 0.08); }
-.health-card__value { font-size: 22px; font-weight: 800; color: var(--rb-text-primary); margin: 0; line-height: 1.1; }
-.health-card__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 3px 0 0; }
-.health-card__desc { font-size: 11.5px; color: var(--rb-text-secondary); margin: 2px 0 0; }
-
 /* Timeline (recent donation activity) */
 .timeline { display: flex; flex-direction: column; }
 .timeline-item { display: flex; align-items: flex-start; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--rb-surface-alt); }
@@ -1362,39 +1256,6 @@ onMounted(async () => {
 .activity-feed__title { font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .activity-feed__desc { font-size: 11.5px; color: var(--rb-text-secondary); margin: 2px 0 0; }
 .activity-feed__time { font-size: 11px; color: var(--rb-text-secondary); flex-shrink: 0; white-space: nowrap; }
-
-/* Quick actions */
-.quick-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); gap: 12px; padding: 18px; }
-.quick-action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface-alt);
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.quick-action-card:hover {
-  border-color: var(--rb-border-hover);
-  background: var(--rb-surface);
-}
-.quick-action-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.quick-action-card__icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.quick-action-card__label { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.quick-action-card__desc { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
@@ -1459,8 +1320,10 @@ onMounted(async () => {
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* Responsive */
-@media (max-width: 1024px) {
-  .insights-grid { grid-template-columns: 1fr; }
+@media (max-width: 1100px) {
+  .focus-grid,
+  .insights-grid,
+  .activity-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -1468,7 +1331,9 @@ onMounted(async () => {
   .header-row { flex-direction: column; align-items: stretch; }
   .header-actions { justify-content: space-between; }
   .panel-header { flex-direction: column; align-items: stretch; }
-  .search-box { width: 100%; }
+  .stock-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attention-item { flex-wrap: wrap; }
+  .attention-item__link { margin-left: 42px; }
   .request-item { flex-direction: column; align-items: stretch; }
   .request-item__right { justify-content: space-between; }
   .form-row { grid-template-columns: 1fr; }

@@ -6,7 +6,7 @@ Output:
         <div class="header-row">
             <div>
                 <h1 class="page-title">Stay updated!</h1>
-                <p class="page-subtitle">Stay informed with appointment reminders, donation updates, and important announcements.</p>
+                <p class="page-subtitle">Stay informed with important announcements.</p>
             </div>
             <button
                 type="button"
@@ -250,7 +250,7 @@ onActivated(() => {
     --warning: #f57c00;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
@@ -545,11 +545,6 @@ onActivated(() => {
         padding: 16px 16px 32px;
     }
 
-    .header-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .notif-row {
         flex-wrap: wrap;
     }
@@ -571,39 +566,39 @@ onActivated(() => {
     background: #0F172A;
 }
 
-:global(.dark .tabs-bar) { border-color: #334155; }
-:global(.dark .tab-btn:hover) { color: #F1F5F9; }
+:global(.dark .notifications-page .tabs-bar) { border-color: #334155; }
+:global(.dark .notifications-page .tab-btn:hover) { color: #F1F5F9; }
 
-:global(.dark .panel) {
+:global(.dark .notifications-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .notif-row) { border-color: #263449; }
-:global(.dark .notif-row--unread) { background: #172033; }
+:global(.dark .notifications-page .notif-row) { border-color: #263449; }
+:global(.dark .notifications-page .notif-row--unread) { background: #172033; }
 
-:global(.dark .notif-row__icon--warning) { background: rgba(245,124,0,0.16); }
-:global(.dark .notif-row__icon--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .notif-row__icon--primary) { background: rgba(66,165,245,0.16); }
-:global(.dark .notif-row__icon--danger) { background: rgba(239,83,80,0.16); }
+:global(.dark .notifications-page .notif-row__icon--warning) { background: rgba(245,124,0,0.16); }
+:global(.dark .notifications-page .notif-row__icon--success) { background: rgba(102,187,106,0.16); }
+:global(.dark .notifications-page .notif-row__icon--primary) { background: rgba(66,165,245,0.16); }
+:global(.dark .notifications-page .notif-row__icon--danger) { background: rgba(239,83,80,0.16); }
 
-:global(.dark .notif-row__meta) { color: #64748b; }
+:global(.dark .notifications-page .notif-row__meta) { color: #64748b; }
 
-:global(.dark .notif-tag--reminder) { background: rgba(245,124,0,0.16); }
-:global(.dark .notif-tag--donation) { background: rgba(102,187,106,0.16); }
-:global(.dark .notif-tag--screening) { background: rgba(66,165,245,0.16); }
-:global(.dark .notif-tag--system) { background: #263449; color: #94a3b8; }
+:global(.dark .notifications-page .notif-tag--reminder) { background: rgba(245,124,0,0.16); }
+:global(.dark .notifications-page .notif-tag--donation) { background: rgba(102,187,106,0.16); }
+:global(.dark .notifications-page .notif-tag--screening) { background: rgba(66,165,245,0.16); }
+:global(.dark .notifications-page .notif-tag--system) { background: #263449; color: #94a3b8; }
 
-:global(.dark .notif-row__read-status) { color: #475569; }
+:global(.dark .notifications-page .notif-row__read-status) { color: #475569; }
 
-:global(.dark .btn-outline) {
+:global(.dark .notifications-page .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155;
+:global(.dark .notifications-page .btn-outline:hover:not(:disabled)) { background: #334155;
 }
 
-:global(.dark .skeleton) {
+:global(.dark .notifications-page .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
 }

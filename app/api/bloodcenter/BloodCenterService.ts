@@ -1,4 +1,11 @@
 import BaseService from '../BaseService'
+import type {
+  BloodRequest,
+  CreateWalkInPayload,
+  DuplicateMatch,
+  RequestEvent,
+  WalkInReference,
+} from '~/types/bloodRequest'
 
 class BloodCenterService extends BaseService {
   private static instance: BloodCenterService | null = null
@@ -45,7 +52,7 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/password`, 'POST', payload)
   }
 
-  // --- Collection (Donor / Collection department) ---
+  // --- Collection department ---
 
   async collectionQueue(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/collection/queue`, 'GET', params)
@@ -66,7 +73,7 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/collection/verify-qr`, 'POST', { token })
   }
 
-  // --- Active donation transaction (Donor / Collection) ---
+  // --- Active donation transaction (Collection) ---
 
   async donations(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/donations`, 'GET', params)
@@ -90,11 +97,11 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donations/${donationId}/collection`, 'POST', payload)
   }
 
-  // --- Laboratory / Processing department ---
+  // --- Laboratory queue (Testing and Processing departments) ---
   //
   // Picks up where the counter stops. The counter leaves a donation at
   // `collected`; nothing here is reachable before that, and `completed` —
-  // cleared for issue to a patient — is only ever set from this department.
+  // cleared for issue to a patient — is only ever set by Processing here.
 
   async laboratoryQueue(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/queue`, 'GET', params)
@@ -104,9 +111,53 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/laboratory/donations/${donationId}`, 'GET')
   }
 
-  /** Record the result a medical technologist reported. Moves it to `tested`. */
-  async recordTestResult(donationId: number, payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/laboratory/donations/${donationId}/results`, 'POST', payload)
+  // --- Testing department: Section II of the DOH form ---
+  //
+  // Duha ka section, gi-save nga tagsa-tagsa, para ang matag usa naay kaugalingon
+  // nga "Screened by". Walay endpoint nga direkta mo-record og overall result:
+  // gikan kini sa duha, so walay donation nga makapasar nga kulang og marker.
+
+  /** ABO + Rh, as one `blood_type_id`. */
+  async recordImmunohematology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/immunohematology`, 'POST', payload)
+  }
+
+  /**
+   * The five-marker panel. A reactive marker must carry `confirm_reactive: true`:
+   * it rejects the donation, permanently defers the donor and refers them.
+   */
+  async recordSerology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/serology`, 'POST', payload)
+  }
+
+  /** Donors with a reactive result the Testing department must follow up. */
+  // --- Correction requests ---
+  //
+  // A saved record is never saved over. Its writer asks; the department's
+  // approver or the Center Admin decides, and the server applies it.
+
+  async corrections(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections`, 'GET', params)
+  }
+
+  async requestCorrection(donationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donations/${donationId}/corrections`, 'POST', payload)
+  }
+
+  async approveCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections/${correctionId}/approve`, 'POST', payload)
+  }
+
+  async rejectCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/corrections/${correctionId}/reject`, 'POST', payload)
+  }
+
+  async counsellingReferrals(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals`, 'GET', params)
+  }
+
+  async updateCounsellingReferral(referralId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals/${referralId}`, 'PATCH', payload)
   }
 
   async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {
@@ -144,6 +195,22 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}/history`, 'GET')
   }
 
+  /**
+   * The donor's health questionnaire, Sections I-A to I-C.
+   *
+   * Deliberately its own call rather than something the scan hands over. The
+   * scan says who is at the counter; this is thirty declared health answers,
+   * so the server gates and audits it separately. Nothing is fetched until a
+   * staff member actually opens the drawer.
+   *
+   * `screening_id` is the pin carried through from the scan, which makes the
+   * read exact. The manual valid-ID path has no token to pin with, so it omits
+   * it and the server resolves the questionnaire itself.
+   */
+  async donorHealthQuestionnaire(uuid: string, params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire`, 'GET', params)
+  }
+
   // --- Component settings (supervisor only) ---
   //
   // Shelf life and price, held per facility. blood_components has no
@@ -159,7 +226,21 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
   }
 
-  // --- Inventory (Inventory / Storage department) ---
+  // --- Facility logo (supervisor only) ---
+  //
+  // Ang facility kay gikan sa token sa staff, dili gikan sa request. FormData,
+  // so ang BaseService mobiya sa Content-Type para ang browser ang mobutang sa
+  // boundary.
+
+  async uploadFacilityLogo(form: FormData): Promise<any> {
+    return this.request(`${this.resource}/facility/logo`, 'POST', form)
+  }
+
+  async removeFacilityLogo(): Promise<any> {
+    return this.request(`${this.resource}/facility/logo`, 'DELETE')
+  }
+
+  // --- Inventory (Issuance department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory`, 'GET', params)
@@ -172,7 +253,7 @@ class BloodCenterService extends BaseService {
   /**
    * Donations the laboratory has cleared that still owe units.
    *
-   * Its own endpoint rather than the laboratory queue: Inventory holds
+   * Its own endpoint rather than the laboratory queue: Issuance holds
    * `donations.view` but not `lab.view`, and this carries the declared-versus-
    * recorded counts that neither of the donation listings does.
    */
@@ -184,8 +265,37 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory`, 'POST', payload)
   }
 
+  /** The Daily Blood Stock Inventory, as of now. Issuance and supervisors. */
+  async stockReport(): Promise<any> {
+    return this.request(`${this.resource}/inventory/stock-report`, 'GET')
+  }
+
+  /** The same report as the printable PDF sheet. */
+  async downloadStockReport(): Promise<Blob> {
+    return this.requestBlob(`${this.resource}/inventory/stock-report/pdf`)
+  }
+
   async updateBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory/${unitId}`, 'PATCH', payload)
+  }
+
+  /**
+   * Release every quarantined unit of a donation to available stock.
+   *
+   * The server refuses unless TTI Testing and Immunohematology have both
+   * cleared the donation — for a supervisor too. All or nothing per donation.
+   */
+  async releaseQuarantine(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/inventory/quarantine/${donationId}/release`, 'POST')
+  }
+
+  /**
+   * The final (Phase 2) label data for a donation's released bags — verified
+   * blood type, expiry, clearance codes, who released them. Refused while the
+   * bags are still in quarantine. Issuance only.
+   */
+  async bloodLabels(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/inventory/donations/${donationId}/labels`, 'GET')
   }
 
   async discardBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {
@@ -196,6 +306,14 @@ class BloodCenterService extends BaseService {
 
   async staff(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/staff`, 'GET', params)
+  }
+
+  /**
+   * Departments and the roles within each, with the abilities a role grants.
+   * Served so the staff form cannot drift from the server's matrix.
+   */
+  async staffRoles(): Promise<any> {
+    return this.request(`${this.resource}/staff/roles`, 'GET')
   }
 
   async createStaff(payload: Record<string, any> = {}): Promise<any> {
@@ -267,18 +385,36 @@ class BloodCenterService extends BaseService {
   }
 
   /**
+   * Download this incoming request as the DOH Blood Request Form (Adult).
+   *
+   * The same document the requesting hospital prints, rendered by the same
+   * server-side service, so the two copies cannot disagree.
+   */
+  async downloadRequestForm(id: number | string): Promise<Blob> {
+    return this.requestBlob(`/blood-center/blood-requests/${id}/form`)
+  }
+
+  /**
    * Approve and hold stock.
    *
    * Omit `quantity` to hold everything the request still needs. Whatever is
    * sent, the server caps it at the outstanding amount and at what is on the
    * shelf, so a partial hold is a normal outcome rather than an error.
+   *
+   * Pass `requestItemId` to hold against one component of a multi-component
+   * request; omit it and the server fills each line in form order.
    */
-  async allocateRequest(id: number | string, quantity?: number): Promise<any> {
-    return this.request(
-      `/blood-center/blood-requests/${id}/allocate`,
-      'POST',
-      quantity ? { quantity } : {},
-    )
+  async allocateRequest(
+    id: number | string,
+    quantity?: number,
+    requestItemId?: number,
+  ): Promise<any> {
+    const payload: Record<string, number> = {}
+
+    if (quantity) payload.quantity = quantity
+    if (requestItemId) payload.request_item_id = requestItemId
+
+    return this.request(`/blood-center/blood-requests/${id}/allocate`, 'POST', payload)
   }
 
   /** Refuse a request. The reason is required and reaches the requester. */
@@ -294,13 +430,70 @@ class BloodCenterService extends BaseService {
     })
   }
 
-  /** Dispatch held units. Refused while the statement is unsettled. */
-  async releaseRequest(id: number | string, allocationIds?: number[]): Promise<any> {
-    return this.request(
-      `/blood-center/blood-requests/${id}/release`,
-      'POST',
-      allocationIds ? { allocation_ids: allocationIds } : {},
-    )
+  /**
+   * Dispatch held units. Refused while the statement is unsettled.
+   *
+   * `handedTo` names who physically took the units — for a walk-in, the
+   * watcher. It is recorded on the request's history.
+   */
+  async releaseRequest(id: number | string, allocationIds?: number[], handedTo?: string | null): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/release`, 'POST', {
+      ...(allocationIds ? { allocation_ids: allocationIds } : {}),
+      ...(handedTo ? { handed_to: handedTo } : {}),
+    })
+  }
+
+  /**
+   * Close the rest of one line this centre cannot supply.
+   *
+   * The line keeps what was requested; the remainder is recorded as
+   * unavailable here and may still be sourced from another facility.
+   */
+  async closeRequestLine(id: number | string, itemId: number, note?: string | null): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/items/${itemId}/close`, 'POST', note ? { note } : {})
+  }
+
+  /** Everything that has happened to an incoming request, oldest first. */
+  async requestHistory(id: number | string): Promise<{ request_id: number; reference_number: string; events: RequestEvent[] }> {
+    return this.request(`/blood-center/blood-requests/${id}/history`, 'GET')
+  }
+
+  // ---------------------------------------------------------------------
+  // Walk-in Patient Transfusion requests.
+  //
+  // A watcher who came to the centre instead of the hospital blood bank.
+  // Issuance phones the hospital and records the request only once the
+  // hospital confirms it; a "no" is never sent.
+  // ---------------------------------------------------------------------
+
+  /** Hospitals, components, indications and ID types for the walk-in form. */
+  async walkInReference(): Promise<WalkInReference> {
+    return this.request('/blood-center/blood-requests/walk-in/reference', 'GET')
+  }
+
+  /**
+   * Look for a request the hospital already has open for this patient.
+   *
+   * A POST so the patient's name never sits in a URL or an access log.
+   */
+  async checkWalkInDuplicates(criteria: {
+    hospital_id: number
+    patient_surname?: string | null
+    patient_first_name?: string | null
+    blood_type_id?: number | null
+    presented_reference?: string | null
+  }): Promise<{ matches: DuplicateMatch[]; requires_acknowledgement: boolean; window_days: number }> {
+    return this.request('/blood-center/blood-requests/walk-in/duplicates', 'POST', criteria)
+  }
+
+  /** Record a walk-in the hospital has confirmed by phone. */
+  async createWalkInRequest(payload: CreateWalkInPayload): Promise<{ message: string; request: BloodRequest }> {
+    return this.request('/blood-center/blood-requests/walk-in', 'POST', payload)
+  }
+
+  /** Every statement raised against this facility's incoming requests. */
+  async billings(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/billings', 'GET', params)
   }
 
   /** The statement raised against one request. */
@@ -308,9 +501,40 @@ class BloodCenterService extends BaseService {
     return this.request(`/blood-center/billings/${requestId}`, 'GET')
   }
 
+  /**
+   * Meet a statement from the government subsidy instead of charging for it.
+   *
+   * Zero-rates the statement and clears the request for release without
+   * recording a payment, because none was taken. Money already collected is
+   * left alone.
+   */
+  async applySubsidy(requestId: number | string, reason?: string): Promise<any> {
+    return this.request(
+      `/blood-center/billings/${requestId}/subsidy`,
+      'POST',
+      reason ? { reason } : {},
+    )
+  }
+
   /** Record a settlement. GCash payments must carry their reference. */
   async recordPayment(requestId: number | string, payload: Record<string, any>): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}/payments`, 'POST', payload)
+  }
+
+  /**
+   * Mobile blood drives this facility runs.
+   *
+   * Lahi ni sa donor-facing nga GET /blood-drives: kana kay read-only nga
+   * catalogue sa umaabot nga drives sa tanang centre. Kini facility-scoped ug
+   * apil ang mga drive nga nahuman na.
+   */
+  async drives(): Promise<any> {
+    return this.request(`${this.resource}/drives`, 'GET')
+  }
+
+  /** Schedule a drive. Ang facility kay gikan sa token, dili sa payload. */
+  async createDrive(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/drives`, 'POST', payload)
   }
 
   async listNotifications(params: Record<string, any> = {}): Promise<any> {

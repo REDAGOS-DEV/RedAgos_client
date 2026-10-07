@@ -22,7 +22,7 @@
         </div>
 
         <div class="page-header__actions" v-if="!isLoadingRequest && request">
-          <span class="status-badge" :class="statusColorClass">{{ request.status }}</span>
+          <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="btn btn--outline" type="button" @click="handleDownloadPdf">
             <AssetIcon name="download" />
             <span>Download PDF</span>
@@ -79,13 +79,24 @@
         <div class="summary-item">
           <span class="summary-label">Priority</span>
           <span class="status-badge status-badge--sm" :class="priorityColorClass">
-            {{ request.priority || '—' }}
+            {{ priorityLabel }}
           </span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Current Status</span>
           <span class="status-badge status-badge--sm" :class="statusColorClass">
-            {{ request.status }}
+            {{ statusText }}
+          </span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Source</span>
+          <span class="summary-value">{{ request.source_label || 'Blood Bank Portal' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Fulfilled</span>
+          <span class="summary-value">
+            {{ request.fulfilled_quantity ?? 0 }} of {{ request.quantity ?? 0 }}
+            <template v-if="request.received_count"> · {{ request.received_count }} received</template>
           </span>
         </div>
         <div class="summary-item">
@@ -107,7 +118,18 @@
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Hospital</span>
-                <span class="info-value">{{ request.hospital || '—' }}</span>
+                <span class="info-value">{{ request.requesting_facility?.name || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Blood Center</span>
+                <span class="info-value">{{ request.target_facility?.name || '—' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Submitted By</span>
+                <span class="info-value">
+                  {{ request.requester_name
+                    || (request.is_walk_in ? `Walk-in — recorded by ${request.recorder_name || 'the blood center'}` : '—') }}
+                </span>
               </div>
               <div class="info-item">
                 <span class="info-label">Department</span>
@@ -132,31 +154,279 @@
             </div>
           </section>
 
+          <!--
+            WALK-IN: a watcher took this request straight to the blood center,
+            which confirmed it with this blood bank by phone before recording
+            it. The request is still this hospital's.
+          -->
+          <section v-if="request.walk_in" class="card">
+            <h2 class="section-title">Walk-in &amp; Confirmation</h2>
+            <WalkInDetailsCard
+              :walk-in="request.walk_in"
+              :centre-name="request.target_facility?.name || ''"
+              :recorder-name="request.recorder_name || ''"
+            />
+          </section>
+
+          <!--
+            A facility allocation is one centre's share of a patient's need.
+            The need itself — and every other centre asked for it — is followed
+            on the Patient Transfusion Request.
+          -->
+          <section v-if="request.transfusion_request" class="card part-of">
+            <h2 class="section-title">Patient Transfusion Request</h2>
+            <p class="part-of__text">
+              This is {{ request.target_facility?.name || 'this facility' }}'s share of
+              <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="part-of__ref">{{ request.transfusion_request.reference_number }}</NuxtLink>
+              ({{ requestStatusLabel(request.transfusion_request) }}). The patient needs {{ requiredSummary }}; other
+              facilities may be asked for the rest.
+            </p>
+            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="btn btn--outline btn--sm">
+              <span>Open the Patient Transfusion Request</span>
+            </NuxtLink>
+          </section>
+
+          <!--
+            One blood type of a weekly request. It goes out in one delivery,
+            and whatever the center does not supply is closed when it does.
+          -->
+          <section v-else-if="request.weekly_request" class="card part-of">
+            <h2 class="section-title">Weekly Request</h2>
+            <p class="part-of__text">
+              This is the {{ request.blood_type?.code || '' }} part of weekly request
+              <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="part-of__ref">{{ request.weekly_request.reference_number || 'WR' }}</NuxtLink>.
+              The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
+              dispatches.
+            </p>
+            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="btn btn--outline btn--sm">
+              <span>Open the weekly request</span>
+            </NuxtLink>
+          </section>
+
           <!-- SECTION 2: BLOOD DETAILS -->
+          <!--
+            Reads the request's own lines. The four fields this section used
+            before — blood_component, units_requested, compatibility and
+            special_requirements — have never existed on the API, so it showed
+            nothing but em dashes.
+          -->
           <section class="card">
             <h2 class="section-title">Blood Details</h2>
             <div class="info-grid">
               <div class="info-item">
+                <span class="info-label">Purpose</span>
+                <span class="info-value">{{ request.purpose_label || '—' }}</span>
+              </div>
+              <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value info-value--emphasis">{{ request.blood_type || '—' }}</span>
+                <span class="info-value info-value--emphasis">{{ request.blood_type?.code || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Blood Component</span>
-                <span class="info-value">{{ request.blood_component || '—' }}</span>
+                <span class="info-label">Priority</span>
+                <span class="info-value">{{ priorityLabel }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Units Requested</span>
-                <span class="info-value">{{ request.units_requested ?? '—' }}</span>
+                <span class="info-label">Total Units Requested</span>
+                <span class="info-value">{{ request.quantity ?? '—' }}</span>
               </div>
-              <div class="info-item">
-                <span class="info-label">Compatibility</span>
-                <span class="info-value">{{ request.compatibility || '—' }}</span>
-              </div>
-              <div class="info-item info-item--full">
-                <span class="info-label">Special Requirements</span>
-                <span class="info-value">{{ request.special_requirements || 'None specified.' }}</span>
+              <div v-if="request.patient" class="info-item info-item--full">
+                <span class="info-label">Patient</span>
+                <span class="info-value">
+                  {{ request.patient.full_name || '—' }}
+                  <template v-if="request.patient.age !== null">
+                    · {{ request.patient.age }} yrs
+                  </template>
+                  <template v-if="request.patient.sex">
+                    · {{ request.patient.sex === 'male' ? 'Male' : 'Female' }}
+                  </template>
+                </span>
               </div>
             </div>
+
+            <table v-if="request.items?.length" class="items-table">
+              <thead>
+                <tr>
+                  <th scope="col">Component</th>
+                  <th scope="col" class="num">Units</th>
+                  <th scope="col">Indication</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in request.items" :key="item.id">
+                  <td>{{ item.component?.name || '—' }}</td>
+                  <td class="num">{{ item.quantity }}</td>
+                  <td>
+                    <template v-if="item.indication_code">
+                      <strong>{{ item.indication_label }}</strong> — {{ item.indication_text }}
+                    </template>
+                    <template v-else>—</template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!--
+            FULFILMENT: what the blood center provided, per component, beside
+            what was requested. On a replenishment a remainder can be closed as
+            no longer needed here; a facility allocation's remainder is closed
+            on its Patient Transfusion Request, which stops every centre asked.
+          -->
+          <section id="request-fulfilment" class="card">
+            <div class="fulfilment-head">
+              <h2 class="section-title">Fulfilment</h2>
+            </div>
+            <p v-if="request.transfusion_request && request.is_open !== false" class="fulfilment-hint">
+              To stop asking for the rest of a component, close it on
+              <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`">{{ request.transfusion_request.reference_number }}</NuxtLink>.
+            </p>
+            <RequestFulfilmentTable
+              :request="request"
+              :closable="request.is_open !== false && !request.transfusion_request"
+              close-label="No longer needed"
+              :busy-item-id="closingLine ? lineToClose?.id ?? null : null"
+              @close-line="openCloseLine"
+            />
+          </section>
+
+          <!-- SECTION: BILLING & PAYMENT -->
+          <section id="request-billing" class="card billing-card">
+            <div class="billing-card__header">
+              <h2 class="section-title">Billing &amp; Payment</h2>
+              <span
+                v-if="showBillingSection && billing"
+                class="status-badge status-badge--sm"
+                :class="billingStatusColorClass"
+              >
+                {{ billing.status }}
+              </span>
+            </div>
+
+            <div v-if="!showBillingSection" class="billing-gated">
+              <AssetIcon name="clock" />
+              <p>Billing becomes available once blood availability is confirmed for this request.</p>
+            </div>
+
+            <div v-else-if="isLoadingBilling" class="availability-skeleton">
+              <div class="skeleton skeleton--row" v-for="n in 3" :key="n" />
+            </div>
+
+            <template v-else-if="billing">
+              <div class="billing-summary">
+                <div class="summary-item">
+                  <span class="summary-label">Billing Reference</span>
+                  <span class="summary-value summary-value--mono">{{ billing.billing_id }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Billing Date</span>
+                  <span class="summary-value">{{ formatDate(billing.billing_date) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Total Amount</span>
+                  <span class="summary-value info-value--emphasis">{{ formatCurrency(billing.total_amount) }}</span>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table class="history-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit Price</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in lineItemsWithSubtotal" :key="item.component_id">
+                      <td>{{ item.component_name }}</td>
+                      <td>{{ item.quantity }}</td>
+                      <td>{{ formatCurrency(item.price) }}</td>
+                      <td>{{ formatCurrency(item.subtotal) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-if="billing.status !== 'PAID'" class="payment-panel">
+                <span class="info-label">Select Payment Method</span>
+                <div class="payment-chips" role="radiogroup" aria-label="Payment method">
+                  <button
+                    type="button"
+                    class="payment-chip"
+                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'CASH' }"
+                    role="radio"
+                    :aria-checked="selectedPaymentMethod === 'CASH'"
+                    @click="selectedPaymentMethod = 'CASH'"
+                  >
+                    <AssetIcon name="box" :size="16" />
+                    <span>Cash</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="payment-chip"
+                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'GCASH' }"
+                    role="radio"
+                    :aria-checked="selectedPaymentMethod === 'GCASH'"
+                    @click="selectedPaymentMethod = 'GCASH'"
+                  >
+                    <AssetIcon name="phone" :size="16" />
+                    <span>GCash</span>
+                  </button>
+                </div>
+                <button
+                  class="btn btn--primary"
+                  type="button"
+                  :disabled="!selectedPaymentMethod || isPaying"
+                  @click="handlePay"
+                >
+                  <span v-if="isPaying">Processing…</span>
+                  <span v-else>Pay Now</span>
+                </button>
+              </div>
+
+              <div v-if="billing.status === 'PAID' && payments.length" class="receipt-block">
+                <AssetIcon name="check-circle" />
+                <div class="receipt-block__body">
+                  <span class="receipt-block__title">Payment received</span>
+                  <span class="receipt-block__meta">
+                    {{ formatCurrency(payments[payments.length - 1].amount_paid) }}
+                    &middot; {{ payments[payments.length - 1].payment_method }}
+                    &middot; {{ formatDateTime(payments[payments.length - 1].paid_at) }}
+                  </span>
+                </div>
+                <button
+                  class="btn btn--outline btn--sm"
+                  type="button"
+                  @click="showToast('Receipt download will be available once connected to the billing system.')"
+                >
+                  <AssetIcon name="download" :size="16" />
+                  <span>Download Receipt</span>
+                </button>
+              </div>
+
+              <div v-if="payments.length" class="payment-history">
+                <span class="info-label">Payment History</span>
+                <div class="table-wrapper">
+                  <table class="history-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="p in payments" :key="p.payment_id">
+                        <td>{{ formatDateTime(p.paid_at) }}</td>
+                        <td>{{ p.payment_method }}</td>
+                        <td>{{ formatCurrency(p.amount_paid) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- SECTION 3: CLINICAL INFORMATION -->
@@ -219,32 +489,19 @@
             <p v-if="!timeline.length" class="documents-empty">Timeline data is not available yet.</p>
           </section>
 
-          <!-- SECTION 5: REQUEST HISTORY -->
+          <!--
+            SECTION 5: REQUEST HISTORY — the request's own event log. Each entry
+            names who acted, from which facility, and every line's figures at
+            that moment.
+          -->
           <section class="card">
             <h2 class="section-title">Request History</h2>
-            <div class="table-wrapper">
-              <table class="history-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Activity</th>
-                    <th>Performed By</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="entry in history" :key="entry.id">
-                    <td>{{ formatDateTime(entry.date) }}</td>
-                    <td>{{ entry.activity }}</td>
-                    <td>{{ entry.performed_by || '—' }}</td>
-                    <td>{{ entry.remarks || '—' }}</td>
-                  </tr>
-                  <tr v-if="!history.length">
-                    <td colspan="4" class="table-empty">No history entries yet for this request.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <RequestHistoryTimeline
+              :events="history"
+              :loading="isLoadingHistory"
+              :error="historyError || ''"
+              link-base="/hospital/bloodrequests/"
+            />
           </section>
         </div>
 
@@ -294,10 +551,93 @@
                 <AssetIcon name="map-pin" />
                 <span>Track Request</span>
               </button>
+              <button v-if="showBillingSection" class="btn btn--outline btn--full" type="button" @click="scrollToBilling">
+                <AssetIcon name="clipboard-list" />
+                <span>View Billing</span>
+              </button>
             </div>
           </section>
         </aside>
       </div>
+
+      <!-- ============== PAYMENT TOAST ============== -->
+      <Transition name="toast">
+        <div v-if="toastMessage" class="toast" role="status">
+          <AssetIcon name="check-circle" :size="16" style="color:#346538" />
+          {{ toastMessage }}
+        </div>
+      </Transition>
+
+      <!-- ============== AWAITING RECEIPT ============== -->
+      <!--
+        The last step of the workflow. The endpoint and the composable wrapper
+        both existed; nothing in this page ever called them, so a request could
+        be dispatched and then never confirmed, leaving it open for ever.
+      -->
+      <section v-if="awaitingReceipt.length" class="card receipt-card">
+        <div class="receipt-head">
+          <AssetIcon name="package-search" :size="18" />
+          <div>
+            <h2 class="section-title">Units on their way</h2>
+            <p class="receipt-sub">
+              {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
+              they physically arrive — only your facility can assert it, and it completes the
+              chain of custody for each unit.
+            </p>
+          </div>
+        </div>
+
+        <table class="receipt-table">
+          <thead>
+            <tr>
+              <th scope="col" class="pick">
+                <input
+                  type="checkbox"
+                  :checked="allReceiptSelected"
+                  aria-label="Select every dispatched unit"
+                  @change="toggleAllReceipt"
+                >
+              </th>
+              <th scope="col">Unit</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Dispatched</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="allocation in awaitingReceipt" :key="allocation.id">
+              <td class="pick">
+                <input
+                  type="checkbox"
+                  :checked="receiptSelection.includes(allocation.id)"
+                  :aria-label="`Select unit ${allocation.unit_id}`"
+                  @change="toggleReceipt(allocation.id)"
+                >
+              </td>
+              <td class="mono">{{ allocation.unit_id }}</td>
+              <td>{{ allocation.expiry_date || '—' }}</td>
+              <td>{{ formatDateTime(allocation.released_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p v-if="receiptError" class="receipt-error">{{ receiptError }}</p>
+
+        <div class="receipt-actions">
+          <span class="receipt-note">
+            {{ receiptSelection.length
+              ? `${receiptSelection.length} of ${awaitingReceipt.length} selected`
+              : 'Nothing selected — confirming will accept every dispatched unit.' }}
+          </span>
+          <button
+            class="btn btn--primary"
+            type="button"
+            :disabled="confirmingReceipt"
+            @click="handleConfirmReceipt"
+          >
+            {{ confirmingReceipt ? 'Confirming…' : 'Confirm Receipt' }}
+          </button>
+        </div>
+      </section>
 
       <!-- ============== BOTTOM ACTIONS ============== -->
       <div class="bottom-actions">
@@ -313,20 +653,52 @@
           Edit
         </NuxtLink>
       </div>
+
+      <CloseLineDialog
+        v-if="lineToClose"
+        :row="lineToClose"
+        side="hospital"
+        :busy="closingLine"
+        :error="closeLineError"
+        @close="closeCloseLine"
+        @confirm="confirmCloseLine"
+      />
+
     </template>
   </div>
 </template>
 
 <script setup>
+import { hospitalService } from '~/api/hospital/HospitalService'
+import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
+import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
+import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
 })
 
+// Editorial serif for headings only — scoped to this page, does not touch
+// the app-wide font set in nuxt.config.ts.
+useHead({
+  link: [
+    {
+      rel: 'stylesheet',
+      href: 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&display=swap',
+    },
+  ],
+})
+
 const route = useRoute()
 const requestId = route.params.id
+
+// Guards the download button against a second click while the server is still
+// rendering the form.
+const downloadingForm = ref(false)
 
 const {
   request,
@@ -336,37 +708,194 @@ const {
   progressPercent,
   isLoadingRequest,
   isLoadingAvailability,
+  isLoadingHistory,
   requestError,
+  historyError,
   fetchRequest,
   fetchAvailability,
+  confirmReceipt,
+  closeLine,
 } = useBloodRequestDetails(requestId)
+
+const {
+  billing,
+  lineItems,
+  payments,
+  isLoadingBilling,
+  isPaying,
+  fetchBilling,
+  payBilling,
+} = useBloodRequestBilling(requestId)
 
 onMounted(() => {
   fetchRequest()
   fetchAvailability()
+  fetchBilling()
 })
 
-const statusColorMap = {
-  Pending: 'warning',
-  Approved: 'success',
-  Processing: 'warning',
-  'Ready for Pickup': 'info',
-  Completed: 'success',
-  Rejected: 'danger',
-  Cancelled: 'danger',
+// Billing only becomes relevant once blood availability has been confirmed
+// for the request — see the Billing BPMN in the proposal (Fig. 10).
+const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'Pending')
+
+const lineItemsWithSubtotal = computed(() =>
+  lineItems.value.map((item) => ({ ...item, subtotal: item.quantity * item.price }))
+)
+
+const selectedPaymentMethod = ref(null)
+
+const billingStatusMap = { UNPAID: 'warning', PARTIAL: 'info', PAID: 'success' }
+const billingStatusColorClass = computed(() => {
+  const s = billing.value?.status
+  return s ? `badge--${billingStatusMap[s] ?? 'neutral'}` : 'badge--neutral'
+})
+
+async function handlePay() {
+  if (!selectedPaymentMethod.value || !billing.value) return
+  const ok = await payBilling({ amount: billing.value.total_amount, method: selectedPaymentMethod.value })
+  if (ok) showToast('Payment successful.')
+}
+
+function scrollToBilling() {
+  document.getElementById('request-billing')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function formatCurrency(value) {
+  if (value === null || value === undefined) return '—'
+  return `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+const toastMessage = ref('')
+let toastTimer = null
+/*
+ * Confirming receipt of dispatched units.
+ *
+ * Only allocations that have left the blood centre and have not been confirmed
+ * are offered: `released` with no received_at. A reserved unit has not moved
+ * yet, and a received one is already done.
+ */
+const receiptSelection = ref([])
+const confirmingReceipt = ref(false)
+const receiptError = ref('')
+
+const awaitingReceipt = computed(() =>
+  (request.value?.allocations ?? []).filter((a) => a.status === 'released' && !a.received_at),
+)
+
+const allReceiptSelected = computed(() =>
+  awaitingReceipt.value.length > 0 && awaitingReceipt.value.every((a) => receiptSelection.value.includes(a.id)),
+)
+
+function toggleReceipt(id) {
+  receiptSelection.value = receiptSelection.value.includes(id)
+    ? receiptSelection.value.filter((each) => each !== id)
+    : [...receiptSelection.value, id]
+}
+
+function toggleAllReceipt() {
+  receiptSelection.value = allReceiptSelected.value ? [] : awaitingReceipt.value.map((a) => a.id)
+}
+
+async function handleConfirmReceipt() {
+  if (confirmingReceipt.value || awaitingReceipt.value.length === 0) return
+
+  confirmingReceipt.value = true
+  receiptError.value = ''
+
+  try {
+    // An empty selection means the whole delivery, which is what the API does
+    // with an omitted allocation_ids.
+    const response = await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
+    receiptSelection.value = []
+
+    // Receipt is what puts the bags on the blood bank's own shelf.
+    const stocked = response?.stocked_count ?? 0
+    showToast(stocked > 0
+      ? `Receipt confirmed. ${stocked} bag${stocked === 1 ? ' is' : 's are'} now in Blood Bank Inventory.`
+      : 'Receipt confirmed. Thank you.')
+  } catch (err) {
+    receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'
+  } finally {
+    confirmingReceipt.value = false
+  }
+}
+
+/** The DOH form calls these ROUTINE and STAT; the stored value is unchanged. */
+const priorityLabel = computed(() =>
+  request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—',
+)
+
+function showToast(msg) {
+  toastMessage.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMessage.value = '' }, 3000)
+}
+
+/*
+ * Keyed on the stored status through the shared tone map. The map this page
+ * carried was keyed on Title Case values ("Ready for Pickup", "Completed") the
+ * API has never sent, so every badge fell through to neutral.
+ */
+const TONE_BADGES = {
+  info: 'info',
+  progress: 'info',
+  warning: 'warning',
+  success: 'success',
+  danger: 'danger',
+  muted: 'neutral',
 }
 
 const statusColorClass = computed(() => {
-  const s = request.value?.status
-  return s ? `badge--${statusColorMap[s] ?? 'neutral'}` : 'badge--neutral'
+  const tone = REQUEST_STATUS_TONES[request.value?.status]
+  return `badge--${TONE_BADGES[tone] ?? 'neutral'}`
 })
 
-const priorityColorClass = computed(() => {
-  const p = request.value?.priority
-  if (!p) return 'badge--neutral'
-  if (p.toLowerCase() === 'urgent' || p.toLowerCase() === 'critical') return 'badge--danger'
-  if (p.toLowerCase() === 'high') return 'badge--warning'
-  return 'badge--neutral'
+/** "Partially Fulfilled (Closed)" once every remainder was closed. */
+const statusText = computed(() => (request.value ? requestStatusLabel(request.value) : '—'))
+
+const priorityColorClass = computed(() =>
+  request.value?.urgency_level === 'emergency' ? 'badge--danger' : 'badge--neutral',
+)
+
+/* CLOSE A LINE — a remainder this blood bank no longer needs */
+const lineToClose = ref(null)
+const closingLine = ref(false)
+const closeLineError = ref('')
+
+function openCloseLine(row) {
+  lineToClose.value = row
+  closeLineError.value = ''
+}
+
+function closeCloseLine() {
+  if (closingLine.value) return
+  lineToClose.value = null
+}
+
+async function confirmCloseLine(note) {
+  if (!lineToClose.value) return
+
+  closingLine.value = true
+  closeLineError.value = ''
+
+  try {
+    await closeLine(lineToClose.value.id, note)
+    showToast(`The rest of ${lineToClose.value.component} is recorded as no longer needed.`)
+    lineToClose.value = null
+  } catch (err) {
+    closeLineError.value = err?.message || 'The remaining quantity could not be closed.'
+  } finally {
+    closingLine.value = false
+  }
+}
+
+/** What the patient needs in all, e.g. "Packed RBC 5, Fresh Frozen Plasma 2". */
+const requiredSummary = computed(() => {
+  const required = request.value?.transfusion_request?.required ?? []
+  const names = Object.fromEntries((request.value?.items ?? []).map((item) => [item.component?.id, item.component?.name]))
+
+  return required
+    .map((line) => `${line.component ?? names[line.component_id] ?? 'a component'} ${line.quantity}`)
+    .join(', ') || 'what was requested'
 })
 
 const canEdit = computed(() => request.value?.status === 'Pending')
@@ -400,18 +929,33 @@ function handlePrint() {
 }
 
 /**
- * Produce a copy of the request.
+ * Download the request as the DOH Blood Request Form (Adult).
  *
- * Routed through the browser's own print dialogue, which offers "Save as PDF"
- * on every supported platform. The previous version fetched
- * `/hospital/bloodrequests/{id}/download` through an undefined `useApi()`
- * helper — an endpoint the API has never served — so the button threw rather
- * than downloading anything. Printing works today and keeps the page as the
- * single source of what a request says; a server-rendered PDF can replace this
- * if the paperwork ever needs a fixed layout.
+ * This used to fall back to window.print(), which produced a picture of this
+ * web page rather than the paperwork a blood bank actually files. The API now
+ * renders the real form, and the fulfilling centre downloads the identical
+ * document from its own portal. handlePrint() above still exists for anyone
+ * who just wants the screen.
  */
-function handleDownloadPdf() {
-  window.print()
+async function handleDownloadPdf() {
+  if (!requestId || downloadingForm.value) return
+
+  downloadingForm.value = true
+
+  try {
+    const blob = await hospitalService.downloadRequestForm(requestId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `BRF-${request.value?.reference_number ?? requestId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Failed to download request form:', err)
+    showToast(err?.message || 'Could not download the request form.')
+  } finally {
+    downloadingForm.value = false
+  }
 }
 
 function scrollToTimeline() {
@@ -421,9 +965,21 @@ function scrollToTimeline() {
 
 <style scoped>
 .request-details-page {
+  --rb-canvas: #FBF9F6;
+  --rb-surface: #FFFFFF;
+  --rb-border: #EAE7E1;
+  --rb-text: #1F1D1B;
+  --rb-text-muted: #78746D;
   padding: 24px;
-  background: #f7f9fc;
+  background: var(--rb-canvas);
   min-height: 100%;
+}
+:global(.dark .request-details-page) {
+  --rb-canvas: #14120F;
+  --rb-surface: #1C1A17;
+  --rb-border: #2E2B26;
+  --rb-text: #EDEAE5;
+  --rb-text-muted: #A19C93;
 }
 
 /* ---------- Header ---------- */
@@ -468,9 +1024,11 @@ function scrollToTimeline() {
   margin-bottom: 24px;
 }
 .page-title {
-  font-family: var(--rb-font-sans);
-  font-size: 30px;
-  font-weight: 700;
+  font-family: 'Newsreader', var(--rb-font-sans);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: #1a2233;
   margin: 0 0 4px;
 }
@@ -493,7 +1051,7 @@ function scrollToTimeline() {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 10px 16px;
   cursor: pointer;
   border: 1px solid transparent;
@@ -503,17 +1061,21 @@ function scrollToTimeline() {
 .btn:active {
   transform: scale(0.98);
 }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .btn--primary {
   background: #1565c0;
   color: #fff;
 }
-.btn--primary:hover {
+.btn--primary:hover:not(:disabled) {
   background: #0f4f9c;
 }
 .btn--outline {
-  background: #fff;
+  background: var(--rb-surface);
   color: #1565c0;
-  border-color: #e5eaf0;
+  border-color: var(--rb-border);
 }
 .btn--outline:hover {
   background: #f1f6fb;
@@ -523,6 +1085,10 @@ function scrollToTimeline() {
   width: 100%;
   justify-content: center;
 }
+.btn--sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
 
 /* ---------- Status badges ---------- */
 .status-badge {
@@ -531,45 +1097,52 @@ function scrollToTimeline() {
   padding: 6px 14px;
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .status-badge--sm {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .badge--success {
-  background: rgba(46, 125, 50, 0.12);
-  color: #2e7d32;
+  background: #EDF3EC;
+  color: #346538;
 }
 .badge--warning {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b8790a;
+  background: #FBF3DB;
+  color: #956400;
 }
 .badge--danger {
-  background: rgba(211, 47, 47, 0.12);
-  color: #d32f2f;
+  background: #FDEBEC;
+  color: #9F2F2D;
 }
 .badge--info {
-  background: rgba(21, 101, 192, 0.12);
-  color: #1565c0;
+  background: #E1F3FE;
+  color: #1F6C9F;
 }
 .badge--neutral {
-  background: #eef0f3;
-  color: #55606e;
+  background: #F0EEE9;
+  color: #6B675F;
 }
+:global(.dark .request-details-page .badge--success) { background: #1D2B1E; color: #8FCB94; }
+:global(.dark .request-details-page .badge--warning) { background: #322A12; color: #E4B54B; }
+:global(.dark .request-details-page .badge--danger) { background: #331A19; color: #E58E8B; }
+:global(.dark .request-details-page .badge--info) { background: #122733; color: #7EC1EE; }
+:global(.dark .request-details-page .badge--neutral) { background: #2A2721; color: #B3AEA4; }
 
 /* ---------- Cards ---------- */
 .card {
-  background: #fff;
-  border: 1px solid #e5eaf0;
-  border-radius: 18px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 10px rgba(20, 30, 50, 0.04);
+  box-shadow: none;
   margin-bottom: 20px;
   transition: box-shadow 0.2s ease;
 }
 .card:hover {
-  box-shadow: 0 6px 18px rgba(20, 30, 50, 0.07);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .summary-card {
@@ -599,8 +1172,10 @@ function scrollToTimeline() {
 }
 
 .section-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: 'Newsreader', var(--rb-font-sans);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: #1a2233;
   margin: 0 0 18px;
 }
@@ -821,7 +1396,7 @@ function scrollToTimeline() {
 }
 .progress-bar__fill {
   height: 100%;
-  background: linear-gradient(90deg, #1565c0, #42a5f5);
+  background: #1565c0;
   border-radius: 999px;
   transition: width 0.5s ease;
 }
@@ -862,6 +1437,129 @@ function scrollToTimeline() {
   gap: 10px;
 }
 
+/* ---------- Billing & Payment ---------- */
+.billing-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.billing-card__header .section-title {
+  margin: 0;
+}
+.billing-gated {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 28px 12px;
+  color: var(--rb-text-muted);
+}
+.billing-gated p {
+  margin: 0;
+  font-size: 13.5px;
+  max-width: 34ch;
+}
+.billing-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.payment-panel {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rb-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.payment-chips {
+  display: flex;
+  gap: 10px;
+}
+.payment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
+  color: var(--rb-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.payment-chip--active {
+  border-color: #1565c0;
+  background: #E1F3FE;
+  color: #1F6C9F;
+}
+.receipt-block {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #EDF3EC;
+  color: #346538;
+}
+.receipt-block__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.receipt-block__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.receipt-block__meta {
+  font-size: 12.5px;
+  opacity: 0.85;
+}
+.payment-history {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  padding: 12px 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rb-text);
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  transform: translate(-50%, 8px);
+  opacity: 0;
+}
+
 /* ---------- Bottom actions ---------- */
 .bottom-actions {
   display: flex;
@@ -896,10 +1594,10 @@ function scrollToTimeline() {
 
 /* ---------- Skeletons ---------- */
 .skeleton {
-  background: linear-gradient(90deg, #eef0f3 25%, #f6f7f9 37%, #eef0f3 63%);
+  background: linear-gradient(90deg, var(--rb-border) 25%, var(--rb-canvas) 37%, var(--rb-border) 63%);
   background-size: 400% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 @keyframes skeleton-shimmer {
   0% { background-position: 100% 50%; }
@@ -945,61 +1643,75 @@ function scrollToTimeline() {
 }
 
 /* ---------- Dark mode ---------- */
-:global(.dark .request-details-page) {
-  background: #0f1420;
+/* .request-details-page / .card / .skeleton already read the warm --rb-*
+   tokens redefined near the top of this file, so no hardcoded overrides
+   are needed for those here. */
+:global(.dark .request-details-page .page-title),
+:global(.dark .request-details-page .crumb-current),
+:global(.dark .request-details-page .section-title),
+:global(.dark .request-details-page .side-card__title),
+:global(.dark .request-details-page .summary-value),
+:global(.dark .request-details-page .info-value),
+:global(.dark .request-details-page .timeline-label) {
+  color: var(--rb-text);
 }
-:global(.dark .card) {
-  background: #161d2e;
-  border-color: #2a3447;
+:global(.dark .request-details-page .page-subtitle),
+:global(.dark .request-details-page .breadcrumb),
+:global(.dark .request-details-page .info-label),
+:global(.dark .request-details-page .summary-label),
+:global(.dark .request-details-page .documents-empty),
+:global(.dark .request-details-page .timeline-timestamp),
+:global(.dark .request-details-page .progress-percent) {
+  color: var(--rb-text-muted);
 }
-:global(.dark .page-title),
-:global(.dark .crumb-current),
-:global(.dark .section-title),
-:global(.dark .side-card__title),
-:global(.dark .summary-value),
-:global(.dark .info-value),
-:global(.dark .timeline-label) {
-  color: #eef1f6;
-}
-:global(.dark .page-subtitle),
-:global(.dark .breadcrumb),
-:global(.dark .info-label),
-:global(.dark .summary-label),
-:global(.dark .documents-empty),
-:global(.dark .timeline-timestamp),
-:global(.dark .progress-percent) {
-  color: #8a93a6;
-}
-:global(.dark .btn--outline) {
-  background: #161d2e;
-  border-color: #2a3447;
+:global(.dark .request-details-page .btn--outline) {
+  background: var(--rb-surface);
+  border-color: var(--rb-border);
   color: #6fa8dc;
 }
-:global(.dark .btn--outline:hover) {
-  background: #1c2438;
+:global(.dark .request-details-page .btn--outline:hover) {
+  background: #262319;
 }
-:global(.dark .history-table th) {
-  color: #8a93a6;
-  border-color: #2a3447;
+:global(.dark .request-details-page .history-table th) {
+  color: var(--rb-text-muted);
+  border-color: var(--rb-border);
 }
-:global(.dark .history-table td) {
-  color: #d6dbe6;
-  border-color: #232c40;
+:global(.dark .request-details-page .history-table td) {
+  color: var(--rb-text);
+  border-color: var(--rb-border);
 }
-:global(.dark .document-chip),
-:global(.dark .availability-item) {
-  background: #1c2438;
-  border-color: #2a3447;
+:global(.dark .request-details-page .document-chip),
+:global(.dark .request-details-page .availability-item) {
+  background: #262319;
+  border-color: var(--rb-border);
 }
 :global(.dark) .timeline-step::before {
-  background: #2a3447;
+  background: var(--rb-border);
 }
-:global(.dark .timeline-marker) {
-  background: #232c40;
+:global(.dark .request-details-page .timeline-marker) {
+  background: #262319;
 }
-:global(.dark .skeleton) {
-  background: linear-gradient(90deg, #1c2438 25%, #232c40 37%, #1c2438 63%);
-  background-size: 400% 100%;
+:global(.dark .request-details-page .billing-gated) {
+  color: var(--rb-text-muted);
+}
+:global(.dark .request-details-page .payment-chip) {
+  background: var(--rb-surface);
+  border-color: var(--rb-border);
+  color: var(--rb-text);
+}
+:global(.dark .request-details-page .payment-chip--active) {
+  border-color: #7EC1EE;
+  background: #122733;
+  color: #7EC1EE;
+}
+:global(.dark .request-details-page .receipt-block) {
+  background: #1D2B1E;
+  color: #8FCB94;
+}
+:global(.dark .request-details-page .toast) {
+  background: var(--rb-surface);
+  border-color: var(--rb-border);
+  color: var(--rb-text);
 }
 
 /* ---------- Responsive ---------- */
@@ -1017,8 +1729,12 @@ function scrollToTimeline() {
     padding: 16px;
   }
   .summary-card,
-  .info-grid {
+  .info-grid,
+  .billing-summary {
     grid-template-columns: 1fr;
+  }
+  .payment-chips {
+    flex-wrap: wrap;
   }
   .bottom-actions {
     justify-content: stretch;
@@ -1051,5 +1767,134 @@ function scrollToTimeline() {
   .content-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Request lines. A form can tick several components, so this is a table
+   rather than another pair of label/value cells. */
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 13px;
+}
+.items-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--rb-text-secondary);
+    padding: 0 10px 7px;
+    border-bottom: 1px solid var(--rb-border-strong);
+}
+.items-table td {
+    padding: 9px 10px;
+    color: var(--rb-text-primary);
+    border-bottom: 1px solid var(--rb-border);
+    vertical-align: top;
+}
+.items-table tr:last-child td { border-bottom: none; }
+.items-table .num { text-align: right; white-space: nowrap; }
+.items-table__held { color: var(--rb-text-secondary); font-size: 11.5px; }
+
+@media (max-width: 640px) {
+    .items-table { font-size: 12px; }
+    .items-table th, .items-table td { padding: 7px 6px; }
+}
+
+/* Awaiting-receipt panel. The hospital is the only party that can say units
+   arrived, so this lives here rather than on the blood centre's screens. */
+.receipt-card {
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    border: 1px solid rgba(var(--rb-primary-rgb), 0.3);
+    background: rgba(var(--rb-primary-rgb), 0.04);
+}
+.receipt-head {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    color: var(--rb-primary-text);
+}
+.receipt-sub {
+    font-size: 13px;
+    color: var(--rb-text-secondary);
+    margin: 4px 0 0;
+    max-width: 68ch;
+}
+
+/* ---------- Fulfilment ---------- */
+.fulfilment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fulfilment-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+.fulfilment-hint a,
+.part-of__ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: var(--rb-primary-text);
+}
+.part-of__text {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--rb-text-secondary);
+}
+.receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 14px;
+}
+.receipt-table th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--rb-text-secondary);
+    padding: 0 10px 6px;
+    border-bottom: 1px solid var(--rb-border-strong);
+}
+.receipt-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--rb-border);
+    color: var(--rb-text-primary);
+}
+.receipt-table tr:last-child td { border-bottom: none; }
+.receipt-table .pick { width: 30px; }
+.receipt-table .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 600;
+}
+.receipt-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+.receipt-note {
+    flex: 1;
+    font-size: 12px;
+    color: var(--rb-text-secondary);
+    min-width: 180px;
+}
+.receipt-error {
+    font-size: 12px;
+    color: var(--rb-accent-text);
+    margin: 10px 0 0;
+}
+
+@media print {
+    .receipt-card { display: none; }
 }
 </style>

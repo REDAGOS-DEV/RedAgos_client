@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-page">
+  <div class="admin-page scope-admin-donor-identities">
     <header class="page-header">
       <div>
         <h1>Donor ID Verification</h1>
@@ -1053,95 +1053,95 @@ onUnmounted(releasePhoto)
  * #F1F5F9 primary text, #94A3B8 secondary, and #64B5F6 as the primary accent
  * (#1565C0 does not carry enough contrast on a dark ground).
  */
-:global(.dark .admin-page) { color: #f1f5f9; }
+:global(.dark .scope-admin-donor-identities) { color: #f1f5f9; }
 
-:global(.dark .subtitle),
-:global(.dark .tab),
-:global(.dark .submissions th),
-:global(.dark .page-label),
-:global(.dark .modal-lede),
-:global(.dark .donor-meta),
-:global(.dark .state),
-:global(.dark .photo-state),
-:global(.dark .review-facts dt) { color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .subtitle),
+:global(.dark .scope-admin-donor-identities .tab),
+:global(.dark .scope-admin-donor-identities .submissions th),
+:global(.dark .scope-admin-donor-identities .page-label),
+:global(.dark .scope-admin-donor-identities .modal-lede),
+:global(.dark .scope-admin-donor-identities .donor-meta),
+:global(.dark .scope-admin-donor-identities .state),
+:global(.dark .scope-admin-donor-identities .photo-state),
+:global(.dark .scope-admin-donor-identities .review-facts dt) { color: #94a3b8; }
 
-:global(.dark .ghost-btn) {
+:global(.dark .scope-admin-donor-identities .ghost-btn) {
   border-color: #334155;
   background: #1e293b;
   color: #cbd5e1;
 }
 
-:global(.dark .ghost-btn:hover:not(:disabled)) { background: #263449; }
+:global(.dark .scope-admin-donor-identities .ghost-btn:hover:not(:disabled)) { background: #263449; }
 
-:global(.dark .tabs) { border-bottom-color: #334155; }
+:global(.dark .scope-admin-donor-identities .tabs) { border-bottom-color: #334155; }
 
-:global(.dark .tab.active) {
+:global(.dark .scope-admin-donor-identities .tab.active) {
   color: #64b5f6;
   border-bottom-color: #64b5f6;
 }
 
-:global(.dark .tab-count) {
+:global(.dark .scope-admin-donor-identities .tab-count) {
   background: rgba(66, 165, 245, 0.16);
   color: #64b5f6;
 }
 
-:global(.dark .banner-success) { background: rgba(76, 175, 80, 0.14); color: #81c784; }
-:global(.dark .banner-error) { background: rgba(239, 83, 80, 0.14); color: #ef9a9a; }
-:global(.dark .banner-info) { background: rgba(66, 165, 245, 0.14); color: #64b5f6; }
+:global(.dark .scope-admin-donor-identities .banner-success) { background: rgba(76, 175, 80, 0.14); color: #81c784; }
+:global(.dark .scope-admin-donor-identities .banner-error) { background: rgba(239, 83, 80, 0.14); color: #ef9a9a; }
+:global(.dark .scope-admin-donor-identities .banner-info) { background: rgba(66, 165, 245, 0.14); color: #64b5f6; }
 
-:global(.dark .table-wrap) {
+:global(.dark .scope-admin-donor-identities .table-wrap) {
   border-color: #334155;
   background: #1e293b;
 }
 
-:global(.dark .submissions td) { border-bottom-color: #334155; }
-:global(.dark .submissions th) { background: #182234; }
-:global(.dark .submissions tbody tr:hover) { background: #263449; }
+:global(.dark .scope-admin-donor-identities .submissions td) { border-bottom-color: #334155; }
+:global(.dark .scope-admin-donor-identities .submissions th) { background: #182234; }
+:global(.dark .scope-admin-donor-identities .submissions tbody tr:hover) { background: #263449; }
 
-:global(.dark .status-pending) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
-:global(.dark .status-verified) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
-:global(.dark .status-rejected) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
-:global(.dark .status-unsubmitted) { background: #334155; color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .status-pending) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .scope-admin-donor-identities .status-verified) { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+:global(.dark .scope-admin-donor-identities .status-rejected) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
+:global(.dark .scope-admin-donor-identities .status-unsubmitted) { background: #334155; color: #94a3b8; }
 
-:global(.dark .link-btn) { color: #64b5f6; }
+:global(.dark .scope-admin-donor-identities .link-btn) { color: #64b5f6; }
 
-:global(.dark .state-error),
-:global(.dark .photo-state--error),
-:global(.dark .modal-error) { color: #ef9a9a; }
+:global(.dark .scope-admin-donor-identities .state-error),
+:global(.dark .scope-admin-donor-identities .photo-state--error),
+:global(.dark .scope-admin-donor-identities .modal-error) { color: #ef9a9a; }
 
-:global(.dark .modal) {
+:global(.dark .scope-admin-donor-identities .modal) {
   background: #1e293b;
   border: 1px solid #334155;
 }
 
-:global(.dark .review-photo) {
+:global(.dark .scope-admin-donor-identities .review-photo) {
   border-color: #334155;
   background: #182234;
 }
 
-:global(.dark .modal-head),
-:global(.dark .modal-review .modal-actions) { border-color: #334155; }
+:global(.dark .scope-admin-donor-identities .modal-head),
+:global(.dark .scope-admin-donor-identities .modal-review .modal-actions) { border-color: #334155; }
 
-:global(.dark .photo-bar__label),
-:global(.dark .photo-note) { color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .photo-bar__label),
+:global(.dark .scope-admin-donor-identities .photo-note) { color: #94a3b8; }
 
-:global(.dark .photo-modes) { border-color: #334155; }
-:global(.dark .photo-mode) { background: #1e293b; color: #cbd5e1; }
-:global(.dark .photo-mode + .photo-mode) { border-left-color: #334155; }
-:global(.dark .photo-mode:hover:not(.active)) { background: #263449; }
-:global(.dark .photo-mode.active) { background: #1565c0; color: #fff; }
+:global(.dark .scope-admin-donor-identities .photo-modes) { border-color: #334155; }
+:global(.dark .scope-admin-donor-identities .photo-mode) { background: #1e293b; color: #cbd5e1; }
+:global(.dark .scope-admin-donor-identities .photo-mode + .photo-mode) { border-left-color: #334155; }
+:global(.dark .scope-admin-donor-identities .photo-mode:hover:not(.active)) { background: #263449; }
+:global(.dark .scope-admin-donor-identities .photo-mode.active) { background: #1565c0; color: #fff; }
 
-:global(.dark .review-facts dd) { color: #f1f5f9; }
-:global(.dark .reason-label) { color: #cbd5e1; }
+:global(.dark .scope-admin-donor-identities .review-facts dd) { color: #f1f5f9; }
+:global(.dark .scope-admin-donor-identities .reason-label) { color: #cbd5e1; }
 
-:global(.dark .reason-input) {
+:global(.dark .scope-admin-donor-identities .reason-input) {
   border-color: #334155;
   background: #182234;
   color: #f1f5f9;
 }
 
-:global(.dark .reason-input:focus) { border-color: #64b5f6; }
-:global(.dark .reason-input::placeholder) { color: #64748b; }
+:global(.dark .scope-admin-donor-identities .reason-input:focus) { border-color: #64b5f6; }
+:global(.dark .scope-admin-donor-identities .reason-input::placeholder) { color: #64748b; }
 
 /* Shimmer placeholder, same treatment as the dashboard and administrators
    pages so a loading table looks like the rest of the console. The two stops

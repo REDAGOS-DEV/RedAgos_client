@@ -41,7 +41,13 @@ export const useTrackRequests = () => {
     const entries = []
 
     if (req.request_date) {
-      entries.push({ label: 'Request submitted', at: req.request_date, tone: 'info' })
+      entries.push({
+        label: req.is_walk_in
+          ? `Walk-in recorded at ${req.target_facility?.name ?? 'the blood center'} after your confirmation`
+          : 'Request submitted',
+        at: req.request_date,
+        tone: 'info',
+      })
     }
 
     if (req.reviewed_at) {
@@ -79,6 +85,8 @@ export const useTrackRequests = () => {
 
     if (req.fulfilled_at) {
       entries.push({ label: 'Request fulfilled', at: req.fulfilled_at, tone: 'success' })
+    } else if (req.status === 'partial' && req.closed_at) {
+      entries.push({ label: 'Request closed as partially fulfilled', at: req.closed_at, tone: 'warning' })
     }
 
     return entries.sort((a, b) => new Date(b.at) - new Date(a.at))
@@ -151,6 +159,17 @@ export const useTrackRequests = () => {
     hasSearched.value = true
 
     try {
+      // A PTR reference is the patient's whole need, split across centres;
+      // it has its own page, which this tracker's single-request view is not.
+      if (/^PTR-/i.test(trimmed)) {
+        const response = await hospitalService.trackTransfusionRequest(trimmed)
+
+        if (response?.request?.id) {
+          await navigateTo(`/hospital/transfusion-requests/${response.request.id}`)
+          return
+        }
+      }
+
       const response = await hospitalService.trackRequest(trimmed)
       trackedData.value = response?.request ?? null
       referenceInput.value = trimmed

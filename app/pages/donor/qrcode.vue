@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 5.3 seconds
-Output:
 <template>
   <div class="qr-page">
     <div v-if="loading" class="qr-page-inner">
@@ -141,20 +138,50 @@ Output:
 
         <!-- Right: how to use -->
         <div class="panel steps-panel">
-          <h2 class="steps-panel__title">How to use QR code</h2>
+          <div class="steps-panel__head">
+            <h2 class="steps-panel__title">How to use QR code</h2>
+            <span class="steps-panel__count">{{ stepsDone }} of {{ steps.length }} done</span>
+          </div>
 
-          <div class="steps-list">
-            <div v-for="(step, i) in steps" :key="step.title" class="step-row">
+          <div
+            class="steps-progress"
+            role="progressbar"
+            :aria-valuenow="stepsDone"
+            aria-valuemin="0"
+            :aria-valuemax="steps.length"
+            :aria-label="`${stepsDone} of ${steps.length} steps done`"
+          >
+            <span class="steps-progress__fill" :style="{ width: `${(stepsDone / steps.length) * 100}%` }" />
+          </div>
+
+          <ol class="steps-list">
+            <li
+              v-for="(step, i) in steps"
+              :key="step.title"
+              class="step-row"
+              :class="`step-row--${step.state}`"
+              :aria-current="step.state === 'current' ? 'step' : undefined"
+            >
               <div class="step-row__marker">
-                <span class="step-dot" :class="{ 'step-dot--done': step.done }" />
-                <span v-if="i < steps.length - 1" class="step-line" />
+                <span class="step-dot" :class="`step-dot--${step.state}`">
+                  <AssetIcon v-if="step.state === 'done'" name="check" :size="12" />
+                  <template v-else>{{ i + 1 }}</template>
+                </span>
+                <span
+                  v-if="i < steps.length - 1"
+                  class="step-line"
+                  :class="{ 'step-line--done': step.state === 'done' }"
+                />
               </div>
               <div class="step-row__body">
-                <p class="step-row__title">{{ step.title }}</p>
+                <p class="step-row__title">
+                  {{ step.title }}
+                  <span v-if="step.state === 'current'" class="step-row__badge">Next step</span>
+                </p>
                 <p class="step-row__desc">{{ step.desc }}</p>
               </div>
-            </div>
-          </div>
+            </li>
+          </ol>
 
           <div class="warning-banner">
             <AssetIcon name="alert" :size="16" class="warning-banner__icon" />
@@ -163,7 +190,7 @@ Output:
               <template v-if="hasActiveToken">
                 Your current code expires on {{ formatDate(qrValidUntil) }} — refresh it from this page to get a new one.
               </template>
-              <template v-else-if="profile?.screening_valid_until">
+              <template v-else-if="profile?.screening_valid_until && !donationIntervalActive">
                 Once issued, a code stays valid for {{ qrValidDays }} days, separate from your screening, which is valid until {{ formatDate(profile.screening_valid_until) }}.
               </template>
             </p>
@@ -185,17 +212,26 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { authService } from '~/api/auth/AuthService'
 import QRCode from 'qrcode'
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 
 const loading = ref(true)
 const profile = ref(null)
-const eligibilityStatus = ref('pending') // 'eligible' | 'deferred' | 'expired' | 'pending'
-const upcomingAppointment = ref(null)
+// Kung na-answer na ba ang questionnaire ug valid pa ba -- dili kung
+// pwede na ba mo-donate. Ang blood center ang mo-desisyon ana, didto sa
+// counter, base sa ilang kaugalingong assessment.
+const questionnaireStatus = ref('not_answered') // 'not_answered' | 'answered' | 'expired'
+const appointments = ref([])
 const qrCodeDataUrl = ref('')
 const qrValidUntil = ref(null)
 const qrValidDays = ref(14)
 const hasActiveToken = ref(false)
+// Waiting period human sa last donation. Gikan ra gyud sa API (GET /qr-code o
+// ang donation_interval_active error sa /refresh) — dili i-compute sa client.
+const donationIntervalActive = ref(false)
+const nextEligibleDate = ref(null) // 'YYYY-MM-DD'
 const emailVerified = ref(false)
 const minting = ref(false)
 const qrError = ref('')
@@ -228,20 +264,49 @@ const QR_STORAGE_KEY = 'donor-qr-code'
 // Ang plaintext token kay dili ma-return sa GET /donors/qr-code — gi-hash ra
 // siya sa server. Naa ra siya sa screening submission ug sa qr-code/refresh,
 // so naa lang QR image kung na-mint na sa maong step.
-const canShowQr = computed(() => !!qrCodeDataUrl.value)
+// Dili ipakita ang QR (ug ang Download/Share/New code) during waiting period
+// o kung wala nay active token, bisan naa pay stale nga image sa memory.
+const canShowQr = computed(() =>
+  !!qrCodeDataUrl.value && hasActiveToken.value && !donationIntervalActive.value
+)
+
+// 'YYYY-MM-DD' i-parse as date-only (local), dili as UTC, para dili mo-display
+// ug usa ka adlaw nga sayo.
+function formatDateOnly(value) {
+  if (!value) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  const d = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+const nextEligibleLabel = computed(() => formatDateOnly(nextEligibleDate.value))
 
 const qrState = computed(() => {
-  if (eligibilityStatus.value === 'deferred') return 'deferred'
-  if (eligibilityStatus.value === 'expired') return 'expired'
-  if (eligibilityStatus.value !== 'eligible') return 'pending'
+  if (donationIntervalActive.value) return 'waiting'
+  // Wala nay 'deferred' nga state. Ang donor dili na i-hukman sa iyang
+  // kaugalingong mga tubag, so ang tanan nga kompleto nga questionnaire
+  // makakuha og QR code.
+  if (questionnaireStatus.value === 'expired') return 'expired'
+  if (questionnaireStatus.value !== 'answered') return 'pending'
   return emailVerified.value ? 'ready' : 'unverified'
 })
 
 const qrEmptyCopy = computed(() => {
   switch (qrState.value) {
+    case 'waiting':
+      return {
+        title: 'You recently donated',
+        sub: nextEligibleLabel.value
+          ? `You can take the eligibility screening and generate a new QR code on ${nextEligibleLabel.value}.`
+          : 'You can take the eligibility screening and generate a new QR code once your waiting period ends.',
+        action: null,
+      }
     case 'ready':
       return {
-        title: 'Your screening passed',
+        title: 'Your questionnaire is submitted',
         sub: hasActiveToken.value
           ? `You have an active check-in code, valid until ${formatDate(qrValidUntil.value)}.`
           : 'Generate your check-in QR code to present at the blood center.',
@@ -250,26 +315,20 @@ const qrEmptyCopy = computed(() => {
     case 'unverified':
       return {
         title: 'Verify your email address',
-        sub: 'Your screening passed. Confirm your email address to receive your check-in QR code.',
+        sub: 'Your questionnaire is submitted. Confirm your email address to receive your check-in QR code.',
         action: null,
-      }
-    case 'deferred':
-      return {
-        title: 'Your screening was deferred',
-        sub: "Please contact the blood center for more information, then retake the screening once you're cleared.",
-        action: { label: 'Retake Screening', to: '/donor/eligibility' },
       }
     case 'expired':
       return {
-        title: 'Your screening has expired',
-        sub: 'Complete the eligibility questionnaire again to restore your check-in code.',
-        action: { label: 'Retake Screening', to: '/donor/eligibility' },
+        title: 'Your questionnaire needs answering again',
+        sub: 'Complete the health questionnaire again to restore your check-in code.',
+        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
       }
     default:
       return {
         title: 'No QR code yet',
-        sub: 'Take the eligibility screening first. Your QR code is generated automatically once you pass.',
-        action: { label: 'Take Screening', to: '/donor/eligibility' },
+        sub: 'Complete the health questionnaire first. Your QR code is generated as soon as you submit it.',
+        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
       }
   }
 })
@@ -279,37 +338,84 @@ const qrStatusLabel = computed(() =>
 )
 
 const statusValueClass = computed(() =>
-  eligibilityStatus.value === 'eligible' ? 'qr-details__value--success' : ''
+  questionnaireStatus.value === 'answered' ? 'qr-details__value--success' : ''
 )
 
 
-const steps = computed(() => [
+// Ang appointment nga sakop sa karon nga donation cycle:
+//   confirmed -> na-scan na ang QR, naa na sa blood center
+//   scheduled -> naka-book, wala pa niabot
+//   completed -> nahuman na ang donation (sukad sa karon nga screening ra,
+//                para dili maihap ang daan nga donation). Dili na kinahanglan
+//                'answered' ang questionnaire: gi-invalidate na siya sa server
+//                pag-record sa collection, pero ang screening_date naa gihapon.
+function byDate(a, b) {
+  return new Date(a.appointment_datetime) - new Date(b.appointment_datetime)
+}
+
+const cycleAppointment = computed(() => {
+  const list = appointments.value
+
+  const confirmed = list.find(a => a.status === 'confirmed')
+  if (confirmed) return confirmed
+
+  const scheduled = list.filter(a => a.status === 'scheduled').sort(byDate)[0]
+  if (scheduled) return scheduled
+
+  const since = profile.value?.screening_date
+  if (!since) return null
+
+  return list
+    .filter(a => a.status === 'completed' && new Date(a.appointment_datetime) >= new Date(since))
+    .sort(byDate)
+    .at(-1) ?? null
+})
+
+const STEP_COPY = [
   {
-    title: 'Complete eligibility screening',
-    desc: 'Take the online questionnaire on the donor portal. If you pass, the system automatically generates your QR code.',
-    done: eligibilityStatus.value === 'eligible',
+    title: 'Complete the health questionnaire',
+    desc: 'Answer it on the donor portal the day before your appointment. Your QR code is generated as soon as you submit it.',
   },
   {
     title: 'Book your appointment',
     desc: 'Choose a blood center or mobile drive, select your preferred date and time slot, and confirm your booking.',
-    done: !!upcomingAppointment.value,
   },
   {
     title: 'Arrive at the blood center',
     desc: 'Present this QR code to the blood center staff upon arrival. They will scan it to verify your eligibility screening status.',
-    done: false,
   },
   {
     title: 'Proceed to physical screening',
     desc: 'After QR verification, the blood center nurse or med tech will conduct a final on-site physical screening (blood pressure, hemoglobin, weight, etc.).',
-    done: false,
   },
   {
     title: 'Donate blood',
     desc: 'If you pass the physical screening, you will proceed to donation. The staff records your donation in the system.',
-    done: false,
   },
-])
+]
+
+// Ang state sa matag step: 'done', 'current' (ang una nga wala pa nahuman),
+// o 'upcoming'.
+const steps = computed(() => {
+  const status = cycleAppointment.value?.status
+  const done = [
+    // Human sa donation 'expired' na ang questionnaire, pero na-answer gihapon
+    // siya para niini nga cycle.
+    questionnaireStatus.value === 'answered' || status === 'completed',
+    !!cycleAppointment.value,
+    status === 'confirmed' || status === 'completed',
+    status === 'completed',
+    status === 'completed',
+  ]
+  const current = done.indexOf(false)
+
+  return STEP_COPY.map((copy, i) => ({
+    ...copy,
+    state: done[i] ? 'done' : i === current ? 'current' : 'upcoming',
+  }))
+})
+
+const stepsDone = computed(() => steps.value.filter(step => step.state === 'done').length)
 
 function formatDate(value) {
   if (!value) return '-'
@@ -349,6 +455,22 @@ function storeQr(donorId, data) {
   }
 }
 
+function clearStoredQr() {
+  if (!import.meta.client) return
+  try {
+    sessionStorage.removeItem(QR_STORAGE_KEY)
+  } catch (err) {
+    console.error('Failed to clear cached QR code:', err)
+  }
+}
+
+// I-drop ang daan nga QR sa memory ug sa sessionStorage para dili na makita
+// o magamit.
+function dropLocalQr() {
+  qrCodeDataUrl.value = ''
+  clearStoredQr()
+}
+
 async function renderQr(token) {
   if (!token) return
 
@@ -367,6 +489,8 @@ async function renderQr(token) {
 }
 
 async function mintQrCode() {
+  if (donationIntervalActive.value) return
+
   // Ang pag-mint kay mo-revoke sa daan nga token, so pahibaw-on sa donor.
   if (hasActiveToken.value) {
     const confirmed = window.confirm(
@@ -393,7 +517,15 @@ async function mintQrCode() {
   } catch (err) {
     const code = err?.data?.code
 
-    if (code === 'email_unverified') {
+    if (code === 'donation_interval_active') {
+      // Stale screen: ang server na ang nag-ingon nga naa pa sa waiting period.
+      // Gamita ang next_eligible_date gikan sa response, dili generic error.
+      donationIntervalActive.value = true
+      nextEligibleDate.value = err?.data?.next_eligible_date ?? nextEligibleDate.value
+      hasActiveToken.value = false
+      dropLocalQr()
+      qrError.value = ''
+    } else if (code === 'email_unverified') {
       qrError.value = 'Please verify your email address before requesting a QR code.'
     } else if (code === 'screening_required') {
       qrError.value = 'You need a valid eligibility screening before a QR code can be issued.'
@@ -442,29 +574,34 @@ async function load({ silent = false } = {}) {
   try {
     // GET /api/donors/qr-code
     // Response: { profile: { full_name, donor_id, blood_type, screening_date,
-    //   screening_valid_until, qr_token }, eligibility_status, qr_valid_until,
+    //   screening_valid_until, qr_token }, questionnaire_status, qr_valid_until,
     //   qr_valid_days, has_active_token, email_verified }
     // NOTE: kanunay null ang profile.qr_token — tinuyo na sa server.
     const data = await donorService.qrCode()
 
     profile.value = data?.profile ?? null
-    eligibilityStatus.value = data?.eligibility_status ?? 'pending'
+    questionnaireStatus.value = data?.questionnaire_status ?? 'not_answered'
     qrValidUntil.value = data?.qr_valid_until ?? null
     qrValidDays.value = data?.qr_valid_days ?? qrValidDays.value
     hasActiveToken.value = !!data?.has_active_token
+    donationIntervalActive.value = !!data?.donation_interval_active
+    nextEligibleDate.value = data?.next_eligible_date ?? null
     emailVerified.value = !!data?.email_verified
+
+    // Ang page kay keepalive, so basin naa pay QR image sa memory gikan sa
+    // miaging mint. Kung wala nay active token (o naa sa waiting period), i-drop.
+    if (!hasActiveToken.value || donationIntervalActive.value) dropLocalQr()
 
     // I-restore ang na-mint na nga code para dili ma-invalidate ang na-download
     // na nga PNG matag balik sa page. Ang server gihapon ang authority kung
     // naa pa bay buhi nga token.
     const stored = readStoredQr(profile.value?.donor_id)
-    if (stored && hasActiveToken.value && stored.validUntil === qrValidUntil.value) {
+    if (stored && hasActiveToken.value && !donationIntervalActive.value
+      && stored.validUntil === qrValidUntil.value) {
       await renderQr(stored.token)
     }
 
-
-    // Ang upcoming_appointment kay wala gi-serve ani nga endpoint — gikan na
-    // siya sa appointments API, so null sa karon.
+    await loadAppointments()
   } catch (err) {
     console.error('Failed to load QR code data:', err)
   } finally {
@@ -473,9 +610,79 @@ async function load({ silent = false } = {}) {
   }
 }
 
-onMounted(() => load())
+// Ang appointments kay para ra sa progress sa "How to use" steps. Kung
+// mapakyas, ang questionnaire step ra ang mahibal-an, dili ma-block ang QR.
+// Ang request number kay para dili ma-overwrite sa mas daan nga response ang
+// mas bag-o, kay mahimong magdungan ang load() ug ang poll.
+let appointmentsRequest = 0
+
+async function loadAppointments({ keepOnError = false } = {}) {
+  const request = ++appointmentsRequest
+  try {
+    const list = await donorService.appointments()
+    if (request !== appointmentsRequest) return
+    appointments.value = Array.isArray(list) ? list : (list?.data ?? [])
+  } catch (err) {
+    console.error('Failed to load appointments for QR steps:', err)
+    // Sa poll, ayaw i-reset sa [] tungod lang sa usa ka napakyas nga request,
+    // kay mobalik ang progress bisan wala may nausab sa server.
+    if (!keepOnError && request === appointmentsRequest) appointments.value = []
+  }
+}
+
+// Ang pag-scan sa QR sa blood center mo-usab sa appointment gikan sa
+// `scheduled` ngadto sa `confirmed` samtang bukas pa ni nga page sa phone sa
+// donor. I-poll ang GET /donors/appointments para mo-update ang steps nga dili
+// na kinahanglan mobiya ug mobalik. Ang API gihapon ang tinubdan sa status —
+// walay gi-compute dinhi.
+//
+// Mo-poll ra samtang ni nga page ang naa sa screen ug visible ang tab. Ang
+// route ang gibantayan, dili onActivated/onDeactivated — tan-awa ang
+// DashboardPage para sa rason.
+const QR_PAGE_PATH = '/donor/qrcode'
+const APPOINTMENT_POLL_MS = 20_000
+let pollTimer = null
+
+function isPageActive() {
+  return route.path === QR_PAGE_PATH && !document.hidden
+}
+
+function startPolling() {
+  if (pollTimer || !isPageActive()) return
+  pollTimer = setInterval(() => {
+    if (isPageActive()) loadAppointments({ keepOnError: true })
+    else stopPolling()
+  }, APPOINTMENT_POLL_MS)
+}
+
+function stopPolling() {
+  clearInterval(pollTimer)
+  pollTimer = null
+}
+
+// Pagbalik sa tab (e.g. gi-unlock ang phone), i-refresh dayon kay basin
+// na-scan na samtang naka-hide.
+function onVisibilityChange() {
+  if (!isPageActive()) return stopPolling()
+  loadAppointments({ keepOnError: true })
+  startPolling()
+}
+
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  startPolling()
+})
 onActivated(() => {
   if (loadedOnce) load({ silent: true })
+})
+watch(() => route.path, (path) => {
+  if (path === QR_PAGE_PATH) startPolling()
+  else stopPolling()
+})
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 </script>
@@ -488,7 +695,7 @@ onActivated(() => {
   --warning: #f57c00;
   --text-primary: #1f2937;
   --text-secondary: #9ca3af;
-  max-width: 1152px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px 32px 60px;
   background: var(--rb-page-bg);
@@ -661,16 +868,50 @@ onActivated(() => {
 }
 
 /* Steps panel */
+.steps-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .steps-panel__title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 20px;
+  margin: 0;
+}
+
+.steps-panel__count {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.steps-progress {
+  height: 6px;
+  margin: 12px 0 22px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.steps-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .steps-list {
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .step-row {
@@ -686,26 +927,44 @@ onActivated(() => {
 }
 
 .step-dot {
-  width: 14px;
-  height: 14px;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   border: 2px solid #cbd5e1;
   background: white;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .step-dot--done {
   border-color: var(--primary);
   background: var(--primary);
+  color: white;
+}
+
+.step-dot--current {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.14);
 }
 
 .step-line {
   width: 2px;
   flex: 1;
-  min-height: 28px;
+  min-height: 24px;
   background: #e5e7eb;
-  margin: 2px 0;
+  margin: 4px 0;
+  border-radius: 999px;
+}
+
+.step-line--done {
+  background: var(--primary);
 }
 
 .step-row__body {
@@ -713,10 +972,34 @@ onActivated(() => {
 }
 
 .step-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
+  margin: 2px 0 0;
+}
+
+.step-row--upcoming .step-row__title {
+  color: var(--text-secondary);
+}
+
+.step-row__badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(21, 101, 192, 0.1);
+  color: var(--primary);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .steps-progress__fill {
+    transition: none;
+  }
 }
 
 .step-row__desc {
@@ -852,35 +1135,47 @@ onActivated(() => {
     background: #0F172A;
 }
 
-:global(.dark .panel) {
+:global(.dark .qr-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
+:global(.dark .qr-page .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
 
-:global(.dark .qr-image-wrap) { border-color: #334155; }
-:global(.dark .qr-image--placeholder) { background: #172033; }
+:global(.dark .qr-page .qr-image-wrap) { border-color: #334155; }
+:global(.dark .qr-page .qr-image--placeholder) { background: #172033; }
 
-:global(.dark .qr-details) { border-color: #334155; }
-:global(.dark .qr-details__row:nth-child(odd)) { background: #172033; }
+:global(.dark .qr-page .qr-details) { border-color: #334155; }
+:global(.dark .qr-page .qr-details__row:nth-child(odd)) { background: #172033; }
 
-:global(.dark .step-dot) { border-color: #475569; background: #1E293B; }
-:global(.dark .step-line) { background: #334155; }
+/* Ang done/current kay kinahanglan i-override pud dinhi, kay kining
+   .dark .step-dot rule mas lig-on sa scoped .step-dot--done. */
+:global(.dark .qr-page .step-dot) { border-color: #475569; background: #1E293B; color: #94A3B8; }
+:global(.dark .qr-page .step-dot--done) { border-color: #64B5F6; background: #64B5F6; color: #0F172A; }
+:global(.dark .qr-page .step-dot--current) {
+  border-color: #64B5F6;
+  color: #64B5F6;
+  box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.18);
+}
+:global(.dark .qr-page .step-line) { background: #334155; }
+:global(.dark .qr-page .step-line--done) { background: #64B5F6; }
+:global(.dark .qr-page .steps-progress) { background: #334155; }
+:global(.dark .qr-page .steps-progress__fill) { background: #64B5F6; }
+:global(.dark .qr-page .step-row__badge) { background: rgba(100, 181, 246, 0.16); color: #90CAF9; }
 
-:global(.dark .warning-banner) {
+:global(.dark .qr-page .warning-banner) {
     background: rgba(245,124,0,0.10);
     border-color: rgba(245,124,0,0.24);
 }
-:global(.dark .warning-banner__text) { color: #CBD5E1; }
+:global(.dark .qr-page .warning-banner__text) { color: #CBD5E1; }
 
-:global(.dark .btn-outline) {
+:global(.dark .qr-page .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .qr-page .btn-outline:hover:not(:disabled)) { background: #334155; }
 
-:global(.dark .skeleton) {
+:global(.dark .qr-page .skeleton) {
     background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
     background-size: 400% 100%;
 }

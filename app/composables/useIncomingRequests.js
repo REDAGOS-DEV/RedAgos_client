@@ -29,10 +29,16 @@ export const useIncomingRequests = () => {
   const filters = reactive({
     status: undefined,
     urgency_level: undefined,
+    request_source: undefined,
     blood_type_id: undefined,
     component_id: undefined,
     search: undefined,
   })
+
+  // The selected request's history, read from the API's own event log.
+  const history = ref([])
+  const isLoadingHistory = ref(false)
+  const historyError = ref(null)
 
   const meta = ref({ current_page: 1, last_page: 1, total: 0 })
 
@@ -117,6 +123,29 @@ export const useIncomingRequests = () => {
     selected.value = null
     inventory.value = null
     actionError.value = null
+    history.value = []
+    historyError.value = null
+  }
+
+  /**
+   * Load everything that has happened to one request, oldest first.
+   *
+   * Separate from openRequest() so a slow history never holds up the review
+   * the counter is waiting on.
+   */
+  async function fetchHistory(id) {
+    isLoadingHistory.value = true
+    historyError.value = null
+
+    try {
+      const response = await bloodCenterService.requestHistory(id)
+      history.value = response?.events ?? []
+    } catch (err) {
+      historyError.value = err?.message ?? 'Could not load the request history.'
+      history.value = []
+    } finally {
+      isLoadingHistory.value = false
+    }
   }
 
   /**
@@ -132,7 +161,7 @@ export const useIncomingRequests = () => {
     try {
       const result = await operation()
       await Promise.all([fetchRequests(meta.value.current_page), fetchSummary()])
-      if (selected.value) await openRequest(selected.value.id)
+      if (selected.value) await Promise.all([openRequest(selected.value.id), fetchHistory(selected.value.id)])
       return result
     } catch (err) {
       actionError.value = err?.message ?? 'That action could not be completed.'
@@ -154,8 +183,13 @@ export const useIncomingRequests = () => {
     return act(() => bloodCenterService.releaseHolds(id, reason, allocationIds))
   }
 
-  function release(id, allocationIds) {
-    return act(() => bloodCenterService.releaseRequest(id, allocationIds))
+  function release(id, allocationIds, handedTo) {
+    return act(() => bloodCenterService.releaseRequest(id, allocationIds, handedTo))
+  }
+
+  /** Close the rest of one line this centre cannot supply. */
+  function closeLine(id, itemId, note) {
+    return act(() => bloodCenterService.closeRequestLine(id, itemId, note))
   }
 
   async function refresh() {
@@ -171,21 +205,26 @@ export const useIncomingRequests = () => {
     awaitingRelease,
     filters,
     meta,
+    history,
     isLoading,
     isLoadingDetail,
+    isLoadingHistory,
     isActing,
     error,
     actionError,
+    historyError,
     toneFor,
     labelFor,
     fetchRequests,
     fetchSummary,
     openRequest,
     closeRequest,
+    fetchHistory,
     allocate,
     reject,
     releaseHolds,
     release,
+    closeLine,
     refresh,
   }
 }

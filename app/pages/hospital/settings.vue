@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="settings-page scope-hospital-settings">
     <!-- ===================== LOADING SKELETON ===================== -->
     <div v-if="loading" class="page-inner">
       <div class="skeleton skeleton--title" />
@@ -660,17 +660,17 @@ onMounted(() => {
 
 <style scoped>
 .settings-page {
-  --sp-primary: #1565C0;
+  --sp-primary: var(--rb-primary, #1565C0);
   --sp-primary-hover: #0D47A1;
   --sp-bg: #F7F9FC;
   --sp-card: #FFFFFF;
   --sp-border: #E5EAF0;
   --sp-text: #1E293B;
-  --sp-text-secondary: #64748B;
-  --sp-text-muted: #94A3B8;
-  --sp-success: #2E7D32;
-  --sp-warning: #F59E0B;
-  --sp-danger: #D32F2F;
+  --sp-text-secondary: var(--rb-text-secondary, #64748B);
+  --sp-text-muted: var(--rb-text-muted, #94A3B8);
+  --sp-success: var(--rb-success, #2E7D32);
+  --sp-warning: var(--rb-warning, #F57C00);
+  --sp-danger: var(--rb-accent, #D32F2F);
   --sp-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   --sp-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
 
@@ -684,7 +684,7 @@ onMounted(() => {
   position: relative;
 }
 
-:global(.dark .settings-page) {
+:global(.dark .scope-hospital-settings) {
   --sp-bg: #0F172A;
   --sp-card: #1E293B;
   --sp-border: #2A3447;
@@ -853,7 +853,7 @@ onMounted(() => {
 /* ---------- STATUS BADGES ---------- */
 .status-badge { font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
 .status-badge--success { background: #2E7D3214; color: var(--sp-success); }
-.status-badge--warning { background: #F59E0B14; color: var(--sp-warning); }
+.status-badge--warning { background: #F57C0014; color: var(--sp-warning); }
 .status-badge--danger { background: #D32F2F14; color: var(--sp-danger); }
 .status-badge--primary { background: #1565C014; color: var(--sp-primary); }
 .status-badge--muted { background: #64748B14; color: var(--sp-text-secondary); }
@@ -925,7 +925,7 @@ onMounted(() => {
   background: linear-gradient(90deg, var(--sp-border) 25%, rgba(255,255,255,0.4) 37%, var(--sp-border) 63%);
   background-size: 400% 100%; border-radius: 18px; animation: sp-shimmer 1.4s ease infinite;
 }
-:global(.dark .skeleton) {
+:global(.dark .scope-hospital-settings .skeleton) {
   background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
   background-size: 400% 100%;
 }

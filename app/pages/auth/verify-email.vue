@@ -468,32 +468,32 @@ onBeforeUnmount(() => {
   background: #0F172A;
 }
 
-:global(.dark .verify-wordmark) {
+:global(.dark .verify-page .verify-wordmark) {
   color: #7cb3f0;
 }
 
-:global(.dark .verify-card) {
+:global(.dark .verify-page .verify-card) {
   background: #1E293B;
   border-color: #334155;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-:global(.dark .verify-input) {
+:global(.dark .verify-page .verify-input) {
   border-color: #334155;
   background: #263449;
   color: #E2E8F0;
 }
 
-:global(.dark .verify-input:focus) {
+:global(.dark .verify-page .verify-input:focus) {
   background: #2c3e57;
 }
 
-:global(.dark .btn-outline) {
+:global(.dark .verify-page .btn-outline) {
   background: #263449;
   color: #E2E8F0;
 }
 
-:global(.dark .btn-outline:hover) {
+:global(.dark .verify-page .btn-outline:hover) {
   background: #2f405b;
 }
 </style>

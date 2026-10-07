@@ -1,1899 +1,1648 @@
 <template>
-    <div class="donors-page">
-        <div v-if="initialLoading" class="loading-wrap">
-            <div class="spinner" />
-        </div>
-
-        <!-- ============ LIST VIEW ============ -->
-        <div v-else-if="!selectedDonorId" class="donors-inner">
-            <div class="header-row">
-                <div>
-                    <h1 class="page-title">Donors</h1>
-                    <p class="page-subtitle">View and manage all registered donors</p>
-                </div>
-                <button type="button" class="btn-primary" @click="openAddDonor">
-                    <AssetIcon name="plus" :size="16" />
-                    Add Donor
-                </button>
-            </div>
-
-            <div v-if="loadError" class="error-banner">
-                {{ loadError }}
-                <button type="button" class="btn-link" @click="loadAll">Retry</button>
-            </div>
-
-            <div class="stats-row">
-                <div class="stat-card">
-                    <p class="stat-card__label">Total Donors</p>
-                    <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' :
-                        stats.total }}</p>
-                </div>
-                <div class="stat-card">
-                    <p class="stat-card__label">Eligible Now</p>
-                    <p class="stat-card__value stat-card__value--success" :class="{ skeleton: loadingStats }">{{
-                        loadingStats ? '' : stats.eligible }}</p>
-                </div>
-                <div class="stat-card">
-                    <p class="stat-card__label">Deferred / Flagged</p>
-                    <p class="stat-card__value stat-card__value--accent" :class="{ skeleton: loadingStats }">{{
-                        loadingStats ? '' : stats.deferred }}</p>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header">
-                    <p class="section-label">Donor Records</p>
-                    <div class="panel-header__filters">
-                        <select v-model="typeFilter" class="form-input filter-select" @change="onFilterChange">
-                            <option value="all">All Types</option>
-                            <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                        </select>
-                        <select v-model="statusFilter" class="form-input filter-select" @change="onFilterChange">
-                            <option value="all">All Status</option>
-                            <option value="eligible">Eligible</option>
-                            <option value="deferred">Deferred</option>
-                            <option value="flagged">Flagged</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="donor-table">
-                    <div class="donor-row donor-row--head">
-                        <span>Donor</span>
-                        <span>Blood Type</span>
-                        <span>Contact</span>
-                        <span>Last Donation</span>
-                        <span>Status</span>
-                        <span>Action</span>
-                    </div>
-
-                    <div v-if="loadingDonors" v-for="n in 4" :key="'skd-' + n" class="donor-row skeleton-block" />
-
-                    <p v-else-if="donors.length === 0" class="empty-state">No donors match the current filters.</p>
-
-                    <div v-else v-for="(donor, i) in donors" :key="donor.id" class="donor-row">
-                        <span class="donor-cell">
-                            <span class="avatar" :style="{ background: avatarColor(i) }">{{ initials(donor.name)
-                                }}</span>
-                            <span class="donor-cell__text">
-                                <span class="donor-cell__name">{{ donor.name }}</span>
-                                <span class="donor-cell__id">{{ donor.donorCode }}</span>
-                            </span>
-                        </span>
-                        <span><span class="pill" :class="bloodTypeClass(donor.bloodType)">{{ donor.bloodType
-                                }}</span></span>
-                        <span>{{ donor.contact }}</span>
-                        <span>{{ donor.lastDonation || '—' }}</span>
-                        <span><span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status
-                                }}</span></span>
-                        <span><button type="button" class="view-link" @click="viewDonor(donor)">View
-                                <AssetIcon name="arrow-right" :size="12" />
-                            </button></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Detail View -->
-        <div v-else class="donors-inner">
-            <div class="breadcrumb">
-                <button type="button" class="breadcrumb__link" @click="backToList">Donors</button>
-                <span class="breadcrumb__sep">/</span>
-                <span class="breadcrumb__current">{{ selectedDonor?.name || '...' }}</span>
-            </div>
-
-            <div v-if="loadingDetail" class="detail-header-card skeleton-block" />
-            <div v-else class="detail-header-card">
-                <div class="detail-header-card__left">
-                    <span class="avatar avatar--lg" :style="{ background: avatarColor(0) }">{{
-                        initials(selectedDonor.name) }}</span>
-                    <div>
-                        <div class="detail-header-card__name-row">
-                            <span class="detail-header-card__name">{{ selectedDonor.name }}</span>
-                            <span class="pill" :class="'pill--' + selectedDonor.status.toLowerCase()">{{
-                                selectedDonor.status }}</span>
-                        </div>
-                        <p class="detail-header-card__meta">
-                            {{ selectedDonor.donorCode }} &middot; {{ selectedDonor.bloodType }} &middot; {{
-                                selectedDonor.facilityName }}
-                        </p>
-                    </div>
-                </div>
-                <div class="detail-header-card__actions">
-                    <button type="button" class="btn-outline" @click="openEditInfo">Edit Info</button>
-                    <button type="button" class="btn-primary" @click="openAddFlag">
-                        <AssetIcon name="flag" :size="14" />
-                        Add Flag
-                    </button>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="tabs">
-                    <button type="button" class="tab" :class="{ 'tab--active': activeDetailTab === 'info' }"
-                        @click="activeDetailTab = 'info'">
-                        Donor info
-                    </button>
-                    <button type="button" class="tab" :class="{ 'tab--active': activeDetailTab === 'history' }"
-                        @click="activeDetailTab = 'history'">
-                        Donation History
-                    </button>
-                </div>
-
-                <!-- Donor info tab -->
-                <section v-if="activeDetailTab === 'info'" class="tab-content">
-                    <div v-if="loadingDetail" class="info-list">
-                        <div v-for="n in 8" :key="'ski-' + n" class="info-row skeleton-block" />
-                    </div>
-                    <div v-else class="info-list">
-                        <div class="info-row">
-                            <span class="info-row__label">Full name</span>
-                            <span class="info-row__value">{{ selectedDonor.name }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Donor ID</span>
-                            <span class="info-row__value">{{ selectedDonor.donorCode }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Blood type</span>
-                            <span class="info-row__value">{{ selectedDonor.bloodType }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Contact number</span>
-                            <span class="info-row__value">{{ selectedDonor.contact }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Last donation</span>
-                            <span class="info-row__value">{{ selectedDonor.lastDonation || '—' }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Eligibility status</span>
-                            <span class="info-row__value"><span class="pill"
-                                    :class="'pill--' + selectedDonor.status.toLowerCase()">{{ selectedDonor.status
-                                    }}</span></span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Total donations</span>
-                            <span class="info-row__value">{{ selectedDonor.totalDonations }} completed</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-row__label">Registered via</span>
-                            <span class="info-row__value">{{ selectedDonor.registeredVia }}</span>
-                        </div>
-
-                        <template v-if="selectedDonor.flags && selectedDonor.flags.length">
-                            <p class="section-label section-label--tight">Active Flags</p>
-                            <div v-for="flag in selectedDonor.flags" :key="flag.id" class="flag-card">
-                                <AssetIcon name="flag" :size="14" class="flag-card__icon" />
-                                <div class="flag-card__body">
-                                    <p class="flag-card__reason">{{ flag.reason }}</p>
-                                    <p class="flag-card__meta">Flagged by {{ flag.flaggedBy }} on {{ flag.flaggedDate
-                                        }}
-                                        <span v-if="flag.notified">&middot; Donor notified</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </section>
-
-                <!-- donation history tab -->
-                <section v-else class="tab-content">
-                    <div class="history-header">
-                        <p class="section-label section-label--tight">All recorded donor events</p>
-                        <!--
-                          A donation is recorded at the counter, not from a
-                          donor's history page: it needs the screening and the
-                          collection, both of which belong to the verified visit
-                          on /blood-center/collection.
-                        -->
-                        <NuxtLink to="/blood-center/collection" class="btn-outline">
-                            <AssetIcon name="plus" :size="14" />
-                            Record at counter
-                        </NuxtLink>
-                    </div>
-
-                    <div v-if="loadingHistory" class="history-list">
-                        <div v-for="n in 4" :key="'skh-' + n" class="history-item skeleton-block" />
-                    </div>
-                    <p v-else-if="donationHistory.length === 0" class="empty-state">No donation records yet.</p>
-                    <div v-else class="history-list">
-                        <div v-for="event in donationHistory" :key="event.id" class="history-item">
-                            <span class="history-item__dot" :class="'history-item__dot--' + event.result" />
-                            <div class="history-item__body">
-                                <p class="history-item__date">{{ event.date }}</p>
-                                <p class="history-item__title">{{ event.title }}</p>
-                                <p class="history-item__meta">{{ event.bloodType }} &middot; {{ event.facilityName }}
-                                    &middot; {{ event.method }}</p>
-                                <p class="history-item__result">{{ event.resultNote }}</p>
-                            </div>
-                            <span class="pill" :class="'pill--' + event.status.toLowerCase()">{{ event.status
-                                }}</span>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- ADD DONOR modal -->
-        <Transition name="modal">
-            <div v-if="showAddDonorModal" class="modal-overlay" @click.self="closeAddDonor">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Add Donor</h2>
-                        <button type="button" class="modal-card__close" @click="closeAddDonor">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <div class="form-group">
-                            <label class="form-label">Full name</label>
-                            <input v-model="addDonorForm.name" type="text" class="form-input"
-                                placeholder="Juan Dela Cruz" />
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Blood type</label>
-                                <select v-model="addDonorForm.bloodType" class="form-input">
-                                    <option value="">Select</option>
-                                    <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Contact number</label>
-                                <div class="form-input-icon">
-                                    <input v-model="addDonorForm.contact" type="text" class="form-input"
-                                        placeholder="0912-345-6789" />
-                                    <AssetIcon name="phone" :size="16" class="form-input-icon__icon" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Valid ID number</label>
-                                <div class="form-input-icon">
-                                    <input v-model="addDonorForm.validIdNumber" type="text" class="form-input" />
-                                    <AssetIcon name="id-card" :size="16" class="form-input-icon__icon" />
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Facility</label>
-                                <select v-model="addDonorForm.facilityId" class="form-input">
-                                    <option value="">Select facility</option>
-                                    <option v-for="f in facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeAddDonor">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="savingDonor || !canSaveDonor"
-                                @click="submitAddDonor">
-                                {{ savingDonor ? 'Saving...' : 'Add Donor' }}
-                            </button>
-                        </div>
-                        <p v-if="addDonorError" class="modal-error">{{ addDonorError }}</p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-
-        <!-- EDIT INFO modal -->
-        <Transition name="modal">
-            <div v-if="showEditInfoModal" class="modal-overlay" @click.self="closeEditInfo">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Edit Donor Info</h2>
-                        <button type="button" class="modal-card__close" @click="closeEditInfo">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <div class="form-group">
-                            <label class="form-label">Full name</label>
-                            <input v-model="editForm.name" type="text" class="form-input" />
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Blood type</label>
-                                <select v-model="editForm.bloodType" class="form-input">
-                                    <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Contact number</label>
-                                <input v-model="editForm.contact" type="text" class="form-input" />
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Eligibility status</label>
-                            <select v-model="editForm.status" class="form-input">
-                                <option value="Eligible">Eligible</option>
-                                <option value="Deferred">Deferred</option>
-                                <option value="Flagged">Flagged</option>
-                            </select>
-                        </div>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeEditInfo">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="savingEdit" @click="submitEditInfo">
-                                {{ savingEdit ? 'Saving...' : 'Save Changes' }}
-                            </button>
-                        </div>
-                        <p v-if="editError" class="modal-error">{{ editError }}</p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-
-        <!-- ADD FLAG modal -->
-        <Transition name="modal">
-            <div v-if="showAddFlagModal" class="modal-overlay" @click.self="closeAddFlag">
-                <div class="modal-card">
-                    <div class="modal-card__header">
-                        <h2 class="modal-card__title">Add Flag</h2>
-                        <button type="button" class="modal-card__close" @click="closeAddFlag">
-                            <AssetIcon name="x" :size="18" />
-                        </button>
-                    </div>
-                    <div class="modal-form">
-                        <p class="modal-subtitle">Flag this donor if they need to be deferred or asked to return
-                            later. The donor will optionally be notified with the reason below.</p>
-
-                        <div class="form-group">
-                            <label class="form-label">Reason</label>
-                            <select v-model="flagForm.reason" class="form-input">
-                                <option value="">Select a reason</option>
-                                <option value="Low hemoglobin level">Low hemoglobin level</option>
-                                <option value="Recent illness or medication">Recent illness or medication</option>
-                                <option value="Below minimum donation interval">Below minimum donation interval
-                                </option>
-                                <option value="Failed eligibility screening">Failed eligibility screening</option>
-                                <option value="Other">Other (specify below)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Additional notes</label>
-                            <textarea v-model="flagForm.notes" class="form-input form-textarea" rows="3"
-                                placeholder="e.g. Please return after 3 months for re-screening."></textarea>
-                        </div>
-                        <label class="checkbox-row">
-                            <input v-model="flagForm.notifyDonor" type="checkbox" />
-                            <span>Notify donor via SMS / email with this reason</span>
-                        </label>
-
-                        <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeAddFlag">Cancel</button>
-                            <button type="button" class="btn-primary" :disabled="savingFlag || !canSaveFlag"
-                                @click="submitAddFlag">
-                                {{ savingFlag ? 'Saving...' : 'Add Flag' }}
-                            </button>
-                        </div>
-                        <p v-if="flagError" class="modal-error">{{ flagError }}</p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-
+  <div class="donors-page">
+    <!-- Skeleton loading state, the same as the other pages -->
+    <div v-if="initialLoading" class="donors-inner" aria-busy="true" aria-label="Loading donors">
+      <div class="skeleton-head">
+        <div class="skeleton skeleton--header" />
+        <div class="skeleton skeleton--sub" />
+      </div>
+      <div class="stats-row">
+        <div v-for="n in 3" :key="'skc-' + n" class="skeleton skeleton--card" />
+      </div>
+      <div class="skeleton skeleton--panel" style="height: 460px" />
     </div>
+
+    <!-- ============ LIST VIEW ============ -->
+    <div v-else-if="!selectedUuid" class="donors-inner">
+      <header class="header-row">
+        <div>
+          <h1 class="page-title">Donors</h1>
+          <p class="page-subtitle">{{ listSummary }}</p>
+        </div>
+        <button v-if="canManage" type="button" class="btn-primary" @click="openAddDonor">
+          <AssetIcon name="plus" :size="15" />
+          Register walk-in
+        </button>
+      </header>
+
+      <div v-if="loadError" class="error-banner" role="alert">
+        <span>{{ loadError }}</span>
+        <button type="button" class="btn-link" @click="loadDonors()">Retry</button>
+      </div>
+
+      <div v-if="listNotice" class="success-banner" role="status">
+        <AssetIcon name="circle-check-big" :size="16" />
+        <p class="success-banner__text">{{ listNotice }}</p>
+        <button type="button" class="btn-link" @click="listNotice = ''">Dismiss</button>
+      </div>
+
+      <!-- KPI cards, as on Inventory -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Total Donors</p>
+            <span class="stat-card__badge stat-card__badge--primary"><AssetIcon name="users" :size="14" /></span>
+          </div>
+          <p class="stat-card__value">{{ pager.total }}</p>
+          <span class="stat-chip">Booked or donated here</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Eligible Now</p>
+            <span class="stat-card__badge stat-card__badge--success"><AssetIcon name="shield-check" :size="14" /></span>
+          </div>
+          <p class="stat-card__value">{{ eligibleCount }}</p>
+          <span class="stat-chip">Of the {{ donors.length }} shown</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__top">
+            <p class="stat-card__label">Waiting Period</p>
+            <span class="stat-card__badge stat-card__badge--warning"><AssetIcon name="calendar" :size="14" /></span>
+          </div>
+          <p class="stat-card__value">{{ waitingCount }}</p>
+          <span class="stat-chip">Not yet due to donate again</span>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Donor records</h2>
+            <p class="panel-subtitle">Sorted by last name.</p>
+          </div>
+        </div>
+
+        <!-- Search is the server's; eligibility narrows the page shown. -->
+        <div class="toolbar">
+          <label class="search">
+            <AssetIcon name="search" :size="15" class="search__icon" />
+            <input
+              v-model="search"
+              type="search"
+              class="search__input"
+              placeholder="Search name, donor ID, phone or email"
+              aria-label="Search donors"
+              @input="onSearchInput"
+            >
+          </label>
+
+          <select
+            v-if="bloodTypeOptions.length"
+            v-model="bloodTypeId"
+            class="select"
+            aria-label="Filter by blood type"
+            @change="loadDonors()"
+          >
+            <option value="">All blood types</option>
+            <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
+          </select>
+
+          <div class="chips" role="group" aria-label="Filter by eligibility">
+            <button
+              v-for="chip in eligibilityChips"
+              :key="chip.value"
+              type="button"
+              class="chip"
+              :class="{ 'chip--on': eligibilityFilter === chip.value }"
+              :aria-pressed="eligibilityFilter === chip.value"
+              @click="eligibilityFilter = chip.value"
+            >
+              {{ chip.label }}
+              <span class="chip__count">{{ chip.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table" :class="{ 'table--contact': contactOnly }">
+          <div class="row row--head">
+            <span>Donor</span>
+            <span v-if="!contactOnly">Blood type</span>
+            <span>Contact</span>
+            <span class="num">Donations</span>
+            <span>Last donation</span>
+            <span>Eligibility</span>
+            <span aria-hidden="true" />
+          </div>
+
+          <template v-if="loadingDonors">
+            <div v-for="n in 6" :key="'skr-' + n" class="row row--skeleton">
+              <span class="skeleton skeleton--line" />
+            </div>
+          </template>
+
+          <div v-else-if="!donors.length" class="empty-state">
+            <span class="empty-state__icon"><AssetIcon name="users" :size="20" /></span>
+            <p class="empty-state__title">{{ search || bloodTypeId ? 'No donors match' : 'No donors yet' }}</p>
+            <p class="empty-state__text">
+              {{ search || bloodTypeId
+                ? 'Try another name, donor ID or blood type.'
+                : 'Donors appear here once they book or donate at this centre.' }}
+            </p>
+            <button v-if="search || bloodTypeId" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
+          </div>
+
+          <div v-else-if="!visibleDonors.length" class="empty-state">
+            <span class="empty-state__icon"><AssetIcon name="search" :size="20" /></span>
+            <p class="empty-state__title">None on this page</p>
+            <p class="empty-state__text">No donor shown here matches that eligibility filter.</p>
+            <button type="button" class="btn-outline" @click="eligibilityFilter = 'all'">Show all</button>
+          </div>
+
+          <template v-else>
+            <component
+              :is="canViewProfile && !donor.contactOnly ? 'button' : 'div'"
+              v-for="donor in visibleDonors"
+              :key="donor.uuid"
+              :type="canViewProfile && !donor.contactOnly ? 'button' : undefined"
+              class="row"
+              :class="{ 'row--link': canViewProfile && !donor.contactOnly }"
+              @click="canViewProfile && !donor.contactOnly && viewDonor(donor)"
+            >
+              <span class="donor-cell">
+                <span class="avatar" aria-hidden="true">{{ initials(donor.name) }}</span>
+                <span class="donor-cell__text">
+                  <span class="donor-cell__name">{{ donor.name }}</span>
+                  <span class="donor-cell__id">{{ donor.donorCode }}</span>
+                </span>
+              </span>
+              <span v-if="!contactOnly">
+                <span v-if="donor.bloodType" class="blood">{{ donor.bloodType }}</span>
+                <span v-else class="muted">Unknown</span>
+              </span>
+              <span class="contact-cell">
+                <span>{{ donor.phone || '—' }}</span>
+                <span v-if="donor.email" class="contact-cell__sub">{{ donor.email }}</span>
+              </span>
+              <span class="num">{{ donor.totalDonations }}</span>
+              <span>{{ donor.lastDonation || '—' }}</span>
+              <span>
+                <span class="pill" :class="`pill--${donor.eligibility.key}`">{{ donor.eligibility.label }}</span>
+              </span>
+              <span class="row__go" aria-hidden="true">
+                <AssetIcon v-if="canViewProfile && !donor.contactOnly" name="chevron-right" :size="16" />
+              </span>
+            </component>
+          </template>
+        </div>
+
+        <footer v-if="pager.lastPage > 1 || pager.total" class="pager">
+          <span class="pager__info">
+            Showing {{ pager.from || 0 }}–{{ pager.to || 0 }} of {{ pager.total }}
+          </span>
+          <div class="pager__btns">
+            <button
+              type="button"
+              class="pager__btn"
+              :disabled="pager.page <= 1 || loadingDonors"
+              aria-label="Previous page"
+              @click="loadDonors(pager.page - 1)"
+            >
+              <AssetIcon name="chevron-left" :size="15" />
+            </button>
+            <span class="pager__page">Page {{ pager.page }} of {{ pager.lastPage }}</span>
+            <button
+              type="button"
+              class="pager__btn"
+              :disabled="pager.page >= pager.lastPage || loadingDonors"
+              aria-label="Next page"
+              @click="loadDonors(pager.page + 1)"
+            >
+              <AssetIcon name="chevron-right" :size="15" />
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <!-- ============ DETAIL VIEW ============ -->
+    <div v-else class="donors-inner">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <button type="button" class="breadcrumb__link" @click="backToList">
+          <AssetIcon name="chevron-left" :size="14" />
+          Donors
+        </button>
+        <span class="breadcrumb__sep">/</span>
+        <span class="breadcrumb__current">{{ profile?.name || '…' }}</span>
+      </nav>
+
+      <div v-if="justRegistered" class="success-banner" role="status">
+        <AssetIcon name="circle-check-big" :size="16" />
+        <div class="success-banner__body">
+          <p class="success-banner__title">{{ justRegistered }}</p>
+          <p class="success-banner__text">
+            They join the donor list after their first visit here. To take their donation now, verify them at the
+            Donation Counter with their valid ID.
+          </p>
+        </div>
+        <NuxtLink to="/blood-center/collection" class="btn-outline">Go to Donation Counter</NuxtLink>
+      </div>
+
+      <div v-if="detailError" class="error-banner" role="alert">
+        <span>{{ detailError }}</span>
+        <button type="button" class="btn-link" @click="loadDonorDetail(selectedUuid)">Retry</button>
+      </div>
+
+      <div v-if="loadingDetail" class="skeleton skeleton--hero" />
+      <div v-else-if="profile" class="hero">
+        <div class="hero__who">
+          <span class="avatar avatar--lg" aria-hidden="true">{{ initials(profile.name) }}</span>
+          <div>
+            <div class="hero__name-row">
+              <h1 class="hero__name">{{ profile.name }}</h1>
+              <span class="pill" :class="`pill--${profile.eligibility.key}`">{{ profile.eligibility.label }}</span>
+            </div>
+            <p class="hero__meta">
+              <span class="mono">{{ profile.donorCode }}</span>
+              <template v-if="profile.bloodType"> &middot; <span class="blood">{{ profile.bloodType }}</span></template>
+              <template v-if="profile.phone"> &middot; {{ profile.phone }}</template>
+            </p>
+          </div>
+        </div>
+
+        <!-- Editing and flagging a donor have no server route yet; shown, not faked. -->
+        <div v-if="canManage" class="hero__actions">
+          <button type="button" class="btn-outline" disabled title="Not connected yet: the server has no route for this.">
+            <AssetIcon name="pencil" :size="14" />
+            Edit info
+          </button>
+          <button type="button" class="btn-outline btn-outline--danger" disabled title="Not connected yet: the server has no route for this.">
+            <AssetIcon name="flag" :size="14" />
+            Add flag
+          </button>
+        </div>
+      </div>
+
+      <p v-if="profile?.restricted" class="notice">
+        <AssetIcon name="lock" :size="14" />
+        <span>{{ profile.restrictionNote }}</span>
+      </p>
+
+      <!-- Donation summary, the numbers a counter asks first -->
+      <div v-if="profile" class="stats-row stats-row--four">
+        <div class="stat-card">
+          <p class="stat-card__label">Total Donations</p>
+          <p class="stat-card__value">{{ profile.totalDonations }}</p>
+          <span class="stat-chip">All centres</span>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__label">At This Centre</p>
+          <p class="stat-card__value">{{ profile.donationsHere ?? '—' }}</p>
+          <span class="stat-chip">{{ profile.restricted ? 'Not shared' : 'Recorded here' }}</span>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__label">Last Donation</p>
+          <p class="stat-card__value stat-card__value--text">{{ profile.lastDonation || 'Never' }}</p>
+          <span class="stat-chip">{{ profile.lastDonationAgo || 'No donation recorded' }}</span>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__label">Next Eligible</p>
+          <p class="stat-card__value stat-card__value--text">{{ profile.nextEligible || 'Now' }}</p>
+          <span class="stat-chip">{{ profile.eligibility.hint }}</span>
+        </div>
+      </div>
+
+      <section v-if="profile" class="panel">
+        <div class="tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            :class="{ 'tab--active': activeDetailTab === 'info' }"
+            :aria-selected="activeDetailTab === 'info'"
+            @click="activeDetailTab = 'info'"
+          >
+            Profile
+          </button>
+          <!-- The history carries deferral reasons and final results: the physician's alone. -->
+          <button
+            v-if="canViewHistory && !profile.restricted"
+            type="button"
+            role="tab"
+            class="tab"
+            :class="{ 'tab--active': activeDetailTab === 'history' }"
+            :aria-selected="activeDetailTab === 'history'"
+            @click="activeDetailTab = 'history'"
+          >
+            Donation history
+            <span v-if="history.length" class="tab__count">{{ history.length }}</span>
+          </button>
+        </div>
+
+        <!-- Profile -->
+        <div v-if="activeDetailTab === 'info'" class="tab-content">
+          <div class="info-grid">
+            <div class="info-group">
+              <p class="info-group__title">Personal</p>
+              <dl class="info-list">
+                <div class="info-row"><dt>Full name</dt><dd>{{ profile.name }}</dd></div>
+                <div class="info-row"><dt>Birth date</dt><dd>{{ profile.birthDate || '—' }}</dd></div>
+                <div class="info-row"><dt>Sex</dt><dd>{{ profile.gender || '—' }}</dd></div>
+                <div class="info-row"><dt>Blood type</dt><dd>{{ profile.bloodType || 'Not typed yet' }}</dd></div>
+                <div v-if="!profile.restricted" class="info-row"><dt>Address</dt><dd>{{ profile.address || '—' }}</dd></div>
+              </dl>
+            </div>
+
+            <div class="info-group">
+              <p class="info-group__title">Contact &amp; identity</p>
+              <dl class="info-list">
+                <div class="info-row"><dt>Phone</dt><dd>{{ profile.phone || '—' }}</dd></div>
+                <div class="info-row">
+                  <dt>Email</dt>
+                  <dd>
+                    {{ profile.email || '—' }}
+                    <span v-if="profile.email && profile.emailVerified === false" class="tag tag--warn">Unverified</span>
+                  </dd>
+                </div>
+                <template v-if="!profile.restricted">
+                  <div class="info-row">
+                    <dt>Valid ID</dt>
+                    <dd>
+                      <span class="mono">{{ profile.validIdNumber || '—' }}</span>
+                      <span v-if="profile.validIdType" class="contact-cell__sub">{{ profile.validIdType }}</span>
+                    </dd>
+                  </div>
+                  <div class="info-row">
+                    <dt>ID check</dt>
+                    <dd><span class="tag" :class="`tag--${profile.identity.tone}`">{{ profile.identity.label }}</span></dd>
+                  </div>
+                  <div class="info-row"><dt>Account</dt><dd>{{ profile.accountStatus }}</dd></div>
+                </template>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- Donation history -->
+        <div v-else class="tab-content">
+          <div class="history-head">
+            <p class="info-group__title">Donations at this centre</p>
+            <!--
+              A donation is recorded at the counter, not from a donor's history
+              page: it needs the screening and the collection, both of which
+              belong to the verified visit on /blood-center/collection.
+            -->
+            <NuxtLink to="/blood-center/collection" class="btn-outline">
+              <AssetIcon name="plus" :size="14" />
+              Record at counter
+            </NuxtLink>
+          </div>
+
+          <div v-if="loadingHistory" class="timeline">
+            <div v-for="n in 3" :key="'skh-' + n" class="skeleton skeleton--line skeleton--tall" />
+          </div>
+          <p v-else-if="historyError" class="notice">
+            <AssetIcon name="lock" :size="14" />
+            <span>{{ historyError }}</span>
+          </p>
+          <div v-else-if="!history.length" class="empty-state empty-state--flat">
+            <span class="empty-state__icon"><AssetIcon name="droplets" :size="20" /></span>
+            <p class="empty-state__title">No donations here yet</p>
+            <p class="empty-state__text">Visits recorded at the Donation Counter appear here.</p>
+          </div>
+          <ol v-else class="timeline">
+            <li v-for="item in history" :key="item.id" class="event" :class="`event--${item.tone}`">
+              <span class="event__dot" aria-hidden="true" />
+              <div class="event__body">
+                <div class="event__top">
+                  <p class="event__date">{{ item.date }}</p>
+                  <span class="pill" :class="`pill--${item.tone}`">{{ item.statusLabel }}</span>
+                </div>
+                <p class="event__title">{{ item.title }}</p>
+                <p v-if="item.detail" class="event__detail">{{ item.detail }}</p>
+                <p v-if="item.lab" class="event__lab">
+                  <AssetIcon name="flask-conical" :size="13" />
+                  {{ item.lab }}
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+    </div>
+
+    <!-- REGISTER WALK-IN modal -->
+    <Transition name="modal">
+      <div v-if="showAddDonorModal" class="modal-overlay" @click.self="closeAddDonor">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-donor-title">
+          <div class="modal-card__header">
+            <div>
+              <h2 id="add-donor-title" class="modal-card__title">Register walk-in donor</h2>
+              <p class="modal-card__subtitle">For a donor at the counter who has no portal account yet.</p>
+            </div>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeAddDonor">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <form class="modal-form" @submit.prevent="submitAddDonor">
+            <p v-if="addDonorError" class="form-error" role="alert">{{ addDonorError }}</p>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="d-first">First name</label>
+                <input id="d-first" v-model="addDonorForm.first_name" type="text" class="form-input" maxlength="150" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="d-last">Last name</label>
+                <input id="d-last" v-model="addDonorForm.last_name" type="text" class="form-input" maxlength="150" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="d-birth">Birth date</label>
+                <input id="d-birth" v-model="addDonorForm.birth_date" type="date" class="form-input" :max="todayIso" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="d-sex">Sex <span class="form-optional">optional</span></label>
+                <select id="d-sex" v-model="addDonorForm.gender" class="form-input select">
+                  <option value="">Not given</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="d-id">Valid ID number</label>
+              <input id="d-id" v-model="addDonorForm.valid_id_number" type="text" class="form-input mono" maxlength="50" placeholder="As printed on the ID card" required>
+              <p class="form-hint">Each ID can only be registered once, so the same person is never added twice.</p>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="d-phone">Mobile number <span class="form-optional">optional</span></label>
+                <input id="d-phone" v-model="addDonorForm.phone" type="tel" class="form-input" placeholder="09XXXXXXXXX">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="d-email">Email <span class="form-optional">optional</span></label>
+                <input id="d-email" v-model="addDonorForm.email" type="email" class="form-input" maxlength="150">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div v-if="bloodTypeOptions.length" class="form-group">
+                <label class="form-label" for="d-bt">Blood type <span class="form-optional">if known</span></label>
+                <select id="d-bt" v-model="addDonorForm.blood_type_id" class="form-input select">
+                  <option value="">Unknown</option>
+                  <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="d-address">Address <span class="form-optional">optional</span></label>
+                <input id="d-address" v-model="addDonorForm.address" type="text" class="form-input" maxlength="255">
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn-outline" @click="closeAddDonor">Cancel</button>
+              <button type="submit" class="btn-primary" :disabled="savingDonor || !canSaveDonor">
+                {{ savingDonor ? 'Registering…' : 'Register donor' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 
 definePageMeta({
-    middleware: ['auth', 'department'],
-    layout: 'blood-centerdashboard',
-  requires: 'donors.view',
+  middleware: ['auth', 'department'],
+  layout: 'blood-centerdashboard',
+  // donors.view_contact, which Recruitment also holds: the server answers them
+  // with a contact list, and the profile and history below stay hidden.
+  requires: 'donors.view_contact',
 })
 
+const { can } = useUser()
+const canViewProfile = computed(() => can('donors.view'))
+const canViewHistory = computed(() => can('donors.view_clinical'))
+const canManage = computed(() => can('donors.manage'))
+
 /**
- * NOTE ON API SHAPE
+ * API SHAPE (tinuod nga mga ruta, /api/blood-center/donors)
  * -------------------------------------------------------------------------
- *  GET  /api/bloodcenter/donors/stats
- *    -> { total, eligible, deferred }
+ *  GET  /donors?search=&blood_type_id=&page=&per_page=
+ *    -> Laravel paginator { data, current_page, last_page, total, from, to }
+ *       data: [{ uuid, donor_code, full_name, blood_type, phone, email,
+ *                total_donations, last_donation_at, next_eligible_date,
+ *                contact_only? }]
+ *  GET  /donors/{uuid}          -> identity + donation_summary + profile
+ *  GET  /donors/{uuid}/history  -> { donor, donations: [...] }
+ *  POST /donors                 { first_name, last_name, valid_id_number,
+ *                                 birth_date, phone?, email?, gender?,
+ *                                 blood_type_id?, address? }
  *
- *  GET  /api/bloodcenter/donors?type=&status=
- *    -> [{ id, donorCode, name, bloodType, contact, lastDonation, status }]
- *
- *  GET  /api/bloodcenter/donors/:id
- *    -> { id, donorCode, name, bloodType, contact, lastDonation, status,
- *          facilityName, totalDonations, registeredVia,
- *          flags: [{ id, reason, flaggedBy, flaggedDate, notified }] }
- *
- *  GET  /api/bloodcenter/donors/:id/history
- *    -> [{ id, date, title, bloodType, facilityName, method, resultNote,
- *          status, result }]   result: 'success' | 'deferred'
- *
- *  GET  /api/bloodcenter/facilities
- *    -> [{ id, name }]
- *
- *  POST /api/bloodcenter/donors           { name, bloodType, contact, validIdNumber, facilityId }
- *    -> created donor
- *
- *  PUT  /api/bloodcenter/donors/:id       { name, bloodType, contact, status }
- *    -> updated donor
- *
- *  POST /api/bloodcenter/donors/:id/flags { reason, notes, notifyDonor }
- *    -> created flag (also triggers a notification to the donor if notifyDonor is true)
- *
- *  POST /api/bloodcenter/donors/:id/donations { volume, date, method, notes }
- *    -> created donation record
+ * WALA PAY ROUTE: donor statistics, pag-edit sa donor, ug flags. Ang mga
+ * button para niana kay naka-disable imbis mo-call og ruta nga wala.
  * -------------------------------------------------------------------------
  */
 
-/**
- * Donor API.
- *
- * Kaniadto raw `$fetch('/api/bloodcenter/...')` ni ang tanan. Duha ka problema
- * ang naa niadto: (1) walay Authorization header, ug (2) ang `/api` prefix kay
- * ni-agi sa `nitro.devProxy` nga naa ra sa `nuxt dev` — sa gi-build nga app,
- * mo-404 siya sa Nitro. Ang upat nga endpoint nga naa gyud sa Laravel kay
- * gibalhin na sa `bloodCenterService`, nga mao nay nagdala sa token.
- *
- * Ang lima sa ubos WALA pay route sa server (walay stats, facilities, update,
- * flags, o donations nga endpoint sa `/blood-center/donors`). Gibiyaan sila nga
- * dayag nga wala pa ma-implementar imbes tagoan sa likod og call nga dili
- * gyud molihok — tan-awa ang endpoint matrix sa audit plan.
- */
-const notImplemented = (name) => async () => {
-    throw Object.assign(
-        new Error(`${name} has no backend endpoint yet.`),
-        { status: 501, notImplemented: true },
-    )
-}
-
-const api = {
-    // Naa nay server route:
-    getDonors: (params) => bloodCenterService.donors(params),
-    getDonor: (id) => bloodCenterService.showDonor(id),
-    getDonorHistory: (id) => bloodCenterService.donorHistory(id),
-    createDonor: (payload) => bloodCenterService.createDonor(payload),
-
-    // Wala pa (Phase P/0B):
-    getStats: notImplemented('Donor statistics'),
-    getFacilities: notImplemented('Facility list'),
-    updateDonor: notImplemented('Updating a donor'),
-    addFlag: notImplemented('Flagging a donor'),
-}
+const PER_PAGE = 25
 
 const initialLoading = ref(true)
 const loadError = ref('')
 
-const bloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
-const facilities = ref([])
+/* ---------- formatting ---------- */
 
-const stats = reactive({ total: 0, eligible: 0, deferred: 0 })
-const loadingStats = ref(false)
+function todayDate() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
 
-const typeFilter = ref('all')
-const statusFilter = ref('all')
-const donors = ref([])
-const loadingDonors = ref(false)
+const todayIso = computed(() => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+})
 
-const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
+function toDate(value) {
+  if (!value) return null
+  const d = new Date(String(value).length === 10 ? `${value}T00:00:00` : value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function formatDate(value) {
+  const d = toDate(value)
+  return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+}
+
+function timeAgo(value) {
+  const d = toDate(value)
+  if (!d) return ''
+  const days = Math.round((todayDate() - d) / 86400000)
+  if (days <= 0) return 'Today'
+  if (days < 31) return `${days} day${days === 1 ? '' : 's'} ago`
+  const months = Math.round(days / 30)
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`
+  const years = Math.round(months / 12)
+  return `${years} year${years === 1 ? '' : 's'} ago`
+}
 
 function initials(name) {
-    if (!name) return '?'
-    return name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase()
+  if (!name) return '?'
+  return name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase()
 }
 
-function avatarColor(index) {
-    return AVATAR_COLORS[index % AVATAR_COLORS.length]
+/**
+ * Eligibility, read off next_eligible_date the server already computes from
+ * the donation interval. Never donated: eligible, and new to us.
+ */
+function eligibilityOf(row) {
+  if (!row.last_donation_at) {
+    return { key: 'new', label: 'First-time', hint: 'Has not donated yet' }
+  }
+  const next = toDate(row.next_eligible_date)
+  if (!next || next <= todayDate()) {
+    return { key: 'eligible', label: 'Eligible', hint: 'Can donate today' }
+  }
+  return { key: 'waiting', label: `From ${formatDate(row.next_eligible_date).replace(/, \d{4}$/, '')}`, hint: `In ${Math.ceil((next - todayDate()) / 86400000)} days` }
 }
 
-function bloodTypeClass(bloodType) {
-    const group = bloodType.replace('+', '').replace('-', '')
-    const map = { A: 'pill--type-a', B: 'pill--type-b', AB: 'pill--type-ab', O: 'pill--type-o' }
-    return map[group] || 'pill--type-o'
+function mapDonor(row) {
+  return {
+    uuid: row.uuid,
+    donorCode: row.donor_code || '—',
+    name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unnamed donor',
+    bloodType: row.blood_type || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    totalDonations: row.total_donations ?? 0,
+    lastDonation: formatDate(row.last_donation_at),
+    contactOnly: Boolean(row.contact_only),
+    eligibility: eligibilityOf(row),
+  }
 }
 
-// ---- List view ----
-async function loadStats() {
-    loadingStats.value = true
-    try {
-        const data = await api.getStats()
-        Object.assign(stats, data)
-    } catch (err) {
-        loadError.value = 'Could not load donor statistics.'
-        console.error(err)
-    } finally {
-        loadingStats.value = false
-    }
+/* ---------- reference data (blood types) ---------- */
+
+const bloodTypeOptions = ref([])
+
+async function loadReference() {
+  try {
+    const data = await bloodCenterService.referenceData()
+    bloodTypeOptions.value = (data?.blood_types ?? []).map((bt) => ({ id: bt.id, code: bt.code ?? bt.label }))
+  } catch {
+    // Without it the blood-type filter and picker simply do not show.
+    bloodTypeOptions.value = []
+  }
 }
 
-async function loadDonors() {
-    loadingDonors.value = true
-    try {
-        donors.value = await api.getDonors({ type: typeFilter.value, status: statusFilter.value })
-    } catch (err) {
-        loadError.value = 'Could not load donor records.'
-        console.error(err)
-    } finally {
-        loadingDonors.value = false
-    }
+/* ---------- list ---------- */
+
+const donors = ref([])
+const loadingDonors = ref(false)
+const search = ref('')
+const bloodTypeId = ref('')
+const eligibilityFilter = ref('all')
+const pager = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
+
+const contactOnly = computed(() => donors.value.length > 0 && donors.value.every((d) => d.contactOnly))
+
+const eligibleCount = computed(() => donors.value.filter((d) => d.eligibility.key !== 'waiting').length)
+const waitingCount = computed(() => donors.value.filter((d) => d.eligibility.key === 'waiting').length)
+
+const eligibilityChips = computed(() => [
+  { value: 'all', label: 'All', count: donors.value.length },
+  { value: 'eligible', label: 'Eligible', count: donors.value.filter((d) => d.eligibility.key === 'eligible').length },
+  { value: 'new', label: 'First-time', count: donors.value.filter((d) => d.eligibility.key === 'new').length },
+  { value: 'waiting', label: 'Waiting', count: waitingCount.value },
+])
+
+const visibleDonors = computed(() => eligibilityFilter.value === 'all'
+  ? donors.value
+  : donors.value.filter((d) => d.eligibility.key === eligibilityFilter.value))
+
+const listSummary = computed(() => {
+  if (!pager.total) return 'Everyone who has booked or donated at this centre.'
+  return `${pager.total} donor${pager.total === 1 ? '' : 's'} who have booked or donated at this centre`
+})
+
+async function loadDonors(page = 1) {
+  loadingDonors.value = true
+  loadError.value = ''
+  try {
+    const params = { page, per_page: PER_PAGE }
+    if (search.value.trim()) params.search = search.value.trim()
+    if (bloodTypeId.value) params.blood_type_id = bloodTypeId.value
+
+    const res = await bloodCenterService.donors(params)
+    const rows = Array.isArray(res) ? res : (res?.data ?? [])
+
+    donors.value = rows.map(mapDonor)
+    Object.assign(pager, {
+      page: res?.current_page ?? page,
+      lastPage: res?.last_page ?? 1,
+      total: res?.total ?? rows.length,
+      from: res?.from ?? (rows.length ? 1 : 0),
+      to: res?.to ?? rows.length,
+    })
+  } catch (err) {
+    donors.value = []
+    loadError.value = err?.message || 'Could not load donor records.'
+    console.error(err)
+  } finally {
+    loadingDonors.value = false
+  }
 }
 
-async function loadFacilities() {
-    try {
-        facilities.value = await api.getFacilities()
-    } catch (err) {
-        console.error(err)
-    }
+let searchTimer = null
+
+// Typing waits a beat before asking the server, rather than once per key.
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => loadDonors(), 300)
 }
 
-async function loadAll() {
-    loadError.value = ''
-    await Promise.all([loadStats(), loadDonors(), loadFacilities()])
+function clearFilters() {
+  search.value = ''
+  bloodTypeId.value = ''
+  eligibilityFilter.value = 'all'
+  loadDonors()
 }
 
-function onFilterChange() {
-    loadDonors()
-}
+onBeforeUnmount(() => clearTimeout(searchTimer))
 
-// ---- Detail View ----
-const selectedDonorId = ref(null)
-const selectedDonor = ref(null)
+/* ---------- detail ---------- */
+
+const selectedUuid = ref(null)
+const profile = ref(null)
 const loadingDetail = ref(false)
+const detailError = ref('')
 const activeDetailTab = ref('info')
-const donationHistory = ref([])
+const history = ref([])
 const loadingHistory = ref(false)
+const historyError = ref('')
+
+const IDENTITY = {
+  verified: { label: 'Verified', tone: 'ok' },
+  pending: { label: 'Pending review', tone: 'warn' },
+  rejected: { label: 'Not approved', tone: 'bad' },
+  unsubmitted: { label: 'Not submitted', tone: 'muted' },
+}
+
+const ACCOUNT = {
+  active: 'Active',
+  pending_verification: 'Pending verification',
+  suspended: 'Suspended',
+  deactivated: 'Deactivated',
+}
+
+const GENDER = { male: 'Male', female: 'Female', other: 'Other', prefer_not_to_say: 'Prefer not to say' }
+
+function mapProfile(data) {
+  const summary = data?.donation_summary ?? {}
+  const base = mapDonor({
+    ...data,
+    total_donations: summary.total_donations,
+    last_donation_at: summary.last_donation_at,
+    next_eligible_date: summary.next_eligible_date,
+  })
+
+  return {
+    ...base,
+    birthDate: data?.birth_date ? `${formatDate(data.birth_date)} (${ageOf(data.birth_date)})` : '',
+    gender: GENDER[data?.gender] ?? '',
+    address: data?.address ?? '',
+    validIdNumber: data?.valid_id_number ?? '',
+    validIdType: data?.valid_id_type ? String(data.valid_id_type).replace(/_/g, ' ') : '',
+    identity: IDENTITY[data?.identity_status] ?? IDENTITY.unsubmitted,
+    accountStatus: ACCOUNT[data?.account_status] ?? (data?.account_status || '—'),
+    emailVerified: data?.email_verified,
+    donationsHere: data?.donations_at_this_facility,
+    restricted: Boolean(data?.restricted),
+    restrictionNote: data?.restriction_note ?? '',
+    lastDonationAgo: timeAgo(summary.last_donation_at),
+    nextEligible: summary.next_eligible_date && toDate(summary.next_eligible_date) > todayDate()
+      ? formatDate(summary.next_eligible_date)
+      : '',
+  }
+}
+
+function ageOf(birthDate) {
+  const b = toDate(birthDate)
+  if (!b) return ''
+  const t = todayDate()
+  let age = t.getFullYear() - b.getFullYear()
+  if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) age -= 1
+  return `${age} yrs`
+}
+
+/** One donation as the timeline shows it. */
+function mapEvent(d) {
+  const s = d.screening
+  const deferred = s?.is_deferral || d.laboratory_deferral
+  const tone = deferred ? 'deferred' : d.status === 'completed' || d.status === 'collected' ? 'eligible' : 'neutral'
+
+  let title = d.volume_ml ? `${d.volume_ml} mL collected` : (d.status_label || 'Visit recorded')
+  if (s?.is_deferral) title = s.outcome_label || 'Deferred at screening'
+  if (d.laboratory_deferral) title = 'Deferred after laboratory testing'
+
+  return {
+    id: d.id,
+    date: formatDate(d.donation_date),
+    statusLabel: deferred ? 'Deferred' : (d.status_label || '—'),
+    tone,
+    title,
+    detail: s?.deferral_reason ? `Reason: ${s.deferral_reason}` : '',
+    lab: d.laboratory
+      ? [d.laboratory.result_label, d.laboratory.blood_type ? `typed ${d.laboratory.blood_type}` : ''].filter(Boolean).join(' · ')
+      : '',
+  }
+}
 
 async function viewDonor(donor) {
-    selectedDonorId.value = donor.id
-    activeDetailTab.value = 'info'
-    await Promise.all([loadDonorDetail(donor.id), loadDonorHistory(donor.id)])
+  selectedUuid.value = donor.uuid
+  activeDetailTab.value = 'info'
+  history.value = []
+  historyError.value = ''
+  await Promise.all([
+    loadDonorDetail(donor.uuid),
+    canViewHistory.value ? loadDonorHistory(donor.uuid) : Promise.resolve(),
+  ])
 }
 
-async function loadDonorDetail(id) {
-    loadingDetail.value = true
-    try {
-        selectedDonor.value = await api.getDonor(id)
-    } catch (err) {
-        loadError.value = 'Could not load donor profile.'
-        console.error(err)
-    } finally {
-        loadingDetail.value = false
-    }
+async function loadDonorDetail(uuid) {
+  loadingDetail.value = true
+  detailError.value = ''
+  try {
+    profile.value = mapProfile(await bloodCenterService.showDonor(uuid))
+  } catch (err) {
+    profile.value = null
+    detailError.value = err?.message || 'Could not load this donor.'
+    console.error(err)
+  } finally {
+    loadingDetail.value = false
+  }
 }
 
-async function loadDonorHistory(id) {
-    loadingHistory.value = true
-    try {
-        donationHistory.value = await api.getDonorHistory(id)
-    } catch (err) {
-        console.error(err)
-    } finally {
-        loadingHistory.value = false
-    }
+async function loadDonorHistory(uuid) {
+  loadingHistory.value = true
+  try {
+    const data = await bloodCenterService.donorHistory(uuid)
+    history.value = (data?.donations ?? []).map(mapEvent)
+  } catch (err) {
+    history.value = []
+    historyError.value = err?.message || 'Could not load the donation history.'
+  } finally {
+    loadingHistory.value = false
+  }
 }
 
 function backToList() {
-    selectedDonorId.value = null
-    selectedDonor.value = null
-    donationHistory.value = []
-    loadDonors()
-    loadStats()
+  justRegistered.value = ''
+  selectedUuid.value = null
+  profile.value = null
+  history.value = []
 }
 
-// ---- ADD MODAL modal ----
+/* ---------- register walk-in ---------- */
+
 const showAddDonorModal = ref(false)
 const savingDonor = ref(false)
+// After registering: shown on the new donor's profile, or on the list.
+const justRegistered = ref('')
+const listNotice = ref('')
 const addDonorError = ref('')
-const addDonorForm = reactive({ name: '', bloodType: '', contact: '', validIdNumber: '', facilityId: '' })
+
+const BLANK_DONOR = {
+  first_name: '',
+  last_name: '',
+  birth_date: '',
+  gender: '',
+  valid_id_number: '',
+  phone: '',
+  email: '',
+  blood_type_id: '',
+  address: '',
+}
+
+const addDonorForm = reactive({ ...BLANK_DONOR })
 
 const canSaveDonor = computed(() =>
-    Boolean(addDonorForm.name) && Boolean(addDonorForm.bloodType) && Boolean(addDonorForm.contact)
-)
+  Boolean(addDonorForm.first_name.trim() && addDonorForm.last_name.trim()
+    && addDonorForm.birth_date && addDonorForm.valid_id_number.trim()))
 
 function openAddDonor() {
-    showAddDonorModal.value = true
-    addDonorError.value = ''
-    Object.assign(addDonorForm, { name: '', bloodType: '', contact: '', validIdNumber: '', facilityId: '' })
+  Object.assign(addDonorForm, BLANK_DONOR)
+  addDonorError.value = ''
+  showAddDonorModal.value = true
 }
 
 function closeAddDonor() {
-    showAddDonorModal.value = false
+  showAddDonorModal.value = false
 }
 
 async function submitAddDonor() {
-    if (!canSaveDonor.value) {
-        addDonorError.value = 'Please fill in the required fields.'
-        return
+  if (!canSaveDonor.value) return
+  savingDonor.value = true
+  addDonorError.value = ''
+  try {
+    // Only what was filled in: the server treats an empty string as a value.
+    const payload = Object.fromEntries(
+      Object.entries(addDonorForm)
+        .map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+        .filter(([, v]) => v !== '' && v !== null),
+    )
+    const res = await bloodCenterService.createDonor(payload)
+    const created = res?.data ?? res
+    closeAddDonor()
+
+    // The list holds only donors with a booking or donation here, so a new
+    // walk-in is not in it yet. Open their profile instead of leaving staff
+    // to search for someone the list cannot show.
+    const message = res?.message || `${payload.first_name} has been registered.`
+    if (created?.uuid && canViewProfile.value) {
+      // The response is already the full record. Re-fetching would come back
+      // restricted, because the donor has no visit here yet.
+      justRegistered.value = message
+      selectedUuid.value = created.uuid
+      activeDetailTab.value = 'info'
+      history.value = []
+      historyError.value = ''
+      detailError.value = ''
+      profile.value = mapProfile(created)
+    } else {
+      listNotice.value = `${message} They will appear in this list after their first visit.`
     }
-    savingDonor.value = true
-    addDonorError.value = ''
-    try {
-        await api.createDonor({ ...addDonorForm })
-        closeAddDonor()
-        await loadAll()
-    } catch (err) {
-        addDonorError.value = 'Could not add donor. Please try again.'
-        console.error(err)
-    } finally {
-        savingDonor.value = false
-    }
-}
-
-// ---- EDIT INFO modal ----
-const showEditInfoModal = ref(false)
-const savingEdit = ref(false)
-const editError = ref('')
-const editForm = reactive({ name: '', bloodType: '', contact: '', status: 'Eligible' })
-
-function openEditInfo() {
-    if (!selectedDonor.value) return
-    showEditInfoModal.value = true
-    editError.value = ''
-    Object.assign(editForm, {
-        name: selectedDonor.value.name,
-        bloodType: selectedDonor.value.bloodType,
-        contact: selectedDonor.value.contact,
-        status: selectedDonor.value.status,
-    })
-}
-
-function closeEditInfo() {
-    showEditInfoModal.value = false
-}
-
-async function submitEditInfo() {
-    savingEdit.value = true
-    editError.value = ''
-    try {
-        const updated = await api.updateDonor(selectedDonorId.value, { ...editForm })
-        selectedDonor.value = { ...selectedDonor.value, ...updated }
-        closeEditInfo()
-    } catch (err) {
-        editError.value = 'Could not save changes. Please try again.'
-        console.error(err)
-    } finally {
-        savingEdit.value = false
-    }
-}
-
-// ---- ADD FLAG modal ----
-const showAddFlagModal = ref(false)
-const savingFlag = ref(false)
-const flagError = ref('')
-const flagForm = reactive({ reason: '', notes: '', notifyDonor: true })
-
-const canSaveFlag = computed(() => Boolean(flagForm.reason))
-
-function openAddFlag() {
-    showAddFlagModal.value = true
-    flagError.value = ''
-    Object.assign(flagForm, { reason: '', notes: '', notifyDonor: true })
-}
-
-function closeAddFlag() {
-    showAddFlagModal.value = false
-}
-
-async function submitAddFlag() {
-    if (!canSaveFlag.value) {
-        flagError.value = 'Please select a reason for the flag.'
-        return
-    }
-    savingFlag.value = true
-    flagError.value = ''
-    try {
-        await api.addFlag(selectedDonorId.value, { ...flagForm })
-        closeAddFlag()
-        await loadDonorDetail(selectedDonorId.value)
-    } catch (err) {
-        flagError.value = 'Could not add flag. Please try again.'
-        console.error(err)
-    } finally {
-        savingFlag.value = false
-    }
+  } catch (err) {
+    addDonorError.value = Object.values(err?.errors ?? err?.data?.errors ?? {}).flat()[0]
+      || err?.message
+      || 'Could not register this donor. Please try again.'
+  } finally {
+    savingDonor.value = false
+  }
 }
 
 onMounted(async () => {
-    await loadAll()
-    initialLoading.value = false
+  await Promise.all([loadDonors(), loadReference()])
+  initialLoading.value = false
 })
 </script>
 
 <style scoped>
 .donors-page {
-    --primary: #1565c0;
-    --accent: #d32f2f;
-    --success: #2e7d32;
-    --warning: #f57c00;
-    --purple: #5e35b1;
-    --text-primary: #1f2937;
-    --text-secondary: #9ca3af;
-    max-width: 1152px;
-    background: var(--rb-page-bg);
-    margin: 0 auto;
-    padding: 24px 32px 40px;
-    font-family: var(--rb-font-sans);
-    color: var(--text-primary);
-}
-
-.loading-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 60vh;
-}
-
-.spinner {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    border: 4px solid #e3ebf6;
-    border-top-color: var(--primary);
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-    .spinner {
-        animation: none !important;
-    }
+  max-width: var(--rb-content-max, 1600px);
+  background: var(--rb-page-bg);
+  margin: 0 auto;
+  padding: 24px var(--rb-gutter, 24px) 40px;
+  font-family: var(--rb-font-sans);
+  color: var(--rb-text-primary);
 }
 
 .donors-inner {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-/* Header */
+/* ---------- Skeletons (the same page skeleton as Inventory) ---------- */
+.skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  border-radius: 14px;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton-head { display: flex; flex-direction: column; gap: 8px; }
+.skeleton--header { height: 28px; max-width: 220px; border-radius: 8px; }
+.skeleton--sub { height: 14px; max-width: 320px; border-radius: 6px; }
+.skeleton--card { height: 108px; }
+.skeleton--hero { height: 96px; }
+.skeleton--line { height: 16px; width: 100%; border-radius: 6px; }
+.skeleton--tall { height: 64px; border-radius: 10px; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* ---------- Header ---------- */
 .header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.page-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0;
-}
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
-.page-subtitle {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
-}
-
-.btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #fff;
-    background: var(--primary);
-    border: none;
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-    white-space: nowrap;
-}
-
-.btn-primary:hover {
-    opacity: 0.92;
-}
-
-.btn-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
+/* ---------- Buttons (as on Inventory) ---------- */
+.btn-primary,
 .btn-outline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 9px 14px;
-    border-radius: 10px;
-    font-size: 12.5px;
-    font-weight: 700;
-    background: #f3f4f6;
-    color: #374151;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.btn-outline:hover {
-    background: #e5e7eb;
-}
+.btn-primary { color: #fff; background: var(--rb-primary); border: none; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.btn-cancel {
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 700;
-    background: #f3f4f6;
-    color: #374151;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-
-.btn-cancel:hover {
-    background: #e5e7eb;
-}
+.btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
+.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+.btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-outline--danger { color: var(--rb-accent-text); }
 
 .btn-link {
-    background: none;
-    border: none;
-    color: var(--primary);
-    text-decoration: underline;
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.error-banner {
-    background: #fdeaea;
-    color: #a11d1d;
-    border: 1px solid #f6c9c9;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Stats */
-/* auto-fit, not a fixed count: the content column now changes width
-   when the rail expands, so the grid has to answer to its container
-   rather than to a viewport breakpoint that no longer describes it. */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-}
-
-.stat-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #eef0f3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    padding: 20px 22px;
-}
-
-.stat-card__label {
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-secondary);
-    margin: 0;
-}
-
-.stat-card__value {
-    font-size: 30px;
-    font-weight: 800;
-    margin: 6px 0 0;
-    color: var(--text-primary);
-    line-height: 1.1;
-}
-
-.stat-card__value--success {
-    color: var(--success);
-}
-
-.stat-card__value--accent {
-    color: var(--accent);
-}
-
-/* Panel */
-.panel {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #eef0f3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    overflow: hidden;
-}
-
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px 12px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.panel-header__filters {
-    display: flex;
-    gap: 10px;
-}
-
-.section-label {
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.section-label--tight {
-    margin: 20px 0 10px;
-}
-
-.form-input {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 9px 12px;
-    font-size: 13px;
-    color: var(--text-primary);
-    background: #fafbfc;
-    font-family: inherit;
-    transition: border-color 0.15s ease;
-    width: 100%;
-}
-.form-input-icon {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.form-input-icon .form-input {
-    padding-left: 36px;
-}
-
-.form-input-icon__icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: #9ca3af;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--primary);
-    background: #fff;
-}
-
-.form-input:disabled {
-    background: #f3f4f6;
-    color: var(--text-secondary);
-}
-
-.form-textarea {
-    resize: vertical;
-    font-family: inherit;
-}
-
-/*
- * One caret, drawn by us. These were bare native selects while the dashboard
- * and inventory selects carried a custom chevron, so the same control looked
- * different depending on which blood-centre page you were on.
- *
- * The `background` shorthand is deliberate, and so is repeating it in the dark
- * rule: a later `background: <colour>` anywhere in the cascade resets
- * background-image to none, and the dark override for .form-input is exactly
- * such a rule. Spelling the whole shorthand out in both themes makes the caret
- * immune to that ordering. #94a3b8 reads on both surfaces, so the glyph itself
- * does not need to change.
- */
-.filter-select {
-    width: 150px;
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background: #fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-    background-size: 10px 6px;
-    padding-right: 32px;
-}
-
-/* Donor table */
-.donor-table {
-    display: flex;
-    flex-direction: column;
-}
-
-.donor-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 0.8fr;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 24px;
-    font-size: 13px;
-    border-top: 1px solid #f3f4f6;
-    min-height: 60px;
-}
-
-.donor-row--head {
-    font-size: 10.5px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-secondary);
-    border-top: none;
-    background: #fafbfc;
-}
-
-.donor-cell {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.donor-cell__text {
-    display: flex;
-    flex-direction: column;
-}
-
-.donor-cell__name {
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.donor-cell__id {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-}
-
-.avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.avatar--lg {
-    width: 52px;
-    height: 52px;
-    font-size: 16px;
-}
-
-.view-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--primary);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-}
-
-.view-link:hover {
-    text-decoration: underline;
-}
-
-.empty-state {
-    color: var(--text-secondary);
-    font-size: 13px;
-    padding: 24px;
-    text-align: center;
-}
-
-/* Breadcrumb */
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-}
-
-.breadcrumb__link {
-    background: none;
-    border: none;
-    color: var(--primary);
-    font-weight: 700;
-    cursor: pointer;
-    padding: 0;
-    font-size: 14px;
-}
-
-.breadcrumb__link:hover {
-    text-decoration: underline;
-}
-
-.breadcrumb__sep {
-    color: var(--text-secondary);
-}
-
-.breadcrumb__current {
-    color: var(--text-primary);
-    font-weight: 700;
-}
-
-/* Detail header card */
-.detail-header-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #eef0f3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    padding: 22px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    min-height: 90px;
-}
-
-.detail-header-card__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.detail-header-card__name-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.detail-header-card__name {
-    font-size: 17px;
-    font-weight: 800;
-}
-
-.detail-header-card__meta {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    margin: 4px 0 0;
-}
-
-.detail-header-card__actions {
-    display: flex;
-    gap: 10px;
-}
-
-/* Tabs */
-/*
- * 20px here plus the tab's own 4px puts the first label on 24px, level with
- * .panel-header and .tab-content. It was 24 + 4 = 28, four pixels adrift of
- * everything else in the same panel.
- */
-.tabs {
-    display: flex;
-    gap: 32px;
-    border-bottom: 1px solid #f3f4f6;
-    padding: 0 20px;
-    background: #fafbfc;
-    overflow-x: auto;
-    scrollbar-width: thin;
-}
-
-.tab {
-    background: none;
-    border: none;
-    padding: 14px 4px;
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    cursor: pointer;
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s ease;
-}
-
-.tab:hover {
-    color: var(--text-primary);
-}
-
-.tab--active {
-    color: var(--primary);
-    border-bottom: 2px solid var(--primary);
-}
-
-.tab-content {
-    padding: 24px;
-}
-
-/* Info list */
-.info-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 13px 0;
-    border-bottom: 1px solid #f3f4f6;
-    font-size: 13.5px;
-}
-
-.info-row:last-child {
-    border-bottom: none;
-}
-
-.info-row__label {
-    color: var(--text-secondary);
-}
-
-.info-row__value {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-/* Flags */
-.flag-card {
-    display: flex;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: #fdeaea;
-    border: 1px solid #f3c1c1;
-    margin-bottom: 8px;
-}
-
-.flag-card__icon {
-    color: var(--accent);
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.flag-card__reason {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.flag-card__meta {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin: 3px 0 0;
-}
-
-/* Donation history */
-.history-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.history-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 16px 0;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.history-item:last-child {
-    border-bottom: none;
-}
-
-.history-item__dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    margin-top: 5px;
-    flex-shrink: 0;
-    background: var(--success);
-}
-
-.history-item__dot--deferred {
-    background: var(--warning);
-}
-
-.history-item__body {
-    flex: 1;
-    min-width: 0;
-}
-
-.history-item__date {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin: 0 0 2px;
-    font-weight: 600;
-}
-
-.history-item__title {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.history-item__meta {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin: 3px 0 0;
-}
-
-.history-item__result {
-    font-size: 12px;
-    color: var(--success);
-    font-weight: 600;
-    margin: 3px 0 0;
-}
-
-/* Pills */
-.pill {
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 999px;
-    white-space: nowrap;
-}
-
-.pill--eligible {
-    background: #e8f5e9;
-    color: var(--success);
-}
-
-.pill--deferred {
-    background: #fff3e0;
-    color: var(--warning);
-}
-
-.pill--flagged {
-    background: #fdeaea;
-    color: var(--accent);
-}
-
-.pill--completed {
-    background: #e8f5e9;
-    color: var(--success);
-}
-
-.pill--type-a {
-    background: #fff3e0;
-    color: var(--warning);
-}
-
-.pill--type-b {
-    background: #e8f5e9;
-    color: var(--success);
-}
-
-.pill--type-ab {
-    background: #ede7f6;
-    color: var(--purple);
-}
-
-.pill--type-o {
-    background: #e3f2fd;
-    color: var(--primary);
-}
-
-/* Checkbox */
-.checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.checkbox-row input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: var(--primary);
-}
-
-/* Modals */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    z-index: 100;
-}
-
-.modal-card {
-    background: #fff;
-    border-radius: 14px;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
-}
-
-.modal-card__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 20px;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.modal-card__title {
-    font-size: 15px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.modal-card__close {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-secondary);
-    padding: 4px;
-    display: flex;
-    transition: color 0.15s ease;
-}
-
-.modal-card__close:hover {
-    color: var(--text-primary);
-}
-
-.modal-form {
-    padding: 18px 20px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.modal-subtitle {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 0;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-}
-
-.form-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.modal-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 4px;
-    width: 100%;
-    margin-left: auto;
-}
-
-.modal-error {
-    color: #C62828;
-    font-size: 12.5px;
-    font-weight: 500;
-    margin: 0;
-}
-
-.modal-enter-active,
-.modal-leave-active {
-    transition: opacity 0.2s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-    opacity: 0;
-}
-
-/* Skeletons */
-.skeleton,
-.skeleton-block {
-    background: linear-gradient(90deg, #eceff3 25%, #f5f7fb 37%, #eceff3 63%);
-    background-size: 400% 100%;
-    animation: skeleton-loading 1.4s ease infinite;
-    border-radius: 8px;
-    color: transparent;
-}
-
-.skeleton-block {
-    min-height: 60px;
-}
-
-@keyframes skeleton-loading {
-    0% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0 50%;
-    }
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-    .donor-row {
-        grid-template-columns: 1fr;
-        gap: 6px;
-    }
-
-    .donor-row--head {
-        display: none;
-    }
-}
-
-@media (max-width: 640px) {
-    .donors-page {
-        padding: 16px 16px 32px;
-    }
-
-    .header-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .detail-header-card {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .detail-header-card__actions {
-        width: 100%;
-    }
-
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* ============ DARK MODE ============ */
-:global(.dark .donors-page) {
-    --primary: #60A5FA;
-    --accent: #F87171;
-    --success: #34D399;
-    --warning: #FBBF24;
-    --purple: #A78BFA;
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    background: #0F172A;
-}
-
-:global(.dark .donors-page .stat-card),
-:global(.dark .donors-page .panel),
-:global(.dark .donors-page .detail-header-card),
-:global(.dark .donors-page .modal-card) {
-    background: #1E293B;
-    border-color: #334155;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark .donors-page .stat-card:hover) {
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-}
-
-:global(.dark .donors-page .stat-card__value) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .stat-card__value--success) {
-    color: #34D399;
-}
-:global(.dark .donors-page .stat-card__value--accent) {
-    color: #F87171;
-}
-
-:global(.dark .donors-page .panel-header) {
-    border-bottom-color: #334155;
-}
-
-:global(.dark .donors-page .section-label) {
-    color: #F1F5F9;
-}
-
-:global(.dark .donors-page .form-input) {
-    background: #1E293B;
-    color: #F1F5F9;
-    border-color: #334155;
-}
-:global(.dark .donors-page .form-input:focus) {
-    border-color: #60A5FA;
-    background: #263449;
-}
-:global(.dark .donors-page .form-input:disabled) {
-    background: #263449;
-    color: #94A3B8;
-}
-:global(.dark .donors-page .form-input-icon__icon) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .filter-select) {
-    background: #1E293B url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-    background-size: 10px 6px;
-    color: #F1F5F9;
-}
-
-:global(.dark .donors-page .donor-row) {
-    border-top-color: #263449;
-}
-:global(.dark .donors-page .donor-row--head) {
-    background: #263449;
-    color: #94A3B8;
-}
-:global(.dark .donors-page .donor-cell__name) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .donor-cell__id) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .view-link) {
-    color: #60A5FA;
-}
-
-:global(.dark .donors-page .empty-state) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .breadcrumb__link) {
-    color: #60A5FA;
-}
-:global(.dark .donors-page .breadcrumb__sep) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .breadcrumb__current) {
-    color: #F1F5F9;
-}
-
-:global(.dark .donors-page .detail-header-card__name) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .detail-header-card__meta) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .tabs) {
-    background: #0F172A;
-    border-bottom-color: #334155;
-}
-:global(.dark .donors-page .tab) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .tab:hover) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .tab--active) {
-    color: #60A5FA;
-    border-bottom-color: #60A5FA;
-}
-
-:global(.dark .donors-page .info-row) {
-    border-bottom-color: #263449;
-}
-:global(.dark .donors-page .info-row__label) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .info-row__value) {
-    color: #F1F5F9;
-}
-
-:global(.dark .donors-page .flag-card) {
-    background: #3A1A1A;
-    border-color: #F87171;
-}
-:global(.dark .donors-page .flag-card__icon) {
-    color: #F87171;
-}
-:global(.dark .donors-page .flag-card__reason) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .flag-card__meta) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .history-item) {
-    border-bottom-color: #263449;
-}
-:global(.dark .donors-page .history-item__date) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .history-item__title) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .history-item__meta) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .history-item__result) {
-    color: #34D399;
-}
-:global(.dark .donors-page .history-item__dot--deferred) {
-    background: #FBBF24;
-}
-
-:global(.dark .donors-page .pill--eligible) {
-    background: #1A3A2A;
-    color: #34D399;
-}
-:global(.dark .donors-page .pill--deferred) {
-    background: #3E2C1A;
-    color: #FBBF24;
-}
-:global(.dark .donors-page .pill--flagged) {
-    background: #3A1A1A;
-    color: #F87171;
-}
-:global(.dark .donors-page .pill--completed) {
-    background: #1A3A2A;
-    color: #34D399;
-}
-:global(.dark .donors-page .pill--type-a) {
-    background: #3E2C1A;
-    color: #FBBF24;
-}
-:global(.dark .donors-page .pill--type-b) {
-    background: #1A3A2A;
-    color: #34D399;
-}
-:global(.dark .donors-page .pill--type-ab) {
-    background: #2D1A4A;
-    color: #A78BFA;
-}
-:global(.dark .donors-page .pill--type-o) {
-    background: #1A3A5F;
-    color: #60A5FA;
-}
-
-:global(.dark .donors-page .checkbox-row) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .checkbox-row input) {
-    accent-color: #60A5FA;
-}
-
-:global(.dark .donors-page .modal-card__header) {
-    border-bottom-color: #334155;
-}
-:global(.dark .donors-page .modal-card__title) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .modal-card__close) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .modal-card__close:hover) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .modal-subtitle) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .form-label) {
-    color: #94A3B8;
-}
-:global(.dark .donors-page .modal-error) {
-    color: #F87171;
-}
-
-:global(.dark .donors-page .modal-overlay) {
-    background: rgba(0, 0, 0, 0.7);
-}
-
-:global(.dark .donors-page .btn-primary) {
-    background: #60A5FA;
-    color: #0F172A;
-}
-:global(.dark .donors-page .btn-primary:hover) {
-    opacity: 0.9;
-}
-:global(.dark .donors-page .btn-primary:disabled) {
-    opacity: 0.4;
-}
-
-:global(.dark .donors-page .btn-outline) {
-    background: #263449;
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .btn-outline:hover) {
-    background: #334155;
-}
-
-:global(.dark .donors-page .btn-cancel) {
-    background: #263449;
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .btn-cancel:hover) {
-    background: #334155;
-}
-
-:global(.dark .donors-page .btn-link) {
-    color: #60A5FA;
-}
-
-:global(.dark .donors-page .error-banner) {
-    background: rgba(239, 83, 80, 0.10);
-    color: #EF9A9A;
-    border-color: rgba(239, 83, 80, 0.24);
-}
-
-:global(.dark .donors-page .page-title) {
-    color: #F1F5F9;
-}
-:global(.dark .donors-page .page-subtitle) {
-    color: #94A3B8;
-}
-
-:global(.dark .donors-page .spinner) {
-    border-color: #1E293B;
-    border-top-color: #60A5FA;
-}
-
-:global(.dark .donors-page .skeleton-block) {
-    background: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
-    background-size: 400% 100%;
-    animation: skeleton-loading-dark 1.4s ease infinite;
-}
-
-@keyframes skeleton-loading-dark {
-    0% { background-position: 100% 50%; }
-    100% { background-position: 0 50%; }
-}
-
-:global(.dark .donors-page .avatar) {
-    border: 2px solid #334155;
-}
-
-:global(.dark .donors-page .avatar--lg) {
-    border-width: 3px;
-}
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--rb-primary-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-link:hover { text-decoration: underline; }
 
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
-.btn-cancel:focus-visible,
-.btn-link:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+.btn-link:focus-visible,
+.chip:focus-visible,
+.pager__btn:focus-visible,
+.row--link:focus-visible,
+.tab:focus-visible,
+.breadcrumb__link:focus-visible {
+  outline: none;
+  box-shadow: var(--rb-focus-ring);
+}
+
+.error-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+  background: rgba(var(--rb-accent-rgb), 0.06);
+  color: var(--rb-accent-text);
+  font-size: 13px;
+}
+
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--rb-success-rgb), 0.3);
+  background: rgba(var(--rb-success-rgb), 0.06);
+  color: var(--rb-success-text);
+}
+
+.success-banner > :deep(svg) { flex-shrink: 0; }
+.success-banner__body { flex: 1; min-width: 0; }
+.success-banner__title { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
+.success-banner__text { flex: 1; margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--rb-text-secondary);
+}
+
+.notice :deep(svg) { flex-shrink: 0; margin-top: 1px; }
+
+/* ---------- KPI cards (as on Inventory) ---------- */
+.stats-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.stats-row--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+}
+
+.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
+.stat-card__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0; }
+.stat-card__badge { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-card__badge--primary { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.stat-card__badge--success { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.stat-card__badge--warning { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
+.stat-card__value { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 0; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat-card__value--text { font-size: 18px; line-height: 24px; }
+.stat-chip { display: inline-flex; align-items: center; align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+/* ---------- Panel ---------- */
+.panel {
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
+.panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+}
+
+.search {
+  position: relative;
+  flex: 0 1 340px;
+}
+
+.search__icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rb-text-secondary);
+  pointer-events: none;
+}
+
+.search__input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.search__input::placeholder { color: var(--rb-placeholder); }
+.search__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+
+.select {
+  height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background-color: var(--rb-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+  appearance: none;
+  cursor: pointer;
+}
+
+.select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.chip:hover { color: var(--rb-text-primary); }
+
+.chip--on,
+.chip--on:hover {
+  background: var(--rb-primary);
+  border-color: var(--rb-primary);
+  color: #fff;
+}
+
+.chip__count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip--on .chip__count { background: rgba(255, 255, 255, 0.22); }
+
+/* ---------- Table ---------- */
+.table { display: flex; flex-direction: column; }
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) 100px minmax(160px, 1.4fr) 90px 130px 130px 24px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 18px;
+  border: 0;
+  border-top: 1px solid var(--rb-border);
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+  text-align: left;
+}
+
+.table--contact .row { grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.4fr) 90px 130px 130px 24px; }
+
+.row--head {
+  min-height: 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 0;
+  background: var(--rb-surface-alt);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rb-text-secondary);
+}
+
+.row--link { cursor: pointer; transition: background 0.15s ease; }
+.row--link:hover { background: var(--rb-surface-hover); }
+.row--link:hover .row__go { color: var(--rb-primary-text); }
+
+.row--skeleton { display: flex; }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.donor-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.donor-cell__text { display: flex; flex-direction: column; min-width: 0; }
+.donor-cell__name { font-weight: 700; text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.donor-cell__id { font-family: var(--rb-font-mono); font-size: 11.5px; color: var(--rb-text-secondary); }
+
+.contact-cell { display: flex; flex-direction: column; min-width: 0; }
+.contact-cell__sub { font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.row__go { display: flex; justify-content: flex-end; color: var(--rb-text-muted); }
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.avatar--lg { width: 56px; height: 56px; font-size: 18px; }
+
+.blood {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  color: var(--rb-accent-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.muted { color: var(--rb-text-secondary); }
+.mono { font-family: var(--rb-font-mono); font-size: 12.5px; }
+
+/* ---------- Pills ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pill--eligible { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.pill--new { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.pill--waiting { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
+.pill--deferred { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.pill--neutral { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+.tag {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+}
+
+.tag--ok { margin-left: 0; background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.tag--warn { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
+.tag--bad { margin-left: 0; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.tag--muted { margin-left: 0; }
+dd .tag--warn { margin-left: 6px; }
+
+/* ---------- Pager ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+
+.pager__btns { display: flex; align-items: center; gap: 8px; }
+
+.pager__btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+
+.pager__btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.pager__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pager__page { font-variant-numeric: tabular-nums; }
+
+/* ---------- Empty states ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 24px;
+  text-align: center;
+  border-top: 1px solid var(--rb-border);
+}
+
+.empty-state--flat { border-top: 0; padding: 32px 16px; }
+
+.empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
+}
+
+.empty-state__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.empty-state__text { margin: 0 0 8px; max-width: 44ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* ---------- Detail ---------- */
+.breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+.breadcrumb__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-primary-text);
+  cursor: pointer;
+}
+
+.breadcrumb__link:hover { text-decoration: underline; }
+.breadcrumb__sep { color: var(--rb-text-muted); }
+.breadcrumb__current { font-weight: 600; color: var(--rb-text-primary); text-transform: capitalize; }
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+}
+
+.hero__who { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.hero__name-row { display: flex; align-items: center; gap: 10px; }
+.hero__name { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); text-transform: capitalize; }
+.hero__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.hero__actions { display: flex; gap: 8px; }
+
+.tabs {
+  display: flex;
+  gap: 24px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--rb-text-primary); }
+.tab--active { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
+
+.tab__count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tab-content { padding: 18px; }
+
+.info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+
+.info-group__title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rb-text-secondary);
+}
+
+.info-list { margin: 0; }
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rb-border);
+  font-size: 13px;
+}
+
+.info-row:last-child { border-bottom: 0; }
+.info-row dt { color: var(--rb-text-secondary); }
+.info-row dd { margin: 0; display: flex; flex-direction: column; align-items: flex-end; font-weight: 600; color: var(--rb-text-primary); text-align: right; }
+
+/* History timeline */
+.history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+
+.timeline { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.event {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 0 0 8px 2px;
+}
+
+.event:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 18px;
+  bottom: -8px;
+  width: 2px;
+  background: var(--rb-border);
+}
+
+.event__dot {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--rb-text-muted);
+  box-shadow: 0 0 0 3px var(--rb-surface);
+}
+
+.event--eligible .event__dot { background: var(--rb-success); }
+.event--deferred .event__dot { background: var(--rb-accent); }
+
+.event__body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+}
+
+.event__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.event__date { margin: 0; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.event__title { margin: 4px 0 0; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
+.event__detail { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.event__lab { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--rb-overlay);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--rb-surface);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.28);
+}
+
+.modal-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.modal-card__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.modal-card__subtitle { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+
+.modal-card__close {
+  display: flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+
+.modal-form { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
+.form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+.form-hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 8px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  color: var(--rb-accent-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Anchored on the page root: other portals ship unscoped dark .form-input rules. */
+.donors-page .form-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background-color: var(--rb-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.donors-page .form-input.select { padding-right: 30px; }
+.donors-page .form-input::placeholder { color: var(--rb-placeholder); }
+.donors-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+.modal-enter-active,
+.modal-leave-active { transition: opacity 0.2s ease; }
+
+.modal-enter-from,
+.modal-leave-to { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none !important; }
 }
 </style>

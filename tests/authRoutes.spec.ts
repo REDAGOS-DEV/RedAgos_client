@@ -8,6 +8,7 @@ import {
   PORTAL_ROLES,
   ROLE_SELECTION,
 } from '~/utils/authRoutes'
+import { departmentHome } from '~/composables/useBloodCenterNav'
 
 // `portalHomeFor` calls `departmentHome`, a Nuxt auto-import from
 // useBloodCenterNav. Stubbed rather than imported so these stay pure-function
@@ -15,13 +16,24 @@ import {
 vi.stubGlobal('departmentHome', (user: any) => {
   const homes: Record<string, string> = {
     collection: '/blood-center/collection',
-    laboratory: '/blood-center/laboratory',
-    inventory: '/blood-center/storage',
+    testing: '/blood-center/testing',
+    processing: '/blood-center/laboratory',
+    issuance: '/blood-center/storage',
     billing: '/blood-center/billing',
   }
   if (user?.department && homes[user.department]) return homes[user.department]
   return user?.is_supervisor ? '/blood-center/dashboard' : '/blood-center/settings'
 })
+
+// Mirrors the server's StaffRole enum. Every role must land on a page of its
+// own, or its staff would be sent to settings.
+const ROLES = [
+  'screening_physician', 'phlebotomist', 'apheresis_specialist', 'medical_receptionist',
+  'component_technologist', 'processing_assistant',
+  'serology_technologist', 'lab_supervisor',
+  'inventory_control_officer', 'dispatch_coordinator', 'it_data_clerk',
+  'billing_clerk',
+]
 
 describe('loginRouteFor', () => {
   it.each([
@@ -112,9 +124,11 @@ describe('portalHomeFor', () => {
   })
 
   it('routes blood-centre staff by department', () => {
-    expect(portalHomeFor({ roles: ['blood_center'], department: 'laboratory' } as any))
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'testing' } as any))
+      .toBe('/blood-center/testing')
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'processing' } as any))
       .toBe('/blood-center/laboratory')
-    expect(portalHomeFor({ roles: ['blood_center'], department: 'inventory' } as any))
+    expect(portalHomeFor({ roles: ['blood_center'], department: 'issuance' } as any))
       .toBe('/blood-center/storage')
   })
 
@@ -147,5 +161,50 @@ describe('portalHomeFor', () => {
       // the user was just refused from.
       expect(required === null || typeof required === 'string').toBe(true)
     }
+  })
+})
+
+// The real map, not the stub above: every department the server's Department
+// enum declares must land somewhere, or its staff would be sent to settings.
+describe('departmentHome', () => {
+  it.each([
+    ['collection', '/blood-center/collection'],
+    // Each laboratory department has its own page now.
+    ['testing', '/blood-center/testing'],
+    ['processing', '/blood-center/laboratory'],
+    ['issuance', '/blood-center/storage'],
+    ['billing', '/blood-center/billing'],
+  ])('sends %s staff to %s', (department, home) => {
+    expect(departmentHome({ department })).toBe(home)
+  })
+
+  it('sends a custom role to its department\'s page', () => {
+    expect(departmentHome({ custom_role: 'Quality Officer', department: 'issuance' })).toBe('/blood-center/storage')
+  })
+
+  it('no longer recognises the retired departments', () => {
+    expect(departmentHome({ department: 'laboratory' })).toBe('/blood-center/settings')
+    expect(departmentHome({ department: 'inventory' })).toBe('/blood-center/settings')
+  })
+
+  it.each(ROLES)('gives %s a home of its own', (role) => {
+    expect(departmentHome({ staff_role: role })).not.toBe('/blood-center/settings')
+  })
+
+  it('sends roles in one department to different places', () => {
+    // A receptionist starts at the appointment list; the physician and the
+    // chair start at the counter.
+    expect(departmentHome({ staff_role: 'medical_receptionist', department: 'collection' })).toBe('/blood-center/appointments')
+    expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/collection')
+    expect(departmentHome({ staff_role: 'dispatch_coordinator', department: 'issuance' })).toBe('/blood-center/fulfillment')
+  })
+
+  it('lets the role win over the department', () => {
+    expect(departmentHome({ staff_role: 'it_data_clerk', department: 'issuance' })).toBe('/blood-center/inventory')
+  })
+
+  it('sends a supervisor who holds a role to that role\'s page', () => {
+    expect(departmentHome({ staff_role: 'lab_supervisor', is_supervisor: true })).toBe('/blood-center/testing')
+    expect(departmentHome({ is_supervisor: true })).toBe('/blood-center/dashboard')
   })
 })

@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 4.3 seconds
-Output:
 <template>
     <div class="history-page">
         <!-- Skeleton loading state -->
@@ -22,7 +19,7 @@ Output:
             <div v-if="donations.length > 0" class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-card__icon stat-card__icon--primary">
-                        <AssetIcon name="droplet" :size="18" />
+                        <AssetIcon name="droplets" :size="18" />
                     </div>
                     <div>
                         <p class="stat-card__value">{{ stats.totalDonations }}</p>
@@ -190,7 +187,7 @@ onActivated(() => {
     --warning: #f57c00;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
@@ -521,73 +518,73 @@ onActivated(() => {
     background: #0F172A;
 }
 
-:global(.dark .stat-card),
-:global(.dark .panel) {
+:global(.dark .history-page .stat-card),
+:global(.dark .history-page .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .stat-card__icon--primary) {
+:global(.dark .history-page .stat-card__icon--primary) {
     background: rgba(66, 165, 245, 0.16);
 }
 
-:global(.dark .stat-card__icon--success) {
+:global(.dark .history-page .stat-card__icon--success) {
     background: rgba(102, 187, 106, 0.16);
 }
 
-:global(.dark .stat-card__icon--warning) {
+:global(.dark .history-page .stat-card__icon--warning) {
     background: rgba(255, 167, 38, 0.16);
 }
 
-:global(.dark .history-row) {
+:global(.dark .history-page .history-row) {
     border-color: #263449;
 }
 
-:global(.dark .history-row__icon) {
+:global(.dark .history-page .history-row__icon) {
     background: rgba(239, 83, 80, 0.16);
 }
 
-:global(.dark .history-row__meta) {
+:global(.dark .history-page .history-row__meta) {
     color: #94A3B8;
 }
 
-:global(.dark .history-row__date) {
+:global(.dark .history-page .history-row__date) {
     color: #64748B;
 }
 
-:global(.dark .history-tag) {
+:global(.dark .history-page .history-tag) {
     background: rgba(66, 165, 245, 0.16);
     color: #90CAF9;
 }
 
-:global(.dark .history-status--completed) {
+:global(.dark .history-page .history-status--completed) {
     background: rgba(102, 187, 106, 0.16);
 }
 
-:global(.dark .history-status--deferred) {
+:global(.dark .history-page .history-status--deferred) {
     background: rgba(239, 83, 80, 0.16);
 }
 
-:global(.dark .history-status--rejected) {
+:global(.dark .history-page .history-status--rejected) {
     background: rgba(239, 83, 80, 0.16);
 }
 
-:global(.dark .history-status--registered),
-:global(.dark .history-status--screening),
-:global(.dark .history-status--collected),
-:global(.dark .history-status--tested) {
+:global(.dark .history-page .history-status--registered),
+:global(.dark .history-page .history-status--screening),
+:global(.dark .history-page .history-status--collected),
+:global(.dark .history-page .history-status--tested) {
     background: rgba(245, 124, 0, 0.16);
     color: #FFCC80;
 }
 
-:global(.dark .state-title) {
+:global(.dark .history-page .state-title) {
     color: #F1F5F9;
 }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .history-page .skeleton) {
     background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 

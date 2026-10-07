@@ -1,8 +1,5 @@
-Exit code: 0
-Wall time: 6 seconds
-Output:
 <template>
-    <div class="settings-page">
+    <div class="settings-page scope-donor-settings">
         <!-- Skeleton loading state -->
         <div v-if="loading" class="skeleton-wrap">
             <div class="skeleton skeleton--header" />
@@ -91,8 +88,26 @@ Output:
                                 </div>
 
                                 <div class="form-field">
-                                    <label class="form-label">Address</label>
+                                    <label class="form-label">Home address</label>
                                     <input v-model="profile.address" type="text" class="form-input" placeholder="Street, Barangay, City">
+                                </div>
+
+                                <!--
+                                    Section I-A. Editable here as well as on the
+                                    profile page, which both write through the
+                                    same endpoint.
+                                -->
+                                <div class="form-field">
+                                    <label class="form-label">Middle name</label>
+                                    <input v-model="profile.middle_name" type="text" class="form-input">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Occupation</label>
+                                    <input v-model="profile.occupation" type="text" class="form-input">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">Nationality</label>
+                                    <input v-model="profile.nationality" type="text" class="form-input">
                                 </div>
                             </div>
 
@@ -256,7 +271,7 @@ Output:
         <!-- Delete account confirmation -->
         <Teleport to="body">
             <Transition name="modal-fade">
-                <div v-if="confirmDeleteOpen" class="modal-backdrop" @click.self="confirmDeleteOpen = false">
+                <div v-if="confirmDeleteOpen" class="modal-backdrop settings-modal" @click.self="confirmDeleteOpen = false">
                     <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="delete-title">
                         <div class="modal-check modal-check--danger">
                             <AssetIcon name="alert" :size="24" />
@@ -295,6 +310,7 @@ definePageMeta({
 })
 
 import { authService } from '~/api/auth/AuthService'
+import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
@@ -314,6 +330,9 @@ const profile = reactive({
     birthDate: '',
     bloodType: '',
     address: '',
+    middle_name: '',
+    occupation: '',
+    nationality: '',
     donorId: '',
     avatarUrl: '',
 })
@@ -394,6 +413,9 @@ async function saveProfile() {
             birth_date: profile.birthDate,
             blood_type: profile.bloodType,
             address: profile.address,
+            middle_name: profile.middle_name,
+            occupation: profile.occupation,
+            nationality: profile.nationality,
         })
         applyProfile(response?.data || {})
         await fetchUser()
@@ -532,8 +554,11 @@ function applyProfile(data) {
     profile.birthDate = data?.birth_date ?? ''
     profile.bloodType = data?.blood_type ?? ''
     profile.address = data?.address ?? ''
+    profile.middle_name = data?.middle_name ?? ''
+    profile.occupation = data?.occupation ?? ''
+    profile.nationality = data?.nationality ?? ''
     profile.donorId = data?.donor_id ?? ''
-    profile.avatarUrl = data?.avatar_url ?? ''
+    profile.avatarUrl = resolveApiAssetURL(data?.avatar_url) ?? ''
 }
 
 function splitFullName(fullName) {
@@ -553,7 +578,7 @@ function splitFullName(fullName) {
     --warning: #f57c00;
     --text-primary: #1f2937;
     --text-secondary: #9ca3af;
-    max-width: 1152px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
@@ -1180,52 +1205,75 @@ function splitFullName(fullName) {
 }
 
 /* ============ Dark mode ============ */
-:global(.dark .settings-page) {
+/*
+ * Tanang dark rule naka-anchor sa .scope-donor-settings (ang .settings-page kay
+ * gigamit pud sa blood-center ug hospital settings) ug sa .settings-modal (ang mga modal kay
+ * gi-Teleport sa <body>, gawas sa page). `:global(…)` mogawas sa scope
+ * system, so ang bare `:global(.dark .form-input)` kaniadto kay mo-match sa
+ * .form-input sa TANANG page human ma-load ni nga stylesheet: mao ang
+ * ngitngit nga inputs ug ang asul nga toggle sa profile.
+ */
+
+:global(.dark .scope-donor-settings) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
     background: #0F172A;
 }
 
-:global(.dark .panel) {
+:global(.dark .scope-donor-settings .panel),
+:global(.dark .settings-modal .panel) {
     background: #1E293B;
     border-color: #334155;
 }
 
-:global(.dark .panel-header--simple) { border-color: #334155; }
+:global(.dark .scope-donor-settings .panel-header--simple),
+:global(.dark .settings-modal .panel-header--simple) { border-color: #334155; }
 
-:global(.dark .avatar) { background: rgba(66,165,245,0.16); }
+:global(.dark .scope-donor-settings .avatar),
+:global(.dark .settings-modal .avatar) { background: rgba(66,165,245,0.16); }
 
-:global(.dark .form-input) {
+:global(.dark .scope-donor-settings .form-input),
+:global(.dark .settings-modal .form-input) {
     background: #0F172A;
     border-color: #334155;
     color: #F1F5F9;
 }
 
-:global(.dark .password-toggle:hover) { color: #F1F5F9; background: #263449; }
+:global(.dark .scope-donor-settings .password-toggle:hover),
+:global(.dark .settings-modal .password-toggle:hover) { color: #F1F5F9; background: #263449; }
 
-:global(.dark .toggle-row) { border-color: #263449; }
-:global(.dark .toggle-switch) { background: #1565c0; }
+:global(.dark .scope-donor-settings .toggle-row),
+:global(.dark .settings-modal .toggle-row) { border-color: #263449; }
+:global(.dark .scope-donor-settings .toggle-switch) { background: #475569; }
+:global(.dark .scope-donor-settings .toggle-switch--on) { background: #1565c0; }
 
-:global(.dark .account-action) { border-color: #263449; }
+:global(.dark .scope-donor-settings .account-action),
+:global(.dark .settings-modal .account-action) { border-color: #263449; }
 
-:global(.dark .btn-outline) {
+:global(.dark .scope-donor-settings .btn-outline),
+:global(.dark .settings-modal .btn-outline) {
     background: #263449;
     color: #E2E8F0;
 }
-:global(.dark .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .scope-donor-settings .btn-outline:hover:not(:disabled)),
+:global(.dark .settings-modal .btn-outline:hover:not(:disabled)) { background: #334155; }
 
-:global(.dark .modal-card) {
+:global(.dark .scope-donor-settings .modal-card),
+:global(.dark .settings-modal .modal-card) {
     background: #1E293B;
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
 }
-:global(.dark .modal-check) { background: rgba(102,187,106,0.16); }
-:global(.dark .modal-check--danger) { background: rgba(239,83,80,0.16); }
+:global(.dark .scope-donor-settings .modal-check),
+:global(.dark .settings-modal .modal-check) { background: rgba(102,187,106,0.16); }
+:global(.dark .scope-donor-settings .modal-check--danger),
+:global(.dark .settings-modal .modal-check--danger) { background: rgba(239,83,80,0.16); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) {
+:global(.dark .scope-donor-settings .skeleton),
+:global(.dark .settings-modal .skeleton) {
     background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 

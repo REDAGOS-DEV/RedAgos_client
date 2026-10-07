@@ -116,7 +116,8 @@ describe('scoped dark-mode rules', () => {
   const PAGE_ROOTS: Record<string, string> = {
     'app/pages/blood-center/appointments.vue': '.appointments-page',
     'app/pages/blood-center/donors.vue': '.donors-page',
-    'app/pages/blood-center/bloodrequests.vue': '.page',
+    // Its dark rules hang off the page's scope class, which sits on the root.
+    'app/pages/blood-center/bloodrequests.vue': '.scope-blood-center-bloodrequests',
   }
 
   for (const [file, root] of Object.entries(PAGE_ROOTS)) {
@@ -175,20 +176,23 @@ describe('page gutters', () => {
   const PAGES = [
     'appointments', 'bloodrequests', 'collection', 'dashboard', 'donors',
     'drives', 'fulfillment', 'inventory', 'reports', 'settings', 'staff',
+    'laboratory', 'testing', 'stock-report', 'corrections',
   ]
 
   for (const page of PAGES) {
-    it(`${page}.vue sits in the shared 1152px column`, () => {
+    // The column width and gutter are shared tokens (main.css), so every page
+    // reads the same values rather than repeating a number.
+    it(`${page}.vue sits in the shared content column`, () => {
       const css = source(`app/pages/blood-center/${page}.vue`)
-      expect(css).toContain('max-width: 1152px')
-      expect(css).toMatch(/padding:\s*24px 32px 40px/)
+      expect(css).toContain('max-width: var(--rb-content-max')
+      expect(css).toMatch(/padding:\s*24px var\(--rb-gutter, 24px\) 40px/)
     })
   }
 
   it('the four department dashboards inherit it from their shared shell', () => {
     const shell = source('app/components/BloodCenter/DepartmentDashboard.vue')
-    expect(shell).toContain('max-width: 1152px')
-    expect(shell).toMatch(/padding:\s*24px 32px 40px/)
+    expect(shell).toContain('max-width: var(--rb-content-max')
+    expect(shell).toMatch(/padding:\s*24px var\(--rb-gutter, 24px\) 40px/)
   })
 
   /*
@@ -210,7 +214,8 @@ describe('chrome links resolve to a page', () => {
    * routes. A route with no page file is a 404 the user finds by clicking.
    */
   function pageExists(route: string): boolean {
-    const rest = route.replace('/blood-center/', '')
+    // A nav path may carry a query that picks a view (testing?test=typing).
+    const rest = route.replace('/blood-center/', '').split('?')[0]
     return existsSync(path.join(root, 'app/pages/blood-center', `${rest}.vue`))
   }
 

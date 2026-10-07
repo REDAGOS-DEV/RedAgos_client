@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard scope-donor-dashboard">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="dashboard-inner">
       <div class="skeleton skeleton--header" />
@@ -27,7 +27,7 @@
           <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
         </div>
         <div class="header-actions">
-          <span v-if="eligibilityStatus === 'eligible'" class="icon-btn__dot" />
+          <span v-if="screeningDone" class="icon-btn__dot" />
           <NuxtLink to="/donor/appointments" class="btn-primary" aria-label="Book Appointment">
             <AssetIcon name="calendar" :size="16" />
             <span class="btn-text">Book Appointment</span>
@@ -36,7 +36,7 @@
       </div>
 
       <!-- Eligibility banner -->
-      <div v-if="eligibilityStatus === 'eligible'" class="banner banner--success">
+      <div v-if="screeningDone" class="banner banner--success">
         <div class="banner-icon-wrapper">
           <AssetIcon name="check-circle" :size="16" class="banner-icon" />
         </div>
@@ -106,26 +106,26 @@
             </div>
           </div>
           <div class="stat-card__value-group">
-            <p class="stat-card__value text-accent">{{ bloodType }}</p>
+            <p class="stat-card__value">{{ bloodType }}</p>
             <span class="blood-type-tag">Donor</span>
           </div>
           <span class="stat-chip stat-chip--neutral">Your blood group</span>
         </div>
 
-        <div class="stat-card" :class="{ 'stat-card--emphasized': eligibilityStatus !== 'eligible' }">
+        <div class="stat-card" :class="{ 'stat-card--emphasized': !screeningDone }">
           <div class="stat-card__top">
             <p class="stat-card__label">QR Status</p>
             <div class="stat-card__badge"
-              :class="eligibilityStatus === 'eligible' ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
+              :class="screeningDone ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
               <AssetIcon name="shield-check" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" :class="eligibilityStatus === 'eligible' ? 'text-success' : 'text-warning'">
-            {{ eligibilityStatus === 'eligible' ? 'Valid' : eligibilityStatus === 'deferred' ? 'Deferred' : 'Pending' }}
+          <p class="stat-card__value" :class="screeningDone ? 'text-success' : 'text-warning'">
+            {{ screeningDone ? 'Valid' : questionnaireStatus === 'expired' ? 'Expired' : 'Pending' }}
           </p>
           <span class="stat-chip"
-            :class="eligibilityStatus === 'eligible' ? 'stat-chip--success' : 'stat-chip--warning'">
-            {{ eligibilityStatus === 'eligible' && profile?.screening_valid_until
+            :class="screeningDone ? 'stat-chip--success' : 'stat-chip--warning'">
+            {{ screeningDone && profile?.screening_valid_until
               ? `Until ${formatDate(profile.screening_valid_until, 'MMM D, YYYY')}`
               : 'Complete screening' }}
           </span>
@@ -154,7 +154,7 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Donation Trend</h2>
-                <p class="panel-subtitle">Completed donations over the last 12 months</p>
+                <p class="panel-subtitle">Donations given over the last 12 months</p>
               </div>
               <span class="period-pill">Last 12 months</span>
             </div>
@@ -225,7 +225,7 @@
                         'Pending' }}
                     </p>
                     <p class="donation-meta">
-                      <strong class="text-accent">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
+                      <strong class="donation-meta__highlight">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
                         d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
                     </p>
                   </div>
@@ -300,11 +300,11 @@
             </div>
             <div class="eligibility-body">
               <div class="eligibility-status-row"
-                :class="eligibilityStatus === 'eligible' ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
+                :class="screeningDone ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
                 <AssetIcon name="shield-check" :size="20" />
                 <div>
-                  <p class="eligibility-status capitalize">
-                    {{ eligibilityStatus }}
+                  <p class="eligibility-status">
+                    {{ QUESTIONNAIRE_LABELS[questionnaireStatus] ?? 'Not yet answered' }}
                   </p>
                   <p v-if="profile?.screening_valid_until" class="eligibility-until">
                     Valid until {{ formatDate(profile.screening_valid_until, 'MMM D, YYYY') }}
@@ -320,12 +320,12 @@
                 </div>
                 <div class="eligibility-details__row">
                   <span class="eligibility-details__label">Blood type</span>
-                  <span class="eligibility-details__value text-accent font-extrabold">{{ bloodType }}</span>
+                  <span class="eligibility-details__value">{{ bloodType }}</span>
                 </div>
               </div>
 
               <NuxtLink to="/donor/eligibility" class="btn-danger">
-                {{ eligibilityStatus === 'eligible' ? 'Retake Screening' : 'Take Screening' }}
+                {{ screeningDone ? 'Retake Screening' : 'Take Screening' }}
               </NuxtLink>
             </div>
           </div>
@@ -359,14 +359,29 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+
+const route = useRoute()
 
 const loading = ref(true)
 
 // Core donor data
 const profile = ref(null)
 const eligibilityStatus = ref('pending')
+
+// Whether the questionnaire is answered and still stands. Every submission is
+// recorded `pending` until the centre decides, so eligibility_status never
+// reports it done — this is what the checklist and QR badge read instead.
+const questionnaireStatus = ref('not_answered')
+const screeningDone = computed(() => questionnaireStatus.value === 'answered')
+
+const QUESTIONNAIRE_LABELS = {
+  not_answered: 'Not yet answered',
+  answered: 'Answered',
+  expired: 'Needs answering again',
+}
 const bloodType = ref('-')
 const totalDonations = ref(0)
 const upcomingAppointment = ref(null)
@@ -411,13 +426,25 @@ const onboardingSteps = computed(() => [
     key: 'screening',
     label: 'Complete eligibility screening',
     path: '/donor/eligibility',
-    done: eligibilityStatus.value === 'eligible',
+    // Recording a collection uses the questionnaire up, so questionnaire_status
+    // reads `expired` right after a donation. A donation still proves this step
+    // was done; the banner and QR card keep reading screeningDone for the next visit.
+    done: screeningDone.value || totalDonations.value > 0,
   },
   {
     key: 'appointment',
     label: 'Book your first appointment',
     path: '/donor/appointments',
     done: !!upcomingAppointment.value || totalDonations.value > 0,
+  },
+  {
+    key: 'check-in',
+    label: 'Check in at blood center',
+    path: '/donor/qrcode',
+    // `confirmed` is what the counter writes when it scans the donor's QR.
+    // Recording the collection then closes the appointment, dropping it out of
+    // upcoming_appointment, so a donation also means the check-in happened.
+    done: upcomingAppointment.value?.status === 'confirmed' || totalDonations.value > 0,
   },
   {
     key: 'donation',
@@ -468,12 +495,19 @@ function formatDate(value, fmt) {
 
 let loadedOnce = false
 
+// Route returns and tab returns can overlap, so only the newest response is
+// applied: a slower, older one must not roll the progress back.
+let latestRequest = 0
+
 async function load({ silent = false } = {}) {
+  const request = ++latestRequest
   if (!silent) loading.value = true
   try {
     const data = await donorService.dashboard()
+    if (request !== latestRequest) return
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
+    questionnaireStatus.value = data.questionnaire_status ?? 'not_answered'
     bloodType.value = data.blood_type ?? '-'
     totalDonations.value = data.total_donations ?? 0
     upcomingAppointment.value = data.upcoming_appointment ?? null
@@ -482,14 +516,45 @@ async function load({ silent = false } = {}) {
   } catch (err) {
     console.error('Failed to load donor dashboard data:', err)
   } finally {
-    loading.value = false
-    loadedOnce = true
+    if (request === latestRequest) {
+      loading.value = false
+      loadedOnce = true
+    }
   }
 }
 
-onMounted(() => load())
-onActivated(() => {
-  if (loadedOnce) load({ silent: true })
+function isOnDashboard() {
+  return route.path === '/donor/dashboard'
+}
+
+/*
+ * The same silent refresh when the donor comes back to the tab — say,
+ * unlocking their phone after giving blood with the dashboard still open.
+ * Navigating back is covered by the route watcher below.
+ */
+function onVisibilityChange() {
+  if (!document.hidden && isOnDashboard() && loadedOnce) load({ silent: true })
+}
+
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
+
+/*
+ * `route` is the app-wide reactive current route, so this watcher keeps
+ * firing even while this page sits deactivated inside <KeepAlive> — unlike
+ * `onActivated`, it doesn't depend on Vue matching this component back into
+ * the keep-alive cache to notice the return trip. Any step completed on
+ * another page (screening, booking, profile edits) shows up here the moment
+ * the donor navigates back, without a full reload.
+ */
+watch(() => route.path, () => {
+  if (isOnDashboard() && loadedOnce) load({ silent: true })
 })
 </script>
 
@@ -506,7 +571,7 @@ onActivated(() => {
   --card-bg: #ffffff;
 
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  max-width: 1152px;
+  max-width: 1400px;
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px 32px 40px;
@@ -514,7 +579,6 @@ onActivated(() => {
 }
 
 .text-primary { color: var(--primary) !important; }
-.text-accent { color: var(--accent) !important; }
 .text-success { color: var(--success) !important; }
 .text-warning { color: var(--warning) !important; }
 .font-extrabold { font-weight: 800; }
@@ -691,14 +755,21 @@ onActivated(() => {
 
 .banner-link:hover { opacity: 0.8; text-decoration: underline; }
 
-/* Onboarding Hero Card */
+/*
+ * Onboarding card — deliberately neutral (same surface/border/shadow as
+ * .stat-card and .panel) rather than a solid brand-color block. Color here
+ * is now reserved for the progress ring fill and the "done" checkmarks, so
+ * it reads as one signal instead of competing with the rest of the page.
+ */
 .onboarding-card {
   position: relative;
   overflow: hidden;
-  background: var(--primary);
+  background: var(--card-bg);
   border-radius: 14px;
-  padding: 24px 28px;
-  color: white;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 22px 24px;
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -711,21 +782,21 @@ onActivated(() => {
   gap: 16px;
 }
 
-.onboarding-card__title { font-size: 18px; font-weight: 800; margin: 0; }
-.onboarding-card__subtitle { font-size: 13px; opacity: 0.85; margin: 4px 0 0; }
+.onboarding-card__title { font-size: 16px; font-weight: 800; margin: 0; color: var(--text-primary); }
+.onboarding-card__subtitle { font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 0; }
 
 .onboarding-card__progress-ring {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
 
 .progress-ring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.progress-ring__bg { fill: none; stroke: rgba(255, 255, 255, 0.22); stroke-width: 3.5; }
+.progress-ring__bg { fill: none; stroke: var(--border); stroke-width: 3.5; }
 .progress-ring__fill {
   fill: none;
-  stroke: white;
+  stroke: var(--primary);
   stroke-width: 3.5;
   stroke-linecap: round;
   transition: stroke-dasharray 0.5s ease;
@@ -737,8 +808,9 @@ onActivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
+  color: var(--text-primary);
 }
 
 .onboarding-steps {
@@ -753,40 +825,41 @@ onActivated(() => {
   gap: 10px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--rb-surface-hover, #f8fafc);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .onboarding-step:not(.onboarding-step--disabled):hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(21, 101, 192, 0.06);
+  border-color: rgba(21, 101, 192, 0.28);
 }
 
 .onboarding-step--done {
-  opacity: 0.7;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
+  opacity: 0.65;
+  background: transparent;
 }
 
 .onboarding-step__check {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border: 1.5px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: transparent;
 }
 
 .onboarding-step--done .onboarding-step__check {
-  background: white;
-  color: var(--primary);
-  border-color: white;
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 .onboarding-step__label { flex: 1; white-space: normal; word-break: break-word; }
@@ -862,8 +935,8 @@ onActivated(() => {
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 6px;
-  background: rgba(211, 47, 47, 0.1);
-  color: var(--accent);
+  background: #f1f5f9;
+  color: var(--text-secondary);
 }
 
 .stat-chip {
@@ -886,7 +959,10 @@ onActivated(() => {
 /* Layout Structure */
 .main-grid {
   display: grid;
-  grid-template-columns: 1.55fr 1fr;
+  /* minmax(0, …), not bare fr: a bare fr track never shrinks below its
+     content, so the 12-column trend chart widened the whole page on phones
+     and the area past the viewport showed through as a strip on the right. */
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: 22px;
 }
 
@@ -930,6 +1006,8 @@ onActivated(() => {
   padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid rgba(21, 101, 192, 0.12);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .panel-link, .panel-link-plain {
@@ -961,7 +1039,7 @@ onActivated(() => {
   width: 20px;
 }
 
-.chart__plot { flex: 1; display: flex; align-items: flex-end; gap: 8px; }
+.chart__plot { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 8px; }
 
 .chart__col {
   position: relative;
@@ -1078,6 +1156,7 @@ onActivated(() => {
 
 .donation-title { font-size: 13.5px; font-weight: 800; color: var(--text-primary); margin: 0; }
 .donation-meta { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
+.donation-meta__highlight { color: var(--text-primary); font-weight: 800; }
 .donation-item__right { text-align: right; flex-shrink: 0; }
 .donation-date { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); margin: 0; }
 
@@ -1232,7 +1311,7 @@ onActivated(() => {
 /* Responsive Overrides */
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .main-grid { grid-template-columns: 1fr; }
+  .main-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
@@ -1292,13 +1371,64 @@ onActivated(() => {
     gap: 8px;
   }
 
+  .skeleton--card { height: 96px; }
+
+  /* Twelve month columns have to fit a phone-width card once the grid lets
+     them shrink, so tighten only the chart's own gutters and labels here. */
+  .chart { gap: 8px; }
+  .chart__plot { gap: 3px; }
+  .chart__col { min-width: 0; padding: 0; }
+  .chart__label { font-size: 9.5px; }
+
+  /* 2x2 nga gagmay nga cards imbes upat ka taas nga card */
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px 12px 12px 14px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+
+  .stat-card__top { gap: 6px; }
+
+  .stat-card__label {
+    min-width: 0;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stat-card__badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
+
+  .stat-card__value { font-size: 21px; }
+
+  .stat-card__value-group { gap: 6px; }
+
+  .blood-type-tag {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+
+  .stat-chip {
+    font-size: 10.5px;
+    padding: 2px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
 /* High-Contrast Dark Mode Enhancements */
-:global(.dark .dashboard) {
+:global(.dark .scope-donor-dashboard) {
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --border: #334155;
@@ -1306,48 +1436,49 @@ onActivated(() => {
   background: #0f172a;
 }
 
-:global(.dark .panel-header) {
+:global(.dark .scope-donor-dashboard .panel-header) {
   background: #1e293b;
 }
 
-:global(.dark .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
-:global(.dark .stat-card:hover) { border-color: #475569; }
+:global(.dark .scope-donor-dashboard .stat-card) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+:global(.dark .scope-donor-dashboard .stat-card:hover) { border-color: #475569; }
 
-:global(.dark .banner--success) {
+:global(.dark .scope-donor-dashboard .banner--success) {
   background: rgba(76, 175, 80, 0.10);
   border-color: rgba(76, 175, 80, 0.24);
   color: #81c784;
 }
 
-:global(.dark .banner--success .banner-text) { color: #CBD5E1; }
-:global(.dark .banner--success .banner-link) { color: #81c784; }
+:global(.dark .scope-donor-dashboard .banner--success .banner-text) { color: #CBD5E1; }
+:global(.dark .scope-donor-dashboard .banner--success .banner-link) { color: #81c784; }
 
-:global(.dark .banner--warning) { color: #FFB74D; }
-:global(.dark .banner--warning .banner-text) { color: #CBD5E1; }
-:global(.dark .text-success) { color: #4caf50 !important; }
+:global(.dark .scope-donor-dashboard .banner--warning) { color: #FFB74D; }
+:global(.dark .scope-donor-dashboard .banner--warning .banner-text) { color: #CBD5E1; }
+:global(.dark .scope-donor-dashboard .text-success) { color: #4caf50 !important; }
 
-:global(.dark .stat-chip--success) {
+:global(.dark .scope-donor-dashboard .stat-chip--success) {
   background: rgba(76, 175, 80, 0.2);
   color: #81c784;
 }
 
-:global(.dark .stat-chip--neutral),
-:global(.dark .trend-empty__icon),
-:global(.dark .empty-state__icon) {
+:global(.dark .scope-donor-dashboard .stat-chip--neutral),
+:global(.dark .scope-donor-dashboard .blood-type-tag),
+:global(.dark .scope-donor-dashboard .trend-empty__icon),
+:global(.dark .scope-donor-dashboard .empty-state__icon) {
   background: #334155;
   color: #94a3b8;
 }
 
-:global(.dark .chart__track) { background: rgba(15, 23, 42, 0.6); }
-:global(.dark .chart__col:hover .chart__track) { background: rgba(51, 65, 85, 0.8); }
-:global(.dark .chart__bar) { background: #475569; }
-:global(.dark .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
-:global(.dark .quick-action:hover) { background: #334155; }
-:global(.dark .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
+:global(.dark .scope-donor-dashboard .chart__track) { background: rgba(15, 23, 42, 0.6); }
+:global(.dark .scope-donor-dashboard .chart__col:hover .chart__track) { background: rgba(51, 65, 85, 0.8); }
+:global(.dark .scope-donor-dashboard .chart__bar) { background: #475569; }
+:global(.dark .scope-donor-dashboard .donation-item:hover) { background: rgba(51, 65, 85, 0.3); }
+:global(.dark .scope-donor-dashboard .quick-action:hover) { background: #334155; }
+:global(.dark .scope-donor-dashboard .quick-action__icon) { background: rgba(255, 255, 255, 0.05); }
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
+:global(.dark .scope-donor-dashboard .skeleton) { background-image: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%); }
 
 .btn-primary:focus-visible,
 .btn-danger:focus-visible {
