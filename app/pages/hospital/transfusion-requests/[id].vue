@@ -143,17 +143,23 @@
                 transfuse them from Blood Bank Inventory.
               </p>
             </div>
-            <NuxtLink to="/hospital/inventory?tab=tagged" class="btn">
-              <AssetIcon name="package" :size="15" />
-              Blood Bank Inventory
-            </NuxtLink>
+            <div class="panel-head__actions">
+              <NuxtLink :to="`/hospital/receiving/direct-distribution?ptr=${requestId}`" class="btn">
+                <AssetIcon name="truck" :size="15" />
+                Receive units
+              </NuxtLink>
+              <NuxtLink to="/hospital/inventory?tab=tagged" class="btn">
+                <AssetIcon name="package" :size="15" />
+                Blood Bank Inventory
+              </NuxtLink>
+            </div>
           </div>
 
           <p v-if="bagsError" class="panel-hint">{{ bagsError }}</p>
           <p v-else-if="!bags.length" class="panel-hint">No bag for this patient has reached your blood bank yet.</p>
           <ul v-else class="bags">
             <li v-for="bag in bags" :key="bag.id" class="bag">
-              <span class="mono">{{ bag.unit_id }}</span>
+              <span class="mono">{{ bag.bag_number || bag.unit_id }}</span>
               <span class="bag__meta">{{ bag.blood_type?.code || '—' }} · {{ bag.component?.name || '—' }}</span>
               <span class="status-chip status-chip--sm" :class="`tone--${HOSPITAL_UNIT_STATUS_TONES[bag.status]}`">
                 {{ HOSPITAL_UNIT_STATUS_LABELS[bag.status] || bag.status_label }}
@@ -552,6 +558,7 @@ function formatDateTime(value) {
 .panel--attention { border-color: rgba(var(--rb-accent-rgb), .35); }
 .panel--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.panel-head__actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 4px; }
 .panel-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; max-width: 70ch; }
 

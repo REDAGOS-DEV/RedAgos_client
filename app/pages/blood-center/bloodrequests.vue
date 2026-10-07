@@ -249,6 +249,11 @@
                 {{ r.code }}
                 <span v-if="r.isWalkIn" class="source-badge" title="Recorded at this blood center after the hospital confirmed it by phone">Walk-in</span>
                 <span v-if="r.ptrReference" class="source-badge source-badge--share" :title="`One facility's share of Patient Transfusion Request ${r.ptrReference}`">Share of {{ r.ptrReference }}</span>
+                <span
+                  v-if="r.weeklyReference"
+                  class="source-badge source-badge--weekly"
+                  :title="`Part of weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
+                >Weekly · {{ r.weeklyReference }}</span>
               </td>
               <td>
                 <div class="hospital-cell">
@@ -802,6 +807,7 @@ function mapRequest(r) {
       ?? (r.is_walk_in ? `Walk-in · recorded by ${r.recorder_name ?? 'this center'}` : ''),
     isWalkIn: Boolean(r.is_walk_in),
     ptrReference: r.transfusion_request?.reference_number ?? null,
+    weeklyReference: r.weekly_request?.reference_number ?? null,
     sourceLabel: r.source_label ?? 'Blood Bank Portal',
     bloodType: r.blood_type?.code ?? '—',
     component: componentSummary(r),
@@ -1687,6 +1693,7 @@ onMounted(() => {
   vertical-align: middle;
 }
 .source-badge--share { background: #e8f0fc; color: var(--info); }
+.source-badge--weekly { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
 .share-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
 .share-note .mono { font-size: 12.5px; color: var(--text-primary); }
 

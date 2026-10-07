@@ -88,6 +88,11 @@
                 <span class="mono">{{ request.reference_number }}</span>
                 <span v-if="request.is_emergency" class="tag tag--stat">STAT</span>
                 <span v-if="request.is_walk_in" class="tag tag--walk-in">Walk-in</span>
+                <span
+                  v-if="request.weekly_request"
+                  class="tag tag--weekly"
+                  title="Part of the hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
+                >Weekly · {{ request.weekly_request.reference_number }}</span>
                 <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
               </div>
               <p class="request-sub">
@@ -180,9 +185,14 @@
           <!-- ACTIONS -->
           <footer v-if="activeTab === 'awaiting_release'" class="request-actions">
             <span class="selection-note">
-              {{ selectedCount(request) > 0
-                ? `${selectedCount(request)} unit(s) selected`
-                : 'Nothing selected — Dispatch sends every reserved unit.' }}
+              <template v-if="request.weekly_request">
+                Weekly request — Dispatch sends every reserved unit{{ selectedCount(request) > 0 ? `; the ${selectedCount(request)} selected apply to Return to Stock` : '' }}.
+              </template>
+              <template v-else>
+                {{ selectedCount(request) > 0
+                  ? `${selectedCount(request)} unit(s) selected`
+                  : 'Nothing selected — Dispatch sends every reserved unit.' }}
+              </template>
             </span>
             <button
               class="btn btn-outline btn-sm"
@@ -219,6 +229,15 @@
           <p class="modal-desc">
             This issues {{ dispatchCount }} unit(s). They leave your inventory now and count as
             fulfilled on the request; the hospital still confirms each unit's arrival.
+          </p>
+
+          <p v-if="dispatchFor.weekly_request" class="modal-warning" role="note">
+            <strong>Weekly request {{ dispatchFor.weekly_request.reference_number }}</strong> goes out in one delivery.
+            <template v-if="dispatchFor.outstanding_quantity > 0">
+              The {{ dispatchFor.outstanding_quantity }} unit(s) you have not reserved will be closed as not supplied —
+              the hospital's next request day replaces them.
+            </template>
+            <template v-else>Everything requested is reserved, so nothing will be closed.</template>
           </p>
 
           <ul class="modal-units">
@@ -466,8 +485,9 @@ const dispatchUnits = computed(() => {
   if (!dispatchFor.value) return []
   const reserved = reservedUnits(dispatchFor.value)
   // No selection means the whole hold, which is what the API does with an
-  // omitted allocation_ids.
-  return dispatchFor.value.selected.length
+  // omitted allocation_ids. A weekly request always goes whole: the API
+  // refuses to dispatch part of one.
+  return dispatchFor.value.selected.length && !dispatchFor.value.weekly_request
     ? reserved.filter((a) => dispatchFor.value.selected.includes(a.id))
     : reserved
 })
@@ -495,14 +515,16 @@ async function confirmDispatch() {
   actionError.value = ''
 
   try {
-    const ids = request.selected.length ? request.selected : undefined
+    const ids = request.selected.length && !request.weekly_request ? request.selected : undefined
     const response = await bloodCenterService.releaseRequest(request.id, ids, handedTo.value || null)
 
     const issued = response?.released_units?.length ?? dispatchCount.value
+    const closedShort = (response?.closed_short ?? []).reduce((sum, line) => sum + (line.quantity ?? 0), 0)
     toast(
       'Units Dispatched',
       'success',
-      `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}${response?.status_label ? ` — ${response.status_label}` : ''}.`,
+      `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}${response?.status_label ? ` — ${response.status_label}` : ''}.`
+        + (closedShort ? ` ${closedShort} unit(s) not supplied were closed.` : ''),
     )
     dispatchFor.value = null
     await load()
@@ -601,6 +623,11 @@ onMounted(load)
 .tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
 .tag--stat { background: var(--rb-accent); color: #fff; }
 .tag--walk-in { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
+.tag--weekly { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
+.modal-warning {
+  font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; padding: 10px 12px; border-radius: 9px;
+  background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3);
+}
 .request-fulfilment { margin-top: 12px; }
 .blood-pill {
   display: inline-block; padding: 1px 7px; border-radius: 6px; font-weight: 700; font-size: 11.5px;

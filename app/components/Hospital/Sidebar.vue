@@ -193,6 +193,13 @@ const navGroups = [
     ]
   },
   {
+    label: 'Receiving',
+    items: [
+      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check' },
+      { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck' }
+    ]
+  },
+  {
     label: 'Inventory',
     items: [
       { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package' }
@@ -236,7 +243,8 @@ const handleLogout = async () => {
 
 const hoveredPath = ref(null)
 
-const isActive = (path) => route.path === path
+// A page under a nav item (a weekly request, a new delivery) keeps its parent lit.
+const isActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 
 const navStyle = (path) => {
   const active = isActive(path)

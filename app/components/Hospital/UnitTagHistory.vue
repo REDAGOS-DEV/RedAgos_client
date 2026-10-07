@@ -12,7 +12,7 @@
       <header class="drawer__header">
         <div>
           <p class="drawer__eyebrow">Bag history</p>
-          <h2 id="unit-history-title" class="drawer__title mono">{{ unitId }}</h2>
+          <h2 id="unit-history-title" class="drawer__title mono">{{ unit?.bag_number || unitId }}</h2>
           <p v-if="unit" class="drawer__meta">
             {{ unit.blood_type?.code || '—' }} · {{ unit.component?.name || '—' }}
             · expires {{ formatDate(unit.expiry_date) }}

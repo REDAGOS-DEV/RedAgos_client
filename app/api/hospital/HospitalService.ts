@@ -5,7 +5,6 @@ import type {
   BloodRequest,
   BloodRequestFilters,
   BloodRequestStatus,
-  CreateBloodRequestPayload,
   CreateTransfusionRequestPayload,
   PatientMatch,
   RequestEvent,
@@ -24,6 +23,16 @@ import type {
   UnitTag,
   UnitTagEvent,
 } from '~/types/hospitalInventory'
+import type {
+  ReceiveDirectDistributionPayload,
+  CreateWeeklyRequestPayload,
+  DirectDistribution,
+  ExternalBloodSource,
+  IsoWeekday,
+  ReplenishmentSchedule,
+  WeeklyRequest,
+  WeeklyStatus,
+} from '~/types/receiving'
 
 /**
  * The requester side of the API: a hospital blood bank's own requests.
@@ -35,7 +44,7 @@ import type {
  * Anything not below is not available; add the endpoint before adding a method.
  */
 
-export type { BloodRequestFilters, CreateBloodRequestPayload, TransfusionRequestFilters }
+export type { BloodRequestFilters, TransfusionRequestFilters }
 
 export interface Paginated<T> {
   data: T[]
@@ -182,21 +191,13 @@ class HospitalService extends BaseService {
   }
 
   /* ---------------------------------------------------------------- *
-   * Blood requests: replenishment orders, and each facility allocation's
+   * Blood requests: each facility allocation's and weekly replenishment's
    * own page — receipt, the DOH form and its history live there.
    * ---------------------------------------------------------------- */
 
   /** This blood bank's own requests. */
   listRequests(params: BloodRequestFilters = {}) {
     return this.request<Paginated<BloodRequest>>('/hospital/blood-requests', 'GET', params)
-  }
-
-  createRequest(payload: CreateBloodRequestPayload) {
-    return this.request<{ message: string; request: BloodRequest }>(
-      '/hospital/blood-requests',
-      'POST',
-      payload,
-    )
   }
 
   showRequest(id: number | string) {
@@ -337,6 +338,73 @@ class HospitalService extends BaseService {
   /** Record that a bag left the shelf for disposal. A reason is required. */
   discardUnit(unit: string, reason: string) {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/discard`, 'POST', { reason })
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Receiving: the blood bank's request days, the weekly request it
+   * sends a center on them, and deliveries from outside RedAgos typed
+   * in bag by bag. A weekly request is one replenishment per blood type;
+   * its receipt is confirmed on each, through confirmReceipt above.
+   * ---------------------------------------------------------------- */
+
+  /** The blood bank's request days, one schedule per blood center. */
+  replenishmentSchedules() {
+    return this.request<{ schedules: ReplenishmentSchedule[] }>('/hospital/replenishment-schedules')
+  }
+
+  /** Set the days the blood bank sends one center its weekly request. Takes effect at once. */
+  saveReplenishmentSchedule(targetFacilityId: number, daysOfWeek: IsoWeekday[]) {
+    return this.request<{ message: string; schedule: ReplenishmentSchedule }>(
+      `/hospital/replenishment-schedules/${targetFacilityId}`,
+      'PUT',
+      { days_of_week: daysOfWeek },
+    )
+  }
+
+  /** Stop keeping request days for one center. Weekly requests already sent are untouched. */
+  deleteReplenishmentSchedule(targetFacilityId: number) {
+    return this.request<{ message: string }>(`/hospital/replenishment-schedules/${targetFacilityId}`, 'DELETE')
+  }
+
+  /** Per center: whether today is a request day, whether today's request went, and recent missed days. */
+  weeklyStatus() {
+    return this.request<WeeklyStatus>('/hospital/weekly-requests/status')
+  }
+
+  weeklyRequests(params: { target_facility_id?: number; search?: string; per_page?: number; page?: number } = {}) {
+    return this.request<Paginated<WeeklyRequest>>('/hospital/weekly-requests', 'GET', params)
+  }
+
+  /** Send a center today's weekly request. Refused on a day that is not one of its request days. */
+  createWeeklyRequest(payload: CreateWeeklyRequestPayload) {
+    return this.request<{ message: string; weekly_request: WeeklyRequest }>('/hospital/weekly-requests', 'POST', payload)
+  }
+
+  /** One weekly request, with every bag dispatched for it. */
+  showWeeklyRequest(id: number | string) {
+    return this.request<{ weekly_request: WeeklyRequest }>(`/hospital/weekly-requests/${id}`)
+  }
+
+  directDistributions(params: { transfusion_request_id?: number; search?: string; per_page?: number; page?: number } = {}) {
+    return this.request<Paginated<DirectDistribution>>('/hospital/direct-distributions', 'GET', params)
+  }
+
+  /** Receive one external bag for a Patient Transfusion Request; it goes straight into the blood bank's stock. */
+  receiveDirectDistribution(payload: ReceiveDirectDistributionPayload) {
+    return this.request<{ message: string; direct_distribution: DirectDistribution }>(
+      '/hospital/direct-distributions',
+      'POST',
+      payload,
+    )
+  }
+
+  /** The blood services a bag can be received from. */
+  externalBloodSources() {
+    return this.request<{ sources: ExternalBloodSource[] }>('/hospital/external-blood-sources')
+  }
+
+  addExternalBloodSource(payload: { name: string; code?: string | null }) {
+    return this.request<{ message: string; source: ExternalBloodSource }>('/hospital/external-blood-sources', 'POST', payload)
   }
 
   listNotifications(params: { category?: string; read?: boolean; per_page?: number } = {}) {

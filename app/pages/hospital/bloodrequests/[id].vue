@@ -186,6 +186,23 @@
             </NuxtLink>
           </section>
 
+          <!--
+            One blood type of a weekly request. It goes out in one delivery,
+            and whatever the center does not supply is closed when it does.
+          -->
+          <section v-else-if="request.weekly_request" class="card part-of">
+            <h2 class="section-title">Weekly Request</h2>
+            <p class="part-of__text">
+              This is the {{ request.blood_type?.code || '' }} part of weekly request
+              <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="part-of__ref">{{ request.weekly_request.reference_number || 'WR' }}</NuxtLink>.
+              The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
+              dispatches.
+            </p>
+            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="btn btn--outline btn--sm">
+              <span>Open the weekly request</span>
+            </NuxtLink>
+          </section>
+
           <!-- SECTION 2: BLOOD DETAILS -->
           <!--
             Reads the request's own lines. The four fields this section used

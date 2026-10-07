@@ -5,7 +5,8 @@
         <div>
           <h1 class="page-title">Blood Bank Inventory</h1>
           <p class="page-subtitle">
-            Bags your blood bank confirmed receipt of, first-expiring-first, and the patients they are tagged to.
+            Bags your blood bank received — from a blood center or by direct distribution — first-expiring-first, and
+            the patients they are tagged to.
           </p>
         </div>
         <button type="button" class="btn" :disabled="refreshing" @click="refresh">
@@ -136,7 +137,7 @@
                 <tr v-for="event in events" :key="event.id">
                   <td>{{ formatDateTime(event.untagged_at || event.transfused_at) }}</td>
                   <td>
-                    <button type="button" class="link-btn mono" @click="historyFor = event.unit.unit_id">{{ event.unit.unit_id }}</button>
+                    <button type="button" class="link-btn mono" @click="historyFor = event.unit.unit_id">{{ event.unit.bag_number || event.unit.unit_id }}</button>
                     <span class="cell-sub">{{ event.unit.blood_type || '—' }} · {{ event.unit.component || '—' }}</span>
                   </td>
                   <td>
@@ -189,8 +190,11 @@
                   :class="rowClass(unit)"
                 >
                   <td>
-                    <button type="button" class="link-btn mono" @click="historyFor = unit.unit_id">{{ unit.unit_id }}</button>
+                    <button type="button" class="link-btn mono" @click="historyFor = unit.unit_id">{{ unit.bag_number || unit.unit_id }}</button>
                     <span v-if="unit.source?.transfusion_reference" class="cell-sub">for {{ unit.source.transfusion_reference }}</span>
+                    <span v-else-if="unit.source?.direct_distribution" class="cell-sub">
+                      from {{ unit.source.direct_distribution.source_name }}<template v-if="unit.source.direct_distribution.requested_for"> · for {{ unit.source.direct_distribution.requested_for }}</template>
+                    </span>
                   </td>
                   <td><span class="type-pill">{{ unit.blood_type?.code || '—' }}</span></td>
                   <td>
@@ -277,7 +281,7 @@
 
     <HospitalUnitReasonDialog
       v-if="dialog?.kind === 'release'"
-      :title="`Release the tag on ${dialog.unit.unit_id}?`"
+      :title="`Release the tag on ${(dialog.unit.bag_number || dialog.unit.unit_id)}?`"
       label="Why is the tag being released?"
       confirm-label="Release tag"
       icon="user-x"
@@ -298,7 +302,7 @@
 
     <HospitalUnitReasonDialog
       v-if="dialog?.kind === 'discard'"
-      :title="`Discard ${dialog.unit.unit_id}?`"
+      :title="`Discard ${(dialog.unit.bag_number || dialog.unit.unit_id)}?`"
       label="Why is the bag being discarded?"
       confirm-label="Discard bag"
       icon="trash-2"
@@ -472,7 +476,7 @@ const emptyTitle = computed(() => ({
 }[tab.value]))
 
 const emptyDescription = computed(() => (tab.value === 'stock'
-  ? 'Bags appear here when you confirm receipt of a delivery from a blood center.'
+  ? 'Bags appear here when you confirm receipt of a delivery from a blood center, or record one received by direct distribution.'
   : 'Nothing matches this view right now.'))
 
 const confirmCopy = computed(() => {
@@ -482,19 +486,19 @@ const confirmCopy = computed(() => {
   switch (value?.kind) {
     case 'crossmatch':
       return {
-        title: `Record the crossmatch for ${value.unit.unit_id}?`,
+        title: `Record the crossmatch for ${(value.unit.bag_number || value.unit.unit_id)}?`,
         body: `The bag leaves storage for ${patient}, and the transfusion must be recorded within 24 hours or the tag is released.`,
         action: 'Record crossmatch',
       }
     case 'transfuse':
       return {
-        title: `Record the transfusion of ${value.unit.unit_id}?`,
+        title: `Record the transfusion of ${(value.unit.bag_number || value.unit.unit_id)}?`,
         body: `The bag was transfused to ${patient}. It can never return to stock.`,
         action: 'Record transfusion',
       }
     case 'return':
       return {
-        title: `Is ${value.unit.unit_id} back in storage?`,
+        title: `Is ${(value.unit.bag_number || value.unit.unit_id)} back in storage?`,
         body: 'Confirm only once the bag is back in the blood bank\'s storage. It becomes available to tag again.',
         action: 'Confirm return',
       }
@@ -834,7 +838,9 @@ function formatDateTime(value) {
   box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
 }
 
-.tabs { display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--rb-border); overflow-x: auto; }
+/* overflow-y is clipped as well: with overflow-x set the other axis becomes auto, and the
+   tabs' -1px bottom margin (which overlaps the border) would otherwise add a vertical scrollbar. */
+.tabs { display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--rb-border); overflow-x: auto; overflow-y: hidden; }
 .tabs__tab {
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   padding: 9px 12px; margin-bottom: -1px; font: inherit; font-size: 13px; font-weight: 600;

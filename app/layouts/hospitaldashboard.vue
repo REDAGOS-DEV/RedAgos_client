@@ -213,10 +213,23 @@ const pageLabels = {
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
   '/hospital/inventory': 'Blood Bank Inventory',
+  '/hospital/receiving/weekly': 'Receiving / Weekly Request',
+  '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
+  '/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution',
   '/hospital/notifications': 'Notifications',
   '/hospital/settings': 'Settings',
 }
-const breadcrumb = computed(() => `Hospital Portal / ${pageLabels[route.path] || ''}`)
+// A detail page (/receiving/weekly/12) falls back to the deepest section it sits under.
+const breadcrumb = computed(() => {
+  const exact = pageLabels[route.path]
+  if (exact) return `Hospital Portal / ${exact}`
+
+  const parent = Object.keys(pageLabels)
+    .filter((path) => route.path.startsWith(`${path}/`))
+    .sort((a, b) => b.length - a.length)[0]
+
+  return `Hospital Portal / ${parent ? pageLabels[parent] : ''}`
+})
 
 const greeting = computed(() => {
   const h = new Date().getHours()
@@ -265,6 +278,8 @@ const searchablePages = [
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
   { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags' },
+  { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan' },
+  { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password' },
 ]

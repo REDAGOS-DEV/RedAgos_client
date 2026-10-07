@@ -87,6 +87,7 @@ export interface UnitTag {
 export interface UnitTagEvent extends UnitTag {
   unit: {
     unit_id: string | null
+    bag_number?: string | null
     status: HospitalUnitStatus | null
     blood_type: string | null
     component: string | null
@@ -95,8 +96,12 @@ export interface UnitTagEvent extends UnitTag {
 
 export interface HospitalUnit {
   id: number
-  /** The bag number printed on the bag. */
+  /** The bag's key: its RedAgos bag number, or an internal key for an external bag. Used in routes. */
   unit_id: string
+  /** The number staff see: the sender's own for an external bag, otherwise `unit_id`. */
+  bag_number?: string
+  /** The number an outside blood service printed on the bag; null for a RedAgos bag. */
+  external_unit_number?: string | null
   status: HospitalUnitStatus
   status_label: string
   blood_type: { id: number | null; code: string | null }
@@ -106,12 +111,24 @@ export interface HospitalUnit {
   days_remaining: number | null
   bag_expired: boolean
   stocked_at: string | null
-  /** The request the bag was received for — the PTR, when it was a patient's share. */
+  /**
+   * Where the bag came from: the request it was received for — the PTR, when
+   * it was a patient's share — or a delivery from outside RedAgos.
+   */
   source: {
+    type?: 'request' | 'direct_distribution'
     request_id: number | null
     reference_number: string | null
     transfusion_request_id: number | null
     transfusion_reference: string | null
+    weekly_request_id?: number | null
+    direct_distribution?: {
+      id: number
+      source_name: string | null
+      external_unit_number: string
+      quantity?: number
+      requested_for?: string | null
+    } | null
   }
   active_tag: UnitTag | null
   /** Why a bag pending return is out of storage: the tag that ended. */

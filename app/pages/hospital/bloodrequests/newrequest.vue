@@ -24,7 +24,7 @@
       </div>
 
       <!-- SUCCESS: PATIENT TRANSFUSION -->
-      <section v-else-if="submitted?.kind === 'transfusion'" class="panel panel--success fade-in">
+      <section v-else-if="submitted" class="panel panel--success fade-in">
         <div class="success-icon"><AssetIcon name="check" :size="26" /></div>
         <h2 class="success-title">Patient Transfusion Request sent</h2>
         <p class="success-text">
@@ -50,26 +50,6 @@
         </div>
       </section>
 
-      <!-- SUCCESS: REPLENISHMENT -->
-      <section v-else-if="submitted" class="panel panel--success fade-in">
-        <div class="success-icon"><AssetIcon name="check" :size="26" /></div>
-        <h2 class="success-title">Request submitted</h2>
-        <p class="success-text">
-          Your request has been sent to <strong>{{ submitted.request.target_facility?.name }}</strong>.
-          Quote reference <strong>{{ submitted.request.reference_number }}</strong> when you follow it up.
-        </p>
-        <div class="success-actions">
-          <button type="button" class="btn-primary" :disabled="downloading" @click="downloadForm">
-            <AssetIcon name="download" :size="16" />
-            {{ downloading ? 'Preparing…' : 'Download Request Form' }}
-          </button>
-          <NuxtLink :to="`/hospital/bloodrequests/${submitted.request.id}`" class="btn-secondary">
-            View request
-          </NuxtLink>
-          <button type="button" class="btn-secondary" @click="startAnother">Raise another</button>
-        </div>
-      </section>
-
       <form v-else class="nr-form" @submit.prevent="onSubmit">
         <!-- BANNER -->
         <div v-if="submitError" class="banner banner--error" role="alert">
@@ -78,7 +58,7 @@
         </div>
 
         <!-- STEPS (patient transfusion only) -->
-        <ol v-if="requiresPatient" class="steps" aria-label="Request steps">
+        <ol class="steps" aria-label="Request steps">
           <li
             v-for="(label, key, index) in STEPS"
             :key="key"
@@ -92,40 +72,18 @@
         </ol>
 
         <template v-if="step === 'details'">
-          <!-- PURPOSE -->
+          <!-- WHAT THIS IS -->
           <section class="panel fade-in" style="--delay:40ms">
-            <h2 class="panel-title">Request purpose</h2>
+            <h2 class="panel-title">Patient transfusion request</h2>
             <p class="panel-hint">
-              A transfusion is for a named patient and may be split across several blood centers. A replenishment
-              restocks your own blood bank from one center and carries no patient details.
+              Blood for a named patient, which may be split across several blood centers. Restocking your blood bank
+              is not requested here: it is your
+              <NuxtLink to="/hospital/receiving/weekly">weekly request</NuxtLink>, sent on your request days.
             </p>
-
-            <div class="choice-grid">
-              <label
-                v-for="purpose in purposes"
-                :key="purpose.value"
-                class="choice"
-                :class="{ 'choice--on': form.request_purpose === purpose.value }"
-              >
-                <input
-                  v-model="form.request_purpose"
-                  type="radio"
-                  name="request_purpose"
-                  :value="purpose.value"
-                  class="sr-only"
-                >
-                <span class="choice-title">{{ purpose.label }}</span>
-                <span class="choice-note">
-                  {{ purpose.requires_patient
-                    ? 'Blood for a specific patient who needs transfusion.'
-                    : 'Restocking your hospital blood bank inventory.' }}
-                </span>
-              </label>
-            </div>
           </section>
 
           <!-- OWN STOCK CHECK -->
-          <section v-if="requiresPatient" class="panel fade-in" style="--delay:50ms">
+          <section class="panel fade-in" style="--delay:50ms">
             <h2 class="panel-title">Your own stock first</h2>
             <p class="panel-hint">
               Check your blood bank's own inventory before asking other facilities. Continue only if it cannot cover
@@ -139,7 +97,7 @@
           </section>
 
           <!-- PATIENT -->
-          <section v-if="requiresPatient" class="panel fade-in" style="--delay:60ms">
+          <section class="panel fade-in" style="--delay:60ms">
             <h2 class="panel-title">Patient information</h2>
 
             <div class="field-grid">
@@ -234,25 +192,9 @@
             <h2 class="panel-title">Request details</h2>
 
             <div class="field-grid">
-              <div v-if="!requiresPatient" class="field field--full">
-                <label for="target" class="field-label">Send request to <span class="req">*</span></label>
-                <select
-                  id="target"
-                  v-model.number="form.target_facility_id"
-                  class="input"
-                  :class="{ 'input--error': errors.target_facility_id }"
-                >
-                  <option :value="null">Select a blood centre…</option>
-                  <option v-for="f in facilities" :key="f.id" :value="f.id">
-                    {{ f.name }}<template v-if="f.address"> — {{ f.address }}</template>
-                  </option>
-                </select>
-                <p v-if="errors.target_facility_id" class="field-error">{{ errors.target_facility_id }}</p>
-              </div>
-
               <div class="field field--wide">
                 <label for="btype" class="field-label">
-                  {{ requiresPatient ? "Patient's blood type" : 'Blood type required' }}
+                  Patient's blood type
                   <span class="req">*</span>
                 </label>
                 <select
@@ -412,7 +354,7 @@
             </div>
 
             <div class="total-row">
-              <span>{{ requiresPatient ? 'Total units required' : 'Total units requested' }}</span>
+              <span>Total units required</span>
               <strong>{{ totalUnits }}</strong>
             </div>
           </section>
@@ -420,13 +362,9 @@
           <!-- ACTIONS -->
           <div class="action-bar">
             <NuxtLink to="/hospital/bloodrequests" class="btn-secondary">Cancel</NuxtLink>
-            <button v-if="requiresPatient" type="button" class="btn-primary" :disabled="planLoading" @click="findFacilities">
+            <button type="button" class="btn-primary" :disabled="planLoading" @click="findFacilities">
               <AssetIcon name="search" :size="16" />
               {{ planLoading ? 'Searching…' : 'Find facilities' }}
-            </button>
-            <button v-else type="submit" class="btn-primary" :disabled="submitting">
-              <AssetIcon name="send" :size="16" />
-              {{ submitting ? 'Submitting…' : 'Submit Request' }}
             </button>
           </div>
         </template>
@@ -519,8 +457,7 @@ import {
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 /*
- * Two requests start here. A replenishment is one form sent to one blood
- * centre. A patient transfusion is a Patient Transfusion Request: staff
+ * A patient's need is a Patient Transfusion Request: staff
  * confirm their own stock cannot cover the patient, record the need, split it
  * across the centres that hold matching stock (earliest expiry first, every
  * quantity editable), review, and send — one facility allocation per centre.
@@ -530,14 +467,12 @@ const STEPS = { details: 'Patient & need', sourcing: 'Facilities', review: 'Revi
 
 const loadingReference = ref(true)
 const submitting = ref(false)
-const downloading = ref(false)
 const submitError = ref('')
-/** { kind: 'transfusion' | 'replenishment', request } once sent. */
+/** { kind: 'transfusion', request } once sent. */
 const submitted = ref(null)
 
 const bloodTypes = ref([])
 const components = ref([])
-const purposes = ref([])
 const priorities = ref([])
 const facilities = ref([])
 
@@ -556,14 +491,12 @@ const lineErrors = ref([])
 
 function blankForm() {
   return {
-    request_purpose: 'patient_transfusion',
     stock_confirmed: false,
     patient_surname: '',
     patient_first_name: '',
     patient_middle_name: '',
     patient_age: null,
     patient_sex: '',
-    target_facility_id: null,
     blood_type_id: null,
     urgency_level: 'routine',
     items: [emptyLine()],
@@ -574,11 +507,6 @@ function emptyLine() {
   return { component_id: null, quantity: 1, indication_code: null, indication_other: '' }
 }
 
-const requiresPatient = computed(() => form.request_purpose === 'patient_transfusion')
-
-watch(() => form.request_purpose, () => {
-  step.value = 'details'
-})
 
 /*
  * Active requirements this blood bank already has for the patient being typed
@@ -590,11 +518,11 @@ const patientMatches = ref([])
 let matchTimer = null
 
 watch(
-  () => [form.request_purpose, form.patient_surname, form.patient_first_name, form.blood_type_id],
+  () => [form.patient_surname, form.patient_first_name, form.blood_type_id],
   () => {
     clearTimeout(matchTimer)
 
-    if (!requiresPatient.value || !form.patient_surname || !form.patient_first_name) {
+    if (!form.patient_surname || !form.patient_first_name) {
       patientMatches.value = []
       return
     }
@@ -638,7 +566,6 @@ onMounted(async () => {
 
     bloodTypes.value = reference?.blood_types ?? []
     components.value = reference?.components ?? []
-    purposes.value = reference?.purposes ?? []
     priorities.value = reference?.priorities ?? []
     facilities.value = eligible?.facilities ?? []
   } catch (err) {
@@ -710,15 +637,11 @@ function validate() {
 
   if (!form.blood_type_id) errors.blood_type_id = 'Select the blood type required.'
 
-  if (requiresPatient.value) {
-    if (!form.stock_confirmed) errors.stock_confirmed = "Confirm your own stock cannot cover this patient before asking other facilities."
-    if (!form.patient_surname) errors.patient_surname = 'Enter the patient surname.'
-    if (!form.patient_first_name) errors.patient_first_name = 'Enter the patient first name.'
-    if (form.patient_age === null || form.patient_age === '') errors.patient_age = 'Enter the patient age.'
-    if (!form.patient_sex) errors.patient_sex = 'Select the patient sex.'
-  } else if (!form.target_facility_id) {
-    errors.target_facility_id = 'Choose the facility this request is being sent to.'
-  }
+  if (!form.stock_confirmed) errors.stock_confirmed = "Confirm your own stock cannot cover this patient before asking other facilities."
+  if (!form.patient_surname) errors.patient_surname = 'Enter the patient surname.'
+  if (!form.patient_first_name) errors.patient_first_name = 'Enter the patient first name.'
+  if (form.patient_age === null || form.patient_age === '') errors.patient_age = 'Enter the patient age.'
+  if (!form.patient_sex) errors.patient_sex = 'Select the patient sex.'
 
   if (form.items.length === 0) errors.items = 'Add at least one blood component to this request.'
 
@@ -800,12 +723,7 @@ async function loadPlan() {
 }
 
 async function onSubmit() {
-  if (requiresPatient.value) {
-    if (step.value === 'review') await sendTransfusion()
-    return
-  }
-
-  await sendReplenishment()
+  if (step.value === 'review') await sendTransfusion()
 }
 
 async function sendTransfusion() {
@@ -845,55 +763,6 @@ async function sendTransfusion() {
     else if (keys.length) step.value = 'details'
   } finally {
     submitting.value = false
-  }
-}
-
-async function sendReplenishment() {
-  submitError.value = ''
-
-  if (!validate()) {
-    submitError.value = 'Please correct the highlighted fields.'
-    return
-  }
-
-  submitting.value = true
-
-  try {
-    const response = await hospitalService.createRequest({
-      target_facility_id: form.target_facility_id,
-      blood_type_id: form.blood_type_id,
-      urgency_level: form.urgency_level,
-      request_purpose: 'replenishment',
-      items: requirementLines(),
-    })
-    submitted.value = { kind: 'replenishment', request: response.request }
-  } catch (err) {
-    applyServerErrors(err?.errors)
-    submitError.value = err?.message || 'Could not submit the request. Please try again.'
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function downloadForm() {
-  const request = submitted.value?.request
-
-  if (!request || downloading.value) return
-
-  downloading.value = true
-
-  try {
-    const blob = await hospitalService.downloadRequestForm(request.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `BRF-${request.reference_number}.pdf`
-    link.click()
-    URL.revokeObjectURL(url)
-  } catch (err) {
-    submitError.value = err?.message || 'Could not download the request form.'
-  } finally {
-    downloading.value = false
   }
 }
 

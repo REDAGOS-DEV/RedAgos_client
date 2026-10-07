@@ -254,6 +254,12 @@ export interface BloodRequest {
   fulfilled_at: string | null
   /** Set when this request is one facility's share of a Patient Transfusion Request. */
   transfusion_request: TransfusionRequestStub | null
+  /**
+   * Set when this replenishment is one blood type of a weekly request. It is
+   * dispatched in one delivery, and whatever is not supplied is closed as
+   * unavailable when it goes.
+   */
+  weekly_request?: { id: number; reference_number: string | null; request_day: string | null } | null
   walk_in: WalkInDetails | null
   allocations?: RequestAllocation[]
 }
@@ -432,15 +438,6 @@ export interface CreateBloodRequestItemPayload {
   indication_code: string | null
   /** Required when the chosen code is an "Others" code. */
   indication_other?: string | null
-}
-
-/** POST /hospital/blood-requests — a replenishment order to one centre. */
-export interface CreateBloodRequestPayload {
-  target_facility_id: number
-  blood_type_id: number
-  urgency_level: UrgencyLevel
-  request_purpose: 'replenishment'
-  items: CreateBloodRequestItemPayload[]
 }
 
 /* ------------------------------------------------------------------ *

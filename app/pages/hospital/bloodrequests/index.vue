@@ -86,21 +86,11 @@
         </div>
       </div>
 
-      <!-- Patient Transfusion Requests and replenishment orders are different records -->
-      <div class="kind-tabs fade-in" style="--delay:80ms" role="tablist" aria-label="Request type">
-        <button
-          v-for="(label, key) in KINDS"
-          :key="key"
-          type="button"
-          role="tab"
-          class="kind-tabs__tab"
-          :class="{ 'kind-tabs__tab--on': kind === key }"
-          :aria-selected="kind === key"
-          @click="setKind(key)"
-        >
-          {{ label }}
-        </button>
-      </div>
+      <!-- Restocking the blood bank is not requested here: it is the weekly request. -->
+      <p class="restock-note fade-in" style="--delay:80ms">
+        Patient transfusion requests. To restock your blood bank, send your
+        <NuxtLink to="/hospital/receiving/weekly">weekly request</NuxtLink> under Receiving.
+      </p>
 
       <!-- Search + Filters -->
       <section class="toolbar fade-in" style="--delay:100ms">
@@ -251,9 +241,6 @@
                     </button>
                     <button type="button" class="action-menu__item" @click="trackRequest(req)">
                       <AssetIcon name="route" :size="14" /> Track Request
-                    </button>
-                    <button v-if="req.kind === 'replenishment'" type="button" class="action-menu__item" @click="downloadPdf(req)">
-                      <AssetIcon name="file-down" :size="14" /> Download PDF
                     </button>
                     <button type="button" class="action-menu__item" @click="printPage">
                       <AssetIcon name="printer" :size="14" /> Print
@@ -422,9 +409,6 @@
           <button type="button" class="btn-primary btn-primary--sm" @click="viewDetails(selectedRequest)">
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
-          <button v-if="selectedRequest.kind === 'replenishment'" type="button" class="btn-ghost" @click="downloadPdf(selectedRequest)">
-            <AssetIcon name="file-down" :size="15" /> Download PDF
-          </button>
           <button v-if="canCancel(selectedRequest)" type="button" class="btn-danger" @click="cancelRequest(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
@@ -450,20 +434,10 @@ const loading = ref(true)
 
 /*
  * A patient's need is a Patient Transfusion Request, possibly split across
- * several centres; a restock order is a replenishment request to one. They
- * are different records from different endpoints, so each has its own tab.
- * The tab is kept in the URL so a back link returns to it.
+ * several centres. Restocking the blood bank is the weekly request, which
+ * lives under Receiving, so it is not listed here.
  */
-const KINDS = { transfusion: 'Patient Transfusion', replenishment: 'Replenishment' }
-const kind = ref(route.query.tab === 'replenishment' ? 'replenishment' : 'transfusion')
-
-function setKind(value) {
-  if (kind.value === value) return
-  kind.value = value
-  router.replace({ query: { ...route.query, tab: value } })
-  resetFilters()
-  loadRequests()
-}
+const kind = ref('transfusion')
 
 // ---------- Reference data ----------
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -556,42 +530,6 @@ function normalizeTransfusion(r) {
     requested_by: r.requester_name
       ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : ''),
     reason: r.cancellation_reason ?? '',
-  }
-}
-
-// Normalizes whatever shape the API returns into what this page expects.
-// Adjust the field mapping here if the backend's response keys differ.
-function normalizeRequest(r) {
-  return {
-    id: r.id,
-    kind: 'replenishment',
-    raw: r,
-    reference_number: r.reference_number ?? r.reference_no ?? r.reference,
-    hospital_name: r.requesting_facility?.name ?? r.hospital_name ?? r.facility_name ?? '',
-    centre_name: r.target_facility?.name ?? '',
-    source: r.request_source ?? 'blood_bank_portal',
-    source_label: r.source_label ?? 'Blood Bank Portal',
-    is_walk_in: Boolean(r.is_walk_in),
-    needs_allocation: false,
-    unallocated: 0,
-    // "Partially Fulfilled (Closed)" once every remainder is closed.
-    status_text: requestStatusLabel(r),
-    fulfilled: r.fulfilled_quantity ?? 0,
-    // blood_type arrives as { id, code }; rendering the object printed
-    // "[object Object]" in the table.
-    blood_type: r.blood_type?.code ?? r.blood_type ?? '',
-    component: componentSummary(r),
-    units: r.quantity ?? r.units,
-    purpose: r.purpose_label ?? '',
-    patient: r.patient?.full_name ?? '',
-    priority: r.urgency_level ?? r.priority ?? 'routine',
-    status: r.status,
-    request_date: r.request_date ? new Date(r.request_date) : (r.created_at ? new Date(r.created_at) : null),
-    // Nobody at the hospital submitted a walk-in; the blood center recorded
-    // it after this blood bank confirmed it by phone.
-    requested_by: r.requester_name
-      ?? (r.is_walk_in ? `Walk-in — recorded by ${r.recorder_name ?? 'the blood center'}` : ''),
-    reason: r.reason ?? r.remarks ?? '',
   }
 }
 
@@ -773,26 +711,6 @@ function viewDetails(req) {
   closeMenu()
   router.push(req.kind === 'transfusion' ? `/hospital/transfusion-requests/${req.id}` : `/hospital/bloodrequests/${req.id}`)
 }
-/**
- * Download the request as the DOH Blood Request Form.
- *
- * The method this called before, `downloadRequestPdf`, was never defined on
- * HospitalService, so the menu item threw every time it was clicked.
- */
-async function downloadPdf(req) {
-  closeMenu()
-  try {
-    const blob = await hospitalService.downloadRequestForm(req.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `BRF-${req.reference_number}.pdf`
-    link.click()
-    URL.revokeObjectURL(url)
-  } catch (err) {
-    console.error('Failed to download request form:', err)
-  }
-}
 function printPage() {
   window.print()
 }
@@ -859,13 +777,8 @@ async function loadRequests() {
   try {
     // Filtered and paged here on the client, so take the most one page may
     // hold rather than the API's default of fifteen.
-    if (kind.value === 'transfusion') {
-      const res = await hospitalService.listTransfusionRequests({ per_page: 100 })
-      allRequests.value = (res?.data ?? []).map(normalizeTransfusion)
-    } else {
-      const res = await hospitalService.listRequests({ request_purpose: 'replenishment', per_page: 100 })
-      allRequests.value = (res?.data ?? []).map(normalizeRequest)
-    }
+    const res = await hospitalService.listTransfusionRequests({ per_page: 100 })
+    allRequests.value = (res?.data ?? []).map(normalizeTransfusion)
   } catch (err) {
     console.error('Failed to load blood requests:', err)
     loadError.value = err
@@ -924,7 +837,7 @@ onUnmounted(() => {
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   border-radius: 18px;
   animation: shimmer 1.4s ease infinite;
@@ -1102,16 +1015,8 @@ onUnmounted(() => {
   color: var(--rb-accent-text);
 }
 
-.kind-tabs {
-  display: inline-flex; align-self: flex-start; gap: 4px; padding: 4px;
-  border-radius: 12px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border);
-}
-.kind-tabs__tab {
-  padding: 8px 16px; border: none; border-radius: 9px; background: transparent;
-  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer;
-}
-.kind-tabs__tab:hover { color: var(--rb-text-primary); }
-.kind-tabs__tab--on { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), .08); }
+.restock-note { margin: 0; font-size: 13px; color: var(--rb-text-secondary); }
+.restock-note a { color: var(--rb-primary-text); font-weight: 600; }
 .req-row__component, .req-row__date { color: var(--text-secondary); }
 
 .type-chip {

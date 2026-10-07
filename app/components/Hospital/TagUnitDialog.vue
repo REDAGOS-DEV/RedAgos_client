@@ -12,7 +12,7 @@
       <div>
         <h2 id="tag-unit-title" class="dialog__title">
           <AssetIcon name="user-check" :size="17" />
-          Tag bag <span class="mono">{{ unit.unit_id }}</span> to a patient
+          Tag bag <span class="mono">{{ unit.bag_number || unit.unit_id }}</span> to a patient
         </h2>
         <p class="dialog__body">
           {{ unit.blood_type?.code || '—' }} · {{ unit.component?.name || '—' }} · expires {{ formatDate(unit.expiry_date) }}.
@@ -74,10 +74,6 @@
           <span v-if="fieldError('patient_sex')" class="field__hint field__hint--error">{{ fieldError('patient_sex') }}</span>
         </label>
         <label class="field">
-          <span class="field__label">Hospital record no.</span>
-          <input v-model.trim="form.patient_record_number" class="field__input" maxlength="60" autocomplete="off" />
-        </label>
-        <label class="field">
           <span class="field__label">Ward</span>
           <input v-model.trim="form.patient_ward" class="field__input" maxlength="100" autocomplete="off" />
         </label>
@@ -137,7 +133,6 @@ const form = reactive({
   patient_middle_name: '',
   patient_age: null,
   patient_sex: '',
-  patient_record_number: '',
   patient_ward: '',
   attending_physician: '',
 })
