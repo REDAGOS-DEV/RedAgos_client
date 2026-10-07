@@ -142,14 +142,8 @@
             <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
-          <button
-            class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
-            :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-            @click="toggleTheme"
-          >
-            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
-          </button>
-
+          <!-- Theme lives in the account menu (Light / Dark / System); the header
+               keeps only what staff reach for often. -->
           <!-- Back now that the facility notification endpoints exist. -->
           <BloodCenterNotificationBell />
 
@@ -162,11 +156,12 @@
 
           <div class="relative">
             <button
+              ref="userMenuTrigger"
               class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
               :aria-expanded="showUserMenu"
               aria-haspopup="menu"
               aria-label="Account menu"
-              @click="showUserMenu = !showUserMenu"
+              @click="toggleUserMenu"
             >
               <div
                 class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
@@ -196,58 +191,88 @@
             <Transition name="popup">
               <div
                 v-if="showUserMenu"
+                ref="userMenuEl"
                 v-click-outside="closeUserMenu"
-                class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 z-40 shadow-lg"
+                class="account-menu absolute right-0 top-full mt-2 w-[296px] rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 z-40 shadow-lg"
                 :style="{ borderColor: headerBorderColor }"
+                role="menu"
+                aria-label="Account"
+                @keydown.esc.prevent="closeUserMenu(true)"
+                @keydown.down.prevent="moveMenuFocus(1)"
+                @keydown.up.prevent="moveMenuFocus(-1)"
               >
-                <div class="flex items-center gap-3 px-4 py-4 border-b dark:border-slate-700" :style="{ borderColor: headerBorderColor }">
-                  <div
-                    class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-                    style="background:#1565C0"
-                  >
-                    <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                    <span v-else>{{ initials }}</span>
+                <!-- Who is signed in: name, email, then role and where they work as plain text -->
+                <div class="px-4 pt-4 pb-3 border-b dark:border-slate-700" :style="{ borderColor: headerBorderColor }">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
+                      style="background:#1565C0"
+                    >
+                      <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
+                      <span v-else>{{ initials }}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100 capitalize">{{ displayName }}</p>
+                      <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
+                    </div>
                   </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100 capitalize">{{ displayName }}</p>
-                    <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
-                    <p v-if="roleLabel || facilityName" class="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span v-if="roleLabel" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#1565C0]/10 text-[#1565C0] dark:bg-sky-400/15 dark:text-sky-300">
-                        {{ roleLabel }}
-                      </span>
-                      <span v-if="facilityName" class="text-[11px] text-gray-500 dark:text-slate-400 truncate max-w-full">
-                        {{ facilityName }}
-                      </span>
-                    </p>
+                  <div v-if="roleLabel || workplaceLabel" class="mt-3 rounded-lg px-3 py-2 bg-[#F7F8FA] dark:bg-slate-800/60">
+                    <p v-if="roleLabel" class="text-[12.5px] font-semibold leading-snug text-gray-800 dark:text-slate-100">{{ roleLabel }}</p>
+                    <p v-if="workplaceLabel" class="text-[11.5px] leading-snug text-gray-500 dark:text-slate-400 mt-0.5">{{ workplaceLabel }}</p>
                   </div>
                 </div>
 
-                <div class="py-2">
+                <div class="py-1.5">
                   <NuxtLink
                     v-for="item in userMenuItems"
                     :key="item.path"
                     :to="item.path"
-                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
-                    @click="closeUserMenu"
+                    role="menuitem"
+                    class="account-menu__item flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                    @click="closeUserMenu()"
                   >
                     <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500" />
-                    <span class="truncate">{{ item.label }}</span>
+                    <span class="truncate">{{ item.path === '/blood-center/settings' ? 'Account settings' : item.label }}</span>
                   </NuxtLink>
+
+                  <!-- Theme: three choices, Light / Dark / System (follows the computer) -->
+                  <div class="flex items-center justify-between gap-3 px-4 py-2">
+                    <span class="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">
+                      <AssetIcon name="palette" :size="16" class="text-gray-400 dark:text-slate-500" />
+                      Theme
+                    </span>
+                    <div class="inline-flex p-0.5 gap-0.5 rounded-lg bg-[#F1F5F9] dark:bg-slate-800" role="group" aria-label="Theme">
+                      <button
+                        v-for="option in THEME_OPTIONS"
+                        :key="option.value"
+                        type="button"
+                        role="menuitemradio"
+                        :aria-checked="themeMode === option.value"
+                        :aria-label="option.label"
+                        :title="option.label"
+                        class="account-menu__item w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                        :class="themeMode === option.value
+                          ? 'bg-white dark:bg-slate-600 text-[#1565C0] dark:text-sky-300 shadow-sm'
+                          : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100'"
+                        @click="setThemeMode(option.value)"
+                      >
+                        <AssetIcon :name="option.icon" :size="14" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="border-t dark:border-slate-700 py-2" :style="{ borderColor: headerBorderColor }">
+                <div class="border-t dark:border-slate-700 py-1.5" :style="{ borderColor: headerBorderColor }">
+                  <!-- Neutral: signing out is routine, not destructive. Red only on hover. -->
                   <button
-                    class="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
-                    style="color:#D32F2F"
+                    type="button"
+                    role="menuitem"
+                    class="account-menu__item flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 transition-colors hover:bg-red-50 hover:text-[#D32F2F] dark:hover:bg-red-950/30 dark:hover:text-red-300"
                     @click="handleLogout"
                   >
                     <AssetIcon name="log-out" :size="16" />
-                    <span>Log Out</span>
+                    <span>Log out</span>
                   </button>
-                </div>
-
-                <div class="px-4 py-2 border-t dark:border-slate-700" :style="{ borderColor: headerBorderColor }">
-                  <p class="text-[11px] text-center text-gray-400 dark:text-slate-500">v1.0.0 · Terms &amp; Conditions</p>
                 </div>
               </div>
             </Transition>
@@ -294,7 +319,13 @@ const { user, ensureUser, logout } = useUser()
 // profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
 // ra sa server.
 const { searchablePages, userMenuItems, labelForPath, sectionForPath } = useBloodCenterNav()
-const { isDark, toggleTheme } = useDarkMode()
+const { isDark, themeMode, setThemeMode } = useDarkMode()
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+  { value: 'system', label: 'System (follows your computer)', icon: 'monitor' },
+]
 const { railExpanded, openMobile } = useSidebar('blood-center')
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
@@ -374,8 +405,36 @@ const greeting = computed(() => {
   return `${time}, ${first}`
 })
 
+// "Processing · Sub-National Blood Center": where this person works.
+const workplaceLabel = computed(() =>
+  [user.value?.is_supervisor ? null : user.value?.department_label, facilityName.value]
+    .filter(Boolean)
+    .join(' · ')
+)
+
+const userMenuEl = ref(null)
+const userMenuTrigger = ref(null)
+
+/** Open, then put focus on the first item so the keyboard can carry on. */
+async function toggleUserMenu() {
+  showUserMenu.value = !showUserMenu.value
+  if (showUserMenu.value) {
+    await nextTick()
+    userMenuEl.value?.querySelector('.account-menu__item')?.focus()
+  }
+}
+
+/** Arrow keys walk the menu's items, wrapping at either end. */
+function moveMenuFocus(step) {
+  const items = [...(userMenuEl.value?.querySelectorAll('.account-menu__item') ?? [])]
+  if (!items.length) return
+  const index = items.indexOf(document.activeElement)
+  items[(index + step + items.length) % items.length]?.focus()
+}
+
 const showUserMenu = ref(false)
-const closeUserMenu = () => {
+const closeUserMenu = (returnFocus = false) => {
+  if (returnFocus === true) nextTick(() => userMenuTrigger.value?.focus())
   showUserMenu.value = false
 }
 

@@ -295,7 +295,7 @@ describe('navigation', () => {
     expect(nav).toMatch(/label: 'Immunohematology', path: '\/blood-center\/testing\?test=typing'[^}]*requires: 'lab\.record_immunohematology'/)
     expect(nav).toMatch(/label: 'Serology \(TTI\)', path: '\/blood-center\/testing\?test=serology'[^}]*requires: 'lab\.record_serology'/)
     expect(nav).not.toContain('/blood-center/immunohematology')
-    expect(nav).toMatch(/label: 'Processing', path: '\/blood-center\/laboratory'[^}]*requires: 'lab\.record_components'/)
+    expect(nav).toMatch(/label: 'Component Processing', path: '\/blood-center\/laboratory'[^}]*requires: 'lab\.record_components'/)
   })
 
   it('offers the corrections page to every role that may ask for one', () => {
@@ -309,21 +309,21 @@ describe('navigation', () => {
    */
   it('gates the collection link exactly as the collection page is gated', () => {
     expect(nav).toContain("export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const")
-    expect(nav).toMatch(/label: 'Collection Dashboard'[^}]*requires: COLLECTION_ABILITIES/)
+    expect(nav).toMatch(/label: 'Collection', path: '\/blood-center\/collection'[^}]*requires: COLLECTION_ABILITIES/)
   })
 
   it('gates the fulfillment link on the ability the fulfillment page requires', () => {
     const page = source('app/pages/blood-center/fulfillment.vue')
 
     expect(page).toContain("requires: 'requests.release'")
-    expect(nav).toMatch(/label: 'Requests Fulfillment'[^}]*requires: 'requests\.release'/)
+    expect(nav).toMatch(/label: 'Request Fulfillment'[^}]*requires: 'requests\.release'/)
   })
 
   it('opens the donor list to Recruitment as a contact list', () => {
     const page = source('app/pages/blood-center/donors.vue')
 
     expect(page).toContain("requires: 'donors.view_contact'")
-    expect(nav).toMatch(/label: 'Donor Management'[^}]*requires: 'donors\.view_contact'/)
+    expect(nav).toMatch(/label: 'Donors'[^}]*requires: 'donors\.view_contact'/)
     expect(page).toContain("const canViewHistory = computed(() => can('donors.view_clinical'))")
   })
 })

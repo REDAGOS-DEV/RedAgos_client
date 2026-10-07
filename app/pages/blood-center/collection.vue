@@ -2,16 +2,10 @@
   <div class="collection">
     <header class="collection__header">
       <div>
-        <p class="collection__eyebrow">Collection</p>
         <h1 class="collection__title">Donation Counter</h1>
         <p class="collection__subtitle">
-          Scan the donor once on arrival, then work through the visit without asking them to identify themselves again.
+          Scan the donor once on arrival. The rest of the visit carries on from that scan.
         </p>
-      </div>
-
-      <div v-if="facilityLabel" class="collection__facility">
-        <AssetIcon name="building-2" :size="14" />
-        {{ facilityLabel }}
       </div>
     </header>
 
@@ -65,7 +59,7 @@
       @refresh="refreshQuestionnaire"
     />
 
-    <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireError }}</p>
+    <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireErrorText }}</p>
 
     <BloodCenterDonorQuestionnaire
       v-if="canReadQuestionnaire && questionnaireOpen && questionnaire"
@@ -90,40 +84,68 @@
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <!-- STAGE 1 — the single scan -->
-    <section v-if="stage === 'scan'" class="card">
-      <h2 class="card__title">Verify the donor</h2>
-      <p class="card__hint">
-        One scan confirms who they are, which appointment they hold, and that it belongs to this facility.
-      </p>
+    <!-- STAGE 1: the single scan. QR on the left, the ID lookup always beside it. -->
+    <div v-if="stage === 'scan'" class="checkin">
+      <section class="card checkin__panel">
+        <div class="checkin__head">
+          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="qr-code" :size="18" /></span>
+          <div>
+            <h2 class="card__title">Scan the donor's QR</h2>
+            <p class="card__hint">The fastest way in, for booked donors and walk-ins alike.</p>
+          </div>
+        </div>
 
-      <div class="scan-grid">
         <BloodCenterQrScanner
           ref="scannerRef"
           :busy="busy"
+          :show-manual="false"
           @scanned="onScanned"
-          @manual="manualOpen = true"
+          @manual="focusLookup"
         />
+      </section>
 
-        <div v-if="manualOpen" class="lookup">
-          <h3 class="lookup__title">Look up by valid ID</h3>
-          <p class="card__hint">Use this when the donor has no QR code, or the camera is unavailable.</p>
+      <section class="card checkin__panel">
+        <div class="checkin__head">
+          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="id-card" :size="18" /></span>
+          <div>
+            <h2 class="card__title">Or look up by valid ID</h2>
+            <p class="card__hint">For a donor without a QR code, or when the camera is unavailable.</p>
+          </div>
+        </div>
 
+        <form class="lookup" @submit.prevent="!busy && lookupValue.trim() && lookupDonor()">
           <label class="field">
             <span class="field__label">Valid ID number</span>
-            <input v-model="lookupValue" type="text" class="field__input" placeholder="e.g. PH-DL-12345" >
+            <input
+              ref="lookupInput"
+              v-model="lookupValue"
+              type="text"
+              class="field__input"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="e.g. PH-DL-12345"
+            >
           </label>
 
-          <button type="button" class="btn btn--primary" :disabled="busy || !lookupValue.trim()" @click="lookupDonor">
+          <button type="submit" class="btn btn--primary" :disabled="busy || !lookupValue.trim()">
             {{ busy ? 'Searching…' : 'Find donor' }}
           </button>
-          <p v-if="lookupError" class="alert alert--error">{{ lookupError }}</p>
+        </form>
+        <p v-if="lookupError" class="alert alert--error" role="alert">{{ lookupError }}</p>
+
+        <div class="checkin__checks">
+          <p class="checkin__checks-title">Either way, the counter confirms</p>
+          <ul>
+            <li><AssetIcon name="check" :size="14" /> Who the donor is</li>
+            <li><AssetIcon name="check" :size="14" /> Which appointment they hold today, if any</li>
+            <li><AssetIcon name="check" :size="14" /> That it belongs to this facility</li>
+          </ul>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <!-- STAGE 2 — check in and open the transaction -->
-    <section v-else-if="stage === 'verified'" class="card">
+    <section v-if="stage === 'verified'" class="card">
       <h2 class="card__title">Start the donation</h2>
       <p class="card__hint">
         <template v-if="appointment?.status === 'confirmed'">
@@ -551,7 +573,6 @@ const canScreen = computed(() => can('donations.screen'))
 const canCollect = computed(() => can('donations.collect'))
 const canClose = computed(() => can('donations.close'))
 const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))
-const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
 
 const service = bloodCenterService
 
@@ -591,7 +612,24 @@ async function refreshQuestionnaire() {
 }
 
 const scannerRef = ref(null)
+const lookupInput = ref(null)
 const manualOpen = ref(false)
+
+function focusLookup() {
+  lookupInput.value?.focus()
+}
+
+/**
+ * Display only. A server that cannot decrypt the stored answers says
+ * "The MAC is invalid", which means nothing at the counter.
+ */
+const questionnaireErrorText = computed(() => {
+  const message = questionnaireError.value || ''
+
+  return /MAC is invalid|payload is invalid/i.test(message)
+    ? "The donor's questionnaire answers can't be read right now. Ask your administrator to check the server's encryption key."
+    : message
+})
 const lookupValue = ref('')
 const lookupError = ref(null)
 const deferring = ref(false)
@@ -948,15 +986,6 @@ function finishVisit() {
   justify-content: space-between;
 }
 
-.collection__eyebrow {
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
-}
-
 .collection__title {
   margin: 0.15rem 0 0;
   font-size: 20px;
@@ -972,17 +1001,6 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-.collection__facility {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 999px;
-  background: var(--rb-surface);
-  font-size: 12.5px;
-  color: var(--rb-text-secondary);
-}
 
 /* --- verified donor bar --- */
 /*
@@ -1122,34 +1140,75 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-.scan-grid {
+/* --- stage 1: check-in --- */
+.checkin {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
 }
 
-@media (min-width: 820px) {
-  .scan-grid { grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); align-items: start; }
+.checkin__panel { gap: 16px; }
+
+.checkin__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-@media (max-width: 640px) {
-  .collection {
-    padding: 16px 16px 32px;
-  }
+.checkin__head .card__hint { margin-top: 2px; }
+
+.checkin__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rb-primary) 12%, transparent);
+  color: var(--rb-primary-text);
 }
 
 .lookup {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
   align-items: flex-start;
-  padding: 0.9rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
+  gap: 12px;
 }
 
-.lookup__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.checkin__checks {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--rb-border);
+}
+
+.checkin__checks-title {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+
+.checkin__checks ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkin__checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.checkin__checks li :deep(svg) { color: var(--rb-success); flex-shrink: 0; }
 
 /* --- forms --- */
 .vitals {

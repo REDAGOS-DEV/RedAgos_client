@@ -1,6 +1,6 @@
 <template>
   <div class="qr-scanner">
-    <div class="qr-scanner__stage">
+    <div class="qr-scanner__stage" :class="{ 'qr-scanner__stage--live': active }">
       <video
         ref="videoRef"
         class="qr-scanner__video"
@@ -14,30 +14,55 @@
         <span class="qr-scanner__corner qr-scanner__corner--tr" />
         <span class="qr-scanner__corner qr-scanner__corner--bl" />
         <span class="qr-scanner__corner qr-scanner__corner--br" />
+        <span class="qr-scanner__beam" />
       </div>
 
+      <span v-if="active" class="qr-scanner__live">
+        <span class="qr-scanner__live-dot" aria-hidden="true" />
+        Camera on
+      </span>
+
+      <!-- Idle: what to ask the donor for, and the one button that starts it. -->
       <div v-if="!active" class="qr-scanner__placeholder">
-        <AssetIcon name="qr-code" :size="34" />
-        <p>{{ placeholderMessage }}</p>
+        <span class="qr-scanner__glyph" aria-hidden="true">
+          <AssetIcon name="qr-code" :size="26" />
+        </span>
+        <p class="qr-scanner__lead">{{ placeholderTitle }}</p>
+        <p class="qr-scanner__sub">{{ placeholderMessage }}</p>
+        <button
+          type="button"
+          class="qr-btn qr-btn--primary"
+          :disabled="starting || !supported"
+          @click="start"
+        >
+          <AssetIcon :name="starting ? 'loader' : 'camera'" :size="15" :class="{ 'qr-spin': starting }" />
+          {{ starting ? 'Opening camera…' : 'Start camera' }}
+        </button>
+      </div>
+
+      <button v-else type="button" class="qr-btn qr-btn--overlay" @click="stop">
+        <AssetIcon name="x" :size="14" />
+        Stop camera
+      </button>
+
+      <div v-if="active && busy" class="qr-scanner__verifying">
+        <AssetIcon name="loader" :size="18" class="qr-spin" />
+        Verifying…
       </div>
     </div>
 
-    <p class="qr-scanner__status" :class="{ 'qr-scanner__status--error': Boolean(error) }" role="status">
-      {{ error || statusMessage }}
+    <p
+      v-show="error || active || busy || !supported"
+      class="qr-scanner__status"
+      :class="{ 'qr-scanner__status--error': Boolean(error) }"
+      role="status"
+    >
+      <AssetIcon v-if="error" name="circle-alert" :size="15" class="qr-scanner__status-icon" />
+      <span v-else class="qr-scanner__status-dot" :class="{ 'qr-scanner__status-dot--live': active }" aria-hidden="true" />
+      <span>{{ error || statusMessage }}</span>
     </p>
 
-    <div class="qr-scanner__actions">
-      <button
-        v-if="!active"
-        type="button"
-        class="qr-btn qr-btn--primary"
-        :disabled="starting || !supported"
-        @click="start"
-      >
-        {{ starting ? 'Opening camera…' : 'Scan donor QR' }}
-      </button>
-      <button v-else type="button" class="qr-btn" @click="stop">Stop camera</button>
-
+    <div v-if="showManual" class="qr-scanner__actions">
       <button type="button" class="qr-btn" @click="$emit('manual')">
         Look up by valid ID
       </button>
@@ -65,6 +90,8 @@ const props = defineProps({
   // Held open while the parent is mid-request, so one code is not submitted
   // twice by the frames that arrive before the response does.
   busy: { type: Boolean, default: false },
+  // Off when the page already shows the ID lookup beside the scanner.
+  showManual: { type: Boolean, default: true },
 })
 
 // How often to run a decode. Every animation frame is wasteful: a QR in view
@@ -85,10 +112,13 @@ let decoder = null
 let timerId = null
 let lastEmitted = null
 
-const placeholderMessage = computed(() => {
-  if (!supported.value) return 'QR scanning is unavailable in this browser.'
+const placeholderTitle = computed(() =>
+  supported.value ? 'Ask the donor for their QR code' : 'QR scanning is unavailable')
 
-  return 'The camera preview will appear here.'
+const placeholderMessage = computed(() => {
+  if (!supported.value) return 'This browser cannot read QR codes. Look the donor up by their valid ID instead.'
+
+  return 'Start the camera, then have them hold the code from their donor portal inside the frame.'
 })
 
 const statusMessage = computed(() => {
@@ -236,19 +266,29 @@ defineExpose({ stop, reset })
 .qr-scanner {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
+/* A recessed, dotted well so it reads as a viewfinder rather than an empty box. */
 .qr-scanner__stage {
   position: relative;
-  aspect-ratio: 4 / 3;
-  max-width: 100%;
+  aspect-ratio: 16 / 10;
+  width: 100%;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface-alt);
+  border: 1px dashed var(--rb-border-strong);
+  background-color: var(--rb-surface-alt);
+  background-image: radial-gradient(color-mix(in srgb, var(--rb-text-secondary) 18%, transparent) 1px, transparent 1px);
+  background-size: 16px 16px;
   display: grid;
   place-items: center;
+  transition: border-color 160ms ease;
+}
+
+.qr-scanner__stage--live {
+  border-style: solid;
+  border-color: var(--rb-primary);
+  background: #0b1220;
 }
 
 .qr-scanner__video {
@@ -264,55 +304,171 @@ defineExpose({ stop, reset })
 .qr-scanner__placeholder {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
   text-align: center;
-  color: var(--rb-text-secondary);
-  font-size: 13.5px;
 }
 
+.qr-scanner__glyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 16px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-primary-text);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+
+.qr-scanner__lead {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+}
+
+.qr-scanner__sub {
+  margin: 0 0 10px;
+  max-width: 38ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rb-text-secondary);
+}
+
+/* Live overlay: a dimmed surround, corner brackets, a slow beam, a "camera on" tag. */
 .qr-scanner__reticle {
   position: absolute;
-  inset: 18%;
+  top: 50%;
+  left: 50%;
+  width: min(58%, 260px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
   pointer-events: none;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgb(2 6 23 / 0.45);
 }
 
 .qr-scanner__corner {
   position: absolute;
-  width: 26px;
-  height: 26px;
-  border: 3px solid var(--rb-primary);
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fff;
 }
 
-.qr-scanner__corner--tl { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
-.qr-scanner__corner--tr { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
-.qr-scanner__corner--bl { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
-.qr-scanner__corner--br { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+.qr-scanner__corner--tl { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 12px; }
+.qr-scanner__corner--tr { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 12px; }
+.qr-scanner__corner--bl { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 12px; }
+.qr-scanner__corner--br { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 12px; }
 
+.qr-scanner__beam {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 10%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+  box-shadow: 0 0 12px #60a5fa;
+  animation: qr-beam 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes qr-beam {
+  to { top: 90%; }
+}
+
+.qr-scanner__live {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(2 6 23 / 0.6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.qr-scanner__live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: qr-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes qr-pulse {
+  50% { opacity: 0.35; }
+}
+
+.qr-scanner__verifying {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgb(2 6 23 / 0.6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Under the stage, only when there is something to say. */
 .qr-scanner__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
-  font-size: 13.5px;
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--rb-text-secondary);
-  min-height: 1.2em;
 }
 
-.qr-scanner__status--error { color: var(--rb-accent-text); }
+.qr-scanner__status--error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--rb-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--rb-accent) 8%, transparent);
+  color: var(--rb-accent-text);
+}
+
+.qr-scanner__status-icon { flex-shrink: 0; margin-top: 1px; }
+
+.qr-scanner__status-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--rb-text-secondary);
+}
+
+.qr-scanner__status-dot--live { background: var(--rb-success); }
 
 .qr-scanner__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .qr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--rb-border-strong);
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   border-radius: 10px;
-  padding: 0.5rem 0.95rem;
+  padding: 9px 16px;
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
@@ -323,6 +479,8 @@ defineExpose({ stop, reset })
   background: var(--rb-surface-hover);
   border-color: var(--rb-border-hover);
 }
+
+.qr-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 .qr-btn:disabled {
   opacity: 0.55;
@@ -338,5 +496,33 @@ defineExpose({ stop, reset })
 .qr-btn--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--rb-primary) 88%, #000);
   border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
+}
+
+.qr-btn--overlay {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  border-color: rgb(255 255 255 / 0.25);
+  background: rgb(2 6 23 / 0.6);
+  color: #fff;
+}
+
+.qr-btn--overlay:hover:not(:disabled) {
+  background: rgb(2 6 23 / 0.8);
+  border-color: rgb(255 255 255 / 0.4);
+}
+
+.qr-spin { animation: qr-spin 0.9s linear infinite; }
+
+@keyframes qr-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr-scanner__beam,
+  .qr-scanner__live-dot,
+  .qr-spin { animation: none; }
 }
 </style>
