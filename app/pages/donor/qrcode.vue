@@ -190,7 +190,7 @@
               <template v-if="hasActiveToken">
                 Your current code expires on {{ formatDate(qrValidUntil) }} — refresh it from this page to get a new one.
               </template>
-              <template v-else-if="profile?.screening_valid_until">
+              <template v-else-if="profile?.screening_valid_until && !donationIntervalActive">
                 Once issued, a code stays valid for {{ qrValidDays }} days, separate from your screening, which is valid until {{ formatDate(profile.screening_valid_until) }}.
               </template>
             </p>
@@ -226,6 +226,10 @@ const qrCodeDataUrl = ref('')
 const qrValidUntil = ref(null)
 const qrValidDays = ref(14)
 const hasActiveToken = ref(false)
+// Waiting period human sa last donation. Gikan ra gyud sa API (GET /qr-code o
+// ang donation_interval_active error sa /refresh) — dili i-compute sa client.
+const donationIntervalActive = ref(false)
+const nextEligibleDate = ref(null) // 'YYYY-MM-DD'
 const emailVerified = ref(false)
 const minting = ref(false)
 const qrError = ref('')
@@ -258,9 +262,28 @@ const QR_STORAGE_KEY = 'donor-qr-code'
 // Ang plaintext token kay dili ma-return sa GET /donors/qr-code — gi-hash ra
 // siya sa server. Naa ra siya sa screening submission ug sa qr-code/refresh,
 // so naa lang QR image kung na-mint na sa maong step.
-const canShowQr = computed(() => !!qrCodeDataUrl.value)
+// Dili ipakita ang QR (ug ang Download/Share/New code) during waiting period
+// o kung wala nay active token, bisan naa pay stale nga image sa memory.
+const canShowQr = computed(() =>
+  !!qrCodeDataUrl.value && hasActiveToken.value && !donationIntervalActive.value
+)
+
+// 'YYYY-MM-DD' i-parse as date-only (local), dili as UTC, para dili mo-display
+// ug usa ka adlaw nga sayo.
+function formatDateOnly(value) {
+  if (!value) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  const d = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+const nextEligibleLabel = computed(() => formatDateOnly(nextEligibleDate.value))
 
 const qrState = computed(() => {
+  if (donationIntervalActive.value) return 'waiting'
   // Wala nay 'deferred' nga state. Ang donor dili na i-hukman sa iyang
   // kaugalingong mga tubag, so ang tanan nga kompleto nga questionnaire
   // makakuha og QR code.
@@ -271,6 +294,14 @@ const qrState = computed(() => {
 
 const qrEmptyCopy = computed(() => {
   switch (qrState.value) {
+    case 'waiting':
+      return {
+        title: 'You recently donated',
+        sub: nextEligibleLabel.value
+          ? `You can take the eligibility screening and generate a new QR code on ${nextEligibleLabel.value}.`
+          : 'You can take the eligibility screening and generate a new QR code once your waiting period ends.',
+        action: null,
+      }
     case 'ready':
       return {
         title: 'Your questionnaire is submitted',
@@ -418,6 +449,22 @@ function storeQr(donorId, data) {
   }
 }
 
+function clearStoredQr() {
+  if (!import.meta.client) return
+  try {
+    sessionStorage.removeItem(QR_STORAGE_KEY)
+  } catch (err) {
+    console.error('Failed to clear cached QR code:', err)
+  }
+}
+
+// I-drop ang daan nga QR sa memory ug sa sessionStorage para dili na makita
+// o magamit.
+function dropLocalQr() {
+  qrCodeDataUrl.value = ''
+  clearStoredQr()
+}
+
 async function renderQr(token) {
   if (!token) return
 
@@ -436,6 +483,8 @@ async function renderQr(token) {
 }
 
 async function mintQrCode() {
+  if (donationIntervalActive.value) return
+
   // Ang pag-mint kay mo-revoke sa daan nga token, so pahibaw-on sa donor.
   if (hasActiveToken.value) {
     const confirmed = window.confirm(
@@ -462,7 +511,15 @@ async function mintQrCode() {
   } catch (err) {
     const code = err?.data?.code
 
-    if (code === 'email_unverified') {
+    if (code === 'donation_interval_active') {
+      // Stale screen: ang server na ang nag-ingon nga naa pa sa waiting period.
+      // Gamita ang next_eligible_date gikan sa response, dili generic error.
+      donationIntervalActive.value = true
+      nextEligibleDate.value = err?.data?.next_eligible_date ?? nextEligibleDate.value
+      hasActiveToken.value = false
+      dropLocalQr()
+      qrError.value = ''
+    } else if (code === 'email_unverified') {
       qrError.value = 'Please verify your email address before requesting a QR code.'
     } else if (code === 'screening_required') {
       qrError.value = 'You need a valid eligibility screening before a QR code can be issued.'
@@ -521,13 +578,20 @@ async function load({ silent = false } = {}) {
     qrValidUntil.value = data?.qr_valid_until ?? null
     qrValidDays.value = data?.qr_valid_days ?? qrValidDays.value
     hasActiveToken.value = !!data?.has_active_token
+    donationIntervalActive.value = !!data?.donation_interval_active
+    nextEligibleDate.value = data?.next_eligible_date ?? null
     emailVerified.value = !!data?.email_verified
+
+    // Ang page kay keepalive, so basin naa pay QR image sa memory gikan sa
+    // miaging mint. Kung wala nay active token (o naa sa waiting period), i-drop.
+    if (!hasActiveToken.value || donationIntervalActive.value) dropLocalQr()
 
     // I-restore ang na-mint na nga code para dili ma-invalidate ang na-download
     // na nga PNG matag balik sa page. Ang server gihapon ang authority kung
     // naa pa bay buhi nga token.
     const stored = readStoredQr(profile.value?.donor_id)
-    if (stored && hasActiveToken.value && stored.validUntil === qrValidUntil.value) {
+    if (stored && hasActiveToken.value && !donationIntervalActive.value
+      && stored.validUntil === qrValidUntil.value) {
       await renderQr(stored.token)
     }
 
