@@ -271,7 +271,7 @@ defineExpose({ stop, reset })
   padding: 1rem;
   text-align: center;
   color: var(--rb-text-secondary);
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .qr-scanner__reticle {
@@ -294,7 +294,7 @@ defineExpose({ stop, reset })
 
 .qr-scanner__status {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   color: var(--rb-text-secondary);
   min-height: 1.2em;
 }
@@ -313,7 +313,7 @@ defineExpose({ stop, reset })
   color: var(--rb-text-primary);
   border-radius: 10px;
   padding: 0.5rem 0.95rem;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;

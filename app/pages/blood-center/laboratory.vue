@@ -2,82 +2,107 @@
   <div class="laboratory">
     <header class="laboratory__header">
       <div>
-        <p class="laboratory__eyebrow">Blood Center Portal / Laboratory</p>
         <h1 class="laboratory__title">Processing</h1>
         <p class="laboratory__subtitle">
-          Record what each unit was separated into, then clear it for issue or reject it. The Testing department
-          records immunohematology and serology on its own page; its outcome appears here.
+          Record what each unit was separated into, then clear it for issue or reject it. Testing's outcome shows here
+          as it is recorded.
         </p>
       </div>
-
-      <span v-if="facilityLabel" class="laboratory__facility">
-        <AssetIcon name="building-2" :size="14" />
-        {{ facilityLabel }}
-      </span>
     </header>
 
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <!-- RECEIVE BLOOD UNIT — the queue of everything collection has handed over -->
-    <section v-if="!selected" class="card">
-      <div class="card__head">
-        <div>
-          <h2 class="card__title">Units awaiting the laboratory</h2>
-          <p class="card__hint">
-            Every donation the counter has finished drawing, until it is cleared for issue or rejected.
+    <!--
+      Workspace: the queue stays on the left while a unit is open on the right,
+      the same layout as Stock Intake. Opening, closing and filtering call the
+      same functions as before.
+    -->
+    <div class="workspace">
+      <aside class="queue-panel" aria-label="Units awaiting the laboratory">
+        <div class="queue-panel__head">
+          <p class="queue-panel__title">
+            Units
+            <span class="queue-panel__count">{{ loadingQueue ? '…' : queue.length }}</span>
+          </p>
+          <button
+            type="button"
+            class="icon-btn"
+            :disabled="loadingQueue"
+            aria-label="Refresh the queue"
+            title="Refresh"
+            @click="loadQueue"
+          >
+            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loadingQueue }" />
+          </button>
+        </div>
+
+        <!-- The status filter as chips: the choice is visible without opening a menu. -->
+        <div class="status-chips" role="group" aria-label="Show">
+          <button
+            v-for="option in STATUS_OPTIONS"
+            :key="option.value || 'awaiting'"
+            type="button"
+            class="status-chip"
+            :class="{ 'status-chip--on': statusFilter === option.value }"
+            :aria-pressed="statusFilter === option.value"
+            :title="option.title"
+            @click="setStatusFilter(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+
+        <ul v-if="loadingQueue" class="qlist" aria-busy="true">
+          <li v-for="n in 4" :key="n" class="qitem qitem--skeleton">
+            <span class="skeleton skeleton--line" />
+            <span class="skeleton skeleton--short" />
+          </li>
+        </ul>
+
+        <div v-else-if="!queue.length" class="queue-empty">
+          <AssetIcon :name="statusFilter ? 'search-x' : 'circle-check-big'" :size="18" />
+          <p>
+            <template v-if="statusFilter">Nothing matches this filter yet.</template>
+            <template v-else>All caught up. Donations appear here once the counter records a collection.</template>
           </p>
         </div>
 
-        <div class="card__tools">
-          <label class="field field--filter">
-            <span class="field__label">Show</span>
-            <select v-model="statusFilter" class="field__input" @change="loadQueue">
-              <option value="">Awaiting the laboratory</option>
-              <option value="collected">With Testing — not yet tested</option>
-              <option value="tested">Tested — ready for processing</option>
-              <option value="completed">Cleared for issue</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </label>
+        <ul v-else class="qlist">
+          <li v-for="row in queue" :key="row.id">
+            <button
+              type="button"
+              class="qitem"
+              :class="{ 'qitem--on': selected?.id === row.id }"
+              :aria-current="selected?.id === row.id ? 'true' : undefined"
+              :disabled="busy"
+              @click="openDonation(row.id)"
+            >
+              <span class="qitem__top">
+                <span class="qitem__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
+                <span class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
+              </span>
+              <span class="qitem__meta">
+                #{{ row.id }} · {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} · {{ formatDate(row.donation_date) }}
+              </span>
+              <span class="qitem__next">
+                <AssetIcon name="arrow-right" :size="12" />
+                {{ nextStepFor(row) }}
+              </span>
+            </button>
+          </li>
+        </ul>
+      </aside>
 
-          <button type="button" class="btn" :disabled="loadingQueue" @click="loadQueue">
-            <AssetIcon name="refresh-cw" :size="14" />
-            {{ loadingQueue ? 'Loading…' : 'Refresh' }}
-          </button>
+      <section class="bench" aria-live="polite">
+        <!-- Nothing open yet -->
+        <div v-if="!selected" class="bench__idle">
+          <span class="bench__idle-icon"><AssetIcon name="flask-conical" :size="26" /></span>
+          <p class="bench__idle-title">Pick a unit to start</p>
+          <p class="bench__idle-text">
+            Choose a donation from the list. Its testing outcome, component breakdown and hand-over open here.
+          </p>
         </div>
-      </div>
-
-      <p v-if="loadingQueue" class="card__hint">Loading the queue…</p>
-
-      <div v-else-if="!queue.length" class="empty">
-        <AssetIcon name="flask-conical" :size="28" />
-        <p v-if="statusFilter">Nothing matches this filter yet.</p>
-        <p v-else>No units are waiting. Donations appear here once the counter records a collection.</p>
-      </div>
-
-      <ul v-else class="queue">
-        <li v-for="row in queue" :key="row.id" class="queue__row">
-          <div class="queue__main">
-            <p class="queue__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</p>
-            <p class="queue__meta">
-              Donation #{{ row.id }} · {{ donorReference(row.donor) }} ·
-              {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} ·
-              {{ formatDate(row.donation_date) }}
-            </p>
-          </div>
-
-          <div class="queue__state">
-            <span class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
-            <span class="queue__next">{{ nextStepFor(row) }}</span>
-          </div>
-
-          <button type="button" class="btn" :disabled="busy" @click="openDonation(row.id)">
-            Open
-          </button>
-        </li>
-      </ul>
-    </section>
 
     <!-- ONE UNIT -->
     <template v-else>
@@ -104,7 +129,7 @@
 
         <div class="fact">
           <span class="fact__label">Barcode</span>
-          <span class="fact__value mono">{{ selected.collection?.donation_barcode || '—' }}</span>
+          <span class="fact__value mono">{{ selected.collection?.donation_barcode || 'None' }}</span>
         </div>
 
         <div class="fact">
@@ -112,7 +137,9 @@
           <span class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
         </div>
 
-        <button type="button" class="btn" :disabled="busy" @click="backToQueue">Back to queue</button>
+        <button type="button" class="icon-btn" :disabled="busy" aria-label="Close this unit" title="Close" @click="backToQueue">
+          <AssetIcon name="x" :size="16" />
+        </button>
       </section>
 
       <ol class="steps" aria-label="Unit progress">
@@ -135,8 +162,8 @@
             </h2>
             <p class="card__hint">
               <template v-if="selected.status === 'completed'">
-                Handed over. Issuance books the bags into quarantine at Stock Intake, and releases them — printing
-                their final labels — once TTI Testing and Immunohematology have both cleared the donation.
+                Handed over. Issuance books the bags into quarantine at Stock Intake, then releases them and prints
+                their final labels once Serology and Immunohematology have both cleared the donation.
               </template>
               <template v-else>
                 {{ selected.rejection_reason || 'No reason was recorded.' }}
@@ -166,8 +193,8 @@
           <section class="card">
             <h2 class="card__title">Testing</h2>
             <p class="card__hint">
-              Recorded by TTI Testing and Immunohematology. You do not wait for them: the bags go into quarantine,
-              and each department's clearance is what releases them.
+              Recorded by Serology and Immunohematology. You do not wait for them: the bags go into quarantine,
+              and each clearance is what releases them.
             </p>
 
             <div class="clearances" aria-label="Clearances">
@@ -224,7 +251,7 @@
             </p>
 
             <NuxtLink v-if="canRecordResult" :to="`/blood-center/testing?donation=${selected.id}`" class="btn btn--link">
-              Open on the TTI Testing page
+              Open on the Testing page
             </NuxtLink>
           </section>
 
@@ -233,7 +260,7 @@
             <h2 class="card__title">Processing</h2>
             <p class="card__hint">
               Record each bag this unit was separated into, with its volume. Two bags of the same component are two
-              rows. This runs alongside testing — neither waits on the other.
+              rows. This runs alongside testing; neither waits on the other.
               <template v-if="selected.collection?.blood_bag_type_label">
                 Drawn into a {{ selected.collection.blood_bag_type_label.toLowerCase() }} bag.
               </template>
@@ -255,7 +282,7 @@
                 Print bag labels (Phase 1)
               </button>
               <span class="card__hint">
-                Base labels: bag number, component and volume, marked "Quarantine — not for issue".
+                Base labels: bag number, component and volume, marked "Quarantine, not for issue".
               </span>
             </div>
 
@@ -299,8 +326,8 @@
 
               <!-- Information only: nothing here decides what a bag should hold. -->
               <p v-if="declaredVolume > 0" class="card__hint">
-                {{ declaredVolume }} mL across {{ componentRows.filter(isCompleteBag).length }} bag(s)<template v-if="selected.volume_ml">
-                  — {{ selected.volume_ml }} mL was collected</template>.
+                {{ declaredVolume }} mL across {{ componentRows.filter(isCompleteBag).length }} bag(s)<template v-if="selected.volume_ml">.
+                  {{ selected.volume_ml }} mL was collected</template>.
               </p>
 
               <div class="actions">
@@ -331,7 +358,7 @@
           <h2 class="card__title">Hand-over to Issuance</h2>
           <p class="card__hint">
             Complete processing to send the bags to Stock Intake, where they are booked into quarantine. Their final
-            labels — verified blood type, expiry, clearance — are printed there once testing clears the donation.
+            labels (verified blood type, expiry, clearance) are printed there once testing clears the donation.
           </p>
 
           <ul v-if="blockers.length" class="blockers">
@@ -369,6 +396,9 @@
         </section>
       </template>
     </template>
+      </section>
+    </div>
+
     <BloodCenterCorrectionRequestDialog
       v-if="correction"
       :donation-id="selected.id"
@@ -428,6 +458,22 @@ const components = ref([])
 // Empty means the laboratory's own working queue: collected and tested, which
 // is what the endpoint returns when no status is given.
 const statusFilter = ref('')
+
+// The filter as chips. Same values the select carried; picking one reloads,
+// exactly as the select's @change did.
+const STATUS_OPTIONS = [
+  { value: '', label: 'Awaiting', title: 'Awaiting the laboratory' },
+  { value: 'collected', label: 'With Testing', title: 'With Testing, not yet tested' },
+  { value: 'tested', label: 'Ready', title: 'Tested, ready for processing' },
+  { value: 'completed', label: 'Cleared', title: 'Cleared for issue' },
+  { value: 'rejected', label: 'Rejected', title: 'Rejected' },
+]
+
+function setStatusFilter(value) {
+  if (statusFilter.value === value) return
+  statusFilter.value = value
+  loadQueue()
+}
 const loadingQueue = ref(false)
 const busy = ref(false)
 const error = ref(null)
@@ -751,7 +797,7 @@ onMounted(async () => {
 
 .laboratory__eyebrow {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -781,7 +827,7 @@ onMounted(async () => {
   border: 1px solid var(--rb-border);
   border-radius: 999px;
   background: var(--rb-surface);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -806,12 +852,12 @@ onMounted(async () => {
 
 .card__tools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
 
-.card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
+.card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
 .card__hint {
   margin: 0;
   max-width: 68ch;
-  font-size: 0.83rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -832,7 +878,7 @@ onMounted(async () => {
   padding: 0.15rem 0.55rem;
   border: 1px solid var(--rb-border);
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 11.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -864,7 +910,7 @@ onMounted(async () => {
   padding: 2rem 1rem;
   text-align: center;
   color: var(--rb-text-secondary);
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .queue { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -881,11 +927,11 @@ onMounted(async () => {
 }
 
 .queue__main { flex: 1 1 16rem; min-width: 0; }
-.queue__name { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--rb-text-primary); }
-.queue__meta { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.queue__name { margin: 0; font-size: 14px; font-weight: 600; color: var(--rb-text-primary); }
+.queue__meta { margin: 0.15rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .queue__state { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
-.queue__next { font-size: 0.74rem; color: var(--rb-text-secondary); }
+.queue__next { font-size: 12px; color: var(--rb-text-secondary); }
 
 /* --- the selected unit --- */
 .unit-bar {
@@ -909,32 +955,32 @@ onMounted(async () => {
   border-radius: 999px;
   background: rgba(var(--rb-primary-rgb), 0.12);
   color: var(--rb-primary-text);
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .unit-bar__names { min-width: 0; }
-.unit-bar__name { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--rb-text-primary); }
-.unit-bar__sub { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.unit-bar__name { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.unit-bar__sub { margin: 0.15rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .fact { display: flex; flex-direction: column; gap: 0.25rem; }
 
 .fact__label {
-  font-size: 0.68rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rb-text-secondary);
 }
 
-.fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
+.fact__value { font-size: 13.5px; color: var(--rb-text-primary); }
 
 /* Who screened a section, and when — the form's "Screened by" column. */
-.fact__sub { font-size: 0.74rem; color: var(--rb-text-secondary); }
+.fact__sub { font-size: 12px; color: var(--rb-text-secondary); }
 
 .mono {
-  font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--rb-font-mono);
   letter-spacing: 0.02em;
 }
 
@@ -956,7 +1002,7 @@ onMounted(async () => {
   display: inline-block;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
@@ -978,7 +1024,7 @@ onMounted(async () => {
   list-style: none;
 }
 
-.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
+.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; }
 
 .step__dot {
   display: grid;
@@ -989,7 +1035,7 @@ onMounted(async () => {
   border: 1px solid var(--rb-border-strong);
   background: var(--rb-surface);
   color: var(--rb-text-secondary);
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -1005,8 +1051,8 @@ onMounted(async () => {
 .field--qty { max-width: 7rem; }
 .field--filter { max-width: 15rem; }
 
-.field__label { font-size: 0.75rem; font-weight: 600; color: var(--rb-text-primary); }
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }
+.field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
+.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 11.5px; }
 
 .field__input {
   width: 100%;
@@ -1016,7 +1062,7 @@ onMounted(async () => {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .field__input:focus-visible {
@@ -1039,7 +1085,7 @@ onMounted(async () => {
   border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
   border-radius: 10px;
   background: rgba(var(--rb-warning-rgb), 0.06);
-  font-size: 0.82rem;
+  font-size: 13px;
   color: var(--rb-warning-text);
 }
 
@@ -1068,7 +1114,7 @@ onMounted(async () => {
   color: var(--rb-text-primary);
   border-radius: 10px;
   padding: 0.5rem 0.95rem;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -1097,7 +1143,7 @@ onMounted(async () => {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
-  font-size: 0.84rem;
+  font-size: 13.5px;
 }
 
 .alert--error {
@@ -1116,4 +1162,145 @@ onMounted(async () => {
 .outcome--success { color: var(--rb-success-text); }
 .outcome--rejected { color: var(--rb-accent-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
+/* ---------- workspace (queue + bench), as on Stock Intake ---------- */
+.laboratory__header { margin-bottom: 0; }
+
+.workspace {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.queue-panel {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 100px);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  overflow: hidden;
+}
+.queue-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+.queue-panel__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rb-text-secondary);
+}
+.queue-panel__count { padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-primary); letter-spacing: 0; }
+
+.status-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 10px; border-bottom: 1px solid var(--rb-border); }
+.status-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.status-chip:hover { color: var(--rb-text-primary); border-color: var(--rb-border-hover); }
+.status-chip--on { border-color: rgba(var(--rb-primary-rgb), 0.35); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.status-chip:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.qlist { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.qitem {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.qitem:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.qitem:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.qitem--on { border-color: rgba(var(--rb-primary-rgb), 0.35); background: rgba(var(--rb-primary-rgb), 0.07); box-shadow: inset 3px 0 0 var(--rb-primary); }
+.qitem--skeleton { cursor: default; gap: 8px; }
+.qitem__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qitem__name { font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qitem__meta { font-size: 12px; color: var(--rb-text-secondary); }
+.qitem__next { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text); }
+
+.queue-empty { display: flex; align-items: flex-start; gap: 10px; margin: 10px 12px 14px; padding: 12px; border-radius: 10px; background: var(--rb-surface-alt); color: var(--rb-success-text); }
+.queue-empty p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.bench { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* The open unit's identity reads as the workbench header, like the other cards. */
+.bench .unit-bar { gap: 24px; padding: 16px 18px; border-color: var(--rb-border); border-radius: 14px; background: var(--rb-surface); }
+.bench .unit-bar__identity { flex: 1; }
+.bench__idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 420px;
+  padding: 48px 24px;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  text-align: center;
+}
+.bench__idle-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.bench__idle-title { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.bench__idle-text { margin: 0; max-width: 42ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.icon-btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: lab-shimmer 1.4s ease infinite;
+}
+.skeleton--line { width: 75%; }
+.skeleton--short { width: 45%; }
+@keyframes lab-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.spin { animation: lab-spin 0.9s linear infinite; }
+@keyframes lab-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 300px minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton, .spin { animation: none; }
+}
 </style>

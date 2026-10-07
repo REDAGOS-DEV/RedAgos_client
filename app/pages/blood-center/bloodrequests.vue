@@ -15,8 +15,8 @@
       <div>
         <h1 class="page-title">Incoming Requests</h1>
         <p class="page-subtitle">
-          Review, prioritize, and process blood requests from hospital blood banks — sent through the Blood Bank
-          Portal or brought here by a watcher.
+          Review and process blood requests from hospital blood banks, sent through the Blood Bank Portal or brought
+          in by a watcher.
         </p>
       </div>
       <div class="header-actions">
@@ -25,17 +25,17 @@
           phones the hospital first; the request is only recorded once the
           hospital confirms it.
         -->
-        <button v-if="canRecord" class="btn btn-primary" @click="showWalkIn = true">
-          <AssetIcon name="clipboard-plus" :size="16" />
-          New Walk-in Request
+        <button class="btn btn-outline" @click="handleExportAll">
+          <AssetIcon name="download" :size="15" />
+          Export
         </button>
         <button class="btn btn-outline" @click="handleRefresh" :disabled="loading">
-          <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
+          <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
           Refresh
         </button>
-        <button class="btn btn-outline" @click="handleExportAll">
-          <AssetIcon name="download" :size="16" />
-          Export Requests
+        <button v-if="canRecord" class="btn btn-primary" @click="showWalkIn = true">
+          <AssetIcon name="clipboard-plus" :size="15" />
+          New Walk-in Request
         </button>
       </div>
     </header>
@@ -79,7 +79,7 @@
               </div>
             </div>
             <p v-if="primaryEmergency.allocated === 0" class="insufficient-tag">
-              <AssetIcon name="octagon-alert" :size="14" /> No stock reserved yet — review to check availability
+              <AssetIcon name="octagon-alert" :size="14" /> No stock reserved yet. Review it to check availability.
             </p>
           </div>
         </div>
@@ -99,25 +99,38 @@
         <div v-for="n in 4" :key="'sk-' + n" class="summary-card skeleton-card" />
       </template>
       <template v-else>
-        <div v-for="stat in summaryStats" :key="stat.key" class="summary-card" :class="{ 'is-danger': stat.danger }">
-          <div class="summary-icon" :class="{ 'is-danger': stat.danger }">
-            <AssetIcon :name="stat.icon" :size="20" />
-          </div>
-          <div class="summary-body">
-            <p class="summary-value">{{ stat.value }}</p>
+        <!-- Red only when there is an emergency to act on, not by default. -->
+        <div
+          v-for="stat in summaryStats"
+          :key="stat.key"
+          class="summary-card"
+          :class="{ 'is-danger': stat.danger && stat.value > 0 }"
+        >
+          <div class="summary-top">
             <p class="summary-label">{{ stat.label }}</p>
-            <p class="summary-trend" :class="{ up: stat.trendUp === true, down: stat.trendUp === false }">
-              <AssetIcon v-if="stat.trendUp === true" name="trending-up" :size="12" />
-              <AssetIcon v-else-if="stat.trendUp === false" name="trending-down" :size="12" />
-              {{ stat.trend }}
-            </p>
+            <span class="summary-icon" :class="{ 'is-danger': stat.danger }">
+              <AssetIcon :name="stat.icon" :size="14" />
+            </span>
           </div>
+          <p class="summary-value">{{ stat.value }}</p>
+          <p class="summary-trend" :class="{ up: stat.trendUp === true, down: stat.trendUp === false }">
+            <AssetIcon v-if="stat.trendUp === true" name="trending-up" :size="12" />
+            <AssetIcon v-else-if="stat.trendUp === false" name="trending-down" :size="12" />
+            {{ stat.trend }}
+          </p>
         </div>
       </template>
     </section>
 
+    <!--
+      The queue: status pills, source, the filter bar and the table in one card,
+      so the controls sit with what they filter. Same refs and handlers as
+      before; Apply is still what sends the toolbar's status and priority.
+    -->
+    <section class="queue-card">
+    <div class="queue-head">
     <!-- QUICK FILTERS -->
-    <div class="quick-filters">
+    <div class="quick-filters" role="group" aria-label="Status and priority">
       <button
         v-for="opt in filterOptions"
         :key="opt"
@@ -130,45 +143,80 @@
     </div>
 
     <!-- SOURCE: where the request was keyed in. Purpose is unchanged by it. -->
-    <div class="quick-filters" role="group" aria-label="Request source">
+    <div class="source-toggle" role="group" aria-label="Request source">
       <button
         v-for="opt in sourceOptions"
         :key="opt.value || 'all'"
-        class="pill pill--source"
+        class="source-toggle__btn"
         :class="{ active: sourceFilter === opt.value }"
+        :aria-pressed="sourceFilter === opt.value"
         @click="sourceFilter = opt.value"
       >
         <AssetIcon v-if="opt.icon" :name="opt.icon" :size="13" />
         {{ opt.label }}
       </button>
     </div>
+    </div>
 
     <!-- ADVANCED FILTER TOOLBAR -->
     <div class="toolbar">
+      <!--
+        Row 1 is always shown: search and what is being asked for. Priority,
+        status and the dates sit under "More filters": the pills above already
+        cover status and priority one at a time, so these are for combining.
+      -->
+      <div class="toolbar-row">
       <div class="toolbar-search">
-        <AssetIcon name="search" :size="16" class="search-icon" />
-        <input v-model="searchQuery" type="text" placeholder="Search request ID, hospital, doctor..." @input="onSearchInput" />
+        <AssetIcon name="search" :size="15" class="search-icon" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search request ID, hospital or doctor"
+          aria-label="Search requests"
+          @input="onSearchInput"
+        />
       </div>
 
-      <select v-model="toolbarFilters.hospital">
-        <option value="">Hospital</option>
+      <!-- The first option names the filter, so a chosen value keeps its meaning. -->
+      <select v-model="toolbarFilters.hospital" aria-label="Hospital">
+        <option value="">All hospitals</option>
         <option v-for="h in hospitalOptions" :key="h" :value="h">{{ h }}</option>
       </select>
-      <select v-model="toolbarFilters.bloodType">
-        <option value="">Blood Type</option>
+      <select v-model="toolbarFilters.bloodType" aria-label="Blood type">
+        <option value="">All blood types</option>
         <option v-for="b in bloodTypeOptions" :key="b" :value="b">{{ b }}</option>
       </select>
-      <select v-model="toolbarFilters.component">
-        <option value="">Blood Component</option>
+      <select v-model="toolbarFilters.component" aria-label="Blood component">
+        <option value="">All components</option>
         <option v-for="c in componentOptions" :key="c" :value="c">{{ c }}</option>
       </select>
-      <select v-model="toolbarFilters.priority">
-        <option value="">Priority</option>
+
+      <button
+        type="button"
+        class="btn btn-outline btn-sm more-filters"
+        :class="{ 'is-on': showMoreFilters || moreFilterCount }"
+        :aria-expanded="showMoreFilters"
+        @click="showMoreFilters = !showMoreFilters"
+      >
+        <AssetIcon name="sliders-horizontal" :size="14" />
+        More filters
+        <span v-if="moreFilterCount" class="more-filters__count">{{ moreFilterCount }}</span>
+      </button>
+
+      <div class="toolbar-buttons">
+        <button class="btn btn-ghost btn-sm" @click="resetFilters">Reset</button>
+        <button class="btn btn-primary btn-sm" :disabled="loading" @click="loadRequests">Apply filters</button>
+      </div>
+      </div>
+
+      <div v-show="showMoreFilters" class="toolbar-row toolbar-row--more">
+      <select v-model="toolbarFilters.priority" aria-label="Priority">
+        <option value="">Any priority</option>
         <option>Routine</option>
         <option>Emergency</option>
       </select>
-      <select v-model="toolbarFilters.status">
-        <option value="">Status</option>
+      <select v-model="toolbarFilters.status" aria-label="Status">
+        <option value="">Any status</option>
         <option>Pending</option>
         <option>Processing</option>
         <option>Partial</option>
@@ -176,23 +224,27 @@
         <option>Rejected</option>
         <option>Cancelled</option>
       </select>
-      <input v-model="toolbarFilters.date" type="date" title="Request Date" />
-      <input v-model="toolbarFilters.neededBy" type="date" title="Needed By" />
-
-      <div class="toolbar-buttons">
-        <button class="btn btn-outline btn-sm" @click="resetFilters">Reset Filters</button>
-        <button class="btn btn-primary btn-sm" :disabled="loading" @click="loadRequests">Apply Filters</button>
+      <label class="date-field">
+        <span>Requested</span>
+        <input v-model="toolbarFilters.date" type="date" />
+      </label>
+      <label class="date-field">
+        <span>Needed by</span>
+        <input v-model="toolbarFilters.neededBy" type="date" />
+      </label>
       </div>
+    </div>
 
-      <div class="toolbar-meta">
-        <span>Showing {{ visibleRequests.length }} of {{ meta.total }} requests</span>
+    <div class="toolbar-meta">
+      <span><strong>{{ visibleRequests.length }}</strong> of {{ meta.total }} requests</span>
+      <template v-if="lastUpdatedAt">
         <span class="dot">·</span>
         <span>Updated {{ lastUpdatedLabel }}</span>
-        <template v-if="activeFilterCount > 0">
-          <span class="dot">·</span>
-          <span>{{ activeFilterCount }} active filter{{ activeFilterCount === 1 ? '' : 's' }}</span>
-        </template>
-      </div>
+      </template>
+      <template v-if="activeFilterCount > 0">
+        <span class="dot">·</span>
+        <span class="toolbar-meta__filters">{{ activeFilterCount }} active filter{{ activeFilterCount === 1 ? '' : 's' }}</span>
+      </template>
     </div>
 
     <!-- REQUEST TABLE -->
@@ -202,33 +254,30 @@
       </div>
 
       <div v-else-if="!error && visibleRequests.length === 0 && activeFilterCount === 0 && !searchQuery" class="empty-state">
-        <AssetIcon name="inbox" :size="40" />
-        <h3>No Incoming Requests</h3>
-        <p>There are currently no hospital blood requests waiting for review.</p>
-        <button class="btn btn-primary btn-sm" @click="handleRefresh">Refresh Requests</button>
+        <AssetIcon name="inbox" :size="32" />
+        <h3>No incoming requests</h3>
+        <p>Hospital requests waiting for review will appear here.</p>
+        <button class="btn btn-outline btn-sm" @click="handleRefresh">Refresh</button>
       </div>
 
       <div v-else-if="!error && visibleRequests.length === 0" class="empty-state">
-        <AssetIcon name="filter-x" :size="40" />
-        <h3>No Requests Match Your Filters</h3>
-        <p>Try adjusting your filters or clearing the current search.</p>
-        <button class="btn btn-outline btn-sm" @click="resetFilters">Clear Filters</button>
+        <AssetIcon name="search-x" :size="32" />
+        <h3>No requests match these filters</h3>
+        <p>Change a filter or clear the search to see more.</p>
+        <button class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
       </div>
 
       <table v-else-if="!error" class="request-table">
         <thead>
           <tr>
-            <th>Request ID</th>
+            <th>Request</th>
             <th>Hospital</th>
-            <th>Requested By</th>
-            <th>Blood Type</th>
-            <th>Component</th>
-            <th>Units</th>
-            <th>Reserved</th>
+            <th>Blood</th>
+            <th>Units held</th>
             <th>Priority</th>
-            <th>Needed By</th>
+            <th>Needed by</th>
             <th>Status</th>
-            <th></th>
+            <th><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -258,17 +307,19 @@
               <td>
                 <div class="hospital-cell">
                   <span class="hospital-name">{{ r.hospital }}</span>
-                  <span class="hospital-contact">{{ r.contact }}</span>
+                  <span class="hospital-contact">{{ r.requestedBy || r.contact || 'Requester not recorded' }}</span>
                 </div>
               </td>
-              <td class="requested-by">{{ r.requestedBy || r.contact || '—' }}</td>
-              <td><span class="blood-pill">{{ r.bloodType }}</span></td>
-              <td>{{ r.component }}</td>
-              <td>{{ r.units }}</td>
+              <td>
+                <div class="blood-cell">
+                  <span class="blood-pill">{{ r.bloodType }}</span>
+                  <span class="blood-component">{{ r.component }}</span>
+                </div>
+              </td>
               <td>
                 <span class="inv-pill" :class="'inv-' + inventoryLevel(r)">
                   <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" />
-                  {{ r.allocated }} / {{ r.units }} held
+                  {{ r.allocated }} / {{ r.units }}
                 </span>
               </td>
               <td>
@@ -286,44 +337,36 @@
                   Review
                 </button>
                 <div class="menu-wrap">
-                  <button class="icon-btn" @click="toggleMenu(r.id)" aria-label="More actions">
+                  <button class="icon-btn" @click="toggleMenu(r.id)" :aria-label="`More actions for ${r.code}`" aria-haspopup="menu" :aria-expanded="openMenuId === r.id">
                     <AssetIcon name="move-vertical" :size="16" />
                   </button>
                   <div v-if="openMenuId === r.id" v-click-outside="() => (openMenuId = null)" class="context-menu">
+                    <!-- One entry per action: "View Details", "Review Request" and
+                         "View Timeline" all opened the same drawer, and "Approve"
+                         and "Reserve Inventory" called the same approval. -->
                     <button @click="openMenuId = null; openReview(r)">
-                      <AssetIcon name="eye" :size="14" /> View Details
-                    </button>
-                    <button @click="openMenuId = null; openReview(r)">
-                      <AssetIcon name="search" :size="14" /> Review Request
-                    </button>
-                    <button
-                      v-if="canAllocate"
-                      :disabled="isMutating(r.id)"
-                      @click="openMenuId = null; requestApprove(r)"
-                    >
-                      <AssetIcon name="check" :size="14" /> Approve Request
-                    </button>
-                    <button v-if="canDecide" class="danger" :disabled="isMutating(r.id)" @click="openMenuId = null; requestReject(r)">
-                      <AssetIcon name="circle-x" :size="14" /> Reject Request
+                      <AssetIcon name="eye" :size="14" /> Review and timeline
                     </button>
                     <button @click="openMenuId = null; toggleExpand(r.id)">
-                      <AssetIcon name="package-search" :size="14" /> Check Inventory
+                      <AssetIcon name="package-search" :size="14" /> Quick look
                     </button>
                     <button
                       v-if="canAllocate"
                       :disabled="isMutating(r.id)"
                       @click="openMenuId = null; requestApprove(r)"
                     >
-                      <AssetIcon name="archive" :size="14" /> Reserve Inventory
+                      <AssetIcon name="check" :size="14" /> Approve and reserve
                     </button>
-                    <button @click="openMenuId = null; openReview(r)">
-                      <AssetIcon name="activity" :size="14" /> View Timeline
-                    </button>
+                    <div class="context-menu__divider" />
                     <button @click="openMenuId = null; handlePrint(r)">
-                      <AssetIcon name="printer" :size="14" /> Print Request
+                      <AssetIcon name="printer" :size="14" /> Print request
                     </button>
                     <button @click="openMenuId = null; handleExportPdf(r)">
                       <AssetIcon name="file-text" :size="14" /> Export PDF
+                    </button>
+                    <div v-if="canDecide" class="context-menu__divider" />
+                    <button v-if="canDecide" class="danger" :disabled="isMutating(r.id)" @click="openMenuId = null; requestReject(r)">
+                      <AssetIcon name="circle-x" :size="14" /> Reject request
                     </button>
                   </div>
                 </div>
@@ -332,11 +375,11 @@
 
             <!-- INLINE ROW EXPANSION (quick review, does not replace the drawer) -->
             <tr v-if="expandedIds.has(r.id)" class="expanded-row">
-              <td colspan="11">
+              <td colspan="8">
                 <div class="expanded-content">
                   <div class="expanded-grid">
                     <div><span class="e-label">Hospital</span><span class="e-value">{{ r.hospital }}</span></div>
-                    <div><span class="e-label">Requested By</span><span class="e-value">{{ r.requestedBy || r.contact || '—' }}</span></div>
+                    <div><span class="e-label">Requested By</span><span class="e-value">{{ r.requestedBy || r.contact || 'Not recorded' }}</span></div>
                     <div><span class="e-label">Blood Requirement</span><span class="e-value">{{ r.bloodType }} · {{ r.component }} · {{ r.units }} units</span></div>
                     <div>
                       <span class="e-label">Inventory Availability</span>
@@ -382,6 +425,7 @@
         </tbody>
       </table>
     </div>
+    </section>
 
     <!-- RECENT ACTIVITY -->
     <section class="activity-card">
@@ -399,7 +443,7 @@
             <AssetIcon :name="activityIcon(item.type)" :size="14" />
           </span>
           <div class="activity-body">
-            <p><strong>{{ item.description }}</strong> — {{ item.hospital }}</p>
+            <p><strong>{{ item.description }}</strong> · {{ item.hospital }}</p>
             <span class="activity-meta">{{ item.time }} · {{ item.staff }}</span>
           </div>
         </li>
@@ -428,9 +472,9 @@
                 <div><dt>Priority</dt><dd><span class="priority-badge" :class="'priority-' + activeRequest.priority.toLowerCase()"><AssetIcon :name="priorityIcon(activeRequest.priority)" :size="12" /> {{ activeRequest.priority }}</span></dd></div>
                 <div><dt>Status</dt><dd><span class="status-badge" :class="activeRequest.statusClass">{{ activeRequest.status }}</span></dd></div>
                 <div><dt>Needed By</dt><dd>{{ activeRequest.neededBy }}</dd></div>
-                <div><dt>Submitted By</dt><dd>{{ activeRequest.requestedBy || '—' }}</dd></div>
+                <div><dt>Submitted By</dt><dd>{{ activeRequest.requestedBy || 'Not recorded' }}</dd></div>
                 <div><dt>Source</dt><dd>{{ activeRequest.sourceLabel }}</dd></div>
-                <div><dt>Purpose</dt><dd>{{ activeRequest.purpose || '—' }}</dd></div>
+                <div><dt>Purpose</dt><dd>{{ activeRequest.purpose || 'Not recorded' }}</dd></div>
               </dl>
             </section>
 
@@ -462,11 +506,11 @@
               <h3>Hospital Information</h3>
               <dl class="detail-grid">
                 <div><dt>Hospital Name</dt><dd>{{ activeRequest.hospital }}</dd></div>
-                <div><dt>Department</dt><dd>{{ activeRequest.department || '—' }}</dd></div>
+                <div><dt>Department</dt><dd>{{ activeRequest.department || 'Not recorded' }}</dd></div>
                 <div><dt>Doctor</dt><dd>{{ activeRequest.contact }}</dd></div>
-                <div><dt>Contact Number</dt><dd>{{ activeRequest.phone || '—' }}</dd></div>
-                <div><dt>Email</dt><dd>{{ activeRequest.email || '—' }}</dd></div>
-                <div><dt>Address</dt><dd>{{ activeRequest.address || '—' }}</dd></div>
+                <div><dt>Contact Number</dt><dd>{{ activeRequest.phone || 'Not recorded' }}</dd></div>
+                <div><dt>Email</dt><dd>{{ activeRequest.email || 'Not recorded' }}</dd></div>
+                <div><dt>Address</dt><dd>{{ activeRequest.address || 'Not recorded' }}</dd></div>
               </dl>
             </section>
 
@@ -481,9 +525,9 @@
               </dl>
               <div class="notes-block">
                 <p class="notes-label">Reason for Request</p>
-                <p class="notes-text">{{ activeRequest.reason || '—' }}</p>
+                <p class="notes-text">{{ activeRequest.reason || 'Not recorded' }}</p>
                 <p class="notes-label">Clinical Notes</p>
-                <p class="notes-text">{{ activeRequest.notes || '—' }}</p>
+                <p class="notes-text">{{ activeRequest.notes || 'Not recorded' }}</p>
               </div>
             </section>
 
@@ -508,7 +552,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
-                    <td>{{ line.component?.name || '—' }}</td>
+                    <td>{{ line.component?.name || 'Not recorded' }}</td>
                     <td class="num">{{ line.requested ?? '—' }}</td>
                     <td class="num">{{ line.outstanding }}</td>
                     <td class="num">{{ line.available }}</td>
@@ -890,6 +934,14 @@ const toolbarFilters = ref({
 })
 
 const activeFilterCount = computed(() => Object.values(toolbarFilters.value).filter(Boolean).length)
+
+// UI only: whether the second filter row is open, and how many of its
+// filters are set (shown on the button so a hidden filter is never forgotten).
+const showMoreFilters = ref(false)
+const moreFilterCount = computed(() => {
+  const f = toolbarFilters.value
+  return [f.priority, f.status, f.date, f.neededBy].filter(Boolean).length
+})
 
 const hospitalOptions = computed(() => [...new Set(requests.value.map((r) => r.hospital))])
 const bloodTypeOptions = computed(() => [...new Set(requests.value.map((r) => r.bloodType))])
@@ -1521,8 +1573,10 @@ onMounted(() => {
 /* HEADER */
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
 .page-title { font-size: 20px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
-.page-subtitle { font-size: 13px; color: var(--text-secondary); margin: 0; }
-.header-actions { display: flex; gap: 10px; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin: 0; max-width: 72ch; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border-color: transparent; }
+.btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--bg); }
 
 .btn {
   display: inline-flex; align-items: center; gap: 6px; border-radius: 10px;
@@ -1572,7 +1626,7 @@ onMounted(() => {
 }
 .emergency-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .emergency-title { font-weight: 600; font-size: 15px; color: #C62828; }
-.emergency-id { font-size: 12px; color: var(--text-secondary); font-family: monospace; }
+.emergency-id { font-size: 12px; color: var(--text-secondary); font-family: var(--rb-font-mono); }
 /* auto-fit, not a fixed count: the content column now changes width
    when the rail expands, so the grid has to answer to its container
    rather than to a viewport breakpoint that no longer describes it. */
@@ -1583,27 +1637,48 @@ onMounted(() => {
 .emergency-actions { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
 
 /* SUMMARY CARDS */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .summary-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: var(--card-padding); display: flex; gap: 14px; box-shadow: var(--shadow);
+  padding: 16px; display: flex; flex-direction: column; box-shadow: var(--shadow);
 }
 .skeleton-card { min-height: 88px; background: linear-gradient(90deg, #eef2f7 25%, #f7f9fc 37%, #eef2f7 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; }
 .summary-icon {
-  width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; background: #e8f0fc; color: var(--primary);
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; background: #e8f0fc; color: var(--primary);
   display: flex; align-items: center; justify-content: center;
 }
 .summary-icon.is-danger { background: #fdecea; color: var(--danger); }
-.summary-value { font-size: 26px; font-weight: 700; margin: 0; line-height: 1.1; }
-.summary-label { font-size: 13px; color: var(--text-secondary); margin: 2px 0 6px; }
+.summary-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.summary-value { font-size: 24px; font-weight: 800; margin: 6px 0 4px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.summary-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin: 0; }
+.summary-card.is-danger { border-color: rgba(211, 47, 47, 0.35); box-shadow: inset 3px 0 0 var(--danger-fill); }
+.summary-card.is-danger .summary-value { color: var(--danger); }
 .summary-trend { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin: 0; }
 .summary-trend.up { color: var(--success); }
 .summary-trend.down { color: var(--danger); }
 
 /* QUICK FILTERS */
 .quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+/* QUEUE CARD: pills, source, toolbar and table together */
+.queue-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.source-toggle { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
+.source-toggle__btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.source-toggle__btn:hover { color: var(--text); }
+.source-toggle__btn.active { background: var(--card); color: var(--primary); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
+.source-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
 .pill {
-  padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
   border: 1px solid var(--border); background: var(--card); color: var(--text-secondary);
   cursor: pointer; transition: all 0.15s ease;
 }
@@ -1612,21 +1687,38 @@ onMounted(() => {
 
 /* TOOLBAR */
 .toolbar {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  box-shadow: var(--shadow); position: sticky; top: 0; z-index: 5;
+  padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;
+  border-bottom: 1px solid var(--border); background: var(--card);
 }
-.toolbar-search { position: relative; flex: 1 1 220px; min-width: 200px; }
+.toolbar-row { display: flex; align-items: center; gap: 8px; }
+.toolbar .toolbar-row > select { flex: 1 1 0; min-width: 0; max-width: 220px; }
+.toolbar-row > .date-field { flex: 0 0 auto; }
+.toolbar-row--more { padding-top: 8px; border-top: 1px dashed var(--border); }
+.toolbar-row--more > select { flex: 0 1 180px !important; }
+
+.more-filters { flex-shrink: 0; }
+.more-filters.is-on { border-color: var(--primary); color: var(--primary); }
+.more-filters__count {
+  min-width: 18px; padding: 0 6px; border-radius: 999px;
+  background: var(--primary-fill); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.toolbar-search { position: relative; flex: 2 1 0; min-width: 220px; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
-.toolbar-search input { width: 100%; padding: 9px 12px 9px 32px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; background: var(--bg); }
-.toolbar select, .toolbar input[type="date"] { padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; background: var(--bg); color: var(--text); }
-.toolbar-buttons { display: flex; gap: 8px; }
-.toolbar-meta { margin-left: auto; font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.toolbar-search input { width: 100%; height: 36px; padding: 0 12px 0 32px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); }
+.toolbar select { height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); max-width: 180px; }
+.toolbar-search input:focus, .toolbar select:focus, .date-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12); }
+.date-field { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.date-field span { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.date-field input { height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
+.toolbar-buttons { display: flex; gap: 6px; margin-left: auto; }
+.toolbar-meta { padding: 10px 18px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.toolbar-meta strong { color: var(--text); }
+.toolbar-meta__filters { color: var(--primary); font-weight: 600; }
 .dot { opacity: 0.5; }
 
 /* TABLE */
-.table-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: auto; }
-.request-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
+.table-card { background: var(--card); overflow: auto; }
+.request-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
 .request-table thead th {
   position: sticky; top: 0; background: var(--card); text-align: left; padding: 14px 16px;
   font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
@@ -1636,7 +1728,7 @@ onMounted(() => {
 .table-row:hover { background: #f4f8fd; border-left-color: var(--primary); }
 .table-row.is-mutating { opacity: 0.6; pointer-events: none; }
 .request-table td { padding: 14px 16px; vertical-align: middle; }
-.mono { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
+.mono { font-family: var(--rb-font-mono); font-size: 12px; color: var(--text-secondary); }
 
 .expand-btn {
   display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
@@ -1648,7 +1740,12 @@ onMounted(() => {
 .hospital-cell { display: flex; flex-direction: column; }
 .hospital-name { font-weight: 600; }
 .hospital-contact { font-size: 12px; color: var(--text-secondary); }
-.requested-by { color: var(--text-secondary); font-size: 12.5px; }
+.blood-cell { display: flex; align-items: center; gap: 8px; }
+.blood-component { font-size: 12.5px; color: var(--text); }
+
+.context-menu__divider { height: 1px; margin: 4px 0; background: var(--border); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .blood-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding: 3px 8px; border-radius: 8px; background: #fdecea; color: var(--danger); font-weight: 700; font-size: 12px; }
 

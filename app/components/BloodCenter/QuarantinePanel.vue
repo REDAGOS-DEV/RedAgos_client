@@ -191,7 +191,7 @@ defineExpose({ load })
   align-items: center;
   gap: 0.45rem;
   margin: 0;
-  font-size: 0.98rem;
+  font-size: 16px;
   font-weight: 700;
   color: var(--rb-text-primary);
 }
@@ -202,13 +202,13 @@ defineExpose({ load })
   border-radius: 999px;
   background: rgba(var(--rb-warning-rgb), 0.16);
   color: var(--rb-warning-text);
-  font-size: 0.75rem;
+  font-size: 12px;
   text-align: center;
 }
 
 .quarantine__hint {
   margin: 0.25rem 0 0;
-  font-size: 0.8rem;
+  font-size: 13px;
   color: var(--rb-text-secondary);
   max-width: 60ch;
 }
@@ -222,7 +222,7 @@ defineExpose({ load })
   border-radius: 8px;
   background: transparent;
   color: var(--rb-text-secondary);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
@@ -230,7 +230,7 @@ defineExpose({ load })
   margin: 0;
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 13px;
   background: rgba(var(--rb-success-rgb), 0.12);
   color: var(--rb-success-text);
 }
@@ -242,7 +242,7 @@ defineExpose({ load })
 
 .quarantine__empty {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -269,13 +269,13 @@ defineExpose({ load })
 .quarantine__name {
   margin: 0;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 14px;
   color: var(--rb-text-primary);
 }
 
 .quarantine__meta {
   margin: 0.15rem 0 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -291,7 +291,7 @@ defineExpose({ load })
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--rb-border);
-  font-size: 0.72rem;
+  font-size: 11.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -314,7 +314,7 @@ defineExpose({ load })
   background: var(--rb-primary);
   color: #fff;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -324,7 +324,7 @@ defineExpose({ load })
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--rb-font-mono);
 }
 
 @media (max-width: 640px) {

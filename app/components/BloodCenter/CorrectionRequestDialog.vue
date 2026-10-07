@@ -173,13 +173,13 @@ async function submit() {
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 16px;
 }
 
 .dialog__body,
 .dialog__hint {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -193,7 +193,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.82rem;
+  font-size: 13px;
 }
 
 .diff li {
@@ -225,7 +225,7 @@ async function submit() {
 }
 
 .field__label {
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -244,7 +244,7 @@ async function submit() {
   border-radius: 8px;
   background: rgba(var(--rb-accent-rgb), 0.12);
   color: var(--rb-accent-text);
-  font-size: 0.82rem;
+  font-size: 13px;
 }
 
 .dialog__actions {
@@ -260,7 +260,7 @@ async function submit() {
   background: transparent;
   color: var(--rb-text-primary);
   font-weight: 600;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   cursor: pointer;
 }
 

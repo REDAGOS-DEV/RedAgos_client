@@ -2,19 +2,12 @@
   <div class="testing">
     <header class="testing__header">
       <div>
-        <p class="testing__eyebrow">Blood Center Portal / Laboratory</p>
-        <h1 class="testing__title">TTI Testing</h1>
+        <h1 class="testing__title">{{ viewCopy.title }}</h1>
         <p class="testing__subtitle">
-          Record each drawn unit's confirmatory blood typing and its five-marker serology panel. Saving a result that
-          passes clears that section; a saved result changes only through an approved correction. RedAgos stores what
-          the medical technologist found — it does not perform or interpret any test.
+          {{ viewCopy.subtitle }} A passing result clears its section; a saved result changes only through an approved
+          correction. RedAgos records what the medical technologist found. It does not perform or interpret any test.
         </p>
       </div>
-
-      <span v-if="facilityLabel" class="testing__facility">
-        <AssetIcon name="building-2" :size="14" />
-        {{ facilityLabel }}
-      </span>
     </header>
 
     <div class="tabs" role="tablist" aria-label="Testing">
@@ -50,11 +43,26 @@
       <section v-if="!selected" class="card">
         <div class="card__head">
           <div>
-            <h2 class="card__title">Units awaiting testing</h2>
+            <h2 class="card__title">{{ viewCopy.queueTitle }}</h2>
             <p class="card__hint">
-              Every drawn donation whose typing or serology is not yet cleared. Scan the barcode sticker on a tube to go
-              straight to its donation.
+              {{ viewCopy.queueHint }} Scan the barcode sticker on a tube to go straight to its donation.
             </p>
+
+            <!-- Only for someone who records both: one switch, same views as the sidebar links. -->
+            <div v-if="canType && canSerology" class="view-switch" role="group" aria-label="Show units waiting for">
+              <button
+                v-for="option in viewOptions"
+                :key="option.value"
+                type="button"
+                class="view-switch__btn"
+                :class="{ 'view-switch__btn--on': testView === option.value }"
+                :aria-pressed="testView === option.value"
+                @click="setTestView(option.value)"
+              >
+                {{ option.label }}
+                <span class="view-switch__count">{{ option.count }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="card__tools">
@@ -85,14 +93,17 @@
 
         <p v-if="loadingQueue" class="card__hint">Loading the queue…</p>
 
-        <div v-else-if="!queue.length" class="empty">
+        <div v-else-if="!visibleQueue.length" class="empty">
           <AssetIcon name="flask-conical" :size="28" />
-          <p v-if="activeBarcode">No unit waiting for testing has barcode {{ activeBarcode }}.</p>
+          <p v-if="activeBarcode">No unit waiting for {{ viewCopy.noun }} has barcode {{ activeBarcode }}.</p>
+          <p v-else-if="testView !== 'all' && queue.length">
+            Nothing is waiting for {{ viewCopy.noun }}. {{ queue.length }} unit{{ queue.length === 1 ? ' is' : 's are' }} still waiting for the other test.
+          </p>
           <p v-else>No units are waiting. Donations appear here once the counter records a collection.</p>
         </div>
 
         <ul v-else class="queue">
-          <li v-for="row in queue" :key="row.id" class="queue__row">
+          <li v-for="row in visibleQueue" :key="row.id" class="queue__row">
             <div class="queue__main">
               <p class="queue__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</p>
               <p class="queue__meta">
@@ -140,7 +151,7 @@
 
           <div class="fact">
             <span class="fact__label">Barcode</span>
-            <span class="fact__value mono">{{ selected.collection?.donation_barcode || '—' }}</span>
+            <span class="fact__value mono">{{ selected.collection?.donation_barcode || 'None' }}</span>
           </div>
 
           <div class="fact">
@@ -187,9 +198,9 @@
           approval, until a bag has left quarantine.
         </p>
 
-        <div class="lab-grid">
-          <!-- IMMUNOHEMATOLOGY — recorded by the Immunohematology department. -->
-          <section v-if="canType" class="card">
+        <div class="lab-grid" :class="{ 'lab-grid--serology-first': testView === 'serology' }">
+          <!-- IMMUNOHEMATOLOGY: recorded by the Immunohematology department. -->
+          <section v-if="canType" class="card card--typing">
             <div class="card__titles">
               <h2 class="card__title">Immunohematology</h2>
               <span v-if="selected.clearances?.immunohematology" class="pill pill--collected">Cleared</span>
@@ -273,8 +284,8 @@
             </div>
           </section>
 
-          <!-- SEROLOGY — TTI Testing's section. -->
-          <section v-if="canSerology" class="card">
+          <!-- SEROLOGY: TTI Testing's section. Shown first in the Serology view. -->
+          <section v-if="canSerology" class="card card--serology">
             <div class="card__titles">
               <h2 class="card__title">Serology</h2>
               <span
@@ -535,6 +546,47 @@ const canSeeReferrals = computed(() => can('lab.referrals'))
 const canSerology = computed(() => can('lab.record_serology'))
 const canType = computed(() => can('lab.record_immunohematology'))
 
+// --- which test's queue is on screen (?test=typing | serology, from the sidebar) ---
+// UI only: the queue is loaded the same way; this narrows what is listed and
+// which card comes first. A view the user cannot record falls back to all.
+const router = useRouter()
+
+const testView = computed(() => {
+  const view = route.query.test
+  if (view === 'typing' && canType.value) return 'typing'
+  if (view === 'serology' && canSerology.value) return 'serology'
+  return 'all'
+})
+
+function setTestView(view) {
+  router.replace({ query: { ...route.query, test: view === 'all' ? undefined : view } })
+}
+
+const VIEW_COPY = {
+  typing: {
+    title: 'Immunohematology',
+    subtitle: 'Record each drawn unit\'s confirmatory ABO/Rh typing and antibody screen.',
+    queueTitle: 'Waiting for typing',
+    queueHint: 'Drawn donations whose typing is not yet cleared.',
+    noun: 'typing',
+  },
+  serology: {
+    title: 'Serology (TTI)',
+    subtitle: 'Record each drawn unit\'s five-marker serology panel.',
+    queueTitle: 'Waiting for serology',
+    queueHint: 'Drawn donations whose serology is not yet cleared.',
+    noun: 'serology',
+  },
+  all: {
+    title: 'Testing',
+    subtitle: 'Record each drawn unit\'s confirmatory blood typing and its five-marker serology panel.',
+    queueTitle: 'Units awaiting testing',
+    queueHint: 'Every drawn donation whose typing or serology is not yet cleared.',
+    noun: 'testing',
+  },
+}
+const viewCopy = computed(() => VIEW_COPY[testView.value])
+
 const service = bloodCenterService
 
 const tab = ref('queue')
@@ -561,6 +613,21 @@ async function loadReference() {
 // --- the queue ----------------------------------------------------------------
 
 const queue = ref([])
+
+const needsTyping = (row) => !row.clearances?.immunohematology
+const needsSerology = (row) => !row.clearances?.tti
+
+const visibleQueue = computed(() => {
+  if (testView.value === 'typing') return queue.value.filter(needsTyping)
+  if (testView.value === 'serology') return queue.value.filter(needsSerology)
+  return queue.value
+})
+
+const viewOptions = computed(() => [
+  { value: 'typing', label: 'Typing', count: queue.value.filter(needsTyping).length },
+  { value: 'serology', label: 'Serology', count: queue.value.filter(needsSerology).length },
+  { value: 'all', label: 'All', count: queue.value.length },
+])
 const loadingQueue = ref(false)
 const barcodeSearch = ref('')
 const activeBarcode = ref('')
@@ -966,7 +1033,7 @@ onMounted(async () => {
 
 .testing__eyebrow {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -996,7 +1063,7 @@ onMounted(async () => {
   border: 1px solid var(--rb-border);
   border-radius: 999px;
   background: var(--rb-surface);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -1017,7 +1084,7 @@ onMounted(async () => {
   border-bottom: 2px solid transparent;
   background: none;
   font: inherit;
-  font-size: 0.86rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--rb-text-secondary);
   cursor: pointer;
@@ -1034,7 +1101,7 @@ onMounted(async () => {
   border-radius: 999px;
   background: var(--rb-accent);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 11px;
   font-weight: 700;
   text-align: center;
 }
@@ -1063,15 +1130,55 @@ onMounted(async () => {
 
 .card__tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
 
-.card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
+.card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
 .card__hint {
   margin: 0;
   max-width: 68ch;
-  font-size: 0.83rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
+
+.lab-grid--serology-first .card--serology { order: -1; }
+
+.view-switch {
+  display: inline-flex;
+  gap: 3px;
+  margin-top: 10px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+}
+.view-switch__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-switch__btn:hover { color: var(--rb-text-primary); }
+.view-switch__btn--on { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
+.view-switch__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.view-switch__count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.view-switch__btn--on .view-switch__count { background: rgba(var(--rb-primary-rgb), 0.12); }
 
 .lab-grid {
   display: grid;
@@ -1101,8 +1208,8 @@ onMounted(async () => {
 .queue__row:first-child { border-top: none; }
 
 .queue__main { flex: 1 1 18rem; min-width: 0; }
-.queue__name { margin: 0; font-weight: 700; font-size: 0.9rem; color: var(--rb-text-primary); }
-.queue__meta { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.queue__name { margin: 0; font-weight: 700; font-size: 14px; color: var(--rb-text-primary); }
+.queue__meta { margin: 0.15rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .queue__state { display: flex; gap: 0.4rem; }
 
 .chip {
@@ -1112,7 +1219,7 @@ onMounted(async () => {
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   border: 1px dashed var(--rb-border-strong);
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--rb-text-secondary);
 }
@@ -1139,7 +1246,7 @@ onMounted(async () => {
   padding: 1.6rem 1rem;
   text-align: center;
   color: var(--rb-text-secondary);
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .empty p { margin: 0; }
@@ -1167,30 +1274,30 @@ onMounted(async () => {
   border-radius: 50%;
   background: rgba(var(--rb-primary-rgb), 0.12);
   color: var(--rb-primary-text);
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.unit-bar__name { margin: 0; font-weight: 700; font-size: 0.95rem; color: var(--rb-text-primary); }
-.unit-bar__sub { margin: 0.1rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.unit-bar__name { margin: 0; font-weight: 700; font-size: 15px; color: var(--rb-text-primary); }
+.unit-bar__sub { margin: 0.1rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .fact { display: flex; flex-direction: column; gap: 0.25rem; }
 
 .fact__label {
-  font-size: 0.68rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rb-text-secondary);
 }
 
-.fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
+.fact__value { font-size: 13.5px; color: var(--rb-text-primary); }
 
 .pill {
   display: inline-block;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
@@ -1210,7 +1317,7 @@ onMounted(async () => {
 .references {
   margin: 0;
   padding-left: 1.1rem;
-  font-size: 0.8rem;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--rb-text-secondary);
 }
@@ -1218,7 +1325,7 @@ onMounted(async () => {
 .references strong { color: var(--rb-text-primary); }
 .references .references__warn { color: var(--rb-warning-text); }
 
-.screened { margin: 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.screened { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 /*
  * Five rows, two choices each, nothing pre-selected. Reactive is the reading
@@ -1243,7 +1350,7 @@ onMounted(async () => {
 .marker__name {
   float: left;
   padding: 0;
-  font-size: 0.86rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--rb-text-primary);
 }
@@ -1258,7 +1365,7 @@ onMounted(async () => {
   border: 1px solid var(--rb-border-strong);
   border-radius: 8px;
   background: var(--rb-surface);
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 600;
   color: var(--rb-text-secondary);
   cursor: pointer;
@@ -1278,8 +1385,8 @@ onMounted(async () => {
 
 /* --- forms --- */
 .field { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
-.field__label { font-size: 0.75rem; font-weight: 600; color: var(--rb-text-primary); }
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }
+.field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
+.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 11.5px; }
 
 .field__input {
   width: 100%;
@@ -1289,12 +1396,12 @@ onMounted(async () => {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .field__input:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; border-color: var(--rb-primary); }
 
-.mono { font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.02em; }
+.mono { font-family: var(--rb-font-mono); letter-spacing: 0.02em; }
 
 /* --- actions --- */
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
@@ -1310,7 +1417,7 @@ onMounted(async () => {
   border-radius: 10px;
   padding: 0.5rem 0.95rem;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -1333,7 +1440,7 @@ onMounted(async () => {
 }
 
 /* --- feedback --- */
-.alert { margin: 0; padding: 0.65rem 0.85rem; border-radius: 10px; font-size: 0.84rem; }
+.alert { margin: 0; padding: 0.65rem 0.85rem; border-radius: 10px; font-size: 13.5px; }
 
 .alert--error {
   background: rgba(var(--rb-accent-rgb), 0.1);
@@ -1362,7 +1469,7 @@ onMounted(async () => {
   border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
   background: rgba(var(--rb-warning-rgb), 0.08);
   color: var(--rb-warning-text);
-  font-size: 0.82rem;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1376,7 +1483,7 @@ onMounted(async () => {
   border: 1px solid var(--rb-border-strong);
   background: var(--rb-surface);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--rb-text-secondary);
   cursor: pointer;
@@ -1399,8 +1506,8 @@ onMounted(async () => {
 }
 
 .referral__head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-.referral__name { margin: 0; font-weight: 700; font-size: 0.92rem; color: var(--rb-text-primary); }
-.referral__meta { margin: 0.1rem 0 0; font-size: 0.78rem; color: var(--rb-text-secondary); }
+.referral__name { margin: 0; font-weight: 700; font-size: 15px; color: var(--rb-text-primary); }
+.referral__meta { margin: 0.1rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .referral__facts { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; align-items: center; }
 
 .referral__note {
@@ -1408,7 +1515,7 @@ onMounted(async () => {
   padding: 0.5rem 0.7rem;
   border-radius: 8px;
   background: var(--rb-surface-alt);
-  font-size: 0.82rem;
+  font-size: 13px;
   color: var(--rb-text-primary);
 }
 
@@ -1444,12 +1551,12 @@ onMounted(async () => {
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 16px;
   font-weight: 700;
   color: var(--rb-accent-text);
 }
 
-.dialog__body { font-size: 0.86rem; line-height: 1.55; color: var(--rb-text-primary); }
+.dialog__body { font-size: 14px; line-height: 1.55; color: var(--rb-text-primary); }
 .dialog__body p { margin: 0 0 0.4rem; }
 .dialog__body ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
 

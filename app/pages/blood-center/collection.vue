@@ -936,7 +936,7 @@ function finishVisit() {
   border: 1px solid var(--rb-border);
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
-  font-size: 0.85rem;
+  font-size: 13.5px;
   line-height: 1.45;
 }
 
@@ -950,7 +950,7 @@ function finishVisit() {
 
 .collection__eyebrow {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -980,7 +980,7 @@ function finishVisit() {
   border: 1px solid var(--rb-border);
   border-radius: 999px;
   background: var(--rb-surface);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -1018,20 +1018,20 @@ function finishVisit() {
   border-radius: 50%;
   background: rgba(var(--rb-primary-rgb), 0.12);
   color: var(--rb-primary-text);
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .donor-bar__name {
   margin: 0;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 15px;
   color: var(--rb-text-primary);
 }
 
 .donor-bar__meta {
   margin: 0.1rem 0 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
 
@@ -1044,20 +1044,20 @@ function finishVisit() {
 .fact { display: flex; flex-direction: column; gap: 0.25rem; }
 
 .fact__label {
-  font-size: 0.68rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rb-text-secondary);
 }
 
-.fact__value { font-size: 0.85rem; color: var(--rb-text-primary); }
+.fact__value { font-size: 13.5px; color: var(--rb-text-primary); }
 
 .pill {
   display: inline-block;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 600;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
@@ -1081,7 +1081,7 @@ function finishVisit() {
   list-style: none;
 }
 
-.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
+.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; }
 
 .step__dot {
   display: grid;
@@ -1089,7 +1089,7 @@ function finishVisit() {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-size: 0.7rem;
+  font-size: 11px;
   font-weight: 700;
   border: 1px solid var(--rb-border-strong);
   color: var(--rb-text-secondary);
@@ -1112,12 +1112,12 @@ function finishVisit() {
   background: var(--rb-surface);
 }
 
-.card__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--rb-text-primary); }
+.card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
 .card__hint {
   margin: 0;
   max-width: 68ch;
-  font-size: 0.83rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -1149,7 +1149,7 @@ function finishVisit() {
   background: var(--rb-surface-alt);
 }
 
-.lookup__title { margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--rb-text-primary); }
+.lookup__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
 
 /* --- forms --- */
 .vitals {
@@ -1162,12 +1162,12 @@ function finishVisit() {
 .field--narrow { max-width: 14rem; }
 
 .field__label {
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   color: var(--rb-text-primary);
 }
 
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 0.72rem; }
+.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 11.5px; }
 
 .field__input {
   width: 100%;
@@ -1177,7 +1177,7 @@ function finishVisit() {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .field__input:focus-visible {
@@ -1208,7 +1208,7 @@ function finishVisit() {
   color: var(--rb-text-primary);
   border-radius: 10px;
   padding: 0.5rem 0.95rem;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -1235,7 +1235,7 @@ function finishVisit() {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
-  font-size: 0.84rem;
+  font-size: 13.5px;
 }
 
 .alert--error {
@@ -1273,7 +1273,7 @@ function finishVisit() {
 
 .exam__legend {
   padding: 0 0.35rem;
-  font-size: 0.7rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1283,7 +1283,7 @@ function finishVisit() {
 .exam__hint {
   margin: 0;
   max-width: 68ch;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -1301,7 +1301,7 @@ function finishVisit() {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   color: var(--rb-text-primary);
   cursor: pointer;
 }
@@ -1363,7 +1363,7 @@ function finishVisit() {
   border-radius: 7px;
   background: var(--rb-surface-alt);
   border: 1px solid var(--rb-border);
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--rb-text-secondary);
 }
@@ -1374,16 +1374,16 @@ function finishVisit() {
   color: #fff;
 }
 
-.bag__label { font-size: 0.85rem; font-weight: 600; color: var(--rb-text-primary); }
+.bag__label { font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); }
 
 .time-row { display: flex; gap: 0.4rem; align-items: stretch; }
 .time-row .field__input { min-width: 0; }
 
-.btn--small { padding: 0.35rem 0.6rem; font-size: 0.78rem; border-radius: 8px; }
+.btn--small { padding: 0.35rem 0.6rem; font-size: 12.5px; border-radius: 8px; }
 
 .field__input--mono,
 .mono {
-  font-family: var(--rb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--rb-font-mono);
   letter-spacing: 0.02em;
 }
 
@@ -1394,7 +1394,7 @@ function finishVisit() {
   background: rgba(var(--rb-accent-rgb), 0.08);
   border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
   color: var(--rb-accent-text);
-  font-size: 0.82rem;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -1403,7 +1403,7 @@ function finishVisit() {
   flex-wrap: wrap;
   gap: 0.35rem 1rem;
   margin: 0.45rem 0 0;
-  font-size: 0.82rem;
+  font-size: 13px;
   color: var(--rb-text-secondary);
 }
 

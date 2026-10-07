@@ -662,7 +662,7 @@ onMounted(load)
 .pill--approved { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
 
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mono { font-family: var(--rb-font-mono); }
 
 /* Skeleton */
 .item--skeleton { gap: 10px; }

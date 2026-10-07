@@ -71,7 +71,7 @@ const onDate = computed(() => {
 
 .deferral-notice__text {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-accent-text);
 }

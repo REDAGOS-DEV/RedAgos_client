@@ -19,6 +19,10 @@
  */
 :root {
   --rb-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  /* For barcodes, unit numbers and reference codes. One stack, so a code looks
+     the same on every page; plain `monospace` fell back to Courier New on
+     Windows. */
+  --rb-font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, 'Roboto Mono', Menlo, monospace;
   --rb-primary: #1565C0;
   --rb-primary-rgb: 21, 101, 192;
   --rb-secondary: #42A5F5;
