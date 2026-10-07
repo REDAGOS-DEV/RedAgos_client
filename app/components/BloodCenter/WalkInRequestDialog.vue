@@ -665,17 +665,17 @@ function formatDate(value) {
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 16px;
 }
 
 .dialog__subtitle {
   margin: 0.25rem 0 0;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   color: var(--rb-text-secondary);
 }
 
 .dialog__loading {
-  font-size: 0.86rem;
+  font-size: 14px;
   color: var(--rb-text-secondary);
 }
 
@@ -685,7 +685,7 @@ function formatDate(value) {
   border-radius: 8px;
   background: rgba(var(--rb-accent-rgb), 0.12);
   color: var(--rb-accent-text);
-  font-size: 0.84rem;
+  font-size: 13.5px;
 }
 
 .dialog__footer {
@@ -718,7 +718,7 @@ function formatDate(value) {
   border-radius: 8px;
   background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
-  font-size: 0.76rem;
+  font-size: 12px;
   font-weight: 600;
   min-width: 0;
 }
@@ -731,7 +731,7 @@ function formatDate(value) {
   place-items: center;
   border-radius: 999px;
   background: var(--rb-border);
-  font-size: 0.72rem;
+  font-size: 11.5px;
 }
 
 .steps__label {
@@ -763,14 +763,14 @@ function formatDate(value) {
 
 .step__intro {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
 
 .step__heading {
   margin: 0.25rem 0 0;
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -811,13 +811,13 @@ function formatDate(value) {
 }
 
 .field__label {
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .field__hint {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--rb-text-secondary);
 }
@@ -830,7 +830,7 @@ function formatDate(value) {
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.86rem;
+  font-size: 14px;
 }
 
 .field__input:disabled {
@@ -899,7 +899,7 @@ function formatDate(value) {
 .match__meta,
 .match__lines {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 13px;
   color: var(--rb-text-secondary);
 }
 
@@ -934,13 +934,13 @@ function formatDate(value) {
 
 .call-card__phone {
   margin: 0.15rem 0 0;
-  font-size: 1rem;
+  font-size: 15px;
   font-weight: 700;
 }
 
 .call-card__body {
   margin: 0.35rem 0 0;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
@@ -969,7 +969,7 @@ function formatDate(value) {
   gap: 0.5rem;
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   line-height: 1.45;
 }
 
@@ -1000,7 +1000,7 @@ function formatDate(value) {
 }
 
 .review dt {
-  font-size: 0.74rem;
+  font-size: 12px;
   color: var(--rb-text-secondary);
 }
 
@@ -1018,7 +1018,7 @@ function formatDate(value) {
   border-radius: 8px;
   background: rgba(var(--rb-accent-rgb), 0.1);
   color: var(--rb-accent-text);
-  font-size: 0.82rem;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1028,7 +1028,7 @@ function formatDate(value) {
   border-radius: 999px;
   background: rgba(var(--rb-primary-rgb), 0.12);
   color: var(--rb-primary-text);
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1042,13 +1042,13 @@ function formatDate(value) {
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 13px;
   font-weight: 600;
   color: var(--rb-success-text);
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--rb-font-mono);
 }
 
 .btn {
@@ -1062,13 +1062,13 @@ function formatDate(value) {
   color: var(--rb-text-primary);
   font: inherit;
   font-weight: 600;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   cursor: pointer;
 }
 
 .btn--sm {
   padding: 0.35rem 0.7rem;
-  font-size: 0.78rem;
+  font-size: 12.5px;
 }
 
 .btn--primary {
@@ -1103,7 +1103,7 @@ function formatDate(value) {
   background: none;
   color: var(--rb-primary-text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }

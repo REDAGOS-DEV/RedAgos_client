@@ -513,7 +513,7 @@ onMounted(load)
 .bl-table td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
 .bl-table tr:last-child td { border-bottom: none; }
 .bl-table .num { text-align: right; white-space: nowrap; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.mono { font-family: var(--rb-font-mono); font-size: 12.5px; }
 .components { color: var(--rb-text-secondary); }
 .blood-pill {
   display: inline-block; padding: 1px 7px; margin-right: 6px; border-radius: 6px;

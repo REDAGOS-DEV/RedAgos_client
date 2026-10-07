@@ -150,13 +150,8 @@
             <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
 
-          <!--
-            The notification bell used to sit here pointing at
-            /blood-center/notifications, which has no page — it 404'd, and its
-            count was hard-coded to 0 so the badge never appeared either. Same
-            call as Help & Support in useBloodCenterNav: restore it together
-            with the page, not before.
-          -->
+          <!-- Back now that the facility notification endpoints exist. -->
+          <BloodCenterNotificationBell />
 
           <!--
             `xs:` is not a breakpoint in this project — tailwind.config.js adds
@@ -290,6 +285,7 @@ import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useSidebar } from '~/composables/useSidebar.js'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterNotificationBell from '~/components/BloodCenter/NotificationBell.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -297,7 +293,7 @@ const { user, ensureUser, logout } = useUser()
 // Ang nav kay usa ra ka source — parehas sa sidebar, sa ⌘F search ug sa
 // profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
 // ra sa server.
-const { navGroups, searchablePages, userMenuItems, labelForPath } = useBloodCenterNav()
+const { searchablePages, userMenuItems, labelForPath, sectionForPath } = useBloodCenterNav()
 const { isDark, toggleTheme } = useDarkMode()
 const { railExpanded, openMobile } = useSidebar('blood-center')
 
@@ -317,7 +313,10 @@ onMounted(() => {
   ensureUser()
 })
 
-const pageLabel = computed(() => labelForPath(route.path) || 'Blood Center')
+// The path as the nav knows it, with the one query that picks a view.
+const navPath = computed(() => (route.query.test ? `${route.path}?test=${route.query.test}` : route.path))
+
+const pageLabel = computed(() => labelForPath(navPath.value) || 'Blood Center')
 
 const facilityName = computed(() =>
   user.value?.facility?.facility_name || user.value?.facility?.name || ''
@@ -325,12 +324,10 @@ const facilityName = computed(() =>
 
 // The sidebar is grouped by department, so the breadcrumb says which one the
 // page belongs to: "Davao Blood Center / Issuance / Blood Inventory".
-const sectionLabel = computed(() =>
-  navGroups.value.find(group => group.items.some(item => item.path === route.path))?.label || ''
-)
+const sectionLabel = computed(() => sectionForPath(route.path))
 
 const breadcrumb = computed(() =>
-  [facilityName.value || 'Blood Center Portal', sectionLabel.value, labelForPath(route.path)]
+  [facilityName.value || 'Blood Center Portal', sectionLabel.value, labelForPath(navPath.value)]
     .filter(Boolean)
     .join(' / ')
 )

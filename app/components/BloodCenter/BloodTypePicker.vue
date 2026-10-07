@@ -101,7 +101,7 @@ watch(
 
 .bt-picker__field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 
-.bt-picker__label { font-size: 0.75rem; font-weight: 600; color: var(--rb-text-primary); }
+.bt-picker__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
 
 .bt-picker__input {
   width: 100%;
@@ -111,7 +111,7 @@ watch(
   background: var(--rb-surface);
   color: var(--rb-text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 13.5px;
 }
 
 .bt-picker__input:focus-visible {
@@ -123,7 +123,7 @@ watch(
 .bt-picker__warn {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   color: var(--rb-accent-text);
 }
 </style>

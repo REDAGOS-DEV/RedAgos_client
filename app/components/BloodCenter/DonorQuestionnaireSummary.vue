@@ -120,12 +120,12 @@ function shortDate(value) {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
-  font-size: 0.82rem;
+  font-size: 13px;
   color: var(--rb-text-primary);
 }
 
 .dhq-strip__label {
-  font-size: 0.68rem;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -148,7 +148,7 @@ function shortDate(value) {
   border-radius: 8px;
   padding: 0.38rem 0.8rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }

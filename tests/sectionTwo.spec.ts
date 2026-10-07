@@ -187,8 +187,8 @@ describe('the Testing page', () => {
 
   it('is shared by TTI Testing and Immunohematology, each seeing only its own card', () => {
     expect(page).toContain("requires: ['lab.record_serology', 'lab.record_immunohematology']")
-    expect(page).toMatch(/<section v-if="canType" class="card">[\s\S]*?Immunohematology/)
-    expect(page).toMatch(/<section v-if="canSerology" class="card">[\s\S]*?Serology/)
+    expect(page).toMatch(/<section v-if="canType" class="card card--typing">[\s\S]*?Immunohematology/)
+    expect(page).toMatch(/<section v-if="canSerology" class="card card--serology">[\s\S]*?Serology/)
   })
 
   it('saves a panel straight away, with no run', () => {
@@ -291,7 +291,9 @@ describe('navigation', () => {
 
   it('gives the laboratory one testing page and Processing its own, each gated on its own write', () => {
     expect(nav).toContain("export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohematology'] as const")
-    expect(nav).toMatch(/label: 'TTI Testing', path: '\/blood-center\/testing'[^}]*requires: TESTING_ABILITIES/)
+    // One page, two links: each department's view, gated on that department's write.
+    expect(nav).toMatch(/label: 'Immunohematology', path: '\/blood-center\/testing\?test=typing'[^}]*requires: 'lab\.record_immunohematology'/)
+    expect(nav).toMatch(/label: 'Serology \(TTI\)', path: '\/blood-center\/testing\?test=serology'[^}]*requires: 'lab\.record_serology'/)
     expect(nav).not.toContain('/blood-center/immunohematology')
     expect(nav).toMatch(/label: 'Processing', path: '\/blood-center\/laboratory'[^}]*requires: 'lab\.record_components'/)
   })
@@ -342,9 +344,11 @@ describe('the staff roster', () => {
 
   it('takes a title, a department, a role and privileges, as the Add Staff use case lists them', () => {
     expect(page).toContain('bloodCenterService.staffRoles()')
-    expect(page).toContain('list="staff-titles"')
+    // Title and role are pick-or-type fields (ComboInput, which replaced the
+    // unstylable <datalist>): the suggestions still come from the catalogue.
+    expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.position"\s+:options="titles"/)
     expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
-    expect(page).toContain('list="staff-roles"')
+    expect(page).toMatch(/<ComboInput\s+id="staff-role"\s+v-model="form\.role"\s+:options="departmentRoles\.map/)
     expect(page).toContain('v-model="form.staff_privileges" type="checkbox"')
   })
 

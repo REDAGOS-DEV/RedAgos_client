@@ -104,7 +104,7 @@ function formatDateTime(value) {
   margin: 0;
   padding: 0.55rem 0.7rem;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -140,7 +140,7 @@ function formatDateTime(value) {
 
 .walk-in__heading {
   margin: 0 0 0.35rem;
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -149,7 +149,7 @@ function formatDateTime(value) {
 
 .walk-in__hint {
   margin: -0.15rem 0 0.4rem;
-  font-size: 0.74rem;
+  font-size: 12px;
   color: var(--rb-text-secondary);
 }
 
@@ -161,18 +161,18 @@ dl {
 }
 
 dt {
-  font-size: 0.72rem;
+  font-size: 11.5px;
   color: var(--rb-text-secondary);
 }
 
 dd {
   margin: 0.1rem 0 0;
-  font-size: 0.84rem;
+  font-size: 13.5px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--rb-font-mono);
 }
 </style>
