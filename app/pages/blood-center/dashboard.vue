@@ -96,6 +96,9 @@
         </NuxtLink>
       </div>
 
+      <!-- ============ LOW STOCK ============ -->
+      <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" class="low-stock-banner" />
+
       <!-- ============ NEEDS ATTENTION + STOCK BY TYPE ============ -->
       <div class="focus-grid">
         <div class="panel">
@@ -456,6 +459,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -773,6 +777,18 @@ const exportReport = async () => {
   }
 }
 
+// Loaded on its own so the banner does not depend on the overview call below.
+// Supplementary: a failure leaves no banner.
+const lowStock = ref([])
+
+onMounted(async () => {
+  try {
+    lowStock.value = (await bloodCenterService.stockThresholds()).low ?? []
+  } catch (err) {
+    console.error('Failed to load stock thresholds:', err)
+  }
+})
+
 onMounted(async () => {
   try {
     // Dev note: gikan sa /blood-center/dashboard-summary, /inventory, /hospital-requests,
@@ -823,6 +839,8 @@ onMounted(async () => {
   padding: 24px var(--rb-gutter, 24px) 40px;
   transition: background-color 0.2s ease;
 }
+
+.low-stock-banner { margin-bottom: 20px; }
 
 /* Skeleton loading */
 .skeleton {

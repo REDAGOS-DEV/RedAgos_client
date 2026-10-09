@@ -20,6 +20,8 @@
         <span>{{ summaryError }}</span>
       </div>
 
+      <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" />
+
       <!-- A lapsed tag the sweep has not reached yet. Normally gone within a
            minute; one that lingers means the scheduler is down. -->
       <div v-if="summary?.overdue_active_tags" class="banner banner--warning" role="status">
@@ -357,6 +359,7 @@
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import HospitalTagUnitDialog from '~/components/Hospital/TagUnitDialog.vue'
 import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue'
 import HospitalUnitTagHistory from '~/components/Hospital/UnitTagHistory.vue'
@@ -569,6 +572,19 @@ async function loadReference() {
   }
 }
 
+// The blood bank's own minimums against its shelf. Supplementary: a failure
+// leaves no banner. Loaded with the summary, so it follows every refresh and
+// every tag, crossmatch, transfusion or discard that changes what is on the shelf.
+const lowStock = ref([])
+
+async function loadLowStock() {
+  try {
+    lowStock.value = (await hospitalService.stockThresholds()).low ?? []
+  } catch {
+    // The banner is a convenience; the page works without it.
+  }
+}
+
 async function loadSummary() {
   summaryError.value = ''
 
@@ -577,6 +593,7 @@ async function loadSummary() {
     summary.value = data
     skew.value = serverSkew(data.as_of, Date.now())
     now.value = Date.now()
+    loadLowStock()
   } catch (err) {
     summaryError.value = err?.message || 'Could not load the stock summary.'
   } finally {

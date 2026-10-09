@@ -202,7 +202,8 @@ const navGroups = [
   {
     label: 'Inventory',
     items: [
-      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package' }
+      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package' },
+      { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal' }
     ]
   },
   // Ang Finance group (billing, transactions) ug ang Help & Support kay

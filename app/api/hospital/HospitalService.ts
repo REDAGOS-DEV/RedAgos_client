@@ -13,6 +13,8 @@ import type {
   TransfusionRequest,
   TransfusionRequestFilters,
 } from '~/types/bloodRequest'
+import type { HospitalNotificationList } from '~/types/hospitalNotification'
+import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
 import type {
   HospitalInventoryFilters,
   HospitalInventorySummary,
@@ -398,6 +400,15 @@ class HospitalService extends BaseService {
     )
   }
 
+  /** The hospital's minimum stock per blood type and component, against its own shelf. */
+  stockThresholds() {
+    return this.request<StockThresholdStatus>('/hospital/inventory/thresholds')
+  }
+
+  saveStockThresholds(payload: SaveStockThresholdsPayload) {
+    return this.request<StockThresholdStatus>('/hospital/inventory/thresholds', 'PUT', payload)
+  }
+
   /** The blood services a bag can be received from. */
   externalBloodSources() {
     return this.request<{ sources: ExternalBloodSource[] }>('/hospital/external-blood-sources')
@@ -407,8 +418,8 @@ class HospitalService extends BaseService {
     return this.request<{ message: string; source: ExternalBloodSource }>('/hospital/external-blood-sources', 'POST', payload)
   }
 
-  listNotifications(params: { category?: string; read?: boolean; per_page?: number } = {}) {
-    return this.request<any>('/hospital/notifications', 'GET', params)
+  listNotifications(params: { category?: string; read?: boolean; per_page?: number; page?: number } = {}) {
+    return this.request<HospitalNotificationList>('/hospital/notifications', 'GET', params)
   }
 
   notificationsUnreadCount() {

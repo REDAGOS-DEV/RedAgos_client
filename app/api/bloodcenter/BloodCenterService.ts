@@ -6,6 +6,7 @@ import type {
   RequestEvent,
   WalkInReference,
 } from '~/types/bloodRequest'
+import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
 
 class BloodCenterService extends BaseService {
   private static instance: BloodCenterService | null = null
@@ -248,6 +249,20 @@ class BloodCenterService extends BaseService {
 
   async inventorySummary(): Promise<any> {
     return this.request(`${this.resource}/inventory/summary`, 'GET')
+  }
+
+  // --- Stock thresholds ---
+  //
+  // The minimum stock per blood type and component. Anyone who can see the
+  // inventory reads how it stands; only the Inventory Control Officer and the
+  // Center Admin (`inventory.thresholds`) save.
+
+  async stockThresholds(): Promise<StockThresholdStatus> {
+    return this.request<StockThresholdStatus>(`${this.resource}/inventory/thresholds`, 'GET')
+  }
+
+  async saveStockThresholds(payload: SaveStockThresholdsPayload): Promise<StockThresholdStatus> {
+    return this.request<StockThresholdStatus>(`${this.resource}/inventory/thresholds`, 'PUT', payload)
   }
 
   /**

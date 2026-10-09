@@ -15,18 +15,20 @@
 
     <!-- Stock by blood type: one tile per type, in the usual order -->
     <template #stock>
+      <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" class="stock-banner" />
+
       <div class="type-grid">
         <NuxtLink
           v-for="tile in typeTiles"
           :key="tile.code"
           :to="`/blood-center/inventory?type=${encodeURIComponent(tile.code)}`"
           class="type-tile"
-          :class="{ 'type-tile--out': tile.available === 0 }"
+          :class="{ 'type-tile--out': tile.available === 0, 'type-tile--low': tile.health === 'low' }"
           :title="`${tile.code}: ${tile.available} available`"
         >
           <span class="type-tile__code">{{ tile.code }}</span>
           <span class="type-tile__value">{{ tile.available }}</span>
-          <span class="type-tile__label">{{ tile.available === 0 ? 'None available' : 'available' }}</span>
+          <span class="type-tile__label">{{ tile.available === 0 ? 'None available' : tile.health === 'low' ? 'below minimum' : 'available' }}</span>
         </NuxtLink>
       </div>
 
@@ -93,7 +95,9 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterDepartmentDashboard from '~/components/BloodCenter/DepartmentDashboard.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { typeHealthByCode } from '~/utils/stockThreshold'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -109,14 +113,19 @@ const { can } = useUser()
 // Both exist; a failure leaves that half empty rather than breaking the page.
 const summary = ref(null)
 const requests = ref(null)
+// The facility's minimums against its stock. Supplementary, like the rest: a
+// failure leaves no banner and no tile grading rather than breaking the page.
+const stockCells = ref([])
+const lowStock = ref([])
 const loading = ref(true)
 
 const canSeeRequests = computed(() => can('requests.view'))
 
 onMounted(async () => {
-  const [inventoryResult, requestResult] = await Promise.allSettled([
+  const [inventoryResult, requestResult, thresholdResult] = await Promise.allSettled([
     bloodCenterService.inventorySummary(),
     canSeeRequests.value ? bloodCenterService.incomingRequestsSummary() : Promise.resolve(null),
+    bloodCenterService.stockThresholds(),
   ])
 
   if (inventoryResult.status === 'fulfilled') summary.value = inventoryResult.value
@@ -124,6 +133,13 @@ onMounted(async () => {
 
   if (requestResult.status === 'fulfilled') requests.value = requestResult.value
   else console.error('Failed to load request summary:', requestResult.reason)
+
+  if (thresholdResult.status === 'fulfilled') {
+    stockCells.value = thresholdResult.value?.cells ?? []
+    lowStock.value = thresholdResult.value?.low ?? []
+  } else {
+    console.error('Failed to load stock thresholds:', thresholdResult.reason)
+  }
 
   loading.value = false
 })
@@ -139,7 +155,11 @@ const typeTiles = computed(() => {
   const byCode = new Map(rows.map((row) => [row.code, row.available]))
   const codes = [...BLOOD_TYPE_ORDER, ...rows.map((row) => row.code).filter((code) => !BLOOD_TYPE_ORDER.includes(code))]
 
-  return codes.map((code) => ({ code, available: byCode.get(code) ?? 0 }))
+  return codes.map((code) => ({
+    code,
+    available: byCode.get(code) ?? 0,
+    health: typeHealthByCode(stockCells.value, code),
+  }))
 })
 
 const nearExpiry = computed(() => ({
@@ -273,10 +293,18 @@ const panels = computed(() => [
   background: rgba(var(--rb-accent-rgb), 0.05);
 }
 
+.type-tile--low {
+  box-shadow: inset 3px 0 0 var(--rb-warning);
+  background: rgba(var(--rb-warning-rgb), 0.07);
+}
+
+.stock-banner { margin-bottom: 14px; }
+
 .type-tile__code { font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); }
 .type-tile__value { font-size: 20px; font-weight: 800; color: var(--rb-text-primary); line-height: 1.15; font-variant-numeric: tabular-nums; }
 .type-tile__label { font-size: 10.5px; font-weight: 600; color: var(--rb-text-secondary); }
 .type-tile--out .type-tile__label { color: var(--rb-accent-text); }
+.type-tile--low .type-tile__label { color: var(--rb-warning-text); }
 
 .expiry {
   list-style: none;

@@ -109,13 +109,14 @@
               </div>
 
               <button
+                v-if="!n.read"
                 type="button"
                 class="notif-mark-btn"
-                :aria-label="n.read ? 'Mark as unread' : 'Mark as read'"
-                :title="n.read ? 'Mark as unread' : 'Mark as read'"
-                @click="toggleRead(n)"
+                aria-label="Mark as read"
+                title="Mark as read"
+                @click="markRead(n)"
               >
-                <AssetIcon :name="n.read ? 'mail' : 'mail-check'" :size="15" />
+                <AssetIcon name="check" :size="15" />
               </button>
             </article>
           </div>
@@ -157,10 +158,14 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
+import { hasMorePages, normalizeHospitalNotification } from '~/utils/hospitalNotifications'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
 const router = useRouter()
+// The bell in the layout reads the same count; what changes here is told to it.
+const sharedUnread = useHospitalUnreadCount()
 const isLoading = ref(true)
 const loadingMore = ref(false)
 const marking = ref(false)
@@ -169,7 +174,8 @@ const marking = ref(false)
 const chipOptions = [
   { key: 'all', label: 'All' },
   { key: 'unread', label: 'Unread' },
-  { key: 'blood_request', label: 'Blood Requests' },
+  { key: 'request', label: 'Blood Requests' },
+  { key: 'inventory', label: 'Stock Alerts' },
   { key: 'blood_availability', label: 'Blood Availability' },
   { key: 'billing', label: 'Billing' },
   { key: 'announcement', label: 'Announcements' },
@@ -177,7 +183,8 @@ const chipOptions = [
 ]
 
 const categoryStyleMap = {
-  blood_request: { color: '#1565C0', bg: '#1565C014', icon: 'clipboard-list' },
+  request: { color: '#1565C0', bg: '#1565C014', icon: 'clipboard-list' },
+  inventory: { color: '#D32F2F', bg: '#D32F2F14', icon: 'triangle-alert' },
   blood_availability: { color: '#F57C00', bg: '#F57C0014', icon: 'droplets' },
   pickup: { color: '#2E7D32', bg: '#2E7D3214', icon: 'package-check' },
   billing: { color: '#7C3AED', bg: '#7C3AED14', icon: 'receipt' },
@@ -189,7 +196,7 @@ function categoryStyle(key) {
 }
 
 // ======================= STATE =======================
-const notifications = ref([]) // { id, category, title, description, created_at, read, action_label, action_path }
+const notifications = ref([]) // HospitalNotificationView: see ~/utils/hospitalNotifications
 const currentPage = ref(1)
 const hasMore = ref(false)
 
@@ -277,22 +284,22 @@ function formatTimestamp(dateStr) {
 
 // ======================= ACTIONS =======================
 function goToAction(n) {
-  if (!n.read) toggleRead(n)
+  if (!n.read) markRead(n)
   router.push(n.action_path)
 }
 
-async function toggleRead(n) {
-  const previous = n.read
-  n.read = !previous
+// The API can mark a notification read but has no way to mark it unread again,
+// so the card offers only the one direction.
+async function markRead(n) {
+  if (n.read) return
+
+  n.read = true
   try {
-    if (n.read) {
-      await hospitalService.markNotificationRead(n.id)
-    } else {
-      await hospitalService.markNotificationUnread(n.id)
-    }
+    await hospitalService.markNotificationRead(n.id)
+    sharedUnread.refresh()
   } catch (err) {
-    console.error('Failed to update notification read state:', err)
-    n.read = previous
+    console.error('Failed to mark the notification as read:', err)
+    n.read = false
   }
 }
 
@@ -302,6 +309,7 @@ async function markAllAsRead() {
   unread.forEach((n) => { n.read = true })
   try {
     await hospitalService.markAllNotificationsRead()
+    sharedUnread.set(0)
   } catch (err) {
     console.error('Failed to mark all notifications as read:', err)
     unread.forEach((n) => { n.read = false })
@@ -311,16 +319,16 @@ async function markAllAsRead() {
 }
 
 // ======================= FETCH =======================
+// GET /hospital/notifications?page=N returns
+// { notifications: [...], unread_count, meta: { page, per_page, total, last_page } }.
 async function loadNotifications() {
   isLoading.value = true
   currentPage.value = 1
   try {
-    // Expects GET /hospital/notifications?page=1, returning either an array
-    // or { data: [...], has_more: boolean }.
     const res = await hospitalService.listNotifications({ page: currentPage.value })
-    const rows = Array.isArray(res) ? res : (res?.data ?? [])
-    notifications.value = rows.map(normalizeNotification)
-    hasMore.value = Array.isArray(res) ? false : !!res?.has_more
+    notifications.value = (res?.notifications ?? []).map(normalizeHospitalNotification)
+    hasMore.value = hasMorePages(res?.meta)
+    if (typeof res?.unread_count === 'number') sharedUnread.set(res.unread_count)
   } catch (err) {
     console.error('Failed to load notifications:', err)
     notifications.value = []
@@ -335,27 +343,13 @@ async function loadOlderNotifications() {
   try {
     const nextPage = currentPage.value + 1
     const res = await hospitalService.listNotifications({ page: nextPage })
-    const rows = Array.isArray(res) ? res : (res?.data ?? [])
-    notifications.value.push(...rows.map(normalizeNotification))
+    notifications.value.push(...(res?.notifications ?? []).map(normalizeHospitalNotification))
     currentPage.value = nextPage
-    hasMore.value = Array.isArray(res) ? false : !!res?.has_more
+    hasMore.value = hasMorePages(res?.meta)
   } catch (err) {
     console.error('Failed to load older notifications:', err)
   } finally {
     loadingMore.value = false
-  }
-}
-
-function normalizeNotification(n) {
-  return {
-    id: n.id,
-    category: n.category,
-    title: n.title,
-    description: n.description ?? n.message ?? '',
-    created_at: n.created_at,
-    read: !!n.read,
-    action_label: n.action_label ?? null,
-    action_path: n.action_path ?? null,
   }
 }
 

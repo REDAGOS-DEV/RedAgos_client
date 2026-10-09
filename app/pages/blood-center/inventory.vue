@@ -114,6 +114,9 @@
         </div>
       </div>
 
+      <!-- ============ LOW STOCK ============ -->
+      <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" />
+
       <!-- ============ EXPIRY ALERT ============ -->
       <div v-if="expiryAlert.visible && expiringBatches.length" class="alert-banner">
         <div class="alert-banner__icon">
@@ -926,11 +929,13 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { useLabelPrint } from '~/composables/useLabelPrint'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { finalLabelsFrom } from '~/utils/bagLabels'
+import { typeHealthByCode } from '~/utils/stockThreshold'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1104,6 +1109,11 @@ const paginatedBatches = computed(() => {
   return filteredBatches.value.slice(start, start + pageSize)
 })
 
+// The facility's minimums against its stock. Supplementary: the page works
+// without them, so a failed load just leaves no banner and no grading.
+const stockCells = ref([])
+const lowStock = ref([])
+
 // --- Available units by blood type (column chart) ---
 const bloodTypeViews = [
   { label: 'Chart', value: 'chart' },
@@ -1128,12 +1138,13 @@ const bloodTypeSummary = computed(() => {
   const max = Math.max(0, ...totals.map(([, total]) => total))
 
   return totals.map(([code, total]) => {
-    // Only the two ends are claimed. Grading "low" needs a per-type minimum
-    // that nothing in this system configures, and inventing a threshold here
-    // would put a stock-level judgement on screen that nobody has made. The
-    // old code read r.status === 'critical' | 'low', which are not unit
-    // statuses at all, so every card reported "Healthy" regardless.
-    const health = total === 0 ? 'critical' : 'healthy'
+    // "Low" is the facility's own judgement: a type is graded against the
+    // minimums staff set on the Stock Thresholds page, and the worst monitored
+    // component decides. A type with no minimum set is not graded, so only the
+    // two ends are claimed for it — empty, or not — rather than inventing a
+    // threshold here that nobody has made.
+    const level = typeHealthByCode(stockCells.value, code)
+    const health = level === 'critical' || level === 'low' ? level : total === 0 ? 'critical' : 'healthy'
 
     return { blood_type: code, total_units: total, health, height: max ? (total / max) * 100 : 0 }
   })
@@ -1627,11 +1638,15 @@ async function loadDashboard() {
     // as `?.()`, the missing method returned undefined instead of throwing and
     // the page rendered zeros with no error anywhere. Optional-call on a
     // service method is banned in this file for that reason.
-    const [units, summary, reference] = await Promise.all([
+    const [units, summary, reference, thresholds] = await Promise.all([
       bloodCenterService.inventory({ per_page: 100 }),
       bloodCenterService.inventorySummary(),
       bloodCenterService.referenceData(),
+      bloodCenterService.stockThresholds().catch(() => null),
     ])
+
+    stockCells.value = thresholds?.cells ?? []
+    lowStock.value = thresholds?.low ?? []
 
     // One row per physical bag. The server records individual units rather than
     // batches, because a unit has to be traceable back to the donation it came

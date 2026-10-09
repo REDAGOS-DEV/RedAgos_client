@@ -35,6 +35,8 @@
         </div>
       </header>
 
+      <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" class="low-stock-banner" />
+
       <!-- Summary KPI cards -->
       <div class="stats-grid">
         <div class="stat-card fade-in" style="--delay: 60ms">
@@ -308,6 +310,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -514,6 +517,18 @@ const quickActions = [
   },
 ]
 
+// Loaded on its own so the banner does not depend on the dashboard call below.
+// Supplementary: a failure leaves no banner.
+const lowStock = ref([])
+
+onMounted(async () => {
+  try {
+    lowStock.value = (await hospitalService.stockThresholds()).low ?? []
+  } catch (err) {
+    console.error('Failed to load stock thresholds:', err)
+  }
+})
+
 onMounted(async () => {
   try {
     // // Dev note: dashboard() kay mag-return unta og
@@ -614,6 +629,8 @@ onMounted(async () => {
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .skeleton { animation: none !important; }
 }
+
+.low-stock-banner { margin-bottom: 16px; }
 
 .dashboard-inner {
   display: flex;

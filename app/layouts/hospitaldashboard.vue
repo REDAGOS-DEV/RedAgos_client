@@ -188,6 +188,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
+import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
 import { useSidebar } from '~/composables/useSidebar.js'
@@ -195,13 +196,20 @@ import { useSidebar } from '~/composables/useSidebar.js'
 const { collapsed, openMobile } = useSidebar('hospital')
 const router = useRouter()
 const route = useRoute()
-const { user, fetchUser, logout } = useUser()
+const { user, ensureUser, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 
-onMounted(() => {
-  if (!user.value) fetchUser()
+// The bell's count belongs to a signed-in hospital account, so polling starts
+// only once the user is known, runs at once and then every minute, and stops
+// with the layout.
+const { count: unreadCount, start: startUnreadPolling, stop: stopUnreadPolling } = useHospitalUnreadCount()
+
+onMounted(async () => {
+  const signedIn = user.value ?? await ensureUser()
+  if (signedIn) startUnreadPolling()
 })
+onUnmounted(stopUnreadPolling)
 
 // --- Breadcrumb + greeting ---
 const pageLabels = {
@@ -213,6 +221,7 @@ const pageLabels = {
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
   '/hospital/inventory': 'Blood Bank Inventory',
+  '/hospital/stock-thresholds': 'Stock Thresholds',
   '/hospital/receiving/weekly': 'Receiving / Weekly Request',
   '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
   '/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution',
@@ -237,10 +246,6 @@ const greeting = computed(() => {
   const first = user.value?.full_name?.split(' ')[0] || 'there'
   return `${time}, ${first}!`
 })
-
-// --- Notifications ---
-// i-connect ni sa notifications unread-count endpoint
-const unreadCount = ref(0)
 
 // --- Profile dropdown ---
 const showUserMenu = ref(false)
@@ -278,6 +283,7 @@ const searchablePages = [
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
   { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags' },
+  { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock alert shortage notification' },
   { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan' },
   { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
