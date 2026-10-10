@@ -6,6 +6,7 @@ import type {
   BloodRequestFilters,
   BloodRequestStatus,
   CreateTransfusionRequestPayload,
+  HospitalBillingView,
   PatientMatch,
   RequestEvent,
   RequestReferenceData,
@@ -257,18 +258,25 @@ class HospitalService extends BaseService {
   }
 
   /**
-   * Billing summary for a request.
+   * What a request was billed, read only: the live statement, the Statements
+   * of Account issued for it, and its payment receipts.
    *
-   * No Laravel route serves this yet — `useBloodRequestBilling` mocks it
-   * until one exists.
+   * There is no way to pay from here. The patient or watcher pays at the blood
+   * centre's billing counter (cash or GCash), and a weekly order is billed by
+   * statement only. Payment references are not part of this view.
    */
   requestBilling(id: number | string) {
-    return this.request<any>(`/hospital/blood-requests/${id}/billing`)
+    return this.request<HospitalBillingView>(`/hospital/blood-requests/${id}/billing`)
   }
 
-  /** Record a payment against a request's billing. Also mock-gated for now. */
-  payRequestBilling(id: number | string, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
-    return this.request<any>(`/hospital/blood-requests/${id}/billing/pay`, 'POST', payload)
+  /** An issued statement addressed to this hospital, as its printed PDF. */
+  downloadStatement(revisionId: number | string) {
+    return this.requestBlob(`/hospital/statements/${revisionId}/pdf`)
+  }
+
+  /** A receipt for one of this hospital's requests, as its printed PDF. */
+  downloadReceipt(receiptId: number | string) {
+    return this.requestBlob(`/hospital/receipts/${receiptId}/pdf`)
   }
 
   /**

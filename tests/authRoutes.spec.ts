@@ -32,7 +32,7 @@ const ROLES = [
   'component_technologist', 'processing_assistant',
   'serology_technologist', 'lab_supervisor',
   'inventory_control_officer', 'dispatch_coordinator', 'it_data_clerk',
-  'billing_clerk',
+  'billing_clerk', 'billing_supervisor',
 ]
 
 describe('loginRouteFor', () => {
@@ -197,6 +197,10 @@ describe('departmentHome', () => {
     expect(departmentHome({ staff_role: 'medical_receptionist', department: 'collection' })).toBe('/blood-center/appointments')
     expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/collection')
     expect(departmentHome({ staff_role: 'dispatch_coordinator', department: 'issuance' })).toBe('/blood-center/fulfillment')
+  })
+
+  it('sends the billing supervisor, the Billing head, to the billing page', () => {
+    expect(departmentHome({ staff_role: 'billing_supervisor', department: 'billing' })).toBe('/blood-center/billing')
   })
 
   it('lets the role win over the department', () => {

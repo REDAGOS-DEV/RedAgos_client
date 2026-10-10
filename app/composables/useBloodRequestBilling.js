@@ -1,120 +1,92 @@
 /*
- * Expected Laravel endpoints (adjust paths to match your actual routes):
- *   GET  /api/hospital/bloodrequests/:id/billing
- *       -> { billing: {...}, line_items: [...], payments: [...] }
- *   POST /api/hospital/bloodrequests/:id/billing/pay
- *       -> { billing: {...}, payment: {...} }
+ * What one of the hospital's requests was billed — read only.
  *
- * Field names mirror the proposal's `billing`, `payment`, and
- * `blood_component` tables so the mock data below can be swapped for real
- * API responses without reshaping the template.
+ * GET /api/hospital/blood-requests/:id/billing
+ *   -> { billing, statements: [...], receipts: [...] }
  *
- * `billing`: { billing_id, request_id, billed_by, billing_date, total_amount, status }
- *   status: 'UNPAID' | 'PARTIAL' | 'PAID'
- * `lineItems`: [{ component_id, component_name, quantity, price }]
- * `payments`: [{ payment_id, billing_id, amount_paid, payment_method, paid_at }]
- *   payment_method: 'CASH' | 'GCASH'
+ * Kini kay basahon ra. Walay "Pay Now" dinhi: ang pasyente o ang watcher ang
+ * mobayad sa billing counter sa blood centre (cash o GCash), ug ang weekly nga
+ * order kay statement ra — gi-settle sa gawas sa RedAgos (desisyon sa project
+ * owner, 2026-10-10). Gitangtang ang mock ug ang payBilling, kay ang server na
+ * ang tinuod nga tinubdan ug walay amount nga gikan sa browser.
  *
- * Toggle: this composable follows the same USE_MOCK_DATA convention as
- * app/pages/blood-center/reports.vue. Walay `/hospital/bloodrequests/:id/billing`
- * route pa ang Laravel side, so mag-mock lang ni hangtod naa na.
+ * A request with no statement yet (nothing reserved) answers 404
+ * `billing_missing`; that is a state, not an error, and reads as "no
+ * statement yet".
  */
 
 import { hospitalService } from '~/api/hospital/HospitalService'
-
-function mockDelay(ms = 400) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function buildMockBilling(requestId) {
-  return {
-    billing_id: `BIL-2026-${String(requestId).padStart(4, '0')}`,
-    request_id: requestId,
-    billed_by: 'Maria Lourdes Guerra, RMT',
-    billing_date: '2026-04-14T09:20:00',
-    total_amount: 4500,
-    status: 'UNPAID',
-  }
-}
-
-const MOCK_LINE_ITEMS = [
-  { component_id: 1, component_name: 'Packed Red Blood Cells', quantity: 2, price: 1800 },
-  { component_id: 2, component_name: 'Processing & Cross-matching Fee', quantity: 1, price: 900 },
-]
+import { saveBlob } from '~/utils/billing'
 
 export const useBloodRequestBilling = (requestId) => {
-  const USE_MOCK_DATA = useRuntimeConfig().public.useMocks
-
   const billing = ref(null)
-  const lineItems = ref([])
-  const payments = ref([])
+  const statements = ref([])
+  const receipts = ref([])
 
   const isLoadingBilling = ref(true)
   const billingError = ref(null)
-  const isPaying = ref(false)
+  const downloadingId = ref(null)
 
   async function fetchBilling() {
     isLoadingBilling.value = true
     billingError.value = null
+
     try {
-      if (USE_MOCK_DATA) {
-        await mockDelay()
-        billing.value = buildMockBilling(requestId)
-        lineItems.value = MOCK_LINE_ITEMS
-        payments.value = []
-      } else {
-        const data = await hospitalService.requestBilling(requestId)
-        billing.value = data?.billing ?? null
-        lineItems.value = data?.line_items ?? []
-        payments.value = data?.payments ?? []
-      }
+      const data = await hospitalService.requestBilling(requestId)
+      billing.value = data?.billing ?? null
+      statements.value = data?.statements ?? []
+      receipts.value = data?.receipts ?? []
     } catch (err) {
-      billingError.value = err
       billing.value = null
-      lineItems.value = []
-      payments.value = []
+      statements.value = []
+      receipts.value = []
+
+      // No statement yet is a normal state for a request nothing was reserved for.
+      if (err?.data?.code !== 'billing_missing') {
+        billingError.value = err?.message || 'Could not load the billing for this request.'
+      }
     } finally {
       isLoadingBilling.value = false
     }
   }
 
-  async function payBilling({ amount, method }) {
-    if (!billing.value) return
-    isPaying.value = true
+  async function downloadStatement(revision) {
+    downloadingId.value = `soa-${revision.id}`
+
     try {
-      if (USE_MOCK_DATA) {
-        await mockDelay(600)
-        payments.value.push({
-          payment_id: `PMT-${Date.now()}`,
-          billing_id: billing.value.billing_id,
-          amount_paid: amount,
-          payment_method: method,
-          paid_at: new Date().toISOString(),
-        })
-        const paidTotal = payments.value.reduce((sum, p) => sum + p.amount_paid, 0)
-        billing.value.status = paidTotal >= billing.value.total_amount ? 'PAID' : 'PARTIAL'
-      } else {
-        const data = await hospitalService.payRequestBilling(requestId, { amount, method })
-        billing.value = data?.billing ?? billing.value
-        if (data?.payment) payments.value.push(data.payment)
-      }
+      saveBlob(await hospitalService.downloadStatement(revision.id), `${revision.document_number}.pdf`)
       return true
     } catch (err) {
-      billingError.value = err
+      billingError.value = err?.message || 'The statement could not be downloaded.'
       return false
     } finally {
-      isPaying.value = false
+      downloadingId.value = null
+    }
+  }
+
+  async function downloadReceipt(receipt) {
+    downloadingId.value = `ar-${receipt.id}`
+
+    try {
+      saveBlob(await hospitalService.downloadReceipt(receipt.id), `${receipt.receipt_number}.pdf`)
+      return true
+    } catch (err) {
+      billingError.value = err?.message || 'The receipt could not be downloaded.'
+      return false
+    } finally {
+      downloadingId.value = null
     }
   }
 
   return {
     billing,
-    lineItems,
-    payments,
+    statements,
+    receipts,
     isLoadingBilling,
     billingError,
-    isPaying,
+    downloadingId,
     fetchBilling,
-    payBilling,
+    downloadStatement,
+    downloadReceipt,
   }
 }

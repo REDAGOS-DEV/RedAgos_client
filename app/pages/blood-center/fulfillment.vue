@@ -166,6 +166,8 @@
                   <th scope="col">Expires</th>
                   <th scope="col">Storage</th>
                   <th scope="col">State</th>
+                  <th v-if="hasReleased(request)" scope="col">Dispatched</th>
+                  <th v-if="hasReleased(request) && canCorrectDispatch" scope="col"><span class="sr-only">Correct</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -190,6 +192,24 @@
                       <span class="dot" :class="`dot--${allocation.received_at ? 'received' : allocation.status}`" />
                       {{ allocation.received_at ? 'Received' : allocation.status_label }}
                     </span>
+                  </td>
+                  <td v-if="hasReleased(request)" :class="{ muted: allocation.status !== 'released' }">
+                    <template v-if="allocation.status === 'released'">
+                      {{ formatWhen(allocation.released_at) }}
+                      <span v-if="allocation.handed_to" class="handed-to">to {{ allocation.handed_to }}</span>
+                    </template>
+                    <template v-else>—</template>
+                  </td>
+                  <td v-if="hasReleased(request) && canCorrectDispatch">
+                    <button
+                      v-if="allocation.status === 'released'"
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      :aria-label="`Request a correction to the dispatch record of unit ${allocation.unit_id}`"
+                      @click="openCorrect(request, allocation)"
+                    >
+                      Correct
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -298,6 +318,52 @@
       </div>
     </Teleport>
 
+    <!-- CORRECT A DISPATCH RECORD. Steps aside while the request is reviewed: its overlay sits above the dialog's. -->
+    <Teleport to="body">
+      <div v-if="correctFor && !dispatchCorrection" class="modal-overlay" @click.self="closeCorrect">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="correct-title">
+          <h2 id="correct-title" class="modal-title">Correct Dispatch Record</h2>
+          <p class="modal-sub">
+            <span class="mono">{{ correctFor.allocation.unit_id }}</span> · {{ correctFor.request.reference_number }}
+          </p>
+
+          <p class="modal-desc">
+            Only when the unit left and who took it can change. Nothing else about the unit or the request is
+            touched, and receipt stays the hospital's to confirm. Your change is applied once it is approved.
+          </p>
+
+          <div class="field">
+            <label for="corrected-released-at" class="field-label">Left at</label>
+            <input id="corrected-released-at" v-model="correctForm.releasedAt" type="datetime-local" class="input">
+          </div>
+
+          <div class="field">
+            <label for="corrected-handed-to" class="field-label">
+              Handed to <span class="field-optional">optional</span>
+            </label>
+            <input id="corrected-handed-to" v-model.trim="correctForm.handedTo" type="text" class="input" maxlength="150">
+          </div>
+
+          <p v-if="correctError" class="field-error field-error--block">{{ correctError }}</p>
+
+          <div class="modal-actions">
+            <button class="btn btn-outline" @click="closeCorrect">Cancel</button>
+            <button class="btn btn-primary" @click="reviewCorrection">Review correction</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <BloodCenterCorrectionRequestDialog
+      v-if="dispatchCorrection"
+      subject="dispatch"
+      :target-id="dispatchCorrection.allocationId"
+      :changes="dispatchCorrection.changes"
+      :previous="dispatchCorrection.previous"
+      @close="dispatchCorrection = null"
+      @submitted="onDispatchCorrectionSent"
+    />
+
     <!-- RETURN TO STOCK -->
     <Teleport to="body">
       <div v-if="returnFor" class="modal-overlay" @click.self="closeReturn">
@@ -339,6 +405,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { requestStatusLabel } from '~/types/bloodRequest'
 
@@ -441,18 +508,23 @@ function gateFor(request) {
   }
 
   if (billing.clears_release) {
-    return {
-      ok: true,
-      message: billing.is_subsidised
-        ? 'Met by the government subsidy. Cleared for release.'
-        : 'Statement settled. Cleared for release.',
+    let message = 'Statement settled. Cleared for release.'
+
+    if (billing.is_statement_only) {
+      // A weekly order is billed to the hospital by statement only and never
+      // waits on a payment in RedAgos (owner decision, 2026-10-10).
+      message = 'Weekly order, billed to the hospital by statement only. Cleared for release.'
+    } else if (billing.is_subsidised) {
+      message = 'Met by the government subsidy. Cleared for release.'
     }
+
+    return { ok: true, message }
   }
 
   const owed = Number(billing.total_amount ?? 0) - Number(billing.collected ?? 0)
   return {
     ok: false,
-    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until this is settled or subsidised.`,
+    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until it is paid (cash or GCash) or subsidised.`,
   }
 }
 
@@ -555,6 +627,80 @@ async function confirmDispatch() {
   } finally {
     busyId.value = null
   }
+}
+
+/* CORRECT A DISPATCH RECORD */
+const { can, canFile } = useUser()
+const canCorrectDispatch = computed(() => can('corrections.request') && canFile('dispatch'))
+
+function hasReleased(request) {
+  return (request.allocations ?? []).some((a) => a.status === 'released')
+}
+
+function formatWhen(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+}
+
+// datetime-local wants the local wall time, to the minute.
+function toLocalInput(iso) {
+  if (!iso) return ''
+
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const correctFor = ref(null)
+const correctForm = reactive({ releasedAt: '', handedTo: '' })
+const correctError = ref('')
+const dispatchCorrection = ref(null)
+
+function openCorrect(request, allocation) {
+  correctError.value = ''
+  correctForm.releasedAt = toLocalInput(allocation.released_at)
+  correctForm.handedTo = allocation.handed_to ?? ''
+  correctFor.value = { request, allocation }
+}
+
+function closeCorrect() {
+  correctFor.value = null
+}
+
+// Only what differs goes to the dialog. The time is compared to the minute the
+// form can show, so an untouched time is not sent back with its seconds lost.
+function reviewCorrection() {
+  const { allocation } = correctFor.value
+  const changes = {}
+
+  if (correctForm.releasedAt && correctForm.releasedAt !== toLocalInput(allocation.released_at)) {
+    changes.released_at = new Date(correctForm.releasedAt).toISOString()
+  }
+
+  if ((correctForm.handedTo.trim() || null) !== (allocation.handed_to || null)) {
+    changes.handed_to = correctForm.handedTo.trim() || null
+  }
+
+  if (!Object.keys(changes).length) {
+    correctError.value = 'Nothing has changed yet.'
+    return
+  }
+
+  correctError.value = ''
+  dispatchCorrection.value = {
+    allocationId: allocation.id,
+    changes,
+    previous: {
+      released_at: allocation.released_at ? new Date(allocation.released_at).toISOString() : null,
+      handed_to: allocation.handed_to || null,
+    },
+  }
+}
+
+function onDispatchCorrectionSent(response) {
+  dispatchCorrection.value = null
+  correctFor.value = null
+  toast('Correction Requested', 'success', response?.message ?? 'It is applied once it is approved.')
 }
 
 /* RETURN TO STOCK */
@@ -698,6 +844,8 @@ onMounted(load)
 }
 .units-table td { padding: 8px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); }
 .units-table td.muted { color: var(--rb-text-secondary); }
+.handed-to { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .units-table tr:last-child td { border-bottom: none; }
 .units-table .pick { width: 30px; }
 .units-empty { font-size: 12.5px; color: var(--rb-text-muted); margin: 0; }

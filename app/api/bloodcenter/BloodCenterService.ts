@@ -3,7 +3,9 @@ import type {
   BloodRequest,
   CreateWalkInPayload,
   DuplicateMatch,
+  PaymentAttempt,
   RequestEvent,
+  StatementRevision,
   WalkInReference,
 } from '~/types/bloodRequest'
 import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
@@ -143,6 +145,21 @@ class BloodCenterService extends BaseService {
 
   async requestCorrection(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/donations/${donationId}/corrections`, 'POST', payload)
+  }
+
+  /** A unit's storage location or expiry date. The subject is fixed by the route. */
+  async requestUnitCorrection(unitId: string, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/inventory/${encodeURIComponent(unitId)}/corrections`, 'POST', payload)
+  }
+
+  /** When a dispatched unit left, and who took it. */
+  async requestDispatchCorrection(allocationId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/allocations/${allocationId}/corrections`, 'POST', payload)
+  }
+
+  /** A recorded payment's amount, method or reference number. */
+  async requestPaymentCorrection(paymentId: number, payload: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/payments/${paymentId}/corrections`, 'POST', payload)
   }
 
   async approveCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
@@ -517,6 +534,15 @@ class BloodCenterService extends BaseService {
   }
 
   /**
+   * The payments recorded against one statement, with what the caller may do to
+   * each. Separate from the statement on purpose: it needs the ability to
+   * record payments, which the roles that only read the statement do not hold.
+   */
+  async billingPayments(requestId: number | string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/payments`, 'GET')
+  }
+
+  /**
    * Meet a statement from the government subsidy instead of charging for it.
    *
    * Zero-rates the statement and clears the request for release without
@@ -531,9 +557,65 @@ class BloodCenterService extends BaseService {
     )
   }
 
-  /** Record a settlement. GCash payments must carry their reference. */
+  /**
+   * Record money taken at the counter. A manual GCash payment must carry its
+   * reference. The server always records it as completed and issues its
+   * receipt in the same step; the response carries the receipt.
+   */
   async recordPayment(requestId: number | string, payload: Record<string, any>): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}/payments`, 'POST', payload)
+  }
+
+  /** The Statements of Account issued for one request, oldest first. */
+  async billingStatements(requestId: number | string): Promise<{ statements: StatementRevision[] }> {
+    return this.request(`/blood-center/billings/${requestId}/statements`, 'GET')
+  }
+
+  /**
+   * Issue a Statement of Account. If nothing has changed since the last one,
+   * the server hands that one back (created: false) instead of numbering a new one.
+   */
+  async issueStatement(requestId: number | string): Promise<{ message: string; created: boolean; revision: StatementRevision }> {
+    return this.request(`/blood-center/billings/${requestId}/statements`, 'POST')
+  }
+
+  /** One issued statement as its printed PDF. */
+  async downloadStatement(revisionId: number | string): Promise<Blob> {
+    return this.requestBlob(`/blood-center/statements/${revisionId}/pdf`)
+  }
+
+  /** One Payment Acknowledgement Receipt as its printed PDF. */
+  async downloadReceipt(receiptId: number | string): Promise<Blob> {
+    return this.requestBlob(`/blood-center/receipts/${receiptId}/pdf`)
+  }
+
+  /**
+   * Open a GCash checkout for the watcher at the counter. Only the payer's
+   * name is sent; the amount comes from the statement on the server, never
+   * from here. Returns the open checkout if one already exists.
+   */
+  async startCheckout(requestId: number | string, payerName: string): Promise<{ message: string; created: boolean; attempt: PaymentAttempt }> {
+    return this.request(`/blood-center/billings/${requestId}/checkout`, 'POST', { payer_name: payerName })
+  }
+
+  /** Every GCash checkout opened against one statement, newest first. */
+  async checkoutAttempts(requestId: number | string): Promise<{ attempts: PaymentAttempt[] }> {
+    return this.request(`/blood-center/billings/${requestId}/attempts`, 'GET')
+  }
+
+  /** Close an open checkout so the payment can be taken another way. */
+  async supersedeCheckout(requestId: number | string, attemptId: number, reason: string): Promise<{ message: string; attempt: PaymentAttempt }> {
+    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/supersede`, 'POST', { reason })
+  }
+
+  /** Ask the provider again about a checkout flagged for review (Billing Supervisor). */
+  async reverifyCheckout(requestId: number | string, attemptId: number): Promise<{ message: string; attempt: PaymentAttempt }> {
+    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/reverify`, 'POST')
+  }
+
+  /** Close a checkout once the provider confirms nothing was paid on it (Billing Supervisor). */
+  async closeCheckout(requestId: number | string, attemptId: number, reason: string): Promise<{ message: string; attempt: PaymentAttempt }> {
+    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/close`, 'POST', { reason })
   }
 
   /**

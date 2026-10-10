@@ -5,6 +5,8 @@
       <p class="corrections__subtitle">
         Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
         approver or the Center Admin decides. An approved correction is applied under the same rules as the original.
+        A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
+        directly, and everyone else files a correction.
       </p>
     </header>
 
@@ -80,7 +82,7 @@
       <li v-for="item in items" :key="item.id" class="item" :class="`item--${item.status}`">
         <div class="item__head">
           <div class="item__heading">
-            <p class="item__title">{{ item.subject_label }} <span class="item__ref">Donation #{{ item.donation_id }}</span></p>
+            <p class="item__title">{{ item.subject_label }} <span class="item__ref">{{ item.target_label || ('Donation #' + item.donation_id) }}</span></p>
             <p class="item__meta">
               <template v-if="item.donation_barcode">Barcode <span class="mono">{{ item.donation_barcode }}</span> · </template>
               Requested by {{ item.requested_by || 'Unknown' }} · {{ formatDate(item.requested_at) }}
@@ -276,6 +278,12 @@ const REFUSALS = {
   results_cleared: 'The record was cleared since this was requested, so it can no longer be corrected. Reject it.',
   results_locked: 'The donation was rejected since this was requested. Reject the correction.',
   run_not_open: 'The serology run has been decided since this was requested. Reject the correction.',
+  record_changed: 'The record has been changed since this was requested. Reject the correction and ask for it again.',
+  nothing_to_correct: 'There is nothing left to correct here. Reject the correction.',
+  unit_not_editable: 'The unit can no longer be edited, so this cannot be applied. Reject the correction.',
+  not_dispatched: 'The unit is no longer dispatched, so there is no dispatch record to correct. Reject the correction.',
+  dispatch_time_invalid: 'That release time no longer fits between when the unit was reserved and when it was received. Reject the correction.',
+  billing_void: 'The statement has been voided, so its payments can no longer be corrected. Reject the correction.',
 }
 
 async function decide(item, action) {

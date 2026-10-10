@@ -68,6 +68,7 @@ const ROLE_HOME: Record<string, string> = {
   dispatch_coordinator: '/blood-center/fulfillment',
   it_data_clerk: '/blood-center/inventory',
   billing_clerk: '/blood-center/billing',
+  billing_supervisor: '/blood-center/billing',
 }
 
 /**

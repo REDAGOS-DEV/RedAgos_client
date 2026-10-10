@@ -40,6 +40,22 @@ export type StaffRole =
   | 'dispatch_coordinator'
   | 'it_data_clerk'
   | 'billing_clerk'
+  | 'billing_supervisor'
+
+/**
+ * What a correction request is about, from the server's `CorrectionSubject`
+ * enum. The first five are records of a donation; the last three are kept by
+ * Issuance and Billing.
+ */
+export type CorrectionSubject =
+  | 'screening'
+  | 'collection'
+  | 'immunohematology'
+  | 'serology'
+  | 'components'
+  | 'unit_details'
+  | 'dispatch'
+  | 'payment'
 
 export interface Facility {
   id: number
@@ -114,6 +130,14 @@ export interface AppUser {
    * Never treat this as authorization.
    */
   permissions: string[]
+
+  /**
+   * The corrections this account may file. `permissions` alone cannot say:
+   * some subjects are open only to a named post, so a custom role in the same
+   * department holds the ability and is still refused. Presentation only — the
+   * server asks the same question on every filing.
+   */
+  correction_subjects: CorrectionSubject[]
 
   /** Only present when the donor profile was eager-loaded. */
   blood_type: string | null

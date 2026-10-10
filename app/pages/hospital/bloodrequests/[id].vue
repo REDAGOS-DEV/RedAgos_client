@@ -289,138 +289,134 @@
             />
           </section>
 
-          <!-- SECTION: BILLING & PAYMENT -->
+          <!-- SECTION: BILLING (read only) -->
           <section id="request-billing" class="card billing-card">
             <div class="billing-card__header">
-              <h2 class="section-title">Billing &amp; Payment</h2>
+              <h2 class="section-title">Billing</h2>
               <span
                 v-if="showBillingSection && billing"
                 class="status-badge status-badge--sm"
                 :class="billingStatusColorClass"
               >
-                {{ billing.status }}
+                {{ billing.status_label }}
               </span>
             </div>
 
             <div v-if="!showBillingSection" class="billing-gated">
               <AssetIcon name="clock" />
-              <p>Billing becomes available once blood availability is confirmed for this request.</p>
+              <p>A statement is raised once the blood centre reserves units for this request.</p>
             </div>
 
             <div v-else-if="isLoadingBilling" class="availability-skeleton">
               <div class="skeleton skeleton--row" v-for="n in 3" :key="n" />
             </div>
 
-            <template v-else-if="billing">
+            <p v-else-if="billingError" class="receipt-error">{{ billingError }}</p>
+
+            <div v-else-if="!billing" class="billing-gated">
+              <AssetIcon name="clock" />
+              <p>No statement has been raised for this request yet.</p>
+            </div>
+
+            <template v-else>
               <div class="billing-summary">
-                <div class="summary-item">
-                  <span class="summary-label">Billing Reference</span>
-                  <span class="summary-value summary-value--mono">{{ billing.billing_id }}</span>
-                </div>
                 <div class="summary-item">
                   <span class="summary-label">Billing Date</span>
                   <span class="summary-value">{{ formatDate(billing.billing_date) }}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">Total Amount</span>
+                  <span class="summary-label">Total</span>
                   <span class="summary-value info-value--emphasis">{{ formatCurrency(billing.total_amount) }}</span>
                 </div>
-              </div>
-
-              <div class="table-wrapper">
-                <table class="history-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qty</th>
-                      <th>Unit Price</th>
-                      <th>Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="item in lineItemsWithSubtotal" :key="item.component_id">
-                      <td>{{ item.component_name }}</td>
-                      <td>{{ item.quantity }}</td>
-                      <td>{{ formatCurrency(item.price) }}</td>
-                      <td>{{ formatCurrency(item.subtotal) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div v-if="billing.status !== 'PAID'" class="payment-panel">
-                <span class="info-label">Select Payment Method</span>
-                <div class="payment-chips" role="radiogroup" aria-label="Payment method">
-                  <button
-                    type="button"
-                    class="payment-chip"
-                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'CASH' }"
-                    role="radio"
-                    :aria-checked="selectedPaymentMethod === 'CASH'"
-                    @click="selectedPaymentMethod = 'CASH'"
-                  >
-                    <AssetIcon name="box" :size="16" />
-                    <span>Cash</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="payment-chip"
-                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'GCASH' }"
-                    role="radio"
-                    :aria-checked="selectedPaymentMethod === 'GCASH'"
-                    @click="selectedPaymentMethod = 'GCASH'"
-                  >
-                    <AssetIcon name="phone" :size="16" />
-                    <span>GCash</span>
-                  </button>
+                <div v-if="billing.collects_payment" class="summary-item">
+                  <span class="summary-label">Received</span>
+                  <span class="summary-value">{{ formatCurrency(billing.collected) }}</span>
                 </div>
-                <button
-                  class="btn btn--primary"
-                  type="button"
-                  :disabled="!selectedPaymentMethod || isPaying"
-                  @click="handlePay"
-                >
-                  <span v-if="isPaying">Processing…</span>
-                  <span v-else>Pay Now</span>
-                </button>
               </div>
 
-              <div v-if="billing.status === 'PAID' && payments.length" class="receipt-block">
-                <AssetIcon name="check-circle" />
-                <div class="receipt-block__body">
-                  <span class="receipt-block__title">Payment received</span>
-                  <span class="receipt-block__meta">
-                    {{ formatCurrency(payments[payments.length - 1].amount_paid) }}
-                    &middot; {{ payments[payments.length - 1].payment_method }}
-                    &middot; {{ formatDateTime(payments[payments.length - 1].paid_at) }}
-                  </span>
-                </div>
-                <button
-                  class="btn btn--outline btn--sm"
-                  type="button"
-                  @click="showToast('Receipt download will be available once connected to the billing system.')"
-                >
-                  <AssetIcon name="download" :size="16" />
-                  <span>Download Receipt</span>
-                </button>
-              </div>
+              <p class="billing-note">
+                <template v-if="billing.is_statement_only">
+                  Weekly order, billed to your facility by statement only and settled outside RedAgos.
+                  It does not hold the units back.
+                </template>
+                <template v-else-if="billing.is_subsidised">
+                  Covered by the government subsidy. Nothing is payable on this request.
+                </template>
+                <template v-else-if="billing.clears_release">
+                  Settled. The blood centre may release the units.
+                </template>
+                <template v-else>
+                  Payable by the patient or watcher at the blood centre's billing counter, in cash or
+                  by GCash. The units are released once it is paid.
+                </template>
+              </p>
 
-              <div v-if="payments.length" class="payment-history">
-                <span class="info-label">Payment History</span>
+              <div v-if="statements.length" class="payment-history">
+                <span class="info-label">Statements of Account</span>
                 <div class="table-wrapper">
                   <table class="history-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Method</th>
-                        <th>Amount</th>
+                        <th>Statement</th>
+                        <th>Issued</th>
+                        <th>{{ billing.is_statement_only ? 'Billed' : 'Due' }}</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="p in payments" :key="p.payment_id">
-                        <td>{{ formatDateTime(p.paid_at) }}</td>
-                        <td>{{ p.payment_method }}</td>
-                        <td>{{ formatCurrency(p.amount_paid) }}</td>
+                      <tr v-for="s in statements" :key="s.id">
+                        <td class="summary-value--mono">{{ s.document_number }} <span class="muted">r{{ s.revision_number }}</span></td>
+                        <td>{{ formatDateTime(s.issued_at) }}</td>
+                        <td>{{ formatCurrency(s.amount_due) }}</td>
+                        <td>
+                          <button
+                            class="btn btn--outline btn--sm"
+                            type="button"
+                            :disabled="downloadingId === `soa-${s.id}`"
+                            @click="downloadStatement(s)"
+                          >
+                            <AssetIcon name="download" :size="16" />
+                            <span>PDF</span>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div v-if="receipts.length" class="payment-history">
+                <span class="info-label">Payment Receipts</span>
+                <div class="table-wrapper">
+                  <table class="history-table">
+                    <thead>
+                      <tr>
+                        <th>Receipt</th>
+                        <th>Issued</th>
+                        <th>Amount</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in receipts" :key="r.id">
+                        <td class="summary-value--mono">
+                          {{ r.receipt_number }}
+                          <span v-if="r.voided" class="muted">(void)</span>
+                          <span v-else-if="r.is_partial" class="muted">(part payment)</span>
+                        </td>
+                        <td>{{ formatDateTime(r.issued_at) }}</td>
+                        <td>{{ formatCurrency(r.amount_paid) }}</td>
+                        <td>
+                          <button
+                            class="btn btn--outline btn--sm"
+                            type="button"
+                            :disabled="downloadingId === `ar-${r.id}`"
+                            @click="downloadReceipt(r)"
+                          >
+                            <AssetIcon name="download" :size="16" />
+                            <span>PDF</span>
+                          </button>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -719,12 +715,14 @@ const {
 
 const {
   billing,
-  lineItems,
-  payments,
+  statements,
+  receipts,
   isLoadingBilling,
-  isPaying,
+  billingError,
+  downloadingId,
   fetchBilling,
-  payBilling,
+  downloadStatement,
+  downloadReceipt,
 } = useBloodRequestBilling(requestId)
 
 onMounted(() => {
@@ -733,27 +731,23 @@ onMounted(() => {
   fetchBilling()
 })
 
-// Billing only becomes relevant once blood availability has been confirmed
-// for the request — see the Billing BPMN in the proposal (Fig. 10).
-const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'Pending')
+// A statement is raised when the centre first reserves units, so a request
+// still pending has none to show. The API sends statuses lowercase; comparing
+// against 'Pending' used to show the section for every request.
+const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'pending')
 
-const lineItemsWithSubtotal = computed(() =>
-  lineItems.value.map((item) => ({ ...item, subtotal: item.quantity * item.price }))
-)
-
-const selectedPaymentMethod = ref(null)
-
-const billingStatusMap = { UNPAID: 'warning', PARTIAL: 'info', PAID: 'success' }
+const billingStatusMap = {
+  unpaid: 'warning',
+  partial: 'info',
+  paid: 'success',
+  subsidised: 'success',
+  statement_only: 'neutral',
+  void: 'neutral',
+}
 const billingStatusColorClass = computed(() => {
   const s = billing.value?.status
   return s ? `badge--${billingStatusMap[s] ?? 'neutral'}` : 'badge--neutral'
 })
-
-async function handlePay() {
-  if (!selectedPaymentMethod.value || !billing.value) return
-  const ok = await payBilling({ amount: billing.value.total_amount, method: selectedPaymentMethod.value })
-  if (ok) showToast('Payment successful.')
-}
 
 function scrollToBilling() {
   document.getElementById('request-billing')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1468,61 +1462,14 @@ function scrollToTimeline() {
   gap: 18px;
   margin-bottom: 20px;
 }
-.payment-panel {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--rb-border);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-start;
+.billing-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
 }
-.payment-chips {
-  display: flex;
-  gap: 10px;
-}
-.payment-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface);
-  color: var(--rb-text);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.payment-chip--active {
-  border-color: #1565c0;
-  background: #E1F3FE;
-  color: #1F6C9F;
-}
-.receipt-block {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 10px;
-  background: #EDF3EC;
-  color: #346538;
-}
-.receipt-block__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-.receipt-block__title {
-  font-size: 14px;
-  font-weight: 700;
-}
-.receipt-block__meta {
-  font-size: 12.5px;
-  opacity: 0.85;
+.billing-card .muted {
+  color: var(--rb-text-muted);
+  font-weight: 400;
 }
 .payment-history {
   margin-top: 20px;
@@ -1694,20 +1641,6 @@ function scrollToTimeline() {
 :global(.dark .request-details-page .billing-gated) {
   color: var(--rb-text-muted);
 }
-:global(.dark .request-details-page .payment-chip) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: var(--rb-text);
-}
-:global(.dark .request-details-page .payment-chip--active) {
-  border-color: #7EC1EE;
-  background: #122733;
-  color: #7EC1EE;
-}
-:global(.dark .request-details-page .receipt-block) {
-  background: #1D2B1E;
-  color: #8FCB94;
-}
 :global(.dark .request-details-page .toast) {
   background: var(--rb-surface);
   border-color: var(--rb-border);
@@ -1732,9 +1665,6 @@ function scrollToTimeline() {
   .info-grid,
   .billing-summary {
     grid-template-columns: 1fr;
-  }
-  .payment-chips {
-    flex-wrap: wrap;
   }
   .bottom-actions {
     justify-content: stretch;

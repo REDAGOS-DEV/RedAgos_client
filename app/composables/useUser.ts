@@ -1,6 +1,6 @@
 import { authService } from '~/api/auth/AuthService'
 import { resolveApiAssetURL, resolveApiBaseURL } from '~/api/BaseService'
-import type { AppUser } from '~/types/user'
+import type { AppUser, CorrectionSubject } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
 // sa composable aron usa ra ka request bisan pila ka caller ang mo-dungan.
@@ -61,6 +61,7 @@ export function useUser() {
         admin_privileges: Array.isArray(payload.admin_privileges) ? payload.admin_privileges : [],
         admin_role: payload.admin_role ?? null,
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+        correction_subjects: Array.isArray(payload.correction_subjects) ? payload.correction_subjects : [],
         blood_type: payload.blood_type ?? null,
         // Signed URL nga mo-expire sa 30 minutos, bag-o sa matag /user. Kaniadto
         // ang upload ra ang nag-set ani, so nawala ang photo human sa login,
@@ -115,6 +116,17 @@ export function useUser() {
       : ability.some((one) => held.includes(one))
   }
 
+  /**
+   * May the user file a correction of this subject.
+   *
+   * Fail-closed like `can()`. Presentation only: it decides whether a
+   * "Request correction" control is drawn, and the server refuses a filing
+   * the account may not make.
+   */
+  function canFile(subject: CorrectionSubject): boolean {
+    return user.value?.correction_subjects?.includes(subject) ?? false
+  }
+
   function updateAvatar(newUrl: string | null): void {
     if (user.value) {
       user.value = { ...user.value, avatar: newUrl }
@@ -161,5 +173,5 @@ export function useUser() {
     }
   }
 
-  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can }
+  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can, canFile }
 }

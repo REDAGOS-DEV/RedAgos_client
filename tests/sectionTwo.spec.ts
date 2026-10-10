@@ -368,9 +368,66 @@ describe('corrections', () => {
   const dialog = source('app/components/BloodCenter/CorrectionRequestDialog.vue')
 
   it('asks with a reason and the corrected values', () => {
-    expect(dialog).toContain('bloodCenterService.requestCorrection(props.donationId, {')
+    expect(dialog).toContain('bloodCenterService.requestCorrection(props.donationId, { subject: props.subject, ...payload })')
     expect(dialog).toContain('reason: reason.value.trim()')
     expect(dialog).toContain(':disabled="busy || !reason.trim()"')
+  })
+
+  it('files each Issuance and Billing subject through its own route', () => {
+    expect(dialog).toContain('bloodCenterService.requestUnitCorrection(String(props.targetId), payload)')
+    expect(dialog).toContain('bloodCenterService.requestDispatchCorrection(Number(props.targetId), payload)')
+    expect(dialog).toContain('bloodCenterService.requestPaymentCorrection(Number(props.targetId), payload)')
+
+    const service = source('app/api/bloodcenter/BloodCenterService.ts')
+    expect(service).toContain('`${this.resource}/inventory/${encodeURIComponent(unitId)}/corrections`')
+    expect(service).toContain('`${this.resource}/allocations/${allocationId}/corrections`')
+    expect(service).toContain('`${this.resource}/payments/${paymentId}/corrections`')
+  })
+
+  it('names every department\'s head, and tells a head their own request goes to the Center Admin', () => {
+    for (const title of [
+      'the Donor Screening Physician',
+      'the Component Laboratory Medical Technologist',
+      'the Laboratory Supervisor',
+      'the Inventory Control Officer',
+      'the Billing Supervisor',
+    ]) {
+      expect(dialog).toContain(title)
+    }
+
+    expect(dialog).toContain("user.value?.staff_role === head.role")
+    // The consultant role was withdrawn with its department.
+    expect(dialog).not.toContain('Reference Laboratory Consultant')
+  })
+
+  it('offers the Issuance and Billing corrections only to the posts the server admits', () => {
+    const inventory = source('app/pages/blood-center/inventory.vue')
+    expect(inventory).toContain("can('inventory.update')")
+    expect(inventory).toContain("canFile('unit_details')")
+    expect(inventory).toContain('subject="unit_details"')
+
+    const fulfillment = source('app/pages/blood-center/fulfillment.vue')
+    expect(fulfillment).toContain("can('corrections.request') && canFile('dispatch')")
+    expect(fulfillment).toContain('subject="dispatch"')
+
+    const billing = source('app/pages/blood-center/billing.vue')
+    expect(billing).toContain("can('billing.record_payment') && can('corrections.request') && canFile('payment')")
+    expect(billing).toContain('subject="payment"')
+    // The payments, with their references, are behind the ability to record them.
+    expect(billing).toContain("const canSeePayments = computed(() => can('billing.record_payment'))")
+    expect(billing).toContain('bloodCenterService.billingPayments(')
+  })
+
+  it('sends only the fields a unit edit changes, so an expired unit is not sent a storage location', () => {
+    const inventory = source('app/pages/blood-center/inventory.vue')
+
+    expect(inventory).toContain("if (row.status !== 'expired'")
+    expect(inventory).toContain('bloodCenterService.updateBloodUnit(editingBatchId.value, changes)')
+  })
+
+  it('shows what a correction is about, whether or not it is a donation', () => {
+    expect(page).toContain("item.target_label || ('Donation #' + item.donation_id)")
+    expect(page).toContain('record_changed:')
   })
 
   it('lets only the server decide who may decide', () => {

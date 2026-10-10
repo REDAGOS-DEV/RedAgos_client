@@ -82,12 +82,30 @@ export type BloodUnitStatus =
   | 'expired'
   | 'discarded'
 
-/** billings.status */
-export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void'
+/**
+ * billings.status.
+ *
+ * `subsidised`: the government met the cost. `statement_only`: a weekly
+ * (replenishment) order, billed to the hospital by statement and settled
+ * outside RedAgos — it takes no payment here and never blocks release.
+ */
+export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void' | 'subsidised' | 'statement_only'
 
-/** payments.payment_method / payments.status */
+/** payments.payment_method / payments.status / payments.source */
 export type PaymentMethod = 'cash' | 'gcash'
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'
+export type PaymentSource = 'manual' | 'gateway'
+
+/** payment_attempts.status — one GCash checkout's state. */
+export type PaymentAttemptStatus =
+  | 'creating'
+  | 'active'
+  | 'awaiting_verification'
+  | 'completed'
+  | 'expired'
+  | 'canceled'
+  | 'failed'
+  | 'superseded'
 
 export interface FacilityStub {
   id: number
@@ -116,6 +134,8 @@ export interface RequestAllocation {
   storage_location?: string | null
   allocated_at: string | null
   released_at: string | null
+  /** Who physically took the units. Null for a release made before it was recorded, or with no name given. */
+  handed_to?: string | null
   received_at: string | null
 }
 
@@ -428,8 +448,86 @@ export interface Billing {
   status: BillingStatus
   status_label: string
   is_zero_rated: boolean
+  is_subsidised: boolean
+  is_statement_only: boolean
+  /** False for void, subsidised and statement-only statements: nothing is collected in RedAgos. */
+  collects_payment: boolean
+  represents_collected_money: boolean
   clears_release: boolean
   billing_date: string | null
+}
+
+/** One frozen line of an issued statement. Amounts are decimal strings. */
+export interface StatementLine {
+  component_name: string
+  quantity: number
+  unit_price: string
+  line_total: string
+}
+
+/** One issued Statement of Account (SOA-…). It never changes once issued. */
+export interface StatementRevision {
+  id: number
+  document_number: string
+  revision_number: number
+  reason: 'statement' | 'checkout' | 'payment'
+  billing_status: BillingStatus
+  billing_status_label: string
+  statement_only: boolean
+  currency: string
+  total_amount: string
+  collected_at_issue: string
+  amount_due: string
+  issued_at: string | null
+  lines: StatementLine[]
+}
+
+/** A Payment Acknowledgement Receipt (AR-…), as lists show it. Not a BIR official receipt. */
+export interface PaymentReceiptSummary {
+  id: number
+  receipt_number: string
+  issued_at: string | null
+  amount_paid: string | null
+  balance_after: string | null
+  is_partial: boolean
+  payment_method_label: string | null
+  statement_document_number: string | null
+  voided: boolean
+  void_reason: string | null
+  replaces_receipt_number: string | null
+}
+
+/**
+ * One GCash checkout opened at the counter. The payer's name is never sent
+ * back. `checkout_url` is present only while the checkout can still be paid.
+ */
+export interface PaymentAttempt {
+  id: number
+  status: PaymentAttemptStatus
+  status_label: string
+  amount: string
+  currency: string
+  checkout_url: string | null
+  expires_at: string | null
+  statement_document_number: string | null
+  failure_code: string | null
+  review_required: boolean
+  review_reason: string | null
+  created_at: string | null
+  completed_at: string | null
+}
+
+/** Why a checkout cannot be opened right now, from GET /blood-center/billings/{id}. */
+export interface CheckoutAvailability {
+  available: boolean
+  reason: string | null
+}
+
+/** GET /hospital/blood-requests/{id}/billing — read only. */
+export interface HospitalBillingView {
+  billing: Billing
+  statements: StatementRevision[]
+  receipts: PaymentReceiptSummary[]
 }
 
 export interface CreateBloodRequestItemPayload {

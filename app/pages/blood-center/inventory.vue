@@ -438,8 +438,12 @@
                       <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('view', row)">
                         <AssetIcon name="eye" :size="13" /> View details
                       </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('edit', row)">
+                      <!-- The head edits a unit directly. Everyone else files a correction, and only the roles the server admits are offered it. -->
+                      <button v-if="canEditUnit" type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('edit', row)">
                         <AssetIcon name="pencil" :size="13" /> Edit unit
+                      </button>
+                      <button v-else-if="canRequestUnitCorrection" type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('edit', row)">
+                        <AssetIcon name="pencil" :size="13" /> Request correction
                       </button>
                       <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('print', row)">
                         <AssetIcon name="printer" :size="13" /> Print label
@@ -448,8 +452,8 @@
                         <AssetIcon name="history" :size="13" /> Movement history
                       </button>
                       <!-- Opens the edit form: expiry comes from the unit's date, there is no flag to set. -->
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('mark-expiring', row)">
-                        <AssetIcon name="clock" :size="13" /> Change expiry date
+                      <button v-if="canChangeUnit" type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('mark-expiring', row)">
+                        <AssetIcon name="clock" :size="13" /> {{ canEditUnit ? 'Change expiry date' : 'Request expiry change' }}
                       </button>
 
                       <p class="row-menu__group">Stock</p>
@@ -667,10 +671,15 @@
               <AssetIcon name="x" :size="16" />
             </button>
 
-            <h3 class="modal-title modal-title--left">Edit unit {{ editingBatchId }}</h3>
+            <h3 class="modal-title modal-title--left">
+              {{ canEditUnit ? 'Edit unit' : 'Request a correction to unit' }} {{ editingBatchId }}
+            </h3>
             <p class="modal-subtitle modal-subtitle--left">
               Only where a unit is kept and when it expires can be changed. Its blood type, component and
               donation are facts about the donation it came from, so they are fixed here.
+              <template v-if="!canEditUnit">
+                Your change goes to the Inventory Control Officer to approve.
+              </template>
             </p>
 
             <form class="batch-form" @submit.prevent="submitBatchForm">
@@ -694,7 +703,7 @@
               <div class="modal-actions">
                 <button type="submit" class="btn-primary modal-actions__btn" :disabled="batchSubmitting">
                   <AssetIcon name="circle-check" :size="15" />
-                  {{ batchSubmitting ? 'Saving…' : 'Save Changes' }}
+                  {{ batchSubmitting ? 'Saving…' : (canEditUnit ? 'Save Changes' : 'Review correction') }}
                 </button>
                 <button type="button" class="btn-outline modal-actions__btn" @click="closeBatchModal" :disabled="batchSubmitting">Cancel</button>
               </div>
@@ -903,8 +912,8 @@
             </div>
 
             <footer v-if="drawerBatch" class="detail-drawer__footer">
-              <button type="button" class="btn-outline" @click="editFromDrawer">
-                <AssetIcon name="pencil" :size="14" /> Edit Inventory
+              <button v-if="canChangeUnit" type="button" class="btn-outline" @click="editFromDrawer">
+                <AssetIcon name="pencil" :size="14" /> {{ canEditUnit ? 'Edit Inventory' : 'Request Correction' }}
               </button>
               <button type="button" class="btn-outline" @click="reserveFromDrawer">
                 <AssetIcon name="lock" :size="14" /> Reserve Units
@@ -921,6 +930,16 @@
       </Transition>
     </Teleport>
 
+    <BloodCenterCorrectionRequestDialog
+      v-if="unitCorrection"
+      subject="unit_details"
+      :target-id="unitCorrection.unitId"
+      :changes="unitCorrection.changes"
+      :previous="unitCorrection.previous"
+      @close="closeUnitCorrection"
+      @submitted="onUnitCorrectionSent"
+    />
+
     <BloodCenterBagLabelSheet />
   </div>
 </template>
@@ -930,6 +949,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { useLabelPrint } from '~/composables/useLabelPrint'
@@ -943,7 +963,15 @@ definePageMeta({
   requires: 'inventory.view',
 })
 
-const { user } = useUser()
+const { user, can, canFile } = useUser()
+
+// A unit is edited directly only by whoever holds inventory.update (the
+// Inventory Control Officer). The IT Data Entry Clerk files a correction
+// instead, and a custom role in the same department is offered neither: it
+// holds the ability but not the post, and the server refuses it.
+const canEditUnit = computed(() => can('inventory.update'))
+const canRequestUnitCorrection = computed(() => !canEditUnit.value && can('corrections.request') && canFile('unit_details'))
+const canChangeUnit = computed(() => canEditUnit.value || canRequestUnitCorrection.value)
 const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'Blood Center')
 
 const loading = ref(true)
@@ -1495,16 +1523,69 @@ function closeBatchModal() {
   if (batchSubmitting.value) return
   batchModalOpen.value = false
 }
+const unitCorrection = ref(null)
+
+function onUnitCorrectionSent(response) {
+  unitCorrection.value = null
+  manageActionNote.value = response?.message ?? 'Correction requested.'
+}
+
+// The edit modal sits above the dialog, so it steps aside while the dialog is
+// open and comes back, with what was typed, if the request is cancelled.
+function closeUnitCorrection() {
+  unitCorrection.value = null
+  batchModalOpen.value = true
+}
+
+/**
+ * What the form changes on the unit, and nothing else.
+ *
+ * An expired unit takes a new expiry date and nothing more — the server refuses
+ * a storage location on it — so sending the untouched location along with a
+ * date change used to make every edit of an expired unit fail.
+ */
+function changedUnitFields(row) {
+  const changes = {}
+
+  if (batchForm.expiryDate && batchForm.expiryDate !== (row.expiry_date || '')) {
+    changes.expiry_date = batchForm.expiryDate
+  }
+
+  if (row.status !== 'expired' && (batchForm.storageLocation || null) !== (row.storage_location || null)) {
+    changes.storage_location = batchForm.storageLocation || null
+  }
+
+  return changes
+}
+
 async function submitBatchForm() {
   if (!editingBatchId.value) return
+
+  const row = inventoryBatches.value.find(batch => batch.id === editingBatchId.value)
+  const changes = row ? changedUnitFields(row) : {}
+
+  if (!Object.keys(changes).length) {
+    batchFormError.value = 'Nothing has changed yet.'
+    return
+  }
+
+  // Anyone but the head files a correction: the change is reviewed in the
+  // dialog and applied only once it is approved.
+  if (!canEditUnit.value) {
+    batchFormError.value = ''
+    unitCorrection.value = {
+      unitId: editingBatchId.value,
+      changes,
+      previous: { storage_location: row.storage_location || null, expiry_date: row.expiry_date || null },
+    }
+    batchModalOpen.value = false
+    return
+  }
 
   batchSubmitting.value = true
   batchFormError.value = ''
   try {
-    await bloodCenterService.updateBloodUnit(editingBatchId.value, {
-      storage_location: batchForm.storageLocation || null,
-      ...(batchForm.expiryDate ? { expiry_date: batchForm.expiryDate } : {}),
-    })
+    await bloodCenterService.updateBloodUnit(editingBatchId.value, changes)
     batchModalOpen.value = false
     await loadDashboard()
   } catch (err) {
