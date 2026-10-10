@@ -56,6 +56,7 @@ export type CorrectionSubject =
   | 'unit_details'
   | 'dispatch'
   | 'payment'
+  | 'payment_void'
 
 export interface Facility {
   id: number

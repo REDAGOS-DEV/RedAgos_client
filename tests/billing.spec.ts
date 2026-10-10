@@ -1,14 +1,22 @@
 import { describe, it, expect } from 'vitest'
 import {
   attemptTone,
+  cashCountTotal,
+  CASH_DENOMINATIONS,
+  changeDue,
   checkoutUnavailableMessage,
+  facilityInitials,
   isAttemptPayable,
   isAttemptSettled,
+  journalAmount,
   pesos,
+  quickTenderAmounts,
   reviewReasonMessage,
+  shiftVariance,
   statementFigures,
   statementStamp,
   takesPayment,
+  transactionTone,
 } from '~/utils/billing'
 
 /**
@@ -130,11 +138,75 @@ describe('billing documents', () => {
   })
 
   it('stamps every statement status with its own label', () => {
-    const statuses = ['unpaid', 'partial', 'paid', 'void', 'subsidised', 'statement_only'] as const
+    const statuses = ['unpaid', 'partial', 'paid', 'void', 'subsidised', 'statement_only', 'settled_outside'] as const
     const labels = statuses.map((s) => statementStamp(s).label)
 
     expect(new Set(labels).size).toBe(statuses.length)
     expect(statementStamp('paid').tone).toBe('success')
     expect(statementStamp('unpaid').tone).toBe('danger')
+  })
+
+  it('heads a document of a centre without a logo with its own initials, as the PDF does', () => {
+    expect(facilityInitials('Davao Regional Blood Center')).toBe('DR')
+    expect(facilityInitials('Bureau of Blood Services')).toBe('BB')
+    expect(facilityInitials('The Philippine Red Cross')).toBe('PR')
+    expect(facilityInitials('Blood Center #2')).toBe('BC')
+    expect(facilityInitials('Tagum')).toBe('T')
+    expect(facilityInitials(null)).toBe('')
+  })
+})
+
+/**
+ * The counter and the journal.
+ *
+ * What is locked in: change is worked in centavos and never offered when the
+ * cash does not cover the payment; the quick amounts are the exact sum and the
+ * next round notes; a drawer count adds up exactly; a difference reads as
+ * over or short; and a journal amount says which way it moved the bill.
+ */
+describe('the counter', () => {
+  it('works out the change in centavos, and offers none when the cash is short', () => {
+    expect(changeDue(2000, 1800)).toBe(200)
+    expect(changeDue('1000.00', '999.70')).toBe(0.3)
+    expect(changeDue(500, 500)).toBe(0)
+    expect(changeDue(400, 500)).toBeNull()
+  })
+
+  it('offers the exact sum, then the next round notes above it', () => {
+    expect(quickTenderAmounts(1830)).toEqual([1830, 1900, 2000])
+    expect(quickTenderAmounts(500)).toEqual([500, 1000])
+    expect(quickTenderAmounts(0)).toEqual([])
+  })
+
+  it('adds up a drawer count exactly, ignoring blanks and negatives', () => {
+    expect(cashCountTotal({ 1000: 1, 500: 1, 100: 3, 50: 1 })).toBe(1850)
+    expect(cashCountTotal({ '0.25': 3, 1: '', 5: -2 })).toBe(0.75)
+  })
+
+  it('lists the same notes and coins the server accepts', () => {
+    expect([...CASH_DENOMINATIONS]).toEqual(['1000', '500', '200', '100', '50', '20', '10', '5', '1', '0.25'])
+  })
+
+  it('reads a drawer difference as balanced, over or short', () => {
+    expect(shiftVariance('0.00')).toEqual({ label: 'Balanced', tone: 'success' })
+    expect(shiftVariance('50.00').tone).toBe('warning')
+    expect(shiftVariance('50.00').label).toContain('Over by')
+    expect(shiftVariance('-50.00').tone).toBe('danger')
+    expect(shiftVariance('-50.00').label).toContain('Short by')
+  })
+})
+
+describe('the journal', () => {
+  it('signs an amount by which way it moved the bill', () => {
+    expect(journalAmount({ amount: '900.00' })).toBe(`+${pesos(900)}`)
+    expect(journalAmount({ amount: '-500.00' })).toBe(`−${pesos(500)}`)
+    expect(journalAmount({ amount: '0.00' })).toBe(pesos(0))
+  })
+
+  it('gives money in and money reversed different tones', () => {
+    expect(transactionTone('payment')).toBe('success')
+    expect(transactionTone('payment_void')).toBe('danger')
+    expect(transactionTone('external_settlement')).toBe('success')
+    expect(transactionTone('charge')).toBe('muted')
   })
 })

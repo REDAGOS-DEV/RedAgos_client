@@ -14,38 +14,46 @@
       <!-- HEADER -->
       <header class="page-header fade-in" style="--delay:0ms">
         <div>
-          <h1 class="page-title">Billing &amp; Payment</h1>
+          <h1 class="page-title">Bills &amp; Statements</h1>
           <p class="page-subtitle">
-            Settle the statement raised against each Patient Transfusion request — cash at the
-            counter, or a GCash checkout the watcher pays on their phone. Blood is not released
-            until it is paid or met by the government subsidy. Weekly orders are billed to the
-            hospital by statement only.
+            Patient bills are paid at the counter — cash, or a GCash checkout the watcher pays on
+            their phone — and blood is not released until one is paid or met by the government
+            subsidy. Weekly orders are billed to the hospital by statement, and recorded here once
+            the hospital settles them.
           </p>
         </div>
-        <button class="btn btn-outline" :disabled="loading" @click="load">
-          <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
-          Refresh
-        </button>
+        <div class="header-actions">
+          <NuxtLink v-if="canSeePayments" to="/blood-center/pos" class="btn btn-primary">
+            <AssetIcon name="credit-card" :size="16" />
+            Open counter
+          </NuxtLink>
+          <NuxtLink v-if="canSeePayments" to="/blood-center/billing-transactions" class="btn btn-outline">
+            Transactions
+          </NuxtLink>
+          <button class="btn btn-outline" :disabled="loading" @click="refreshAll">
+            <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
+            Refresh
+          </button>
+        </div>
       </header>
+
+      <!-- Documents are headed by the centre's own logo; without one, its initials. -->
+      <div v-if="summary && !summary.issuer?.logo_url" class="banner banner--info">
+        <AssetIcon name="info" :size="16" />
+        <span>
+          Your statements and receipts are printed with your centre's initials because no logo is uploaded.
+          <template v-if="can('center.configure')">
+            Upload one in <NuxtLink to="/blood-center/settings" class="inline-link">Settings</NuxtLink>.
+          </template>
+          <template v-else>A supervisor can upload one in Settings.</template>
+        </span>
+      </div>
 
       <!-- ERROR -->
       <div v-if="error" class="banner banner--error">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ error }}</span>
         <button class="btn btn-outline btn-sm" @click="load">Retry</button>
-      </div>
-
-      <!-- RECEIPT JUST ISSUED -->
-      <div v-if="lastReceipt" class="banner banner--ok">
-        <AssetIcon name="check" :size="16" />
-        <span>
-          Receipt <strong class="mono">{{ lastReceipt.receipt_number }}</strong> issued
-          <template v-if="lastReceipt.is_partial">for a part payment — {{ pesos(lastReceipt.balance_after) }} is still owed</template>.
-        </span>
-        <button class="btn btn-outline btn-sm" :disabled="downloadingId === `ar-${lastReceipt.id}`" @click="downloadReceipt(lastReceipt)">
-          Download receipt
-        </button>
-        <button class="btn btn-outline btn-sm" @click="lastReceipt = null">Dismiss</button>
       </div>
 
       <!-- STATS -->
@@ -55,6 +63,22 @@
           <span class="stat-value" :class="stat.tone && `stat-value--${stat.tone}`">{{ stat.value }}</span>
           <span class="stat-note">{{ stat.note }}</span>
         </div>
+      </div>
+
+      <!-- CATEGORY: owed by a patient at the counter, or by a hospital by statement -->
+      <div class="category-switch fade-in" role="tablist" aria-label="Bill category" style="--delay:75ms">
+        <button
+          v-for="c in categories"
+          :key="c.value"
+          role="tab"
+          class="category"
+          :class="{ 'category--on': category === c.value }"
+          :aria-selected="category === c.value"
+          @click="category = c.value"
+        >
+          <strong>{{ c.label }}</strong>
+          <span>{{ c.note }}</span>
+        </button>
       </div>
 
       <!-- FILTERS -->
@@ -84,8 +108,8 @@
 
         <div v-else-if="statements.length === 0" class="empty">
           <AssetIcon name="inbox" :size="36" />
-          <h3>No statements</h3>
-          <p>A statement is raised the moment stock is reserved for a request.</p>
+          <h3>{{ category === 'weekly' ? 'No hospital statements' : 'No patient bills' }}</h3>
+          <p>A bill is raised the moment stock is reserved for a request.</p>
         </div>
 
         <table v-else class="bl-table">
@@ -95,9 +119,10 @@
               <th scope="col">Hospital</th>
               <th scope="col">Components</th>
               <th scope="col" class="num">Total</th>
-              <th scope="col" class="num">Collected</th>
+              <th v-if="category === 'patient'" scope="col" class="num">Collected</th>
               <th scope="col">Status</th>
-              <th scope="col" class="num">Release</th>
+              <th v-if="category === 'patient'" scope="col" class="num">Release</th>
+              <th v-else scope="col">Settlement</th>
               <th scope="col" />
             </tr>
           </thead>
@@ -113,30 +138,47 @@
                 {{ (s.request?.components || []).join(', ') || '—' }}
               </td>
               <td class="num">{{ peso(s.total_amount) }}</td>
-              <td class="num">{{ s.collected > 0 ? peso(s.collected) : '—' }}</td>
+              <td v-if="category === 'patient'" class="num">{{ s.collected > 0 ? peso(s.collected) : '—' }}</td>
               <td>
                 <span class="status" :class="`status--${s.status}`">{{ s.status_label }}</span>
               </td>
-              <td class="num">
+              <td v-if="category === 'patient'" class="num">
                 <span class="gate" :class="s.clears_release ? 'gate--ok' : 'gate--blocked'">
                   <AssetIcon :name="s.clears_release ? 'check' : 'x'" :size="12" />
                   {{ s.clears_release ? 'Cleared' : 'Blocked' }}
                 </span>
               </td>
+              <td v-else class="settlement-cell">
+                <template v-if="s.settlement">
+                  {{ formatDay(s.settlement.settled_at) }}
+                  <span class="mono">{{ s.settlement.reference }}</span>
+                </template>
+                <span v-else class="settled-note">Awaiting the hospital</span>
+              </td>
               <td class="actions">
                 <!-- Write actions only for whoever may record money; billing.view alone reads. -->
                 <template v-if="canSeePayments && takesPayment(s)">
-                  <button class="btn btn-primary btn-sm" @click="openPayment(s)">
-                    Record Payment
-                  </button>
-                  <button class="btn btn-outline btn-sm" @click="openCheckout(s)">
+                  <!-- Money is taken at the counter. -->
+                  <NuxtLink :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="btn btn-primary btn-sm">
+                    Take payment
+                  </NuxtLink>
+                  <button class="btn btn-outline btn-sm" @click="checkoutFor = s">
                     GCash QR
                   </button>
                   <button class="btn btn-outline btn-sm" @click="openSubsidy(s)">
                     Apply Subsidy
                   </button>
                 </template>
-                <span v-else-if="s.is_statement_only" class="settled-note">Statement only</span>
+                <button
+                  v-else-if="canSeePayments && s.status === 'statement_only'"
+                  class="btn btn-primary btn-sm"
+                  @click="openSettlement(s)"
+                >
+                  Record settlement
+                </button>
+                <span v-else-if="s.is_statement_only" class="settled-note">
+                  {{ s.is_settled_outside ? 'Settled by hospital' : 'Statement only' }}
+                </span>
                 <span v-else-if="s.clears_release" class="settled-note">
                   {{ s.is_subsidised ? 'Government funded' : 'Settled' }}
                 </span>
@@ -158,92 +200,94 @@
       </div>
     </div>
 
-    <!-- RECORD PAYMENT -->
+    <!-- RECORD A WEEKLY BILL'S SETTLEMENT. No money moves through RedAgos. -->
     <Teleport to="body">
-      <div v-if="paymentFor" class="modal-overlay" @click.self="closePayment">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pay-title">
-          <h2 id="pay-title" class="modal-title">Record Payment</h2>
+      <div v-if="settlementFor" class="modal-overlay" @click.self="closeSettlement">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settle-title">
+          <h2 id="settle-title" class="modal-title">Record Hospital Settlement</h2>
           <p class="modal-sub">
-            {{ paymentFor.request?.reference_number }} · {{ paymentFor.request?.requesting_facility }}
+            {{ settlementFor.request?.reference_number }} · {{ settlementFor.request?.requesting_facility }}
+          </p>
+
+          <p class="modal-desc">
+            The hospital settled this weekly bill outside RedAgos. Recording it closes the statement at the
+            figure below; nothing is collected here.
           </p>
 
           <dl class="modal-facts">
-            <div><dt>Statement total</dt><dd>{{ peso(paymentFor.total_amount) }}</dd></div>
-            <div><dt>Already collected</dt><dd>{{ peso(paymentFor.collected) }}</dd></div>
-            <div><dt>Outstanding</dt><dd class="owing">{{ peso(outstanding) }}</dd></div>
+            <div><dt>Amount billed</dt><dd>{{ peso(settlementFor.total_amount) }}</dd></div>
           </dl>
 
           <div class="field">
-            <label for="pay-amount" class="field-label">Amount received <span class="req">*</span></label>
+            <label for="settle-ref" class="field-label">Hospital's payment reference <span class="req">*</span></label>
             <input
-              id="pay-amount"
-              v-model.number="payment.amount_paid"
-              type="number"
-              step="0.01"
-              min="0.01"
-              class="input"
-              :class="{ 'input--error': payErrors.amount_paid }"
-            >
-            <p v-if="payErrors.amount_paid" class="field-error">{{ payErrors.amount_paid }}</p>
-            <p v-else class="field-hint">
-              A part payment is recorded, but does not release blood — the Capstone requires
-              payment in full.
-            </p>
-          </div>
-
-          <div class="field">
-            <span class="field-label">Method <span class="req">*</span></span>
-            <div class="method-row">
-              <label
-                v-for="method in methods"
-                :key="method.value"
-                class="pill"
-                :class="{ 'pill--on': payment.payment_method === method.value }"
-              >
-                <input v-model="payment.payment_method" type="radio" name="method" :value="method.value" class="sr-only">
-                {{ method.label }}
-              </label>
-            </div>
-          </div>
-
-          <div v-if="payment.payment_method === 'gcash'" class="field">
-            <label for="pay-ref" class="field-label">GCash reference <span class="req">*</span></label>
-            <input
-              id="pay-ref"
-              v-model.trim="payment.reference_number"
+              id="settle-ref"
+              v-model.trim="settlement.settlement_reference"
               type="text"
               class="input"
-              :class="{ 'input--error': payErrors.reference_number }"
+              :class="{ 'input--error': settlementErrors.settlement_reference }"
               maxlength="100"
+              placeholder="e.g. cheque or transfer number"
             >
-            <p v-if="payErrors.reference_number" class="field-error">{{ payErrors.reference_number }}</p>
-            <p v-else class="field-hint">
-              For a transfer you can see on the payer's phone; the reference is the evidence.
-              For a payment they make on their own phone, close this and use GCash QR instead —
-              the provider confirms that one.
-            </p>
+            <p v-if="settlementErrors.settlement_reference" class="field-error">{{ settlementErrors.settlement_reference }}</p>
           </div>
 
           <div class="field">
-            <label for="pay-payer" class="field-label">Received from <span class="optional">(optional)</span></label>
+            <label for="settle-date" class="field-label">Date settled <span class="req">*</span></label>
             <input
-              id="pay-payer"
-              v-model.trim="payment.payer_name"
-              type="text"
+              id="settle-date"
+              v-model="settlement.settled_at"
+              type="date"
               class="input"
-              maxlength="120"
-              placeholder="e.g. the patient's watcher"
-              autocomplete="off"
+              :class="{ 'input--error': settlementErrors.settled_at }"
+              :max="todayIso"
             >
-            <p class="field-hint">Printed on the receipt.</p>
+            <p v-if="settlementErrors.settled_at" class="field-error">{{ settlementErrors.settled_at }}</p>
           </div>
 
-          <p v-if="payError" class="field-error field-error--block">{{ payError }}</p>
+          <div class="field">
+            <label for="settle-note" class="field-label">Note <span class="optional">(optional)</span></label>
+            <input id="settle-note" v-model.trim="settlement.settlement_note" type="text" class="input" maxlength="500">
+          </div>
+
+          <p v-if="settlementError" class="field-error field-error--block">{{ settlementError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="saving" @click="closePayment">Cancel</button>
-            <button class="btn btn-primary" :disabled="saving" @click="submitPayment">
-              {{ saving ? 'Recording…' : 'Record Payment' }}
+            <button class="btn btn-outline" :disabled="saving" @click="closeSettlement">Cancel</button>
+            <button class="btn btn-primary" :disabled="saving || !settlement.settlement_reference" @click="submitSettlement">
+              {{ saving ? 'Recording…' : 'Record settlement' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- REQUEST A VOID: decided by the Billing Supervisor -->
+    <Teleport to="body">
+      <div v-if="voidFor" class="modal-overlay" @click.self="closeVoid">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="void-title">
+          <h2 id="void-title" class="modal-title">Request a Void</h2>
+          <p class="modal-sub">
+            {{ peso(voidFor.amount_paid) }} {{ voidFor.payment_method_label }} · {{ formatWhen(voidFor.payment_date) }}
+            <template v-if="voidFor.receipt"> · Receipt {{ voidFor.receipt.receipt_number }}</template>
+          </p>
+
+          <p class="modal-desc">
+            For a payment recorded in error, or money handed straight back, on the day it was taken.
+            The Billing Supervisor decides. After that, money given back is a refund, settled outside RedAgos.
+          </p>
+
+          <div class="field">
+            <label for="void-reason" class="field-label">Why is it being voided? <span class="req">*</span></label>
+            <input id="void-reason" v-model.trim="voidReason" type="text" class="input" maxlength="1000">
+          </div>
+
+          <p v-if="voidError" class="field-error field-error--block">{{ voidError }}</p>
+
+          <div class="modal-actions">
+            <button class="btn btn-outline" :disabled="saving" @click="closeVoid">Back</button>
+            <button class="btn btn-primary" :disabled="saving || voidReason.length < 3" @click="submitVoid">
+              {{ saving ? 'Sending…' : 'Request void' }}
             </button>
           </div>
         </div>
@@ -302,7 +346,7 @@
 
     <!-- RECORDED PAYMENTS. Each modal below steps aside while the request is reviewed: its overlay sits above the dialog's. -->
     <Teleport to="body">
-      <div v-if="paymentsFor && !editingPayment && !paymentCorrection" class="modal-overlay" @click.self="closePayments">
+      <div v-if="paymentsFor && !editingPayment && !paymentCorrection && !voidFor" class="modal-overlay" @click.self="closePayments">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payments-title">
           <h2 id="payments-title" class="modal-title">Recorded Payments</h2>
           <p class="modal-sub">
@@ -314,12 +358,17 @@
           <p v-else-if="!paymentList.length" class="modal-desc">No payments have been recorded against this statement.</p>
 
           <ul v-else class="payment-list">
-            <li v-for="p in paymentList" :key="p.id" class="payment-row">
+            <li v-for="p in paymentList" :key="p.id" class="payment-row" :class="{ 'payment-row--voided': p.status === 'voided' }">
               <div class="payment-main">
-                <strong>{{ peso(p.amount_paid) }}</strong>
+                <strong>{{ peso(p.amount_paid) }} <span v-if="p.status === 'voided'" class="voided-tag">Voided</span></strong>
                 <span class="payment-meta">{{ p.payment_method_label }} · {{ p.source_label ?? p.status_label }} · {{ formatWhen(p.payment_date) }}</span>
+                <span v-if="p.amount_tendered" class="payment-meta">
+                  Tendered {{ pesos(p.amount_tendered) }} · change {{ pesos(p.change_given) }}
+                </span>
+                <span v-if="p.cash_session" class="payment-meta mono">Shift {{ p.cash_session.session_number }}</span>
                 <span v-if="p.reference_number" class="payment-meta mono">Ref {{ p.reference_number }}</span>
                 <span v-if="p.receipt" class="payment-meta mono">Receipt {{ p.receipt.receipt_number }}</span>
+                <span v-if="p.void_reason" class="payment-meta">Voided: {{ p.void_reason }}</span>
               </div>
               <div class="payment-actions">
                 <button
@@ -332,14 +381,25 @@
                   Receipt
                 </button>
                 <span v-if="p.pending_correction" class="payment-pending">Correction pending</span>
-                <button
-                  v-else-if="canCorrectPayment && p.can_request_correction"
-                  type="button"
-                  class="btn btn-outline btn-sm"
-                  @click="openPaymentCorrection(p)"
-                >
-                  Request correction
-                </button>
+                <span v-else-if="p.pending_void" class="payment-pending">Void pending</span>
+                <template v-else>
+                  <button
+                    v-if="canCorrectPayment && p.can_request_correction"
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    @click="openPaymentCorrection(p)"
+                  >
+                    Request correction
+                  </button>
+                  <button
+                    v-if="canVoidPayment && p.can_request_void"
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    @click="openVoid(p)"
+                  >
+                    Request void
+                  </button>
+                </template>
               </div>
             </li>
           </ul>
@@ -528,127 +588,17 @@
       </div>
     </Teleport>
 
-    <!-- GCASH CHECKOUT -->
-    <Teleport to="body">
-      <div v-if="checkoutFor" class="modal-overlay" @click.self="closeCheckout">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
-          <h2 id="qr-title" class="modal-title">GCash Checkout</h2>
-          <p class="modal-sub">
-            {{ checkoutFor.request?.reference_number }} · {{ checkoutFor.request?.requesting_facility }}
-          </p>
-
-          <div v-if="checkoutLoading" class="skeleton skeleton--row" />
-
-          <!-- Nothing open yet -->
-          <template v-else-if="!attempt">
-            <p v-if="!checkoutAvailability?.available" class="banner banner--warn">
-              <AssetIcon name="triangle-alert" :size="15" />
-              <span>{{ checkoutUnavailableMessage(checkoutAvailability?.reason) }}</span>
-            </p>
-            <template v-else>
-              <dl class="modal-facts">
-                <div><dt>Statement total</dt><dd>{{ peso(checkoutFor.total_amount) }}</dd></div>
-                <div><dt>Already collected</dt><dd>{{ peso(checkoutFor.collected) }}</dd></div>
-                <div><dt>To be paid by GCash</dt><dd class="owing">{{ peso(outstandingOf(checkoutFor)) }}</dd></div>
-              </dl>
-              <div class="field">
-                <label for="payer-name" class="field-label">Name of the person paying <span class="req">*</span></label>
-                <input
-                  id="payer-name"
-                  v-model.trim="payerName"
-                  type="text"
-                  class="input"
-                  maxlength="120"
-                  autocomplete="off"
-                  placeholder="As the watcher gives it"
-                >
-                <p class="field-hint">
-                  Sent to the payment provider as the payer. Nothing from the patient's record is sent.
-                </p>
-              </div>
-            </template>
-          </template>
-
-          <!-- A checkout exists -->
-          <template v-else>
-            <div class="attempt-head">
-              <span class="status" :class="`tone--${attemptTone(attempt.status)}`">{{ attempt.status_label }}</span>
-              <span class="payment-meta">{{ pesos(attempt.amount) }} · {{ attempt.statement_document_number }}</span>
-            </div>
-
-            <div v-if="isAttemptPayable(attempt)" class="qr-block">
-              <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR code for the GCash checkout" class="qr">
-              <p class="field-hint">
-                Ask the payer to scan this with their phone, or send them the link. It expires
-                {{ formatWhen(attempt.expires_at) }}.
-              </p>
-              <div class="link-row">
-                <input class="input mono" :value="attempt.checkout_url" readonly aria-label="Checkout link">
-                <button class="btn btn-outline btn-sm" type="button" @click="copyCheckoutLink">Copy</button>
-              </div>
-              <p class="field-hint">
-                This updates by itself when the provider confirms the payment. The payer's phone
-                saying "paid" is not a confirmation — wait for this screen.
-              </p>
-            </div>
-            <p v-else-if="attempt.status === 'creating'" class="modal-desc">Opening the checkout with the provider…</p>
-            <p v-else-if="attempt.status === 'awaiting_verification'" class="banner banner--warn">
-              <AssetIcon name="triangle-alert" :size="15" />
-              <span>The provider reports a payment and it is being confirmed. Do not take cash for this statement meanwhile.</span>
-            </p>
-            <p v-else-if="attempt.status === 'completed'" class="banner banner--ok">
-              <AssetIcon name="check" :size="15" />
-              <span>Payment confirmed by the provider. Its receipt is under Documents.</span>
-            </p>
-            <p v-else class="modal-desc">This checkout is closed ({{ attempt.status_label.toLowerCase() }}).</p>
-
-            <p v-if="attempt.review_required" class="banner banner--error">
-              <AssetIcon name="triangle-alert" :size="15" />
-              <span>{{ reviewReasonMessage(attempt.review_reason) }}</span>
-            </p>
-
-            <div v-if="attemptAction" class="field">
-              <label for="attempt-reason" class="field-label">
-                {{ attemptAction === 'supersede' ? 'Why is the payment being taken another way?' : 'Why is this checkout being closed?' }}
-                <span class="req">*</span>
-              </label>
-              <input id="attempt-reason" v-model.trim="attemptReason" type="text" class="input" maxlength="255">
-            </div>
-          </template>
-
-          <p v-if="checkoutError" class="field-error field-error--block">{{ checkoutError }}</p>
-
-          <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="checkoutBusy" @click="closeCheckout">Close</button>
-
-            <button
-              v-if="!attempt && checkoutAvailability?.available"
-              class="btn btn-primary"
-              :disabled="checkoutBusy || payerName.length < 2"
-              @click="startCheckout"
-            >
-              {{ checkoutBusy ? 'Opening…' : 'Open checkout' }}
-            </button>
-
-            <template v-if="attempt && attemptAction">
-              <button class="btn btn-outline" :disabled="checkoutBusy" @click="attemptAction = null">Back</button>
-              <button class="btn btn-primary" :disabled="checkoutBusy || attemptReason.length < 3" @click="confirmAttemptAction">
-                {{ attemptAction === 'supersede' ? 'Supersede checkout' : 'Close checkout' }}
-              </button>
-            </template>
-            <template v-else-if="attempt">
-              <button v-if="attempt.status === 'active'" class="btn btn-outline" :disabled="checkoutBusy" @click="beginAttemptAction('supersede')">
-                Take payment another way
-              </button>
-              <template v-if="attempt.review_required && isBillingSupervisor">
-                <button class="btn btn-outline" :disabled="checkoutBusy" @click="reverifyAttempt">Re-check with provider</button>
-                <button class="btn btn-outline" :disabled="checkoutBusy" @click="beginAttemptAction('close')">Close checkout</button>
-              </template>
-            </template>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- GCASH CHECKOUT: the same dialog the counter uses -->
+    <GcashCheckoutDialog
+      v-if="checkoutFor"
+      :request-id="requestIdOf(checkoutFor)"
+      :heading="`${checkoutFor.request?.reference_number ?? ''} · ${checkoutFor.request?.requesting_facility ?? ''}`"
+      :total="checkoutFor.total_amount"
+      :collected="checkoutFor.collected"
+      @close="checkoutFor = null"
+      @changed="refreshAll"
+      @notify="(n) => toast(n.title, n.variant, n.message)"
+    />
 
     <BloodCenterCorrectionRequestDialog
       v-if="paymentCorrection"
@@ -663,18 +613,13 @@
 </template>
 
 <script setup>
-import QRCode from 'qrcode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
+import GcashCheckoutDialog from '~/components/BloodCenter/GcashCheckoutDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import {
-  attemptTone,
-  checkoutUnavailableMessage,
-  isAttemptPayable,
-  isAttemptSettled,
   pesos,
-  reviewReasonMessage,
   saveBlob,
   statementFigures,
   takesPayment,
@@ -686,23 +631,20 @@ definePageMeta({
   requires: 'billing.view',
 })
 
-const { user, can, canFile } = useUser()
-
-// Resolving a checkout flagged for review is the Billing Supervisor's or the
-// Center Admin's; the server refuses anyone else, this only hides the buttons.
-const isBillingSupervisor = computed(() => Boolean(user.value?.is_supervisor) || user.value?.staff_role === 'billing_supervisor')
+const { can, canFile } = useUser()
 
 // The payments, with their reference numbers, are served only to whoever may
 // record them. Filing a correction to one also needs the ability to request it
 // and the subject itself, which a custom role in the department lacks.
 const canSeePayments = computed(() => can('billing.record_payment'))
 const canCorrectPayment = computed(() => can('billing.record_payment') && can('corrections.request') && canFile('payment'))
+const canVoidPayment = computed(() => can('billing.record_payment') && can('corrections.request') && canFile('payment_void'))
 
 /*
- * This page was a 41-line placeholder wrapping a generic department dashboard.
- * The endpoints behind it — list, record payment, apply subsidy — are real, and
- * release is blocked until a statement is settled, so without this screen the
- * workflow dead-ended immediately after stock was reserved.
+ * The bills raised against this centre's requests, in two categories that are
+ * owed by different people and never added together: patient bills, paid at
+ * the counter (the POS page takes the money), and
+ * the hospitals' weekly statements, settled outside RedAgos and recorded here.
  */
 
 const statements = ref([])
@@ -710,20 +652,38 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const search = ref('')
+const category = ref('patient')
 const activeTab = ref('outstanding')
+const summary = ref(null)
 
-const tabs = [
-  { value: 'outstanding', label: 'Outstanding' },
-  { value: 'all', label: 'All' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'subsidised', label: 'Subsidised' },
-  { value: 'statement_only', label: 'Weekly (statement only)' },
+const categories = [
+  { value: 'patient', label: 'Patient bills', note: 'Paid at the counter' },
+  { value: 'weekly', label: 'Hospital statements', note: 'Weekly orders, settled by the hospital' },
 ]
 
+const TABS = {
+  patient: [
+    { value: 'outstanding', label: 'Outstanding' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'subsidised', label: 'Subsidised' },
+    { value: 'all', label: 'All' },
+  ],
+  weekly: [
+    { value: 'statement_only', label: 'Awaiting settlement' },
+    { value: 'settled_outside', label: 'Settled' },
+    { value: 'all', label: 'All' },
+  ],
+}
+
+const tabs = computed(() => TABS[category.value])
+
+// For correcting a recorded payment's method.
 const methods = [
   { value: 'cash', label: 'Cash' },
   { value: 'gcash', label: 'GCash' },
 ]
+
+const todayIso = new Date().toISOString().slice(0, 10)
 
 /* TOASTS */
 const toasts = ref([])
@@ -741,27 +701,19 @@ function peso(value) {
   return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// Counted on the server from the journal and every statement, never from the
+// page of rows this screen happens to hold.
 const stats = computed(() => {
-  const owing = statements.value.filter((s) => !s.clears_release)
-  const owed = owing.reduce((sum, s) => sum + Number(s.total_amount ?? 0) - Number(s.collected ?? 0), 0)
-  const subsidised = statements.value.filter((s) => s.is_subsidised).length
-  // Only statements where money actually moved. A subsidised statement cleared
-  // its request without a peso changing hands and must not be counted here.
-  const collected = statements.value
-    .filter((s) => s.represents_collected_money)
-    .reduce((sum, s) => sum + Number(s.collected ?? 0), 0)
+  const s = summary.value
+
+  if (!s) return []
 
   return [
-    { key: 'blocked', label: 'Blocking Release', value: owing.length, note: 'Unsettled statements', tone: owing.length ? 'danger' : null },
-    { key: 'owed', label: 'Outstanding', value: peso(owed), note: 'Still to be settled' },
-    { key: 'collected', label: 'Collected', value: peso(collected), note: 'Money actually received' },
-    { key: 'subsidy', label: 'Subsidised', value: subsidised, note: 'Met by government funding' },
+    { key: 'blocked', label: 'Blocking Release', value: s.outstanding.count, note: `${pesos(s.outstanding.amount)} still owed by patients`, tone: s.outstanding.count ? 'danger' : null },
+    { key: 'today', label: 'Collected Today', value: pesos(s.collected_today), note: 'Cash and GCash, less voids' },
+    { key: 'month', label: 'Collected This Month', value: pesos(s.collected_this_month), note: `${s.subsidised_this_month.count} subsidised (${pesos(s.subsidised_this_month.amount)} waived)` },
+    { key: 'weekly', label: 'Awaiting Hospital Settlement', value: s.weekly_awaiting_settlement.count, note: `${pesos(s.weekly_awaiting_settlement.amount)} in weekly statements` },
   ]
-})
-
-const outstanding = computed(() => {
-  if (!paymentFor.value) return 0
-  return Math.max(0, Number(paymentFor.value.total_amount ?? 0) - Number(paymentFor.value.collected ?? 0))
 })
 
 let searchDebounce = null
@@ -770,13 +722,17 @@ function onSearch() {
   searchDebounce = setTimeout(load, 400)
 }
 
+watch(category, () => {
+  activeTab.value = tabs.value[0].value
+  load()
+})
 watch(activeTab, () => load())
 
 async function load() {
   loading.value = true
   error.value = ''
 
-  const params = {}
+  const params = { category: category.value }
   if (activeTab.value === 'outstanding') params.outstanding = 1
   else if (activeTab.value !== 'all') params.status = activeTab.value
   if (search.value.trim()) params.search = search.value.trim()
@@ -792,74 +748,93 @@ async function load() {
   }
 }
 
-/* RECORD PAYMENT */
-const paymentFor = ref(null)
-const payError = ref('')
-const payErrors = reactive({})
-const payment = reactive({ amount_paid: null, payment_method: 'cash', reference_number: '', payer_name: '' })
-
-function openPayment(statement) {
-  paymentFor.value = statement
-  payError.value = ''
-  Object.keys(payErrors).forEach((k) => delete payErrors[k])
-  Object.assign(payment, {
-    // Defaults to what is still owed, which is what a counter clerk almost
-    // always takes.
-    amount_paid: outstandingOf(statement),
-    payment_method: 'cash',
-    reference_number: '',
-    payer_name: '',
-  })
+async function loadSummary() {
+  try {
+    summary.value = await bloodCenterService.billingSummary()
+  } catch {
+    // The cards are a convenience; the list below still works without them.
+    summary.value = null
+  }
 }
 
-function outstandingOf(statement) {
-  return Math.max(0, Number(statement?.total_amount ?? 0) - Number(statement?.collected ?? 0))
+async function refreshAll() {
+  await Promise.all([load(), loadSummary()])
 }
 
-function closePayment() {
+function formatDay(value) {
+  return value ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'
+}
+
+/* RECORD A WEEKLY BILL'S SETTLEMENT */
+const settlementFor = ref(null)
+const settlementError = ref('')
+const settlementErrors = reactive({})
+const settlement = reactive({ settlement_reference: '', settled_at: todayIso, settlement_note: '' })
+
+function openSettlement(statement) {
+  settlementFor.value = statement
+  settlementError.value = ''
+  Object.keys(settlementErrors).forEach((k) => delete settlementErrors[k])
+  Object.assign(settlement, { settlement_reference: '', settled_at: todayIso, settlement_note: '' })
+}
+
+function closeSettlement() {
   if (saving.value) return
-  paymentFor.value = null
+  settlementFor.value = null
 }
 
-async function submitPayment() {
-  payError.value = ''
-  Object.keys(payErrors).forEach((k) => delete payErrors[k])
-
-  if (!payment.amount_paid || payment.amount_paid <= 0) {
-    payErrors.amount_paid = 'Record the amount actually received.'
-    return
-  }
-
-  if (payment.payment_method === 'gcash' && !payment.reference_number) {
-    payErrors.reference_number = 'A GCash payment needs its reference number.'
-    return
-  }
-
+async function submitSettlement() {
+  settlementError.value = ''
+  Object.keys(settlementErrors).forEach((k) => delete settlementErrors[k])
   saving.value = true
 
   try {
-    const response = await bloodCenterService.recordPayment(paymentFor.value.request.id, {
-      amount_paid: payment.amount_paid,
-      payment_method: payment.payment_method,
-      ...(payment.reference_number ? { reference_number: payment.reference_number } : {}),
-      ...(payment.payer_name ? { payer_name: payment.payer_name } : {}),
+    const response = await bloodCenterService.settleWeeklyBill(requestIdOf(settlementFor.value), {
+      settlement_reference: settlement.settlement_reference,
+      settled_at: settlement.settled_at,
+      settlement_note: settlement.settlement_note || null,
     })
-
-    const settled = response?.billing?.clears_release
-    toast(
-      'Payment Recorded',
-      'success',
-      settled ? 'The statement is settled and the units can be released.' : 'Part payment recorded — the statement is still outstanding.',
-    )
-    // The receipt is issued with the payment; offer it straight away.
-    lastReceipt.value = response?.receipt ?? null
-    paymentFor.value = null
-    await load()
+    toast('Settlement Recorded', 'success', response?.message)
+    settlementFor.value = null
+    await refreshAll()
   } catch (err) {
     Object.entries(err?.errors ?? {}).forEach(([key, messages]) => {
-      payErrors[key] = Array.isArray(messages) ? messages[0] : messages
+      settlementErrors[key] = Array.isArray(messages) ? messages[0] : messages
     })
-    payError.value = err?.message || 'Could not record that payment.'
+    settlementError.value = err?.message || 'The settlement could not be recorded.'
+  } finally {
+    saving.value = false
+  }
+}
+
+/* REQUEST A VOID, decided by the Billing Supervisor */
+const voidFor = ref(null)
+const voidReason = ref('')
+const voidError = ref('')
+
+function openVoid(payment) {
+  voidFor.value = payment
+  voidReason.value = ''
+  voidError.value = ''
+}
+
+function closeVoid() {
+  if (saving.value) return
+  voidFor.value = null
+}
+
+async function submitVoid() {
+  voidError.value = ''
+  saving.value = true
+
+  try {
+    const response = await bloodCenterService.requestPaymentVoid(voidFor.value.id, voidReason.value)
+    toast('Void Requested', 'success', response?.message ?? 'It is applied once the Billing Supervisor approves it.')
+    voidFor.value = null
+
+    if (paymentsFor.value) await openPayments(paymentsFor.value)
+  } catch (err) {
+    voidError.value = err?.message || 'The void could not be requested.'
   } finally {
     saving.value = false
   }
@@ -993,7 +968,6 @@ async function onPaymentCorrectionSent(response) {
 }
 
 /* RECEIPTS AND STATEMENT DOWNLOADS */
-const lastReceipt = ref(null)
 const downloadingId = ref(null)
 
 async function downloadReceipt(receipt) {
@@ -1177,172 +1151,14 @@ async function printDocument() {
   }
 }
 
-/* GCASH CHECKOUT */
-const POLL_MS = 4000
-
+/* GCASH CHECKOUT: the shared dialog polls the server and reports back */
 const checkoutFor = ref(null)
-const checkoutAvailability = ref(null)
-const attempt = ref(null)
-const checkoutLoading = ref(false)
-const checkoutBusy = ref(false)
-const checkoutError = ref('')
-const payerName = ref('')
-const qrDataUrl = ref('')
-const attemptAction = ref(null)
-const attemptReason = ref('')
-let pollTimer = null
 
 function requestIdOf(statement) {
   return statement?.request?.id ?? statement?.request_id
 }
 
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-}
-
-// Polls the server, never the provider: only the server's confirmed status
-// says a checkout was paid.
-function startPolling() {
-  stopPolling()
-
-  if (!attempt.value || isAttemptSettled(attempt.value.status)) return
-
-  pollTimer = setInterval(refreshAttempt, POLL_MS)
-}
-
-async function showAttempt(next) {
-  const wasSettled = isAttemptSettled(attempt.value?.status)
-  attempt.value = next
-  qrDataUrl.value = isAttemptPayable(next)
-    ? await QRCode.toDataURL(next.checkout_url, { margin: 1, width: 240 })
-    : ''
-
-  if (next && isAttemptSettled(next.status)) {
-    stopPolling()
-
-    if (!wasSettled && next.status === 'completed') {
-      toast('GCash Payment Confirmed', 'success', 'The statement is updated and the receipt is issued.')
-      await load()
-    }
-  }
-}
-
-async function openCheckout(statement) {
-  checkoutFor.value = statement
-  checkoutAvailability.value = null
-  attempt.value = null
-  qrDataUrl.value = ''
-  checkoutError.value = ''
-  payerName.value = ''
-  attemptAction.value = null
-  checkoutLoading.value = true
-
-  try {
-    const response = await bloodCenterService.billingForRequest(requestIdOf(statement))
-    checkoutAvailability.value = response?.checkout ?? null
-
-    if (response?.open_attempt) {
-      await showAttempt(response.open_attempt)
-      startPolling()
-    }
-  } catch (err) {
-    checkoutError.value = err?.message || 'Could not load this statement.'
-  } finally {
-    checkoutLoading.value = false
-  }
-}
-
-function closeCheckout() {
-  if (checkoutBusy.value) return
-  stopPolling()
-  checkoutFor.value = null
-  attempt.value = null
-}
-
-async function startCheckout() {
-  checkoutBusy.value = true
-  checkoutError.value = ''
-
-  try {
-    const response = await bloodCenterService.startCheckout(requestIdOf(checkoutFor.value), payerName.value)
-    await showAttempt(response.attempt)
-    startPolling()
-  } catch (err) {
-    checkoutError.value = err?.message || 'The checkout could not be opened. Take the payment in cash, or try again.'
-  } finally {
-    checkoutBusy.value = false
-  }
-}
-
-async function refreshAttempt() {
-  if (!checkoutFor.value || !attempt.value) return
-
-  try {
-    const response = await bloodCenterService.checkoutAttempts(requestIdOf(checkoutFor.value))
-    const latest = (response?.attempts ?? []).find((a) => a.id === attempt.value.id)
-
-    if (latest) await showAttempt(latest)
-  } catch {
-    // A missed poll is not an error worth showing; the next one tries again.
-  }
-}
-
-async function copyCheckoutLink() {
-  try {
-    await navigator.clipboard.writeText(attempt.value.checkout_url)
-    toast('Link Copied', 'info')
-  } catch {
-    toast('Copy Failed', 'danger', 'Select the link and copy it by hand.')
-  }
-}
-
-function beginAttemptAction(action) {
-  attemptAction.value = action
-  attemptReason.value = ''
-  checkoutError.value = ''
-}
-
-async function confirmAttemptAction() {
-  checkoutBusy.value = true
-  checkoutError.value = ''
-
-  try {
-    const requestId = requestIdOf(checkoutFor.value)
-    const response = attemptAction.value === 'supersede'
-      ? await bloodCenterService.supersedeCheckout(requestId, attempt.value.id, attemptReason.value)
-      : await bloodCenterService.closeCheckout(requestId, attempt.value.id, attemptReason.value)
-
-    attemptAction.value = null
-    await showAttempt(response.attempt)
-    toast(response.message ?? 'Checkout updated', 'success')
-    await load()
-  } catch (err) {
-    checkoutError.value = err?.message || 'The checkout could not be updated.'
-  } finally {
-    checkoutBusy.value = false
-  }
-}
-
-async function reverifyAttempt() {
-  checkoutBusy.value = true
-  checkoutError.value = ''
-
-  try {
-    const response = await bloodCenterService.reverifyCheckout(requestIdOf(checkoutFor.value), attempt.value.id)
-    await showAttempt(response.attempt)
-    startPolling()
-  } catch (err) {
-    checkoutError.value = err?.message || 'The provider could not be asked again.'
-  } finally {
-    checkoutBusy.value = false
-  }
-}
-
-onMounted(load)
-onBeforeUnmount(stopPolling)
+onMounted(refreshAll)
 </script>
 
 <style scoped>
@@ -1410,21 +1226,28 @@ onBeforeUnmount(stopPolling)
 .status--subsidised { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
 .status--void { background: var(--rb-surface-hover); color: var(--rb-text-muted); }
 .status--statement_only { background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-primary-text); }
+.status--settled_outside { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
 
-/* Checkout status tones */
-.tone--success { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
-.tone--warning { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
-.tone--danger { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
-.tone--info { background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-primary-text); }
-.tone--muted { background: var(--rb-surface-hover); color: var(--rb-text-muted); }
+.banner--info { background: rgba(var(--rb-primary-rgb), .06); color: var(--rb-text-primary); border: 1px solid rgba(var(--rb-primary-rgb), .2); }
+.inline-link { color: var(--rb-primary-text); font-weight: 600; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.header-actions .btn { text-decoration: none; }
+.actions .btn { text-decoration: none; }
+.payment-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.payment-row--voided .payment-main strong { text-decoration: line-through; color: var(--rb-text-muted); }
+.voided-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 5px; font-size: 10.5px; font-weight: 700; text-decoration: none; background: var(--rb-surface-hover); color: var(--rb-text-secondary); }
 
-.banner--ok { background: rgba(var(--rb-success-rgb), .1); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), .3); flex-wrap: wrap; }
-.attempt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.qr-block { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 8px; }
-.qr { width: 220px; height: 220px; border: 1px solid var(--rb-border); border-radius: 10px; background: #fff; padding: 8px; }
-.link-row { display: flex; gap: 8px; width: 100%; }
-.link-row .input { font-size: 12px; }
-.payment-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+/* Category: who owes it */
+.category-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.category {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left;
+  font-family: inherit; cursor: pointer; border-radius: 12px;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); color: var(--rb-text-primary);
+}
+.category strong { font-size: 14px; }
+.category span { font-size: 12px; color: var(--rb-text-secondary); }
+.category--on { border-color: var(--rb-primary); box-shadow: inset 0 0 0 1px var(--rb-primary); background: rgba(var(--rb-primary-rgb), .04); }
+.settlement-cell { font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }
 
 .gate { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; }
 .gate--ok { color: var(--rb-success-text); }
@@ -1517,11 +1340,11 @@ onBeforeUnmount(stopPolling)
 
 /* Toasts */
 .toast-stack { position: fixed; top: 18px; right: 18px; z-index: 120; display: flex; flex-direction: column; gap: 8px; }
-.toast { background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-left-width: 3px; border-radius: 10px; padding: 11px 15px; min-width: 250px; }
-.toast--success { border-left-color: var(--rb-success); }
-.toast--danger { border-left-color: var(--rb-accent); }
-.toast--info { border-left-color: var(--rb-primary); }
+.toast { background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-radius: 10px; padding: 11px 15px; min-width: 250px; box-shadow: 0 6px 20px rgba(var(--rb-shadow-rgb), .1); }
 .toast-title { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); }
+.toast--success .toast-title { color: var(--rb-success-text); }
+.toast--danger .toast-title { color: var(--rb-accent-text); }
+.toast--info .toast-title { color: var(--rb-primary-text); }
 .toast-message { font-size: 12px; color: var(--rb-text-secondary); margin-top: 2px; }
 .toast-enter-active, .toast-leave-active { transition: opacity .25s, transform .25s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(14px); }

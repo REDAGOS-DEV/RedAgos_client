@@ -10,7 +10,15 @@
  * Pure functions, so the rules can be tested without mounting a page.
  */
 
-import type { Billing, BillingStatus, PaymentAttempt, PaymentAttemptStatus, StatementRevision } from '~/types/bloodRequest'
+import type {
+  Billing,
+  BillingStatus,
+  BillingTransaction,
+  PaymentAttempt,
+  PaymentAttemptStatus,
+  StatementRevision,
+  TransactionType,
+} from '~/types/bloodRequest'
 
 /** Statuses after which a checkout will never change again. */
 const SETTLED_ATTEMPTS: PaymentAttemptStatus[] = ['completed', 'expired', 'canceled', 'failed', 'superseded']
@@ -162,11 +170,130 @@ export function statementStamp(status: BillingStatus): { label: string; tone: 's
       return { label: 'GOVERNMENT SUBSIDISED', tone: 'info' }
     case 'statement_only':
       return { label: 'STATEMENT ONLY', tone: 'info' }
+    case 'settled_outside':
+      return { label: 'SETTLED BY HOSPITAL', tone: 'success' }
     case 'void':
       return { label: 'VOID', tone: 'muted' }
     default:
       return { label: 'UNPAID', tone: 'danger' }
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * The counter: cash tendered, change, and the drawer count
+ * ------------------------------------------------------------------ */
+
+/**
+ * The peso notes and coins a drawer count lists, largest first.
+ *
+ * The same list the server accepts (CashSessionService::DENOMINATIONS).
+ */
+export const CASH_DENOMINATIONS = ['1000', '500', '200', '100', '50', '20', '10', '5', '1', '0.25'] as const
+
+/**
+ * The change owed back for cash handed over against what is being paid, in pesos.
+ *
+ * Null when what was handed over does not cover it: the screen asks for more
+ * rather than recording less. Worked in centavos, so ₱0.30 of change is
+ * never ₱0.29999.
+ */
+export function changeDue(tendered: string | number | null | undefined, paying: string | number | null | undefined): number | null {
+  const handed = centavos(tendered)
+  const owed = centavos(paying)
+
+  if (handed < owed) return null
+
+  return (handed - owed) / 100
+}
+
+/**
+ * The amounts a cashier is most likely handed for a balance: the exact sum,
+ * then the next round ₱100, ₱500 and ₱1,000 above it.
+ */
+export function quickTenderAmounts(owed: string | number | null | undefined): number[] {
+  const exact = centavos(owed)
+  if (exact <= 0) return []
+
+  const roundUp = (step: number) => Math.ceil(exact / step) * step
+  const amounts = [exact, roundUp(10_000), roundUp(50_000), roundUp(100_000)]
+
+  return [...new Set(amounts)].sort((a, b) => a - b).map((value) => value / 100)
+}
+
+/** Add up a drawer count — denomination to how many — in pesos, exactly. */
+export function cashCountTotal(breakdown: Record<string, number | string | null | undefined>): number {
+  let total = 0
+
+  for (const [denomination, count] of Object.entries(breakdown)) {
+    const pieces = Math.max(0, Math.floor(Number(count) || 0))
+    total += centavos(denomination) * pieces
+  }
+
+  return total / 100
+}
+
+/** What a shift's difference between counted and expected cash reads as. */
+export function shiftVariance(variance: string | number | null | undefined): { label: string; tone: 'success' | 'warning' | 'danger' } {
+  const amount = centavos(variance)
+
+  if (amount === 0) return { label: 'Balanced', tone: 'success' }
+
+  return amount > 0
+    ? { label: `Over by ${pesos(amount / 100)}`, tone: 'warning' }
+    : { label: `Short by ${pesos(-amount / 100)}`, tone: 'danger' }
+}
+
+/* ------------------------------------------------------------------ *
+ * The billing journal
+ * ------------------------------------------------------------------ */
+
+/** The badge tone for a journal row's type. */
+export function transactionTone(type: TransactionType): 'success' | 'warning' | 'danger' | 'muted' | 'info' {
+  switch (type) {
+    case 'payment':
+    case 'external_settlement':
+      return 'success'
+    case 'payment_void':
+      return 'danger'
+    case 'payment_correction':
+    case 'charge_adjustment':
+      return 'warning'
+    case 'subsidy':
+      return 'info'
+    default:
+      return 'muted'
+  }
+}
+
+/**
+ * A journal row's amount as it reads in a list: a charge raises the bill (+),
+ * anything that settles it lowers it (−).
+ */
+export function journalAmount(row: Pick<BillingTransaction, 'amount'>): string {
+  const amount = centavos(row.amount)
+
+  if (amount === 0) return pesos(0)
+
+  return `${amount > 0 ? '+' : '−'}${pesos(Math.abs(amount) / 100)}`
+}
+
+/** Words that are never an initial: "Bureau of Blood" is "BB", not "BO". */
+const MONOGRAM_SKIPPED = ['of', 'the', 'and', 'de', 'del', 'ng', 'sa', 'for']
+
+/**
+ * The initials a centre's billing documents carry when it has uploaded no logo.
+ *
+ * The same rule as the server's FacilityMonogram, so the screen and the PDF
+ * show the same mark: up to two initials, skipping the small joining words.
+ */
+export function facilityInitials(name: string | null | undefined): string {
+  return (name ?? '')
+    .trim()
+    .split(/[\s-]+/u)
+    .filter((word) => /^\p{L}/u.test(word) && !MONOGRAM_SKIPPED.includes(word.toLowerCase()))
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('')
 }
 
 /** Save a downloaded document under the given name. */

@@ -88,13 +88,33 @@ export type BloodUnitStatus =
  * `subsidised`: the government met the cost. `statement_only`: a weekly
  * (replenishment) order, billed to the hospital by statement and settled
  * outside RedAgos — it takes no payment here and never blocks release.
+ * `settled_outside`: that weekly bill once billing staff record the hospital's
+ * settlement of it, with its reference and date.
  */
-export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void' | 'subsidised' | 'statement_only'
+export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void' | 'subsidised' | 'statement_only' | 'settled_outside'
 
-/** payments.payment_method / payments.status / payments.source */
+/**
+ * payments.payment_method / payments.status / payments.source
+ *
+ * `voided`: a counter payment voided on the Billing Supervisor's approval
+ * while its shift was open. It stays on record and no longer counts.
+ */
 export type PaymentMethod = 'cash' | 'gcash'
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided'
 export type PaymentSource = 'manual' | 'gateway'
+
+/** billing_transactions: what a journal row was for, what it was, and where it came in. */
+export type TransactionCategory = 'patient_transfusion' | 'weekly_replenishment'
+export type TransactionType =
+  | 'charge'
+  | 'charge_adjustment'
+  | 'payment'
+  | 'payment_correction'
+  | 'payment_void'
+  | 'subsidy'
+  | 'external_settlement'
+  | 'opening_balance'
+export type TransactionChannel = 'counter' | 'gateway' | 'outside' | 'system'
 
 /** payment_attempts.status — one GCash checkout's state. */
 export type PaymentAttemptStatus =
@@ -457,12 +477,153 @@ export interface Billing {
   status_label: string
   is_zero_rated: boolean
   is_subsidised: boolean
+  /** A weekly bill, before and after the hospital settles it. */
   is_statement_only: boolean
+  is_settled_outside?: boolean
   /** False for void, subsidised and statement-only statements: nothing is collected in RedAgos. */
   collects_payment: boolean
   represents_collected_money: boolean
   clears_release: boolean
   billing_date: string | null
+  /** Set once the hospital settled a weekly bill outside RedAgos. */
+  settlement?: { settled_at: string | null; reference: string | null; note: string | null } | null
+}
+
+/** One payment on a statement, as GET …/billings/{id}/payments lists it to whoever may record payments. */
+export interface RecordedPayment {
+  id: number
+  amount_paid: number
+  /** Cash at the counter: what was handed over, and the change given back. */
+  amount_tendered: string | null
+  change_given: string | null
+  payment_method: PaymentMethod
+  payment_method_label: string
+  reference_number: string | null
+  status: PaymentStatus
+  status_label: string
+  source: PaymentSource
+  source_label: string
+  payment_date: string | null
+  cash_session: { id: number; session_number: string; is_open: boolean } | null
+  voided_at: string | null
+  void_reason: string | null
+  receipt: PaymentReceiptSummary | null
+  pending_correction: boolean
+  pending_void: boolean
+  can_request_correction: boolean
+  can_request_void: boolean
+}
+
+/** One row of the billing journal. Amounts are decimal strings, signed against the bill. */
+export interface BillingTransaction {
+  id: number
+  transaction_number: string
+  occurred_at: string | null
+  category: TransactionCategory
+  category_label: string
+  type: TransactionType
+  type_label: string
+  channel: TransactionChannel
+  channel_label: string
+  payment_method: PaymentMethod | null
+  payment_method_label: string | null
+  amount: string
+  /** A debit raises what is owed; a credit settles it. */
+  direction: 'debit' | 'credit' | 'none'
+  balance_after: string
+  billing_id: number
+  request: { id: number; reference_number: string } | null
+  payment_id: number | null
+  receipt: { id: number; receipt_number: string } | null
+  statement: { id: number; document_number: string } | null
+  cash_session: { id: number; session_number: string } | null
+  reverses_transaction_number: string | null
+  reference: string | null
+  note: string | null
+  recorded_by: string | null
+}
+
+/** The totals of every journal row a filter matches, as positive money. */
+export interface BillingTransactionTotals {
+  count: number
+  charged: string
+  collected: string
+  subsidised: string
+  settled_outside: string
+}
+
+/** GET /blood-center/billings/summary — counted on the server. */
+export interface BillingSummary {
+  outstanding: { count: number; amount: string }
+  collected_today: string
+  collected_this_month: string
+  subsidised_this_month: { count: number; amount: string }
+  weekly_awaiting_settlement: { count: number; amount: string }
+  weekly_settled_this_month: number
+  issuer: { name: string | null; logo_url: string | null }
+  as_of: string
+}
+
+/** A cash shift's drawer, in decimal strings. Counted and variance only once closed. */
+export interface CashShiftFigures {
+  opening_float: string
+  cash_collected: string
+  cash_voided: string
+  expected_cash: string
+  gcash_counter: string
+  gcash_checkout: string
+  total_collected: string
+  counted_cash?: string
+  variance?: string
+}
+
+/** A cashier's shift at the billing counter. `figures` and `transactions` come with a reading. */
+export interface CashShift {
+  id: number
+  session_number: string
+  status: 'open' | 'closed'
+  status_label: string
+  counter_label: string | null
+  cashier: { id: number; name: string } | null
+  opened_at: string | null
+  closed_at: string | null
+  closed_by: string | null
+  opening_float: string
+  expected_cash: string | null
+  counted_cash: string | null
+  variance: string | null
+  count_breakdown: Record<string, number> | null
+  closing_note: string | null
+  figures?: CashShiftFigures
+  counts?: { payments: number; voids: number }
+  pending_voids?: number
+  transactions?: BillingTransaction[]
+}
+
+/** A patient bill as the counter finds it. Amounts are decimal strings. */
+export interface CounterBill {
+  request_id: number
+  reference_number: string
+  transfusion_reference: string | null
+  presented_reference: string | null
+  is_walk_in: boolean
+  patient_name: string | null
+  requesting_facility: string | null
+  blood_types: string[]
+  is_emergency: boolean
+  request_date: string | null
+  billing_status: BillingStatus
+  billing_status_label: string
+  total_amount: string
+  collected: string
+  outstanding: string
+  clears_release: boolean
+  takes_payment: boolean
+  /** Only on GET /pos/bills/{id}. */
+  lines?: StatementLine[]
+  billing?: Billing
+  checkout?: CheckoutAvailability
+  open_attempt?: PaymentAttempt | null
 }
 
 /** One frozen line of an issued statement. Amounts are decimal strings. */
@@ -503,6 +664,12 @@ export interface BillingFacilityCard {
   doh_license_number?: string | null
   phone?: string | null
   email?: string | null
+  /**
+   * A signed, expiring link to the logo the document was issued with — the
+   * centre's own, never a shared mark. Null when the centre has none; its
+   * initials stand in.
+   */
+  logo_url?: string | null
 }
 
 /** A Payment Acknowledgement Receipt (AR-…), as lists show it. Not a BIR official receipt. */
@@ -529,7 +696,15 @@ export interface PaymentReceiptSummary {
   issuing_facility?: BillingFacilityCard | null
   request?: { reference_number: string | null; patient_name: string | null; requesting_facility: string | null } | null
   statement?: { document_number: string; revision_number: number; total_amount: string; amount_due: string } | null
-  payment?: { method_label: string | null; source: PaymentSource | null; paid_at: string | null }
+  payment?: {
+    method_label: string | null
+    source: PaymentSource | null
+    paid_at: string | null
+    /** Cash at the counter: what was handed over, and the change given back. */
+    amount_tendered?: string | null
+    change_given?: string | null
+    cash_session_number?: string | null
+  }
   /** Empty on a receipt issued before receipts carried their lines. */
   lines?: StatementLine[]
 }

@@ -1,9 +1,14 @@
 import BaseService from '../BaseService'
 import type {
+  Billing,
+  BillingSummary,
   BloodRequest,
+  CashShift,
+  CounterBill,
   CreateWalkInPayload,
   DuplicateMatch,
   PaymentAttempt,
+  PaymentReceiptSummary,
   RequestEvent,
   StatementRevision,
   WalkInReference,
@@ -160,6 +165,15 @@ class BloodCenterService extends BaseService {
   /** A recorded payment's amount, method or reference number. */
   async requestPaymentCorrection(paymentId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/payments/${paymentId}/corrections`, 'POST', payload)
+  }
+
+  /**
+   * Ask for a counter payment to be voided, on the Billing Supervisor's
+   * approval. Only while its cash shift is open; later is a refund, settled
+   * outside RedAgos.
+   */
+  async requestPaymentVoid(paymentId: number, reason: string): Promise<any> {
+    return this.request(`${this.resource}/payments/${paymentId}/void`, 'POST', { reason })
   }
 
   async approveCorrection(correctionId: number, payload: Record<string, any> = {}): Promise<any> {
@@ -587,6 +601,89 @@ class BloodCenterService extends BaseService {
   /** One Payment Acknowledgement Receipt as its printed PDF. */
   async downloadReceipt(receiptId: number | string): Promise<Blob> {
     return this.requestBlob(`/blood-center/receipts/${receiptId}/pdf`)
+  }
+
+  /** One receipt as data, for the counter's 80mm print. */
+  async receipt(receiptId: number | string): Promise<{ receipt: PaymentReceiptSummary }> {
+    return this.request(`/blood-center/receipts/${receiptId}`, 'GET')
+  }
+
+  /** The centre's billing at a glance, counted on the server. */
+  async billingSummary(): Promise<BillingSummary> {
+    return this.request('/blood-center/billings/summary', 'GET')
+  }
+
+  /**
+   * Record that the hospital settled a weekly bill outside RedAgos, with its
+   * reference and date. Allowed once the weekly order has been dispatched.
+   */
+  async settleWeeklyBill(
+    requestId: number | string,
+    payload: { settlement_reference: string; settled_at: string; settlement_note?: string | null },
+  ): Promise<{ message: string; billing: Billing }> {
+    return this.request(`/blood-center/billings/${requestId}/settlement`, 'POST', payload)
+  }
+
+  /** The billing journal, newest first, with the totals of everything the filters match. */
+  async billingTransactions(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/billing-transactions', 'GET', params)
+  }
+
+  /** The journal rows the filters match, as CSV. */
+  async exportBillingTransactions(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined).map(([key, value]) => [key, String(value)]),
+    ).toString()
+
+    return this.requestBlob(`/blood-center/billing-transactions/export${query ? `?${query}` : ''}`)
+  }
+
+  /** The caller's open cash shift with its running figures, or null, and whether the counter works in shifts at all. */
+  async currentShift(): Promise<{ shifts_enabled: boolean; session: CashShift | null }> {
+    return this.request('/blood-center/pos/session', 'GET')
+  }
+
+  /** Open a cash shift at the counter with the float in the drawer. */
+  async openShift(payload: { opening_float: number; counter_label?: string | null }): Promise<{ message: string; session: CashShift }> {
+    return this.request('/blood-center/pos/sessions', 'POST', payload)
+  }
+
+  /** Close a shift with the drawer counted; a difference needs a note. */
+  async closeShift(
+    sessionId: number,
+    payload: { counted_cash: number; count_breakdown?: Record<string, number> | null; closing_note?: string | null },
+  ): Promise<{ message: string; session: CashShift }> {
+    return this.request(`/blood-center/pos/sessions/${sessionId}/close`, 'POST', payload)
+  }
+
+  /** Shifts the caller may see: their own, or every one at the centre for a billing supervisor. */
+  async cashShifts(params: Record<string, any> = {}): Promise<any> {
+    return this.request('/blood-center/pos/sessions', 'GET', params)
+  }
+
+  /** One shift with its reading. */
+  async cashShift(sessionId: number | string): Promise<{ session: CashShift }> {
+    return this.request(`/blood-center/pos/sessions/${sessionId}`, 'GET')
+  }
+
+  /** A shift's reading as its printed report: X while open, Z once closed. */
+  async downloadShiftReport(sessionId: number | string): Promise<Blob> {
+    return this.requestBlob(`/blood-center/pos/sessions/${sessionId}/pdf`)
+  }
+
+  /** Find this centre's patient bills by reference or patient name. */
+  async counterLookup(q: string): Promise<{ data: CounterBill[] }> {
+    return this.request('/blood-center/pos/lookup', 'GET', { q })
+  }
+
+  /** The patient bills holding blood back, oldest first. */
+  async counterQueue(): Promise<{ data: CounterBill[] }> {
+    return this.request('/blood-center/pos/queue', 'GET')
+  }
+
+  /** One patient bill as the counter takes it. */
+  async counterBill(requestId: number | string): Promise<{ bill: CounterBill }> {
+    return this.request(`/blood-center/pos/bills/${requestId}`, 'GET')
   }
 
   /**

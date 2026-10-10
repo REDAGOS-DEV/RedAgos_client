@@ -336,7 +336,12 @@
               </div>
 
               <p class="billing-note">
-                <template v-if="billing.is_statement_only">
+                <template v-if="billing.settlement">
+                  Weekly order, settled by your facility outside RedAgos on {{ formatDate(billing.settlement.settled_at) }}
+                  <template v-if="billing.settlement.reference">(reference {{ billing.settlement.reference }})</template>,
+                  as recorded by the blood centre.
+                </template>
+                <template v-else-if="billing.is_statement_only">
                   Weekly order, billed to your facility by statement only and settled outside RedAgos.
                   It does not hold the units back.
                 </template>
@@ -743,6 +748,7 @@ const billingStatusMap = {
   paid: 'success',
   subsidised: 'success',
   statement_only: 'neutral',
+  settled_outside: 'success',
   void: 'neutral',
 }
 const billingStatusColorClass = computed(() => {

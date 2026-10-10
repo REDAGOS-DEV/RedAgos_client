@@ -104,7 +104,7 @@
             <span role="columnheader">Corrected</span>
           </div>
           <div v-for="field in item.changed_fields" :key="field" class="diff__row" role="row">
-            <span class="diff__field" role="cell">{{ field.replace(/_/g, ' ') }}</span>
+            <span class="diff__field" role="cell">{{ fieldName(field) }}</span>
             <span class="diff__before" role="cell">
               <template v-if="isEmpty(item.previous?.[field])"><i class="diff__empty">empty</i></template>
               <template v-else>{{ display(item.previous?.[field]) }}</template>
@@ -230,8 +230,14 @@ function statusLabel(status) {
   return STATUS[status] ?? status
 }
 
+// A payment void carries one field, whether the payment is voided.
+function fieldName(field) {
+  return field === 'void' ? 'voided' : field.replace(/_/g, ' ')
+}
+
 function display(value) {
   if (isEmpty(value)) return ''
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (Array.isArray(value)) return value.map((row) => (typeof row === 'object' ? Object.values(row).join(' / ') : row)).join('; ')
   if (typeof value === 'object') return JSON.stringify(value)
 
