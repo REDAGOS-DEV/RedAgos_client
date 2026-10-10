@@ -487,7 +487,22 @@ export interface StatementRevision {
   collected_at_issue: string
   amount_due: string
   issued_at: string | null
+  /** The staff member whose action issued it; null for one issued by the system. */
+  issued_by?: string | null
+  issuer?: BillingFacilityCard
+  /** A Patient Transfusion statement bills the patient; a weekly one the hospital, with no patient. */
+  bill_to?: { patient_name: string | null; facility: string | null }
+  request_reference?: string | null
   lines: StatementLine[]
+}
+
+/** The issuing centre as a billing document heads it. */
+export interface BillingFacilityCard {
+  name: string | null
+  address: string | null
+  doh_license_number?: string | null
+  phone?: string | null
+  email?: string | null
 }
 
 /** A Payment Acknowledgement Receipt (AR-…), as lists show it. Not a BIR official receipt. */
@@ -503,6 +518,20 @@ export interface PaymentReceiptSummary {
   voided: boolean
   void_reason: string | null
   replaces_receipt_number: string | null
+  /*
+   * The rest of the receipt, frozen when it was issued, for showing it as it
+   * prints. Never the payment reference: that comes with the payment, to
+   * whoever may record payments.
+   */
+  balance_before?: string | null
+  payer_name?: string | null
+  received_by?: string | null
+  issuing_facility?: BillingFacilityCard | null
+  request?: { reference_number: string | null; patient_name: string | null; requesting_facility: string | null } | null
+  statement?: { document_number: string; revision_number: number; total_amount: string; amount_due: string } | null
+  payment?: { method_label: string | null; source: PaymentSource | null; paid_at: string | null }
+  /** Empty on a receipt issued before receipts carried their lines. */
+  lines?: StatementLine[]
 }
 
 /**

@@ -10,7 +10,7 @@
  * Pure functions, so the rules can be tested without mounting a page.
  */
 
-import type { Billing, PaymentAttempt, PaymentAttemptStatus } from '~/types/bloodRequest'
+import type { Billing, BillingStatus, PaymentAttempt, PaymentAttemptStatus, StatementRevision } from '~/types/bloodRequest'
 
 /** Statuses after which a checkout will never change again. */
 const SETTLED_ATTEMPTS: PaymentAttemptStatus[] = ['completed', 'expired', 'canceled', 'failed', 'superseded']
@@ -107,6 +107,66 @@ export function reviewReasonMessage(reason: string | null | undefined): string {
 /** Whether billing staff may take a payment (cash, GCash, subsidy) on a statement at all. */
 export function takesPayment(billing: Pick<Billing, 'collects_payment' | 'clears_release'>): boolean {
   return billing.collects_payment && !billing.clears_release
+}
+
+/** An amount the server sent as a decimal string, in whole centavos, so sums never drift. */
+function centavos(value: string | number | null | undefined): number {
+  const amount = Number(value ?? 0)
+
+  return Number.isFinite(amount) ? Math.round(amount * 100) : 0
+}
+
+/** The totals block of a statement, in pesos, as the document lays it out. */
+export interface StatementFigures {
+  subtotal: number
+  /** The government subsidy waives the whole charge, so it is the subtotal or nothing. */
+  subsidy: number
+  /** What the statement charges once the subsidy is taken off. */
+  payable: number
+  /** Received before the statement was issued. */
+  paid: number
+  /** What the statement leaves to be paid. */
+  balance: number
+}
+
+/**
+ * The figures a frozen statement prints, from its own amounts only.
+ *
+ * A subsidised statement shows the subsidy as a deduction of the whole charge;
+ * anything collected before it stays recorded and is refunded, if at all,
+ * outside RedAgos, so it never turns into a balance here.
+ */
+export function statementFigures(
+  revision: Pick<StatementRevision, 'billing_status' | 'total_amount' | 'collected_at_issue' | 'amount_due'>,
+): StatementFigures {
+  const subtotal = centavos(revision.total_amount)
+  const subsidy = revision.billing_status === 'subsidised' ? subtotal : 0
+
+  return {
+    subtotal: subtotal / 100,
+    subsidy: subsidy / 100,
+    payable: (subtotal - subsidy) / 100,
+    paid: centavos(revision.collected_at_issue) / 100,
+    balance: centavos(revision.amount_due) / 100,
+  }
+}
+
+/** The stamp a statement's status prints under its number. */
+export function statementStamp(status: BillingStatus): { label: string; tone: 'success' | 'danger' | 'info' | 'muted' | 'warning' } {
+  switch (status) {
+    case 'paid':
+      return { label: 'PAID', tone: 'success' }
+    case 'partial':
+      return { label: 'PARTIALLY PAID', tone: 'warning' }
+    case 'subsidised':
+      return { label: 'GOVERNMENT SUBSIDISED', tone: 'info' }
+    case 'statement_only':
+      return { label: 'STATEMENT ONLY', tone: 'info' }
+    case 'void':
+      return { label: 'VOID', tone: 'muted' }
+    default:
+      return { label: 'UNPAID', tone: 'danger' }
+  }
 }
 
 /** Save a downloaded document under the given name. */

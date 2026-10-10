@@ -140,8 +140,8 @@
                 <span v-else-if="s.clears_release" class="settled-note">
                   {{ s.is_subsidised ? 'Government funded' : 'Settled' }}
                 </span>
-                <button class="btn btn-outline btn-sm" @click="openStatements(s)">
-                  Statements
+                <button class="btn btn-outline btn-sm" @click="openDocuments(s)">
+                  Documents
                 </button>
                 <!-- The payments carry reference numbers, so they are behind the ability to record them. -->
                 <button
@@ -400,56 +400,128 @@
       </div>
     </Teleport>
 
-    <!-- STATEMENTS OF ACCOUNT -->
+    <!-- BILLING DOCUMENTS: each statement revision and receipt, laid out as it prints -->
     <Teleport to="body">
-      <div v-if="statementsFor" class="modal-overlay" @click.self="closeStatements">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="soa-title">
-          <h2 id="soa-title" class="modal-title">Statements of Account</h2>
-          <p class="modal-sub">
-            {{ statementsFor.request?.reference_number }} · {{ statementsFor.request?.requesting_facility }}
-          </p>
-
-          <p class="modal-desc">
-            <template v-if="statementsFor.is_statement_only">
-              Weekly order: the statement goes to the hospital for settlement outside RedAgos.
-              No payment is taken here.
-            </template>
-            <template v-else>
-              Each statement is frozen when it is issued. Issuing again after the bill or the
-              balance changes adds a new revision; the earlier ones stay as they were.
-            </template>
-          </p>
-
-          <div v-if="statementsLoading" class="skeleton skeleton--row" />
-          <p v-else-if="statementsError" class="field-error field-error--block">{{ statementsError }}</p>
-          <p v-else-if="!statementList.length" class="modal-desc">No statement has been issued yet.</p>
-
-          <ul v-else class="payment-list">
-            <li v-for="r in statementList" :key="r.id" class="payment-row">
-              <div class="payment-main">
-                <strong class="mono">{{ r.document_number }}</strong>
-                <span class="payment-meta">
-                  Revision {{ r.revision_number }} · {{ formatWhen(r.issued_at) }} ·
-                  {{ r.statement_only ? 'Billed' : 'Due' }} {{ pesos(r.amount_due) }}
-                </span>
-              </div>
+      <div v-if="documentsFor" class="modal-overlay" @click.self="closeDocuments">
+        <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="docs-title">
+          <div class="docs-head">
+            <div>
+              <h2 id="docs-title" class="modal-title">Billing Documents</h2>
+              <p class="modal-sub">
+                {{ documentsFor.request?.reference_number }} · {{ documentsFor.request?.requesting_facility }}
+              </p>
+            </div>
+            <div class="pills" role="tablist" aria-label="Document">
               <button
-                type="button"
-                class="btn btn-outline btn-sm"
-                :disabled="downloadingId === `soa-${r.id}`"
-                @click="downloadStatement(r)"
+                role="tab"
+                class="pill"
+                :class="{ 'pill--on': docTab === 'statement' }"
+                :aria-selected="docTab === 'statement'"
+                @click="docTab = 'statement'"
               >
-                PDF
+                Statement of Account
               </button>
-            </li>
-          </ul>
+              <!-- Receipts come with the payments, which only whoever may record them is served. -->
+              <button
+                v-if="canSeePayments"
+                role="tab"
+                class="pill"
+                :class="{ 'pill--on': docTab === 'receipt' }"
+                :aria-selected="docTab === 'receipt'"
+                @click="docTab = 'receipt'"
+              >
+                Receipts
+              </button>
+            </div>
+          </div>
 
-          <p v-if="issueError" class="field-error field-error--block">{{ issueError }}</p>
+          <!-- STATEMENT -->
+          <template v-if="docTab === 'statement'">
+            <div v-if="statementsLoading" class="skeleton skeleton--doc" />
+            <p v-else-if="statementsError" class="field-error field-error--block">{{ statementsError }}</p>
+            <div v-else-if="!statementList.length" class="empty empty--compact">
+              <AssetIcon name="file-text" :size="30" />
+              <h3>No statement issued yet</h3>
+              <p>
+                {{ documentsFor.is_statement_only
+                  ? 'Issue one to send this weekly order to the hospital; it is settled outside RedAgos.'
+                  : 'Issue one to give the patient or their watcher the amount payable.' }}
+              </p>
+            </div>
+            <template v-else-if="selectedRevision">
+              <div class="doc-toolbar">
+                <label for="doc-revision" class="field-label">Revision</label>
+                <select id="doc-revision" v-model="selectedRevisionId" class="input input--select">
+                  <option v-for="r in revisionsNewestFirst" :key="r.id" :value="r.id">
+                    {{ r.document_number }} · Revision {{ r.revision_number }} · {{ formatWhen(r.issued_at) }}
+                  </option>
+                </select>
+                <p class="field-hint">
+                  Each statement is frozen when it is issued. Issuing again after the bill or the balance
+                  changes adds a new revision; earlier ones stay as they were.
+                </p>
+              </div>
+              <div class="doc-metrics">
+                <div v-for="m in documentMetrics" :key="m.label" class="stat-card">
+                  <span class="stat-label">{{ m.label }}</span>
+                  <span class="stat-value" :class="m.tone && `stat-value--${m.tone}`">{{ m.value }}</span>
+                  <span class="stat-note">{{ m.note }}</span>
+                </div>
+              </div>
+              <BillingDocument :revision="selectedRevision" />
+            </template>
+            <p v-if="issueError" class="field-error field-error--block">{{ issueError }}</p>
+          </template>
+
+          <!-- RECEIPTS -->
+          <template v-else>
+            <div v-if="receiptsLoading" class="skeleton skeleton--doc" />
+            <p v-else-if="receiptsError" class="field-error field-error--block">{{ receiptsError }}</p>
+            <div v-else-if="!receiptPayments.length" class="empty empty--compact">
+              <AssetIcon name="receipt" :size="30" />
+              <h3>No receipts yet</h3>
+              <p>A receipt is issued with every payment recorded, cash or GCash.</p>
+            </div>
+            <template v-else-if="selectedReceiptPayment">
+              <div class="doc-toolbar">
+                <label for="doc-receipt" class="field-label">Receipt</label>
+                <select id="doc-receipt" v-model="selectedReceiptId" class="input input--select">
+                  <option v-for="p in receiptPayments" :key="p.receipt.id" :value="p.receipt.id">
+                    {{ p.receipt.receipt_number }} · {{ pesos(p.receipt.amount_paid) }} · {{ formatWhen(p.receipt.issued_at) }}
+                  </option>
+                </select>
+              </div>
+              <div class="doc-metrics">
+                <div v-for="m in documentMetrics" :key="m.label" class="stat-card">
+                  <span class="stat-label">{{ m.label }}</span>
+                  <span class="stat-value" :class="m.tone && `stat-value--${m.tone}`">{{ m.value }}</span>
+                  <span class="stat-note">{{ m.note }}</span>
+                </div>
+              </div>
+              <BillingDocument
+                :receipt="selectedReceiptPayment.receipt"
+                :payment-reference="selectedReceiptPayment.reference_number"
+              />
+            </template>
+          </template>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" @click="closeStatements">Close</button>
-            <button v-if="canSeePayments" class="btn btn-primary" :disabled="issuing" @click="issueStatement">
+            <button class="btn btn-outline" @click="closeDocuments">Close</button>
+            <button
+              v-if="docTab === 'statement' && canSeePayments"
+              class="btn btn-outline"
+              :disabled="issuing"
+              @click="issueStatement"
+            >
               {{ issuing ? 'Issuing…' : 'Issue statement' }}
+            </button>
+            <button class="btn btn-outline" :disabled="!currentDocument || printing" @click="printDocument">
+              <AssetIcon name="printer" :size="15" />
+              {{ printing ? 'Opening…' : 'Print' }}
+            </button>
+            <button class="btn btn-primary" :disabled="!currentDocument || downloadingId !== null" @click="downloadCurrent">
+              <AssetIcon name="download" :size="15" />
+              Download PDF
             </button>
           </div>
         </div>
@@ -526,7 +598,7 @@
             </p>
             <p v-else-if="attempt.status === 'completed'" class="banner banner--ok">
               <AssetIcon name="check" :size="15" />
-              <span>Payment confirmed by the provider. Its receipt is under Payments.</span>
+              <span>Payment confirmed by the provider. Its receipt is under Documents.</span>
             </p>
             <p v-else class="modal-desc">This checkout is closed ({{ attempt.status_label.toLowerCase() }}).</p>
 
@@ -593,6 +665,7 @@
 <script setup>
 import QRCode from 'qrcode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BillingDocument from '~/components/common/BillingDocument.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import {
@@ -603,6 +676,7 @@ import {
   pesos,
   reviewReasonMessage,
   saveBlob,
+  statementFigures,
   takesPayment,
 } from '~/utils/billing'
 
@@ -934,36 +1008,67 @@ async function downloadReceipt(receipt) {
   }
 }
 
-async function downloadStatement(revision) {
-  downloadingId.value = `soa-${revision.id}`
-
-  try {
-    saveBlob(await bloodCenterService.downloadStatement(revision.id), `${revision.document_number}.pdf`)
-  } catch (err) {
-    toast('Download Failed', 'danger', err?.message || 'The statement could not be downloaded.')
-  } finally {
-    downloadingId.value = null
-  }
-}
-
-/* STATEMENTS OF ACCOUNT */
-const statementsFor = ref(null)
+/*
+ * BILLING DOCUMENTS
+ *
+ * Every statement revision and receipt of one request, each shown as it prints
+ * (the owner's billing mock-up, 2026-10-11). The PDF from the server is the
+ * official copy: Print and Download both fetch it.
+ */
+const documentsFor = ref(null)
+const docTab = ref('statement')
 const statementList = ref([])
 const statementsLoading = ref(false)
 const statementsError = ref('')
+const selectedRevisionId = ref(null)
 const issuing = ref(false)
 const issueError = ref('')
+const receiptPayments = ref([])
+const receiptsLoading = ref(false)
+const receiptsError = ref('')
+const selectedReceiptId = ref(null)
+const printing = ref(false)
 
-async function openStatements(statement) {
-  statementsFor.value = statement
-  statementList.value = []
+const revisionsNewestFirst = computed(() => [...statementList.value].sort((a, b) => b.revision_number - a.revision_number))
+const selectedRevision = computed(() => statementList.value.find((r) => r.id === selectedRevisionId.value) ?? null)
+const selectedReceiptPayment = computed(() => receiptPayments.value.find((p) => p.receipt.id === selectedReceiptId.value) ?? null)
+
+const currentDocument = computed(() => (docTab.value === 'statement'
+  ? selectedRevision.value && { kind: 'statement', id: selectedRevision.value.id, name: selectedRevision.value.document_number }
+  : selectedReceiptPayment.value && { kind: 'receipt', id: selectedReceiptPayment.value.receipt.id, name: selectedReceiptPayment.value.receipt.receipt_number }))
+
+// The three figures above the document, from its own frozen amounts.
+const documentMetrics = computed(() => {
+  if (docTab.value === 'statement' && selectedRevision.value) {
+    const r = selectedRevision.value
+    const f = statementFigures(r)
+
+    return [
+      { label: r.statement_only ? 'Amount billed' : 'Amount payable', value: pesos(f.payable), note: f.subsidy > 0 ? 'After the government subsidy' : 'Statement total' },
+      { label: 'Amount received', value: pesos(f.paid), note: f.paid > 0 ? 'Before this statement' : 'No payment yet' },
+      { label: 'Outstanding balance', value: pesos(f.balance), note: f.balance > 0 ? (r.statement_only ? 'Settled outside RedAgos' : 'Payment still due') : 'Nothing outstanding', tone: f.balance > 0 && !r.statement_only ? 'danger' : null },
+    ]
+  }
+
+  const receipt = selectedReceiptPayment.value?.receipt
+  if (!receipt) return []
+  const after = Number(receipt.balance_after ?? 0)
+
+  return [
+    { label: 'Statement total', value: receipt.statement ? pesos(receipt.statement.total_amount) : '—', note: receipt.statement?.document_number ?? 'No statement on record' },
+    { label: 'Amount received', value: pesos(receipt.amount_paid), note: receipt.payment?.method_label ?? receipt.payment_method_label ?? '' },
+    { label: 'Remaining balance', value: pesos(Math.max(after, 0)), note: after > 0 ? 'Still due' : 'Settled by this payment', tone: after > 0 ? 'danger' : null },
+  ]
+})
+
+async function loadStatements() {
   statementsError.value = ''
-  issueError.value = ''
   statementsLoading.value = true
 
   try {
-    const response = await bloodCenterService.billingStatements(statement.request?.id ?? statement.request_id)
+    const response = await bloodCenterService.billingStatements(requestIdOf(documentsFor.value))
     statementList.value = response?.statements ?? []
+    selectedRevisionId.value = revisionsNewestFirst.value[0]?.id ?? null
   } catch (err) {
     statementsError.value = err?.message || 'Could not load the statements.'
   } finally {
@@ -971,9 +1076,38 @@ async function openStatements(statement) {
   }
 }
 
-function closeStatements() {
+async function loadReceipts() {
+  receiptsError.value = ''
+  receiptsLoading.value = true
+
+  try {
+    const response = await bloodCenterService.billingPayments(requestIdOf(documentsFor.value))
+    receiptPayments.value = (response?.payments ?? [])
+      .filter((p) => p.receipt)
+      .sort((a, b) => b.receipt.id - a.receipt.id)
+    selectedReceiptId.value = receiptPayments.value[0]?.receipt.id ?? null
+  } catch (err) {
+    receiptsError.value = err?.data?.message || err?.message || 'Could not load the receipts.'
+  } finally {
+    receiptsLoading.value = false
+  }
+}
+
+async function openDocuments(statement, tab = 'statement') {
+  documentsFor.value = statement
+  docTab.value = tab
+  statementList.value = []
+  receiptPayments.value = []
+  selectedRevisionId.value = null
+  selectedReceiptId.value = null
+  issueError.value = ''
+
+  await Promise.all([loadStatements(), canSeePayments.value ? loadReceipts() : null])
+}
+
+function closeDocuments() {
   if (issuing.value) return
-  statementsFor.value = null
+  documentsFor.value = null
 }
 
 async function issueStatement() {
@@ -981,17 +1115,65 @@ async function issueStatement() {
   issueError.value = ''
 
   try {
-    const response = await bloodCenterService.issueStatement(statementsFor.value.request?.id ?? statementsFor.value.request_id)
+    const response = await bloodCenterService.issueStatement(requestIdOf(documentsFor.value))
     toast(
       response.created ? 'Statement Issued' : 'No Changes Since Last Statement',
       response.created ? 'success' : 'info',
       response.revision?.document_number,
     )
-    await openStatements(statementsFor.value)
+    await loadStatements()
   } catch (err) {
     issueError.value = err?.message || 'The statement could not be issued.'
   } finally {
     issuing.value = false
+  }
+}
+
+function fetchPdf(doc) {
+  return doc.kind === 'statement'
+    ? bloodCenterService.downloadStatement(doc.id)
+    : bloodCenterService.downloadReceipt(doc.id)
+}
+
+async function downloadCurrent() {
+  const doc = currentDocument.value
+  if (!doc) return
+  downloadingId.value = `${doc.kind}-${doc.id}`
+
+  try {
+    saveBlob(await fetchPdf(doc), `${doc.name}.pdf`)
+  } catch (err) {
+    toast('Download Failed', 'danger', err?.message || 'The document could not be downloaded.')
+  } finally {
+    downloadingId.value = null
+  }
+}
+
+// Opens the server's PDF in a new tab, where the browser's viewer prints it.
+async function printDocument() {
+  const doc = currentDocument.value
+  if (!doc) return
+
+  // Opened before the download, while the click still counts, so the browser
+  // does not take it for a pop-up.
+  const tab = window.open('', '_blank')
+  printing.value = true
+
+  try {
+    const blob = await fetchPdf(doc)
+
+    if (tab) {
+      const url = URL.createObjectURL(blob)
+      tab.location.href = url
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } else {
+      saveBlob(blob, `${doc.name}.pdf`)
+    }
+  } catch (err) {
+    tab?.close()
+    toast('Print Failed', 'danger', err?.message || 'The document could not be opened.')
+  } finally {
+    printing.value = false
   }
 }
 
@@ -1293,6 +1475,14 @@ onBeforeUnmount(stopPolling)
   border-radius: 15px; padding: 22px; font-family: var(--rb-font-sans);
   max-height: 90vh; overflow-y: auto;
 }
+.modal--wide { max-width: 980px; padding: 22px 24px; }
+.docs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+.doc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 14px; }
+.doc-toolbar .input--select { width: auto; min-width: 300px; max-width: 100%; }
+.doc-toolbar .field-hint { flex-basis: 100%; }
+.doc-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.skeleton--doc { height: 360px; }
+.empty--compact { padding: 32px 16px; }
 .modal-title { font-size: 17px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 3px; }
 .modal-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; }
 .modal-desc { font-size: 13px; color: var(--rb-text-secondary); margin: 0 0 14px; }
@@ -1344,6 +1534,12 @@ onBeforeUnmount(stopPolling)
 
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .skeleton, .spinning { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .doc-metrics { grid-template-columns: 1fr; }
+  .doc-toolbar .input--select { min-width: 0; width: 100%; }
+  .modal-actions { flex-wrap: wrap; }
 }
 
 @media (max-width: 900px) {
