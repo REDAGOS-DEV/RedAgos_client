@@ -20,7 +20,7 @@ import type {
   LineFulfilmentStatus,
   UrgencyLevel,
 } from '~/types/bloodRequest'
-import { LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
+import { LINE_STATUS_LABELS, LINE_STATUS_TONES, requestLineLabel } from '~/types/bloodRequest'
 
 export type Tone = 'info' | 'progress' | 'warning' | 'success' | 'danger' | 'muted'
 
@@ -62,8 +62,15 @@ export function deriveLineStatus(item: BloodRequestItem): LineFulfilmentStatus {
   return 'unfulfilled'
 }
 
-/** One row per requested component: what was asked for, and what was provided. */
-export function fulfilmentRows(request: Pick<BloodRequest, 'items'> | null | undefined): FulfilmentRow[] {
+/**
+ * One row per requested line: what was asked for, and what was provided.
+ *
+ * A weekly request's lines can each restock a different blood type, so each
+ * row is then named with its type: "A+ Cryoprecipitate".
+ */
+export function fulfilmentRows(
+  request: (Pick<BloodRequest, 'items'> & Partial<Pick<BloodRequest, 'blood_type' | 'blood_types'>>) | null | undefined,
+): FulfilmentRow[] {
   return (request?.items ?? []).map((item) => {
     const requested = item.quantity ?? 0
     const fulfilled = item.fulfilled_quantity ?? 0
@@ -71,7 +78,7 @@ export function fulfilmentRows(request: Pick<BloodRequest, 'items'> | null | und
 
     return {
       id: item.id,
-      component: item.component?.name ?? '—',
+      component: requestLineLabel(request, item),
       requested,
       reserved: item.reserved_quantity ?? 0,
       fulfilled,

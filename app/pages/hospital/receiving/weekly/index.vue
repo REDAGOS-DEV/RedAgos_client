@@ -241,6 +241,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalWeekdayPicker from '~/components/Hospital/WeekdayPicker.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import { bloodTypeCodes } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS, WEEKLY_STATUS_TONES } from '~/types/receiving'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
@@ -413,9 +414,9 @@ async function addSchedule() {
   }
 }
 
-/** The blood types a weekly request asked for, as one line. */
+/** The blood types a weekly request asked for, as one line. Its one request may restock several. */
 function bloodTypesOf(weekly) {
-  const codes = (weekly.requests ?? []).map((request) => request.blood_type?.code).filter(Boolean)
+  const codes = [...new Set((weekly.requests ?? []).flatMap((request) => bloodTypeCodes(request)))]
 
   return codes.length ? codes.join(' · ') : '—'
 }

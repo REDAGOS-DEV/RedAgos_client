@@ -112,7 +112,7 @@
         <div class="hero-grid">
           <div class="hero-item">
             <span class="hero-label">Blood Type</span>
-            <span class="hero-value hero-value--emphasis">{{ request.blood_type || '—' }}</span>
+            <span class="hero-value hero-value--emphasis">{{ bloodTypeSummary(request) }}</span>
           </div>
           <div class="hero-item">
             <span class="hero-label">Blood Component</span>
@@ -225,7 +225,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value">{{ request.blood_type || '—' }}</span>
+                <span class="info-value">{{ bloodTypeSummary(request) }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Component</span>
@@ -393,7 +393,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
-import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 /**
  * /hospital/track-requests
  * Tracking-only page (NOT a management page) for Hospital Blood Bank staff.

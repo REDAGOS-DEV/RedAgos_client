@@ -178,8 +178,9 @@ export const useBloodRequestDetails = (requestId) => {
         return
       }
 
+      // The line's own type: a weekly request's lines can each differ.
       const response = await hospitalService.availability({
-        blood_type_id: request.value.blood_type?.id,
+        blood_type_id: firstLine.blood_type?.id ?? request.value.blood_type?.id,
         component_id: firstLine.component?.id,
         quantity: firstLine.outstanding_quantity || request.value.outstanding_quantity || undefined,
       })

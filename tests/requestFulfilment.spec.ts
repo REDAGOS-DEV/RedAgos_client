@@ -13,7 +13,18 @@ import {
   walkInStepProblems,
   type WalkInForm,
 } from '~/utils/requestFulfilment'
-import { requestStage, requestStatusLabel, type BloodRequest, type ComponentOption, type DuplicateMatch } from '~/types/bloodRequest'
+import {
+  bloodTypeCodes,
+  bloodTypeSummary,
+  componentSummary,
+  hasMixedBloodTypes,
+  requestLineLabel,
+  requestStage,
+  requestStatusLabel,
+  type BloodRequest,
+  type ComponentOption,
+  type DuplicateMatch,
+} from '~/types/bloodRequest'
 
 /**
  * Request versus fulfilment, and the walk-in form.
@@ -87,6 +98,54 @@ describe('the fulfilment table', () => {
 
     expect(rows.map((row) => canCloseLine(row, true))).toEqual([false, true, true])
     expect(rows.map((row) => canCloseLine(row, false))).toEqual([false, false, false])
+  })
+})
+
+describe('a weekly request restocking several blood types in one request', () => {
+  function weekly(): BloodRequest {
+    return {
+      status: 'pending',
+      is_open: true,
+      blood_type: { id: null, code: null },
+      blood_types: ['A+', 'AB+', 'O-'],
+      items: [
+        { id: 21, blood_type: { id: 1, code: 'A+' }, component: { id: 5, name: 'Cryoprecipitate' }, quantity: 12 },
+        { id: 22, blood_type: { id: 4, code: 'AB+' }, component: { id: 5, name: 'Cryoprecipitate' }, quantity: 12 },
+        { id: 23, blood_type: { id: 8, code: 'O-' }, component: { id: 3, name: 'Platelet Concentrate' }, quantity: 12 },
+      ],
+    } as unknown as BloodRequest
+  }
+
+  it('names every blood type it asks for', () => {
+    expect(bloodTypeCodes(weekly())).toEqual(['A+', 'AB+', 'O-'])
+    expect(bloodTypeSummary(weekly())).toBe('A+, AB+, O-')
+    expect(hasMixedBloodTypes(weekly())).toBe(true)
+  })
+
+  it('names each line with its blood type, so one component in two types reads as two lines', () => {
+    expect(fulfilmentRows(weekly()).map((row) => row.component)).toEqual([
+      'A+ Cryoprecipitate',
+      'AB+ Cryoprecipitate',
+      'O- Platelet Concentrate',
+    ])
+  })
+
+  it('lists each component once in the one-line summary', () => {
+    expect(componentSummary(weekly())).toBe('Cryoprecipitate, Platelet Concentrate')
+  })
+
+  it('reads the types from the lines when the request was loaded without them', () => {
+    const request = { ...weekly(), blood_types: undefined }
+
+    expect(bloodTypeCodes(request)).toEqual(['A+', 'AB+', 'O-'])
+  })
+
+  it('leaves a request of one blood type reading as before', () => {
+    const single = scenario({ blood_type: { id: 7, code: 'O+' }, blood_types: ['O+'] })
+
+    expect(bloodTypeSummary(single)).toBe('O+')
+    expect(hasMixedBloodTypes(single)).toBe(false)
+    expect(requestLineLabel(single, single.items[0]!)).toBe('Packed RBC')
   })
 })
 

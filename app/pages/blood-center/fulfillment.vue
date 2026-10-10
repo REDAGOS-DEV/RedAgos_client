@@ -97,13 +97,13 @@
                 <span
                   v-if="request.weekly_request"
                   class="tag tag--weekly"
-                  title="Part of the hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
+                  title="The hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
                 >Weekly · {{ request.weekly_request.reference_number }}</span>
                 <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
               </div>
               <p class="request-sub">
                 <span class="request-facility">{{ request.requesting_facility?.name || 'Hospital not recorded' }}</span>
-                <span class="blood-pill">{{ request.blood_type?.code || '?' }}</span>
+                <span v-for="code in (bloodTypeCodes(request).length ? bloodTypeCodes(request) : ['?'])" :key="code" class="blood-pill">{{ code }}</span>
                 <span>{{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested</span>
               </p>
             </div>
@@ -129,7 +129,7 @@
           <RequestFulfilmentTable v-if="request.detail" :request="request.detail" class="request-fulfilment" />
           <div v-else-if="request.items?.length" class="lines">
             <span v-for="item in request.items" :key="item.id" class="line-chip">
-              {{ item.component?.name }} &times;{{ item.quantity }}
+              {{ requestLineLabel(request, item) }} &times;{{ item.quantity }}
             </span>
           </div>
 
@@ -407,7 +407,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeCodes, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -538,7 +538,7 @@ function reservedCount(request) {
 
 function componentFor(request, allocation) {
   const item = (request.items ?? []).find((i) => i.id === allocation.request_item_id)
-  return item?.component?.name ?? '—'
+  return item ? requestLineLabel(request, item) : '—'
 }
 
 /** Flags a bag close enough to expiry that a dispatcher should notice. */

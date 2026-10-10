@@ -187,13 +187,14 @@
           </section>
 
           <!--
-            One blood type of a weekly request. It goes out in one delivery,
-            and whatever the center does not supply is closed when it does.
+            A weekly request: every blood type it restocks, in this one
+            request. It goes out in one delivery, and whatever the center does
+            not supply is closed when it does.
           -->
           <section v-else-if="request.weekly_request" class="card part-of">
             <h2 class="section-title">Weekly Request</h2>
             <p class="part-of__text">
-              This is the {{ request.blood_type?.code || '' }} part of weekly request
+              This request was sent as weekly request
               <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="part-of__ref">{{ request.weekly_request.reference_number || 'WR' }}</NuxtLink>.
               The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
               dispatches.
@@ -219,7 +220,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value info-value--emphasis">{{ request.blood_type?.code || '—' }}</span>
+                <span class="info-value info-value--emphasis">{{ bloodTypeSummary(request) }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Priority</span>
@@ -253,7 +254,7 @@
               </thead>
               <tbody>
                 <tr v-for="item in request.items" :key="item.id">
-                  <td>{{ item.component?.name || '—' }}</td>
+                  <td>{{ item.component?.name ? requestLineLabel(request, item) : '—' }}</td>
                   <td class="num">{{ item.quantity }}</td>
                   <td>
                     <template v-if="item.indication_code">
@@ -666,7 +667,7 @@
 
 <script setup>
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'

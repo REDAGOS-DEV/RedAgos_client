@@ -113,8 +113,9 @@ export interface FacilityStub {
   address: string | null
 }
 
+/** On a request, both are null when its lines differ in blood type: a weekly request restocking several. */
 export interface BloodTypeStub {
-  id: number
+  id: number | null
   code: string | null
 }
 
@@ -154,6 +155,8 @@ export interface BloodRequestItem {
   id: number
   /** On a facility allocation: the patient's requirement line this is a share of. */
   transfusion_request_item_id?: number | null
+  /** The request's own on every request but a weekly one, whose lines can each restock a different type. */
+  blood_type?: BloodTypeStub
   component: ComponentStub
   quantity: number
   indication_code: string | null
@@ -246,7 +249,10 @@ export interface BloodRequest {
   /** The blood-centre staff member who entered a walk-in. */
   recorder_name: string | null
   patient: PatientDetails | null
+  /** Null id and code when the lines differ in blood type; blood_types then names them all. */
   blood_type: BloodTypeStub
+  /** Every blood type the lines ask for, in blood-group order. One code on every request but a weekly one. */
+  blood_types?: string[]
   /** What the request asks for. A form can tick several components. */
   items: BloodRequestItem[]
   /** The sum of every line's units. Derived server-side, never stored. */
@@ -275,7 +281,7 @@ export interface BloodRequest {
   /** Set when this request is one facility's share of a Patient Transfusion Request. */
   transfusion_request: TransfusionRequestStub | null
   /**
-   * Set when this replenishment is one blood type of a weekly request. It is
+   * Set when this replenishment was sent as a weekly request. It is
    * dispatched in one delivery, and whatever is not supplied is closed as
    * unavailable when it goes.
    */
@@ -295,6 +301,8 @@ export interface BloodRequest {
 export interface RequestEventLine {
   request_item_id?: number
   transfusion_request_item_id?: number
+  /** The line's blood type code, on an allocation's snapshot recorded since lines carried their own. */
+  blood_type?: string | null
   component: string | null
   required?: number
   requested: number
@@ -319,7 +327,7 @@ export interface RequestEvent {
   actor_facility: { id: number; name: string } | null
   /** Which facility allocation it happened to; null for an event on the requirement itself. */
   allocation?: { id: number; reference_number: string; facility: string | null } | null
-  item: { id: number; component: string | null } | null
+  item: { id: number; blood_type?: string | null; component: string | null } | null
   related_request: { id: number; reference_number: string; facility: string | null } | null
   lines: RequestEventLine[]
   unit_count: number
@@ -855,14 +863,61 @@ export const REQUEST_STATUS_TONES: Record<BloodRequestStatus, 'info' | 'progress
  * that it counts the rest rather than overflowing the column.
  */
 export function componentSummary(request: Pick<BloodRequest, 'items'>): string {
-  const names = (request.items ?? [])
+  // Distinct: a weekly request can ask for one component in several blood types.
+  const names = [...new Set((request.items ?? [])
     .map((item) => item.component?.name)
-    .filter((name): name is string => Boolean(name))
+    .filter((name): name is string => Boolean(name)))]
 
   if (names.length === 0) return '\u2014'
   if (names.length <= 2) return names.join(', ')
 
   return `${names[0]}, ${names[1]} +${names.length - 2} more`
+}
+
+type BloodTyped = Partial<Pick<BloodRequest, 'blood_type' | 'blood_types' | 'items'>>
+
+/**
+ * Every blood type a request asks for, in the order the API sends them.
+ *
+ * Read from blood_types, which the API sends in blood-group order; the lines
+ * and then the request's own type are the fallback for a request loaded
+ * without it.
+ */
+export function bloodTypeCodes(request: BloodTyped | null | undefined): string[] {
+  if (request?.blood_types?.length) return request.blood_types
+
+  const fromLines = [...new Set((request?.items ?? [])
+    .map((item) => item.blood_type?.code)
+    .filter((code): code is string => Boolean(code)))]
+
+  if (fromLines.length) return fromLines
+
+  return request?.blood_type?.code ? [request.blood_type.code] : []
+}
+
+/** Whether a request's lines differ in blood type \u2014 a weekly request restocking several. */
+export function hasMixedBloodTypes(request: BloodTyped | null | undefined): boolean {
+  return bloodTypeCodes(request).length > 1
+}
+
+/** Name the blood type a request is for: "O+", or "A+, B+, O-" when its lines differ. */
+export function bloodTypeSummary(request: BloodTyped | null | undefined): string {
+  const codes = bloodTypeCodes(request)
+
+  return codes.length ? codes.join(', ') : '\u2014'
+}
+
+/**
+ * Name one line of a request: its component, with its blood type when the lines differ.
+ *
+ * "A+ Cryoprecipitate" and "AB+ Cryoprecipitate" are two lines of one weekly
+ * request; on any other request the type is the request's and is shown once.
+ */
+export function requestLineLabel(request: BloodTyped | null | undefined, item: Pick<BloodRequestItem, 'blood_type' | 'component'>): string {
+  const name = item.component?.name ?? '\u2014'
+  const code = item.blood_type?.code
+
+  return hasMixedBloodTypes(request) && code ? `${code} ${name}` : name
 }
 
 /**

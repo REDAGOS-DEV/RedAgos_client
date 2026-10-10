@@ -137,7 +137,8 @@ export function awaitingBagsFor(facilityAllocations: AllocationLike[] | null | u
  * Group ticked bags by the blood request they were dispatched for.
  *
  * Receipt is confirmed per request, so one weekly delivery is confirmed as one
- * call per blood type, each naming only the bags that actually arrived.
+ * call — or one per blood type, for a weekly request sent before its lines
+ * carried their own — each naming only the bags that actually arrived.
  */
 export function receiptsByRequest(awaiting: AwaitingBag[], scanned: Set<number>): Map<number, number[]> {
   const groups = new Map<number, number[]>()

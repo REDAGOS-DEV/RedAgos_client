@@ -301,7 +301,7 @@
                 <span
                   v-if="r.weeklyReference"
                   class="source-badge source-badge--weekly"
-                  :title="`Part of weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
+                  :title="`Weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
                 >Weekly · {{ r.weeklyReference }}</span>
               </td>
               <td>
@@ -311,8 +311,11 @@
                 </div>
               </td>
               <td>
-                <div class="blood-cell">
-                  <span class="blood-pill">{{ r.bloodType }}</span>
+                <!-- A weekly request restocks several blood types in one request: one pill each. -->
+                <div class="blood-cell" :class="{ 'blood-cell--mixed': r.mixedTypes }">
+                  <span class="blood-pills">
+                    <span v-for="code in r.bloodTypes" :key="code" class="blood-pill">{{ code }}</span>
+                  </span>
                   <span class="blood-component">{{ r.component }}</span>
                 </div>
               </td>
@@ -380,7 +383,11 @@
                   <div class="expanded-grid">
                     <div><span class="e-label">Hospital</span><span class="e-value">{{ r.hospital }}</span></div>
                     <div><span class="e-label">Requested By</span><span class="e-value">{{ r.requestedBy || r.contact || 'Not recorded' }}</span></div>
-                    <div><span class="e-label">Blood Requirement</span><span class="e-value">{{ r.bloodType }} · {{ r.component }} · {{ r.units }} units</span></div>
+                    <div>
+                      <span class="e-label">Blood Requirement</span>
+                      <span v-if="r.mixedTypes" class="e-value">{{ r.lineSummary }} · {{ r.units }} units</span>
+                      <span v-else class="e-value">{{ r.bloodType }} · {{ r.component }} · {{ r.units }} units</span>
+                    </div>
                     <div>
                       <span class="e-label">Inventory Availability</span>
                       <span class="e-value inv-inline" :class="'inv-' + inventoryLevel(r)">
@@ -517,7 +524,12 @@
             <section class="drawer-section">
               <h3>Blood Request</h3>
               <dl class="detail-grid">
-                <div><dt>Blood Type</dt><dd><span class="blood-pill">{{ activeRequest.bloodType }}</span></dd></div>
+                <div>
+                  <dt>Blood Type</dt>
+                  <dd class="blood-pills">
+                    <span v-for="code in activeRequest.bloodTypes" :key="code" class="blood-pill">{{ code }}</span>
+                  </dd>
+                </div>
                 <div v-if="activeRequest.patient"><dt>Patient</dt><dd>{{ activeRequest.patient }}</dd></div>
                 <div><dt>Component</dt><dd>{{ activeRequest.component }}</dd></div>
                 <div><dt>Units Requested</dt><dd>{{ activeRequest.units }}</dd></div>
@@ -552,7 +564,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
-                    <td>{{ line.component?.name || 'Not recorded' }}</td>
+                    <td>{{ line.component?.name ? requestLineLabel(activeRequest.raw, line) : 'Not recorded' }}</td>
                     <td class="num">{{ line.requested ?? '—' }}</td>
                     <td class="num">{{ line.outstanding }}</td>
                     <td class="num">{{ line.available }}</td>
@@ -744,7 +756,14 @@ import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vu
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
-import { componentSummary, requestStatusLabel } from '~/types/bloodRequest'
+import {
+  bloodTypeCodes,
+  bloodTypeSummary,
+  componentSummary,
+  hasMixedBloodTypes,
+  requestLineLabel,
+  requestStatusLabel,
+} from '~/types/bloodRequest'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
@@ -853,7 +872,12 @@ function mapRequest(r) {
     ptrReference: r.transfusion_request?.reference_number ?? null,
     weeklyReference: r.weekly_request?.reference_number ?? null,
     sourceLabel: r.source_label ?? 'Blood Bank Portal',
-    bloodType: r.blood_type?.code ?? '—',
+    // A weekly request is one request whose lines can each restock a
+    // different blood type, so a row may carry several.
+    bloodType: bloodTypeSummary(r),
+    bloodTypes: bloodTypeCodes(r).length ? bloodTypeCodes(r) : ['—'],
+    mixedTypes: hasMixedBloodTypes(r),
+    lineSummary: (r.items ?? []).map((item) => `${requestLineLabel(r, item)} ×${item.quantity}`).join(', '),
     component: componentSummary(r),
     units,
     items: r.items ?? [],
@@ -944,7 +968,7 @@ const moreFilterCount = computed(() => {
 })
 
 const hospitalOptions = computed(() => [...new Set(requests.value.map((r) => r.hospital))])
-const bloodTypeOptions = computed(() => [...new Set(requests.value.map((r) => r.bloodType))])
+const bloodTypeOptions = computed(() => [...new Set(requests.value.flatMap((r) => r.bloodTypes))].filter((code) => code !== '—'))
 const componentOptions = computed(() =>
   [...new Set(requests.value.flatMap((r) => r.items.map((i) => i.component?.name).filter(Boolean)))],
 )
@@ -960,7 +984,7 @@ const visibleRequests = computed(() =>
   requests.value.filter((r) => {
     const f = toolbarFilters.value
     if (f.hospital && r.hospital !== f.hospital) return false
-    if (f.bloodType && r.bloodType !== f.bloodType) return false
+    if (f.bloodType && !r.bloodTypes.includes(f.bloodType)) return false
     if (f.component && !r.items.some((i) => i.component?.name === f.component)) return false
     if (f.priority && r.priority !== f.priority) return false
     return true
@@ -1741,6 +1765,8 @@ onMounted(() => {
 .hospital-name { font-weight: 600; }
 .hospital-contact { font-size: 12px; color: var(--text-secondary); }
 .blood-cell { display: flex; align-items: center; gap: 8px; }
+.blood-cell--mixed { flex-direction: column; align-items: flex-start; gap: 5px; }
+.blood-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .blood-component { font-size: 12.5px; color: var(--text); }
 
 .context-menu__divider { height: 1px; margin: 4px 0; background: var(--border); }
