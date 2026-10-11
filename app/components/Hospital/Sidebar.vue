@@ -161,7 +161,7 @@ const sidebarShadow = computed(() =>
 
 const route = useRoute()
 const router = useRouter()
-const { user, fetchUser, logout } = useUser()
+const { user, fetchUser, logout, can } = useUser()
 
 const activePath = ref(route.path || '/')
 watch(
@@ -171,13 +171,18 @@ watch(
 
 const facilityName = computed(() => user.value?.facility?.facility_name || '')
 const userInitial = computed(() => facilityName.value?.charAt(0) || user.value?.full_name?.charAt(0) || 'H')
-// // Dev note: role wala pay field sa users table karon — TODO ni sa backend teammate.
-const userRole = computed(() => user.value?.role || 'Hospital Staff')
+// The hospital role (Blood Bank Head, Inventory Staff, Requesting Staff).
+const userRole = computed(() => user.value?.hospital_role_label || 'Hospital Staff')
 
 // // Dev note: pending/emergency counts naka-fetch sa dashboard summary endpoint
 const badgeCounts = ref({ pending: 0, emergency: 0 })
 
-const navGroups = [
+/*
+ * Each item names the hospital ability its page needs (hospital roles,
+ * project owner 2026-10-11), and a role without it does not see the item.
+ * Presentation only: the server refuses the endpoints with `can:` either way.
+ */
+const NAV_GROUPS = [
   {
     label: 'Main',
     items: [
@@ -187,23 +192,23 @@ const navGroups = [
   {
     label: 'Requests',
     items: [
-      { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending' },
-      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'droplets' },
-      { label: 'Track Requests', path: '/hospital/trackrequests', icon: 'route' }
+      { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
+      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'droplets', requires: 'hospital.requests.view' },
+      { label: 'Track Requests', path: '/hospital/trackrequests', icon: 'route', requires: 'hospital.requests.view' }
     ]
   },
   {
     label: 'Receiving',
     items: [
-      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check' },
-      { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck' }
+      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' },
+      { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', requires: 'hospital.receiving.direct' }
     ]
   },
   {
     label: 'Inventory',
     items: [
-      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package' },
-      { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal' }
+      { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', requires: 'hospital.inventory.view' },
+      { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', requires: 'hospital.inventory.view' }
     ]
   },
   // Ang Finance group (billing, transactions) ug ang Help & Support kay
@@ -212,10 +217,15 @@ const navGroups = [
   {
     label: 'System',
     items: [
+      { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
       { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
     ]
   }
 ]
+
+const navGroups = computed(() => NAV_GROUPS
+  .map((group) => ({ ...group, items: group.items.filter((item) => !item.requires || can(item.requires)) }))
+  .filter((group) => group.items.length > 0))
 
 const loadUser = async () => {
   try {

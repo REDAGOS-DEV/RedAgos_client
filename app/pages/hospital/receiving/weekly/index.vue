@@ -244,7 +244,7 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeCodes } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS, WEEKLY_STATUS_TONES } from '~/types/receiving'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const status = ref(null)
 const statusLoading = ref(true)

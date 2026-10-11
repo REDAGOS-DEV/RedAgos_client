@@ -33,6 +33,128 @@
         </span>
       </div>
 
+      <!-- ============ AWAITING STOCK-IN ============ -->
+      <!-- Receiving's second step (project owner, 2026-10-11): bags whose
+           arrival was confirmed, or that came from outside RedAgos, wait here
+           until inventory staff put them on a shelf. They are not stock until then. -->
+      <section v-if="arrived.length" class="panel stockin" aria-labelledby="stockin-title">
+        <div class="stockin__head">
+          <div>
+            <h2 id="stockin-title" class="stockin__title">
+              Awaiting stock-in
+              <span class="tabs__count">{{ arrived.length }}</span>
+            </h2>
+            <p class="stockin__desc">
+              {{ canStockIn
+                ? 'These bags arrived. Say where each one is stored (optional) and stock them in; they cannot be tagged until then.'
+                : 'These bags arrived and wait for inventory staff to stock them in. They cannot be tagged until then.' }}
+            </p>
+          </div>
+          <form v-if="canStockIn" class="stockin__bulk" @submit.prevent="applyBulkLocation">
+            <input
+              v-model="bulkLocation"
+              list="hinv-storage-locations"
+              maxlength="100"
+              class="filter-select stockin__input"
+              placeholder="Location for the ticked bags"
+              aria-label="Storage location for the ticked bags"
+            />
+            <button type="submit" class="btn" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th v-if="canStockIn" class="check-col">
+                  <input
+                    type="checkbox"
+                    :checked="allTicked"
+                    :indeterminate.prop="ticked.length > 0 && !allTicked"
+                    aria-label="Tick every bag in date"
+                    @change="toggleAllTicked"
+                  />
+                </th>
+                <th>Bag</th>
+                <th>Type</th>
+                <th>Component</th>
+                <th>Expiry</th>
+                <th>Arrived</th>
+                <th>Storage location</th>
+                <th v-if="canDiscard" class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="unit in arrived" :key="unit.id" :class="{ 'row--expired': unit.bag_expired }">
+                <td v-if="canStockIn" class="check-col">
+                  <input
+                    v-model="ticked"
+                    type="checkbox"
+                    :value="unit.unit_id"
+                    :disabled="unit.bag_expired"
+                    :aria-label="`Tick ${unit.bag_number || unit.unit_id}`"
+                  />
+                </td>
+                <td>
+                  <span class="mono">{{ unit.bag_number || unit.unit_id }}</span>
+                  <span v-if="unit.source?.reference_number" class="cell-sub">from {{ unit.source.reference_number }}</span>
+                  <span v-else-if="unit.source?.direct_distribution" class="cell-sub">from {{ unit.source.direct_distribution.source_name }}</span>
+                </td>
+                <td><span class="type-pill">{{ unit.blood_type?.code || '—' }}</span></td>
+                <td>
+                  {{ unit.component?.name || '—' }}
+                  <span v-if="unit.volume_ml" class="cell-sub">{{ unit.volume_ml }} mL</span>
+                </td>
+                <td>
+                  {{ formatDate(unit.expiry_date) }}
+                  <span class="cell-sub" :class="{ 'cell-sub--alert': unit.bag_expired || (unit.days_remaining ?? 99) <= 3 }">
+                    {{ daysRemainingLabel(unit) }}
+                  </span>
+                </td>
+                <td>{{ formatDateTime(unit.received_at) }}</td>
+                <td>
+                  <input
+                    v-if="canStockIn && !unit.bag_expired"
+                    v-model="locations[unit.unit_id]"
+                    list="hinv-storage-locations"
+                    maxlength="100"
+                    class="filter-select stockin__input"
+                    placeholder="Optional"
+                    :aria-label="`Storage location for ${unit.bag_number || unit.unit_id}`"
+                  />
+                  <span v-else-if="unit.bag_expired" class="cell-sub cell-sub--alert">Past its date — discard it</span>
+                  <span v-else class="muted">—</span>
+                </td>
+                <td v-if="canDiscard" class="actions-col">
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--quiet"
+                      :disabled="busyUnit === unit.unit_id"
+                      @click="startAction('discard', unit)"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <datalist id="hinv-storage-locations">
+            <option v-for="location in summary?.storage_locations ?? []" :key="location" :value="location" />
+          </datalist>
+        </div>
+
+        <div v-if="canStockIn" class="stockin__foot">
+          <p v-if="stockInError" class="stockin__error" role="alert">{{ stockInError }}</p>
+          <button type="button" class="btn btn--primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
+            <AssetIcon name="package" :size="14" />
+            {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} bag${ticked.length === 1 ? '' : 's'}` }}
+          </button>
+        </div>
+      </section>
+
       <!-- ============ SUMMARY ============ -->
       <section class="stats-grid" aria-label="Stock summary">
         <button
@@ -197,6 +319,7 @@
                     <span v-else-if="unit.source?.direct_distribution" class="cell-sub">
                       from {{ unit.source.direct_distribution.source_name }}<template v-if="unit.source.direct_distribution.requested_for"> · for {{ unit.source.direct_distribution.requested_for }}</template>
                     </span>
+                    <span v-if="unit.storage_location" class="cell-sub">Stored in {{ unit.storage_location }}</span>
                   </td>
                   <td><span class="type-pill">{{ unit.blood_type?.code || '—' }}</span></td>
                   <td>
@@ -246,7 +369,7 @@
                   <td class="actions-col">
                     <div class="row-actions">
                       <button
-                        v-for="action in actionsFor(unit.status, unit.bag_expired)"
+                        v-for="action in allowedActions(unit)"
                         :key="action"
                         type="button"
                         class="btn btn--sm"
@@ -374,7 +497,7 @@ import {
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
 const ACTION_LABELS = {
   tag: 'Tag to patient',
@@ -430,6 +553,90 @@ const dialogError = ref('')
 const dialogFieldErrors = ref({})
 const busyUnit = ref(null)
 const historyFor = ref(null)
+
+/*
+ * What this role may do (hospital roles, project owner 2026-10-11). The
+ * server refuses the endpoints with `can:` either way; this only keeps a role
+ * from being offered a button that would be refused.
+ */
+const { can } = useUser()
+const canStockIn = computed(() => can('hospital.inventory.stock_in'))
+const canHandle = computed(() => can('hospital.inventory.handle'))
+const canDiscard = computed(() => can('hospital.inventory.discard'))
+
+/** The row actions this role may take on a bag. */
+function allowedActions(unit) {
+  return actionsFor(unit.status, unit.bag_expired)
+    .filter((action) => (action === 'discard' ? canDiscard.value : canHandle.value))
+}
+
+/* AWAITING STOCK-IN: arrived bags, ticked and given a location, then stocked in. */
+const arrived = ref([])
+const ticked = ref([])
+const locations = reactive({})
+const bulkLocation = ref('')
+const stockingIn = ref(false)
+const stockInError = ref('')
+
+const tickable = computed(() => arrived.value.filter((unit) => !unit.bag_expired).map((unit) => unit.unit_id))
+const allTicked = computed(() => tickable.value.length > 0 && tickable.value.every((id) => ticked.value.includes(id)))
+
+async function loadArrived() {
+  try {
+    const known = new Set(arrived.value.map((unit) => unit.unit_id))
+    const page = await hospitalService.inventory({ status: 'received', per_page: 100 })
+    arrived.value = page?.data ?? []
+
+    // A new arrival is ticked, so one click stocks the whole delivery in;
+    // a bag no longer waiting drops out of the ticks.
+    const waiting = new Set(tickable.value)
+    ticked.value = [
+      ...ticked.value.filter((id) => waiting.has(id)),
+      ...tickable.value.filter((id) => !known.has(id) && !ticked.value.includes(id)),
+    ]
+  } catch {
+    // The list below still works; the panel just does not show.
+    arrived.value = []
+  }
+}
+
+function toggleAllTicked() {
+  ticked.value = allTicked.value ? [] : [...tickable.value]
+}
+
+function applyBulkLocation() {
+  const location = bulkLocation.value.trim()
+  if (!location) return
+
+  for (const id of ticked.value) locations[id] = location
+  bulkLocation.value = ''
+}
+
+async function stockInTicked() {
+  if (!ticked.value.length) return
+
+  stockingIn.value = true
+  stockInError.value = ''
+
+  try {
+    const response = await hospitalService.stockIn(ticked.value.map((id) => ({
+      unit_id: id,
+      storage_location: (locations[id] || '').trim() || null,
+    })))
+
+    for (const id of ticked.value) delete locations[id]
+    ticked.value = []
+    showToast(response?.message || 'Stocked in.')
+    await refresh()
+  } catch (err) {
+    stockInError.value = err?.status === 422 ? firstError(err) : refusalMessage(err)
+
+    // Someone else stocked one in, or it was discarded: show the list as it stands.
+    if (err?.status === 409 || err?.status === 404) await loadArrived()
+  } finally {
+    stockingIn.value = false
+  }
+}
 
 const toast = ref('')
 
@@ -539,6 +746,7 @@ onMounted(() => {
   ticker = setInterval(() => { now.value = Date.now() }, 30_000)
   loadReference()
   loadSummary()
+  loadArrived()
   loadList()
 })
 
@@ -557,7 +765,7 @@ async function refresh() {
   refreshing.value = true
 
   try {
-    await Promise.all([loadSummary(), loadList({ quiet: true })])
+    await Promise.all([loadSummary(), loadArrived(), loadList({ quiet: true })])
   } finally {
     refreshing.value = false
   }
@@ -909,6 +1117,25 @@ function formatDateTime(value) {
 /* The left edge marks urgency, never colour alone: the countdown says it in words. */
 .row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
 .row--soon td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
+
+/* Awaiting stock-in: the arrived bags, above the stock they are about to join. */
+.stockin { margin-bottom: 16px; border-color: rgba(var(--rb-warning-rgb), 0.45); }
+.stockin__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--rb-border); }
+.stockin__title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.stockin__desc { margin: 4px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 70ch; }
+.stockin__bulk { display: flex; gap: 8px; align-items: center; }
+.stockin__bulk .stockin__input { width: 230px; max-width: none; }
+/* A text field in the filter style, without the select's arrow. */
+.stockin__input { cursor: text; background-image: none; padding-right: 12px; min-width: 0; width: 100%; max-width: 220px; }
+.stockin__foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
+.stockin__error { margin: 0; margin-right: auto; font-size: 12.5px; color: var(--rb-accent-text); }
+.check-col { width: 36px; text-align: center; }
+.row--expired td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+
+@media (max-width: 640px) {
+  .stockin__bulk { width: 100%; }
+  .stockin__input, .stockin__bulk .stockin__input { width: 100%; max-width: none; }
+}
 
 .type-pill { display: inline-flex; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }

@@ -196,7 +196,7 @@ import { useSidebar } from '~/composables/useSidebar.js'
 const { collapsed, openMobile } = useSidebar('hospital')
 const router = useRouter()
 const route = useRoute()
-const { user, ensureUser, logout } = useUser()
+const { user, ensureUser, logout, can } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 
@@ -226,6 +226,7 @@ const pageLabels = {
   '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
   '/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution',
   '/hospital/notifications': 'Notifications',
+  '/hospital/staff': 'Staff',
   '/hospital/settings': 'Settings',
 }
 // A detail page (/receiving/weekly/12) falls back to the deepest section it sits under.
@@ -277,16 +278,18 @@ function handleEscSearch() {
 }
 
 // --- Global search ---
+// Each page names the hospital ability it needs; a role without it is not offered the page.
 const searchablePages = [
   { label: 'Dashboard', path: '/hospital/dashboard', icon: 'home', keywords: 'dashboard home overview' },
-  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing' },
-  { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood' },
-  { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units' },
-  { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags' },
-  { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock alert shortage notification' },
-  { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan' },
-  { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number' },
+  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing', requires: 'hospital.requests.view' },
+  { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood', requires: 'hospital.requests.manage' },
+  { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units', requires: 'hospital.requests.view' },
+  { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags stock in storage location receive', requires: 'hospital.inventory.view' },
+  { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock alert shortage notification', requires: 'hospital.inventory.view' },
+  { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan', requires: 'hospital.requests.view' },
+  { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number', requires: 'hospital.receiving.direct' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
+  { label: 'Staff', path: '/hospital/staff', icon: 'id-card', keywords: 'staff accounts roles head inventory requesting team users', requires: 'hospital.staff.manage' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password' },
 ]
 
@@ -299,7 +302,7 @@ const filteredResults = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return []
   return searchablePages.filter(p =>
-    p.label.toLowerCase().includes(q) || p.keywords.includes(q)
+    (!p.requires || can(p.requires)) && (p.label.toLowerCase().includes(q) || p.keywords.includes(q))
   )
 })
 

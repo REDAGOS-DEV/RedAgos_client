@@ -454,7 +454,7 @@ import {
   suggestedSplit,
 } from '~/utils/transfusionSourcing'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.manage' })
 
 /*
  * A patient's need is a Patient Transfusion Request: staff

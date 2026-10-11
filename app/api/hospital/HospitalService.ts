@@ -15,6 +15,7 @@ import type {
   TransfusionRequestFilters,
 } from '~/types/bloodRequest'
 import type { HospitalNotificationList } from '~/types/hospitalNotification'
+import type { HospitalRoleOption, HospitalStaffMember } from '~/types/hospitalStaff'
 import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
 import type {
   HospitalInventoryFilters,
@@ -348,6 +349,47 @@ class HospitalService extends BaseService {
   /** Record that a bag left the shelf for disposal. A reason is required. */
   discardUnit(unit: string, reason: string) {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/discard`, 'POST', { reason })
+  }
+
+  /**
+   * Stock in arrived bags (inventory staff): each becomes available, stored
+   * where staff said. The location is optional. All or nothing.
+   */
+  stockIn(units: Array<{ unit_id: string; storage_location?: string | null }>) {
+    return this.request<{ message: string; stocked_count: number; units: HospitalUnit[] }>(
+      '/hospital/inventory/stock-in',
+      'POST',
+      { units },
+    )
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Staff: the blood bank's accounts and their roles, kept by its Head.
+   * ---------------------------------------------------------------- */
+
+  /** The blood bank's accounts, removed ones included, and the roles a colleague can hold. */
+  staff() {
+    return this.request<{ data: HospitalStaffMember[]; roles: HospitalRoleOption[] }>('/hospital/staff')
+  }
+
+  /** Add a colleague with their role; they verify their address before signing in. */
+  addStaff(payload: Record<string, unknown>) {
+    return this.request<{ message: string; data: HospitalStaffMember }>('/hospital/staff', 'POST', payload)
+  }
+
+  /** Change a colleague's role or title. */
+  updateStaff(uuid: string, payload: { hospital_role?: string; position?: string | null }) {
+    return this.request<{ message: string; data: HospitalStaffMember }>(`/hospital/staff/${uuid}`, 'PATCH', payload)
+  }
+
+  /** Remove a colleague's account and end their sessions. */
+  removeStaff(uuid: string) {
+    return this.request<{ message: string }>(`/hospital/staff/${uuid}`, 'DELETE')
+  }
+
+  /** Restore a removed colleague, with the role they had. */
+  restoreStaff(uuid: string) {
+    return this.request<{ message: string; data: HospitalStaffMember }>(`/hospital/staff/${uuid}/restore`, 'POST')
   }
 
   /* ---------------------------------------------------------------- *

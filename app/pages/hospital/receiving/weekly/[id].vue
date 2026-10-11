@@ -147,7 +147,7 @@ import { bloodTypeSummary, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types
 import { RECEIVING_REFUSAL_MESSAGES, WEEKLY_STATUS_TONES } from '~/types/receiving'
 import { receiptsByRequest } from '~/utils/receiving'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const route = useRoute()
 

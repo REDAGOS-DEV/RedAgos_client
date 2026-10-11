@@ -18,7 +18,7 @@
 import { hospitalService } from '~/api/hospital/HospitalService'
 import StockThresholdsPanel from '~/components/common/StockThresholdsPanel.vue'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
 useHead({ title: 'Stock Thresholds · RedAgos' })
 </script>

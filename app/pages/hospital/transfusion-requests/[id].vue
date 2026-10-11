@@ -293,7 +293,7 @@ import {
   transfusionProgressLabel,
 } from '~/utils/transfusionSourcing'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const route = useRoute()
 const requestId = computed(() => route.params.id)

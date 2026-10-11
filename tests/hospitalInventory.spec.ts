@@ -30,12 +30,18 @@ describe('the hospital inventory page', () => {
   const page = source('app/pages/hospital/inventory.vue')
   const labels = source('app/types/hospitalInventory.ts')
 
-  it('is a hospital portal page', () => {
-    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })")
+  it('is a hospital portal page every hospital role may read', () => {
+    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })")
+  })
+
+  it('offers stock-in and the bag actions only to the roles that hold them', () => {
+    expect(page).toContain("can('hospital.inventory.stock_in')")
+    expect(page).toContain("can('hospital.inventory.handle')")
+    expect(page).toContain("can('hospital.inventory.discard')")
   })
 
   it('takes every action through the service', () => {
-    for (const call of ['tagUnit(', 'crossmatchUnit(', 'transfuseUnit(', 'releaseTag(', 'confirmUnitReturn(', 'discardUnit(', 'inventorySummary(', 'tagEvents(']) {
+    for (const call of ['tagUnit(', 'crossmatchUnit(', 'transfuseUnit(', 'releaseTag(', 'confirmUnitReturn(', 'discardUnit(', 'inventorySummary(', 'tagEvents(', 'stockIn(']) {
       expect(page).toContain(`hospitalService.${call}`)
     }
   })

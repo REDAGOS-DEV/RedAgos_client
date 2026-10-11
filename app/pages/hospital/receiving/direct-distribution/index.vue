@@ -377,7 +377,7 @@ import { HOSPITAL_UNIT_STATUS_LABELS, HOSPITAL_UNIT_STATUS_TONES } from '~/types
 import { RECEIVING_REFUSAL_MESSAGES } from '~/types/receiving'
 import { awaitingBagsFor, matchScannedBag, normalizeUnitNumber, UNIT_NUMBER_PATTERN } from '~/utils/receiving'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.receiving.direct' })
 
 const route = useRoute()
 const { user } = useUser()

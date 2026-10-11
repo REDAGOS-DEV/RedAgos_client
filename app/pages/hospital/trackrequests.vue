@@ -407,6 +407,7 @@ import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusL
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
+  requires: 'hospital.requests.view',
 })
 
 const route = useRoute()

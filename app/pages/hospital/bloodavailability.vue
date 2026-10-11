@@ -496,6 +496,7 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
+  requires: 'hospital.requests.view',
 })
 
 // ======================= STATE =======================

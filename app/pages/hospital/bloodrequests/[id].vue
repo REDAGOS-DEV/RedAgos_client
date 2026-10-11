@@ -584,7 +584,8 @@
             <p class="receipt-sub">
               {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
               they physically arrive — only your facility can assert it, and it completes the
-              chain of custody for each unit.
+              chain of custody for each unit. Inventory staff then stock them in from Blood Bank
+              Inventory, choosing where each is stored.
             </p>
           </div>
         </div>
@@ -624,7 +625,8 @@
 
         <p v-if="receiptError" class="receipt-error">{{ receiptError }}</p>
 
-        <div class="receipt-actions">
+        <!-- Requesting staff and the Head confirm arrival; inventory staff stock in. -->
+        <div v-if="canConfirmReceipt" class="receipt-actions">
           <span class="receipt-note">
             {{ receiptSelection.length
               ? `${receiptSelection.length} of ${awaitingReceipt.length} selected`
@@ -639,6 +641,9 @@
             {{ confirmingReceipt ? 'Confirming…' : 'Confirm Receipt' }}
           </button>
         </div>
+        <p v-else class="receipt-note receipt-actions">
+          Requesting staff or the Blood Bank Head confirm receipt once the units arrive.
+        </p>
       </section>
 
       <!-- ============== BOTTOM ACTIONS ============== -->
@@ -682,6 +687,7 @@ import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
+  requires: 'hospital.requests.view',
 })
 
 // Editorial serif for headings only — scoped to this page, does not touch
@@ -808,10 +814,10 @@ async function handleConfirmReceipt() {
     const response = await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
     receiptSelection.value = []
 
-    // Receipt is what puts the bags on the blood bank's own shelf.
-    const stocked = response?.stocked_count ?? 0
-    showToast(stocked > 0
-      ? `Receipt confirmed. ${stocked} bag${stocked === 1 ? ' is' : 's are'} now in Blood Bank Inventory.`
+    // Receipt takes the bags into custody; inventory staff then stock them in.
+    const arrived = response?.awaiting_stock_in ?? response?.stocked_count ?? 0
+    showToast(arrived > 0
+      ? `Receipt confirmed. ${arrived} bag${arrived === 1 ? ' waits' : 's wait'} in Blood Bank Inventory for stock-in.`
       : 'Receipt confirmed. Thank you.')
   } catch (err) {
     receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'
@@ -899,7 +905,11 @@ const requiredSummary = computed(() => {
     .join(', ') || 'what was requested'
 })
 
-const canEdit = computed(() => request.value?.status === 'Pending')
+// What this role may do here (hospital roles, project owner 2026-10-11). The
+// server refuses with `can:` either way; this only hides what would be refused.
+const { can } = useUser()
+const canEdit = computed(() => request.value?.status === 'Pending' && can('hospital.requests.manage'))
+const canConfirmReceipt = computed(() => can('hospital.receipt.confirm'))
 
 function formatDate(value) {
   if (!value) return '—'

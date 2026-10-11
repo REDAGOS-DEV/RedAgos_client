@@ -147,14 +147,14 @@ describe('the receiving routes and pages', () => {
     expect(layout).toContain("'/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution'")
   })
 
-  it('makes every receiving page a hospital portal page', () => {
-    for (const page of [
-      'app/pages/hospital/receiving/weekly/index.vue',
-      'app/pages/hospital/receiving/weekly/new.vue',
-      'app/pages/hospital/receiving/weekly/[id].vue',
-      'app/pages/hospital/receiving/direct-distribution/index.vue',
+  it('makes every receiving page a hospital portal page, for the roles that work it', () => {
+    for (const [page, ability] of [
+      ['app/pages/hospital/receiving/weekly/index.vue', 'hospital.requests.view'],
+      ['app/pages/hospital/receiving/weekly/new.vue', 'hospital.requests.manage'],
+      ['app/pages/hospital/receiving/weekly/[id].vue', 'hospital.requests.view'],
+      ['app/pages/hospital/receiving/direct-distribution/index.vue', 'hospital.receiving.direct'],
     ]) {
-      expect(source(page)).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })")
+      expect(source(page)).toContain(`definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: '${ability}' })`)
     }
   })
 })
