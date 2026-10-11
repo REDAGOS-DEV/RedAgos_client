@@ -11,7 +11,8 @@
           </p>
         </div>
         <div class="header-actions">
-          <NuxtLink to="/blood-center/billing" class="btn btn-outline">Bills &amp; statements</NuxtLink>
+          <NuxtLink to="/blood-center/billing" class="btn btn-outline">Statements</NuxtLink>
+          <NuxtLink to="/blood-center/receipts" class="btn btn-outline">Receipts</NuxtLink>
           <button class="btn btn-outline" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />
             {{ exporting ? 'Exporting…' : 'Export CSV' }}
@@ -58,8 +59,7 @@
           <span>Method</span>
           <select v-model="filters.payment_method" class="input">
             <option value="">All</option>
-            <option value="cash">Cash</option>
-            <option value="gcash">GCash</option>
+            <option v-for="m in RECORDED_METHODS" :key="m.value" :value="m.value">{{ m.label }}</option>
           </select>
         </label>
         <label class="filter filter--search">
@@ -111,7 +111,11 @@
               <tr v-for="row in rows" :key="row.id">
                 <td class="mono">{{ row.transaction_number }}</td>
                 <td class="nowrap">{{ when(row.occurred_at) }}</td>
-                <td class="mono">{{ row.request?.reference_number || '—' }}</td>
+                <td>
+                  <NuxtLink v-if="row.request" :to="`/blood-center/statement/${row.request.id}`" class="mono doc-link">{{ row.request.reference_number }}</NuxtLink>
+                  <span v-else class="mono">—</span>
+                  <span v-if="row.request?.patient_name || row.request?.requesting_facility" class="sub">{{ row.request.patient_name || row.request.requesting_facility }}</span>
+                </td>
                 <td>{{ row.category_label }}</td>
                 <td>
                   <span class="chip" :class="`tone--${transactionTone(row.type)}`">{{ row.type_label }}</span>
@@ -125,7 +129,7 @@
                 <td class="num amount" :class="`amount--${row.direction}`">{{ journalAmount(row) }}</td>
                 <td class="num">{{ pesos(row.balance_after) }}</td>
                 <td class="docs">
-                  <span v-if="row.receipt" class="mono">{{ row.receipt.receipt_number }}</span>
+                  <NuxtLink v-if="row.receipt" :to="`/blood-center/receipt/${row.receipt.id}`" class="mono doc-link">{{ row.receipt.receipt_number }}</NuxtLink>
                   <span v-if="row.statement" class="mono">{{ row.statement.document_number }}</span>
                   <span v-if="row.cash_session" class="mono">{{ row.cash_session.session_number }}</span>
                   <span v-if="row.reference" class="mono sub">Ref {{ row.reference }}</span>
@@ -157,7 +161,7 @@
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { journalAmount, pesos, saveBlob, transactionTone } from '~/utils/billing'
+import { RECORDED_METHODS, journalAmount, pesos, saveBlob, transactionTone } from '~/utils/billing'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -278,6 +282,8 @@ onMounted(() => load())
 .num { text-align: right !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
 .mono { font-family: var(--rb-font-mono); font-size: 12px; }
+.doc-link { color: var(--rb-primary-text); font-weight: 600; text-decoration: none; }
+.doc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); margin-top: 2px; }
 .docs { display: flex; flex-direction: column; gap: 2px; }
 .amount { font-weight: 700; }

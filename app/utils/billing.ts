@@ -16,9 +16,87 @@ import type {
   BillingTransaction,
   PaymentAttempt,
   PaymentAttemptStatus,
+  PaymentMethod,
+  PaymentReceiptSummary,
+  StatementDetail,
   StatementRevision,
   TransactionType,
 } from '~/types/bloodRequest'
+
+/**
+ * The methods a payment is recorded under by hand, in the counter's order.
+ * Card and bank transfer were added by the project owner on 2026-10-11.
+ */
+export const RECORDED_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'gcash', label: 'GCash' },
+  { value: 'bank_transfer', label: 'Bank transfer' },
+]
+
+/** What each method's reference is called on a form. Cash has none. */
+const REFERENCE_NAMES: Record<PaymentMethod, string | null> = {
+  cash: null,
+  card: 'Card terminal reference',
+  gcash: 'GCash reference',
+  bank_transfer: 'Bank transfer reference',
+}
+
+/**
+ * Whether a payment by this method must carry its reference: every method but
+ * cash. RedAgos checks none of them with the provider, so the reference is the
+ * only evidence the money moved; the server refuses the payment without it.
+ */
+export function needsReference(method: string | null | undefined): boolean {
+  return Boolean(method && REFERENCE_NAMES[method as PaymentMethod])
+}
+
+/** The label for a method's reference field, or null for cash and anything unknown. */
+export function referenceName(method: string | null | undefined): string | null {
+  return (method && REFERENCE_NAMES[method as PaymentMethod]) || null
+}
+
+/** Where the amount being entered leaves a payment that may be split across methods. */
+export interface SplitEntry {
+  /** What is left to pay after the parts already added. */
+  remaining: number
+  /** How much of the amount entered is recorded as this part. */
+  paid: number
+  /** Cash handed over beyond what is left. */
+  change: number
+  /** What would still be left after this part: paid another way. */
+  short: number
+  /** A card, GCash or transfer amount beyond what is left, which cannot be recorded. */
+  over: number
+}
+
+/**
+ * Work out the part being entered of a payment split across methods (asked for
+ * by the project owner on 2026-10-11): ₱10,000 cash against ₱25,000 due is a
+ * part of 10,000 with 15,000 left for another method. Cash handed over beyond
+ * what is left is change; any other method is for the amount itself. Counted
+ * in centavos, so the parts always add up.
+ */
+export function splitEntry(
+  target: string | number | null | undefined,
+  partsTotal: string | number | null | undefined,
+  method: string,
+  entered: string | number | null | undefined,
+): SplitEntry {
+  const centavos = (value: string | number | null | undefined) => Math.round((Number(value) || 0) * 100)
+  const remaining = Math.max(centavos(target) - centavos(partsTotal), 0)
+  const amount = Math.max(centavos(entered), 0)
+  const paid = Math.min(amount, remaining)
+  const beyond = Math.max(amount - remaining, 0)
+
+  return {
+    remaining: remaining / 100,
+    paid: paid / 100,
+    change: method === 'cash' ? beyond / 100 : 0,
+    short: amount > 0 ? (remaining - paid) / 100 : 0,
+    over: method === 'cash' ? 0 : beyond / 100,
+  }
+}
 
 /** Statuses after which a checkout will never change again. */
 const SETTLED_ATTEMPTS: PaymentAttemptStatus[] = ['completed', 'expired', 'canceled', 'failed', 'superseded']
@@ -159,6 +237,92 @@ export function statementFigures(
   }
 }
 
+/** The totals block of the live statement, in pesos: what its page shows before anything is issued. */
+export interface LiveStatementTotals {
+  subtotal: number
+  /** The whole charge when the government subsidy met it, otherwise nothing. */
+  subsidy: number
+  paid: number
+  balance: number
+}
+
+/**
+ * The live statement's totals, from the server's own figures.
+ *
+ * The balance is the server's outstanding amount, never worked out here: a
+ * statement that collects nothing (subsidised, weekly, void) owes nothing
+ * at the counter, whatever its total says.
+ */
+export function liveStatementTotals(
+  statement: Pick<StatementDetail, 'status' | 'total_amount' | 'collected' | 'outstanding'>,
+): LiveStatementTotals {
+  const subtotal = centavos(statement.total_amount)
+
+  return {
+    subtotal: subtotal / 100,
+    subsidy: statement.status === 'subsidised' ? subtotal / 100 : 0,
+    paid: centavos(statement.collected) / 100,
+    balance: centavos(statement.outstanding) / 100,
+  }
+}
+
+/** A receipt's figures, in pesos, from its frozen snapshot. */
+export interface ReceiptFigures {
+  /** The statement total the payment was made against; null on a receipt with no statement. */
+  total: number | null
+  /** Paid before this receipt, worked out from the balance it was made against. */
+  paidBefore: number | null
+  paid: number
+  remaining: number
+}
+
+export function receiptFigures(
+  receipt: Pick<PaymentReceiptSummary, 'amount_paid' | 'balance_before' | 'balance_after' | 'statement'>,
+): ReceiptFigures {
+  const total = receipt.statement ? centavos(receipt.statement.total_amount) : null
+  const before = centavos(receipt.balance_before)
+
+  return {
+    total: total === null ? null : total / 100,
+    paidBefore: total === null ? null : Math.max(total - before, 0) / 100,
+    paid: centavos(receipt.amount_paid) / 100,
+    remaining: Math.max(centavos(receipt.balance_after), 0) / 100,
+  }
+}
+
+/** One status in the counter's bar of this month's patient bills. */
+export interface BillShare {
+  key: 'paid' | 'subsidised' | 'partial' | 'unpaid'
+  label: string
+  count: number
+  /** Of all the bills counted, 0 to 1; every share is 0 when there are none. */
+  share: number
+}
+
+/**
+ * This month's patient bills by status, in the bar's fixed order.
+ *
+ * The order never follows the counts, so a colour always means the same
+ * status: settled first (paid, subsidised), then what is still owed.
+ */
+export function billStatusShares(
+  counts: { paid: number; subsidised: number; partial: number; unpaid: number } | null | undefined,
+): BillShare[] {
+  const order: Array<[BillShare['key'], string]> = [
+    ['paid', 'Paid'],
+    ['subsidised', 'Subsidised'],
+    ['partial', 'Part paid'],
+    ['unpaid', 'Unpaid'],
+  ]
+  const total = order.reduce((sum, [key]) => sum + Math.max(Number(counts?.[key] ?? 0), 0), 0)
+
+  return order.map(([key, label]) => {
+    const count = Math.max(Number(counts?.[key] ?? 0), 0)
+
+    return { key, label, count, share: total > 0 ? count / total : 0 }
+  })
+}
+
 /** The stamp a statement's status prints under its number. */
 export function statementStamp(status: BillingStatus): { label: string; tone: 'success' | 'danger' | 'info' | 'muted' | 'warning' } {
   switch (status) {
@@ -262,6 +426,38 @@ export function transactionTone(type: TransactionType): 'success' | 'warning' | 
       return 'info'
     default:
       return 'muted'
+  }
+}
+
+/** Rows that raise a bill rather than settle it; the counter's day leaves them out. */
+const CHARGE_TYPES: TransactionType[] = ['charge', 'charge_adjustment', 'opening_balance']
+
+/** Whether a journal row is something that happened at the counter: money in, a void, a subsidy, a settlement. */
+export function isCounterEvent(row: Pick<BillingTransaction, 'type'>): boolean {
+  return !CHARGE_TYPES.includes(row.type)
+}
+
+/**
+ * Where a journal row left its bill, as the counter's list labels it.
+ *
+ * A payment that leaves a balance is a part payment; one that clears it, paid.
+ */
+export function journalStatus(
+  row: Pick<BillingTransaction, 'type' | 'balance_after'>,
+): { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'purple' } {
+  switch (row.type) {
+    case 'payment':
+      return centavos(row.balance_after) > 0 ? { label: 'Part paid', tone: 'warning' } : { label: 'Paid', tone: 'success' }
+    case 'payment_correction':
+      return { label: 'Corrected', tone: 'warning' }
+    case 'payment_void':
+      return { label: 'Voided', tone: 'muted' }
+    case 'subsidy':
+      return { label: 'Subsidised', tone: 'purple' }
+    case 'external_settlement':
+      return { label: 'Settled', tone: 'success' }
+    default:
+      return { label: 'Charged', tone: 'info' }
   }
 }
 

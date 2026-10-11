@@ -1,18 +1,27 @@
 import { describe, it, expect } from 'vitest'
 import {
   attemptTone,
+  billStatusShares,
   cashCountTotal,
   CASH_DENOMINATIONS,
   changeDue,
   checkoutUnavailableMessage,
   facilityInitials,
   isAttemptPayable,
+  isCounterEvent,
   isAttemptSettled,
   journalAmount,
+  journalStatus,
+  liveStatementTotals,
+  needsReference,
   pesos,
   quickTenderAmounts,
+  RECORDED_METHODS,
+  receiptFigures,
+  referenceName,
   reviewReasonMessage,
   shiftVariance,
+  splitEntry,
   statementFigures,
   statementStamp,
   takesPayment,
@@ -208,5 +217,101 @@ describe('the journal', () => {
     expect(transactionTone('payment_void')).toBe('danger')
     expect(transactionTone('external_settlement')).toBe('success')
     expect(transactionTone('charge')).toBe('muted')
+  })
+})
+
+describe('the statement and receipt pages', () => {
+  it('takes the balance from the server, so a subsidised bill owes nothing', () => {
+    expect(liveStatementTotals({ status: 'partial', total_amount: 1800, collected: 500, outstanding: '1300.00' }))
+      .toEqual({ subtotal: 1800, subsidy: 0, paid: 500, balance: 1300 })
+
+    expect(liveStatementTotals({ status: 'subsidised', total_amount: 900, collected: 0, outstanding: '0.00' }))
+      .toEqual({ subtotal: 900, subsidy: 900, paid: 0, balance: 0 })
+  })
+
+  it('works out what was paid before a receipt from the balance it was made against', () => {
+    const receipt = {
+      amount_paid: '400.00',
+      balance_before: '1300.00',
+      balance_after: '900.00',
+      statement: { document_number: 'SOA-1-000002', revision_number: 2, total_amount: '1800.00', amount_due: '1300.00' },
+    }
+
+    expect(receiptFigures(receipt)).toEqual({ total: 1800, paidBefore: 500, paid: 400, remaining: 900 })
+    expect(receiptFigures({ ...receipt, statement: null })).toMatchObject({ total: null, paidBefore: null, remaining: 900 })
+  })
+})
+
+describe('the counter overview', () => {
+  it('keeps the statuses in one order whatever the counts', () => {
+    const shares = billStatusShares({ unpaid: 6, paid: 2, partial: 1, subsidised: 1 })
+
+    expect(shares.map((s) => s.key)).toEqual(['paid', 'subsidised', 'partial', 'unpaid'])
+    expect(shares.map((s) => s.share)).toEqual([0.2, 0.1, 0.1, 0.6])
+  })
+
+  it('draws nothing when there are no bills yet', () => {
+    expect(billStatusShares(null).every((s) => s.count === 0 && s.share === 0)).toBe(true)
+  })
+})
+
+describe("the counter's recent transactions", () => {
+  it('reads a payment as paid or part paid by the balance it left', () => {
+    expect(journalStatus({ type: 'payment', balance_after: '0.00' })).toEqual({ label: 'Paid', tone: 'success' })
+    expect(journalStatus({ type: 'payment', balance_after: '900.00' })).toEqual({ label: 'Part paid', tone: 'warning' })
+    expect(journalStatus({ type: 'payment_void', balance_after: '900.00' }).label).toBe('Voided')
+    expect(journalStatus({ type: 'subsidy', balance_after: '0.00' }).label).toBe('Subsidised')
+  })
+
+  it('leaves out the charges that raise a bill', () => {
+    expect(isCounterEvent({ type: 'charge' })).toBe(false)
+    expect(isCounterEvent({ type: 'charge_adjustment' })).toBe(false)
+    expect(isCounterEvent({ type: 'payment' })).toBe(true)
+    expect(isCounterEvent({ type: 'external_settlement' })).toBe(true)
+  })
+})
+
+describe('payment methods recorded by hand', () => {
+  it('offers cash, card, GCash and bank transfer, in the counter order', () => {
+    expect(RECORDED_METHODS.map((m) => m.value)).toEqual(['cash', 'card', 'gcash', 'bank_transfer'])
+  })
+
+  it('needs a reference for everything but cash', () => {
+    expect(needsReference('cash')).toBe(false)
+    expect(needsReference('card')).toBe(true)
+    expect(needsReference('gcash')).toBe(true)
+    expect(needsReference('bank_transfer')).toBe(true)
+    // The GCash checkout is confirmed by the provider, not keyed in.
+    expect(needsReference('checkout')).toBe(false)
+    expect(needsReference(null)).toBe(false)
+  })
+
+  it('names each reference for its field', () => {
+    expect(referenceName('card')).toBe('Card terminal reference')
+    expect(referenceName('bank_transfer')).toBe('Bank transfer reference')
+    expect(referenceName('cash')).toBeNull()
+  })
+})
+
+describe('a payment split across methods', () => {
+  it('takes less cash than is due as a part, leaving the rest for another method', () => {
+    expect(splitEntry(25000, 0, 'cash', 10000)).toEqual({ remaining: 25000, paid: 10000, change: 0, short: 15000, over: 0 })
+  })
+
+  it('gives change only on cash handed over beyond what is left', () => {
+    expect(splitEntry(25000, 10000, 'cash', 20000)).toEqual({ remaining: 15000, paid: 15000, change: 5000, short: 0, over: 0 })
+    expect(splitEntry(25000, 10000, 'card', 20000)).toEqual({ remaining: 15000, paid: 15000, change: 0, short: 0, over: 5000 })
+  })
+
+  it('settles exactly when the last part meets what is left', () => {
+    expect(splitEntry('25000.00', 10000, 'bank_transfer', '15000')).toMatchObject({ paid: 15000, short: 0, over: 0 })
+  })
+
+  it('counts in centavos, so the parts add up', () => {
+    expect(splitEntry(0.3, 0.1, 'cash', 0.2)).toMatchObject({ remaining: 0.2, paid: 0.2, short: 0 })
+  })
+
+  it('leaves nothing short until an amount is entered', () => {
+    expect(splitEntry(900, 0, 'cash', null)).toEqual({ remaining: 900, paid: 0, change: 0, short: 0, over: 0 })
   })
 })

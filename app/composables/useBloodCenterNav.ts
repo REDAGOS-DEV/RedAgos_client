@@ -168,8 +168,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       // No Cash Shifts entry: the counter runs without shifts (one billing staff
       // member). When the server turns them on, the counter links to their history.
-      { label: 'Billing Counter', path: '/blood-center/pos', icon: 'dollar-sign', requires: 'billing.record_payment', keywords: 'pos point of sale counter cashier cash change tendered gcash qr receipt print' },
-      { label: 'Bills & Statements', path: '/blood-center/billing', icon: 'credit-card', requires: 'billing.view', keywords: 'billing payment finance invoice receipt gcash cash statement weekly hospital settlement subsidy' },
+      { label: 'Billing Counter', path: '/blood-center/pos', icon: 'dollar-sign', requires: 'billing.record_payment', keywords: 'pos point of sale counter cashier cash change tendered gcash qr receipt print restocking settlement' },
+      { label: 'Statements', path: '/blood-center/billing', icon: 'file-text', requires: 'billing.view', keywords: 'billing bills statement of account soa invoice patient weekly hospital settlement subsidy balance' },
+      { label: 'Receipts', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', keywords: 'receipt acknowledgement ar reprint print 80mm pdf void' },
       { label: 'Billing Transactions', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', keywords: 'transactions journal ledger history export csv void correction' },
     ],
   },

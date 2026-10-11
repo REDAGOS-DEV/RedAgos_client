@@ -99,7 +99,7 @@ export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void' | 'subsidised
  * `voided`: a counter payment voided on the Billing Supervisor's approval
  * while its shift was open. It stays on record and no longer counts.
  */
-export type PaymentMethod = 'cash' | 'gcash'
+export type PaymentMethod = 'cash' | 'gcash' | 'card' | 'bank_transfer'
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided'
 export type PaymentSource = 'manual' | 'gateway'
 
@@ -532,7 +532,7 @@ export interface BillingTransaction {
   direction: 'debit' | 'credit' | 'none'
   balance_after: string
   billing_id: number
-  request: { id: number; reference_number: string } | null
+  request: { id: number; reference_number: string; patient_name: string | null; requesting_facility: string | null } | null
   payment_id: number | null
   receipt: { id: number; receipt_number: string } | null
   statement: { id: number; document_number: string } | null
@@ -554,6 +554,9 @@ export interface BillingTransactionTotals {
 
 /** GET /blood-center/billings/summary — counted on the server. */
 export interface BillingSummary {
+  /** This month's patient bills by where they stand now. */
+  patient_bills_this_month: { paid: number; partial: number; unpaid: number; subsidised: number }
+  payments_today: number
   outstanding: { count: number; amount: string }
   collected_today: string
   collected_this_month: string
@@ -572,6 +575,8 @@ export interface CashShiftFigures {
   expected_cash: string
   gcash_counter: string
   gcash_checkout: string
+  card_counter: string
+  bank_transfer_counter: string
   total_collected: string
   counted_cash?: string
   variance?: string
@@ -611,6 +616,10 @@ export interface CounterBill {
   requesting_facility: string | null
   blood_types: string[]
   is_emergency: boolean
+  urgency_label: string
+  purpose_label: string
+  /** Named on a walk-in's request form only. */
+  attending_physician: string | null
   request_date: string | null
   billing_status: BillingStatus
   billing_status_label: string
@@ -629,6 +638,8 @@ export interface CounterBill {
 /** One frozen line of an issued statement. Amounts are decimal strings. */
 export interface StatementLine {
   component_name: string
+  /** On the live lines a billing screen reads; an issued statement folds it into the name. */
+  blood_type?: string | null
   quantity: number
   unit_price: string
   line_total: string
@@ -676,6 +687,9 @@ export interface BillingFacilityCard {
 export interface PaymentReceiptSummary {
   id: number
   receipt_number: string
+  payment_id?: number | null
+  /** The request the receipt's statement belongs to, for opening it. */
+  request_id?: number | null
   issued_at: string | null
   amount_paid: string | null
   balance_after: string | null
@@ -733,6 +747,33 @@ export interface PaymentAttempt {
 export interface CheckoutAvailability {
   available: boolean
   reason: string | null
+}
+
+/** GET /blood-center/billings/{id}: one statement with its request and live lines. */
+export interface StatementDetail extends Billing {
+  request: {
+    id: number
+    reference_number: string
+    status: string
+    status_label: string
+    request_purpose: string
+    purpose_label: string
+    requesting_facility: string | null
+    patient_name: string | null
+    blood_type: string | null
+    urgency_level: string
+    urgency_label: string
+    is_emergency: boolean
+    components: string[]
+    request_date: string | null
+    transfusion_reference: string | null
+    presented_reference: string | null
+    attending_physician: string | null
+    is_walk_in: boolean
+    is_closed: boolean
+  } | null
+  lines: StatementLine[]
+  outstanding: string
 }
 
 /** GET /hospital/blood-requests/{id}/billing — read only. */

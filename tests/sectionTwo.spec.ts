@@ -410,7 +410,8 @@ describe('corrections', () => {
     expect(fulfillment).toContain("can('corrections.request') && canFile('dispatch')")
     expect(fulfillment).toContain('subject="dispatch"')
 
-    const billing = source('app/pages/blood-center/billing.vue')
+    // Payments are corrected and voided on the statement's own page.
+    const billing = source('app/pages/blood-center/statement/[id].vue')
     expect(billing).toContain("can('billing.record_payment') && can('corrections.request') && canFile('payment')")
     expect(billing).toContain('subject="payment"')
     // The payments, with their references, are behind the ability to record them.

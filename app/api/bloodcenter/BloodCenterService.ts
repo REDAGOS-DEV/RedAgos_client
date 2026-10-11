@@ -542,7 +542,7 @@ class BloodCenterService extends BaseService {
     return this.request('/blood-center/billings', 'GET', params)
   }
 
-  /** The statement raised against one request. */
+  /** The statement raised against one request, with the request behind it and its live lines. */
   async billingForRequest(requestId: number | string): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}`, 'GET')
   }
@@ -580,6 +580,11 @@ class BloodCenterService extends BaseService {
     return this.request(`/blood-center/billings/${requestId}/payments`, 'POST', payload)
   }
 
+  /** One payment split across methods (part cash, the rest by card, GCash or transfer): every part or none. */
+  async recordSplitPayment(requestId: number | string, payload: Record<string, any>): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/payments/split`, 'POST', payload)
+  }
+
   /** The Statements of Account issued for one request, oldest first. */
   async billingStatements(requestId: number | string): Promise<{ statements: StatementRevision[] }> {
     return this.request(`/blood-center/billings/${requestId}/statements`, 'GET')
@@ -603,9 +608,17 @@ class BloodCenterService extends BaseService {
     return this.requestBlob(`/blood-center/receipts/${receiptId}/pdf`)
   }
 
-  /** One receipt as data, for the counter's 80mm print. */
-  async receipt(receiptId: number | string): Promise<{ receipt: PaymentReceiptSummary }> {
+  /**
+   * One receipt as data, for its page and the counter's 80mm print. The
+   * payment reference comes beside it: the receipt itself never carries one.
+   */
+  async receipt(receiptId: number | string): Promise<{ receipt: PaymentReceiptSummary; payment_reference: string | null }> {
     return this.request(`/blood-center/receipts/${receiptId}`, 'GET')
+  }
+
+  /** The receipts this centre has issued, newest first, paginated. */
+  async receipts(params: Record<string, any> = {}): Promise<{ data: PaymentReceiptSummary[]; current_page: number; last_page: number; total: number }> {
+    return this.request('/blood-center/receipts', 'GET', params)
   }
 
   /** The centre's billing at a glance, counted on the server. */

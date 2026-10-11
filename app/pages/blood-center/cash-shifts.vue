@@ -111,6 +111,8 @@
               </template>
               <div><dt>GCash at the counter</dt><dd>{{ pesos(selected.figures?.gcash_counter) }}</dd></div>
               <div><dt>GCash checkouts</dt><dd>{{ pesos(selected.figures?.gcash_checkout) }}</dd></div>
+              <div><dt>Card</dt><dd>{{ pesos(selected.figures?.card_counter) }}</dd></div>
+              <div><dt>Bank transfer</dt><dd>{{ pesos(selected.figures?.bank_transfer_counter) }}</dd></div>
               <div class="drawer-strong"><dt>Total collected</dt><dd>{{ pesos(selected.figures?.total_collected) }}</dd></div>
             </dl>
 
