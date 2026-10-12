@@ -59,9 +59,9 @@
             >
           </div>
           <select v-model.number="ptrId" class="input" aria-label="Patient transfusion request" :disabled="ptrLoading">
-            <option :value="null">{{ ptrLoading ? 'Loading…' : openRequests.length ? 'Choose a request…' : 'No open requests' }}</option>
-            <option v-for="ptr in openRequests" :key="ptr.id" :value="ptr.id">
-              {{ ptr.reference_number }} — {{ ptr.patient?.full_name || 'Patient' }} · {{ ptr.blood_type?.code }}
+            <option :value="null">{{ ptrLoading ? 'Loading…' : selectableRequests.length ? 'Choose a request…' : 'No requests found' }}</option>
+            <option v-for="ptr in selectableRequests" :key="ptr.id" :value="ptr.id">
+              {{ ptr.reference_number }} — {{ ptr.patient?.full_name || 'Patient' }} · {{ ptr.blood_type?.code }}<template v-if="ptr.is_open === false"> · {{ ptr.status_label }}</template>
             </option>
           </select>
         </div>
@@ -431,7 +431,20 @@ const receiveLabel = computed(() => {
   return `Receive ${count} unit${count === 1 ? '' : 's'}`
 })
 
-const openRequests = computed(() => ptrList.value.filter((request) => request.is_open !== false))
+/*
+ * Every Patient Transfusion Request raised in RedAgos can take a bag received
+ * from outside it, whatever the centres did with it — fulfilled, rejected or
+ * still open — except a cancelled one, as the server rules. Open ones first;
+ * the rest follow, marked with their status.
+ */
+const selectableRequests = computed(() => {
+  const usable = ptrList.value.filter((request) => request.status !== 'cancelled')
+
+  return [
+    ...usable.filter((request) => request.is_open !== false),
+    ...usable.filter((request) => request.is_open === false),
+  ]
+})
 const awaiting = computed(() => awaitingBagsFor(ptr.value?.allocations))
 const staffName = computed(() => user.value?.full_name || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ') || '—')
 
