@@ -11,7 +11,7 @@
       <AssetIcon name="users" :size="22" />
     </div>
 
-    <!-- ── Partner Facilities ── -->
+    <!-- ── Blood Service Facilities ── -->
     <div class="facilities-wrap" ref="facilitiesRef">
       <div class="section-inner">
 
@@ -20,8 +20,8 @@
             <AssetIcon name="heart" class="badge-icon" :size="16" />
             Be a Lifesaver Today
           </div>
-          <h2>Partner Facilities</h2>
-          <p>Visit any of our partner facilities to donate blood or request blood supply.</p>
+          <h2>Blood Service Facilities</h2>
+          <p>Blood service facilities in Davao City. Contact them directly to donate blood or request blood supply.</p>
         </div>
 
         <div class="facilities-grid">
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, defineComponent, h } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const pageRef           = ref(null)
@@ -97,51 +97,15 @@ onMounted(() => {
 })
 onUnmounted(() => { obs1?.disconnect(); obs2?.disconnect() })
 
-// ── Icons ──
-const mk = (children) => defineComponent({ setup: () => () => h('svg', {
-  viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-  'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-  width: '16', height: '16',
-}, children) })
-
-const IconHeart    = mk([h('path', { d: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z' })])
-const IconMapPin   = mk([h('path', { d: 'M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z' }), h('circle', { cx:'12', cy:'10', r:'3' })])
-const IconPhone    = mk([h('path', { d: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.04 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z' })])
-const IconClock    = mk([h('circle', { cx:'12', cy:'12', r:'10' }), h('path', { d:'M12 6v6l4 2' })])
-const IconArrowRight = defineComponent({ setup: () => () => h('svg', {
-  viewBox:'0 0 24 24', fill:'none', stroke:'currentColor',
-  'stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round',
-  width:'15', height:'15',
-}, [h('line',{x1:'5',y1:'12',x2:'19',y2:'12'}), h('polyline',{points:'12 5 19 12 12 19'})])})
-
-// Decorative floating icons
-const mkLg = (children) => defineComponent({ setup: () => () => h('svg', {
-  viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-  'stroke-width': '1.75', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-  width: '22', height: '22',
-}, children) })
-
-const IconSettings = mkLg([
-  h('circle', { cx:'12', cy:'12', r:'3' }),
-  h('path', { d:'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z' }),
-])
-const IconActivity = mkLg([h('polyline', { points:'22 12 18 12 15 21 9 3 6 12 2 12' })])
-const IconUsers    = mkLg([
-  h('path', { d:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' }),
-  h('circle', { cx:'9', cy:'7', r:'4' }),
-  h('path', { d:'M23 21v-2a4 4 0 0 0-3-3.87' }),
-  h('path', { d:'M16 3.13a4 4 0 0 1 0 7.75' }),
-])
-
 const facilities = [
   { name:'Southern Philippines Medical Center', address:'J.P. Laurel Ave, Bajada, Davao City', phone:'(082) 227-2731', hours:'Mon – Fri, 8:00 AM – 5:00 PM' },
   { name:'Sub-National Blood Center', address:'J.P. Laurel Avenue, Bajada, Davao City', phone:'(082) 221-6900', hours:'Mon – Fri, 8:00 AM – 3:00 PM' },
   { name:'Philippine Red Cross – Davao Chapter', address:'Quirino Ave, Davao City', phone:'(082) 226-2661', hours:'Mon – Sun, 8:00 AM – 5:00 PM' },
 ]
 const stats = [
-  { value:'100+', label:'Units Needed Daily' },
-  { value:'24/7', label:'Live Monitoring' },
-  { value:'98.5%', label:'Fulfillment Rate' },
+  { value:'3', label:'User Portals' },
+  { value:'24/7', label:'Online Access' },
+  { value:'3 Mos', label:'Between Donations' },
 ]
 </script>
 
@@ -192,7 +156,7 @@ const stats = [
 
 /* ── Shared inner ── */
 .section-inner {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 2.5rem;
 }
@@ -251,7 +215,7 @@ const stats = [
 }
 
 .facility-card {
-  background: #fff;
+  background: var(--lp-surface);
   border-radius: 14px;
   padding: 28px 24px 30px;
   opacity: 0;
@@ -268,7 +232,7 @@ const stats = [
 .facility-card h3 {
   font-size: 15.5px;
   font-weight: 700;
-  color: #111827;
+  color: var(--lp-text);
   margin-bottom: 20px;
   line-height: 1.35;
 }
@@ -284,10 +248,10 @@ const stats = [
   align-items: flex-start;
   gap: 10px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--lp-muted);
   line-height: 1.45;
 }
-.facility-icon { color: #2563eb; margin-top: 1px; }
+.facility-icon { color: var(--lp-accent-text); margin-top: 1px; }
 
 /* ── CTA block ── */
 .cta-wrap {
@@ -336,20 +300,20 @@ const stats = [
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #e53935;
-  color: #fff;
+  background: var(--lp-on-accent);
+  color: var(--lp-accent);
   font-size: 14px;
   font-weight: 700;
   padding: 14px 32px;
   border-radius: 10px;
   text-decoration: none;
-  box-shadow: 0 8px 24px rgba(229,57,53,0.38);
+  box-shadow: 0 8px 24px rgba(15,23,42,0.25);
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 .btn-primary:hover {
-  background: #c62828;
+  background: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(229,57,53,0.45);
+  box-shadow: 0 12px 30px rgba(15,23,42,0.32);
 }
 
 .btn-outline {
@@ -410,13 +374,21 @@ const stats = [
 @media (max-width: 480px) {
   .facilities-wrap { padding: 56px 0 60px; }
   .section-inner   { padding: 0 1.25rem; }
-  .cta-wrap        { padding: 60px 1.25rem 72px; }
+  .section-head    { margin-bottom: 32px; }
+  .section-head h2 { font-size: 28px; }
+  .badge-pill      { font-size: 12px; padding: 6px 14px; margin-bottom: 16px; }
+  .facilities-grid { gap: 14px; }
+  .facility-card   { padding: 18px 18px 20px; }
+  .facility-card h3 { font-size: 15px; margin-bottom: 12px; }
+  .facility-details { gap: 8px; }
+  .cta-wrap       { padding: 60px 1.25rem 72px; }
   .cta-heading     { font-size: 28px; }
   .cta-buttons     { flex-direction: column; width: 100%; }
   .btn-primary, .btn-outline { justify-content: center; width: 100%; }
-  .stats-row       { flex-direction: column; }
-  .stat-item       { border-left: none; border-top: 1px solid rgba(255,255,255,0.15); padding: 16px 0; }
-  .stat-item:first-child { border-top: none; }
+  .stats-row       { width: 100%; }
+  .stat-item       { flex: 1; min-width: 0; padding: 6px 8px; }
+  .stat-value      { font-size: 22px; }
+  .stat-label      { font-size: 10.5px; line-height: 1.3; }
   .float-icon      { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {

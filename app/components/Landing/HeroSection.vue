@@ -6,9 +6,9 @@
     <div class="hero-content">
       <!-- Left -->
       <div class="hero-left" :class="{ 'animate-in': mounted }">
-        <div class="live-badge">
-          <span class="live-dot"></span>
-          Live &nbsp;·&nbsp; Davao City's Blood Bank Network
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          Davao City's Blood Bank Network
         </div>
 
         <h1 class="hero-title">
@@ -39,38 +39,38 @@
         <div class="visual-scene">
           <img
             :src="heroImage"
-            alt="Refrigerated blood bags labeled and stored in a blood bank facility"
+            alt="A blood donor giving blood while a health worker attends to them"
             class="visual-photo"
             loading="eager"
             width="620"
             height="480"
           />
 
-          <!-- Blood Available -->
+          <!-- Floating cards show general donation facts only — no live
+               inventory, request, or donor data (confidential). -->
+
+          <!-- Impact -->
           <div class="fcard fcard-blood">
             <div class="fcard-row">
-              <div class="fcard-icon-wrap fcard-icon-blue">
-                <AssetIcon name="activity" class="fcard-icon-blue-svg" :size="20" />
+              <div class="fcard-icon-wrap fcard-icon-red">
+                <AssetIcon name="heart" class="fcard-icon-red-svg" :size="20" />
               </div>
               <div>
-                <div class="fcard-label">Blood Available</div>
-                <div class="fcard-value-row">
-                  <span class="fcard-value">247 Units</span>
-                  <span class="green-dot"></span>
-                </div>
+                <div class="fcard-label">Every Donation</div>
+                <div class="fcard-value">Saves up to 3 Lives</div>
               </div>
             </div>
           </div>
 
-          <!-- Request Fulfilled -->
+          <!-- Donation time -->
           <div class="fcard fcard-fulfilled">
             <div class="fcard-row">
               <div class="fcard-icon-wrap fcard-icon-green">
-                <AssetIcon name="shield" class="fcard-icon-green-svg" :size="20" />
+                <AssetIcon name="clock" class="fcard-icon-green-svg" :size="20" />
               </div>
               <div class="fcard-fulfilled-body">
-                <div class="fcard-label">Request Fulfilled</div>
-                <div class="fcard-value">98.5%</div>
+                <div class="fcard-label">Donation Time</div>
+                <div class="fcard-value">~10 Minutes</div>
                 <div class="progress-track">
                   <div class="progress-fill"></div>
                 </div>
@@ -78,53 +78,35 @@
             </div>
           </div>
 
-          <!-- Active Donors -->
+          <!-- Blood types -->
           <div class="fcard fcard-donors">
             <div class="fcard-row">
-              <div class="fcard-icon-wrap fcard-icon-red">
-                <AssetIcon name="users" class="fcard-icon-red-svg" :size="20" />
+              <div class="fcard-icon-wrap fcard-icon-blue">
+                <AssetIcon name="droplets" class="fcard-icon-blue-svg" :size="20" />
               </div>
               <div>
-                <div class="fcard-label">Active Donors</div>
-                <div class="fcard-value">1,240+</div>
-                <div class="avatar-stack" aria-hidden="true">
-                  <img
-                    v-for="donor in donorAvatars"
-                    :key="donor.id"
-                    :src="donor.img"
-                    :alt="donor.name"
-                    class="avatar"
-                    loading="lazy"
-                  />
-                  <span class="avatar avatar-more">+</span>
+                <div class="fcard-label">All Blood Types</div>
+                <div class="fcard-value">Are Needed</div>
+                <div class="type-chips">
+                  <span v-for="type in bloodTypes" :key="type" class="type-chip">{{ type }}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Real-time Alerts -->
+          <!-- Sample donor notification (feature showcase) -->
           <div class="fcard fcard-alert">
             <div class="fcard-alert-title">
-              <AssetIcon name="bolt-fill" :size="16" />
-              Real-time Alerts
+              <AssetIcon name="bell" :size="16" />
+              Your blood is on its way!
             </div>
-            <ul class="alert-list">
-              <li>
-                <span class="alert-dot alert-dot-red"></span>
-                <span class="alert-text">Low Stock: O&minus;</span>
-                <span class="alert-value alert-value-red">5 Units Left</span>
-              </li>
-              <li>
-                <span class="alert-dot alert-dot-gold"></span>
-                <span class="alert-text">Expiring Soon</span>
-                <span class="alert-value">12 Units</span>
-              </li>
-              <li>
-                <span class="alert-dot alert-dot-blue"></span>
-                <span class="alert-text">New Request</span>
-                <span class="alert-value">SPMC Blood Bank</span>
-              </li>
-            </ul>
+            <p class="alert-body">
+              Your donation was matched to a patient in need.
+            </p>
+            <div class="alert-meta">
+              <span class="alert-dot alert-dot-red"></span>
+              RedAgos Notification
+            </div>
           </div>
         </div>
       </div>
@@ -134,11 +116,11 @@
     <div class="stats-bar" :class="{ 'animate-in': mounted }">
       <div class="stat">
         <div class="stat-icon">
-          <AssetIcon name="map-pin-simple" :size="22" />
+          <AssetIcon name="users" :size="22" />
         </div>
         <div class="stat-text">
-          <div class="stat-num">100+</div>
-          <div class="stat-label">Units Needed Daily</div>
+          <div class="stat-num">3</div>
+          <div class="stat-label">User Portals</div>
         </div>
       </div>
       <div class="stat">
@@ -147,16 +129,16 @@
         </div>
         <div class="stat-text">
           <div class="stat-num">24/7</div>
-          <div class="stat-label">Live Monitoring</div>
+          <div class="stat-label">Online Access</div>
         </div>
       </div>
       <div class="stat">
         <div class="stat-icon">
-          <AssetIcon name="shield" :size="22" />
+          <AssetIcon name="calendar-check" :size="22" />
         </div>
         <div class="stat-text">
-          <div class="stat-num">98.5%</div>
-          <div class="stat-label">Fulfillment Rate</div>
+          <div class="stat-num">3 Mos</div>
+          <div class="stat-label">Between Donations</div>
         </div>
       </div>
     </div>
@@ -172,18 +154,7 @@ const heroImage = ref(
   'https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=900&q=70'
 )
 
-// Active-donors avatar stack. Swap `img` for real donor photos once you
-// have them — either local assets:
-//   import donor1 from '~/assets/images/donors/donor-1.jpg'
-// or URLs coming back from `donorService`/`hospitalService` (whichever
-// endpoint eventually returns recent/featured donors). Keep it at 4
-// entries so it matches the "+" overflow chip after it.
-const donorAvatars = ref([
-  { id: 1, name: 'Donor 1', img: 'https://randomuser.me/api/portraits/men/32.jpg' },
-  { id: 2, name: 'Donor 2', img: 'https://randomuser.me/api/portraits/women/44.jpg' },
-  { id: 3, name: 'Donor 3', img: 'https://randomuser.me/api/portraits/men/65.jpg' },
-  { id: 4, name: 'Donor 4', img: 'https://randomuser.me/api/portraits/women/68.jpg' },
-])
+const bloodTypes = ['A+', 'B+', 'O+', 'AB+']
 
 onMounted(() => {
   setTimeout(() => { mounted.value = true }, 80)
@@ -206,10 +177,6 @@ onMounted(() => {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes liveGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
-  50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
-}
 /* gentle floating bob for the dashboard cards */
 @keyframes cardFloat {
   0%, 100% { transform: translateY(0); }
@@ -225,7 +192,6 @@ onMounted(() => {
 .hero-right.animate-in { animation: fadeSlideRight 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards; }
 .stats-bar.animate-in  { animation: statSlideUp    0.6s  ease                           0.7s forwards; }
 
-.live-dot    { animation: liveGlow   1.8s  ease-in-out infinite; }
 
 /* ── HERO ── */
 .hero {
@@ -236,7 +202,7 @@ onMounted(() => {
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
-  background: #f8faff;
+  background: var(--lp-bg);
 }
 .hero-bg {
   position: absolute; inset: 0;
@@ -248,35 +214,39 @@ onMounted(() => {
   background: linear-gradient(135deg, rgba(219,234,254,0.55) 0%, rgba(255,255,255,0.35) 40%, rgba(254,226,226,0.45) 100%);
   z-index: 1;
 }
+/* The light wash above would grey out the dark page background */
+:global(.dark) .hero-overlay {
+  background: linear-gradient(135deg, rgba(37,99,235,0.14) 0%, rgba(11,18,32,0.4) 40%, rgba(211,47,47,0.10) 100%);
+}
 .hero-content {
   position: relative; z-index: 2;
   display: flex; align-items: center; gap: 3rem;
-  padding: 80px 3rem 40px;
-  max-width: 1200px; margin: 0 auto; width: 100%;
+  padding: 80px 2.5rem 40px;
+  max-width: 1280px; margin: 0 auto; width: 100%;
 }
 .hero-left { flex: 1; max-width: 480px; min-width: 0; }
 
 /* ── LEFT COLUMN — unchanged: badge, heading, description, CTA ── */
-.live-badge {
+.hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.9); border: 1px solid #e5e7eb;
+  background: var(--lp-surface); border: 1px solid var(--lp-border);
   border-radius: 20px; padding: 5px 14px; font-size: 12px;
-  font-weight: 500; color: #374151; margin-bottom: 24px;
+  font-weight: 500; color: var(--lp-text-2); margin-bottom: 24px;
 }
-.live-dot {
+.hero-badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #22c55e; display: inline-block; flex-shrink: 0;
+  background: var(--lp-brand); display: inline-block; flex-shrink: 0;
 }
 
 .hero-title {
   font-size: 52px; font-weight: 800; line-height: 1.08;
-  color: #111; margin-bottom: 18px;
+  color: var(--lp-text); margin-bottom: 18px;
 }
 
 .accent{
  position:relative;
  display:inline-block;
- color:#2563eb;
+ color:var(--lp-accent-text);
 }
 
 .accent::after{
@@ -286,30 +256,30 @@ onMounted(() => {
  width:100%;
  bottom:-8px;
  height:12px;
- border-bottom:4px solid #e32636;
+ border-bottom:4px solid var(--lp-brand);
  border-radius:50%;
 
  transform:rotate(-2deg);
 
 }
 
-.hero-desc { font-size: 15px; color: #4b5563; line-height: 1.75; margin-bottom: 32px; }
-.hero-desc strong { font-weight: 600; color: #111; }
+.hero-desc { font-size: 15px; color: var(--lp-text-2); line-height: 1.75; margin-bottom: 32px; }
+.hero-desc strong { font-weight: 600; color: var(--lp-text); }
 
 .hero-btns { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .btn-primary {
-  background: #2563eb; color: #fff; font-size: 14px; font-weight: 600;
+  background: var(--lp-accent); color: #fff; font-size: 14px; font-weight: 600;
   padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;
   text-decoration: none; display: inline-block;
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
 }
-.btn-primary:hover { background: #1d4ed8; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37,99,235,0.3); }
+.btn-primary:hover { background: var(--lp-accent-hover); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37,99,235,0.3); }
 .btn-secondary {
-  background: #fff; color: #374151; font-size: 14px; font-weight: 500;
-  padding: 11px 20px; border-radius: 8px; border: 1px solid #d1d5db; cursor: pointer;
+  background: var(--lp-surface); color: var(--lp-text-2); font-size: 14px; font-weight: 500;
+  padding: 11px 20px; border-radius: 8px; border: 1px solid var(--lp-border); cursor: pointer;
   transition: background 0.2s, border-color 0.2s, transform 0.15s;
 }
-.btn-secondary:hover { background: #f9fafb; border-color: #2563eb; color: #2563eb; transform: translateY(-1px); }
+.btn-secondary:hover { background: var(--lp-bg); border-color: var(--lp-accent); color: var(--lp-accent-text); transform: translateY(-1px); }
 
 /* ── RIGHT: PHOTO + DASHBOARD CARDS ── */
 .hero-right {
@@ -337,8 +307,8 @@ onMounted(() => {
 /* ── FLOATING CARDS ── */
 .fcard {
   position: absolute;
-  background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #e5e7eb;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
   border-radius: 12px;
   padding: 10px 14px;
   backdrop-filter: blur(6px);
@@ -364,74 +334,57 @@ onMounted(() => {
 }
 .fcard-icon-blue  { background: rgba(37, 99, 235, 0.10); }
 .fcard-icon-green { background: rgba(22, 163, 74, 0.10); }
-.fcard-icon-red   { background: rgba(227, 38, 54, 0.10); }
-.fcard-icon-blue-svg  { color: #2563eb; }
+.fcard-icon-red   { background: var(--lp-brand-soft); }
+.fcard-icon-blue-svg  { color: var(--lp-accent-text); }
 .fcard-icon-green-svg { color: #16a34a; }
-.fcard-icon-red-svg   { color: #e32636; }
+.fcard-icon-red-svg   { color: var(--lp-brand); }
 
 .fcard-label {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #9ca3af;
+  color: var(--lp-muted);
   margin-bottom: 3px;
 }
 .fcard-value {
-  font-size: 17px; font-weight: 700; color: #111;
+  font-size: 17px; font-weight: 700; color: var(--lp-text);
 }
-.fcard-value-row {
-  display: flex; align-items: center; gap: 6px;
-}
-.green-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #22c55e; flex-shrink: 0;
-}
-
-/* Blood Available — top right, over the photo */
+/* Impact — top right, over the photo */
 .fcard-blood {
   top: 10px; right: -30px; min-width: 165px;
   animation-duration: 4.6s;
   animation-delay: 0s;
 }
 
-/* Request Fulfilled */
+/* Donation time */
 .fcard-fulfilled {
   top: 150px; left: -90px; min-width: 165px;
   animation-duration: 5.2s;
   animation-delay: 0.6s;
 }
 .fcard-fulfilled-body { min-width: 0; }
-.progress-track { height: 4px; border-radius: 2px; background: #e5e7eb; margin-top: 7px; overflow: hidden; }
-.progress-fill { width: 98.5%; height: 100%; background: #22c55e; border-radius: 2px; }
+.progress-track { height: 4px; border-radius: 2px; background: var(--lp-border); margin-top: 7px; overflow: hidden; }
+.progress-fill { width: 25%; height: 100%; background: #22c55e; border-radius: 2px; }
 
-/* Active Donors */
+/* Blood types */
 .fcard-donors {
   bottom: -32px; left: 30px; min-width: 170px;
   animation-duration: 4.2s;
   animation-delay: 1.1s;
 }
-.avatar-stack { display: flex; align-items: center; margin-top: 8px; }
-.avatar {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid #fff;
-  margin-left: -8px;
-  flex-shrink: 0;
-  object-fit: cover;
-  background: #e5e7eb; /* shows while the photo loads */
-  display: block;
-}
-.avatar:first-child { margin-left: 0; }
-.avatar-more {
-  background: #2563eb; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700;
+.type-chips { display: flex; gap: 4px; margin-top: 8px; }
+.type-chip {
+  font-size: 10px; font-weight: 700; color: var(--lp-brand);
+  background: var(--lp-brand-soft);
+  border-radius: 6px; padding: 2px 6px;
 }
 
-/* Real-time AlertS */
+/* Sample donor notification */
 .fcard-alert {
   bottom: 20px;
   right: -40px;
   min-width: 200px;
+  max-width: 230px;
   background: #10192F;
   border-color: transparent;
   color: #fff;
@@ -444,19 +397,17 @@ onMounted(() => {
   font-size: 13px; font-weight: 700; color: #fff;
   margin-bottom: 10px;
 }
-.alert-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
-.alert-list li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.alert-body { font-size: 12px; line-height: 1.5; color: #cbd5e1; }
+.alert-meta {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; font-size: 10.5px; color: #94a3b8;
+}
 .alert-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .alert-dot-red  { background: #f87171; }
-.alert-dot-gold { background: #f4c430; }
-.alert-dot-blue { background: #60a5fa; }
-.alert-text { color: #cbd5e1; flex: 1; }
-.alert-value { color: #e2e8f0; font-weight: 600; white-space: nowrap; }
-.alert-value-red { color: #f87171; }
 .stats-bar {
   position: relative; z-index: 2;
-  display: flex; max-width: 1200px;
-  margin: 0 auto; padding: 0 3rem 3rem;
+  display: flex; max-width: 1280px; width: 100%;
+  margin: 0 auto; padding: 0 2.5rem 3rem;
   gap: 2rem;
 }
 .stat {
@@ -468,21 +419,21 @@ onMounted(() => {
   padding-right: 2rem;
   min-width: 0;
 }
-.stat + .stat { padding-left: 2rem; border-left: 1px solid #e5e7eb; }
-.stat-icon  { color: #9ca3af; flex-shrink: 0; display: flex; }
+.stat + .stat { padding-left: 2rem; border-left: 1px solid var(--lp-border); }
+.stat-icon  { color: var(--lp-muted); flex-shrink: 0; display: flex; }
 .stat-text  { min-width: 0; }
-.stat-num   { font-size: 34px; font-weight: 800; color: #111; line-height: 1; }
-.stat-label { font-size: 13px; color: #9ca3af; margin-top: 4px; white-space: nowrap; }
+.stat-num   { font-size: 34px; font-weight: 800; color: var(--lp-text); line-height: 1; }
+.stat-label { font-size: 13px; color: var(--lp-muted); margin-top: 4px; white-space: nowrap; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1150px) {
-  .hero-content { flex-direction: column; padding: 60px 1.5rem 20px; }
+  .hero-content { flex-direction: column; padding: 60px 2.5rem 20px; }
   .hero-left { max-width: 100%; }
   .hero-title   { font-size: 38px; }
   .hero-right   { width: 100%; }
   .visual-scene { width: 420px; margin: 0 auto; }
   .visual-photo { height: 360px; }
-  .stats-bar    { padding: 0 1.5rem 2rem; }
+  .stats-bar    { padding: 0 2.5rem 2rem; }
 }
 
 @media (max-width: 900px) {
@@ -493,6 +444,7 @@ onMounted(() => {
 }
 
 @media (max-width: 600px) {
+  .hero-content { padding-left: 1.25rem; padding-right: 1.25rem; }
   .hero-title { font-size: 30px; }
   .visual-scene { width: 320px; }
   .visual-photo { height: 280px; border-radius: 16px; }
@@ -525,7 +477,6 @@ onMounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
   .hero-left, .hero-right, .stats-bar { opacity: 1; animation: none; }
   .fcard { animation: none; }
 }

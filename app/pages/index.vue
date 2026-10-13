@@ -4,6 +4,7 @@
     <main>
       <LandingHeroSection />
       <LandingFeaturesSection />
+      <LandingRolesSection />
       <LandingDonationDrives />
       <LandingAboutSection />
       <LandingContactSection />

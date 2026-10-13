@@ -73,6 +73,7 @@ import logo from '~/assets/images/RedAgosLogo.png'
 const quickLinks = [
   { label: 'Home', to: '#home' },
   { label: 'Features', to: '#features' },
+  { label: "Who It's For", to: '#roles' },
   { label: 'Donation Drives', to: '#drives' },
   { label: 'About', to: '#about' },
   { label: 'Contact', to: '#contact' },
@@ -270,17 +271,48 @@ const quickLinks = [
 
 @media (max-width: 640px) {
   .footer {
-    padding: 48px 1.25rem 0;
+    padding: 36px 1.25rem 0;
   }
 
   .footer-inner {
     grid-template-columns: 1fr;
-    gap: 32px;
+    gap: 24px;
+    padding-bottom: 28px;
+  }
+
+  .footer-desc {
+    max-width: none;
+    margin-bottom: 12px;
+  }
+
+  .footer-links h4,
+  .footer-contact h4 {
+    margin-bottom: 10px;
+  }
+
+  /* Quick links wrap in a row instead of stacking one per line */
+  .footer-links ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+
+  .footer-links li::before {
+    content: none;
+  }
+
+  .footer-contact ul {
+    gap: 8px;
+  }
+
+  .footer-contact li {
+    font-size: 12.5px;
   }
 
   .footer-bottom {
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+    padding: 14px 0;
     text-align: center;
   }
 }

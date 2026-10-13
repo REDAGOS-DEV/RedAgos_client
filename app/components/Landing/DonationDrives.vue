@@ -7,49 +7,67 @@
       </div>
 
       <div class="heading-wrap" :class="{ 'animate-in': visible }">
-        <h2 class="heading-top">Upcoming Donation Drives</h2>
+        <h2 class="heading-top">
+          Upcoming <span class="heading-blue">Donation Drives</span>
+        </h2>
         <p class="subheading">Join a mobile blood donation drive near you and help save lives.</p>
       </div>
 
-      <div v-if="drives.length === 0" class="empty-state">
-        <IconCalendar />
+      <div v-if="sortedDrives.length === 0" class="empty-state">
+        <AssetIcon name="calendar" :size="32" />
         <p>No upcoming drives at the moment. Check back soon!</p>
       </div>
 
       <div v-else class="drive-grid">
         <article
-          v-for="(drive, index) in drives"
+          v-for="(drive, index) in sortedDrives"
           :key="drive.title"
           class="drive-card"
           :class="{ 'animate-in': visible }"
           :style="{ '--drive-delay': `${index * 0.08}s` }"
         >
-          <div class="card-top">
-            <span class="status-pill">Upcoming</span>
-            <span class="capacity">
-              <IconUsers />
-              {{ drive.registered }}/{{ drive.capacity }}
-            </span>
+          <div class="card-head">
+            <div class="date-block" aria-hidden="true">
+              <span class="date-month">{{ drive.month }}</span>
+              <span class="date-day">{{ drive.day }}</span>
+            </div>
+            <div class="card-head-text">
+              <span class="status-pill">Upcoming</span>
+              <h3>{{ drive.title }}</h3>
+            </div>
           </div>
 
-          <div class="card-body">
-            <h3>{{ drive.title }}</h3>
+          <ul class="drive-details">
+            <li>
+              <AssetIcon name="map-pin" :size="16" />
+              <span>{{ drive.location }}</span>
+            </li>
+            <li>
+              <AssetIcon name="calendar" :size="16" />
+              <span>{{ drive.dateLabel }}</span>
+            </li>
+            <li>
+              <AssetIcon name="clock" :size="16" />
+              <span>{{ drive.time }}</span>
+            </li>
+          </ul>
 
-            <ul class="drive-details">
-              <li>
-                <IconMapPin />
-                <span>{{ drive.location }}</span>
-              </li>
-              <li>
-                <IconCalendar />
-                <span>{{ drive.date }}</span>
-              </li>
-              <li>
-                <IconClock />
-                <span>{{ drive.time }}</span>
-              </li>
-            </ul>
+          <div class="slots">
+            <div class="slots-row">
+              <span class="slots-label">
+                <AssetIcon name="users" :size="16" />
+                {{ drive.registered }}/{{ drive.capacity }} registered
+              </span>
+              <span class="slots-left">{{ drive.capacity - drive.registered }} slots left</span>
+            </div>
+            <div class="slots-track">
+              <div class="slots-fill" :style="{ width: `${(drive.registered / drive.capacity) * 100}%` }"></div>
+            </div>
           </div>
+
+          <button class="card-cta" @click="navigateTo('/auth/donor/login')">
+            Register to Donate
+          </button>
         </article>
       </div>
     </div>
@@ -57,7 +75,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, defineComponent, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
 
 const sectionRef = ref(null)
 const visible = ref(false)
@@ -66,7 +85,7 @@ const drives = [
   {
     title: 'Davao City Hall Community Drive',
     location: 'Davao City Hall, San Pedro St.',
-    date: 'August 5, 2026',
+    date: '2026-12-05',
     time: '7:00 AM – 12:00 PM',
     registered: 8,
     capacity: 60,
@@ -74,7 +93,7 @@ const drives = [
   {
     title: 'SM Lanang Blood Donation',
     location: 'SM Lanang Premier, J.P. Laurel Ave.',
-    date: 'July 22, 2026',
+    date: '2026-11-21',
     time: '9:00 AM – 5:00 PM',
     registered: 15,
     capacity: 80,
@@ -82,63 +101,31 @@ const drives = [
   {
     title: 'Ateneo de Davao Blood Drive',
     location: 'Ateneo de Davao University, Jacinto St.',
-    date: 'July 15, 2026',
+    date: '2026-11-07',
     time: '8:00 AM – 3:00 PM',
     registered: 42,
     capacity: 100,
   },
 ]
 
-const svgProps = {
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  'stroke-width': '2.2',
-  'stroke-linecap': 'round',
-  'stroke-linejoin': 'round',
-  width: '16',
-  height: '16',
-}
+// Local YYYY-MM-DD, so a drive stays listed through its own day.
+const today = new Date().toLocaleDateString('en-CA')
 
-const IconUsers = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }),
-      h('circle', { cx: '9', cy: '7', r: '4' }),
-      h('path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }),
-      h('path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }),
-    ])
-  },
-})
-
-const IconMapPin = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('path', { d: 'M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z' }),
-      h('circle', { cx: '12', cy: '10', r: '3' }),
-    ])
-  },
-})
-
-const IconCalendar = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('rect', { x: '3', y: '4', width: '18', height: '18', rx: '2' }),
-      h('path', { d: 'M16 2v4' }),
-      h('path', { d: 'M8 2v4' }),
-      h('path', { d: 'M3 10h18' }),
-    ])
-  },
-})
-
-const IconClock = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('circle', { cx: '12', cy: '12', r: '10' }),
-      h('path', { d: 'M12 6v6l4 2' }),
-    ])
-  },
-})
+// Upcoming drives only, soonest first, with the pieces the date block needs.
+const sortedDrives = computed(() =>
+  drives
+    .filter((drive) => drive.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((drive) => {
+      const d = new Date(`${drive.date}T00:00:00`)
+      return {
+        ...drive,
+        month: d.toLocaleString('en-US', { month: 'short' }),
+        day: d.getDate(),
+        dateLabel: d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+      }
+    })
+)
 
 let observer
 
@@ -156,28 +143,29 @@ onUnmounted(() => observer?.disconnect())
 <style scoped>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Same motion as FeaturesSection/RolesSection. The card reveal animates
+   `translate`/`scale` so the `transform` used on hover still applies. */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes cardRise {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes cardReveal {
+  0%   { opacity: 0; translate: 0 34px; scale: 0.96; filter: blur(4px); }
+  100% { opacity: 1; translate: 0 0;    scale: 1;    filter: blur(0); }
 }
 
-.donation-drives {
-  padding: 50px 0 80px;
-  background: #f9fafb;
-  border-radius:60px;
+/* ── Section — same container as About/Footer ── */
+.drives {
+  padding: 90px 0 100px;
+  background: var(--lp-bg);
   font-family: var(--rb-font-sans);
+  scroll-margin-top: 76px;
 }
 
-.section-inner{
-  width: 100%;
-  max-width:1700px;
-  margin:0 auto;
-  padding:0 80px;
+.section-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 2.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -188,46 +176,49 @@ onUnmounted(() => observer?.disconnect())
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 6px 18px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-text);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.12em;
   border: 1px solid rgba(37, 99, 235, 0.2);
+  margin-bottom: 32px;
   opacity: 0;
 }
 .badge.animate-in {
-  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
 }
 .badge-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--lp-accent);
 }
 
 /* ── Heading ── */
 .heading-wrap {
   text-align: center;
-  margin-top: 28px;
-  margin-bottom: 70px;
+  max-width: 780px;
+  margin-bottom: 56px;
   opacity: 0;
 }
 .heading-wrap.animate-in {
-  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s forwards;
+  animation: fadeUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.12s forwards;
 }
 .heading-top {
   font-size: 44px;
   font-weight: 800;
-  color: #111827;
-  line-height: 1.2;
+  color: var(--lp-text);
+  line-height: 1.15;
 }
+.heading-blue { color: var(--lp-accent-text); }
 .subheading {
-  margin-top: 12px;
-  color: #6b7280;
+  margin: 16px auto 0;
+  color: var(--lp-text-2);
   font-size: 17px;
+  line-height: 1.7;
   max-width: 680px;
 }
 
@@ -235,7 +226,7 @@ onUnmounted(() => observer?.disconnect())
 .empty-state {
   text-align: center;
   padding: 64px 0;
-  color: #9ca3af;
+  color: var(--lp-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -249,109 +240,184 @@ onUnmounted(() => observer?.disconnect())
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
-  margin-top: 50px;
 }
 
 /* ── Card ── */
 .drive-card {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
   border-radius: 16px;
   padding: 24px;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
   opacity: 0;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: box-shadow 0.28s ease, transform 0.28s ease, border-color 0.28s ease;
+}
+.drive-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--lp-accent), var(--lp-brand));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s ease;
 }
 .drive-card.animate-in {
-  animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--drive-delay) forwards;
+  animation: cardReveal 0.72s cubic-bezier(0.22, 1, 0.36, 1) var(--drive-delay) forwards;
 }
 .drive-card:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.14);
+  transform: translateY(-8px) scale(1.015);
+  border-color: rgba(37, 99, 235, 0.16);
+}
+.drive-card:hover::before {
+  transform: scaleX(1);
 }
 
-/* ── Card top row ── */
-.card-top {
+/* ── Card head: date block + title ── */
+.card-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  align-items: flex-start;
+  gap: 14px;
 }
-
+.date-block {
+  width: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--lp-brand-soft);
+  color: var(--lp-brand);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  line-height: 1;
+}
+.date-month {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.date-day {
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+.card-head-text { min-width: 0; }
 .status-pill {
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
+  display: inline-block;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-text);
   font-size: 11px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
-  cursor: pointer;
-  transition: all .3s ease;
+  margin-bottom: 8px;
 }
-
-.status-pill:hover {
-  background: #2563eb;
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37,99,235,.25);
-
-}
-
-.capacity {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-/* ── Card body ── */
-.card-body h3 {
+.card-head h3 {
   font-size: 17px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 14px;
+  font-weight: 700;
+  color: var(--lp-text);
   line-height: 1.35;
 }
 
+/* ── Details ── */
 .drive-details {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--lp-border);
 }
-
 .drive-details li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 13.5px;
+  color: var(--lp-text-2);
+  line-height: 1.4;
+}
+.drive-details .asset-icon {
+  color: var(--lp-accent-text);
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.drive-details svg {
-  color: #2563eb;
-  flex-shrink: 0;
+/* ── Slots ── */
+.slots { margin-top: auto; }
+.slots-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.slots-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lp-muted);
+}
+.slots-left {
+  color: #16a34a;
+  font-weight: 600;
+}
+.slots-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lp-border);
+  overflow: hidden;
+}
+.slots-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lp-accent);
+}
+
+/* ── CTA ── */
+.card-cta {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--lp-accent);
+  background: var(--lp-surface);
+  color: var(--lp-accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+/* Same lift as the Hero/Contact buttons */
+.card-cta:hover {
+  background: var(--lp-accent);
+  color: var(--lp-on-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+}
+.card-cta:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 2px;
 }
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .drive-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .drive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
-  .donation-drives {
-    padding: 56px 1rem 72px;
-  }
-  .heading-top {
-    font-size: 28px;
-  }
-  .drive-grid {
-    grid-template-columns: 1fr;
-    margin-top: 36px;
-  }
+  .drives { padding: 56px 0 64px; }
+  .section-inner { padding: 0 1.25rem; }
+  .heading-top { font-size: 28px; }
+  .subheading { font-size: 15px; }
+  .heading-wrap { margin-bottom: 36px; }
+  .drive-grid { grid-template-columns: 1fr; }
+  .drive-card { padding: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -360,6 +426,7 @@ onUnmounted(() => observer?.disconnect())
     transform: none;
     animation: none;
   }
-  .drive-card:hover { box-shadow: none; }
+  .drive-card:hover,
+  .card-cta:hover { transform: none; }
 }
 </style>

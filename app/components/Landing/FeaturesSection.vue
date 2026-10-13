@@ -25,8 +25,8 @@
         :class="{ 'animate-in': visible }"
         :style="{ '--card-delay': `${0.12 + i * 0.08}s` }"
       >
-        <div class="card-icon-wrap" :style="{ background: feature.iconBg }">
-          <component :is="feature.icon" :color="feature.iconColor" />
+        <div class="card-icon-wrap" :style="{ background: feature.iconBg, color: feature.iconColor }">
+          <component :is="feature.icon" color="currentColor" />
         </div>
         <h3 class="card-title">{{ feature.title }}</h3>
         <p class="card-desc">{{ feature.desc }}</p>
@@ -108,22 +108,22 @@ const IconBarChart = defineComponent({
 const features = [
   {
     icon: IconSearch,
-    iconBg: 'rgba(37,99,235,0.08)',
-    iconColor: '#2563eb',
+    iconBg: 'var(--lp-accent-soft)',
+    iconColor: 'var(--lp-accent)',
     title: 'Blood Search & Request',
     desc: 'Search available blood across partner facilities and submit digital blood requests instantly.',
   },
   {
     icon: IconClipboard,
-    iconBg: 'rgba(37,99,235,0.08)',
-    iconColor: '#2563eb',
+    iconBg: 'var(--lp-accent-soft)',
+    iconColor: 'var(--lp-accent)',
     title: 'Request Processing',
     desc: 'Review, process, dispatch, and track blood requests with complete status visibility.',
   },
   {
     icon: IconBox,
-    iconBg: 'rgba(227,38,54,0.08)',
-    iconColor: '#e32636',
+    iconBg: 'var(--lp-brand-soft)',
+    iconColor: 'var(--lp-brand)',
     title: 'Inventory Management',
     desc: 'Real-time blood stock monitoring with FEFO method, expiration alerts, and critical-level notifications.',
   },
@@ -143,22 +143,22 @@ const features = [
   },
   {
     icon: IconCalendar,
-    iconBg: 'rgba(37,99,235,0.08)',
-    iconColor: '#2563eb',
+    iconBg: 'var(--lp-accent-soft)',
+    iconColor: 'var(--lp-accent)',
     title: 'Donor Portal',
     desc: 'Donors register, book appointments, complete eligibility screening, and track donation history.',
   },
   {
     icon: IconBell,
-    iconBg: 'rgba(37,99,235,0.08)',
-    iconColor: '#2563eb',
+    iconBg: 'var(--lp-accent-soft)',
+    iconColor: 'var(--lp-accent)',
     title: 'Smart Notifications',
     desc: 'Automated alerts for appointment reminders, request updates, low inventory, and drive announcements.',
   },
   {
     icon: IconBarChart,
-    iconBg: 'rgba(227,38,54,0.08)',
-    iconColor: '#e32636',
+    iconBg: 'var(--lp-brand-soft)',
+    iconColor: 'var(--lp-brand)',
     title: 'Reports & Analytics',
     desc: 'Generate usage reports, analyze consumption trends, and make data-driven decisions.',
   },
@@ -183,27 +183,31 @@ onUnmounted(() => observer?.disconnect())
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* Reveals animate the individual `translate`/`scale`/`rotate` properties
+   so the finished animation doesn't hold down the hover `transform`. */
 @keyframes cardReveal {
   0% {
     opacity: 0;
-    transform: translateY(34px) scale(0.96);
+    translate: 0 34px;
+    scale: 0.96;
     filter: blur(4px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    translate: 0 0;
+    scale: 1;
     filter: blur(0);
   }
 }
 @keyframes iconPop {
-  0% { transform: scale(0.78) rotate(-8deg); }
-  70% { transform: scale(1.08) rotate(3deg); }
-  100% { transform: scale(1) rotate(0); }
+  0% { scale: 0.78; rotate: -8deg; }
+  70% { scale: 1.08; rotate: 3deg; }
+  100% { scale: 1; rotate: 0deg; }
 }
 
 /* ── SECTION ── */
 .features {
-  background: #eef2fb;
+  background: var(--lp-surface-alt);
   padding: 90px 0 100px;
   display: flex;
   flex-direction: column;
@@ -217,21 +221,21 @@ onUnmounted(() => observer?.disconnect())
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--lp-surface);
   border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 20px;
   padding: 6px 18px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #374151;
+  color: var(--lp-text-2);
   margin-bottom: 32px;
   opacity: 0;
 }
 .badge.animate-in { animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) 0.05s forwards; }
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #2563eb; flex-shrink: 0;
+  background: var(--lp-accent); flex-shrink: 0;
 }
 
 /* ── HEADINGS ── */
@@ -246,19 +250,19 @@ onUnmounted(() => observer?.disconnect())
 .heading-top {
   font-size: 44px;
   font-weight: 800;
-  color: #111;
+  color: var(--lp-text);
   line-height: 1.1;
 }
 .heading-blue {
   font-size: 44px;
   font-weight: 800;
-  color: #2563eb;
+  color: var(--lp-accent-text);
   line-height: 1.15;
   margin-bottom: 20px;
 }
 .subheading {
   font-size: 17px;
-  color: #4b5563;
+  color: var(--lp-text-2);
   line-height: 1.7;
   max-width: 680px;
   margin: 0 auto;
@@ -275,7 +279,7 @@ onUnmounted(() => observer?.disconnect())
 
 /* ── CARD ── */
 .card {
-  background: #fff;
+  background: var(--lp-surface);
   border-radius: 16px;
   padding: 28px 20px 32px;
   display: flex;
@@ -284,17 +288,16 @@ onUnmounted(() => observer?.disconnect())
   position: relative;
   overflow: hidden;
   opacity: 0;
-  transform: translateY(34px) scale(0.96);
   transition: box-shadow 0.28s ease, transform 0.28s ease, border-color 0.28s ease;
   cursor: default;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--lp-border);
 }
 .card::before {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
   height: 4px;
-  background: linear-gradient(90deg, #2563eb, #e32636);
+  background: linear-gradient(90deg, var(--lp-accent), var(--lp-brand));
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.28s ease;
@@ -329,13 +332,13 @@ onUnmounted(() => observer?.disconnect())
 .card-title {
   font-size: 15px;
   font-weight: 700;
-  color: #111;
+  color: var(--lp-text);
   margin-bottom: 10px;
   line-height: 1.3;
 }
 .card-desc {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--lp-muted);
   line-height: 1.65;
 }
 
