@@ -518,7 +518,7 @@ import {
   UNIT_TAG_STATUS_TONES,
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
-import { matchScannedBag } from '~/utils/stockIn'
+import { matchStockInScan } from '~/utils/stockIn'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
@@ -630,7 +630,7 @@ function scanBag() {
   scanEntry.value = ''
   if (!code.trim()) return
 
-  const result = matchScannedBag(code, arrived.value, ticked.value)
+  const result = matchStockInScan(code, arrived.value, ticked.value)
   scanAlert.value = result.kind !== 'scanned'
 
   if (result.kind === 'scanned') {

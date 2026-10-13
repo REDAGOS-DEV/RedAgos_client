@@ -14,7 +14,7 @@ export interface ScannableBag {
   bag_expired?: boolean
 }
 
-export type ScanResult =
+export type StockInScanResult =
   | { kind: 'scanned'; unitId: string; label: string }
   | { kind: 'unknown'; code: string }
   | { kind: 'expired'; code: string }
@@ -28,7 +28,7 @@ export type ScanResult =
  * the next bag of the batch not yet scanned. Case and surrounding space are
  * ignored, as a scanner or a hand may add either.
  */
-export function matchScannedBag(code: string, arrived: ScannableBag[], scanned: string[]): ScanResult {
+export function matchStockInScan(code: string, arrived: ScannableBag[], scanned: string[]): StockInScanResult {
   const wanted = code.trim().toUpperCase()
   const same = (value: string | null | undefined) => Boolean(value) && value!.trim().toUpperCase() === wanted
 

@@ -251,7 +251,7 @@ const sidebarShadow = computed(() =>
 const portalLabel = computed(() => user.value?.facility?.facility_name || 'Blood Center')
 
 // // Dev note: pending/urgent counts naka-fetch sa blood center dashboard summary endpoint
-const badgeCounts = ref({ pending: 0, urgent: 0, notifications: 0, corrections: 0 })
+const badgeCounts = ref({ pending: 0, urgent: 0, corrections: 0 })
 
 const badgeStyle = (badge) => {
   const urgent = badge === 'urgent'
@@ -294,21 +294,32 @@ const loadUser = async () => {
     // ensureUser() mo-reuse sa fetch nga gi-sugdan sa department middleware
     // imbes mo-fire og bag-o.
     await ensureUser()
-    // // Dev note: i-connect ni sa /blood-center/dashboard-summary endpoint para sa pending/urgent/notifications badge count
-    const summary = await bloodCenterService.dashboardSummary?.()
-    if (summary) {
-      badgeCounts.value.pending = summary.pending_requests || 0
-      badgeCounts.value.urgent = summary.urgent_requests || 0
-      badgeCounts.value.notifications = summary.unread_notifications || 0
-    }
-
-    // Corrections waiting on this user's decision.
-    if (can('corrections.approve')) {
-      const review = await bloodCenterService.corrections({ scope: 'review', status: 'pending', per_page: 1 })
-      badgeCounts.value.corrections = review?.total ?? 0
-    }
   } catch (err) {
     console.error(err)
+    return
+  }
+
+  // Each count is loaded on its own, and only for a user who may open the page
+  // it sits on, so one refusal or failure never hides the others.
+  const counts = []
+
+  // Incoming Requests: requests still waiting; Request Fulfillment: open emergencies.
+  if (can('requests.view')) {
+    counts.push(bloodCenterService.incomingRequestsSummary().then((summary) => {
+      badgeCounts.value.pending = summary?.totals?.pending ?? 0
+      badgeCounts.value.urgent = summary?.open_emergencies ?? 0
+    }))
+  }
+
+  // Corrections waiting on this user's decision.
+  if (can('corrections.approve')) {
+    counts.push(bloodCenterService.corrections({ scope: 'review', status: 'pending', per_page: 1 }).then((review) => {
+      badgeCounts.value.corrections = review?.total ?? 0
+    }))
+  }
+
+  for (const result of await Promise.allSettled(counts)) {
+    if (result.status === 'rejected') console.error(result.reason)
   }
 }
 

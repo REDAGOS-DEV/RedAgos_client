@@ -97,6 +97,7 @@
                 <div v-if="receipt.payment?.amount_tendered"><dt>Change given</dt><dd>{{ pesos(receipt.payment.change_given) }}</dd></div>
                 <div><dt>Paid on</dt><dd>{{ when(receipt.payment?.paid_at || receipt.issued_at) }}</dd></div>
                 <div v-if="paymentReference"><dt>Reference</dt><dd class="mono">{{ paymentReference }}</dd></div>
+                <div v-if="paymentInfo"><dt>Additional information</dt><dd>{{ paymentInfo }}</dd></div>
               </dl>
             </section>
 
@@ -186,6 +187,8 @@ function when(iso) {
 
 const receipt = ref(null)
 const paymentReference = ref(null)
+// A card payment's additional information (the cardholder's last name), like the reference, on screen only.
+const paymentInfo = ref(null)
 const loading = ref(true)
 const loadError = ref('')
 const view = ref('details')
@@ -247,6 +250,7 @@ async function load() {
     const response = await bloodCenterService.receipt(receiptId.value)
     receipt.value = response?.receipt ?? null
     paymentReference.value = response?.payment_reference ?? null
+    paymentInfo.value = response?.payment_additional_information ?? null
   } catch (err) {
     loadError.value = err?.status === 404 ? 'No receipt with that number was issued by this centre.' : (err?.message || 'Please try again.')
   } finally {

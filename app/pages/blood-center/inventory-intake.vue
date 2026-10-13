@@ -257,8 +257,13 @@
 
                 <input v-model="row.expiry_date" type="date" class="field__input" :aria-label="`Bag ${index + 1} expiry date`">
 
-                <select v-model="row.storage_location" class="field__input" :aria-label="`Bag ${index + 1} storage location`">
-                  <option value="">Not recorded</option>
+                <select
+                  v-model="row.storage_location"
+                  class="field__input"
+                  :aria-label="`Bag ${index + 1} storage location`"
+                  required
+                >
+                  <option value="" disabled>Select a location</option>
                   <option v-for="loc in storageLocations" :key="loc" :value="loc">{{ loc }}</option>
                 </select>
 
@@ -473,6 +478,10 @@ const blockers = computed(() => {
   if (unitRows.value.some((row) => !row.component_id)) list.push('Every bag needs a component.')
   if (unitRows.value.some((row) => !row.expiry_date)) list.push('Every bag needs an expiry date.')
 
+  // Every bag goes onto a shelf (project owner, 2026-10-13).
+  if (!storageLocations.value.length) list.push('The storage locations could not be loaded. Reload the page to book bags in.')
+  else if (unitRows.value.some((row) => !row.storage_location)) list.push('Every bag needs a storage location.')
+
   const over = (selected.value?.components ?? []).filter((c) => remainingFor(c.component_id) < 0)
 
   if (over.length) {
@@ -619,8 +628,8 @@ async function loadReference() {
 
     storageLocations.value = res?.storage_locations ?? []
   } catch {
-    // The intake still works without them: storage_location is nullable, so an
-    // empty list costs a shelf label, not the ability to book a bag in.
+    // Every bag needs a location, so without the list nothing can be booked
+    // in; the blockers say so.
     storageLocations.value = []
   }
 }
@@ -686,7 +695,7 @@ async function submit() {
   const units = unitRows.value.map((row) => ({
     component_id: row.component_id,
     expiry_date: row.expiry_date,
-    ...(row.storage_location ? { storage_location: row.storage_location } : {}),
+    storage_location: row.storage_location,
     ...(!row.bag_number && row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {}),
   }))
 

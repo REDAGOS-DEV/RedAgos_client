@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchScannedBag } from '../app/utils/stockIn'
+import { matchStockInScan } from '../app/utils/stockIn'
 
 const arrived = [
   { unit_id: 'RA1-1007-02', bag_number: 'RA1-1007-02' },
@@ -11,17 +11,17 @@ const arrived = [
 
 describe('stocking in by scanning', () => {
   it('finds a RedAgos bag by its number, whatever the case or spacing', () => {
-    expect(matchScannedBag('  ra1-1007-02 ', arrived, [])).toEqual({ kind: 'scanned', unitId: 'RA1-1007-02', label: 'RA1-1007-02' })
+    expect(matchStockInScan('  ra1-1007-02 ', arrived, [])).toEqual({ kind: 'scanned', unitId: 'RA1-1007-02', label: 'RA1-1007-02' })
   })
 
   it('takes the next bag of a batch on each scan of the sender’s number', () => {
-    expect(matchScannedBag('PRC-77', arrived, [])).toMatchObject({ kind: 'scanned', unitId: 'DD-4' })
-    expect(matchScannedBag('PRC-77', arrived, ['DD-4'])).toMatchObject({ kind: 'scanned', unitId: 'DD-4-2' })
-    expect(matchScannedBag('PRC-77', arrived, ['DD-4', 'DD-4-2'])).toEqual({ kind: 'already', code: 'PRC-77' })
+    expect(matchStockInScan('PRC-77', arrived, [])).toMatchObject({ kind: 'scanned', unitId: 'DD-4' })
+    expect(matchStockInScan('PRC-77', arrived, ['DD-4'])).toMatchObject({ kind: 'scanned', unitId: 'DD-4-2' })
+    expect(matchStockInScan('PRC-77', arrived, ['DD-4', 'DD-4-2'])).toEqual({ kind: 'already', code: 'PRC-77' })
   })
 
   it('says so when a bag is not waiting, or is past its date', () => {
-    expect(matchScannedBag('RA1-9999-01', arrived, [])).toEqual({ kind: 'unknown', code: 'RA1-9999-01' })
-    expect(matchScannedBag('RA1-1016-02', arrived, [])).toEqual({ kind: 'expired', code: 'RA1-1016-02' })
+    expect(matchStockInScan('RA1-9999-01', arrived, [])).toEqual({ kind: 'unknown', code: 'RA1-9999-01' })
+    expect(matchStockInScan('RA1-1016-02', arrived, [])).toEqual({ kind: 'expired', code: 'RA1-1016-02' })
   })
 })

@@ -44,10 +44,6 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/dashboard`, 'GET')
   }
 
-  async dashboardSummary(): Promise<any> {
-    return this.request(`${this.resource}/dashboard-summary`, 'GET')
-  }
-
   async profile(): Promise<any> {
     return this.request(`${this.resource}/profile`, 'GET')
   }
@@ -610,9 +606,10 @@ class BloodCenterService extends BaseService {
 
   /**
    * One receipt as data, for its page and the counter's 80mm print. The
-   * payment reference comes beside it: the receipt itself never carries one.
+   * payment reference and a card's additional information (the cardholder's
+   * last name) come beside it: the receipt itself never carries them.
    */
-  async receipt(receiptId: number | string): Promise<{ receipt: PaymentReceiptSummary; payment_reference: string | null }> {
+  async receipt(receiptId: number | string): Promise<{ receipt: PaymentReceiptSummary; payment_reference: string | null; payment_additional_information: string | null }> {
     return this.request(`/blood-center/receipts/${receiptId}`, 'GET')
   }
 

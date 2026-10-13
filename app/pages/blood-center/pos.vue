@@ -250,7 +250,6 @@
               Receipt <NuxtLink :to="`/blood-center/receipt/${r.id}`" class="link mono">{{ r.receipt_number }}</NuxtLink>
               · {{ r.payment_method_label }} {{ pesos(r.amount_paid) }}
             </p>
-            <p v-if="done.receipts.at(-1)?.is_partial" class="done-sub">{{ pesos(done.receipts.at(-1).balance_after) }} still due</p>
             <div v-if="done.change !== null" class="change-row">
               <span class="field-label">Change to give back</span>
               <strong class="change-box">{{ pesos(done.change) }}</strong>
@@ -384,7 +383,7 @@
                   <dd>− {{ pesos(p.amount) }}</dd>
                 </div>
                 <div class="summary-due">
-                  <dt>{{ parts.length ? (payTab === 'partial' ? 'Left to pay now' : 'Remaining balance') : 'Amount due' }}</dt>
+                  <dt>{{ parts.length ? 'Remaining balance' : 'Amount due' }}</dt>
                   <dd>{{ pesos(parts.length ? entry.remaining : bill?.outstanding) }}</dd>
                 </div>
               </dl>
@@ -419,36 +418,24 @@
             </p>
 
             <form v-else id="pay-form" class="form" @submit.prevent="footAction === 'add' ? addPart() : takePayment()">
-              <!-- Side by side on the part-payment tab, so the extra field costs no height. -->
-              <div class="amounts" :class="{ 'amounts--split': payTab === 'partial' }">
-                <!-- Part payment: pay less than is due; the blood stays held until the rest is paid. -->
-                <div v-if="payTab === 'partial'" class="field">
-                  <label for="pay-now" class="field-label" :title="`Paying now, up to ${pesos(bill?.outstanding)}`">Paying now <span class="optional">(up to {{ pesos(bill?.outstanding) }})</span></label>
+              <div class="field">
+                <label for="pay-received" class="field-label">Amount received</label>
+                <div class="received">
                   <div class="money">
                     <span aria-hidden="true">₱</span>
-                    <input id="pay-now" v-model.number="paying" type="number" min="0.01" step="0.01" :max="Number(bill?.outstanding ?? 0)" class="input" :disabled="!canPay || parts.length > 0">
+                    <input
+                      id="pay-received"
+                      ref="tenderedInput"
+                      v-model.number="tendered"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      class="input"
+                      :disabled="!canPay"
+                      placeholder="0.00"
+                    >
                   </div>
-                </div>
-
-                <div class="field">
-                  <label for="pay-received" class="field-label">Amount received</label>
-                  <div class="received">
-                    <div class="money">
-                      <span aria-hidden="true">₱</span>
-                      <input
-                        id="pay-received"
-                        ref="tenderedInput"
-                        v-model.number="tendered"
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        class="input"
-                        :disabled="!canPay"
-                        placeholder="0.00"
-                      >
-                    </div>
-                    <button type="button" class="btn btn-outline" :disabled="!canPay" @click="tendered = entry.remaining">Full Amount</button>
-                  </div>
+                  <button type="button" class="btn btn-outline" :disabled="!canPay" @click="tendered = entry.remaining">Full Amount</button>
                 </div>
               </div>
 
@@ -459,22 +446,39 @@
                 </strong>
               </div>
 
-              <div class="field">
-                <label for="pay-ref" class="field-label">Payment reference <span class="optional">· {{ referenceName(method) || 'card, GCash or bank transfer' }} no.</span></label>
-                <div class="ref">
+              <!-- A card's additional information sits beside its reference, so it costs no height. -->
+              <div class="refs" :class="{ 'refs--split': method === 'card' }">
+                <div class="field">
+                  <label for="pay-ref" class="field-label" :title="`Payment reference · ${referenceName(method) || 'card, GCash or bank transfer'} no.`">Payment reference <span class="optional">· {{ referenceName(method) || 'card, GCash or bank transfer' }} no.</span></label>
+                  <div class="ref">
+                    <input
+                      id="pay-ref"
+                      v-model.trim="reference"
+                      type="text"
+                      maxlength="100"
+                      class="input mono"
+                      :placeholder="methodInfo.placeholder"
+                      :disabled="!canPay || !needsReference(method)"
+                      :required="needsReference(method)"
+                    >
+                    <button type="button" class="ref-copy" :disabled="!reference" aria-label="Copy the reference" title="Copy the reference" @click="copyReference">
+                      <AssetIcon name="clipboard-list" :size="15" />
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="method === 'card'" class="field">
+                  <label for="pay-info" class="field-label" title="Additional information (optional)">Additional information <span class="optional"></span></label>
                   <input
-                    id="pay-ref"
-                    v-model.trim="reference"
+                    id="pay-info"
+                    v-model.trim="additionalInfo"
                     type="text"
                     maxlength="100"
-                    class="input mono"
-                    :placeholder="methodInfo.placeholder"
-                    :disabled="!canPay || !needsReference(method)"
-                    :required="needsReference(method)"
+                    class="input"
+                    placeholder=""
+                    autocomplete="off"
+                    :disabled="!canPay"
                   >
-                  <button type="button" class="ref-copy" :disabled="!reference" aria-label="Copy the reference" title="Copy the reference" @click="copyReference">
-                    <AssetIcon name="clipboard-list" :size="15" />
-                  </button>
                 </div>
               </div>
 
@@ -660,7 +664,7 @@ const CATEGORIES = [
 // Card and bank transfer are recorded from their reference, as GCash is. A
 // GCash checkout (QR) is opened from the statement's own page, not here.
 const METHODS = [
-  { value: 'cash', label: 'Cash', icon: 'dollar-sign', placeholder: 'Not needed for cash' },
+  { value: 'cash', label: 'Cash', icon: 'philippine-peso', placeholder: 'Not needed for cash' },
   { value: 'card', label: 'Card', icon: 'credit-card', placeholder: 'From the card terminal slip' },
   { value: 'gcash', label: 'GCash', icon: 'smartphone', placeholder: 'From the payer’s GCash app' },
   { value: 'bank_transfer', label: 'Bank Transfer', short: 'Bank', icon: 'building-2', placeholder: 'From the bank’s transfer confirmation' },
@@ -938,9 +942,10 @@ async function selectBill(requestId) {
 /* TAKE THE PAYMENT */
 const payTab = ref('method')
 const method = ref('cash')
-const paying = ref(0)
 const tendered = ref(null)
 const reference = ref('')
+// A card payment's additional information: the cardholder's last name.
+const additionalInfo = ref('')
 const payerName = ref('')
 const payError = ref('')
 const recording = ref(false)
@@ -957,11 +962,11 @@ const MAX_PARTS = 4
 const parts = ref([])
 const partsTotal = computed(() => parts.value.reduce((sum, p) => sum + p.amount, 0))
 const hasCashPart = computed(() => parts.value.some((p) => p.method === 'cash'))
-const entry = computed(() => splitEntry(paying.value, partsTotal.value, method.value, tendered.value))
+const entry = computed(() => splitEntry(bill.value?.outstanding, partsTotal.value, method.value, tendered.value))
 
 const payTabs = computed(() => (category.value === 'weekly'
   ? [{ value: 'settle', label: 'Settlement' }, { value: 'preview', label: 'Statement Preview' }]
-  : [{ value: 'method', label: 'Payment Method' }, { value: 'partial', label: 'Partial Payment' }, { value: 'preview', label: 'Statement Preview' }]))
+  : [{ value: 'method', label: 'Payment Method' }, { value: 'preview', label: 'Statement Preview' }]))
 
 // Only a loaded bill with something due can be paid; the layout shows either way.
 const canPay = computed(() => Boolean(bill.value) && takes.value && !(shiftsEnabled.value && !shift.value))
@@ -993,10 +998,10 @@ const footAction = computed(() => {
 
 function resetPayment() {
   method.value = 'cash'
-  paying.value = Number(bill.value?.outstanding ?? 0)
   parts.value = []
   tendered.value = null
   reference.value = ''
+  additionalInfo.value = ''
   payerName.value = ''
   payError.value = ''
   Object.assign(settlement, { settlement_reference: '', settled_at: todayIso, settlement_note: '' })
@@ -1022,8 +1027,10 @@ function addPart() {
     label: methodInfo.value.label,
     amount: entry.value.paid,
     reference: cash ? null : reference.value,
+    info: additionalInfo.value,
   })
   reference.value = ''
+  additionalInfo.value = ''
   payError.value = ''
 
   // Cash is counted once; the rest is paid another way, prefilled with what is left.
@@ -1036,12 +1043,14 @@ function removePart(index) {
   payError.value = ''
 }
 
-// A part as the server records it: cash with what was handed over, the rest with a reference.
+// A part as the server records it: cash with what was handed over, the rest
+// with a reference, and a card with its additional information if any.
 function asPayment(part, tenderedCash = part.amount) {
   return {
     amount_paid: part.amount,
     payment_method: part.method,
     ...(part.method === 'cash' ? { amount_tendered: tenderedCash } : { reference_number: part.reference }),
+    ...(part.method === 'card' && part.info ? { additional_information: part.info } : {}),
   }
 }
 
@@ -1052,7 +1061,7 @@ async function takePayment() {
   recording.value = true
 
   const last = asPayment(
-    { method: method.value, amount: entry.value.paid, reference: reference.value },
+    { method: method.value, amount: entry.value.paid, reference: reference.value, info: additionalInfo.value },
     Number(tendered.value),
   )
   const payer = payerName.value ? { payer_name: payerName.value } : {}
@@ -1230,17 +1239,7 @@ async function loadSummary() {
 // Cash is counted as handed over; any other method is for what is left, unless the cashier splits it.
 watch(method, (value) => {
   payError.value = ''
-  if (payTab.value !== 'partial') paying.value = Number(bill.value?.outstanding ?? 0)
   tendered.value = value === 'cash' || !bill.value ? null : entry.value.remaining
-})
-
-// Between paying the whole balance and paying part of it, the split starts over.
-// The statement preview is only a look, and changes nothing.
-watch(payTab, (tab, previous) => {
-  if (tab === 'preview' || previous === 'preview') return
-  parts.value = []
-  if (tab !== 'partial') paying.value = Number(bill.value?.outstanding ?? 0)
-  tendered.value = method.value === 'cash' || !bill.value ? null : entry.value.remaining
 })
 
 onMounted(async () => {
@@ -1467,9 +1466,9 @@ onBeforeUnmount(() => {
 .input::placeholder { color: var(--rb-text-muted); }
 .input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .input:disabled { background: var(--rb-surface-alt); color: var(--rb-text-muted); cursor: not-allowed; }
-.amounts { display: grid; gap: 6px; }
-.amounts--split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.amounts--split .field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.refs { display: grid; gap: 6px; }
+.refs--split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.refs--split .field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .received { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 .money { position: relative; }
 .money span { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 12px; color: var(--rb-text-secondary); pointer-events: none; }
@@ -1669,7 +1668,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .tx-info, .pair, .amounts--split { grid-template-columns: 1fr; }
+  .tx-info, .pair, .refs--split { grid-template-columns: 1fr; }
   .seg { width: 100%; }
   .seg-btn { flex: 1; height: auto; min-height: var(--pos-ctl); padding: 6px 8px; }
   .overview-body { flex-direction: column; align-items: stretch; }
