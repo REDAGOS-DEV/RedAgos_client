@@ -12,6 +12,8 @@
  * the nullable ones.
  */
 
+import type { HospitalRole } from './hospitalStaff'
+
 /** Canonical role names, as stored in the database and checked by `RequireRole`. */
 export type RoleName = 'admin' | 'donor' | 'blood_center' | 'blood_bank'
 
@@ -103,6 +105,10 @@ export interface AppUser {
   /** The privileges in force; all four for an account that never had them set. */
   staff_privileges: StaffPrivilege[]
   is_supervisor: boolean
+
+  /** A hospital blood bank account's role. Null for everyone else. */
+  hospital_role: HospitalRole | null
+  hospital_role_label: string | null
 
   /**
    * Unrestricted platform admin. Holds every `admin.*` privilege without any of
