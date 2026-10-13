@@ -20,6 +20,20 @@ class AuthService extends BaseService {
         return await this.request('/forgot-password', 'POST', payload);
     }
 
+    /**
+     * Set a new password from the emailed reset link. `token` and `email` come
+     * from the link's query string (see ResetPasswordNotification on the
+     * server); the server revokes every existing session on success.
+     */
+    async resetPassword(payload: {
+        token: string;
+        email: string;
+        password: string;
+        password_confirmation: string;
+    }): Promise<any> {
+        return await this.request('/reset-password', 'POST', payload);
+    }
+
     async logout(): Promise<any> {
         return await this.request('/logout', 'POST');
     }

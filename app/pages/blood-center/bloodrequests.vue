@@ -341,7 +341,7 @@
                 </button>
                 <div class="menu-wrap">
                   <button class="icon-btn" @click="toggleMenu(r.id)" :aria-label="`More actions for ${r.code}`" aria-haspopup="menu" :aria-expanded="openMenuId === r.id">
-                    <AssetIcon name="move-vertical" :size="16" />
+                    <AssetIcon name="more-vertical" :size="16" />
                   </button>
                   <div v-if="openMenuId === r.id" v-click-outside="() => (openMenuId = null)" class="context-menu">
                     <!-- One entry per action: "View Details", "Review Request" and
