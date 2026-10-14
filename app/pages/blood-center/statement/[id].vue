@@ -27,8 +27,8 @@
         <h2>This statement could not be opened</h2>
         <p>{{ loadError }}</p>
         <div class="empty-actions">
-          <NuxtLink to="/blood-center/billing" class="btn btn-outline">Back to statements</NuxtLink>
-          <button class="btn btn-primary" @click="loadAll">Try again</button>
+          <NuxtLink to="/blood-center/billing" class="ui-btn">Back to statements</NuxtLink>
+          <button class="ui-btn ui-btn--primary" @click="loadAll">Try again</button>
         </div>
       </div>
 
@@ -45,19 +45,19 @@
             </div>
           </div>
           <div class="header-actions">
-            <button class="btn btn-outline" :disabled="!selectedRevision || printing" @click="printRevision">
+            <button class="ui-btn" :disabled="!selectedRevision || printing" @click="printRevision">
               <AssetIcon name="printer" :size="15" />
               {{ printing ? 'Opening…' : 'Print' }}
             </button>
-            <button class="btn btn-outline" :disabled="!selectedRevision || downloading" @click="downloadRevision">
+            <button class="ui-btn" :disabled="!selectedRevision || downloading" @click="downloadRevision">
               <AssetIcon name="download" :size="15" />
               Download PDF
             </button>
-            <button v-if="canSeePayments" class="btn btn-outline" :disabled="issuing" @click="issueStatement">
+            <button v-if="canSeePayments" class="ui-btn" :disabled="issuing" @click="issueStatement">
               <AssetIcon name="file-text" :size="15" />
               {{ issuing ? 'Issuing…' : latestRevision ? 'Issue updated statement' : 'Issue statement' }}
             </button>
-            <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="btn btn-primary">
+            <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="credit-card" :size="15" />
               Take payment
             </NuxtLink>
@@ -232,7 +232,7 @@
                             <button
                               v-if="canCorrectPayment && p.can_request_correction && !p.pending_correction && !p.pending_void"
                               type="button"
-                              class="btn btn-ghost btn-sm"
+                              class="ui-btn ui-btn--ghost ui-btn--sm"
                               @click="openPaymentCorrection(p)"
                             >
                               Correct
@@ -240,7 +240,7 @@
                             <button
                               v-if="canVoidPayment && p.can_request_void && !p.pending_correction && !p.pending_void"
                               type="button"
-                              class="btn btn-ghost btn-sm btn-ghost--danger"
+                              class="ui-btn ui-btn--ghost ui-btn--sm btn-ghost--danger"
                               @click="openVoid(p)"
                             >
                               Void
@@ -274,8 +274,8 @@
                               </div>
                               <p v-if="fixError" class="field-error">{{ fixError }}</p>
                               <div class="inline-actions">
-                                <button type="button" class="btn btn-outline btn-sm" @click="closePaymentCorrection">Cancel</button>
-                                <button type="button" class="btn btn-primary btn-sm" @click="reviewPaymentCorrection">Review correction</button>
+                                <button type="button" class="ui-btn ui-btn--sm" @click="closePaymentCorrection">Cancel</button>
+                                <button type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="reviewPaymentCorrection">Review correction</button>
                               </div>
                             </div>
                           </td>
@@ -296,8 +296,8 @@
                               </label>
                               <p v-if="voidError" class="field-error">{{ voidError }}</p>
                               <div class="inline-actions">
-                                <button type="button" class="btn btn-outline btn-sm" :disabled="saving" @click="voidFor = null">Cancel</button>
-                                <button type="button" class="btn btn-danger btn-sm" :disabled="saving || voidReason.length < 3" @click="submitVoid">
+                                <button type="button" class="ui-btn ui-btn--sm" :disabled="saving" @click="voidFor = null">Cancel</button>
+                                <button type="button" class="ui-btn ui-btn--danger ui-btn--sm" :disabled="saving || voidReason.length < 3" @click="submitVoid">
                                   {{ saving ? 'Sending…' : 'Request void' }}
                                 </button>
                               </div>
@@ -339,15 +339,15 @@
               <!-- Patient bill: take the money at the counter, by QR, or waive it. -->
               <template v-if="!weekly && canSeePayments && takes">
                 <div class="pay-actions">
-                  <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="btn btn-primary btn-block">
+                  <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary btn-block">
                     <AssetIcon name="credit-card" :size="15" />
                     Take payment at the counter
                   </NuxtLink>
-                  <button class="btn btn-outline btn-block" @click="checkoutOpen = true">
+                  <button class="ui-btn btn-block" @click="checkoutOpen = true">
                     <AssetIcon name="qr-code" :size="15" />
                     GCash QR
                   </button>
-                  <button v-if="!subsidyOpen" class="btn btn-ghost btn-block" @click="openSubsidy">
+                  <button v-if="!subsidyOpen" class="ui-btn ui-btn--ghost btn-block" @click="openSubsidy">
                     Apply government subsidy
                   </button>
                 </div>
@@ -366,8 +366,8 @@
                   </label>
                   <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
                   <div class="inline-actions">
-                    <button class="btn btn-outline btn-sm" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
-                    <button class="btn btn-primary btn-sm" :disabled="saving" @click="submitSubsidy">
+                    <button class="ui-btn ui-btn--sm" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--sm" :disabled="saving" @click="submitSubsidy">
                       {{ saving ? 'Applying…' : 'Apply subsidy' }}
                     </button>
                   </div>
@@ -395,7 +395,7 @@
                     <input v-model.trim="settlement.settlement_note" type="text" maxlength="500" class="input">
                   </label>
                   <p v-if="settlementError" class="field-error">{{ settlementError }}</p>
-                  <button type="submit" class="btn btn-primary btn-block" :disabled="saving || !settlement.settlement_reference">
+                  <button type="submit" class="ui-btn ui-btn--primary btn-block" :disabled="saving || !settlement.settlement_reference">
                     {{ saving ? 'Recording…' : 'Record settlement' }}
                   </button>
                 </form>
@@ -425,8 +425,8 @@
                     <div class="revision-foot">
                       <span class="revision-amount">{{ pesos(r.amount_due) }} <small>{{ r.statement_only ? 'billed' : 'due' }}</small></span>
                       <span class="revision-actions">
-                        <button class="btn btn-ghost btn-sm" @click="showRevision(r)">View</button>
-                        <button class="btn btn-ghost btn-sm" :disabled="downloading" @click="downloadRevision(r)">PDF</button>
+                        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="showRevision(r)">View</button>
+                        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="downloading" @click="downloadRevision(r)">PDF</button>
                       </span>
                     </div>
                   </div>

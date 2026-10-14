@@ -2,30 +2,23 @@
   <div class="tx-page">
     <div class="tx-inner">
       <!-- Two columns, so the actions stay on the right at every width. -->
-      <header class="page-header">
-        <div class="page-heading">
-          <h1 class="page-title">Billing Transactions</h1>
-          <p class="page-subtitle">
-            Every money event on this centre's bills, numbered and in order: charges as units are reserved,
-            payments at the counter and through GCash, subsidies, corrections, voids and hospital settlements.
-            Nothing here is ever edited; a mistake is answered by a further transaction.
-          </p>
-        </div>
-        <div class="header-actions">
-          <NuxtLink to="/blood-center/billing" class="btn btn-outline" title="Statements" aria-label="Statements">
+      <!-- The shared header keeps the actions on the right at every width. -->
+      <PageHeader title="Billing Transactions" subtitle="Every money event on this centre's bills, numbered and in order. Nothing here is edited; a mistake gets a new transaction.">
+        <template #actions>
+          <NuxtLink to="/blood-center/billing" class="ui-btn" title="Statements" aria-label="Statements">
             <AssetIcon name="file-text" :size="15" />
             <span class="btn-label">Statements</span>
           </NuxtLink>
-          <NuxtLink to="/blood-center/receipts" class="btn btn-outline" title="Receipts" aria-label="Receipts">
+          <NuxtLink to="/blood-center/receipts" class="ui-btn" title="Receipts" aria-label="Receipts">
             <AssetIcon name="receipt" :size="15" />
             <span class="btn-label">Receipts</span>
           </NuxtLink>
-          <button class="btn btn-primary" :disabled="exporting" @click="exportCsv">
+          <button class="ui-btn ui-btn--primary" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />
             {{ exporting ? 'Exporting…' : 'Export CSV' }}
           </button>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <!-- MONEY FLOW: the server's totals over everything the filters match, not just this page -->
       <section v-if="totals" class="flow" aria-label="Totals">
@@ -62,7 +55,7 @@
         <div class="select-sm">
           <SelectField id="tx-type" v-model="filters.type" :options="typeOptions" icon="sliders-horizontal" size="sm" />
         </div>
-        <button type="button" class="btn btn-outline btn-filters" :class="{ 'btn-filters--on': moreOpen }" :aria-expanded="moreOpen" aria-controls="tx-more" @click="moreOpen = !moreOpen">
+        <button type="button" class="ui-btn btn-filters" :class="{ 'btn-filters--on': moreOpen }" :aria-expanded="moreOpen" aria-controls="tx-more" @click="moreOpen = !moreOpen">
           <AssetIcon name="sliders-horizontal" :size="15" />
           More filters
           <span v-if="moreCount" class="count-badge">{{ moreCount }}</span>
@@ -88,7 +81,7 @@
             <span class="chip-filter-label">{{ chip.label }}</span>
             <button type="button" :aria-label="`Remove ${chip.label}`" @click="filters[chip.key] = ''"><AssetIcon name="x" :size="12" /></button>
           </span>
-          <button class="btn btn-ghost btn-sm" @click="reset">Clear all</button>
+          <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="reset">Clear all</button>
         </div>
       </section>
 
@@ -153,9 +146,9 @@
         </div>
 
         <footer v-if="meta.last_page > 1" class="pager">
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1 || loading" @click="load(meta.current_page - 1)">Previous</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1 || loading" @click="load(meta.current_page - 1)">Previous</button>
           <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page >= meta.last_page || loading" @click="load(meta.current_page + 1)">Next</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page || loading" @click="load(meta.current_page + 1)">Next</button>
         </footer>
       </div>
     </div>
@@ -179,6 +172,7 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { RECORDED_METHODS, journalAmount, pesos, saveBlob, transactionTone } from '~/utils/billing'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -521,7 +515,7 @@ onMounted(() => load())
 
 /* Narrow: the link labels give way to their icons; the actions stay right. */
 @media (max-width: 960px) {
-  .header-actions .btn-label { display: none; }
+  .btn-label { display: none; }
   .flow { grid-template-columns: 1fr; gap: 14px; }
   .flow-arrow { display: none; }
   .more { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }

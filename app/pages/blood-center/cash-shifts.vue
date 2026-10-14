@@ -10,19 +10,19 @@
         </transition-group>
       </div>
 
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Cash Shifts</h1>
-          <p class="page-subtitle">
-            {{ mayOversee
-              ? 'Every cashier\'s shifts at this centre: the float, what was taken, what the drawer should hold, and what was counted.'
-              : 'Your shifts at the counter: the float, what you took, what the drawer should hold, and what you counted.' }}
-          </p>
-        </div>
-        <div class="header-actions">
-          <NuxtLink to="/blood-center/pos" class="btn btn-primary">Open counter</NuxtLink>
-        </div>
-      </header>
+      <PageHeader
+        title="Cash Shifts"
+        :subtitle="mayOversee
+          ? 'Every cashier\'s shifts: the float, what was taken, what the drawer should hold, and what was counted.'
+          : 'Your shifts at the counter: the float, what you took, what the drawer should hold, and what you counted.'"
+      >
+        <template #actions>
+          <NuxtLink to="/blood-center/pos" class="ui-btn ui-btn--primary">
+            <AssetIcon name="credit-card" :size="15" />
+            Open counter
+          </NuxtLink>
+        </template>
+      </PageHeader>
 
       <p v-if="!shiftsEnabled" class="banner banner--warn">
         The counter is not using cash shifts: payments are taken without one. Any shifts listed here are from before.
@@ -42,11 +42,7 @@
         <!-- LIST -->
         <section class="card list-card" aria-label="Shifts">
           <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton skeleton--row" /></div>
-          <div v-else-if="!shifts.length" class="empty">
-            <AssetIcon name="clock" :size="30" />
-            <h3>No shifts</h3>
-            <p>A shift is opened at the counter before the first payment.</p>
-          </div>
+          <EmptyState v-else-if="!shifts.length" icon="clock" title="No shifts" description="A shift is opened at the counter before the first payment." compact />
           <ul v-else class="shift-list">
             <li v-for="s in shifts" :key="s.id">
               <button type="button" class="shift-item" :class="{ 'shift-item--on': selected?.id === s.id }" @click="select(s.id)">
@@ -61,20 +57,16 @@
             </li>
           </ul>
           <footer v-if="meta.last_page > 1" class="pager">
-            <button class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
+            <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
             <span>{{ meta.current_page }} / {{ meta.last_page }}</span>
-            <button class="btn btn-outline btn-sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
+            <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
           </footer>
         </section>
 
         <!-- READING -->
         <section class="card detail-card" aria-label="Shift reading">
           <div v-if="detailLoading" class="skeleton skeleton--doc" />
-          <div v-else-if="!selected" class="empty">
-            <AssetIcon name="receipt" :size="30" />
-            <h3>Pick a shift</h3>
-            <p>Its reading shows the drawer and every payment taken in it.</p>
-          </div>
+          <EmptyState v-else-if="!selected" icon="receipt" title="Pick a shift" description="Its reading shows the drawer and every payment taken in it." />
           <template v-else>
             <header class="detail-head">
               <div>
@@ -86,13 +78,13 @@
                 </p>
               </div>
               <div class="detail-actions">
-                <button class="btn btn-outline btn-sm" :disabled="downloading" @click="download">
+                <button class="ui-btn ui-btn--sm" :disabled="downloading" @click="download">
                   <AssetIcon name="download" :size="14" />
                   {{ selected.status === 'open' ? 'X reading' : 'Z report' }} PDF
                 </button>
                 <button
                   v-if="selected.status === 'open' && mayOversee && selected.cashier?.id !== user?.id"
-                  class="btn btn-outline btn-sm"
+                  class="ui-btn ui-btn--sm"
                   @click="closing = true"
                 >
                   Close for cashier
@@ -175,6 +167,8 @@ import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { journalAmount, pesos, saveBlob, shiftVariance, transactionTone } from '~/utils/billing'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -315,7 +309,8 @@ onMounted(async () => {
 /* Tokens come from app/assets/css/main.css. */
 .cs-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .cs-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+/* The shared PageHeader, with the space below it the old header kept. */
+.cs-inner > .ph { margin-bottom: 16px; }
 .page-title { font-size: 20px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
 .header-actions .btn { text-decoration: none; }
@@ -427,4 +422,7 @@ onMounted(async () => {
 @media (max-width: 900px) {
   .cs-grid { grid-template-columns: 1fr; }
 }
+
+/* Cards in the shared SectionCard's shape (2026-10-15). */
+.card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>

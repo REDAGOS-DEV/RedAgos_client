@@ -1,14 +1,11 @@
 <template>
   <div class="testing">
-    <header class="testing__header">
-      <div>
-        <h1 class="testing__title">{{ viewCopy.title }}</h1>
-        <p class="testing__subtitle">
-          {{ viewCopy.subtitle }} A passing result clears its section; a saved result changes only through an approved
-          correction. RedAgos records what the medical technologist found. It does not perform or interpret any test.
-        </p>
-      </div>
-    </header>
+    <PageHeader :title="viewCopy.title">
+      <template #subtitle>
+        {{ viewCopy.subtitle }} A passing result clears its section; a saved result changes only through an approved
+        correction. RedAgos records what the medical technologist found. It does not perform or interpret any test.
+      </template>
+    </PageHeader>
 
     <div class="tabs" role="tablist" aria-label="Testing">
       <button
@@ -78,13 +75,13 @@
                   placeholder="Scan or type"
                 >
               </label>
-              <button type="submit" class="btn" :disabled="loadingQueue" aria-label="Find" title="Find">
+              <button type="submit" class="ui-btn" :disabled="loadingQueue" aria-label="Find" title="Find">
                 <AssetIcon name="scan-line" :size="14" />
                 <span class="btn__text">Find</span>
               </button>
             </form>
 
-            <button type="button" class="btn" :disabled="loadingQueue" :aria-label="loadingQueue ? 'Loading' : 'Refresh'" :title="loadingQueue ? 'Loading' : 'Refresh'" @click="clearSearch">
+            <button type="button" class="ui-btn" :disabled="loadingQueue" :aria-label="loadingQueue ? 'Loading' : 'Refresh'" :title="loadingQueue ? 'Loading' : 'Refresh'" @click="clearSearch">
               <AssetIcon name="refresh-cw" :size="14" />
               <span class="btn__text">{{ loadingQueue ? 'Loading…' : 'Refresh' }}</span>
             </button>
@@ -126,7 +123,7 @@
               </span>
             </div>
 
-            <button type="button" class="btn" :disabled="busy" @click="openDonation(row.id)">Open</button>
+            <button type="button" class="ui-btn" :disabled="busy" @click="openDonation(row.id)">Open</button>
           </li>
         </ul>
       </section>
@@ -164,7 +161,7 @@
             <span class="pill" :class="`pill--${selected.status}`">{{ selected.status_label }}</span>
           </div>
 
-          <button type="button" class="btn" :disabled="busy" @click="backToQueue">Back to queue</button>
+          <button type="button" class="ui-btn" :disabled="busy" @click="backToQueue">Back to queue</button>
         </section>
 
         <!-- Finished: nothing left for Testing to record -->
@@ -186,8 +183,8 @@
           </div>
 
           <div class="actions">
-            <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
-            <button v-if="isReactive && canSeeReferrals" type="button" class="btn" @click="switchTab('referrals')">
+            <button type="button" class="ui-btn ui-btn--primary" @click="backToQueue">Back to queue</button>
+            <button v-if="isReactive && canSeeReferrals" type="button" class="ui-btn" @click="switchTab('referrals')">
               Open Counselling referrals
             </button>
           </div>
@@ -279,7 +276,7 @@
             </p>
 
             <div v-if="!isFinal" class="actions">
-              <button type="button" class="btn btn--primary" :disabled="busy || !typingComplete" @click="submitTyping">
+              <button type="button" class="ui-btn ui-btn--primary" :disabled="busy || !typingComplete" @click="submitTyping">
                 {{ busy ? 'Saving…' : selected.immunohematology ? 'Request correction' : 'Record typing' }}
               </button>
               <span v-if="selected.immunohematology" class="card__hint">Saved typings change only with approval.</span>
@@ -331,7 +328,7 @@
             <div v-if="!isFinal" class="actions">
               <button
                 type="button"
-                class="btn"
+                class="ui-btn"
                 :class="pendingReactive.length ? 'btn--danger' : 'btn--primary'"
                 :disabled="busy || !panelIsComplete"
                 @click="submitSerology"
@@ -426,13 +423,13 @@
               <div class="actions">
                 <button
                   type="button"
-                  class="btn btn--primary"
+                  class="ui-btn ui-btn--primary"
                   :disabled="busy || (editing.status === 'closed' && !editing.note.trim())"
                   @click="submitReferral"
                 >
                   {{ busy ? 'Saving…' : `Mark ${statusLabel(editing.status).toLowerCase()}` }}
                 </button>
-                <button type="button" class="btn" :disabled="busy" @click="editing = null">Cancel</button>
+                <button type="button" class="ui-btn" :disabled="busy" @click="editing = null">Cancel</button>
               </div>
             </template>
 
@@ -441,7 +438,7 @@
                 v-for="next in nextStatuses(referral.status)"
                 :key="next"
                 type="button"
-                class="btn"
+                class="ui-btn"
                 :disabled="busy"
                 @click="startReferralUpdate(referral, next)"
               >
@@ -492,10 +489,10 @@
           <p>It cannot be undone here. Check the readings against the bench record first.</p>
         </div>
         <div class="actions">
-          <button type="button" class="btn btn--danger" :disabled="busy" @click="confirmReactive">
+          <button type="button" class="ui-btn ui-btn--danger" :disabled="busy" @click="confirmReactive">
             {{ busy ? 'Saving…' : 'Confirm reactive result' }}
           </button>
-          <button type="button" class="btn" :disabled="busy" @click="confirmingReactive = false">Go back</button>
+          <button type="button" class="ui-btn" :disabled="busy" @click="confirmingReactive = false">Go back</button>
         </div>
       </div>
     </div>
@@ -518,6 +515,7 @@ import {
   serologyPayload,
 } from '~/utils/serology'
 import SelectField from '~/components/common/SelectField.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
  * The testing page: Section II's Immunohematology and Serology tables, and the

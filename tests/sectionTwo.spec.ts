@@ -274,7 +274,7 @@ describe('the counter', () => {
     expect(page).toContain("const canRegister = computed(() => can('donations.register'))")
     expect(page).toContain("const canScreen = computed(() => can('donations.screen'))")
     expect(page).toContain("const canCollect = computed(() => can('donations.collect'))")
-    expect(page).toContain('v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation"')
+    expect(page).toContain('v-if="canRegister" type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="openDonation"')
     expect(page).toContain(`v-else-if="stage === 'screening' && !canScreen"`)
     expect(page).toContain(`v-else-if="stage === 'collection' && !canCollect"`)
   })

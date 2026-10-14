@@ -1,15 +1,10 @@
 <template>
   <div class="hc-page">
     <div class="hc-inner">
-      <header class="hc-head">
-        <div>
-          <h1 class="hc-title">Help Center</h1>
-          <p class="hc-sub">
-            How each part of the blood center works. To find something fast, type it in the search at the top;
-            help guides show there too.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Help Center"
+        subtitle="How each part of the blood center works. To find something fast, type it in the search at the top; help guides show there too."
+      />
 
       <!-- GUIDES: departments down the left, their guides on the right -->
       <section class="card guides-card" aria-labelledby="hc-guides">
@@ -130,6 +125,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import KeyCombo from '~/components/BloodCenter/KeyCombo.vue'
 import { HELP_GLOSSARY, HELP_GUIDES, guideVisible } from '~/utils/bloodCenterHelp'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
   middleware: 'auth',

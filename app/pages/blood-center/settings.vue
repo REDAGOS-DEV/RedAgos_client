@@ -32,7 +32,7 @@
           </div>
         </div>
 
-        <button v-if="activeTab === 'profile' && !editingProfile" type="button" class="btn-soft" @click="startEditProfile">
+        <button v-if="activeTab === 'profile' && !editingProfile" type="button" class="ui-btn" @click="startEditProfile">
           <AssetIcon name="pencil" :size="14" /> Edit profile
         </button>
       </section>
@@ -119,8 +119,8 @@
         <p v-if="profileSuccess" class="note note--ok"><AssetIcon name="check" :size="14" /> {{ profileSuccess }}</p>
 
         <footer v-if="editingProfile" class="card__foot">
-          <button type="button" class="btn-ghost" @click="cancelEditProfile">Cancel</button>
-          <button type="button" class="btn-primary" :disabled="savingProfile" @click="saveProfile">
+          <button type="button" class="ui-btn ui-btn--ghost" @click="cancelEditProfile">Cancel</button>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="savingProfile" @click="saveProfile">
             {{ savingProfile ? 'Saving...' : 'Save changes' }}
           </button>
         </footer>
@@ -178,7 +178,7 @@
           <p v-if="passwordSuccess" class="note note--ok"><AssetIcon name="check" :size="14" /> {{ passwordSuccess }}</p>
 
           <div class="card__foot card__foot--flat">
-            <button type="button" class="btn-primary" :disabled="updatingPassword" @click="updatePassword">
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="updatingPassword" @click="updatePassword">
               {{ updatingPassword ? 'Updating...' : 'Update password' }}
             </button>
           </div>
@@ -376,7 +376,7 @@
               This signs you out everywhere, including this device. You'll need to sign in again on each one.
             </p>
             <div class="modal-actions">
-              <button type="button" class="btn-ghost" @click="confirmLogoutOthers = false">Cancel</button>
+              <button type="button" class="ui-btn ui-btn--ghost" @click="confirmLogoutOthers = false">Cancel</button>
               <button type="button" class="btn-danger-soft" :disabled="loggingOutOthers" @click="logoutOtherDevices">
                 {{ loggingOutOthers ? 'Logging out...' : 'Yes, log out everywhere' }}
               </button>

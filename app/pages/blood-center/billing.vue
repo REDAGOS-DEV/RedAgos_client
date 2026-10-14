@@ -2,30 +2,23 @@
   <div class="bl-page">
     <div class="bl-inner">
       <!-- Two columns, so the actions stay on the right at every width. -->
-      <header class="page-header">
-        <div class="page-heading">
-          <h1 class="page-title">Statements</h1>
-          <p class="page-subtitle">
-            A bill is raised the moment stock is reserved for a request. Patient bills are paid at the counter and hold
-            the blood until they are paid or met by the government subsidy; weekly orders are billed to the hospital
-            and recorded here once it settles them.
-          </p>
-        </div>
-        <div class="header-actions">
-          <NuxtLink v-if="canSeePayments" to="/blood-center/pos" class="btn btn-primary">
+      <!-- The shared header keeps the actions on the right at every width. -->
+      <PageHeader title="Statements" subtitle="A bill is raised when stock is reserved. Patient bills are paid at the counter; weekly orders are billed to the hospital.">
+        <template #actions>
+          <NuxtLink v-if="canSeePayments" to="/blood-center/pos" class="ui-btn ui-btn--primary">
             <AssetIcon name="credit-card" :size="15" />
             Billing counter
           </NuxtLink>
-          <NuxtLink v-if="canSeePayments" to="/blood-center/receipts" class="btn btn-outline">
+          <NuxtLink v-if="canSeePayments" to="/blood-center/receipts" class="ui-btn">
             <AssetIcon name="receipt" :size="15" />
             Receipts
           </NuxtLink>
-          <button class="btn btn-outline btn-icon-only" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refreshAll">
+          <button class="ui-btn btn-icon-only" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refreshAll">
             <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
             <span class="btn-label">Refresh</span>
           </button>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <!-- Documents are headed by the centre's own logo; without one, its initials. -->
       <p v-if="summary && !summary.issuer?.logo_url" class="banner banner--info">
@@ -119,7 +112,7 @@
         <div v-if="error" class="banner banner--error banner--inset">
           <AssetIcon name="triangle-alert" :size="15" />
           <span>{{ error }}</span>
-          <button class="btn btn-outline btn-sm" @click="load()">Retry</button>
+          <button class="ui-btn ui-btn--sm" @click="load()">Retry</button>
         </div>
 
         <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton" /></div>
@@ -184,10 +177,10 @@
                 </td>
                 <td class="row-actions" @click.stop>
                   <!-- Write actions only for whoever may record money; billing.view alone reads. -->
-                  <NuxtLink v-if="canSeePayments && takesPayment(s)" :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="btn btn-primary btn-sm">
+                  <NuxtLink v-if="canSeePayments && takesPayment(s)" :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="ui-btn ui-btn--primary ui-btn--sm">
                     Take payment
                   </NuxtLink>
-                  <NuxtLink :to="`/blood-center/statement/${requestIdOf(s)}`" class="btn btn-outline btn-sm">Open</NuxtLink>
+                  <NuxtLink :to="`/blood-center/statement/${requestIdOf(s)}`" class="ui-btn ui-btn--sm">Open</NuxtLink>
                 </td>
               </tr>
             </tbody>
@@ -195,9 +188,9 @@
         </div>
 
         <footer v-if="!loading && meta.last_page > 1" class="pager">
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
           <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
         </footer>
       </section>
     </div>
@@ -215,6 +208,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, statementStamp, takesPayment } from '~/utils/billing'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -483,7 +477,7 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 /* Narrow: the subtitle gives way and Refresh becomes an icon, but the actions stay right. */
 @media (max-width: 900px) {
   .btn-icon-only .btn-label { display: none; }
-  .btn-icon-only { padding: 8px 10px; }
+  .btn-icon-only { width: 38px; padding: 0; }
 }
 
 @media (max-width: 640px) {

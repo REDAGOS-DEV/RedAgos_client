@@ -211,7 +211,10 @@ watch(() => changes.value.length > 0, (dirty) => emit('dirty', dirty), { immedia
 .grid-scroll { overflow-x: auto; }
 .grid-scroll:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
 
-.grid { width: 100%; min-width: max-content; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+/* `display: table` on purpose: Tailwind's own .grid utility (display: grid)
+   also matches this class, and would split the heading row and the body into
+   separate tables whose columns no longer line up. */
+.grid { display: table; width: 100%; min-width: max-content; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 
 .grid th {
   padding: 10px 14px;

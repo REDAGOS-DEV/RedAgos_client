@@ -10,12 +10,8 @@
 
         <div v-else class="reports-inner">
             <!-- Header -->
-            <div class="header-row">
-                <div>
-                    <h1 class="page-title">Reports &amp; Analytics</h1>
-                    <p class="page-subtitle">Projected demand, shortage risks and generated reports.</p>
-                </div>
-                <div class="header-actions">
+            <PageHeader title="Reports &amp; Analytics" subtitle="Projected demand, shortage risks and generated reports.">
+                <template #actions>
                     <div class="select-wrap">
                         <SelectField
                             v-model="facilityFilter"
@@ -34,8 +30,8 @@
                             @change="onFilterChange()"
                         />
                     </div>
-                </div>
-            </div>
+                </template>
+            </PageHeader>
 
             <!--
                 The /bloodcenter/reports endpoints are not built yet (see the
@@ -339,7 +335,7 @@
 
                     <div v-if="!loadingAlerts && emergencyAlerts.length > 0" class="alert-footer">
                         <span>{{ criticalAlertCount }} blood type{{ criticalAlertCount === 1 ? '' : 's' }} require attention.</span>
-                        <button type="button" class="btn-outline-blue" @click="viewInventory">View Inventory</button>
+                        <button type="button" class="ui-btn ui-btn--ghost" @click="viewInventory">View Inventory</button>
                     </div>
 
                 </section>
@@ -377,11 +373,11 @@
                             />
                         </div>
                         <div class="report-generator__actions">
-                            <button type="submit" class="btn-primary" :disabled="!canGenerateReport || generatingReport || unavailable.recent">
+                            <button type="submit" class="ui-btn ui-btn--primary" :disabled="!canGenerateReport || generatingReport || unavailable.recent">
                                 <AssetIcon name="bar-chart" :size="15" />
                                 {{ generatingReport ? 'Generating...' : 'Generate Report' }}
                             </button>
-                            <button type="button" class="btn-cancel" @click="resetReportForm">Reset</button>
+                            <button type="button" class="ui-btn" @click="resetReportForm">Reset</button>
                         </div>
                     </form>
                     <p v-if="generateError" class="form-error" role="alert">{{ generateError }}</p>
@@ -458,7 +454,7 @@
                             <template v-if="unavailable.recent">Generated reports will be listed here once the reports service is connected.</template>
                             <template v-else>
                                 No reports generated yet.
-                                <button type="button" class="btn-outline-blue" @click="focusReportForm">Generate Report</button>
+                                <button type="button" class="ui-btn ui-btn--ghost" @click="focusReportForm">Generate Report</button>
                             </template>
                         </p>
                         <div v-else v-for="report in recentReports" :key="report.id" class="reports-row">
@@ -503,8 +499,8 @@
                         </div>
 
                         <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeReportPreview">Close</button>
-                            <button type="button" class="btn-primary"
+                            <button type="button" class="ui-btn" @click="closeReportPreview">Close</button>
+                            <button type="button" class="ui-btn ui-btn--primary"
                                 @click="handleExport(selectedReport, 'pdf')">Export as PDF</button>
                         </div>
                     </div>
@@ -527,6 +523,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
     middleware: ['auth', 'department'],

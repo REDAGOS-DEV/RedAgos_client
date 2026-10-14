@@ -1,14 +1,6 @@
 <template>
   <div class="laboratory">
-    <header class="laboratory__header">
-      <div>
-        <h1 class="laboratory__title">Processing</h1>
-        <p class="laboratory__subtitle">
-          Record what each unit was separated into, then clear it for issue or reject it. Testing's outcome shows here
-          as it is recorded.
-        </p>
-      </div>
-    </header>
+    <PageHeader title="Processing" subtitle="Record what each unit was separated into, then clear it for issue or reject it. Testing's outcome shows here as it is recorded." />
 
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
@@ -174,8 +166,8 @@
         </div>
 
         <div class="actions">
-          <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
-          <NuxtLink v-if="selected.status === 'completed'" to="/blood-center/inventory" class="btn">
+          <button type="button" class="ui-btn ui-btn--primary" @click="backToQueue">Back to queue</button>
+          <NuxtLink v-if="selected.status === 'completed'" to="/blood-center/inventory" class="ui-btn">
             Go to inventory
           </NuxtLink>
         </div>
@@ -277,7 +269,7 @@
 
             <!-- Phase 1 labelling: what the product is and its number. No blood type, no clearance. -->
             <div v-if="phaseOneLabels.length" class="actions">
-              <button type="button" class="btn" @click="printBaseLabels">
+              <button type="button" class="ui-btn" @click="printBaseLabels">
                 <AssetIcon name="file-down" :size="14" />
                 Print bag labels (Phase 1)
               </button>
@@ -316,7 +308,7 @@
 
                 <button
                   type="button"
-                  class="btn btn--icon"
+                  class="ui-btn ui-btn--icon"
                   :disabled="componentRows.length === 1"
                   aria-label="Remove this bag"
                   @click="componentRows.splice(index, 1)"
@@ -332,12 +324,12 @@
               </p>
 
               <div class="actions">
-                <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
+                <button type="button" class="ui-btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
                   Add bag
                 </button>
                 <button
                   type="button"
-                  class="btn btn--primary"
+                  class="ui-btn ui-btn--primary"
                   :disabled="busy || !validComponents"
                   @click="submitComponents"
                 >
@@ -379,18 +371,18 @@
               <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
             </label>
             <div class="actions">
-              <button type="button" class="btn btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
+              <button type="button" class="ui-btn ui-btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
                 {{ busy ? 'Saving…' : 'Confirm rejection' }}
               </button>
-              <button type="button" class="btn" :disabled="busy" @click="rejecting = false">Cancel</button>
+              <button type="button" class="ui-btn" :disabled="busy" @click="rejecting = false">Cancel</button>
             </div>
           </div>
 
           <div v-else class="actions">
-            <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submitRelease">
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy || blockers.length > 0" @click="submitRelease">
               {{ busy ? 'Saving…' : 'Complete processing' }}
             </button>
-            <button type="button" class="btn btn--danger" :disabled="busy" @click="rejecting = true">
+            <button type="button" class="ui-btn ui-btn--danger" :disabled="busy" @click="rejecting = true">
               Reject this unit
             </button>
           </div>
@@ -422,6 +414,7 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 import { baseLabelsFrom } from '~/utils/bagLabels'
 import SelectField from '~/components/common/SelectField.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
  * The Processing department's side of a donation.

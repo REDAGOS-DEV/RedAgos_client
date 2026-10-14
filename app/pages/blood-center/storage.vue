@@ -7,7 +7,7 @@
     :panels="panels"
   >
     <template #actions>
-      <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
+      <NuxtLink to="/blood-center/inventory-intake" class="ui-btn ui-btn--primary">
         <AssetIcon name="package-check" :size="15" />
         Stock Intake
       </NuxtLink>

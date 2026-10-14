@@ -14,13 +14,8 @@
 
     <div v-else class="appointments-inner">
       <!-- Header -->
-      <header class="header-row">
-        <div class="header-copy">
-          <h1 class="page-title">Appointments</h1>
-          <p class="page-subtitle">{{ headerSummary }}</p>
-        </div>
-
-        <div class="header-actions">
+      <PageHeader title="Appointments" :subtitle="headerSummary">
+        <template #actions>
           <div class="date-control">
             <span class="date-control__chip" :class="{ 'date-control__chip--today': isToday }">
               {{ isToday ? 'Today' : 'Viewing' }}
@@ -30,17 +25,17 @@
             </div>
           </div>
 
-          <button v-if="!isToday" type="button" class="btn-outline" @click="resetToToday">
+          <button v-if="!isToday" type="button" class="ui-btn" @click="resetToToday">
             Back to today
           </button>
 
           <!-- The slot list is read-only, so this opens a view, not an editor. -->
-          <button type="button" class="btn-outline" @click="openManageSlots">
+          <button type="button" class="ui-btn" @click="openManageSlots">
             <AssetIcon name="clock" :size="14" />
             Time Slots
           </button>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <!-- Error banner -->
       <div v-if="loadError" class="error-banner" role="alert">
@@ -49,18 +44,17 @@
       </div>
 
       <!-- Stat cards -->
-      <div class="stats-row">
-        <div v-for="card in statCards" :key="card.key" class="stat-card" :class="`stat-card--${card.tone}`">
-          <div class="stat-card__top">
-            <p class="stat-card__label">{{ card.label }}</p>
-            <span class="stat-card__icon">
-              <AssetIcon :name="card.icon" :size="14" />
-            </span>
-          </div>
-          <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' : card.value }}</p>
-          <span class="stat-card__hint">{{ loadingStats ? '\u00A0' : card.hint }}</span>
-        </div>
-      </div>
+      <StatStrip>
+        <StatItem
+          v-for="card in statCards"
+          :key="card.key"
+          :label="card.label"
+          :value="loadingStats ? '…' : card.value"
+          :hint="loadingStats ? '' : card.hint"
+          :icon="card.icon"
+          :tone="STAT_TONE[card.tone] || 'neutral'"
+        />
+      </StatStrip>
 
       <!-- Main panel -->
       <div class="panel">
@@ -209,7 +203,7 @@
               <span class="empty-state__icon"><AssetIcon name="user-x" :size="20" /></span>
               <p class="empty-state__title">No matches</p>
               <p class="empty-state__text">No appointments match the current filters.</p>
-              <button type="button" class="btn-outline btn-outline--sm" @click="clearFilters">Clear filters</button>
+              <button type="button" class="ui-btn ui-btn--sm" @click="clearFilters">Clear filters</button>
             </div>
 
             <template v-else>
@@ -277,7 +271,7 @@
               <p class="section-hint">Registrations donors made through the portal.</p>
             </div>
             <!-- KEPT YANNIE'S VERSION – simplified path -->
-            <NuxtLink to="/blood-center/drives" class="btn-outline-blue">
+            <NuxtLink to="/blood-center/drives" class="ui-btn ui-btn--ghost">
               Go to Mobile Drives
               <AssetIcon name="arrow-right" :size="14" />
             </NuxtLink>
@@ -341,9 +335,9 @@
               <p v-else class="drive-note">The donor list for each drive is not available yet.</p>
 
               <div class="drive-card__actions">
-                <button type="button" class="btn-outline btn-outline--sm" disabled title="Not available yet"
+                <button type="button" class="ui-btn ui-btn--sm" disabled title="Not available yet"
                   @click="openViewDonors(drive)">View all {{ drive.registered }} donors</button>
-                <button type="button" class="btn-outline-blue" disabled title="Not available yet"
+                <button type="button" class="ui-btn ui-btn--ghost" disabled title="Not available yet"
                   @click="openManageDrive(drive)">Manage Drive &amp; Attendance</button>
               </div>
             </div>
@@ -400,7 +394,7 @@
             <p v-if="saveSlotsError" class="modal-error">{{ saveSlotsError }}</p>
 
             <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeManageSlots">Close</button>
+              <button type="button" class="ui-btn" @click="closeManageSlots">Close</button>
             </div>
           </div>
         </div>
@@ -438,7 +432,7 @@
             </div>
 
             <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeViewDonors">Close</button>
+              <button type="button" class="ui-btn" @click="closeViewDonors">Close</button>
             </div>
           </div>
         </div>
@@ -454,6 +448,9 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -782,6 +779,9 @@ function clearFilters() {
 function toggleSlot(id) {
   selectedSlotId.value = selectedSlotId.value === id ? null : id
 }
+
+// The stat cards' colour names, as the shared figures strip's tones.
+const STAT_TONE = { blue: 'primary', orange: 'warning', green: 'success', red: 'danger', purple: 'purple', gray: 'neutral', grey: 'neutral' }
 
 const statCards = computed(() => {
   const rows = walkInAppointments.value

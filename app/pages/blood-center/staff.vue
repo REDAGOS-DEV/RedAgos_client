@@ -1,18 +1,13 @@
 <template>
   <div class="staff">
-    <header class="staff__header">
-      <div>
-        <h1 class="staff__title">Staff Accounts</h1>
-        <p class="staff__subtitle">
-          Add colleagues, place them in a department and set what they can do.
-        </p>
-      </div>
-
-      <button type="button" class="btn-primary" @click="openCreate">
-        <AssetIcon name="plus" :size="16" />
-        Add Staff
-      </button>
-    </header>
+    <PageHeader title="Staff Accounts" subtitle="Add colleagues, place them in a department and set what they can do.">
+      <template #actions>
+        <button type="button" class="ui-btn ui-btn--primary" @click="openCreate">
+          <AssetIcon name="plus" :size="16" />
+          Add Staff
+        </button>
+      </template>
+    </PageHeader>
 
     <div v-if="banner" class="banner" :class="`banner--${bannerKind}`" role="status">
       <AssetIcon :name="bannerKind === 'error' ? 'circle-alert' : 'circle-check-big'" :size="16" />
@@ -75,7 +70,7 @@
       <p class="empty__text">
         Give each colleague a department and role, and they can sign in to the pages their work needs.
       </p>
-      <button type="button" class="btn-primary" @click="openCreate">
+      <button type="button" class="ui-btn ui-btn--primary" @click="openCreate">
         <AssetIcon name="plus" :size="16" />
         Add Staff
       </button>
@@ -342,7 +337,7 @@
 
             <div class="modal__actions">
               <button type="button" class="ghost-btn" @click="modalOpen = false">Cancel</button>
-              <button type="submit" class="btn-primary" :disabled="saving">
+              <button type="submit" class="ui-btn ui-btn--primary" :disabled="saving">
                 {{ saving ? 'Saving…' : (editing ? 'Save changes' : 'Add staff') }}
               </button>
             </div>
@@ -358,6 +353,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1285,4 +1281,7 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   }
 }
 .select { width: 200px; }
+
+/* The shared PageHeader, with the space below it the old header kept. */
+.staff > .ph { margin-bottom: 20px; }
 </style>
