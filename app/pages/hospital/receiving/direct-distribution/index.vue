@@ -58,10 +58,14 @@
               aria-label="Search patient transfusion requests"
             >
           </div>
+          <!-- Every request except a cancelled one: open first, the rest marked with their status. -->
           <SelectField
             v-model="ptrId"
-            :options="openRequests.map((ptr) => ({ value: ptr.id, label: `${ptr.reference_number} · ${ptr.patient?.full_name || 'Patient'} · ${ptr.blood_type?.code ?? ''}` }))"
-            :placeholder="ptrLoading ? 'Loading…' : openRequests.length ? 'Choose a request…' : 'No open requests'"
+            :options="selectableRequests.map((ptr) => ({
+              value: ptr.id,
+              label: `${ptr.reference_number} — ${ptr.patient?.full_name || 'Patient'} · ${ptr.blood_type?.code ?? ''}${ptr.is_open === false ? ` · ${ptr.status_label}` : ''}`,
+            }))"
+            :placeholder="ptrLoading ? 'Loading…' : selectableRequests.length ? 'Choose a request…' : 'No requests found'"
             aria-label="Patient transfusion request"
             :disabled="ptrLoading"
           />
@@ -444,7 +448,20 @@ const receiveLabel = computed(() => {
   return `Receive ${count} unit${count === 1 ? '' : 's'}`
 })
 
-const openRequests = computed(() => ptrList.value.filter((request) => request.is_open !== false))
+/*
+ * Every Patient Transfusion Request raised in RedAgos can take a bag received
+ * from outside it, whatever the centres did with it — fulfilled, rejected or
+ * still open — except a cancelled one, as the server rules. Open ones first;
+ * the rest follow, marked with their status.
+ */
+const selectableRequests = computed(() => {
+  const usable = ptrList.value.filter((request) => request.status !== 'cancelled')
+
+  return [
+    ...usable.filter((request) => request.is_open !== false),
+    ...usable.filter((request) => request.is_open === false),
+  ]
+})
 const awaiting = computed(() => awaitingBagsFor(ptr.value?.allocations))
 const staffName = computed(() => user.value?.full_name || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ') || '—')
 

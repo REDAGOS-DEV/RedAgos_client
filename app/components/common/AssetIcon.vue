@@ -96,6 +96,7 @@ import packageSearch from '~/assets/icons/package-search.svg?raw'
 import palette from '~/assets/icons/palette.svg?raw'
 import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
+import philippinePeso from '~/assets/icons/philippine-peso.svg?raw'
 import plus from '~/assets/icons/plus.svg?raw'
 import printer from '~/assets/icons/printer.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
@@ -224,6 +225,7 @@ const icons = {
   palette,
   pencil,
   phone,
+  'philippine-peso': philippinePeso,
   plus,
   printer,
   'qr-code': qrCode,

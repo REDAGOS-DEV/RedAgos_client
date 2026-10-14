@@ -46,18 +46,40 @@
             </h2>
             <p class="stockin__desc">
               {{ canStockIn
-                ? 'These bags arrived. Say where each one is stored (optional) and stock them in; they cannot be tagged until then.'
+                ? 'These bags arrived. Scan each one as you put it away, give the scanned bags their storage location, and stock them in. They cannot be tagged until then.'
                 : 'These bags arrived and wait for inventory staff to stock them in. They cannot be tagged until then.' }}
             </p>
           </div>
-          <form v-if="canStockIn" class="stockin__bulk" @submit.prevent="applyBulkLocation">
+        </div>
+
+        <!-- Scan a fridge's bags, give them its location, stock them in; then the next fridge. -->
+        <div v-if="canStockIn" class="stockin__tools">
+          <form class="stockin__scan" @submit.prevent="scanBag">
+            <AssetIcon name="scan-line" :size="15" class="stockin__scan-icon" />
+            <input
+              ref="scanInput"
+              v-model="scanEntry"
+              type="text"
+              class="filter-select stockin__input stockin__input--scan mono"
+              placeholder="Scan or type a bag number"
+              aria-label="Scan a bag to stock in"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="characters"
+              maxlength="50"
+            />
+          </form>
+          <p class="stockin__note" :class="{ 'stockin__note--alert': scanAlert }" aria-live="polite">
+            {{ scanNote || `${ticked.length} of ${tickable.length} scanned` }}
+          </p>
+          <form class="stockin__bulk" @submit.prevent="applyBulkLocation">
             <input
               v-model="bulkLocation"
               list="hinv-storage-locations"
               maxlength="100"
               class="filter-select stockin__input"
-              placeholder="Location for the ticked bags"
-              aria-label="Storage location for the ticked bags"
+              placeholder="Location for the scanned bags"
+              aria-label="Storage location for the scanned bags"
             />
             <button type="submit" class="btn" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
           </form>
@@ -72,7 +94,7 @@
                     type="checkbox"
                     :checked="allTicked"
                     :indeterminate.prop="ticked.length > 0 && !allTicked"
-                    aria-label="Tick every bag in date"
+                    aria-label="Mark every bag in date, without scanning"
                     @change="toggleAllTicked"
                   />
                 </th>
@@ -86,7 +108,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="unit in arrived" :key="unit.id" :class="{ 'row--expired': unit.bag_expired }">
+              <tr v-for="unit in arrived" :key="unit.id" :class="{ 'row--expired': unit.bag_expired, 'row--scanned': ticked.includes(unit.unit_id) }">
                 <td v-if="canStockIn" class="check-col">
                   <input
                     v-model="ticked"
@@ -150,7 +172,7 @@
           <p v-if="stockInError" class="stockin__error" role="alert">{{ stockInError }}</p>
           <button type="button" class="btn btn--primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
             <AssetIcon name="package" :size="14" />
-            {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} bag${ticked.length === 1 ? '' : 's'}` }}
+            {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} scanned bag${ticked.length === 1 ? '' : 's'}` }}
           </button>
         </div>
       </section>
@@ -510,6 +532,7 @@ import {
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
 import SelectField from '~/components/common/SelectField.vue'
+import { matchStockInScan } from '~/utils/stockIn'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
@@ -597,20 +620,42 @@ const allTicked = computed(() => tickable.value.length > 0 && tickable.value.eve
 
 async function loadArrived() {
   try {
-    const known = new Set(arrived.value.map((unit) => unit.unit_id))
     const page = await hospitalService.inventory({ status: 'received', per_page: 100 })
     arrived.value = page?.data ?? []
 
-    // A new arrival is ticked, so one click stocks the whole delivery in;
-    // a bag no longer waiting drops out of the ticks.
+    // Nothing is marked until it is scanned (or ticked by hand); a bag no
+    // longer waiting drops out of the marks.
     const waiting = new Set(tickable.value)
-    ticked.value = [
-      ...ticked.value.filter((id) => waiting.has(id)),
-      ...tickable.value.filter((id) => !known.has(id) && !ticked.value.includes(id)),
-    ]
+    ticked.value = ticked.value.filter((id) => waiting.has(id))
   } catch {
     // The list below still works; the panel just does not show.
     arrived.value = []
+  }
+}
+
+/* SCANNING: each bag's barcode as it is put away marks it for stock-in. */
+const scanInput = ref(null)
+const scanEntry = ref('')
+const scanNote = ref('')
+const scanAlert = ref(false)
+
+function scanBag() {
+  const code = scanEntry.value
+  scanEntry.value = ''
+  if (!code.trim()) return
+
+  const result = matchStockInScan(code, arrived.value, ticked.value)
+  scanAlert.value = result.kind !== 'scanned'
+
+  if (result.kind === 'scanned') {
+    ticked.value = [...ticked.value, result.unitId]
+    scanNote.value = `${result.label} scanned — ${ticked.value.length} of ${tickable.value.length}.`
+  } else if (result.kind === 'expired') {
+    scanNote.value = `${result.code} is past its date. Discard it instead of stocking it in.`
+  } else if (result.kind === 'already') {
+    scanNote.value = `${result.code} is already scanned.`
+  } else {
+    scanNote.value = `${result.code} is not awaiting stock-in here.`
   }
 }
 
@@ -640,8 +685,13 @@ async function stockInTicked() {
 
     for (const id of ticked.value) delete locations[id]
     ticked.value = []
+    scanNote.value = ''
+    scanAlert.value = false
     showToast(response?.message || 'Stocked in.')
     await refresh()
+
+    // Ready for the next fridge's bags.
+    nextTick(() => scanInput.value?.focus())
   } catch (err) {
     stockInError.value = err?.status === 422 ? firstError(err) : refusalMessage(err)
 
@@ -1132,9 +1182,22 @@ function formatDateTime(value) {
 .stockin__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--rb-border); }
 .stockin__title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
 .stockin__desc { margin: 4px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 70ch; }
-.stockin__bulk { display: flex; gap: 8px; align-items: center; }
+.stockin__tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
+.stockin__scan { position: relative; flex: 1 1 260px; max-width: 360px; }
+.stockin__scan-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
+.stockin__input--scan { width: 100%; max-width: none; padding-left: 34px; background-color: var(--rb-surface); }
+.stockin__note { margin: 0; flex: 1 1 auto; font-size: 12.5px; color: var(--rb-text-secondary); }
+.stockin__note--alert { color: var(--rb-accent-text); }
+.row--scanned td { background: rgba(var(--rb-success-rgb), 0.06); }
+.stockin__bulk { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .stockin__bulk .stockin__input { width: 230px; max-width: none; }
-/* A text field in the filter style, without the select's arrow. */
+/* A text field in the filter style, without the select's arrow. The look is
+   set here: .filter-select now only sizes the SelectField filters. */
+.stockin__input {
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
+  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); background: var(--rb-surface-alt);
+}
+.stockin__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .stockin__input { cursor: text; background-image: none; padding-right: 12px; min-width: 0; width: 100%; max-width: 220px; }
 .stockin__foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
 .stockin__error { margin: 0; margin-right: auto; font-size: 12.5px; color: var(--rb-accent-text); }

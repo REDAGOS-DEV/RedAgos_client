@@ -223,8 +223,15 @@ const NAV_GROUPS = [
   }
 ]
 
+// The server knows no user (the token lives in the browser), so the server
+// render and hydration show the whole menu, as they always have; the role's
+// own menu follows once mounted. Filtering earlier would make the two renders
+// disagree, and a production build keeps the server's link targets.
+const hydrated = ref(false)
+onMounted(() => { hydrated.value = true })
+
 const navGroups = computed(() => NAV_GROUPS
-  .map((group) => ({ ...group, items: group.items.filter((item) => !item.requires || can(item.requires)) }))
+  .map((group) => ({ ...group, items: group.items.filter((item) => !item.requires || !hydrated.value || can(item.requires)) }))
   .filter((group) => group.items.length > 0))
 
 const loadUser = async () => {

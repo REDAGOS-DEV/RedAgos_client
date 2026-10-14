@@ -261,12 +261,13 @@ describe('pages and navigation', () => {
     expect(page).toContain(":editable=\"can('inventory.thresholds')\"")
   })
 
-  it('opens the hospital page to every blood-bank account, always editable', () => {
+  it('opens the hospital page to every role, editable by those who set minimums', () => {
     const page = source('app/pages/hospital/stock-thresholds.vue')
 
     expect(page).toContain("middleware: ['auth', 'hospital-portal']")
     expect(page).toContain("layout: 'hospitaldashboard'")
-    expect(page).toMatch(/^\s+editable$/m)
+    expect(page).toContain("requires: 'hospital.inventory.view'")
+    expect(page).toContain(":editable=\"can('hospital.inventory.thresholds')\"")
   })
 
   it('links the centre page from the Issuance navigation under the ability the server checks', () => {

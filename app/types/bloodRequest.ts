@@ -499,6 +499,8 @@ export interface RecordedPayment {
   payment_method: PaymentMethod
   payment_method_label: string
   reference_number: string | null
+  /** Card only: the cardholder's last name, if the counter recorded it. */
+  additional_information: string | null
   status: PaymentStatus
   status_label: string
   source: PaymentSource

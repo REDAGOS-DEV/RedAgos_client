@@ -217,7 +217,10 @@
                             <span class="sub">{{ p.source_label }}</span>
                           </td>
                           <td class="num strong">{{ pesos(p.amount_paid) }}</td>
-                          <td class="mono">{{ p.reference_number || '—' }}</td>
+                          <td>
+                            <span class="mono">{{ p.reference_number || '—' }}</span>
+                            <span v-if="p.additional_information" class="sub" title="Additional information">{{ p.additional_information }}</span>
+                          </td>
                           <td>
                             <NuxtLink v-if="p.receipt" :to="`/blood-center/receipt/${p.receipt.id}`" class="link mono">{{ p.receipt.receipt_number }}</NuxtLink>
                             <span v-else class="muted">—</span>
@@ -334,6 +337,7 @@
                 <div><dt>Last payment</dt><dd>{{ pesos(lastPayment.amount_paid) }} · {{ lastPayment.payment_method_label }}</dd></div>
                 <div><dt>Received</dt><dd>{{ when(lastPayment.payment_date) }}</dd></div>
                 <div v-if="lastPayment.reference_number"><dt>Reference</dt><dd class="mono">{{ lastPayment.reference_number }}</dd></div>
+                <div v-if="lastPayment.additional_information"><dt>Additional information</dt><dd>{{ lastPayment.additional_information }}</dd></div>
               </dl>
 
               <!-- Patient bill: take the money at the counter, by QR, or waive it. -->
