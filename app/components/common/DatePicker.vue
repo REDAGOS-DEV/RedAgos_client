@@ -433,7 +433,7 @@ const iconSize = computed(() => (props.size === 'sm' ? 15 : 17))
 
   position: relative;
   width: 100%;
-  font-family: var(--rb-font-sans, inherit);
+  font-family: inherit;
 }
 .dp--sm { --dp-h: 36px; --dp-font: 13px; --dp-radius: 8px; }
 .dp--lg { --dp-h: 50px; --dp-font: 15px; --dp-radius: 12px; }
@@ -503,10 +503,11 @@ const iconSize = computed(() => (props.size === 'sm' ? 15 : 17))
   --dpp-faint: #94A3B8;
   --dpp-border: #E2E8F0;
   --dpp-hover: #F1F5F9;
-  --dpp-accent: #1565C0;
-  --dpp-accent-hover: #0D47A1;
-  --dpp-accent-soft: rgba(21, 101, 192, 0.1);
-  --dpp-accent-text: #1565C0;
+  /* Follow the donor's colour theme (set on <html>); default blue elsewhere. */
+  --dpp-accent: var(--rb-primary, #1565C0);
+  --dpp-accent-hover: var(--rb-primary-hover, #0D47A1);
+  --dpp-accent-soft: rgba(var(--rb-primary-rgb, 21, 101, 192), 0.1);
+  --dpp-accent-text: var(--accent-text-light, #1565C0);
   --dpp-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 20px 44px -16px rgba(15, 23, 42, 0.35);
 
   /* Day cell size. Compact for a mouse; touch screens get 36px below. */
@@ -521,8 +522,16 @@ const iconSize = computed(() => (props.size === 'sm' ? 15 : 17))
   border-radius: 14px;
   box-shadow: var(--dpp-shadow);
   color: var(--dpp-text);
-  font-family: var(--rb-font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--rb-font-ui, var(--rb-font-sans, ui-sans-serif, system-ui, sans-serif));
   -webkit-font-smoothing: antialiased;
+}
+/* The auth screens keep their own typeface. */
+.dp-panel--light {
+  --dpp-accent: #1565C0;
+  --dpp-accent-hover: #0D47A1;
+  --dpp-accent-soft: rgba(21, 101, 192, 0.1);
+  --dpp-accent-text: #1565C0;
+  font-family: var(--rb-font-sans, ui-sans-serif, system-ui, sans-serif);
 }
 html.dark .dp-panel:not(.dp-panel--light) {
   --dpp-surface: #1E293B;
@@ -531,8 +540,8 @@ html.dark .dp-panel:not(.dp-panel--light) {
   --dpp-faint: #64748B;
   --dpp-border: #334155;
   --dpp-hover: #263449;
-  --dpp-accent-soft: rgba(100, 181, 246, 0.14);
-  --dpp-accent-text: #64B5F6;
+  --dpp-accent-soft: rgba(var(--rb-primary-rgb, 100, 181, 246), 0.2);
+  --dpp-accent-text: var(--accent-text-dark, #64B5F6);
   --dpp-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
 }

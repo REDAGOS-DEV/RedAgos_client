@@ -40,19 +40,14 @@
         <div class="form-grid">
           <div class="form-field">
             <label class="form-label" for="identity-type">ID type</label>
-            <select
+            <SelectField
               id="identity-type"
-              ref="idTypeSelect"
               v-model="form.validIdType"
-              class="form-input"
-              :class="{ 'form-input--wanted': needsIdType }"
+              :options="idTypeOptions"
+              placeholder="Select an ID"
+              :invalid="needsIdType"
               :disabled="submitting"
-            >
-              <option value="" disabled>Select an ID</option>
-              <option v-for="option in idTypeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
+            />
           </div>
 
           <div class="form-field">
@@ -180,6 +175,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import IdCameraCapture from '~/components/profile/IdCameraCapture.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
 const props = defineProps({
@@ -196,7 +192,6 @@ const localPreview = ref(null)
 const message = ref('')
 const failed = ref(false)
 const cameraOpen = ref(false)
-const idTypeSelect = ref(null)
 const needsIdType = ref(false)
 
 const form = reactive({
@@ -286,7 +281,7 @@ watch(() => form.validIdType, (type) => {
 function openCamera() {
   if (!form.validIdType) {
     needsIdType.value = true
-    idTypeSelect.value?.focus()
+    document.getElementById('identity-type')?.focus()
 
     return
   }

@@ -19,6 +19,20 @@
  */
 :root {
   --rb-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  /* UI font for dense portal text: clearer at 12-14px, aligned digits. */
+  --rb-font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /*
+   * Portal type scale: six sizes. The donor portal uses only these (numbers
+   * that are the data itself, like stat values and date chips, keep their
+   * own larger sizes). 12px is the floor for anything people need to read.
+   */
+  --rb-fs-display: 24px;  /* dashboard greeting */
+  --rb-fs-title: 20px;    /* page titles */
+  --rb-fs-section: 15px;  /* card and step titles */
+  --rb-fs-body: 14px;     /* most text, buttons, inputs */
+  --rb-fs-small: 13px;    /* descriptions, secondary lines */
+  --rb-fs-caption: 12px;  /* labels, chips, badges, timestamps */
   /* For barcodes, unit numbers and reference codes. One stack, so a code looks
      the same on every page; plain `monospace` fell back to Courier New on
      Windows. */
@@ -48,7 +62,9 @@
    * Light values are the base colours, except warning: #F57C00 is only 2.7:1
    * on white, so text uses amber-700 (4.8:1). The fill keeps #F57C00.
    */
-  --rb-primary-text: #1565C0;
+  /* --accent-text-* are set by the donor colour theme (useAccentTheme). */
+  --rb-primary-text: var(--accent-text-light, #1565C0);
+  --rb-primary-hover: #0D47A1;
   --rb-accent-text: #D32F2F;
   --rb-success-text: #2E7D32;
   --rb-warning-text: #B45309;
@@ -133,7 +149,7 @@
    * fills (--rb-primary and friends) deliberately do not move: they still
    * carry white text.
    */
-  --rb-primary-text: #64B5F6;
+  --rb-primary-text: var(--accent-text-dark, #64B5F6);
   --rb-accent-text: #F87171;
   --rb-success-text: #66BB6A;
   --rb-warning-text: #FFB74D;

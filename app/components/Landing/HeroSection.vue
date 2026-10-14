@@ -44,7 +44,7 @@
             <span class="phone-island" aria-hidden="true"></span>
             <img
               :src="phoneShot"
-              alt="The RedAgos donor portal on a phone: eligibility status, a getting-started checklist, and donation stats"
+              alt="The RedAgos donor portal on a phone: a Book a donation button, blood type and QR code status, and a getting-started checklist"
               width="860"
               height="1864"
               fetchpriority="high"
@@ -116,7 +116,7 @@ function goToDrives() {
 const stats = [
   { icon: 'users', value: '3 portals', label: 'Donors, centers, hospitals' },
   { icon: 'activity', value: '24/7', label: 'Online access' },
-  { icon: 'calendar-check', value: 'Every 3 months', label: 'You can donate whole blood' },
+  { icon: 'calendar-check', value: 'Every 8 weeks', label: 'You can donate whole blood' },
 ]
 </script>
 
@@ -128,6 +128,11 @@ const stats = [
 
 .hero {
   position: relative;
+  /* The blue disc behind the phone is wider than a phone screen and sits
+     right of centre; without this it pushed the whole page sideways on
+     mobile (360px screens scrolled to 407px). `clip`, not `hidden`, so the
+     stats card can still hang below the hero. */
+  overflow-x: clip;
   /* Clears the fixed 64px navbar (plus its 14px inset) with ~32px to spare. */
   padding: 112px 1.5rem 0;
   background:
@@ -290,7 +295,7 @@ const stats = [
   z-index: 2;
   left: 0;
   bottom: 12%;
-  max-width: 260px;
+  max-width: 300px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -399,7 +404,7 @@ const stats = [
   /* Phones have room for one card. The next drive is the more useful one,
      so it stays (bottom-left, over the disc) and the fact card goes. */
   .fact { display: none; }
-  .drive-card { left: 0; bottom: 6%; max-width: 240px; }
+  .drive-card { left: 0; bottom: 6%; max-width: 270px; }
   .fact-icon { width: 36px; height: 36px; }
   .stats { grid-template-columns: 1fr; padding: 8px 20px; }
   .stat { padding: 18px 0; }

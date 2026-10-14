@@ -92,7 +92,7 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 const navItems = [
   { id: 'home', label: 'Home' },
-  { id: 'features', label: 'Features' },
+  { id: 'features', label: 'How It Works' },
   { id: 'roles', label: "Who It's For" },
   { id: 'drives', label: 'Donation Drives' },
   { id: 'about', label: 'About' },

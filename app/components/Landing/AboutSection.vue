@@ -26,46 +26,94 @@
       </div>
     </section>
 
-    <!-- ── Sample scenarios ── -->
+    <!--
+      ── How RedAgos helps ──
+      Before / with RedAgos, per role. It used to be quote cards that looked
+      like testimonials while saying "these are not user reviews"; this says
+      what changes instead, using only features the portals have today.
+    -->
     <section class="scenarios lp-section" aria-labelledby="scenarios-title">
       <div class="lp-inner">
         <header v-reveal class="lp-head lp-head--center">
           <h2 id="scenarios-title" class="lp-h2">How RedAgos helps</h2>
           <p class="lp-lead">
-            Illustrative scenarios of how donors, hospital staff, and families
-            can use RedAgos. These are examples, not user reviews.
+            Five everyday situations, and what changes for each person once
+            RedAgos is in place.
           </p>
         </header>
 
         <div v-reveal class="scenario-panel">
-          <div class="scenario-picker" role="group" aria-label="Choose a scenario">
+          <div
+            ref="tablist"
+            class="scenario-picker"
+            role="tablist"
+            aria-label="Choose a person"
+            @keydown="onTabKeydown"
+          >
             <button
               v-for="(item, i) in scenarios"
-              :key="item.name"
+              :id="`scenario-tab-${i}`"
+              :key="item.role"
               type="button"
+              role="tab"
               class="picker-btn"
               :class="{ active: i === current }"
-              :aria-pressed="i === current"
+              :aria-selected="i === current"
+              :aria-controls="`scenario-panel-${i}`"
+              :tabindex="i === current ? 0 : -1"
               @click="current = i"
             >
               <AssetIcon :name="item.icon" :size="18" />
-              {{ item.name }}
+              {{ item.role }}
             </button>
           </div>
 
-          <div class="scenario-body" aria-live="polite">
+          <div
+            :id="`scenario-panel-${current}`"
+            class="scenario-body"
+            role="tabpanel"
+            :aria-labelledby="`scenario-tab-${current}`"
+          >
             <Transition name="swap" mode="out-in">
-              <figure :key="current" class="scenario">
-                <AssetIcon name="quote" :size="28" class="quote-mark" />
-                <blockquote>{{ scenarios[current].quote }}</blockquote>
-                <figcaption>
-                  <span class="who">{{ scenarios[current].name }}</span>
-                  <span class="tag">Sample scenario</span>
-                  <span v-if="scenarios[current].bloodType" class="blood-tag">
-                    {{ scenarios[current].bloodType }}
-                  </span>
-                </figcaption>
-              </figure>
+              <div :key="current" class="scenario">
+                <p class="scenario-role">{{ scenarios[current].role }}</p>
+                <h3 class="scenario-title">{{ scenarios[current].situation }}</h3>
+
+                <div class="compare">
+                  <div class="compare-col compare-col--before">
+                    <p class="compare-label">
+                      <AssetIcon name="circle-x" :size="16" />
+                      Before
+                    </p>
+                    <ul>
+                      <li v-for="line in scenarios[current].before" :key="line">{{ line }}</li>
+                    </ul>
+                  </div>
+
+                  <div class="compare-col compare-col--with">
+                    <p class="compare-label">
+                      <AssetIcon name="check-circle" :size="16" />
+                      With RedAgos
+                    </p>
+                    <ul>
+                      <li v-for="line in scenarios[current].with" :key="line">{{ line }}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <NuxtLink
+                  v-if="scenarios[current].cta.to"
+                  :to="scenarios[current].cta.to"
+                  class="scenario-cta"
+                >
+                  {{ scenarios[current].cta.label }}
+                  <AssetIcon name="arrow-right" :size="16" />
+                </NuxtLink>
+                <a v-else href="#drives" class="scenario-cta" @click.prevent="goToDrives">
+                  {{ scenarios[current].cta.label }}
+                  <AssetIcon name="arrow-right" :size="16" />
+                </a>
+              </div>
             </Transition>
           </div>
         </div>
@@ -84,39 +132,76 @@ const pillars = [
   { icon: 'bar-chart', title: 'Data-Driven', desc: 'Analytics and reporting support smarter planning, forecasting, and blood supply management.' },
 ]
 
-// Illustrative only. No real names, photos, facilities, or figures. The
-// section header says so, and these must never read as genuine reviews.
+// One situation per role. Every "With RedAgos" line must describe something
+// the portals actually do; no names, figures, or quotes.
 const scenarios = [
   {
-    name: 'Regular Donor',
+    role: 'Regular Donor',
     icon: 'blood-drop',
-    bloodType: 'O+',
-    quote: 'I can book appointments, check my eligibility, and see my full donation history from my phone. RedAgos also reminds me when I can donate again.',
+    situation: 'Keeping up with regular donations',
+    before: ['Keeps donation dates on paper or in memory', 'Calls the center to ask about appointments'],
+    with: ['Sees their full donation history in the donor portal', 'Books online and gets appointment reminders'],
+    cta: { label: 'Register as a donor', to: '/auth/donor/register' },
   },
   {
-    name: 'First-Time Donor',
+    role: 'First-Time Donor',
     icon: 'user',
-    bloodType: 'A+',
-    quote: 'I was nervous about donating for the first time, but the online eligibility screening walked me through everything before I even got to the center.',
+    situation: 'Donating for the first time',
+    before: ['Not sure they qualify until they reach the center', 'Fills in paper forms while waiting in line'],
+    with: ['Completes eligibility screening online first', 'Books a slot and checks in with a QR code'],
+    cta: { label: 'Register as a donor', to: '/auth/donor/register' },
   },
   {
-    name: 'Hospital Blood Bank Staff',
+    role: 'Hospital Blood Bank Staff',
     icon: 'hospital',
-    quote: 'Instead of calling around for blood, we submit a request and track its status until it arrives. Stock thresholds warn us before we run low.',
+    situation: 'Finding blood for a patient',
+    before: ['Phones blood centers one by one to find units', 'No clear view of when the blood will arrive'],
+    with: ['Searches availability across partner blood centers', 'Requests online and tracks it until it arrives'],
+    cta: { label: 'Hospital sign in', to: '/auth/hospital/login' },
   },
   {
-    name: 'Drive Organizer',
+    role: 'Drive Organizer',
     icon: 'calendar',
-    quote: 'We list upcoming donation drives and donors register online, so we know how many people to expect before the day itself.',
+    situation: 'Running a mobile blood drive',
+    before: ['Announces drives through posters and phone calls', 'Cannot tell how many donors will come'],
+    with: ['Posts the drive where donors already look', 'Sees who has registered before the day itself'],
+    cta: { label: 'Blood center sign in', to: '/auth/blood-center/login' },
   },
   {
-    name: "Patient's Family Member",
+    role: "Patient's Family",
     icon: 'heart',
-    quote: 'When my father needed a transfusion, the hospital could request blood from the blood center right away, and the request was tracked every step of the way.',
+    situation: 'When a family member needs blood',
+    before: ['Asked to look for blood or replacement donors themselves', 'Left waiting without updates'],
+    with: ['The hospital requests from the blood center right away', 'The request is tracked until the units arrive'],
+    cta: { label: 'Find a donation drive', to: null },
   },
 ]
 
 const current = ref(0)
+const tablist = ref(null)
+
+// Tabs pattern: arrow keys (and Home / End) move between people.
+function onTabKeydown(e) {
+  const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
+  let next = null
+  if (e.key in keys) next = (current.value + keys[e.key] + scenarios.length) % scenarios.length
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = scenarios.length - 1
+  if (next === null) return
+  e.preventDefault()
+  current.value = next
+  nextTick(() => {
+    const tab = tablist.value?.querySelector(`#scenario-tab-${next}`)
+    tab?.focus()
+    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+
+// Same as the navbar: smooth scroll and a #drives hash.
+function goToDrives() {
+  document.getElementById('drives')?.scrollIntoView({ behavior: 'smooth' })
+  window.history.replaceState(null, '', '#drives')
+}
 </script>
 
 <style scoped>
@@ -206,38 +291,84 @@ const current = ref(0)
 .picker-btn:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
 
 .scenario-body {
-  display: flex;
-  align-items: center;
-  min-height: 280px;
-  padding: 40px clamp(24px, 5vw, 56px);
+  min-height: 340px;
+  padding: 36px clamp(24px, 4vw, 48px);
 }
 .scenario { margin: 0; }
-.quote-mark { color: var(--lp-brand); opacity: 0.5; margin-bottom: 16px; }
-.scenario blockquote {
-  max-width: 52ch;
-  margin: 0 0 24px;
-  font-size: clamp(18px, 1.8vw, 22px);
-  font-weight: 500;
-  line-height: 1.55;
+.scenario-role {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-accent-text);
+}
+.scenario-title {
+  margin: 0 0 22px;
+  font-size: clamp(20px, 2vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--lp-text);
 }
-.scenario figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
+
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
 }
-.who { font-weight: 700; color: var(--lp-text); }
-.tag { color: var(--lp-muted); }
-.blood-tag {
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--lp-brand-soft);
-  color: var(--lp-brand);
-  font-size: 12px;
+.compare-col {
+  padding: 18px 20px;
+  border-radius: 16px;
+}
+.compare-col--before { background: var(--lp-bg); border: 1px solid var(--lp-border); }
+.compare-col--with { background: var(--lp-accent-soft); border: 1px solid rgba(21, 101, 192, 0.22); }
+.compare-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 13px;
   font-weight: 700;
 }
+.compare-col--before .compare-label { color: var(--lp-muted); }
+.compare-col--with .compare-label { color: var(--lp-accent-text); }
+.compare ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.compare li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.compare li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.compare-col--before li { color: var(--lp-text-2); }
+.compare-col--before li::before { background: var(--lp-muted); }
+.compare-col--with li { color: var(--lp-text); font-weight: 600; }
+.compare-col--with li::before { background: var(--lp-accent); }
+
+.scenario-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-accent-text);
+  text-decoration: none;
+}
+.scenario-cta:hover { text-decoration: underline; text-underline-offset: 4px; }
+.scenario-cta:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; border-radius: 4px; }
 
 .swap-enter-active,
 .swap-leave-active { transition: opacity 0.2s ease, transform 0.2s var(--lp-ease); }
@@ -255,7 +386,10 @@ const current = ref(0)
     scroll-snap-type: x mandatory;
   }
   .picker-btn { flex-shrink: 0; white-space: nowrap; scroll-snap-align: start; }
-  .scenario-body { min-height: 0; padding: 28px 24px 32px; }
+  .scenario-body { min-height: 0; padding: 26px 20px 28px; }
+}
+@media (max-width: 640px) {
+  .compare { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .pillars { grid-template-columns: 1fr; }

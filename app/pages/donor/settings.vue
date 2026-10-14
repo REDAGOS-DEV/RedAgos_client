@@ -3,269 +3,241 @@
         <!-- Skeleton loading state -->
         <div v-if="loading" class="skeleton-wrap">
             <div class="skeleton skeleton--header" />
+            <div class="skeleton skeleton--panel" style="height:72px" />
+            <div class="skeleton skeleton--panel" style="height:200px" />
             <div class="skeleton-main-grid">
-                <div class="skeleton-col">
-                    <div class="skeleton skeleton--panel" style="height:360px" />
-                    <div class="skeleton skeleton--panel" style="height:220px" />
-                </div>
-                <div class="skeleton-col">
-                    <div class="skeleton skeleton--panel" style="height:260px" />
-                    <div class="skeleton skeleton--panel" style="height:180px" />
-                </div>
+                <div class="skeleton skeleton--panel" style="height:320px" />
+                <div class="skeleton skeleton--panel" style="height:320px" />
             </div>
         </div>
 
         <template v-else>
             <div class="header-row">
                 <h1 class="page-title">Personalize your experience</h1>
-                <p class="page-subtitle">Manage your account preferences, notification settings, and privacy options.</p>
+                <p class="page-subtitle">How the donor portal looks, what it tells you, and how you sign in.</p>
             </div>
+
+            <!-- Who is signed in; personal details are edited on the Profile page -->
+            <NuxtLink to="/donor/profile" class="profile-strip">
+                <span class="profile-strip__avatar">
+                    <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="" class="profile-strip__img">
+                    <span v-else>{{ initials }}</span>
+                </span>
+                <span class="profile-strip__text">
+                    <span class="profile-strip__name">{{ niceName }}</span>
+                    <span class="profile-strip__meta">Donor ID: {{ profile.donorId || '-' }} · {{ profile.email || '-' }}</span>
+                </span>
+                <span class="profile-strip__cta">
+                    Edit personal info
+                    <AssetIcon name="chevron-right" :size="15" />
+                </span>
+            </NuxtLink>
+
+            <!--
+              Appearance: the donor's colour theme. Applies to the whole donor
+              portal at once and is saved on this device (see
+              composables/useAccentTheme.ts). The preview uses the live theme
+              variables, so it changes the moment a swatch is picked.
+            -->
+            <section class="panel appearance-panel" aria-labelledby="appearance-title">
+                <div class="appearance-panel__pick">
+                    <h2 id="appearance-title" class="panel-title">Appearance</h2>
+                    <p class="appearance__lead">Choose a colour theme for your donor portal.</p>
+                    <div class="swatches" role="radiogroup" aria-label="Colour theme">
+                        <button
+                            v-for="t in accentThemes"
+                            :key="t.key"
+                            type="button"
+                            role="radio"
+                            class="swatch"
+                            :class="{ 'swatch--on': accentKey === t.key }"
+                            :aria-checked="accentKey === t.key"
+                            @click="setAccent(t.key)"
+                        >
+                            <span
+                                class="swatch__circle"
+                                :style="{ background: `linear-gradient(135deg, ${t.gradFrom}, ${t.gradTo})`, '--ring': t.primary }"
+                            >
+                                <span class="swatch__dot" :style="{ background: t.primary }" />
+                                <span v-if="accentKey === t.key" class="swatch__check" :style="{ background: t.primary }">
+                                    <AssetIcon name="check" :size="12" />
+                                </span>
+                            </span>
+                            <span class="swatch__name">{{ t.name }}</span>
+                        </button>
+                    </div>
+                    <p class="appearance__note">
+                        <AssetIcon name="info" :size="13" />
+                        Saved on this device. Light, dark, or same as your browser: choose it in your account menu (top right).
+                    </p>
+                </div>
+
+                <!-- A tiny dashboard in the picked theme -->
+                <div class="theme-preview" aria-hidden="true">
+                    <div class="theme-preview__hero">
+                        <span class="theme-preview__line theme-preview__line--sm" />
+                        <span class="theme-preview__line" />
+                        <span class="theme-preview__btn">Book a donation</span>
+                    </div>
+                    <div class="theme-preview__row">
+                        <span class="theme-preview__chip">Next</span>
+                        <span class="theme-preview__toggle"><span /></span>
+                        <span class="theme-preview__ring" />
+                    </div>
+                    <p class="theme-preview__label">Preview</p>
+                </div>
+            </section>
 
             <div class="main-grid">
-                <!-- Left column: profile + security -->
-                <div class="col-left">
-                    <!-- Profile information -->
-                    <div class="panel">
-                        <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Profile Information</h2>
+                <!-- Notification preferences -->
+                <section class="panel" aria-labelledby="notif-title">
+                    <div class="panel-header panel-header--simple">
+                        <h2 id="notif-title" class="panel-title">Notifications</h2>
+                        <p class="panel-sub">Choose what RedAgos tells you about.</p>
+                    </div>
+                    <div class="toggle-list">
+                        <div v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
+                            <div class="toggle-row__text">
+                                <p :id="`pref-${pref.key}`" class="toggle-row__label">{{ pref.label }}</p>
+                                <p class="toggle-row__desc">{{ pref.desc }}</p>
+                            </div>
+                            <button
+                                type="button"
+                                class="toggle-switch"
+                                :class="{ 'toggle-switch--on': pref.enabled }"
+                                role="switch"
+                                :aria-checked="pref.enabled"
+                                :aria-labelledby="`pref-${pref.key}`"
+                                @click="pref.enabled = !pref.enabled"
+                            >
+                                <span class="toggle-switch__knob" />
+                            </button>
                         </div>
-                        <div class="form-body">
-                            <div class="avatar-row">
-                                <div class="avatar-frame">
-                                    <div class="avatar">
-                                        <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="Profile photo" class="avatar__img">
-                                        <span v-else class="avatar__initials">{{ initials }}</span>
-                                    </div>
-                                    <button type="button" class="avatar__edit" @click="triggerAvatarPick" aria-label="Change photo">
-                                        <AssetIcon name="camera" :size="14" />
+                    </div>
+                    <div class="panel-footer">
+                        <p class="status-note" :class="{ 'status-note--error': notifsError, 'status-note--ok': notifsSaved && !notifsError }" aria-live="polite">
+                            <template v-if="notifsError">{{ notifsError }}</template>
+                            <template v-else-if="notifsSaved"><AssetIcon name="check" :size="14" /> Saved</template>
+                        </p>
+                        <button type="button" class="btn-outline" :disabled="savingNotifs" @click="saveNotifications">
+                            {{ savingNotifs ? 'Saving...' : 'Save preferences' }}
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Password & security -->
+                <section class="panel" aria-labelledby="security-title">
+                    <div class="panel-header panel-header--simple">
+                        <h2 id="security-title" class="panel-title">Password &amp; security</h2>
+                        <p class="panel-sub">Choose one you don't use on other sites.</p>
+                    </div>
+                    <div class="form-body">
+                        <div class="form-stack">
+                            <div class="form-field">
+                                <label class="form-label" for="pw-current">Current password</label>
+                                <div class="password-field">
+                                    <input
+                                        id="pw-current"
+                                        v-model="security.currentPassword"
+                                        :type="showCurrentPassword ? 'text' : 'password'"
+                                        class="form-input"
+                                        autocomplete="current-password"
+                                        placeholder="**************"
+                                    >
+                                    <button
+                                        type="button"
+                                        class="password-toggle"
+                                        :aria-label="showCurrentPassword ? 'Hide password' : 'Show password'"
+                                        @click="showCurrentPassword = !showCurrentPassword"
+                                    >
+                                        <AssetIcon :name="showCurrentPassword ? 'eye' : 'eye-off'" :size="16" />
                                     </button>
                                 </div>
-                                <input ref="avatarInput" type="file" accept="image/*" class="avatar-input-hidden" @change="onAvatarChange">
-                                <div>
-                                    <p class="avatar-row__name">{{ profile.fullName || 'Your name' }}</p>
-                                    <p class="avatar-row__meta">Donor ID: {{ profile.donorId || 'â€”' }}</p>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="pw-new">New password</label>
+                                <div class="password-field">
+                                    <input
+                                        id="pw-new"
+                                        v-model="security.newPassword"
+                                        :type="showNewPassword ? 'text' : 'password'"
+                                        class="form-input"
+                                        autocomplete="new-password"
+                                        placeholder="**************"
+                                    >
+                                    <button
+                                        type="button"
+                                        class="password-toggle"
+                                        :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
+                                        @click="showNewPassword = !showNewPassword"
+                                    >
+                                        <AssetIcon :name="showNewPassword ? 'eye' : 'eye-off'" :size="16" />
+                                    </button>
                                 </div>
                             </div>
-
-                            <div class="form-stack">
-                                <div class="form-field">
-                                    <label class="form-label">Full name</label>
-                                    <input v-model="profile.fullName" type="text" class="form-input" placeholder="Juan Dela Cruz">
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-field">
-                                        <label class="form-label">Email address</label>
-                                        <div class="input-icon-field">
-                                            <AssetIcon name="mail" :size="16" class="input-icon-field__icon" />
-                                            <input v-model="profile.email" type="email" class="form-input form-input--with-icon" placeholder="juan@email.com">
-                                        </div>
-                                    </div>
-                                    <div class="form-field">
-                                        <label class="form-label">Phone number</label>
-                                        <div class="input-icon-field">
-                                            <AssetIcon name="phone" :size="16" class="input-icon-field__icon" />
-                                            <input v-model="profile.phone" type="tel" class="form-input form-input--with-icon" placeholder="09XX XXX XXXX">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-field">
-                                        <label class="form-label">Date of birth</label>
-                                        <input v-model="profile.birthDate" type="date" class="form-input">
-                                    </div>
-                                    <div class="form-field">
-                                        <label class="form-label">Blood type</label>
-                                        <div class="select-wrap">
-                                            <select v-model="profile.bloodType" class="form-input form-input--select">
-                                                <option value="">Unknown</option>
-                                                <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
-                                            </select>
-                                            <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="form-field">
-                                    <label class="form-label">Home address</label>
-                                    <input v-model="profile.address" type="text" class="form-input" placeholder="Street, Barangay, City">
-                                </div>
-
-                                <!--
-                                    Section I-A. Editable here as well as on the
-                                    profile page, which both write through the
-                                    same endpoint.
-                                -->
-                                <div class="form-field">
-                                    <label class="form-label">Middle name</label>
-                                    <input v-model="profile.middle_name" type="text" class="form-input">
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Occupation</label>
-                                    <input v-model="profile.occupation" type="text" class="form-input">
-                                </div>
-                                <div class="form-field">
-                                    <label class="form-label">Nationality</label>
-                                    <input v-model="profile.nationality" type="text" class="form-input">
+                            <div class="form-field">
+                                <label class="form-label" for="pw-confirm">Confirm new password</label>
+                                <div class="password-field">
+                                    <input
+                                        id="pw-confirm"
+                                        v-model="security.confirmPassword"
+                                        :type="showConfirmPassword ? 'text' : 'password'"
+                                        class="form-input"
+                                        autocomplete="new-password"
+                                        placeholder="**************"
+                                    >
+                                    <button
+                                        type="button"
+                                        class="password-toggle"
+                                        :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+                                        @click="showConfirmPassword = !showConfirmPassword"
+                                    >
+                                        <AssetIcon :name="showConfirmPassword ? 'eye' : 'eye-off'" :size="16" />
+                                    </button>
                                 </div>
                             </div>
-
-                            <div class="form-footer">
-                                <span v-if="profileSaved" class="saved-note">
-                                    <AssetIcon name="check" :size="14" />
-                                    Saved
-                                </span>
-                                <button type="button" class="btn-primary" :disabled="savingProfile" @click="saveProfile">
-                                    {{ savingProfile ? 'Saving...' : 'Save changes' }}
-                                </button>
-                            </div>
+                            <p v-if="passwordMismatch" class="field-error">
+                                <AssetIcon name="alert" :size="13" />
+                                New password and confirmation don't match.
+                            </p>
                         </div>
-                    </div>
 
-                    <!-- Password & security -->
-                    <div class="panel">
-                        <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Password &amp; Security</h2>
-                        </div>
-                        <div class="form-body">
-                            <div class="form-stack">
-                                <div class="form-field">
-                                    <label class="form-label">Current password</label>
-                                    <div class="password-field">
-                                        <input
-                                            v-model="security.currentPassword"
-                                            :type="showCurrentPassword ? 'text' : 'password'"
-                                            class="form-input"
-                                            placeholder="**************"
-                                        >
-                                        <button
-                                            type="button"
-                                            class="password-toggle"
-                                            :aria-label="showCurrentPassword ? 'Hide password' : 'Show password'"
-                                            @click="showCurrentPassword = !showCurrentPassword"
-                                        >
-                                            <AssetIcon :name="showCurrentPassword ? 'eye' : 'eye-off'" :size="16" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-field">
-                                        <label class="form-label">New password</label>
-                                        <div class="password-field">
-                                            <input
-                                                v-model="security.newPassword"
-                                                :type="showNewPassword ? 'text' : 'password'"
-                                                class="form-input"
-                                                placeholder="**************"
-                                            >
-                                            <button
-                                                type="button"
-                                                class="password-toggle"
-                                                :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
-                                                @click="showNewPassword = !showNewPassword"
-                                            >
-                                                <AssetIcon :name="showNewPassword ? 'eye' : 'eye-off'" :size="16" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-field">
-                                        <label class="form-label">Confirm new password</label>
-                                        <div class="password-field">
-                                            <input
-                                                v-model="security.confirmPassword"
-                                                :type="showConfirmPassword ? 'text' : 'password'"
-                                                class="form-input"
-                                                placeholder="**************"
-                                            >
-                                            <button
-                                                type="button"
-                                                class="password-toggle"
-                                                :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
-                                                @click="showConfirmPassword = !showConfirmPassword"
-                                            >
-                                                <AssetIcon :name="showConfirmPassword ? 'eye' : 'eye-off'" :size="16" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p v-if="passwordMismatch" class="field-error">
-                                    <AssetIcon name="alert" :size="13" />
-                                    New password and confirmation don't match.
-                                </p>
-                            </div>
-
-                            <div class="form-footer">
-                                <button
-                                    type="button"
-                                    class="btn-primary"
-                                    :disabled="savingPassword || !canSubmitPassword"
-                                    @click="updatePassword"
-                                >
-                                    {{ savingPassword ? 'Updating...' : 'Update password' }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right column: notifications + account -->
-                <div class="col-right">
-                    <!-- Notification preferences -->
-                    <div class="panel">
-                        <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Notification Preferences</h2>
-                        </div>
-                        <div class="toggle-list">
-                            <div v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
-                                <div class="toggle-row__text">
-                                    <p class="toggle-row__label">{{ pref.label }}</p>
-                                    <p class="toggle-row__desc">{{ pref.desc }}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="toggle-switch"
-                                    :class="{ 'toggle-switch--on': pref.enabled }"
-                                    role="switch"
-                                    :aria-checked="pref.enabled"
-                                    @click="pref.enabled = !pref.enabled"
-                                >
-                                    <span class="toggle-switch__knob" />
-                                </button>
-                            </div>
-                        </div>
-                        <div class="panel-footer">
-                            <span v-if="notifsSaved" class="saved-note">
-                                <AssetIcon name="check" :size="14" />
-                                Saved
-                            </span>
-                            <button type="button" class="btn-outline btn-block" :disabled="savingNotifs" @click="saveNotifications">
-                                {{ savingNotifs ? 'Saving...' : 'Save preferences' }}
+                        <div class="form-footer">
+                            <p class="status-note" :class="{ 'status-note--error': passwordFailed, 'status-note--ok': passwordMessage && !passwordFailed }" aria-live="polite">
+                                {{ passwordMessage }}
+                            </p>
+                            <button
+                                type="button"
+                                class="btn-primary"
+                                :disabled="savingPassword || !canSubmitPassword"
+                                @click="updatePassword"
+                            >
+                                {{ savingPassword ? 'Updating...' : 'Update password' }}
                             </button>
                         </div>
                     </div>
-
-                    <!-- Account -->
-                    <div class="panel">
-                        <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Account</h2>
-                        </div>
-                        <div class="account-actions">
-                            <button type="button" class="account-action" @click="handleLogout">
-                                <AssetIcon name="log-out" :size="16" />
-                                <span>Log out</span>
-                            </button>
-                            <button type="button" class="account-action account-action--danger" @click="confirmDeleteOpen = true">
-                                <AssetIcon name="trash-2" :size="16" />
-                                <span>Delete account</span>
-                            </button>
-                        </div>
-                        <p class="account-note">
-                            Deleting your account permanently removes your donor profile, screening history, and QR code.
-                        </p>
-                    </div>
-                </div>
+                </section>
             </div>
+
+            <!-- Account -->
+            <section class="panel account-panel" aria-labelledby="account-title">
+                <div class="account-panel__text">
+                    <h2 id="account-title" class="panel-title">Account</h2>
+                    <p class="account-note">
+                        Deleting your account permanently removes your donor profile, screening history, and QR code.
+                    </p>
+                </div>
+                <div class="account-actions">
+                    <button type="button" class="account-action" @click="handleLogout">
+                        <AssetIcon name="log-out" :size="16" />
+                        <span>Log out</span>
+                    </button>
+                    <button type="button" class="account-action account-action--danger" @click="confirmDeleteOpen = true">
+                        <AssetIcon name="trash-2" :size="16" />
+                        <span>Delete account</span>
+                    </button>
+                </div>
+            </section>
         </template>
 
         <!-- Delete account confirmation -->
@@ -309,19 +281,20 @@ definePageMeta({
   keepalive: true,
 })
 
-import { authService } from '~/api/auth/AuthService'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
+import { useAccentTheme } from '~/composables/useAccentTheme'
 
 
 const router = useRouter()
-const { fetchUser, clearUser, logout } = useUser()
+const { clearUser, logout } = useUser()
 
 const loading = ref(true)
 
-const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+// Colour theme (Appearance card). The layout has already applied the saved one.
+const { current: accentKey, themes: accentThemes, set: setAccent } = useAccentTheme()
 
 const profile = reactive({
     fullName: '',
@@ -352,13 +325,13 @@ const notificationPrefs = reactive([
 const deletePassword = ref('')
 const deleteError = ref('')
 
-const avatarInput = ref(null)
-const savingProfile = ref(false)
 const savingPassword = ref(false)
+const passwordMessage = ref('')
+const passwordFailed = ref(false)
+const notifsError = ref('')
 const savingNotifs = ref(false)
 const deleting = ref(false)
 const confirmDeleteOpen = ref(false)
-const profileSaved = ref(false)
 const notifsSaved = ref(false)
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
@@ -374,6 +347,11 @@ const initials = computed(() => {
         .join('')
 })
 
+// Names are stored as typed ("yana cruz"); show them capitalised.
+const niceName = computed(() =>
+    (profile.fullName || 'Your name').replace(/(^|[\s-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+)
+
 const passwordMismatch = computed(() =>
     security.newPassword.length > 0 &&
     security.confirmPassword.length > 0 &&
@@ -386,52 +364,11 @@ const canSubmitPassword = computed(() =>
     security.newPassword === security.confirmPassword
 )
 
-function triggerAvatarPick() {
-    avatarInput.value?.click()
-}
-
-function onAvatarChange(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    // Preview locally; actual upload happens on saveProfile()
-    profile.avatarUrl = URL.createObjectURL(file)
-}
-
-async function saveProfile() {
-    savingProfile.value = true
-    profileSaved.value = false
-    try {
-        // Backend contract: PATCH /api/donor/profile
-        // Body: { full_name, email, phone, birth_date, blood_type, address }
-        // Avatar upload would go through a separate multipart endpoint in practice.
-        const name = splitFullName(profile.fullName)
-        const response = await donorService.updateProfile({
-            first_name: name.firstName,
-            last_name: name.lastName,
-            email: profile.email,
-            phone: profile.phone,
-            birth_date: profile.birthDate,
-            blood_type: profile.bloodType,
-            address: profile.address,
-            middle_name: profile.middle_name,
-            occupation: profile.occupation,
-            nationality: profile.nationality,
-        })
-        applyProfile(response?.data || {})
-        await fetchUser()
-        profileSaved.value = true
-        // Ang na-save na nga values mao nay bag-ong baseline sa dirty check.
-        formSnapshot = snapshotForm()
-    } catch (err) {
-        console.error('Failed to save profile:', err)
-    } finally {
-        savingProfile.value = false
-    }
-}
-
 async function updatePassword() {
     if (!canSubmitPassword.value) return
     savingPassword.value = true
+    passwordMessage.value = ''
+    passwordFailed.value = false
     try {
         // Backend contract: POST /api/donor/change-password
         // Body: { current_password, new_password }
@@ -443,8 +380,14 @@ async function updatePassword() {
         security.currentPassword = ''
         security.newPassword = ''
         security.confirmPassword = ''
+        passwordMessage.value = 'Password updated.'
     } catch (err) {
         console.error('Failed to update password:', err)
+        passwordFailed.value = true
+        passwordMessage.value = err?.errors?.current_password?.[0]
+            || err?.errors?.password?.[0]
+            || err?.message
+            || 'Could not update your password. Please try again.'
     } finally {
         savingPassword.value = false
     }
@@ -453,6 +396,7 @@ async function updatePassword() {
 async function saveNotifications() {
     savingNotifs.value = true
     notifsSaved.value = false
+    notifsError.value = ''
     try {
         // Backend contract: PATCH /api/donor/notification-preferences
         // Body: { appointment_reminders, eligibility_renewal, nearby_drives, email_updates }
@@ -461,6 +405,7 @@ async function saveNotifications() {
         formSnapshot = snapshotForm()
     } catch (err) {
         console.error('Failed to save notification preferences:', err)
+        notifsError.value = err?.message || 'Could not save your preferences. Please try again.'
     } finally {
         savingNotifs.value = false
     }
@@ -560,19 +505,11 @@ function applyProfile(data) {
     profile.donorId = data?.donor_id ?? ''
     profile.avatarUrl = resolveApiAssetURL(data?.avatar_url) ?? ''
 }
-
-function splitFullName(fullName) {
-    const parts = fullName.trim().split(/\s+/).filter(Boolean)
-    return {
-        firstName: parts.shift() || '',
-        lastName: parts.join(' ') || '',
-    }
-}
 </script>
 
 <style scoped>
 .settings-page {
-    --primary: #1565c0;
+    --primary: var(--rb-primary);
     --accent: #d32f2f;
     --success: #2e7d32;
     --warning: #f57c00;
@@ -593,14 +530,14 @@ function splitFullName(fullName) {
 }
 
 .page-title {
-    font-size: 20px;
+    font-size: var(--rb-fs-title);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
 .page-subtitle {
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     color: var(--text-secondary);
     margin: 2px 0 0;
 }
@@ -683,9 +620,89 @@ function splitFullName(fullName) {
     border-bottom: 1px solid #f3f4f6;
 }
 
+/* ── Appearance ── */
+.appearance { padding: 16px 20px 18px; }
+.appearance__lead {
+    margin: 0 0 14px;
+    font-size: var(--rb-fs-small);
+    color: var(--text-secondary);
+}
+.swatches {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px 8px;
+}
+.swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+}
+.swatch__circle {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.swatch:hover .swatch__circle { transform: scale(1.06); }
+.swatch--on .swatch__circle {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--ring);
+}
+/* The button colour this theme uses, as a small dot. */
+.swatch__dot {
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    width: 14px;
+    height: 14px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #fff;
+}
+.swatch__check {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    box-shadow: 0 0 0 2px #fff;
+}
+.swatch__name {
+    font-size: var(--rb-fs-caption);
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--text-secondary);
+}
+.swatch--on .swatch__name { color: var(--text-primary); font-weight: 700; }
+.swatch:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 12px; }
+.appearance__note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 16px 0 0;
+    font-size: var(--rb-fs-caption);
+    color: var(--text-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+    .swatch__circle { transition: none; }
+}
+
 .panel-title {
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--rb-fs-body);
     color: var(--text-primary);
     margin: 0;
 }
@@ -693,78 +710,6 @@ function splitFullName(fullName) {
 /* Profile form */
 .form-body {
     padding: 20px;
-}
-
-.avatar-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 24px;
-}
-
-/* Non-clipping positioning context so the edit button is not cut off by the
-   overflow:hidden that the circular crop below requires. */
-.avatar-frame {
-    position: relative;
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-}
-
-.avatar {
-    width: 100%;
-    height: 100%;
-    border-radius: 999px;
-    background: #eaf3fc;
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.avatar__img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.avatar__initials {
-    font-size: 18px;
-    font-weight: 700;
-}
-
-.avatar__edit {
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    background: var(--primary);
-    color: white;
-    border: 2px solid white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-}
-
-.avatar-input-hidden {
-    display: none;
-}
-
-.avatar-row__name {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.avatar-row__meta {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
 }
 
 .form-stack {
@@ -781,7 +726,7 @@ function splitFullName(fullName) {
 
 .form-label {
     display: block;
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 6px;
@@ -792,7 +737,7 @@ function splitFullName(fullName) {
     padding: 10px 12px;
     border-radius: 8px;
     border: 1px solid #e5e7eb;
-    font-size: 13.5px;
+    font-size: var(--rb-fs-body);
     color: var(--text-primary);
     background: white;
     transition: border-color 0.15s ease;
@@ -874,7 +819,7 @@ function splitFullName(fullName) {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     color: var(--accent);
     margin: -4px 0 0;
 }
@@ -891,7 +836,7 @@ function splitFullName(fullName) {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     color: var(--success);
 }
@@ -917,14 +862,14 @@ function splitFullName(fullName) {
 }
 
 .toggle-row__label {
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
 .toggle-row__desc {
-    font-size: 11.5px;
+    font-size: var(--rb-fs-caption);
     color: var(--text-secondary);
     margin: 3px 0 0;
     line-height: 1.4;
@@ -982,7 +927,7 @@ function splitFullName(fullName) {
     border: none;
     border-bottom: 1px solid #f3f4f6;
     background: none;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
     cursor: pointer;
@@ -998,7 +943,7 @@ function splitFullName(fullName) {
 }
 
 .account-note {
-    font-size: 11.5px;
+    font-size: var(--rb-fs-caption);
     color: var(--text-secondary);
     line-height: 1.5;
     padding: 4px 20px 20px;
@@ -1013,7 +958,7 @@ function splitFullName(fullName) {
     gap: 6px;
     padding: 10px 18px;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: white;
     background: var(--primary);
@@ -1038,7 +983,7 @@ function splitFullName(fullName) {
     gap: 6px;
     padding: 10px 18px;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
     background: #f3f4f6;
@@ -1058,7 +1003,7 @@ function splitFullName(fullName) {
     gap: 6px;
     padding: 10px 18px;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: white;
     background: var(--accent);
@@ -1088,7 +1033,7 @@ function splitFullName(fullName) {
 
 .delete-confirm__error {
     margin: 8px 0 0;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.5;
     color: var(--accent);
 }
@@ -1107,7 +1052,7 @@ function splitFullName(fullName) {
 .modal-card {
     /* Redeclared here because Teleport moves this DOM node out of .settings-page,
        so it no longer inherits the custom properties defined up there. */
-    --primary: #1565c0;
+    --primary: var(--rb-primary);
     --accent: #d32f2f;
     --success: #2e7d32;
     --text-primary: #1f2937;
@@ -1142,14 +1087,14 @@ function splitFullName(fullName) {
 }
 
 .modal-title {
-    font-size: 16px;
+    font-size: var(--rb-fs-section);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
 .modal-subtitle {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     color: var(--text-secondary);
     line-height: 1.5;
     margin: 6px 0 20px;
@@ -1204,6 +1149,235 @@ function splitFullName(fullName) {
     }
 }
 
+
+/* ── Redesign ── */
+.panel { border-radius: 20px; }
+.panel-header--simple { padding: 18px 20px 14px; }
+.panel-sub { margin: 2px 0 0; font-size: var(--rb-fs-caption); color: #64748B; }
+.main-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Profile strip: who is signed in, linking to the Profile page */
+.profile-strip {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 1px solid #eef0f3;
+    border-radius: 20px;
+    background: white;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.15s ease;
+}
+
+.profile-strip:hover { border-color: rgba(var(--rb-primary-rgb), 0.4); }
+.profile-strip:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+.profile-strip__avatar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: rgba(var(--rb-primary-rgb), 0.12);
+    color: var(--rb-primary-text);
+    font-weight: 800;
+}
+
+.profile-strip__img { width: 100%; height: 100%; object-fit: cover; }
+.profile-strip__text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.profile-strip__name { font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); }
+
+.profile-strip__meta {
+    overflow: hidden;
+    font-size: var(--rb-fs-caption);
+    color: #64748B;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.profile-strip__cta {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--rb-fs-small);
+    font-weight: 700;
+    color: var(--rb-primary-text);
+}
+
+/* Appearance: the page's one showpiece, swatches beside a live preview */
+.appearance-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 24px;
+    align-items: center;
+    padding: 22px 24px;
+}
+
+.appearance-panel .appearance__lead { margin: 4px 0 18px; }
+.appearance-panel .swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+
+.theme-preview {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid #eef0f3;
+    border-radius: 18px;
+    background: #f8fafc;
+}
+
+.theme-preview__hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--rb-grad-from, #E3F2FD), var(--rb-grad-to, #BBDEFB));
+    transition: background 0.3s ease;
+}
+
+.theme-preview__line { width: 70%; height: 8px; border-radius: 999px; background: rgba(15, 23, 42, 0.55); }
+.theme-preview__line--sm { width: 40%; height: 6px; background: rgba(15, 23, 42, 0.25); }
+
+.theme-preview__btn {
+    margin-top: 4px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--rb-primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    transition: background-color 0.3s ease;
+}
+
+.theme-preview__row { display: flex; align-items: center; gap: 10px; }
+
+.theme-preview__chip {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(var(--rb-primary-rgb), 0.12);
+    color: var(--rb-primary-text);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.theme-preview__toggle {
+    display: flex;
+    justify-content: flex-end;
+    width: 34px;
+    height: 20px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--rb-primary);
+}
+
+.theme-preview__toggle span { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+
+.theme-preview__ring {
+    width: 22px;
+    height: 22px;
+    margin-left: auto;
+    border-radius: 50%;
+    background: conic-gradient(var(--rb-primary) 65%, #e2e8f0 0);
+    -webkit-mask: radial-gradient(circle, transparent 6px, #000 7px);
+    mask: radial-gradient(circle, transparent 6px, #000 7px);
+}
+
+.theme-preview__label {
+    position: absolute;
+    top: -9px;
+    right: 14px;
+    margin: 0;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 0 0 1px #eef0f3;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748B;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-preview__hero, .theme-preview__btn { transition: none; }
+}
+
+/* Save feedback, left of the buttons */
+.panel-footer, .form-footer { justify-content: space-between; }
+.status-note { display: flex; align-items: center; gap: 4px; margin: 0; font-size: var(--rb-fs-small); font-weight: 600; color: #64748B; }
+.status-note--ok { color: var(--success); }
+.status-note--error { color: #C62828; }
+
+.panel-footer .btn-outline,
+.form-footer .btn-primary { border-radius: 999px; padding-left: 20px; padding-right: 20px; }
+
+/* Account: a slim row, danger kept quiet until clicked */
+.account-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 24px;
+    flex-wrap: wrap;
+    padding: 18px 20px;
+}
+
+.account-panel__text { flex: 1 1 320px; }
+.account-panel .account-note { padding: 4px 0 0; }
+.account-panel .account-actions { flex-direction: row; gap: 10px; padding: 0; }
+
+.account-panel .account-action {
+    padding: 10px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+}
+
+.account-panel .account-action:last-child { border-bottom: 1px solid #e5e7eb; }
+.account-panel .account-action:hover { background: #f8fafc; }
+.account-panel .account-action--danger { border-color: #F5C2C2; }
+.account-panel .account-action--danger:last-child { border-bottom-color: #F5C2C2; }
+.account-panel .account-action--danger:hover { background: #FEF3F2; }
+.account-panel .account-action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+@media (max-width: 1100px) {
+    .main-grid { grid-template-columns: minmax(0, 1fr); }
+    .appearance-panel { grid-template-columns: minmax(0, 1fr); }
+    .theme-preview { max-width: 360px; }
+}
+
+@media (max-width: 760px) {
+    .appearance-panel { padding: 18px 16px; }
+    .appearance-panel .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .profile-strip { flex-wrap: wrap; }
+    .profile-strip__cta { width: 100%; justify-content: flex-end; }
+    .account-panel .account-actions { width: 100%; }
+    .account-panel .account-action { flex: 1; justify-content: center; }
+}
+
+:global(.dark .scope-donor-settings .profile-strip) { background: #1E293B; border-color: #334155; }
+:global(.dark .scope-donor-settings .profile-strip__avatar) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .scope-donor-settings .theme-preview) { background: #172033; border-color: #334155; }
+:global(.dark .scope-donor-settings .theme-preview__hero) {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, #1E293B), color-mix(in srgb, var(--rb-primary) 18%, #1E293B));
+}
+:global(.dark .scope-donor-settings .theme-preview__line) { background: rgba(241, 245, 249, 0.7); }
+:global(.dark .scope-donor-settings .theme-preview__line--sm) { background: rgba(241, 245, 249, 0.35); }
+:global(.dark .scope-donor-settings .theme-preview__label) { background: #1E293B; box-shadow: 0 0 0 1px #334155; color: #94A3B8; }
+:global(.dark .scope-donor-settings .theme-preview__chip) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .scope-donor-settings .account-panel .account-action) { border-color: #334155; }
+:global(.dark .scope-donor-settings .account-panel .account-action:hover) { background: #263449; }
+:global(.dark .scope-donor-settings .account-panel .account-action--danger) { border-color: rgba(239, 83, 80, 0.35); }
+:global(.dark .scope-donor-settings .account-panel .account-action--danger:hover) { background: rgba(239, 83, 80, 0.12); }
+:global(.dark .scope-donor-settings .panel-sub),
+:global(.dark .scope-donor-settings .profile-strip__meta) { color: #94A3B8; }
+
 /* ============ Dark mode ============ */
 /*
  * Tanang dark rule naka-anchor sa .scope-donor-settings (ang .settings-page kay
@@ -1230,7 +1404,7 @@ function splitFullName(fullName) {
 :global(.dark .settings-modal .panel-header--simple) { border-color: #334155; }
 
 :global(.dark .scope-donor-settings .avatar),
-:global(.dark .settings-modal .avatar) { background: rgba(66,165,245,0.16); }
+:global(.dark .settings-modal .avatar) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 
 :global(.dark .scope-donor-settings .form-input),
 :global(.dark .settings-modal .form-input) {
@@ -1245,7 +1419,7 @@ function splitFullName(fullName) {
 :global(.dark .scope-donor-settings .toggle-row),
 :global(.dark .settings-modal .toggle-row) { border-color: #263449; }
 :global(.dark .scope-donor-settings .toggle-switch) { background: #475569; }
-:global(.dark .scope-donor-settings .toggle-switch--on) { background: #1565c0; }
+:global(.dark .scope-donor-settings .toggle-switch--on) { background: var(--rb-primary); }
 
 :global(.dark .scope-donor-settings .account-action),
 :global(.dark .settings-modal .account-action) { border-color: #263449; }
@@ -1280,7 +1454,12 @@ function splitFullName(fullName) {
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .btn-danger:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
+
+/* Appearance swatches on a dark card: the white rings become the card colour. */
+:global(.dark .scope-donor-settings .swatch--on .swatch__circle) { box-shadow: 0 0 0 3px #1E293B, 0 0 0 5px var(--ring); }
+:global(.dark .scope-donor-settings .swatch__dot),
+:global(.dark .scope-donor-settings .swatch__check) { box-shadow: 0 0 0 2px #1E293B; }
 </style>

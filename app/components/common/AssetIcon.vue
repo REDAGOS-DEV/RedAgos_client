@@ -62,6 +62,9 @@ import filePlus from '~/assets/icons/file-plus.svg?raw'
 import fileText from '~/assets/icons/file-text.svg?raw'
 import flag from '~/assets/icons/flag.svg?raw'
 import flaskConical from '~/assets/icons/flask-conical.svg?raw'
+import folder from '~/assets/icons/folder.svg?raw'
+import folderOpen from '~/assets/icons/folder-open.svg?raw'
+import chevronsLeft from '~/assets/icons/chevrons-left.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
 import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import helpCircle from '~/assets/icons/help-circle.svg?raw'
@@ -114,7 +117,10 @@ import smartphone from '~/assets/icons/smartphone.svg?raw'
 import smile from '~/assets/icons/smile.svg?raw'
 import triangleAlert from '~/assets/icons/triangle-alert.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
+import pill from '~/assets/icons/pill.svg?raw'
+import plane from '~/assets/icons/plane.svg?raw'
 import stethoscope from '~/assets/icons/stethoscope.svg?raw'
+import syringe from '~/assets/icons/syringe.svg?raw'
 import sun from '~/assets/icons/sun.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
@@ -158,6 +164,8 @@ const icons = {
   'chevron-down' :chevronDown,
   'chevron-up': chevronUp,
   'circle-alert': circleAlert,
+  // Server notifications send this older Lucide name.
+  'alert-circle': circleAlert,
   'circle-plus': circlePlus,
   'circle-check-big': circleCheck,
   'circle-x': circleX,
@@ -182,6 +190,9 @@ const icons = {
   'file-text': fileText,
   flag,
   'flask-conical': flaskConical,
+  folder,
+  'folder-open': folderOpen,
+  'chevrons-left': chevronsLeft,
   heart,
   'heart-fill': heartFill,
   'help-circle': helpCircle,
@@ -232,7 +243,10 @@ const icons = {
   'sliders-horizontal': slidersHorizontal,
   smartphone,
   smile,
+  pill,
+  plane,
   stethoscope,
+  syringe,
   'star-fill': starFill,
   'triangle-alert': triangleAlert,
   'trending-down': trendingDown,

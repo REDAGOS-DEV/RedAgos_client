@@ -21,7 +21,10 @@
             <div class="header-row">
                 <div class="header-row__titles">
                     <h1 class="page-title">Blood Donor's Health Questionnaire</h1>
-                    <p class="page-subtitle">Answer honestly. A "Yes" does not by itself mean you cannot donate.</p>
+                    <!-- On desktop the progress panel carries the "Yes" line; said once, not twice. -->
+                    <p class="page-subtitle" :class="{ 'page-subtitle--with-rail': showsRail }">
+                        Answer honestly.<span class="page-subtitle__yes"> A "Yes" does not by itself mean you cannot donate.</span>
+                    </p>
                 </div>
 
                 <!-- Gamay nga chip imbes dakong block; ang tibuok pasabot kay naa sa duol sa Submit -->
@@ -84,32 +87,52 @@
                 imbes nga mahibal-an ra sa donor human matubag ang 30 ka
                 pangutana ug ma-reject ang submit (409 screening_already_valid).
             -->
-            <div v-else-if="hasValidScreening && !answeringAgain" class="panel valid-gate">
-                <span class="valid-gate__icon">
-                    <AssetIcon name="circle-check-big" :size="22" />
-                </span>
-                <div class="valid-gate__body">
+            <div v-else-if="hasValidScreening && !answeringAgain" class="valid-card">
+                <div class="valid-card__main">
+                    <span class="valid-card__badge">
+                        <AssetIcon name="circle-check-big" :size="14" />
+                        Screening on file
+                    </span>
                     <h2 class="valid-gate__title">
-                        Your screening is valid until {{ formatDate(eligibility.screening_valid_until) }}
+                        Your answers are valid until {{ formatDate(eligibility.screening_valid_until) }}
                     </h2>
-                    <p class="valid-gate__text">
-                        You answered it on {{ formatDate(eligibility.screening_date) }}. You only need to answer
-                        again if your health has changed since then, for example a new illness, medication,
-                        tattoo or travel.
-                    </p>
+                    <dl class="valid-card__dates">
+                        <div>
+                            <dt>Answered</dt>
+                            <dd>{{ formatDate(eligibility.screening_date) }}</dd>
+                        </div>
+                        <div>
+                            <dt>Valid until</dt>
+                            <dd>{{ formatDate(eligibility.screening_valid_until) }}</dd>
+                        </div>
+                        <div v-if="validDaysLeft !== null">
+                            <dt>Days left</dt>
+                            <dd>{{ validDaysLeft }}</dd>
+                        </div>
+                    </dl>
+                    <div class="valid-card__actions">
+                        <button type="button" class="btn-primary" @click="router.push('/donor/qrcode')">
+                            <AssetIcon name="qr-code" :size="16" />
+                            View my QR code
+                        </button>
+                        <button type="button" class="btn-outline valid-card__again" @click="startAnsweringAgain">
+                            Answer again
+                        </button>
+                    </div>
                 </div>
-                <div class="valid-gate__actions">
-                    <button type="button" class="btn-primary" @click="router.push('/donor/qrcode')">
-                        <AssetIcon name="qr-code" :size="16" />
-                        View my QR code
-                    </button>
-                    <button type="button" class="btn-outline" @click="startAnsweringAgain">
-                        Answer again
-                    </button>
+
+                <div class="valid-card__aside">
+                    <p class="valid-card__aside-title">Answer again if, since then, you have had</p>
+                    <ul class="valid-card__reasons">
+                        <li><span class="valid-card__reason-icon"><AssetIcon name="stethoscope" :size="16" /></span>A new illness or fever</li>
+                        <li><span class="valid-card__reason-icon"><AssetIcon name="pill" :size="16" /></span>New medication</li>
+                        <li><span class="valid-card__reason-icon"><AssetIcon name="syringe" :size="16" /></span>A tattoo, piercing or vaccine</li>
+                        <li><span class="valid-card__reason-icon"><AssetIcon name="plane" :size="16" /></span>Travel outside the country</li>
+                    </ul>
                 </div>
             </div>
 
-            <div v-else class="main-grid">
+            <div v-else ref="mainGrid" class="main-grid">
                 <div v-if="sections.length" ref="wizardTop" class="wizard-progress">
                     <!-- Ang category title kay naa na sa panel header, so screen reader ra ni -->
                     <p class="visually-hidden" aria-live="polite">
@@ -191,16 +214,27 @@
                                     <div class="question-list">
                                         <div v-for="q in group.questions" :key="q.code" class="question-card"
                                             :id="`q-${q.code}`"
-                                            :class="{ 'question-card--missing': missingHighlight === q.code }">
-                                            <p class="question-card__text">{{ displayNumber[q.code] }}. {{ q.text }}</p>
-                                            <div class="answer-toggle">
+                                            :class="{
+                                                'question-card--missing': missingHighlight === q.code,
+                                                'question-card--answered': answers[q.code] !== undefined,
+                                            }">
+                                            <p class="question-card__text">
+                                                <span class="question-card__num" aria-hidden="true">
+                                                    <AssetIcon v-if="answers[q.code] !== undefined" name="check" :size="13" />
+                                                    <template v-else>{{ displayNumber[q.code] }}</template>
+                                                </span>
+                                                <span><span class="visually-hidden">{{ displayNumber[q.code] }}. </span>{{ q.text }}</span>
+                                            </p>
+                                            <div class="answer-toggle" role="group" :aria-label="`Answer to question ${displayNumber[q.code]}`">
                                                 <button type="button" class="answer-btn answer-btn--yes"
                                                     :class="{ 'answer-btn--active': answers[q.code] === true }"
+                                                    :aria-pressed="answers[q.code] === true ? 'true' : 'false'"
                                                     @click="answers[q.code] = true">
                                                     {{ q.kind === 'acknowledgement' ? 'Yes, I understand' : 'Yes' }}
                                                 </button>
                                                 <button type="button" class="answer-btn answer-btn--no"
                                                     :class="{ 'answer-btn--active': answers[q.code] === false }"
+                                                    :aria-pressed="answers[q.code] === false ? 'true' : 'false'"
                                                     @click="answers[q.code] = false">No</button>
                                                 <!--
                                                     Only where the server says the question is not required of
@@ -211,13 +245,14 @@
                                                 <button v-if="q.required === false" type="button"
                                                     class="answer-btn answer-btn--na"
                                                     :class="{ 'answer-btn--active': answers[q.code] === null }"
+                                                    :aria-pressed="answers[q.code] === null ? 'true' : 'false'"
                                                     @click="answers[q.code] = null">Not applicable to me</button>
                                             </div>
 
                                             <div v-if="q.code === lastMenstrualCode && answers[q.code] !== null" class="lmp-field">
                                                 <label class="form-label" :for="`lmp-${q.code}`">Last menstrual period</label>
-                                                <input :id="`lmp-${q.code}`" v-model="vitals.lastMenstrualPeriod" type="date"
-                                                    class="form-input">
+                                                <DatePicker :id="`lmp-${q.code}`" v-model="vitals.lastMenstrualPeriod"
+                                                    :max="todayIso" placeholder="Select a date" />
                                             </div>
                                         </div>
                                     </div>
@@ -284,15 +319,8 @@
                                 </div>
                                 <div class="form-field">
                                     <label class="form-label">Blood type (if known)</label>
-                                    <div class="select-wrap">
-                                        <select v-model="vitals.bloodType" class="form-input form-input--select"
-                                            :class="{ 'form-input--locked': prefilled.bloodType }"
-                                            :disabled="prefilled.bloodType">
-                                            <option value="">Select</option>
-                                            <option v-for="bt in bloodTypeOptions" :key="bt" :value="bt">{{ bt }}</option>
-                                        </select>
-                                        <AssetIcon name="chevron-down" :size="16" class="select-wrap__icon" />
-                                    </div>
+                                    <SelectField id="vitals-blood" v-model="vitals.bloodType" :options="bloodSelectOptions"
+                                        icon="blood-drop" placeholder="Select" :disabled="prefilled.bloodType" />
                                     <p v-if="prefilled.bloodType" class="form-hint">
                                         From your profile. Change it in Profile settings.
                                     </p>
@@ -300,7 +328,8 @@
 
                                 <div class="form-field">
                                     <label class="form-label">Last blood donation date</label>
-                                    <input v-model="vitals.lastDonationDate" type="date" class="form-input">
+                                    <DatePicker id="vitals-last-donation" v-model="vitals.lastDonationDate"
+                                        :max="todayIso" placeholder="Select a date" />
                                 </div>
                             </div>
                         </div>
@@ -442,6 +471,71 @@
                     </div>
 
                 </div>
+
+                <!--
+                    Desktop: every step at a glance, like the booking ticket.
+                    Same goToPage / goToDetails as the strip above, which takes
+                    over on smaller screens.
+                -->
+                <aside v-if="sections.length" class="q-rail" aria-label="Questionnaire progress">
+                    <div class="q-rail__head">
+                        <div class="q-rail__ring" :style="{ '--pct': answeredPct }" aria-hidden="true">
+                            <span>{{ answeredPct }}%</span>
+                        </div>
+                        <div>
+                            <p class="q-rail__eyebrow">Your progress</p>
+                            <p class="q-rail__count">{{ answeredCount }} of {{ allQuestions.length }} answered</p>
+                        </div>
+                    </div>
+
+                    <ol class="q-rail__steps">
+                        <li v-for="(page, i) in pages" :key="page.key">
+                            <button
+                                type="button"
+                                class="q-step"
+                                :class="{
+                                    'q-step--done': pageComplete(page),
+                                    'q-step--current': stage === 'questions' && i === activePage,
+                                }"
+                                :aria-current="stage === 'questions' && i === activePage ? 'step' : undefined"
+                                @click="goToPage(i)"
+                            >
+                                <span class="q-step__num">
+                                    <AssetIcon v-if="pageComplete(page)" name="check" :size="12" />
+                                    <template v-else>{{ i + 1 }}</template>
+                                </span>
+                                <span class="q-step__title">
+                                    {{ page.groups.map(g => g.title).join(' & ') }}
+                                    <span v-if="page.groups[0].parts > 1" class="q-step__part">
+                                        Part {{ page.groups[0].part }} of {{ page.groups[0].parts }}
+                                    </span>
+                                </span>
+                                <span class="q-step__count">{{ sectionProgress(page) }}</span>
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                                type="button"
+                                class="q-step"
+                                :class="{ 'q-step--current': stage === 'details' }"
+                                :disabled="!allAnswered"
+                                :aria-current="stage === 'details' ? 'step' : undefined"
+                                @click="goToDetails"
+                            >
+                                <span class="q-step__num">{{ pages.length + 1 }}</span>
+                                <span class="q-step__title">
+                                    Details and consent
+                                    <span v-if="!allAnswered" class="q-step__part">After all questions</span>
+                                </span>
+                            </button>
+                        </li>
+                    </ol>
+
+                    <p class="q-rail__note">
+                        <AssetIcon name="info" :size="14" />
+                        <span>A "Yes" does not by itself mean you cannot donate. Staff go through your answers with you.</span>
+                    </p>
+                </aside>
             </div>
         </template>
 
@@ -540,6 +634,8 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import { donorService } from '~/api/donor/DonorService'
 import QRCode from 'qrcode'
 
@@ -567,6 +663,13 @@ const questionVersion = ref(null)
 const answers = reactive({})
 
 const bloodTypeOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const bloodSelectOptions = bloodTypeOptions.map(bt => ({ value: bt, label: bt }))
+
+// Past dates only (last period, last donation). Local date, not UTC.
+const todayIso = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})()
 
 const vitals = reactive({
     age: null,
@@ -770,6 +873,12 @@ const activePage = ref(0)
 const wizardTop = ref(null)
 const wizardPanel = ref(null)
 const finishColumn = ref(null)
+const mainGrid = ref(null)
+
+// Whole-number percentage for the progress ring.
+const answeredPct = computed(() =>
+    allQuestions.value.length ? Math.round((answeredCount.value / allQuestions.value.length) * 100) : 0
+)
 
 const currentPage = computed(() => pages.value[Math.min(activePage.value, pages.value.length - 1)] ?? null)
 const isLastPage = computed(() => activePage.value >= pages.value.length - 1)
@@ -829,7 +938,9 @@ const continueBlocked = ref(false)
 function scrollToProgress() {
     if (!import.meta.client) return
 
-    const top = wizardTop.value
+    // The strip is hidden on desktop (the side panel replaces it); scroll to
+    // the grid instead.
+    const top = wizardTop.value?.offsetParent ? wizardTop.value : mainGrid.value
     if (top && top.getBoundingClientRect().top < 0) {
         top.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
     }
@@ -958,6 +1069,23 @@ const statusBanner = computed(() => {
 
 // Naa nay valid nga screening ug dili gikinahanglan ang bag-ong version
 // (re_screen_recommended): ang server mo-409 sa submit gawas kung force.
+// Whole days until the screening runs out, for the valid card.
+const validDaysLeft = computed(() => {
+    const until = eligibility.value?.screening_valid_until
+    if (!until) return null
+    const end = new Date(until)
+    if (Number.isNaN(end.getTime())) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    end.setHours(0, 0, 0, 0)
+    return Math.max(Math.round((end - today) / 86400000), 0)
+})
+
+// The questionnaire (with its desktop progress panel) is what is on screen.
+const showsRail = computed(() =>
+    sections.value.length > 0 && !windowClosed.value && !(hasValidScreening.value && !answeringAgain.value)
+)
+
 const hasValidScreening = computed(() =>
     eligibility.value?.questionnaire_status === 'answered'
     && !eligibility.value?.re_screen_recommended
@@ -1211,7 +1339,7 @@ onActivated(() => {
 */
 .eligibility-page,
 .modal-backdrop {
-    --primary: #1565c0;
+    --primary: var(--rb-primary);
     --accent: #d32f2f;
     --success: #2e7d32;
     --warning: #f57c00;
@@ -1225,7 +1353,7 @@ onActivated(() => {
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
-    background: var(--rb-page-bg);
+    background: transparent;
     flex-direction: column;
     gap: 20px;
     transition: background-color 0.2s ease;
@@ -1253,7 +1381,7 @@ onActivated(() => {
     border-radius: 999px;
     background: #FFFAEB;
     color: #B54708;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
 }
 
@@ -1265,7 +1393,7 @@ onActivated(() => {
     background: none;
     color: #B54708;
     font: inherit;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     cursor: pointer;
 }
@@ -1284,7 +1412,7 @@ onActivated(() => {
     align-items: flex-start;
     gap: 8px;
     margin: 0;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.55;
     color: #4b5563;
 }
@@ -1304,14 +1432,18 @@ onActivated(() => {
 }
 
 .page-title {
-    font-size: 20px;
+    font-size: var(--rb-fs-title);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
+@media (min-width: 1100px) {
+    .page-subtitle--with-rail .page-subtitle__yes { display: none; }
+}
+
 .page-subtitle {
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     color: var(--text-secondary);
     margin: 2px 0 0;
 }
@@ -1399,14 +1531,14 @@ onActivated(() => {
 }
 
 .status-banner__title {
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     margin: 0;
     line-height: 1.45;
 }
 
 .status-banner__detail {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 400;
     margin: 0;
     line-height: 1.55;
@@ -1416,7 +1548,7 @@ onActivated(() => {
 .status-banner__reasons {
     margin: 2px 0 0;
     padding-left: 18px;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.6;
     color: #475569;
 }
@@ -1523,14 +1655,14 @@ onActivated(() => {
     background: none;
     color: var(--text-secondary, #6b7280);
     font: inherit;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     cursor: pointer;
     transition: background-color 150ms ease, color 150ms ease;
 }
 
 .details-back:hover {
-    background: rgba(21, 101, 192, 0.06);
+    background: rgba(var(--rb-primary-rgb), 0.06);
     color: var(--text-primary);
 }
 
@@ -1549,7 +1681,7 @@ onActivated(() => {
     border-top: 1px solid #fde68a;
     background: #fffbeb;
     color: #92400e;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.5;
 }
 
@@ -1567,7 +1699,7 @@ onActivated(() => {
 
 .panel {
     background: white;
-    border-radius: 14px;
+    border-radius: 20px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
     border: 1px solid #eef0f3;
     overflow: hidden;
@@ -1585,7 +1717,7 @@ onActivated(() => {
 /* Per-section progress. At thirty questions a donor needs to see where they
    are without counting the cards themselves. */
 .panel-count {
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     color: var(--text-secondary, #6b7280);
     font-variant-numeric: tabular-nums;
@@ -1594,7 +1726,7 @@ onActivated(() => {
 
 .panel-title {
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--rb-fs-body);
     color: var(--text-primary);
     margin: 0;
 }
@@ -1631,7 +1763,7 @@ onActivated(() => {
 
 .wizard-progress__count {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     color: #6b7280;
     font-variant-numeric: tabular-nums;
@@ -1713,7 +1845,7 @@ onActivated(() => {
 
 .wizard-group__part {
     margin: 2px 0 0;
-    font-size: 11.5px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     color: #6b7280;
 }
@@ -1734,7 +1866,7 @@ onActivated(() => {
 
 .wizard-nav__count {
     margin: 0 6px 0 0;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 500;
     color: #6b7280;
     font-variant-numeric: tabular-nums;
@@ -1810,58 +1942,108 @@ onActivated(() => {
     padding: 16px 20px 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
 }
 
 .question-card {
-    background: #f5f6f8;
-    border-radius: 10px;
+    background: white;
+    border: 1px solid #e6eaf0;
+    border-radius: 16px;
     padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.question-card--answered {
+    border-color: rgba(var(--rb-primary-rgb), 0.28);
+    background: rgba(var(--rb-primary-rgb), 0.03);
 }
 
 .question-card__text {
-    font-size: 13.5px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: var(--rb-fs-body);
     font-weight: 600;
+    line-height: 1.5;
     color: var(--text-primary);
     margin: 0;
 }
 
-.answer-toggle {
+.question-card__num {
     display: flex;
-    gap: 12px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-top: -1px;
+    border-radius: 50%;
+    background: #eef2f6;
+    color: #64748B;
+    font-size: var(--rb-fs-caption);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.question-card--answered .question-card__num {
+    background: var(--rb-primary);
+    color: #fff;
+}
+
+/*
+  Yes / No as one segmented pill. The picked answer takes the theme colour,
+  the same for Yes and No: the old green Yes / red No read as a verdict,
+  and the page tells donors a "Yes" is not one.
+*/
+.answer-toggle {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-self: flex-start;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #f1f5f9;
 }
 
 .answer-btn {
     min-width: 84px;
     padding: 8px 18px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    background: white;
-    color: var(--text-primary);
-    font-size: 13px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: #334155;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.answer-btn--yes.answer-btn--active {
-    background: #eaf6ea;
-    border-color: var(--success);
-    color: var(--success);
-}
-
-.answer-btn--no.answer-btn--active {
-    background: #fbeaea;
-    border-color: var(--accent);
-    color: var(--accent);
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .answer-btn:hover:not(.answer-btn--active) {
-    background: #f3f4f6;
+    background: white;
 }
+
+.answer-btn.answer-btn--active {
+    background: var(--rb-primary);
+    color: #fff;
+    box-shadow: 0 4px 10px -4px rgba(var(--rb-primary-rgb), 0.7);
+}
+
+.answer-btn:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+    .answer-btn, .question-card, .question-card__num { transition: none; }
+}
+
+@media (max-width: 640px) {
+    .answer-toggle { display: flex; align-self: stretch; }
+    .answer-btn { flex: 1; min-width: 0; padding: 9px 12px; }
+    .answer-btn--na { flex-basis: 100%; }
+}
+
 
 /* Forms */
 .form-body {
@@ -1869,7 +2051,7 @@ onActivated(() => {
 }
 
 .load-error__text {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.6;
@@ -1887,7 +2069,7 @@ onActivated(() => {
 
 .form-label {
     display: block;
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 6px;
@@ -1898,7 +2080,7 @@ onActivated(() => {
     padding: 10px 12px;
     border-radius: 8px;
     border: 1px solid #e5e7eb;
-    font-size: 13.5px;
+    font-size: var(--rb-fs-body);
     color: var(--text-primary);
     background: white;
     transition: border-color 0.15s ease;
@@ -1916,7 +2098,7 @@ onActivated(() => {
 }
 
 .form-hint {
-    font-size: 11.5px;
+    font-size: var(--rb-fs-caption);
     color: var(--text-secondary);
     margin: 6px 0 0;
     line-height: 1.5;
@@ -1966,7 +2148,7 @@ onActivated(() => {
 }
 
 .result-box__label {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-secondary);
     margin: 0 0 4px;
@@ -1991,7 +2173,7 @@ onActivated(() => {
 }
 
 .result-body__note {
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.6;
@@ -2006,7 +2188,7 @@ onActivated(() => {
     gap: 6px;
     padding: 12px 16px;
     border-radius: 10px;
-    font-size: 13.5px;
+    font-size: var(--rb-fs-body);
     font-weight: 700;
     color: white;
     background: var(--primary);
@@ -2054,74 +2236,290 @@ onActivated(() => {
 }
 
 /* --- Valid screening gate --- */
-.valid-gate {
+/* --- Valid screening: status on the theme gradient, reasons beside it --- */
+.valid-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    border: 1px solid #eef0f3;
+    border-radius: 22px;
+    background: white;
+    overflow: hidden;
+    box-shadow: 0 18px 40px -30px rgba(15, 23, 42, 0.4);
+}
+
+.valid-card__main {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
-    padding: 22px 24px;
+    gap: 14px;
+    padding: 26px 28px;
+    border-right: 1px solid #eef0f3;
+    color: #0F172A;
 }
 
-.valid-gate__icon {
-    display: flex;
-    flex: none;
-    width: 44px;
-    height: 44px;
+.valid-card__badge {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 6px;
+    padding: 5px 12px;
     border-radius: 999px;
-    background: #E8F5E9;
-    color: var(--success);
-}
-
-.valid-gate__body {
-    flex: 1;
-    min-width: 0;
+    background: #eaf6ea;
+    color: #1B5E20;
+    font-size: var(--rb-fs-caption);
+    font-weight: 700;
 }
 
 .valid-gate__title {
-    margin: 2px 0 0;
-    font-size: 16px;
+    margin: 0;
+    font-family: var(--rb-font-sans);
+    font-size: var(--rb-fs-display);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: #0F172A;
+}
+
+.valid-card__dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+}
+
+.valid-card__dates > div {
+    min-width: 120px;
+    padding: 10px 14px;
+    border: 1px solid #eef0f3;
+    border-radius: 14px;
+    background: #f8fafc;
+}
+
+.valid-card__dates dt {
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1.35;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+.valid-card__dates dd {
+    margin: 2px 0 0;
+    font-size: var(--rb-fs-section);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.valid-card__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.valid-card__actions .btn-primary,
+.valid-card__actions .btn-outline { border-radius: 999px; white-space: nowrap; }
+
+.valid-card__again {
+    background: transparent !important;
+    border: 1px solid rgba(var(--rb-primary-rgb), 0.4) !important;
+    color: var(--rb-primary-text) !important;
+}
+
+.valid-card__aside { padding: 26px 28px; }
+
+.valid-card__aside-title {
+    margin: 0 0 14px;
+    font-size: var(--rb-fs-small);
+    font-weight: 700;
     color: var(--text-primary);
 }
 
-.valid-gate__text {
-    margin: 6px 0 0;
-    max-width: 65ch;
-    font-size: 13px;
-    line-height: 1.6;
-    color: #4b5563;
+.valid-card__reasons { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.valid-card__reasons li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: var(--rb-fs-small);
+    color: #475569;
 }
 
-.valid-gate__actions {
+.valid-card__reason-icon {
     display: flex;
     flex: none;
-    gap: 10px;
-    align-self: center;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    background: rgba(var(--rb-primary-rgb), 0.1);
+    color: var(--rb-primary-text);
 }
 
-.valid-gate__actions .btn-primary,
-.valid-gate__actions .btn-outline {
-    white-space: nowrap;
+@media (max-width: 900px) {
+    .valid-card { grid-template-columns: 1fr; }
+    .valid-card__main { border-right: none; border-bottom: 1px solid #eef0f3; }
 }
 
-@media (max-width: 767px) {
-    .valid-gate {
-        flex-wrap: wrap;
-        padding: 18px;
-    }
+@media (max-width: 560px) {
+    .valid-card__main, .valid-card__aside { padding: 20px; }
+    .valid-gate__title { font-size: var(--rb-fs-title); }
+    .valid-card__dates > div { flex: 1 1 calc(50% - 10px); min-width: 0; }
+    .valid-card__actions { width: 100%; }
+    .valid-card__actions > * { flex: 1; justify-content: center; }
+}
 
-    .valid-gate__actions {
-        width: 100%;
+/* --- Progress panel: desktop only; the strip covers smaller screens --- */
+.q-rail { display: none; }
+
+@media (min-width: 1100px) {
+    .main-grid { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+    .main-grid > .wizard-progress { display: none; }
+    .main-grid > .col-left,
+    .main-grid > .col-right { grid-column: 1; grid-row: 1; }
+
+    .q-rail {
+        position: sticky;
+        top: 88px;
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
         flex-direction: column;
-    }
-
-    .valid-gate__actions .btn-primary,
-    .valid-gate__actions .btn-outline {
-        width: 100%;
+        border: 1px solid #eef0f3;
+        border-radius: 22px;
+        background: white;
+        box-shadow: 0 18px 40px -30px rgba(15, 23, 42, 0.4);
+        overflow: hidden;
     }
 }
+
+.q-rail__head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid #eef0f3;
+    color: #0F172A;
+}
+
+/* Ring filled by --pct (0-100) */
+.q-rail__ring {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: conic-gradient(var(--rb-primary) calc(var(--pct, 0) * 1%), #e8edf3 0);
+}
+
+.q-rail__ring::before {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.q-rail__ring span {
+    position: relative;
+    font-size: var(--rb-fs-caption);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.q-rail__eyebrow {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.q-rail__count {
+    margin: 2px 0 0;
+    font-family: var(--rb-font-sans);
+    font-size: var(--rb-fs-section);
+    font-weight: 700;
+}
+
+.q-rail__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 10px;
+    list-style: none;
+}
+
+.q-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.q-step:hover:not(:disabled):not(.q-step--current) { background: #f5f7fa; }
+.q-step:disabled { cursor: not-allowed; opacity: 0.6; }
+.q-step:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
+
+.q-step--current { background: rgba(var(--rb-primary-rgb), 0.08); }
+
+.q-step__num {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #eef2f6;
+    color: #64748B;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.q-step--current .q-step__num,
+.q-step--done .q-step__num { background: var(--rb-primary); color: #fff; }
+
+.q-step__title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    font-size: var(--rb-fs-small);
+    font-weight: 600;
+    line-height: 1.35;
+    color: #334155;
+}
+
+.q-step--current .q-step__title { color: var(--rb-primary-text); font-weight: 700; }
+
+.q-step__part { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+
+.q-step__count {
+    flex: none;
+    font-size: var(--rb-fs-caption);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.q-rail__note {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 14px 20px 18px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: var(--rb-fs-caption);
+    line-height: 1.5;
+    color: #64748B;
+}
+
+.q-rail__note :deep(svg) { flex: none; margin-top: 2px; color: var(--rb-primary-text); }
 
 
 .submit-error__body {
@@ -2138,7 +2536,7 @@ onActivated(() => {
 }
 
 .submit-error__text {
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     color: var(--notice-text);
     margin: 0;
     line-height: 1.55;
@@ -2214,14 +2612,14 @@ onActivated(() => {
 }
 
 .modal-title {
-    font-size: 16px;
+    font-size: var(--rb-fs-section);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
 .modal-subtitle {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     color: var(--text-secondary);
     line-height: 1.5;
     margin: 6px 0 20px;
@@ -2262,7 +2660,7 @@ onActivated(() => {
 }
 
 .modal-validity {
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0 0 20px;
@@ -2287,7 +2685,7 @@ onActivated(() => {
     gap: 6px;
     padding: 11px 16px;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
     background: #f3f4f6;
@@ -2361,10 +2759,10 @@ onActivated(() => {
     background: #334155;
 }
 :global(.dark .eligibility-page .wizard-seg::after) {
-    background: #64B5F6;
+    background: var(--rb-primary-text);
 }
 :global(.dark .eligibility-page .wizard-seg--current::before) {
-    background: rgba(100, 181, 246, 0.28);
+    background: color-mix(in srgb, var(--rb-primary-text) 28%, transparent);
 }
 :global(.dark .eligibility-page .wizard-blocked) {
     background: rgba(245, 158, 11, 0.10);
@@ -2398,7 +2796,7 @@ onActivated(() => {
 }
 :global(.dark .eligibility-page .consent-item__more),
 :global(.dark .eligibility-page .review-missing__link) {
-    color: #64B5F6;
+    color: var(--rb-primary-text);
 }
 
 :global(.dark .eligibility-page .modal-subtitle),
@@ -2419,7 +2817,7 @@ onActivated(() => {
 
 :global(.dark .eligibility-page .modal-actions .btn-primary),
 :global(.dark .eligibility-modal .modal-actions .btn-primary) {
-    background: #1565C0;
+    background: var(--rb-primary);
 }
 
 :global(.dark .eligibility-page .modal-card--review .review-head),
@@ -2455,14 +2853,6 @@ onActivated(() => {
     --notice-border: rgba(247, 144, 9, 0.30);
 }
 
-:global(.dark .eligibility-page .valid-gate__icon) {
-    background: rgba(102, 187, 106, 0.16);
-    color: #66BB6A;
-}
-
-:global(.dark .eligibility-page .valid-gate__text) {
-    color: #94A3B8;
-}
 
 :global(.dark .eligibility-page .again-chip) {
     background: rgba(247, 144, 9, 0.10);
@@ -2480,7 +2870,7 @@ onActivated(() => {
 }
 
 :global(.dark .eligibility-page .submit-hint svg) {
-    color: #64B5F6;
+    color: var(--rb-primary-text);
 }
 
 :global(.dark .eligibility-page .submit-hint--warning) {
@@ -2528,21 +2918,6 @@ onActivated(() => {
 :global(.dark .eligibility-modal .panel-header--simple) { border-color: #334155; }
 
 
-:global(.dark .eligibility-page .question-card),
-:global(.dark .eligibility-modal .question-card) { background: #172033; }
-
-:global(.dark .eligibility-page .answer-btn),
-:global(.dark .eligibility-modal .answer-btn) {
-    background: #1E293B;
-    border-color: #334155;
-    color: #F1F5F9;
-}
-:global(.dark .eligibility-page .answer-btn:hover:not(.answer-btn--active)),
-:global(.dark .eligibility-modal .answer-btn:hover:not(.answer-btn--active)) { background: #263449; }
-:global(.dark .eligibility-page .answer-btn--yes.answer-btn--active),
-:global(.dark .eligibility-modal .answer-btn--yes.answer-btn--active) { background: rgba(102,187,106,0.16); }
-:global(.dark .eligibility-page .answer-btn--no.answer-btn--active),
-:global(.dark .eligibility-modal .answer-btn--no.answer-btn--active) { background: rgba(239,83,80,0.16); }
 
 :global(.dark .eligibility-page .form-input),
 :global(.dark .eligibility-modal .form-input) {
@@ -2586,7 +2961,7 @@ onActivated(() => {
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .answer-btn:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 
@@ -2607,7 +2982,7 @@ onActivated(() => {
     width: 16px;
     height: 16px;
     flex: none;
-    accent-color: var(--rb-primary, #1565C0);
+    accent-color: var(--rb-primary);
     cursor: pointer;
 }
 
@@ -2618,7 +2993,7 @@ onActivated(() => {
 
 .consent-item__text {
     display: block;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.55;
     color: var(--text-primary);
     cursor: pointer;
@@ -2637,9 +3012,9 @@ onActivated(() => {
     padding: 2px 0;
     border: none;
     background: none;
-    color: var(--rb-primary, #1565C0);
+    color: var(--rb-primary);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
     cursor: pointer;
 }
@@ -2650,7 +3025,7 @@ onActivated(() => {
 }
 
 .consent-item__more:focus-visible {
-    outline: 2px solid var(--rb-primary, #1565C0);
+    outline: 2px solid var(--rb-primary);
     outline-offset: 2px;
     border-radius: 4px;
 }
@@ -2664,7 +3039,7 @@ onActivated(() => {
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     background: #f9fafb;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     color: var(--text-primary);
     cursor: pointer;
@@ -2677,7 +3052,7 @@ onActivated(() => {
 .review-missing,
 .review-ready {
     margin: 0 0 12px;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.5;
 }
 
@@ -2690,7 +3065,7 @@ onActivated(() => {
     padding: 0;
     font: inherit;
     font-weight: 600;
-    color: var(--rb-primary, #1565C0);
+    color: var(--rb-primary);
     text-decoration: underline;
     cursor: pointer;
 }
@@ -2702,11 +3077,6 @@ onActivated(() => {
     outline-offset: 2px;
 }
 
-.answer-btn--na.answer-btn--active {
-    background: #e5e7eb;
-    border-color: #9ca3af;
-    color: #374151;
-}
 
 .lmp-field {
     margin-top: 12px;
@@ -2719,7 +3089,7 @@ onActivated(() => {
 
 .window-closed__text {
     margin: 0 0 14px;
-    font-size: 13px;
+    font-size: var(--rb-fs-small);
     line-height: 1.6;
     color: var(--text-secondary, #6b7280);
 }
@@ -2772,7 +3142,7 @@ onActivated(() => {
 
 .review-section__title {
     margin: 0 0 4px;
-    font-size: 11px;
+    font-size: var(--rb-fs-caption);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -2793,7 +3163,7 @@ onActivated(() => {
 }
 
 .review-answer__text {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     line-height: 1.5;
     color: var(--text-primary);
 }
@@ -2802,10 +3172,44 @@ onActivated(() => {
     flex: none;
     min-width: 32px;
     text-align: right;
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
 }
 
+
+/* Valid card, progress panel, question cards: dark */
+:global(.dark .eligibility-page .valid-card),
+:global(.dark .eligibility-page .q-rail) { background: #1E293B; border-color: #334155; }
+:global(.dark .eligibility-page .valid-card__main),
+:global(.dark .eligibility-page .q-rail__head) { border-color: #334155; color: #F1F5F9; }
+:global(.dark .eligibility-page .valid-gate__title) { color: #F1F5F9; }
+:global(.dark .eligibility-page .valid-card__badge) { background: rgba(102, 187, 106, 0.18); color: #A5D6A7; }
+:global(.dark .eligibility-page .valid-card__dates > div) { background: #172033; border-color: #334155; }
+:global(.dark .eligibility-page .valid-card__dates dt) { color: #CBD5E1; }
+:global(.dark .eligibility-page .valid-card__again) {
+    border-color: color-mix(in srgb, var(--rb-primary-text) 40%, transparent) !important;
+    color: var(--rb-primary-text) !important;
+}
+:global(.dark .eligibility-page .valid-card__reasons li),
+:global(.dark .eligibility-page .q-step__title) { color: #CBD5E1; }
+:global(.dark .eligibility-page .valid-card__reason-icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .eligibility-page .q-rail__ring) { background: conic-gradient(var(--rb-primary-text) calc(var(--pct, 0) * 1%), #334155 0); }
+:global(.dark .eligibility-page .q-rail__ring::before) { background: #1E293B; }
+:global(.dark .eligibility-page .q-step:hover:not(:disabled):not(.q-step--current)) { background: #263449; }
+:global(.dark .eligibility-page .q-step--current) { background: color-mix(in srgb, var(--rb-primary-text) 12%, transparent); }
+:global(.dark .eligibility-page .q-step--current .q-step__title) { color: var(--rb-primary-text); }
+:global(.dark .eligibility-page .q-step__num),
+:global(.dark .eligibility-page .question-card__num) { background: #263449; color: #94A3B8; }
+:global(.dark .eligibility-page .q-step--current .q-step__num),
+:global(.dark .eligibility-page .q-step--done .q-step__num),
+:global(.dark .eligibility-page .question-card--answered .question-card__num) { background: var(--rb-primary); color: #fff; }
+:global(.dark .eligibility-page .q-rail__note) { border-color: #334155; color: #94A3B8; }
+:global(.dark .eligibility-page .question-card) { background: #172033; border-color: #334155; }
+:global(.dark .eligibility-page .question-card--answered) { border-color: color-mix(in srgb, var(--rb-primary-text) 35%, transparent); }
+:global(.dark .eligibility-page .answer-toggle) { background: #0F172A; }
+:global(.dark .eligibility-page .answer-btn) { color: #CBD5E1; }
+:global(.dark .eligibility-page .answer-btn:hover:not(.answer-btn--active)) { background: #263449; }
+:global(.dark .eligibility-page .answer-btn.answer-btn--active) { background: var(--rb-primary); color: #fff; }
 </style>

@@ -67,7 +67,7 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 const quickLinks = [
   { label: 'Home', to: '#home' },
-  { label: 'Features', to: '#features' },
+  { label: 'How It Works', to: '#features' },
   { label: "Who It's For", to: '#roles' },
   { label: 'Donation Drives', to: '#drives' },
   { label: 'About', to: '#about' },
@@ -186,9 +186,31 @@ const quickLinks = [
   .footer-inner { grid-template-columns: 1fr 1fr; gap: 40px; }
   .footer-brand { grid-column: 1 / -1; }
 }
+/* Phones: same content, packed tighter. Links go two per row, spacing and
+   type step down, and the bottom bar shrinks to two short lines. */
 @media (max-width: 600px) {
-  .footer { padding: 48px 1rem 0; }
-  .footer-inner { grid-template-columns: 1fr; gap: 32px; }
-  .footer-bottom { flex-direction: column; text-align: center; }
+  .footer { padding: 32px 1rem 0; }
+  .footer-inner { grid-template-columns: 1fr; gap: 22px; padding-bottom: 24px; }
+
+  .footer-logo { margin-bottom: 10px; }
+  .footer-logo-image { width: 34px; height: 34px; }
+  .logo-text { font-size: 18px; }
+  .footer-desc { margin-bottom: 10px; font-size: 13px; line-height: 1.55; }
+  .footer-cap { font-size: 12px; }
+
+  .footer-title { margin-bottom: 10px; }
+  .footer-col ul { gap: 8px; }
+  nav.footer-col ul { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .footer-col a,
+  .contact-list li { font-size: 13px; }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 0 18px;
+    font-size: 12px;
+    text-align: center;
+  }
+  .footer-bottom-links { flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
 }
 </style>

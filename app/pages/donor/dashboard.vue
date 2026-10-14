@@ -20,40 +20,48 @@
     </div>
 
     <div v-else class="dashboard-inner">
-      <!-- Top header row -->
-      <div class="header-row">
-        <div class="header-titles">
-          <h1 class="page-title">Here's your donor overview</h1>
-          <p class="page-subtitle">Everything you need to track your journey, all in one place.</p>
-        </div>
-        <div class="header-actions">
-          <span v-if="screeningDone" class="icon-btn__dot" />
-          <NuxtLink to="/donor/appointments" class="btn-primary" aria-label="Book Appointment">
-            <AssetIcon name="calendar" :size="16" />
-            <span class="btn-text">Book Appointment</span>
+      <!--
+        Hero: the donor's theme gradient with a soft glass glow. One greeting,
+        one line about where they stand, and ONE next step that changes with
+        their situation (screen, then book, then show QR). It replaced a plain
+        title, a separate "Book Appointment" button and the eligibility banner.
+      -->
+      <section class="hero" :class="`hero--${heroTone}`" aria-labelledby="hero-greeting">
+        <div class="hero__copy">
+          <p class="hero__eyebrow">{{ todayLabel }}</p>
+          <h1 id="hero-greeting" class="hero__title">{{ greeting }}</h1>
+          <p class="hero__status">{{ nextStep.status }}</p>
+          <NuxtLink :to="nextStep.to" class="hero__cta">
+            <AssetIcon :name="nextStep.icon" :size="16" />
+            {{ nextStep.label }}
+            <AssetIcon name="arrow-right" :size="15" class="hero__cta-arrow" />
           </NuxtLink>
         </div>
-      </div>
 
-      <!-- Eligibility banner -->
-      <div v-if="screeningDone" class="banner banner--success">
-        <div class="banner-icon-wrapper">
-          <AssetIcon name="check-circle" :size="16" class="banner-icon" />
+        <!-- At a glance: blood type and QR status on frosted glass -->
+        <div class="hero__glass">
+          <div class="hero__fact">
+            <span class="hero__fact-icon hero__fact-icon--blood"><AssetIcon name="blood-drop" :size="18" /></span>
+            <span>
+              <span class="hero__fact-label">Blood type</span>
+              <span class="hero__fact-value">{{ bloodType }}</span>
+            </span>
+          </div>
+          <div class="hero__fact">
+            <span class="hero__fact-icon" :class="screeningDone ? 'hero__fact-icon--ok' : 'hero__fact-icon--warn'">
+              <AssetIcon :name="screeningDone ? 'shield-check' : 'clock'" :size="18" />
+            </span>
+            <span>
+              <span class="hero__fact-label">QR code</span>
+              <span class="hero__fact-value">{{ screeningDone ? 'Valid' : questionnaireStatus === 'expired' ? 'Expired' : 'Not yet' }}</span>
+            </span>
+          </div>
+          <NuxtLink to="/donor/qrcode" class="hero__qr-link">
+            View QR
+            <AssetIcon name="arrow-right" :size="14" />
+          </NuxtLink>
         </div>
-        <p class="banner-text">
-          Eligibility screening is valid. Present your QR code at the blood center on arrival.
-        </p>
-        <NuxtLink to="/donor/qrcode" class="banner-link">View QR &rarr;</NuxtLink>
-      </div>
-      <div v-else-if="eligibilityStatus === 'deferred'" class="banner banner--warning">
-        <div class="banner-icon-wrapper">
-          <AssetIcon name="alert" :size="16" class="banner-icon" />
-        </div>
-        <p class="banner-text">
-          Your eligibility screening is deferred. Please contact the blood center for more information.
-        </p>
-        <NuxtLink to="/donor/eligibility" class="banner-link">View Details &rarr;</NuxtLink>
-      </div>
+      </section>
 
       <!-- Onboarding checklist -->
       <div v-if="showOnboarding" class="onboarding-card">
@@ -74,13 +82,16 @@
         </div>
 
         <div class="onboarding-steps">
-          <NuxtLink v-for="step in onboardingSteps" :key="step.key" :to="step.done ? undefined : step.path"
-            class="onboarding-step" :class="{ 'onboarding-step--done': step.done }">
+          <NuxtLink v-for="(step, i) in onboardingSteps" :key="step.key" :to="step.done ? undefined : step.path"
+            class="onboarding-step"
+            :class="{ 'onboarding-step--done': step.done, 'onboarding-step--next': step.key === nextOnboardingKey }"
+            :aria-current="step.key === nextOnboardingKey ? 'step' : undefined">
             <div class="onboarding-step__check">
               <AssetIcon v-if="step.done" name="check" :size="12" />
+              <span v-else>{{ i + 1 }}</span>
             </div>
             <span class="onboarding-step__label">{{ step.label }}</span>
-            <AssetIcon v-if="!step.done" name="chevron-right" :size="14" class="onboarding-step__arrow" />
+            <span v-if="step.key === nextOnboardingKey" class="onboarding-step__next">Next</span>
           </NuxtLink>
         </div>
       </div>
@@ -98,36 +109,28 @@
           <span class="stat-chip stat-chip--neutral">Lifetime</span>
         </div>
 
-        <div class="stat-card stat-card--blood-type">
+        <!-- Lives potentially helped: one whole-blood donation can help up to 3 patients. -->
+        <div class="stat-card">
           <div class="stat-card__top">
-            <p class="stat-card__label">Blood Type</p>
+            <p class="stat-card__label">Lives Helped</p>
             <div class="stat-card__badge stat-card__badge--accent">
-              <AssetIcon name="blood-drop" :size="14" />
+              <AssetIcon name="heart" :size="14" />
             </div>
           </div>
-          <div class="stat-card__value-group">
-            <p class="stat-card__value">{{ bloodType }}</p>
-            <span class="blood-type-tag">Donor</span>
-          </div>
-          <span class="stat-chip stat-chip--neutral">Your blood group</span>
+          <p class="stat-card__value">{{ totalDonations * 3 }}</p>
+          <span class="stat-chip stat-chip--neutral">Up to 3 per donation</span>
         </div>
 
-        <div class="stat-card" :class="{ 'stat-card--emphasized': !screeningDone }">
+        <div class="stat-card">
           <div class="stat-card__top">
-            <p class="stat-card__label">QR Status</p>
-            <div class="stat-card__badge"
-              :class="screeningDone ? 'stat-card__badge--success' : 'stat-card__badge--warning'">
-              <AssetIcon name="shield-check" :size="14" />
+            <p class="stat-card__label">Last Donation</p>
+            <div class="stat-card__badge stat-card__badge--success">
+              <AssetIcon name="history" :size="14" />
             </div>
           </div>
-          <p class="stat-card__value" :class="screeningDone ? 'text-success' : 'text-warning'">
-            {{ screeningDone ? 'Valid' : questionnaireStatus === 'expired' ? 'Expired' : 'Pending' }}
-          </p>
-          <span class="stat-chip"
-            :class="screeningDone ? 'stat-chip--success' : 'stat-chip--warning'">
-            {{ screeningDone && profile?.screening_valid_until
-              ? `Until ${formatDate(profile.screening_valid_until, 'MMM D, YYYY')}`
-              : 'Complete screening' }}
+          <p class="stat-card__value stat-card__value--date">{{ lastDonationDate }}</p>
+          <span class="stat-chip stat-chip--neutral truncate-chip">
+            {{ lastDonation ? lastDonation.facility_name : 'No donations yet' }}
           </span>
         </div>
 
@@ -194,7 +197,7 @@
                 <div class="trend-empty__icon">
                   <AssetIcon name="trending-up" :size="28" />
                 </div>
-                <p>Not enough data yet to show a trend</p>
+                <p>Your donations will show here month by month.</p>
               </div>
             </div>
           </div>
@@ -288,8 +291,8 @@
               <div class="empty-state__icon">
                 <AssetIcon name="calendar" :size="28" />
               </div>
-              <p class="mb-3">No upcoming appointments</p>
-              <NuxtLink to="/donor/appointments" class="btn-primary btn-primary--sm">Book Now</NuxtLink>
+              <p class="mb-3">Nothing booked yet</p>
+              <NuxtLink to="/donor/appointments" class="btn-outline">Find a time</NuxtLink>
             </div>
           </div>
 
@@ -315,17 +318,14 @@
               <div class="eligibility-details">
                 <div v-if="profile?.screening_date" class="eligibility-details__row">
                   <span class="eligibility-details__label">Screening date</span>
-                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY')
-                  }}</span>
-                </div>
-                <div class="eligibility-details__row">
-                  <span class="eligibility-details__label">Blood type</span>
-                  <span class="eligibility-details__value">{{ bloodType }}</span>
+                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY') }}</span>
                 </div>
               </div>
 
-              <NuxtLink to="/donor/eligibility" class="btn-danger">
-                {{ screeningDone ? 'Retake Screening' : 'Take Screening' }}
+              <!-- Outline, not the old full-width red: red is the brand, not an action. -->
+              <NuxtLink to="/donor/eligibility" class="btn-outline btn-outline--block">
+                <AssetIcon name="clipboard-check" :size="15" />
+                {{ screeningDone ? 'Retake screening' : 'Take screening' }}
               </NuxtLink>
             </div>
           </div>
@@ -362,10 +362,67 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+import { useUser } from '~/composables/useUser'
+import { useAccentTheme } from '~/composables/useAccentTheme'
+import { accentTheme } from '~/utils/accentThemes'
 
 const route = useRoute()
 
 const loading = ref(true)
+
+// ── Hero ──
+const { user } = useUser()
+const { current: accentKey } = useAccentTheme()
+// Dark or white hero text, per theme (see utils/accentThemes.ts).
+const heroTone = computed(() => accentTheme(accentKey.value).headerText)
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  const first = user.value?.full_name?.split(' ')[0]
+  const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : ''
+  return name ? `${part}, ${name}!` : `${part}!`
+})
+
+const todayLabel = computed(() =>
+  new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }))
+
+// The one next step for this donor, most urgent first.
+const nextStep = computed(() => {
+  if (eligibilityStatus.value === 'deferred') {
+    return {
+      status: 'Your screening was deferred. Check the details before booking.',
+      label: 'View screening result',
+      icon: 'clipboard-check',
+      to: '/donor/eligibility',
+    }
+  }
+  if (!screeningDone.value) {
+    const expired = questionnaireStatus.value === 'expired'
+    return {
+      status: expired
+        ? 'Your eligibility screening has expired. Retake it to donate again.'
+        : 'Start with a quick eligibility screening. It takes about 5 minutes.',
+      label: expired ? 'Retake screening' : 'Take eligibility screening',
+      icon: 'clipboard-check',
+      to: '/donor/eligibility',
+    }
+  }
+  if (upcomingAppointment.value) {
+    return {
+      status: `You are booked for ${nextApptDate.value} at ${upcomingAppointment.value.facility_name}. Show your QR code on arrival.`,
+      label: 'Show my QR code',
+      icon: 'qr-code',
+      to: '/donor/qrcode',
+    }
+  }
+  return {
+    status: 'You are eligible to donate. Pick a blood center and a time that suits you.',
+    label: 'Book a donation',
+    icon: 'calendar',
+    to: '/donor/appointments',
+  }
+})
 
 // Core donor data
 const profile = ref(null)
@@ -386,6 +443,9 @@ const bloodType = ref('-')
 const totalDonations = ref(0)
 const upcomingAppointment = ref(null)
 const recentDonations = ref([])
+// Hero shows blood type and QR status, so the stat cards show the history.
+const lastDonation = computed(() => recentDonations.value.find(d => d.status === 'completed') ?? null)
+const lastDonationDate = computed(() => (lastDonation.value ? formatDate(lastDonation.value.donation_date, 'MMM D, YYYY') : '-'))
 const monthlyTrend = ref([])
 
 // Trend chart state
@@ -412,6 +472,7 @@ const nextApptDate = computed(() => {
   if (!upcomingAppointment.value) return '-'
   return formatDate(upcomingAppointment.value.appointment_datetime, 'MMM D')
 })
+
 
 const quickActions = [
   { path: '/donor/appointments', icon: 'calendar', color: '#1565C0', label: 'Book Appointment' },
@@ -460,6 +521,8 @@ const onboardingSteps = computed(() => [
   },
 ])
 
+// The first unfinished step is the one to highlight.
+const nextOnboardingKey = computed(() => onboardingSteps.value.find(s => !s.done)?.key ?? null)
 const completedSteps = computed(() => onboardingSteps.value.filter(s => s.done).length)
 const progressPercent = computed(() => (completedSteps.value / onboardingSteps.value.length) * 100)
 const showOnboarding = computed(() => completedSteps.value < onboardingSteps.value.length)
@@ -560,8 +623,8 @@ watch(() => route.path, () => {
 
 <style scoped>
 .dashboard {
-  --primary: #1565c0;
-  --secondary: #42a5f5;
+  --primary: var(--rb-primary);
+  --secondary: color-mix(in srgb, var(--rb-primary) 65%, white);
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
@@ -570,7 +633,7 @@ watch(() => route.path, () => {
   --border: #eef0f3;
   --card-bg: #ffffff;
 
-  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   max-width: 1400px;
   background: var(--rb-page-bg);
   margin: 0 auto;
@@ -609,6 +672,165 @@ watch(() => route.path, () => {
 }
 
 /* Header Section */
+/* ── Hero ── */
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 32px;
+  border-radius: 22px;
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(255, 255, 255, 0.45), transparent 60%),
+    linear-gradient(120deg, var(--rb-grad-from, #E5EFFC) 0%, var(--rb-grad-to, #ADCCEF) 100%);
+  box-shadow: 0 18px 40px -26px rgba(var(--rb-primary-rgb), 0.55);
+  --hero-text: #0B1F3A;
+  --hero-text-2: #2B3E58;
+}
+/* Two soft discs: the glass glow, like the landing page. */
+.hero::before,
+.hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.hero::before {
+  width: 260px;
+  height: 260px;
+  right: 16%;
+  top: -140px;
+  background: rgba(255, 255, 255, 0.28);
+}
+.hero::after {
+  width: 180px;
+  height: 180px;
+  left: -60px;
+  bottom: -110px;
+  background: rgba(255, 255, 255, 0.22);
+}
+/* Deep gradients (headerText 'light') put white text on their dark end. */
+.hero--light {
+  --hero-text: #FFFFFF;
+  --hero-text-2: rgba(255, 255, 255, 0.88);
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
+    linear-gradient(120deg, var(--rb-grad-to) 0%, var(--rb-grad-from) 100%);
+}
+
+.hero__copy { position: relative; z-index: 1; min-width: 0; }
+.hero__eyebrow {
+  margin: 0 0 6px;
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  color: var(--hero-text-2);
+}
+.hero__title {
+  margin: 0 0 6px;
+  font-size: var(--rb-fs-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--hero-text);
+}
+.hero__status {
+  max-width: 52ch;
+  margin: 0 0 18px;
+  font-size: var(--rb-fs-body);
+  line-height: 1.55;
+  color: var(--hero-text-2);
+}
+.hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--rb-primary);
+  color: #FFFFFF;
+  font-size: var(--rb-fs-body);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 22px -12px rgba(var(--rb-primary-rgb), 0.9);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.hero__cta:hover { background: var(--rb-primary-hover); }
+.hero__cta:active { transform: scale(0.98); }
+.hero__cta:focus-visible { outline: 2px solid var(--hero-text); outline-offset: 3px; }
+.hero__cta-arrow { transition: transform 0.2s ease; }
+.hero__cta:hover .hero__cta-arrow { transform: translateX(3px); }
+.hero--light .hero__cta { background: #FFFFFF; color: var(--rb-primary); }
+.hero--light .hero__cta:hover { background: #F1F5F9; }
+
+/* Frosted glass card with two facts. */
+.hero__glass {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  min-width: 220px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.hero__fact { display: flex; align-items: center; gap: 12px; }
+.hero__fact-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+.hero__fact-icon--blood { color: #C62828; }
+.hero__fact-icon--ok { color: #2E7D32; }
+.hero__fact-icon--warn { color: #B45309; }
+.hero__fact-label { display: block; font-size: var(--rb-fs-caption); font-weight: 600; color: #475569; }
+.hero__fact-value { display: block; font-size: 17px; font-weight: 800; color: #0B1F3A; }
+
+.stat-card__value--date { font-size: 20px; }
+
+/* Dark mode: a deep tint of the theme instead of a bright pastel block. */
+:global(.dark .scope-donor-dashboard .hero) {
+  --hero-text: #F1F5F9;
+  --hero-text-2: #CBD5E1;
+  background:
+    radial-gradient(60% 120% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 22%, transparent), transparent 60%),
+    linear-gradient(120deg, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 30%, #111A2E) 0%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 12%, #111A2E) 100%);
+  box-shadow: 0 18px 40px -26px rgba(0, 0, 0, 0.7);
+}
+:global(.dark .scope-donor-dashboard .hero::before),
+:global(.dark .scope-donor-dashboard .hero::after) { background: rgba(255, 255, 255, 0.05); }
+:global(.dark .scope-donor-dashboard .hero__glass) {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:global(.dark .scope-donor-dashboard .hero__fact-icon) { background: rgba(255, 255, 255, 0.08); }
+:global(.dark .scope-donor-dashboard .hero__fact-label) { color: #94A3B8; }
+:global(.dark .scope-donor-dashboard .hero__fact-value) { color: #F1F5F9; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding: 22px 20px; }
+  .hero__glass { grid-template-columns: 1fr 1fr; min-width: 0; }
+  .hero__cta { width: 100%; justify-content: center; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .hero__glass { background: rgba(255, 255, 255, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero__cta, .hero__cta-arrow { transition: none; }
+}
+
 .header-row {
   display: flex;
   align-items: flex-start;
@@ -624,7 +846,7 @@ watch(() => route.path, () => {
 }
 
 .page-title {
-  font-size: 20px;
+  font-size: var(--rb-fs-title);
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text-primary);
@@ -633,7 +855,7 @@ watch(() => route.path, () => {
 }
 
 .page-subtitle {
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   color: var(--text-secondary);
   margin: 6px 0 0;
 }
@@ -665,7 +887,7 @@ watch(() => route.path, () => {
   gap: 8px;
   padding: 11px 20px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   font-weight: 700;
   color: white;
   background: var(--primary);
@@ -676,21 +898,42 @@ watch(() => route.path, () => {
 }
 
 .btn-primary:hover {
-  background: #0d47a1;
+  background: var(--rb-primary-hover);
 }
 
 .btn-primary--sm {
   padding: 9px 18px;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   border-radius: 10px;
 }
+
+/* Secondary action: outlined in the theme colour. */
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.4);
+  background: transparent;
+  color: var(--rb-primary-text);
+  font-size: var(--rb-fs-small);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-outline:hover { background: rgba(var(--rb-primary-rgb), 0.07); border-color: var(--rb-primary); }
+.btn-outline:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.btn-outline--block { display: flex; width: 100%; }
 
 .btn-danger {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   font-weight: 700;
   padding: 12px;
   border-radius: 10px;
@@ -741,11 +984,11 @@ watch(() => route.path, () => {
 .banner--warning .banner-icon-wrapper { background: rgba(245, 124, 0, 0.12); }
 
 .banner-icon { color: currentColor; flex-shrink: 0; display: block; }
-.banner-text { font-size: 12.5px; font-weight: 400; line-height: 1.55; margin: 0; color: #475569; }
+.banner-text { font-size: var(--rb-fs-small); font-weight: 400; line-height: 1.55; margin: 0; color: #475569; }
 
 .banner-link {
   margin-left: auto;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   font-weight: 600;
   text-decoration: none;
   color: currentColor;
@@ -765,7 +1008,7 @@ watch(() => route.path, () => {
   position: relative;
   overflow: hidden;
   background: var(--card-bg);
-  border-radius: 14px;
+  border-radius: 18px;
   border: 1px solid var(--border);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   padding: 22px 24px;
@@ -782,8 +1025,8 @@ watch(() => route.path, () => {
   gap: 16px;
 }
 
-.onboarding-card__title { font-size: 16px; font-weight: 800; margin: 0; color: var(--text-primary); }
-.onboarding-card__subtitle { font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 0; }
+.onboarding-card__title { font-size: var(--rb-fs-section); font-weight: 800; margin: 0; color: var(--text-primary); }
+.onboarding-card__subtitle { font-size: var(--rb-fs-small); color: var(--text-secondary); margin: 4px 0 0; }
 
 .onboarding-card__progress-ring {
   position: relative;
@@ -808,15 +1051,18 @@ watch(() => route.path, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10.5px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   color: var(--text-primary);
 }
 
 .onboarding-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 1180px) {
+  .onboarding-steps { grid-template-columns: 1fr; }
 }
 
 .onboarding-step {
@@ -828,15 +1074,15 @@ watch(() => route.path, () => {
   background: var(--rb-surface-hover, #f8fafc);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   font-weight: 600;
   text-decoration: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .onboarding-step:not(.onboarding-step--disabled):hover {
-  background: rgba(21, 101, 192, 0.06);
-  border-color: rgba(21, 101, 192, 0.28);
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border-color: rgba(var(--rb-primary-rgb), 0.28);
 }
 
 .onboarding-step--done {
@@ -844,16 +1090,39 @@ watch(() => route.path, () => {
   background: transparent;
 }
 
+/* The next thing to do: theme-tinted, with a "Next" tag. */
+.onboarding-step--next {
+  background: rgba(var(--rb-primary-rgb), 0.07);
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
+  color: var(--rb-primary-text);
+}
+.onboarding-step--next .onboarding-step__check {
+  background: var(--rb-primary);
+  border-color: var(--rb-primary);
+  color: #fff;
+}
+.onboarding-step__next {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--rb-primary);
+  color: #fff;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+}
+
 .onboarding-step__check {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 1.5px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: transparent;
+  font-size: var(--rb-fs-caption);
+  font-weight: 800;
+  color: var(--text-secondary);
 }
 
 .onboarding-step--done .onboarding-step__check {
@@ -874,7 +1143,7 @@ watch(() => route.path, () => {
 
 .stat-card {
   background: var(--card-bg);
-  border-radius: 14px;
+  border-radius: 18px;
   padding: 18px 20px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
@@ -895,7 +1164,7 @@ watch(() => route.path, () => {
 
 .stat-card__top { display: flex; align-items: center; justify-content: space-between; }
 .stat-card__label {
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -913,8 +1182,8 @@ watch(() => route.path, () => {
   flex-shrink: 0;
 }
 
-.stat-card__badge--primary { background: rgba(21, 101, 192, 0.08); color: var(--primary); }
-.stat-card__badge--secondary { background: rgba(66, 165, 245, 0.1); color: #0288d1; }
+.stat-card__badge--primary { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--primary); }
+.stat-card__badge--secondary { background: color-mix(in srgb, var(--rb-primary-text) 10%, transparent); color: #0288d1; }
 .stat-card__badge--accent { background: rgba(211, 47, 47, 0.08); color: var(--accent); }
 .stat-card__badge--success { background: rgba(46, 125, 50, 0.08); color: var(--success); }
 .stat-card__badge--warning { background: rgba(245, 124, 0, 0.08); color: var(--warning); }
@@ -930,7 +1199,7 @@ watch(() => route.path, () => {
 }
 
 .blood-type-tag {
-  font-size: 10px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   text-transform: uppercase;
   padding: 3px 7px;
@@ -944,7 +1213,7 @@ watch(() => route.path, () => {
   align-items: center;
   align-self: flex-start;
   max-width: 100%;
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   font-weight: 700;
   padding: 3px 10px;
   border-radius: 999px;
@@ -971,7 +1240,7 @@ watch(() => route.path, () => {
 /* Panels */
 .panel {
   background: var(--card-bg);
-  border-radius: 14px;
+  border-radius: 18px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -990,28 +1259,28 @@ watch(() => route.path, () => {
 
 .panel-title {
   font-weight: 800;
-  font-size: 15px;
+  font-size: var(--rb-fs-section);
   color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.01em;
 }
 
-.panel-subtitle { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
+.panel-subtitle { font-size: var(--rb-fs-caption); color: var(--text-secondary); margin: 3px 0 0; }
 
 .period-pill {
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   color: var(--primary);
-  background: rgba(21, 101, 192, 0.08);
+  background: rgba(var(--rb-primary-rgb), 0.08);
   padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(21, 101, 192, 0.12);
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.12);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .panel-link, .panel-link-plain {
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   color: var(--primary);
   display: flex;
@@ -1021,7 +1290,7 @@ watch(() => route.path, () => {
   transition: color 0.15s ease;
 }
 
-.panel-link:hover, .panel-link-plain:hover { color: #0d47a1; text-decoration: underline; }
+.panel-link:hover, .panel-link-plain:hover { color: var(--rb-primary-hover); text-decoration: underline; }
 
 /* Chart */
 .trend-chart { padding: 22px 22px 24px; }
@@ -1031,7 +1300,7 @@ watch(() => route.path, () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: var(--rb-fs-caption);
   font-weight: 700;
   color: var(--text-secondary);
   padding-bottom: 24px;
@@ -1061,7 +1330,7 @@ watch(() => route.path, () => {
   background: #0f172a;
   border-radius: 6px;
   padding: 4px 9px;
-  font-size: 10.5px;
+  font-size: var(--rb-fs-caption);
   font-weight: 700;
   color: white;
   white-space: nowrap;
@@ -1098,7 +1367,7 @@ watch(() => route.path, () => {
 .chart__bar--low { background: var(--warning); }
 .chart__bar--empty { background: transparent; }
 
-.chart__label { margin-top: 8px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); }
+.chart__label { margin-top: 8px; font-size: var(--rb-fs-caption); font-weight: 700; color: var(--text-secondary); }
 .chart__label--current { color: var(--primary); font-weight: 800; }
 
 .trend-empty {
@@ -1106,10 +1375,10 @@ watch(() => route.path, () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 36px;
+  gap: 10px;
+  padding: 24px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   font-weight: 600;
 }
 
@@ -1154,14 +1423,14 @@ watch(() => route.path, () => {
 .donation-icon--success { background: rgba(46, 125, 50, 0.08); color: var(--success); }
 .donation-icon--warning { background: rgba(245, 124, 0, 0.08); color: var(--warning); }
 
-.donation-title { font-size: 13.5px; font-weight: 800; color: var(--text-primary); margin: 0; }
-.donation-meta { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; }
+.donation-title { font-size: var(--rb-fs-body); font-weight: 800; color: var(--text-primary); margin: 0; }
+.donation-meta { font-size: var(--rb-fs-caption); color: var(--text-secondary); margin: 3px 0 0; }
 .donation-meta__highlight { color: var(--text-primary); font-weight: 800; }
 .donation-item__right { text-align: right; flex-shrink: 0; }
-.donation-date { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); margin: 0; }
+.donation-date { font-size: var(--rb-fs-caption); font-weight: 700; color: var(--text-secondary); margin: 0; }
 
 .badge {
-  font-size: 10px;
+  font-size: var(--rb-fs-caption);
   font-weight: 800;
   padding: 3px 9px;
   border-radius: 999px;
@@ -1180,7 +1449,7 @@ watch(() => route.path, () => {
   align-items: center;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
 }
 
 /* Appointment Widget Details */
@@ -1200,17 +1469,17 @@ watch(() => route.path, () => {
 }
 
 .appt-date-chip__day { color: white; font-weight: 800; font-size: 22px; line-height: 1; }
-.appt-date-chip__month { color: rgba(255, 255, 255, 0.85); font-size: 10px; text-transform: uppercase; font-weight: 800; margin-top: 2px; }
+.appt-date-chip__month { color: rgba(255, 255, 255, 0.85); font-size: var(--rb-fs-caption); text-transform: uppercase; font-weight: 800; margin-top: 2px; }
 
 .appt-info { flex: 1; min-width: 0; }
-.appt-type { font-weight: 800; font-size: 14px; margin: 0; color: var(--text-primary); }
+.appt-type { font-weight: 800; font-size: var(--rb-fs-body); margin: 0; color: var(--text-primary); }
 
 .appt-meta-row {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-top: 5px;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   color: var(--text-secondary);
 }
 
@@ -1220,15 +1489,15 @@ watch(() => route.path, () => {
   margin-top: 18px;
   border-radius: 12px;
   padding: 10px 14px;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(21, 101, 192, 0.05);
+  background: rgba(var(--rb-primary-rgb), 0.05);
   color: var(--primary);
-  border: 1px dashed rgba(21, 101, 192, 0.25);
+  border: 1px dashed rgba(var(--rb-primary-rgb), 0.25);
 }
 
 /* Eligibility Body */
@@ -1261,14 +1530,14 @@ watch(() => route.path, () => {
   border: 1px solid rgba(245, 124, 0, 0.18);
 }
 
-.eligibility-status { font-size: 14px; font-weight: 800; margin: 0; }
-.eligibility-until { font-size: 11.5px; opacity: 0.85; margin: 2px 0 0; }
+.eligibility-status { font-size: var(--rb-fs-body); font-weight: 800; margin: 0; }
+.eligibility-until { font-size: var(--rb-fs-caption); opacity: 0.85; margin: 2px 0 0; }
 
 .eligibility-details {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   margin-bottom: 18px;
   padding: 0 4px;
 }
@@ -1304,9 +1573,62 @@ watch(() => route.path, () => {
   color: var(--qa-color, var(--primary));
 }
 
-.quick-action__label { font-size: 13px; font-weight: 700; color: var(--text-primary); flex: 1; }
+.quick-action__label { font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); flex: 1; }
 .quick-action__chevron { color: #cbd5e1; transition: color 0.15s ease; }
 .quick-action:hover .quick-action__chevron { color: var(--primary); }
+
+.quick-actions { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.quick-action:hover { background: #f1f5f9; }
+.quick-action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+.quick-action__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--qa-color) 10%, transparent);
+  color: var(--qa-color, var(--rb-primary));
+}
+
+.quick-action__label { font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); flex: 1; }
+.quick-action__chevron { color: #cbd5e1; transition: color 0.15s ease; }
+.quick-action:hover .quick-action__chevron { color: var(--rb-primary); }
+
+:global(.dark .dashboard .quick-action:hover) { background: #263449; }
+:global(.dark .dashboard .quick-action__icon) { background: color-mix(in srgb, var(--qa-color) 18%, transparent); }
+
+/* "View QR" on the hero's glass card */
+.hero__qr-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--rb-primary-text);
+  font-size: var(--rb-fs-small);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.hero__qr-link:hover { background: #fff; }
+.hero__qr-link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+:global(.dark .dashboard .hero__qr-link) { background: rgba(15, 23, 42, 0.45); }
 
 /* Responsive Overrides */
 @media (max-width: 1024px) {
@@ -1348,11 +1670,11 @@ watch(() => route.path, () => {
   }
 
   .page-title {
-    font-size: 20px;
+    font-size: var(--rb-fs-title);
   }
 
   .page-subtitle {
-    font-size: 12.5px;
+    font-size: var(--rb-fs-small);
   }
 
   .onboarding-card {
@@ -1378,7 +1700,7 @@ watch(() => route.path, () => {
   .chart { gap: 8px; }
   .chart__plot { gap: 3px; }
   .chart__col { min-width: 0; padding: 0; }
-  .chart__label { font-size: 9.5px; }
+  .chart__label { font-size: var(--rb-fs-caption); }
 
   /* 2x2 nga gagmay nga cards imbes upat ka taas nga card */
   .stats-grid {
@@ -1394,13 +1716,12 @@ watch(() => route.path, () => {
 
   .stat-card__top { gap: 6px; }
 
+  /* Wraps to a second line rather than cutting the word off. */
   .stat-card__label {
     min-width: 0;
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: var(--rb-fs-caption);
+    letter-spacing: 0.03em;
+    line-height: 1.3;
   }
 
   .stat-card__badge {
@@ -1414,16 +1735,16 @@ watch(() => route.path, () => {
   .stat-card__value-group { gap: 6px; }
 
   .blood-type-tag {
-    font-size: 9px;
+    font-size: var(--rb-fs-caption);
     padding: 2px 5px;
   }
 
   .stat-chip {
-    font-size: 10.5px;
+    max-width: 100%;
+    font-size: var(--rb-fs-caption);
     padding: 2px 8px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.35;
+    white-space: normal;
   }
 }
 
@@ -1482,7 +1803,7 @@ watch(() => route.path, () => {
 
 .btn-primary:focus-visible,
 .btn-danger:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 </style>
