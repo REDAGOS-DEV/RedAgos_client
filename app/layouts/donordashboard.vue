@@ -639,9 +639,12 @@ const handleLogout = async () => {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .topbar { background-color: var(--rb-page-bg, #F7F8FA); }
 }
+/* Reduced transparency: the glass stays (it sits over a still gradient, not
+   over content), only the scrolled bar, with content sliding under it,
+   turns solid. */
 @media (prefers-reduced-transparency: reduce) {
-  .topbar { background-color: rgba(255, 255, 255, 0.92); }
-  :global(.dark .topbar) { background-color: rgba(15, 23, 42, 0.94); }
+  .topbar--scrolled { background-color: rgba(255, 255, 255, 0.96); }
+  :global(.dark .donor-portal .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.96); }
 }
 
 /*

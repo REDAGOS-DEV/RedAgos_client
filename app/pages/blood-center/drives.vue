@@ -216,7 +216,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="drive-date">Date</label>
-                <input id="drive-date" v-model="driveForm.event_date" type="date" class="form-input" :min="todayIso" required>
+                <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="drive-capacity">Max donors</label>
@@ -333,6 +333,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -424,6 +425,11 @@ function closeCancelDialog() {
 async function handleCreateDrive() {
   // Editing has no server route yet; the button is disabled, this is the backstop.
   if (editingDrive.value) return
+
+  if (!driveForm.event_date) {
+    formError.value = 'Choose the date of the drive.'
+    return
+  }
 
   submitting.value = true
   formError.value = ''

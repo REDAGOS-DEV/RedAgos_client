@@ -44,8 +44,8 @@
             {{ s.label }}
           </button>
         </div>
-        <label class="filter"><span>From</span><input v-model="from" type="date" class="input" :max="to || undefined"></label>
-        <label class="filter"><span>To</span><input v-model="to" type="date" class="input" :min="from || undefined"></label>
+        <label class="filter"><span>From</span><DatePicker id="receipts-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" /></label>
+        <label class="filter"><span>To</span><DatePicker id="receipts-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" /></label>
       </section>
 
       <section class="card" aria-label="Receipts">
@@ -132,6 +132,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],

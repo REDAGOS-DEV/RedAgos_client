@@ -43,12 +43,15 @@
         </button>
       </div>
 
-      <select v-model="departmentFilter" class="select" aria-label="Filter by department" @change="load">
-        <option value="">All departments</option>
-        <option v-for="group in departments" :key="group.department" :value="group.department">
-          {{ group.label }}
-        </option>
-      </select>
+      <div class="select">
+        <SelectField
+          v-model="departmentFilter"
+          :options="[{ value: '', label: 'All departments' }, ...departments.map((group) => ({ value: group.department, label: group.label }))]"
+          aria-label="Filter by department"
+          size="sm"
+          @change="load()"
+        />
+      </div>
 
       <label class="toggle">
         <input v-model="includeDeleted" type="checkbox" @change="load" >
@@ -267,12 +270,10 @@
               <div class="form__row">
                 <label class="form__field">
                   <span>Department</span>
-                  <select v-model="form.department">
-                    <option value="">Select a department</option>
-                    <option v-for="group in departments" :key="group.department" :value="group.department">
-                      {{ group.label }}
-                    </option>
-                  </select>
+                  <SelectField
+                    v-model="form.department"
+                    :options="[{ value: '', label: 'Select a department' }, ...departments.map((group) => ({ value: group.department, label: group.label }))]"
+                  />
                   <em v-if="errors.department">{{ errors.department[0] }}</em>
                 </label>
 
@@ -329,11 +330,10 @@
 
               <label v-if="editing" class="form__field">
                 <span>Account status</span>
-                <select v-model="form.account_status">
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
-                  <option value="deactivated">Deactivated</option>
-                </select>
+                <SelectField
+                  v-model="form.account_status"
+                  :options="[{ value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' }, { value: 'deactivated', label: 'Deactivated' }]"
+                />
                 <small>Suspending or deactivating an account signs it out immediately.</small>
               </label>
             </section>
@@ -357,6 +357,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -783,8 +784,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-primary);
 }
 
-.select,
-.form__field select,
 .form__field input {
   padding: 9px 12px;
   border-radius: 10px;
@@ -796,8 +795,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.select:focus,
-.form__field select:focus,
 .form__field input:focus {
   outline: none;
   border-color: var(--rb-primary);
@@ -1287,4 +1284,5 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
     grid-template-columns: 1fr;
   }
 }
+.select { width: 200px; }
 </style>

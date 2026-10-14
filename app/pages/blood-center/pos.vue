@@ -29,15 +29,16 @@
       </form>
     </section>
 
-    <div class="pos-top">
-      <!-- NEW TRANSACTION -->
-      <section class="card tx" aria-labelledby="tx-title">
-        <div class="card-head">
-          <h2 id="tx-title" class="card-title">New Transaction</h2>
-          <button v-if="bill" type="button" class="link-btn" @click="nextCustomer">
-            <AssetIcon name="x" :size="13" />
-            Clear
-          </button>
+    <!-- The counter, left to right: who is waiting, their bill, the payment. -->
+    <div class="counter">
+      <!-- 1. WAITING: the queue is always in view; typing turns it into results -->
+      <section class="card queue" aria-labelledby="queue-title">
+        <div class="queue-head">
+          <h2 id="queue-title" class="card-title">
+            {{ scanQuery.trim().length >= 2 ? 'Results' : 'Waiting' }}
+            <span v-if="!queueLoading && scanQuery.trim().length < 2" class="count-chip">{{ queue.length }}</span>
+          </h2>
+          <kbd class="kbd" title="Press / or F2 to scan">/</kbd>
         </div>
 
         <!-- Owed by different people: a patient at this counter, or a hospital by statement. -->
@@ -51,161 +52,179 @@
             :aria-selected="category === c.value"
             @click="switchCategory(c.value)"
           >
-            {{ c.label }}
+            {{ c.short }}
           </button>
         </div>
 
         <!-- Scan or type: a handheld scanner types into this box too. -->
-        <div class="search-wrap">
-          <form class="search" role="search" @submit.prevent="searchNow('scan')">
-            <AssetIcon name="search" :size="15" class="search-icon" />
-            <input
-              ref="scanInput"
-              v-model="scanQuery"
-              type="search"
-              class="input search-input"
-              :placeholder="category === 'patient' ? 'Scan or enter a request or PTR reference' : 'Enter a weekly request reference'"
-              :aria-label="category === 'patient' ? 'Scan or enter a request reference' : 'Find a hospital statement'"
-              autocomplete="off"
-              @focus="openDropdown('scan')"
-              @blur="closeDropdownSoon"
-              @keydown.esc="dropdown = null"
-              @input="onQuery('scan')"
-            >
-            <button type="button" class="scan-btn" aria-label="Ready the scanner" title="Ready the scanner" @click="focusScanner">
-              <AssetIcon name="scan-line" :size="16" />
-            </button>
-          </form>
-
-          <div v-if="dropdown === 'scan'" class="dropdown" role="listbox" :aria-label="dropdownHeading">
-            <p class="dropdown-heading">{{ dropdownHeading }}</p>
-            <div v-if="dropdownLoading" class="skeleton skeleton--row" />
-            <p v-else-if="!dropdownRows.length" class="dropdown-empty">{{ dropdownEmpty }}</p>
-            <button v-for="b in dropdownRows" v-else :key="b.request_id" type="button" role="option" class="dropdown-row" @mousedown.prevent="selectBill(b.request_id)">
-              <span class="mono strong">{{ b.reference_number }}</span>
-              <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
-              <span class="dropdown-who">{{ b.who }}</span>
-              <span class="dropdown-amount" :class="{ 'dropdown-amount--clear': !b.owing }">{{ b.owing ? `${pesos(b.amount)} ${b.amountWord}` : b.status_label }}</span>
-            </button>
-          </div>
-        </div>
+        <form class="search" role="search" @submit.prevent="searchNow('scan')">
+          <AssetIcon name="search" :size="15" class="search-icon" />
+          <input
+            ref="scanInput"
+            v-model="scanQuery"
+            type="search"
+            class="input search-input"
+            :placeholder="category === 'patient' ? 'Scan a reference or type a name' : 'Weekly request reference'"
+            :aria-label="category === 'patient' ? 'Scan a request reference or search a patient' : 'Find a hospital statement'"
+            autocomplete="off"
+            @keydown.esc="scanQuery = ''"
+            @input="onQuery('scan')"
+          >
+          <button type="button" class="scan-btn" aria-label="Ready the scanner" title="Ready the scanner" @click="focusScanner">
+            <AssetIcon name="scan-line" :size="16" />
+          </button>
+        </form>
         <p v-if="searchError" class="field-error">{{ searchError }}</p>
 
-        <!-- ITEMS: the units held for the request; nothing is added or priced at the counter -->
-        <div class="items">
-          <table class="grid-table">
-            <colgroup>
-              <col style="width: 6%">
-              <col style="width: 30%">
-              <col style="width: 16%">
-              <col style="width: 8%">
-              <col style="width: 19%">
-              <col style="width: 21%">
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Component</th>
-                <th scope="col">Blood type</th>
-                <th scope="col" class="num">Qty</th>
-                <th scope="col" class="num">Unit price</th>
-                <th scope="col" class="num">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-if="billLoading">
-                <tr v-for="n in 3" :key="n"><td colspan="6"><div class="skeleton skeleton--line" /></td></tr>
-              </template>
-              <template v-else-if="bill && bill.lines?.length">
-                <tr v-for="(line, i) in bill.lines" :key="i">
-                  <td class="muted">{{ i + 1 }}</td>
-                  <td class="ellipsis">{{ line.component_name }}</td>
-                  <td><span v-if="line.blood_type" class="type">{{ line.blood_type }}</span><span v-else class="muted">—</span></td>
-                  <td class="num">{{ line.quantity }}</td>
-                  <td class="num">{{ pesos(line.unit_price) }}</td>
-                  <td class="num">{{ pesos(line.line_total) }}</td>
+        <div class="queue-list" role="listbox" :aria-label="listHeading">
+          <template v-if="listLoading">
+            <div v-for="n in 4" :key="n" class="skeleton skeleton--row" />
+          </template>
+          <p v-else-if="!listRows.length" class="queue-empty">
+            <AssetIcon :name="scanQuery.trim().length >= 2 ? 'search-x' : 'check-check'" :size="20" />
+            {{ listEmpty }}
+          </p>
+          <button
+            v-for="b in listRows"
+            v-else
+            :key="b.request_id"
+            type="button"
+            role="option"
+            class="q-row"
+            :class="{ 'q-row--on': bill?.request_id === b.request_id, 'q-row--stat': b.is_emergency }"
+            :aria-selected="bill?.request_id === b.request_id"
+            @click="selectBill(b.request_id)"
+          >
+            <span class="q-row__top">
+              <span class="mono strong">{{ b.reference_number }}</span>
+              <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
+            </span>
+            <span class="q-row__who">{{ b.who }}</span>
+            <span class="q-row__amount" :class="{ 'q-row__amount--clear': !b.owing }">
+              {{ b.owing ? pesos(b.amount) : b.status_label }}
+              <small v-if="b.owing">{{ b.amountWord }}</small>
+            </span>
+          </button>
+        </div>
+
+        <!-- The day at a glance, from the billing summary -->
+        <dl class="today" aria-label="Today at this counter">
+          <div>
+            <dt>Collected today</dt>
+            <dd>{{ pesos(summary?.collected_today) }}</dd>
+          </div>
+          <div>
+            <dt>{{ category === 'weekly' ? 'Awaiting settlement' : 'Still owed' }}</dt>
+            <dd>
+              {{ category === 'weekly'
+                ? (summary?.weekly_awaiting_settlement?.count ?? 0)
+                : (summary?.outstanding?.count ?? 0) }}
+              <small>bills</small>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- 2. THE BILL -->
+      <section class="card billcard" aria-labelledby="bill-title">
+        <h2 id="bill-title" class="sr-only">Bill</h2>
+
+        <div v-if="billLoading" class="bill-loading" aria-busy="true">
+          <div class="skeleton skeleton--head" />
+          <div v-for="n in 3" :key="n" class="skeleton skeleton--line" />
+        </div>
+
+        <div v-else-if="!bill" class="bill-empty">
+          <span class="bill-empty__icon"><AssetIcon name="scan-line" :size="28" /></span>
+          <p class="bill-empty__title">Scan a request to start</p>
+          <p class="bill-empty__sub">
+            Or pick one from the waiting list.
+            Press <kbd class="kbd">/</kbd> anytime to scan.
+          </p>
+          <button v-if="queue.length" type="button" class="btn btn-outline" @click="selectBill(queue[0].request_id)">
+            Take the next one ({{ queue[0].reference_number }})
+          </button>
+        </div>
+
+        <template v-else>
+          <div class="bill-head">
+            <span class="avatar" aria-hidden="true"><AssetIcon :name="weekly ? 'building-2' : 'user'" :size="18" /></span>
+            <div class="bill-head__main">
+              <p class="bill-head__name">
+                {{ recipientName }}
+                <BillingBadge v-if="bill.request?.is_emergency" tone="danger">STAT</BillingBadge>
+              </p>
+              <p class="bill-head__line">{{ recipientLine }}</p>
+              <p v-if="recipientExtra" class="bill-head__extra">{{ recipientExtra }}</p>
+            </div>
+            <div class="bill-head__actions">
+              <NuxtLink :to="`/blood-center/statement/${bill.request_id}`" class="link-btn">View details</NuxtLink>
+              <button type="button" class="icon-btn" title="Clear (Esc)" aria-label="Clear this bill" @click="nextCustomer">
+                <AssetIcon name="x" :size="15" />
+              </button>
+            </div>
+          </div>
+
+          <!-- ITEMS: the units held for the request; nothing is added or priced at the counter -->
+          <div class="items">
+            <table class="grid-table">
+              <colgroup>
+                <col style="width: 6%">
+                <col style="width: 34%">
+                <col style="width: 14%">
+                <col style="width: 8%">
+                <col style="width: 18%">
+                <col style="width: 20%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Component</th>
+                  <th scope="col">Type</th>
+                  <th scope="col" class="num">Qty</th>
+                  <th scope="col" class="num">Unit price</th>
+                  <th scope="col" class="num">Subtotal</th>
                 </tr>
-              </template>
-              <tr v-else class="empty-row">
-                <td colspan="6">
-                  {{ bill ? 'No units are held for this request yet.' : 'No items yet. Scan or enter a request reference, or search for the patient below.' }}
-                  <button v-if="!bill && queue.length" type="button" class="link-btn" @click="focusScanner">
-                    {{ queue.length }} {{ category === 'patient' ? 'awaiting payment' : 'awaiting settlement' }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                <template v-if="bill.lines?.length">
+                  <tr v-for="(line, i) in bill.lines" :key="i">
+                    <td class="muted">{{ i + 1 }}</td>
+                    <td class="ellipsis">{{ line.component_name }}</td>
+                    <td><span v-if="line.blood_type" class="type">{{ line.blood_type }}</span><span v-else class="muted">-</span></td>
+                    <td class="num">{{ line.quantity }}</td>
+                    <td class="num">{{ pesos(line.unit_price) }}</td>
+                    <td class="num strong">{{ pesos(line.line_total) }}</td>
+                  </tr>
+                </template>
+                <tr v-else class="empty-row">
+                  <td colspan="6">No units are held for this request yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="tx-info">
-          <!-- PATIENT / RECIPIENT -->
-          <section class="tx-left" aria-labelledby="recipient-title">
-            <h3 id="recipient-title" class="sub-title">{{ category === 'weekly' ? 'Hospital / Recipient Information' : 'Patient / Recipient Information' }}</h3>
-            <div class="search-wrap">
-              <div class="search search--right">
-                <input
-                  v-model="patientQuery"
-                  type="search"
-                  class="input search-input"
-                  :placeholder="category === 'patient' ? 'Search patient by name' : 'Weekly bills are owed by the hospital'"
-                  :disabled="category !== 'patient'"
-                  aria-label="Search patient by name"
-                  autocomplete="off"
-                  @focus="openDropdown('patient')"
-                  @blur="closeDropdownSoon"
-                  @keydown.esc="dropdown = null"
-                  @input="onQuery('patient')"
-                >
-                <AssetIcon name="search" :size="15" class="search-icon" />
-              </div>
-              <div v-if="dropdown === 'patient'" class="dropdown dropdown--up" role="listbox" :aria-label="dropdownHeading">
-                <p class="dropdown-heading">{{ dropdownHeading }}</p>
-                <div v-if="dropdownLoading" class="skeleton skeleton--row" />
-                <p v-else-if="!dropdownRows.length" class="dropdown-empty">{{ dropdownEmpty }}</p>
-                <button v-for="b in dropdownRows" v-else :key="b.request_id" type="button" role="option" class="dropdown-row" @mousedown.prevent="selectBill(b.request_id)">
-                  <span class="mono strong">{{ b.reference_number }}</span>
-                  <span class="dropdown-who">{{ b.who }}</span>
-                  <span class="dropdown-amount" :class="{ 'dropdown-amount--clear': !b.owing }">{{ b.owing ? `${pesos(b.amount)} ${b.amountWord}` : b.status_label }}</span>
-                </button>
-              </div>
+          <!-- Read-only facts, as text rather than greyed-out boxes -->
+          <dl class="facts">
+            <div>
+              <dt>Type</dt>
+              <dd>{{ bill.request?.purpose_label || (weekly ? 'Blood Bank Replenishment' : 'Patient Transfusion') }}</dd>
             </div>
+            <div>
+              <dt>Priority</dt>
+              <dd :class="{ 'facts__stat': bill.request?.is_emergency }">{{ bill.request?.urgency_label || 'Routine' }}</dd>
+            </div>
+            <div>
+              <dt>{{ weekly ? 'Requested on' : 'Physician / hospital' }}</dt>
+              <dd>{{ weekly ? day(bill.request?.request_date) : (bill.request?.attending_physician || bill.request?.requesting_facility || '-') }}</dd>
+            </div>
+          </dl>
 
-            <div class="person" :class="{ 'person--empty': !bill }">
-              <span class="avatar" aria-hidden="true"><AssetIcon :name="weekly ? 'building-2' : 'user'" :size="15" /></span>
-              <div class="person-main">
-                <strong>{{ recipientName }}</strong>
-                <span>{{ recipientLine }}</span>
-                <span v-if="bill">{{ recipientExtra }}</span>
-              </div>
-              <NuxtLink v-if="bill" :to="`/blood-center/statement/${bill.request_id}`" class="link-btn">View details</NuxtLink>
-            </div>
-
-            <label class="field">
-              <span class="field-label">Received from <span class="optional">(Optional)</span></span>
-              <input v-model.trim="payerName" type="text" maxlength="120" class="input" placeholder="Name printed on the receipt, e.g. the patient's watcher" autocomplete="off" :disabled="!canPay">
-            </label>
-          </section>
-
-          <!-- TRANSACTION DETAILS -->
-          <section class="tx-right" aria-labelledby="details-title">
-            <h3 id="details-title" class="sub-title detail-wide">Transaction Details</h3>
-            <div class="field">
-              <span class="field-label">Transaction type</span>
-              <span class="readout">{{ bill?.request?.purpose_label || (category === 'weekly' ? 'Blood Bank Replenishment' : 'Patient Transfusion') }}</span>
-            </div>
-            <div class="field">
-              <span class="field-label">Priority</span>
-              <span class="readout" :class="{ 'readout--empty': !bill, 'readout--stat': bill?.request?.is_emergency }">{{ bill ? (bill.request?.urgency_label || 'Routine') : '—' }}</span>
-            </div>
-            <div class="field detail-wide">
-              <span class="field-label">{{ weekly ? 'Requested on' : 'Requesting physician / hospital' }}</span>
-              <span class="readout" :class="{ 'readout--empty': !bill }">
-                {{ !bill ? '—' : weekly ? day(bill.request?.request_date) : (bill.request?.attending_physician || bill.request?.requesting_facility || '—') }}
-              </span>
-            </div>
-          </section>
-        </div>
+          <label v-if="!weekly" class="field">
+            <span class="field-label">Received from <span class="optional">(optional)</span></span>
+            <input v-model.trim="payerName" type="text" maxlength="120" class="input" placeholder="Name printed on the receipt, e.g. the patient's watcher" autocomplete="off" :disabled="!canPay">
+          </label>
+        </template>
 
         <p class="note">
           <AssetIcon name="info" :size="14" />
@@ -217,14 +236,15 @@
         </p>
       </section>
 
-      <!-- PAYMENT -->
+      <!-- 3. PAYMENT -->
       <aside class="card pay" aria-labelledby="pay-title">
-        <div class="card-head">
-          <h2 id="pay-title" class="card-title card-title--lg">{{ weekly ? 'Settlement' : 'Payment' }}</h2>
-          <div class="txn">
-            <span>Bill #</span>
-            <strong class="mono">{{ bill?.request?.reference_number || '—' }}</strong>
+        <div class="pay-hero" :class="{ 'pay-hero--empty': !bill }">
+          <div class="pay-hero__top">
+            <h2 id="pay-title" class="pay-hero__title">{{ weekly ? 'Settlement' : 'Payment' }}</h2>
+            <span class="txn">Bill <strong class="mono">{{ bill?.request?.reference_number || '-' }}</strong></span>
           </div>
+          <p class="pay-hero__label">{{ heroLabel }}</p>
+          <p class="pay-hero__amount">{{ pesos(heroAmount) }}</p>
         </div>
 
         <div class="tabs" role="tablist" aria-label="Payment">
@@ -235,28 +255,30 @@
             class="tab"
             :class="{ 'tab--on': payTab === t.value }"
             :aria-selected="payTab === t.value"
+            :title="t.label"
             @click="payTab = t.value"
           >
-            {{ t.label }}
+            <span class="tab__long">{{ t.label }}</span>
+            <span class="tab__short" aria-hidden="true">{{ t.short }}</span>
           </button>
         </div>
 
         <div class="pay-body">
           <!-- DONE: the receipt to hand over -->
           <div v-if="done" class="done">
-            <div class="done-mark"><AssetIcon name="check" :size="18" /></div>
+            <div class="done-mark"><AssetIcon name="check" :size="22" /></div>
             <h3 class="done-title">{{ done.receipts.length > 1 ? `Payment recorded in ${done.receipts.length} parts` : 'Payment recorded' }}</h3>
+            <div v-if="done.change !== null" class="done-change">
+              <span>Change to give back</span>
+              <strong>{{ pesos(done.change) }}</strong>
+            </div>
             <p v-for="r in done.receipts" :key="r.id" class="done-sub">
               Receipt <NuxtLink :to="`/blood-center/receipt/${r.id}`" class="link mono">{{ r.receipt_number }}</NuxtLink>
               · {{ r.payment_method_label }} {{ pesos(r.amount_paid) }}
             </p>
             <p v-if="done.receipts.at(-1)?.is_partial" class="done-sub">{{ pesos(done.receipts.at(-1).balance_after) }} still due</p>
-            <div v-if="done.change !== null" class="change-row">
-              <span class="field-label">Change to give back</span>
-              <strong class="change-box">{{ pesos(done.change) }}</strong>
-            </div>
-            <button class="btn btn-primary btn-block" @click="printReceipts(done.receipts)">
-              <AssetIcon name="printer" :size="15" />
+            <button ref="printBtn" class="btn btn-primary btn-block btn-lg" @click="printReceipts(done.receipts)">
+              <AssetIcon name="printer" :size="16" />
               {{ done.receipts.length > 1 ? 'Print receipts (80mm)' : 'Print receipt (80mm)' }}
             </button>
             <div class="pair">
@@ -306,11 +328,9 @@
           <!-- WEEKLY: no money moves here; the hospital's settlement is recorded -->
           <template v-else-if="weekly">
             <div class="summary">
-              <p class="summary-title">Settlement Summary</p>
               <dl>
                 <div><dt>Total billed</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
                 <div><dt>Status</dt><dd>{{ bill.status_label }}</dd></div>
-                <div class="summary-due"><dt>Owed by the hospital</dt><dd>{{ pesos(bill.settlement ? 0 : bill.total_amount) }}</dd></div>
               </dl>
             </div>
             <dl v-if="bill.settlement" class="settled">
@@ -325,12 +345,12 @@
                 <span v-if="settlementErrors.settlement_reference" class="field-error">{{ settlementErrors.settlement_reference }}</span>
               </label>
               <div class="pair">
+                <div class="field">
+                  <label class="field-label" for="settled-at">Date settled</label>
+                  <DatePicker id="settled-at" v-model="settlement.settled_at" :max="todayIso" size="sm" />
+                </div>
                 <label class="field">
-                  <span class="field-label">Date settled</span>
-                  <input v-model="settlement.settled_at" type="date" :max="todayIso" class="input" required>
-                </label>
-                <label class="field">
-                  <span class="field-label">Note <span class="optional">(Optional)</span></span>
+                  <span class="field-label">Note <span class="optional">(optional)</span></span>
                   <input v-model.trim="settlement.settlement_note" type="text" maxlength="500" class="input">
                 </label>
               </div>
@@ -363,7 +383,6 @@
             </div>
 
             <div class="summary">
-              <p class="summary-title">Payment Summary</p>
               <dl>
                 <div><dt>Total amount</dt><dd>{{ pesos(bill?.total_amount) }}</dd></div>
                 <div class="subsidy-row">
@@ -382,10 +401,6 @@
                     </button>
                   </dt>
                   <dd>− {{ pesos(p.amount) }}</dd>
-                </div>
-                <div class="summary-due">
-                  <dt>{{ parts.length ? (payTab === 'partial' ? 'Left to pay now' : 'Remaining balance') : 'Amount due' }}</dt>
-                  <dd>{{ pesos(parts.length ? entry.remaining : bill?.outstanding) }}</dd>
                 </div>
               </dl>
             </div>
@@ -442,7 +457,7 @@
                         type="number"
                         min="0.01"
                         step="0.01"
-                        class="input"
+                        class="input input--money"
                         :disabled="!canPay"
                         placeholder="0.00"
                       >
@@ -452,11 +467,18 @@
                 </div>
               </div>
 
-              <div class="change-row">
-                <span class="field-label">{{ entry.short > 0 ? 'Remaining' : 'Change' }}</span>
-                <strong class="change-box" :class="{ 'change-box--due': entry.short > 0, 'change-box--short': entry.over > 0 }">
-                  {{ entry.over > 0 ? `${pesos(entry.over)} more than is due` : entry.short > 0 ? `${pesos(entry.short)} by another method` : pesos(entry.change) }}
-                </strong>
+              <!-- Quick cash: the next round amounts above what is left -->
+              <div v-if="method === 'cash' && canPay && cashChips.length" class="cash-chips" aria-label="Quick amounts received">
+                <button
+                  v-for="amount in cashChips"
+                  :key="amount"
+                  type="button"
+                  class="cash-chip"
+                  :class="{ 'cash-chip--on': Number(tendered) === amount }"
+                  @click="tendered = amount"
+                >
+                  {{ pesos(amount) }}
+                </button>
               </div>
 
               <div class="field">
@@ -485,6 +507,13 @@
 
         <!-- The panel's action, outside the scrolling form so it never drops below the fold. -->
         <div v-if="footAction" class="pay-foot">
+          <!-- The change sits by the button, so it never scrolls out of view. -->
+          <div v-if="footAction !== 'settle'" class="change" :class="{ 'change--due': entry.short > 0, 'change--short': entry.over > 0 }" aria-live="polite">
+            <span class="change__label">{{ entry.short > 0 ? 'Remaining' : 'Change' }}</span>
+            <strong class="change__value">
+              {{ entry.over > 0 ? `${pesos(entry.over)} more than is due` : entry.short > 0 ? `${pesos(entry.short)} by another method` : pesos(entry.change) }}
+            </strong>
+          </div>
           <button v-if="footAction === 'add'" type="button" class="btn btn-primary btn-cta" :disabled="!canAddPart" @click="addPart">
             <AssetIcon name="circle-plus" :size="16" />
             Add {{ pesos(entry.paid) }} {{ methodInfo.label }} to the payment
@@ -495,16 +524,17 @@
           <button v-else type="submit" form="pay-form" class="btn btn-primary btn-cta" :disabled="recording || !canComplete">
             <AssetIcon name="credit-card" :size="16" />
             {{ recording ? 'Recording…' : 'Complete Payment' }}
+            <kbd class="kbd kbd--on-primary">Enter</kbd>
           </button>
         </div>
       </aside>
     </div>
 
     <div class="pos-bottom">
-      <!-- RECENT TRANSACTIONS -->
+      <!-- TODAY'S TRANSACTIONS -->
       <section class="card recent" aria-labelledby="recent-title">
         <div class="card-head">
-          <h2 id="recent-title" class="card-title">Recent Transactions</h2>
+          <h2 id="recent-title" class="card-title">Recent transactions</h2>
           <NuxtLink to="/blood-center/billing-transactions" class="link-btn">View all</NuxtLink>
         </div>
         <div class="recent-scroll">
@@ -541,7 +571,7 @@
               <tr v-for="row in recent" v-else :key="row.id">
                 <td class="ellipsis">{{ when(row.occurred_at) }}</td>
                 <td class="mono ellipsis">{{ row.transaction_number }}</td>
-                <td class="ellipsis">{{ row.request?.patient_name || row.request?.requesting_facility || '—' }}</td>
+                <td class="ellipsis">{{ row.request?.patient_name || row.request?.requesting_facility || '-' }}</td>
                 <td class="ellipsis">{{ row.type_label }}</td>
                 <td class="num">{{ journalAmount(row) }}</td>
                 <td class="ellipsis">{{ row.payment_method_label || row.channel_label }}</td>
@@ -556,9 +586,9 @@
         </div>
       </section>
 
-      <!-- PAYMENT STATUS OVERVIEW: this month's patient bills, parts in a fixed order -->
+      <!-- THIS MONTH: patient bills by status, parts in a fixed order -->
       <section class="card overview" aria-labelledby="overview-title">
-        <h2 id="overview-title" class="card-title">Payment Status Overview</h2>
+        <h2 id="overview-title" class="card-title">This month's patient bills</h2>
         <div class="overview-body">
           <div class="donut" role="img" :aria-label="ringLabel">
             <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -579,7 +609,7 @@
             </svg>
             <div class="donut-center">
               <strong>{{ billsTotal }}</strong>
-              <span>bills<span class="donut-when"> this month</span></span>
+              <span>bills</span>
             </div>
           </div>
           <ul class="legend">
@@ -616,12 +646,13 @@
  * The billing counter: find a bill, take a patient's payment in person, and
  * hand over the receipt; or record a hospital's settlement of a weekly bill.
  *
- * The workspace follows the owner's POS reference (2026-10-11) inside the
- * dashboard's usual header and sidebar, which this page leaves alone: New
- * Transaction and Payment side by side, Recent Transactions and the status
- * overview beneath. It follows the chosen theme. The whole layout renders
- * before any bill is loaded, with empty and disabled states, and fits a
- * 1366×768 screen without the page scrolling; long lists scroll inside.
+ * Three columns, left to right, in the order a cashier works (redesigned
+ * 2026-10-14): who is waiting (the queue, always in view; typing turns it into
+ * search results), their bill, and the payment with the amount due and the
+ * change in large type. Recent transactions sit under the first two, the
+ * month's bills under the payment. It follows the portal colour. The page
+ * grows with its content and scrolls; long lists scroll inside. Keys: / or F2
+ * to scan, Enter to complete, Esc to clear the bill.
  *
  * Everything that matters is decided by the server: what is due, whether the
  * payment went in, and whether the counter works in cash shifts at all. Off —
@@ -630,6 +661,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import {
   billStatusShares,
@@ -653,8 +685,8 @@ definePageMeta({
 const route = useRoute()
 
 const CATEGORIES = [
-  { value: 'patient', label: 'Patient Bills' },
-  { value: 'weekly', label: 'Hospital Billing / Restocking' },
+  { value: 'patient', label: 'Patient Bills', short: 'Patient bills' },
+  { value: 'weekly', label: 'Hospital Billing / Restocking', short: 'Hospital / restock' },
 ]
 
 // Card and bank transfer are recorded from their reference, as GCash is. A
@@ -765,7 +797,7 @@ async function downloadShift() {
   }
 }
 
-/* FIND A BILL: the scan bar and the patient search share one dropdown */
+/* FIND A BILL: one box takes a scanned reference or a patient's name */
 const category = ref('patient')
 const scanInput = ref(null)
 const scanQuery = ref('')
@@ -777,7 +809,6 @@ const searchError = ref('')
 const queue = ref([])
 const queueLoading = ref(true)
 let searchTimer = null
-let blurTimer = null
 
 // The two lists come from different places; each row is read the same way.
 function fromCounter(b) {
@@ -806,27 +837,18 @@ function fromStatement(s) {
   }
 }
 
-const activeQuery = computed(() => (dropdown.value === 'patient' ? patientQuery.value : scanQuery.value).trim())
-const dropdownRows = computed(() => (activeQuery.value.length >= 2 ? results.value : queue.value))
-const dropdownLoading = computed(() => (activeQuery.value.length >= 2 ? searching.value : queueLoading.value))
-const dropdownHeading = computed(() => {
-  if (activeQuery.value.length >= 2) return 'Results'
+// The Waiting column: the queue, or the results once two letters are typed.
+const typing = computed(() => scanQuery.value.trim().length >= 2)
+const listRows = computed(() => (typing.value ? results.value : queue.value))
+const listLoading = computed(() => (typing.value ? searching.value : queueLoading.value))
+const listHeading = computed(() => {
+  if (typing.value) return 'Results'
   return category.value === 'patient' ? 'Awaiting payment' : 'Awaiting hospital settlement'
 })
-const dropdownEmpty = computed(() => {
-  if (activeQuery.value.length >= 2) return `Nothing matches “${activeQuery.value}”.`
-  return category.value === 'patient' ? 'No patient bill is holding blood back.' : 'No weekly statement is waiting for the hospital.'
+const listEmpty = computed(() => {
+  if (typing.value) return `Nothing matches “${scanQuery.value.trim()}”.`
+  return category.value === 'patient' ? 'Nobody is waiting to pay.' : 'No weekly statement is waiting for the hospital.'
 })
-
-function openDropdown(which) {
-  clearTimeout(blurTimer)
-  dropdown.value = which
-}
-
-// Late enough for a click on a row to land first.
-function closeDropdownSoon() {
-  blurTimer = setTimeout(() => { dropdown.value = null }, 150)
-}
 
 function focusScanner() {
   scanInput.value?.focus()
@@ -946,6 +968,7 @@ const payError = ref('')
 const recording = ref(false)
 const done = ref(null)
 const tenderedInput = ref(null)
+const printBtn = ref(null)
 const methodInfo = computed(() => METHODS.find((m) => m.value === method.value) ?? METHODS[0])
 
 /*
@@ -960,8 +983,30 @@ const hasCashPart = computed(() => parts.value.some((p) => p.method === 'cash'))
 const entry = computed(() => splitEntry(paying.value, partsTotal.value, method.value, tendered.value))
 
 const payTabs = computed(() => (category.value === 'weekly'
-  ? [{ value: 'settle', label: 'Settlement' }, { value: 'preview', label: 'Statement Preview' }]
-  : [{ value: 'method', label: 'Payment Method' }, { value: 'partial', label: 'Partial Payment' }, { value: 'preview', label: 'Statement Preview' }]))
+  ? [{ value: 'settle', label: 'Settlement', short: 'Settle' }, { value: 'preview', label: 'Statement Preview', short: 'Preview' }]
+  : [{ value: 'method', label: 'Payment Method', short: 'Full' }, { value: 'partial', label: 'Partial Payment', short: 'Partial' }, { value: 'preview', label: 'Statement Preview', short: 'Preview' }]))
+
+// The payment panel's big number, and what it is.
+const heroAmount = computed(() => {
+  if (!bill.value) return 0
+  if (weekly.value) return bill.value.settlement ? 0 : bill.value.total_amount
+  return parts.value.length ? entry.value.remaining : bill.value.outstanding
+})
+const heroLabel = computed(() => {
+  if (weekly.value) return 'Owed by the hospital'
+  if (parts.value.length) return payTab.value === 'partial' ? 'Left to pay now' : 'Remaining balance'
+  return 'Amount due'
+})
+
+// Quick cash: the next round amounts above what is left (₱3,250 gives ₱3,300,
+// ₱3,500, ₱4,000), so the cashier taps what was handed over.
+const cashChips = computed(() => {
+  const left = Number(entry.value.remaining)
+  if (!(left > 0)) return []
+  const up = step => Math.ceil(left / step) * step
+  const picks = [up(100), up(500), up(1000), up(1000) + 1000]
+  return [...new Set(picks)].filter(v => v > left).slice(0, 3)
+})
 
 // Only a loaded bill with something due can be paid; the layout shows either way.
 const canPay = computed(() => Boolean(bill.value) && takes.value && !(shiftsEnabled.value && !shift.value))
@@ -1068,6 +1113,7 @@ async function takePayment() {
       change: response?.change_given == null ? null : Number(response.change_given),
     }
     parts.value = []
+    nextTick(() => printBtn.value?.focus())
 
     // The bill, the queue, the day and the drawer have all moved.
     await Promise.all([loadShift(), loadQueue(), loadRecent(), loadSummary()])
@@ -1252,31 +1298,37 @@ onMounted(async () => {
   else scanInput.value?.focus()
 })
 
+function onCounterKeys(e) {
+  const typingInField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
+  if ((e.key === '/' && !typingInField) || e.key === 'F2') {
+    e.preventDefault()
+    focusScanner()
+  } else if (e.key === 'Escape' && !typingInField && bill.value && !closingShift.value) {
+    nextCustomer()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onCounterKeys))
+
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
-  clearTimeout(blurTimer)
+  window.removeEventListener('keydown', onCounterKeys)
 })
 </script>
 
 <style scoped>
 /*
- * The POS reference's composition in this system's tokens, which follow the
- * theme. Only this workspace is styled here; the header and sidebar are the
- * layout's.
- *
- * Sized for a 1366×768 screen at 100% zoom, where the browser leaves the page
- * about 600–700px of height: compact controls (--pos-ctl), tight card padding
- * and 11–12px text. A taller screen gets roomier sizes (bottom of the file).
+ * The counter, three columns: who is waiting, their bill, the payment.
+ * Styled in the system tokens, so it follows the portal colour and dark mode.
+ * On a desktop it fits one screen (a 1366×768 laptop included) with only the
+ * lists scrolling inside themselves; below that it stacks and scrolls.
  */
 .pos {
-  --pos-ctl: 28px;
-  --pos-card-pad: 10px 14px;
-  --pos-card-gap: 6px;
-  --pos-donut: clamp(76px, 12vh, 100px);
+  --pos-ctl: 36px;
+  --pos-donut: clamp(76px, 11vh, 104px);
 
   font-family: var(--rb-font-sans);
-  padding: 10px 14px;
-  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 12px;
   color: var(--rb-text-primary);
 
   /*
@@ -1298,246 +1350,305 @@ onBeforeUnmount(() => {
   --pos-chart-unpaid: #B92727;
 }
 
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 /* Shift bar, one line */
-.shift-bar, .shift-open { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
-.shift-bar { flex: none; padding: 5px 10px; background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-radius: 10px; }
+.shift-bar, .shift-open { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.shift-bar { flex: none; padding: 7px 12px; background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; }
 .shift-bar--open { border-color: rgba(var(--rb-success-rgb), .45); }
 .shift-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rb-success); flex: none; }
 .shift-dot--off { background: var(--rb-text-muted); }
 .spacer { flex: 1; }
-.shift-bar .input--sm { width: 130px; height: 26px; padding: 0 8px; font-size: 12px; }
+.shift-bar .input--sm { width: 130px; height: 30px; padding: 0 10px; font-size: 12.5px; }
 
-/* The two rows: bill and payment (about 59/41), then the day (about 72/28). */
-.pos-top { display: grid; grid-template-columns: minmax(0, 1.47fr) minmax(0, 1fr); gap: 10px; }
-.pos-bottom { display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); gap: 10px; }
+/* ── Layout ── */
+.counter { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(320px, 380px); gap: 12px; }
+.pos-bottom { display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); gap: 12px; }
 
 .card {
-  background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-radius: 10px;
-  box-shadow: var(--rb-shadow-sm); padding: var(--pos-card-pad); min-width: 0; min-height: 0;
-  display: flex; flex-direction: column; gap: var(--pos-card-gap);
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 18px;
+  box-shadow: var(--rb-shadow-sm); padding: 14px 16px; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex: none; }
-.card-title { margin: 0; font-size: 14px; line-height: 1.3; font-weight: 700; color: var(--rb-text-primary); }
-.card-title--lg { font-size: 15px; }
-.sub-title { margin: 0; font-size: 12px; line-height: 1.3; font-weight: 700; color: var(--rb-text-primary); }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex: none; }
+.card-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
 
-/* New Transaction */
-.seg { display: flex; flex: none; }
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border: 1px solid var(--rb-border-strong); border-bottom-width: 2px; border-radius: 6px; background: var(--rb-surface-alt);
+  font-family: var(--rb-font-mono); font-size: 11px; font-weight: 600; color: var(--rb-text-secondary);
+}
+.kbd--on-primary { margin-left: 6px; border-color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .15); color: #fff; }
+
+/* ── 1. Waiting ── */
+.queue-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
+.count-chip { padding: 1px 8px; border-radius: 999px; background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); font-size: 12px; font-weight: 700; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; flex: none; border-radius: 12px; background: var(--rb-surface-alt); }
 .seg-btn {
-  height: var(--pos-ctl); padding: 0 14px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
-  color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border-strong);
+  height: 30px; padding: 0 8px; border: 0; border-radius: 9px; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap;
+  transition: background-color .15s var(--rb-ease-out), color .15s var(--rb-ease-out);
 }
-.seg-btn:first-child { border-radius: 7px 0 0 7px; }
-.seg-btn:last-child { border-radius: 0 7px 7px 0; border-left: 0; }
-.seg-btn:hover { color: var(--rb-text-primary); }
-.seg-btn--on, .seg-btn--on:hover { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
-.seg-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); position: relative; }
+.seg-btn:hover:not(.seg-btn--on) { color: var(--rb-text-primary); }
+.seg-btn--on { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 3px rgba(var(--rb-shadow-rgb), .14); }
+.seg-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
-.search-wrap { position: relative; flex: none; }
-.search { position: relative; }
-.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
-/* Scoped under .search so it outranks .input's padding, declared further down. */
-.search .search-input { padding: 0 42px 0 32px; }
-.search--right .search-input { padding: 0 32px 0 10px; }
-.search--right .search-icon { left: auto; right: 10px; }
+.search { position: relative; flex: none; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
+.search .search-input { padding: 0 44px 0 36px; border-radius: 12px; }
 .scan-btn {
-  position: absolute; right: 1px; top: 1px; bottom: 1px; width: 36px; display: grid; place-items: center;
-  border: 0; border-left: 1px solid var(--rb-border-strong); border-radius: 0 6px 6px 0; background: transparent;
-  color: var(--rb-text-secondary); cursor: pointer;
+  position: absolute; right: 4px; top: 4px; bottom: 4px; width: 32px; display: grid; place-items: center;
+  border: 0; border-radius: 9px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); cursor: pointer;
 }
-.scan-btn:hover { color: var(--rb-primary-text); background: var(--rb-surface-hover); }
+.scan-btn:hover { background: rgba(var(--rb-primary-rgb), .18); }
 .scan-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
-/* A dropdown sits over what is below it; nothing above it clips. */
-.dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: min(220px, 40vh); overflow-y: auto;
-  padding: 5px; border-radius: 9px; background: var(--rb-surface); border: 1px solid var(--rb-border-strong);
-  box-shadow: 0 12px 28px -8px rgba(var(--rb-shadow-rgb), .25);
+.queue-list { flex: 1 1 auto; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0 -4px; padding: 0 4px; }
+.queue-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: auto 0; padding: 20px 8px; text-align: center; font-size: 12.5px; color: var(--rb-text-secondary); }
+
+.q-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top amount" "who amount";
+  align-items: center; gap: 2px 10px; width: 100%; padding: 10px 12px; text-align: left;
+  border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); cursor: pointer;
+  font-family: inherit; color: var(--rb-text-primary);
+  transition: border-color .15s var(--rb-ease-out), background-color .15s var(--rb-ease-out);
 }
-/* Low in its panel, so it opens upward over the items rather than past the panel's edge. */
-.dropdown--up { top: auto; bottom: calc(100% + 4px); }
-.dropdown-heading { margin: 2px 8px 4px; font-size: 11px; font-weight: 700; color: var(--rb-text-secondary); }
-.dropdown-empty { margin: 2px 8px 5px; font-size: 11.5px; color: var(--rb-text-muted); }
-.dropdown-row {
-  width: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 10px; padding: 6px 8px;
-  border: 0; border-radius: 6px; background: transparent; font-family: inherit; font-size: 12px; color: var(--rb-text-primary); text-align: left; cursor: pointer;
+.q-row:hover { border-color: rgba(var(--rb-primary-rgb), .4); }
+.q-row:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.q-row--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .07); }
+.q-row--stat { box-shadow: inset 3px 0 0 var(--rb-accent, #D32F2F); }
+.q-row__top { grid-area: top; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
+.q-row__who { grid-area: who; overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.q-row__amount { grid-area: amount; display: flex; flex-direction: column; align-items: flex-end; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.q-row__amount small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.q-row__amount--clear { color: var(--rb-success-text); font-size: 12px; }
+
+.today { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; flex: none; }
+.today div { padding: 8px 10px; border-radius: 12px; background: var(--rb-surface-alt); }
+.today dt { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
+.today dd { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.today dd small { font-size: 11px; font-weight: 500; color: var(--rb-text-secondary); }
+
+/* ── 2. The bill ── */
+.bill-loading { display: flex; flex-direction: column; gap: 10px; }
+.bill-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
+.bill-empty__icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 4px; border-radius: 20px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.bill-empty__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.bill-empty__sub { margin: 0 0 6px; font-size: 13px; line-height: 1.6; color: var(--rb-text-secondary); }
+
+.bill-head { display: flex; align-items: flex-start; gap: 12px; flex: none; }
+.avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .12); }
+.bill-head__main { flex: 1; min-width: 0; }
+.bill-head__name { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.bill-head__line { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.bill-head__extra { margin: 1px 0 0; overflow: hidden; font-size: 12px; color: var(--rb-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.bill-head__actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.icon-btn {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--rb-border); border-radius: 10px;
+  background: var(--rb-surface); color: var(--rb-text-secondary); cursor: pointer;
 }
-.dropdown-row:hover, .dropdown-row:focus-visible { background: var(--rb-surface-hover); outline: none; }
-.dropdown-who { color: var(--rb-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.dropdown-amount { font-weight: 700; color: var(--rb-accent-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dropdown-amount--clear { color: var(--rb-success-text); }
+.icon-btn:hover { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.icon-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 /* Tables: fixed columns, so nothing pushes the page sideways. */
-.grid-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.grid-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .grid-table th {
-  position: sticky; top: 0; z-index: 1; text-align: left; font-size: 11px; font-weight: 600; color: var(--rb-text-secondary);
-  background: var(--rb-surface-alt); padding: 5px 9px; border-bottom: 1px solid var(--rb-border-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: sticky; top: 0; z-index: 1; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--rb-text-secondary); background: var(--rb-surface-alt); padding: 8px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.grid-table td { padding: 5px 9px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.grid-table td { padding: 8px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
 .grid-table tbody tr:last-child td { border-bottom: 0; }
-.empty-row td { text-align: center; color: var(--rb-text-muted); padding: 10px 9px; white-space: normal; }
-.empty-row .link-btn { margin-left: 6px; }
+.empty-row td { text-align: center; color: var(--rb-text-muted); padding: 14px 10px; white-space: normal; }
 
 /* The bill's lines take whatever height the panel has left, and scroll inside it. */
-.items { flex: 1 1 auto; min-height: 58px; overflow: auto; border: 1px solid var(--rb-border-strong); border-radius: 8px; }
-.type { display: inline-block; min-width: 28px; text-align: center; padding: 0 5px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
+.items { flex: 1 1 auto; min-height: 80px; overflow: auto; border: 1px solid var(--rb-border); border-radius: 14px; }
+.type { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #B71C1C; background: #FDECEC; }
 
-.tx-info { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; flex: none; }
-.tx-left { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.tx-right { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; gap: 5px 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--rb-border-strong); border-radius: 9px; }
-.detail-wide { grid-column: 1 / -1; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; flex: none; overflow: hidden; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-border); }
+.facts div { padding: 8px 12px; background: var(--rb-surface-alt); min-width: 0; }
+.facts dt { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
+.facts dd { margin: 2px 0 0; overflow: hidden; font-size: 13px; font-weight: 600; color: var(--rb-text-primary); text-overflow: ellipsis; white-space: nowrap; }
+.facts .facts__stat { color: var(--rb-accent-text); }
 
-.person { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border-strong); min-width: 0; }
-.person--empty { border-style: dashed; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1); }
-.person--empty .avatar { color: var(--rb-text-muted); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
-.person-main { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
-.person-main strong { font-size: 12px; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.person--empty .person-main strong { color: var(--rb-text-secondary); font-weight: 600; }
-.person-main span { font-size: 11px; color: var(--rb-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note { display: flex; gap: 8px; align-items: center; margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 12px; line-height: 1.4; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .06); flex: none; margin-top: auto; }
 
-.readout {
-  display: block; height: var(--pos-ctl); line-height: calc(var(--pos-ctl) - 2px); padding: 0 9px; border-radius: 7px;
-  border: 1px solid var(--rb-border-strong); background: var(--rb-surface);
-  font-size: 12px; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ── 3. Payment ── */
+.pay { padding: 0; overflow: hidden; gap: 0; }
+.pay > .tabs,
+.pay > .pay-body,
+.pay > .pay-foot { margin: 0 16px; }
+
+.pay-hero {
+  padding: 14px 16px 12px; flex: none;
+  background:
+    radial-gradient(80% 140% at 100% 0%, rgba(var(--rb-primary-rgb), .16), transparent 65%),
+    var(--rb-surface-alt);
+  border-bottom: 1px solid var(--rb-border);
 }
-.readout--empty { color: var(--rb-text-muted); }
-.readout--stat { color: var(--rb-accent-text); font-weight: 700; }
+.pay-hero__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pay-hero__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.txn { font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
+.txn strong { margin-left: 4px; font-size: 12px; color: var(--rb-text-primary); }
+.pay-hero__label { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.pay-hero__amount { margin: 0; font-size: 32px; font-weight: 800; line-height: 1.15; letter-spacing: -.02em; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.pay-hero--empty .pay-hero__amount { color: var(--rb-text-muted); }
 
-.note { display: flex; gap: 7px; align-items: center; margin: 0; padding: 5px 10px; border-radius: 8px; font-size: 11px; line-height: 1.35; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .06); border: 1px solid rgba(var(--rb-primary-rgb), .18); flex: none; }
-
-/* Payment */
-.txn { display: flex; align-items: baseline; gap: 5px; line-height: 1.3; white-space: nowrap; }
-.txn span { font-size: 10px; color: var(--rb-text-secondary); }
-.txn strong { font-size: 11.5px; color: var(--rb-text-primary); }
-.tabs { display: flex; border-bottom: 1px solid var(--rb-border-strong); flex: none; }
+.tabs { display: flex; gap: 4px; flex: none; margin-top: 12px !important; padding: 3px; border-radius: 12px; background: var(--rb-surface-alt); }
 .tab {
-  flex: 1; padding: 2px 4px 6px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent;
-  font-family: inherit; font-size: 12px; font-weight: 500; color: var(--rb-text-secondary); cursor: pointer; white-space: nowrap;
+  flex: 1; height: 30px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent;
+  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; white-space: nowrap;
 }
-.tab:hover { color: var(--rb-text-primary); }
-.tab--on { color: var(--rb-primary-text); font-weight: 600; border-bottom-color: var(--rb-primary); }
+.tab:hover:not(.tab--on) { color: var(--rb-text-primary); }
+.tab--on { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 3px rgba(var(--rb-shadow-rgb), .14); }
 .tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
-.pay-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.pay-foot { flex: none; }
-.pay-empty { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 18px 8px; color: var(--rb-text-muted); text-align: center; }
-.pay-empty p { margin: 0; font-size: 11.5px; color: var(--rb-text-secondary); }
+.tab__short { display: none; }
+/* A narrow panel: the tabs fall back to one word each. */
+.pay { container-type: inline-size; }
+@container (max-width: 350px) {
+  .tab__long { display: none; }
+  .tab__short { display: inline; }
+}
+
+.pay-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 0; }
+.pay-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 0 14px; border-top: 1px solid var(--rb-border); }
+.pay-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 8px; color: var(--rb-text-muted); text-align: center; }
+.pay-empty p { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 /* Four tiles in one row. In a narrow panel a long label gives way to its short form. */
 .methods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; flex: none; container-type: inline-size; }
 .method {
-  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px; border-radius: 8px;
-  border: 1px solid var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-primary);
-  font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px;
+  border: 1px solid var(--rb-border); background: var(--rb-surface); color: var(--rb-text-primary);
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   transition: border-color .15s var(--rb-ease-out), background-color .15s var(--rb-ease-out);
 }
 .method:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), .45); }
-.method--on { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
+.method--on { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; box-shadow: 0 6px 14px -8px rgba(var(--rb-primary-rgb), .8); }
 .method:disabled { cursor: not-allowed; color: var(--rb-text-muted); }
-.method--on:disabled { background: rgba(var(--rb-primary-rgb), .12); border-color: rgba(var(--rb-primary-rgb), .35); color: var(--rb-primary-text); }
+.method--on:disabled { background: rgba(var(--rb-primary-rgb), .12); border-color: rgba(var(--rb-primary-rgb), .35); color: var(--rb-primary-text); box-shadow: none; }
 .method:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .method-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .method-label--short { display: none; }
-@container (max-width: 380px) {
+@container (max-width: 330px) {
   .method-label--long { display: none; }
   .method-label--short { display: block; }
 }
 
-.summary { flex: none; padding: 5px 10px; border-radius: 9px; border: 1px solid var(--rb-border-strong); font-variant-numeric: tabular-nums; }
-.summary-title { margin: 0 0 1px; font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); }
-.summary dl, dl.summary { margin: 0; display: flex; flex-direction: column; gap: 1px; }
-.summary dl div, dl.summary div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11.5px; }
+.summary { flex: none; padding: 8px 12px; border-radius: 12px; background: var(--rb-surface-alt); font-variant-numeric: tabular-nums; }
+.summary dl, dl.summary { margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.summary dl div, dl.summary div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; }
 .summary dt { color: var(--rb-text-secondary); display: flex; align-items: center; gap: 6px; }
 .summary dd { margin: 0; font-weight: 600; color: var(--rb-text-primary); }
 .subsidy-row dt, .subsidy-row dd { color: var(--rb-success-text) !important; }
-.summary-due { padding-top: 4px; margin-top: 1px; border-top: 1px solid var(--rb-border-strong); }
-.summary-due dt { color: var(--rb-text-primary) !important; font-weight: 700; font-size: 12px; }
-.summary-due dd { font-size: 14px; font-weight: 800 !important; }
+.summary-due { padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--rb-border-strong); }
+.summary-due dt { color: var(--rb-text-primary) !important; font-weight: 700; }
+.summary-due dd { font-size: 15px; font-weight: 800 !important; }
 
-.form { display: flex; flex-direction: column; gap: 6px; }
-.field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.field-label { font-size: 11.5px; font-weight: 600; color: var(--rb-text-primary); }
+.form { display: flex; flex-direction: column; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
 .optional { color: var(--rb-text-muted); font-weight: 400; }
-.field-error { font-size: 11px; color: var(--rb-accent-text); margin: 0; }
+.field-error { font-size: 12px; color: var(--rb-accent-text); margin: 0; }
 .input {
-  width: 100%; height: var(--pos-ctl); padding: 0 9px; font-size: 12px; font-family: inherit;
+  width: 100%; height: var(--pos-ctl); padding: 0 12px; font-size: 13px; font-family: inherit;
   color: var(--rb-text-primary); background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong); border-radius: 7px;
+  border: 1px solid var(--rb-border-strong); border-radius: 10px;
 }
 .input::placeholder { color: var(--rb-text-muted); }
 .input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .input:disabled { background: var(--rb-surface-alt); color: var(--rb-text-muted); cursor: not-allowed; }
-.amounts { display: grid; gap: 6px; }
+.amounts { display: grid; gap: 10px; }
 .amounts--split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .amounts--split .field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .received { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 .money { position: relative; }
-.money span { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 12px; color: var(--rb-text-secondary); pointer-events: none; }
-.money .input { padding-left: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.change-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex: none; }
-.change-box {
-  min-width: 46%; padding: 3px 10px; border-radius: 7px; text-align: right; font-size: 12.5px; font-weight: 700;
-  color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .1); font-variant-numeric: tabular-nums;
+.money span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 13px; color: var(--rb-text-secondary); pointer-events: none; }
+.money .input { padding-left: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.money .input--money { font-size: 15px; }
+
+/* Quick cash */
+.cash-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cash-chip {
+  padding: 6px 12px; border: 1px solid var(--rb-border-strong); border-radius: 999px; background: var(--rb-surface);
+  font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); cursor: pointer; font-variant-numeric: tabular-nums;
 }
-.change-box--short { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
-.change-box--due { color: var(--rb-warning-text); background: rgba(var(--rb-warning-rgb), .12); }
+.cash-chip:hover { border-color: rgba(var(--rb-primary-rgb), .5); color: var(--rb-primary-text); }
+.cash-chip--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-primary-text); }
+.cash-chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+/* Change: big, because the cashier reads it aloud */
+.change {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px;
+  background: rgba(var(--rb-success-rgb), .1); color: var(--rb-success-text);
+}
+.change__label { font-size: 12.5px; font-weight: 700; }
+.change__value { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.change--due { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
+.change--short { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); }
+.change--due .change__value,
+.change--short .change__value { font-size: 14px; }
+
 .part-row dt, .part-row dd { color: var(--rb-primary-text); }
-.part-ref { margin-left: 6px; font-size: 10.5px; color: var(--rb-text-secondary); }
+.part-ref { margin-left: 6px; font-size: 11px; color: var(--rb-text-secondary); }
 .part-remove {
-  display: inline-grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 4px;
+  display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 5px;
   background: transparent; color: var(--rb-text-muted); cursor: pointer;
 }
 .part-remove:hover { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
 .part-remove:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .ref { display: flex; }
-.ref .input { border-radius: 7px 0 0 7px; }
+.ref .input { border-radius: 10px 0 0 10px; }
 .ref-copy {
-  width: 32px; flex: none; display: grid; place-items: center; border: 1px solid var(--rb-border-strong); border-left: 0;
-  border-radius: 0 7px 7px 0; background: var(--rb-surface); color: var(--rb-text-secondary); cursor: pointer;
+  width: 38px; flex: none; display: grid; place-items: center; border: 1px solid var(--rb-border-strong); border-left: 0;
+  border-radius: 0 10px 10px 0; background: var(--rb-surface); color: var(--rb-text-secondary); cursor: pointer;
 }
 .ref-copy:hover:not(:disabled) { color: var(--rb-primary-text); }
 .ref-copy:disabled { cursor: not-allowed; color: var(--rb-text-muted); background: var(--rb-surface-alt); }
 .ref-copy:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-.subsidy-form { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(var(--rb-success-rgb), .3); background: rgba(var(--rb-success-rgb), .05); }
-.subsidy-title { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-success-text); }
+.subsidy-form { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(var(--rb-success-rgb), .3); background: rgba(var(--rb-success-rgb), .05); }
+.subsidy-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-success-text); }
 
-.nothing-due { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 9px; color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .07); border: 1px solid rgba(var(--rb-success-rgb), .25); }
-.nothing-due strong { display: block; font-size: 12px; }
-.nothing-due p { margin: 2px 0 0; font-size: 11px; color: var(--rb-text-secondary); }
+.nothing-due { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .07); border: 1px solid rgba(var(--rb-success-rgb), .25); }
+.nothing-due strong { display: block; font-size: 13px; }
+.nothing-due p { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
 
-.settled { margin: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.settled { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
 .settled div { display: flex; justify-content: space-between; gap: 12px; }
 .settled dt { color: var(--rb-text-secondary); }
 .settled dd { margin: 0; font-weight: 600; color: var(--rb-text-primary); }
 
-.preview { display: flex; flex-direction: column; gap: 7px; }
-.preview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; }
-.preview-head span { font-size: 11px; color: var(--rb-text-secondary); }
-.preview-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 11.5px; }
-.preview-lines li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--rb-border-strong); font-variant-numeric: tabular-nums; }
+.preview { display: flex; flex-direction: column; gap: 8px; }
+.preview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.preview-head span { font-size: 11.5px; color: var(--rb-text-secondary); }
+.preview-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 12.5px; }
+.preview-lines li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--rb-border-strong); font-variant-numeric: tabular-nums; }
 
-.done { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 2px 0; }
-.done .change-row { width: 100%; }
+/* Done: the change, large, then the receipt */
+.done { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 4px 0; }
 .done .pair { width: 100%; }
-.done-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(var(--rb-success-rgb), .14); color: var(--rb-success-text); }
-.done-title { font-size: 14px; font-weight: 800; margin: 0; }
-.done-sub { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
+.done-mark { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: rgba(var(--rb-success-rgb), .14); color: var(--rb-success-text); }
+.done-title { font-size: 16px; font-weight: 800; margin: 0; }
+.done-change { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 12px; border-radius: 14px; background: rgba(var(--rb-success-rgb), .1); color: var(--rb-success-text); }
+.done-change span { font-size: 12.5px; font-weight: 700; }
+.done-change strong { font-size: 30px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.done-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0; }
 
-.quiet { margin: 0; font-size: 11px; line-height: 1.4; color: var(--rb-text-secondary); }
+.quiet { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 
-/* Recent transactions */
-.recent-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; border: 1px solid var(--rb-border-strong); border-radius: 8px; }
+/* ── Bottom: recent transactions and the month ── */
+/* The list scrolls inside the card; the header row stays put. */
+.recent-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; border: 1px solid var(--rb-border); border-radius: 12px; }
 .view-btn {
-  display: inline-block; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--rb-border-strong); background: var(--rb-surface);
-  font-size: 11px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none;
+  display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--rb-border-strong); background: var(--rb-surface);
+  font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none;
 }
 .view-btn:hover { background: var(--rb-surface-hover); }
 .view-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
-/* Overview: a ring with a surface gap between parts, and a legend that names every count. */
-.overview-body { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-height: 0; }
+.overview-body { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .donut { position: relative; width: var(--pos-donut); height: var(--pos-donut); flex: none; }
 .donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .donut-track { fill: none; stroke: var(--rb-surface-alt); stroke-width: 15; }
@@ -1545,20 +1656,20 @@ onBeforeUnmount(() => {
 .donut-arc--dim { opacity: .3; }
 .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .donut-center strong { font-size: 18px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-.donut-center span { font-size: 9.5px; color: var(--rb-text-secondary); margin-top: 2px; max-width: 60px; line-height: 1.2; }
+.donut-center span { font-size: 10px; color: var(--rb-text-secondary); margin-top: 2px; }
 .arc--paid { stroke: var(--pos-chart-paid); background: var(--pos-chart-paid); }
 .arc--subsidised { stroke: var(--pos-chart-subsidised); background: var(--pos-chart-subsidised); }
 .arc--partial { stroke: var(--pos-chart-partial); background: var(--pos-chart-partial); }
 .arc--unpaid { stroke: var(--pos-chart-unpaid); background: var(--pos-chart-unpaid); }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.legend-row { display: grid; grid-template-columns: 9px 1fr auto; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 6px; font-size: 11.5px; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.legend-row { display: grid; grid-template-columns: 9px 1fr auto; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 6px; font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .legend-row--on { background: var(--rb-surface-hover); }
 .swatch { width: 8px; height: 8px; border-radius: 50%; }
 .legend-label { color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .legend-count { font-weight: 600; white-space: nowrap; }
 .legend-count small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-secondary); }
 
-.banner { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; border-radius: 8px; font-size: 11.5px; margin: 0; }
+.banner { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; margin: 0; }
 .banner--warn { background: rgba(var(--rb-warning-rgb), .1); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3); }
 
 .mono { font-family: var(--rb-font-mono); }
@@ -1570,39 +1681,43 @@ onBeforeUnmount(() => {
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .link-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; font-family: inherit;
-  font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; text-decoration: none; white-space: nowrap;
+  font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; text-decoration: none; white-space: nowrap;
 }
 .link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
 .link-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
-.link-btn--inline { font-size: 11px; }
+.link-btn--inline { font-size: 11.5px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: var(--pos-ctl); padding: 0 10px; font-size: 12px; font-weight: 600; font-family: inherit;
-  border-radius: 7px; cursor: pointer; white-space: nowrap; text-decoration: none;
-  transition: background-color .15s var(--rb-ease-out);
+  height: var(--pos-ctl); padding: 0 14px; font-size: 13px; font-weight: 600; font-family: inherit;
+  border-radius: 999px; cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition: background-color .15s var(--rb-ease-out), border-color .15s var(--rb-ease-out);
 }
 .btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn-primary { background: var(--rb-primary); color: #fff; border: 1px solid var(--rb-primary); }
-.btn-primary:hover:not(:disabled) { background: #10509c; }
+.btn-primary:hover:not(:disabled) { background: var(--rb-primary-hover); }
 .btn-outline { background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong); }
 .btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-sm { height: 26px; padding: 0 9px; font-size: 11.5px; }
+.btn-sm { height: 30px; padding: 0 12px; font-size: 12px; }
 .btn-block { width: 100%; }
-.btn-cta { width: 100%; height: 34px; font-size: 13px; border-radius: 8px; flex: none; }
+.btn-lg { height: 42px; font-size: 14px; }
+.btn-cta { width: 100%; height: 46px; font-size: 14.5px; font-weight: 700; flex: none; box-shadow: 0 10px 20px -12px rgba(var(--rb-primary-rgb), .9); }
+.btn-cta:disabled { box-shadow: none; }
 
 .skeleton {
-  border-radius: 6px;
+  border-radius: 10px;
   background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 50%, var(--rb-skeleton-a) 75%);
   background-size: 200% 100%; animation: shimmer 1.4s infinite;
 }
-.skeleton--row { height: var(--pos-ctl); margin: 4px; }
-.skeleton--line { height: 12px; }
+.skeleton--row { height: 56px; border-radius: 14px; flex: none; }
+.skeleton--line { height: 14px; }
+.skeleton--head { height: 46px; }
 @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 
 .toast-stack { position: fixed; top: 76px; right: 18px; z-index: 120; display: flex; flex-direction: column; gap: 8px; }
-.toast { background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-radius: 10px; padding: 10px 14px; min-width: 240px; box-shadow: 0 6px 20px rgba(var(--rb-shadow-rgb), .1); }
+.toast { background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-radius: 14px; padding: 10px 14px; min-width: 240px; box-shadow: 0 10px 28px -10px rgba(var(--rb-shadow-rgb), .3); }
 .toast--danger .toast-title { color: var(--rb-accent-text); }
 .toast--success .toast-title { color: var(--rb-success-text); }
 .toast--info .toast-title { color: var(--rb-primary-text); }
@@ -1612,66 +1727,60 @@ onBeforeUnmount(() => {
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(14px); }
 
 /*
- * Desktop: one screen, no page scroll. The page takes what the 64px bar
- * leaves. The day row takes a share of the height (20vh, within limits) and
- * the bill and payment share the rest. Only the items, the payment form and
- * the recent list scroll, inside themselves, if their content runs long.
+ * Desktop: the page is as tall as its content and scrolls; the queue, the
+ * items and the recent list scroll inside themselves.
  */
 @media (min-width: 1024px) {
-  .pos { height: calc(100dvh - 64px); min-height: 480px; overflow: hidden; }
-  .pos-top { flex: 1 1 auto; min-height: 0; }
-  .pos-bottom { flex: none; height: clamp(120px, 20vh, 172px); }
-  /* A card never spills into the row below; its dropdowns open inside it. */
-  .tx, .pay, .recent, .overview { overflow: hidden; }
-}
-
-/* A short window (a 1366×768 screen under a browser's bars and bookmarks): tighter still. */
-@media (min-width: 1024px) and (max-height: 640px) {
+  /*
+   * One grid: the three counter cards on top, then recent transactions under
+   * the first two and the month's bills under the payment. The page grows to
+   * fit its content and scrolls like any other page; the cards keep their
+   * natural size (the payment form never scrolls inside itself).
+   */
   .pos {
-    --pos-ctl: 26px;
-    --pos-card-pad: 8px 12px;
-    --pos-card-gap: 5px;
-    --pos-donut: clamp(64px, 11vh, 76px);
-    padding: 8px 12px; gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(320px, 380px);
+    grid-template-rows: auto minmax(560px, auto) auto;
+    grid-template-areas:
+      "shift shift shift"
+      "queue bill pay"
+      "recent recent overview";
   }
-  .pos-top, .pos-bottom { gap: 8px; }
-  .pos-bottom { height: clamp(112px, 18vh, 124px); }
-  .legend { gap: 0; }
-  /* The ring is too small for the whole caption; the count keeps its noun. */
-  .donut-when { display: none; }
-  .legend-row { padding: 1px 6px; line-height: 1.3; }
-}
-
-/* A taller screen: roomier controls and cards, and a deeper day row. */
-@media (min-width: 1024px) and (min-height: 860px) {
-  .pos {
-    --pos-ctl: 32px;
-    --pos-card-pad: 16px 18px;
-    --pos-card-gap: 12px;
-    --pos-donut: 124px;
-    padding: 16px 20px; gap: 14px;
+  /* No shift bar (the usual case): no empty first row. */
+  .pos:not(:has(> .shift-bar)) {
+    grid-template-rows: minmax(560px, auto) auto;
+    grid-template-areas:
+      "queue bill pay"
+      "recent recent overview";
   }
-  .pos-top, .pos-bottom { gap: 14px; }
-  .pos-bottom { height: 214px; }
+  .counter, .pos-bottom { display: contents; }
+  .shift-bar { grid-area: shift; }
+  .queue { grid-area: queue; }
+  .billcard { grid-area: bill; }
+  .pay { grid-area: pay; }
+  .recent { grid-area: recent; }
+  .overview { grid-area: overview; }
+  .pay-body { overflow: visible; }
+  /* The transactions list keeps a set height and scrolls inside its card. */
+  .recent-scroll { max-height: 260px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-  .toast-enter-active, .toast-leave-active, .btn, .method, .donut-arc { transition: none; }
+  .toast-enter-active, .toast-leave-active, .btn, .method, .donut-arc, .q-row, .seg-btn { transition: none; }
 }
 
 /* Below desktop the page scrolls as one column, with touch-sized controls. */
 @media (max-width: 1023px) {
-  .pos { --pos-ctl: 34px; }
-  .pos-top, .pos-bottom { grid-template-columns: 1fr; }
-  .items { max-height: 260px; }
+  .pos { --pos-ctl: 40px; }
+  .counter, .pos-bottom { grid-template-columns: 1fr; }
+  .queue-list { max-height: 320px; }
+  .items { max-height: 280px; }
   .recent-scroll { max-height: 300px; }
 }
 
 @media (max-width: 640px) {
-  .tx-info, .pair, .amounts--split { grid-template-columns: 1fr; }
-  .seg { width: 100%; }
-  .seg-btn { flex: 1; height: auto; min-height: var(--pos-ctl); padding: 6px 8px; }
+  .pair, .amounts--split, .facts { grid-template-columns: 1fr; }
   .overview-body { flex-direction: column; align-items: stretch; }
   .donut { align-self: center; }
 }

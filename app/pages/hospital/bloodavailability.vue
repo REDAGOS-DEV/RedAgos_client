@@ -115,28 +115,21 @@
             </button>
 
             <div class="ba-filter-fields" :class="{ 'is-open': filtersOpen }">
-              <select v-model="filters.bloodType" class="ba-select" aria-label="Filter by blood type">
-                <option value="">Blood Type</option>
-                <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.bloodType" :options="[{ value: '', label: 'Blood Type' }, ...bloodTypeOptions.map((t) => ({ value: t, label: t }))]" aria-label="Filter by blood type" size="sm" />
+              </div>
 
-              <select v-model="filters.component" class="ba-select" aria-label="Filter by blood component">
-                <option value="">Blood Component</option>
-                <option v-for="c in componentOptions" :key="c" :value="c">{{ c }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.component" :options="[{ value: '', label: 'Blood Component' }, ...componentOptions.map((c) => ({ value: c, label: c }))]" aria-label="Filter by blood component" size="sm" />
+              </div>
 
-              <select v-model="filters.status" class="ba-select" aria-label="Filter by availability status">
-                <option value="">Availability Status</option>
-                <option value="Healthy">Healthy</option>
-                <option value="Low">Low</option>
-                <option value="Critical">Critical</option>
-                <option value="Unavailable">Unavailable</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.status" :options="[{ value: '', label: 'Availability Status' }, { value: 'Healthy', label: 'Healthy' }, { value: 'Low', label: 'Low' }, { value: 'Critical', label: 'Critical' }, { value: 'Unavailable', label: 'Unavailable' }]" aria-label="Filter by availability status" size="sm" />
+              </div>
 
-              <select v-model="filters.center" class="ba-select" aria-label="Filter by blood center">
-                <option value="">Blood Center</option>
-                <option v-for="c in centerOptions" :key="c" :value="c">{{ c }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.center" :options="[{ value: '', label: 'Blood Center' }, ...centerOptions.map((c) => ({ value: c, label: c }))]" aria-label="Filter by blood center" size="sm" />
+              </div>
 
               <div class="ba-filter-actions">
                 <button class="ba-btn-ghost" @click="resetFilters">Reset Filters</button>
@@ -492,6 +485,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -1148,16 +1142,7 @@ const donutSegments = computed(() => {
   gap: 12px;
   align-items: center;
 }
-.ba-select {
-  height: 44px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--ba-border);
-  background: var(--ba-bg);
-  color: var(--ba-text);
-  font-size: 14px;
-  font-family: var(--rb-font-sans);
-}
+.ba-select { width: 190px; }
 .ba-filter-actions {
   display: flex;
   gap: 10px;

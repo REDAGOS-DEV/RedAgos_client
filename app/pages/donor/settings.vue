@@ -42,7 +42,7 @@
             <section class="panel appearance-panel" aria-labelledby="appearance-title">
                 <div class="appearance-panel__pick">
                     <h2 id="appearance-title" class="panel-title">Appearance</h2>
-                    <p class="appearance__lead">Choose a colour theme for your donor portal.</p>
+                    <p class="appearance__lead">Choose a colour for your portal. It applies to every RedAgos portal on this device.</p>
                     <div class="swatches" role="radiogroup" aria-label="Colour theme">
                         <button
                             v-for="t in accentThemes"

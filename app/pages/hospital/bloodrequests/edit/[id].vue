@@ -81,18 +81,19 @@
                 <input v-model="form.patientRef" type="text" class="eb-input" />
               </div>
               <div class="eb-field">
-                <label class="eb-label">Priority <span class="eb-required">*</span></label>
-                <select v-model="form.priority" class="eb-input" :class="{ 'has-error': errors.priority }">
-                  <option value="" disabled>Select priority</option>
-                  <option value="Routine">Routine</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
+                <label class="eb-label" for="eb-priority">Priority <span class="eb-required">*</span></label>
+                <SelectField
+                  id="eb-priority"
+                  v-model="form.priority"
+                  :options="[{ value: 'Routine', label: 'Routine' }, { value: 'High', label: 'High' }, { value: 'Urgent', label: 'Urgent' }]"
+                  placeholder="Select priority"
+                  :invalid="Boolean(errors.priority)"
+                />
                 <span v-if="errors.priority" class="eb-error-msg">{{ errors.priority }}</span>
               </div>
               <div class="eb-field">
-                <label class="eb-label">Required Date <span class="eb-required">*</span></label>
-                <input v-model="form.requiredDate" type="date" class="eb-input" :class="{ 'has-error': errors.requiredDate }" />
+                <label class="eb-label" for="eb-required-date">Required Date <span class="eb-required">*</span></label>
+                <DatePicker id="eb-required-date" v-model="form.requiredDate" :invalid="Boolean(errors.requiredDate)" />
                 <span v-if="errors.requiredDate" class="eb-error-msg">{{ errors.requiredDate }}</span>
               </div>
               <div class="eb-field">
@@ -106,23 +107,25 @@
             <h2 class="eb-section-title">Blood Details</h2>
             <div class="eb-form-grid">
               <div class="eb-field">
-                <label class="eb-label">Blood Type <span class="eb-required">*</span></label>
-                <select v-model="form.bloodType" class="eb-input" :class="{ 'has-error': errors.bloodType }">
-                  <option value="" disabled>Select blood type</option>
-                  <option v-for="t in ['O+','O-','A+','A-','B+','B-','AB+','AB-']" :key="t" :value="t">{{ t }}</option>
-                </select>
+                <label class="eb-label" for="eb-blood-type">Blood Type <span class="eb-required">*</span></label>
+                <SelectField
+                  id="eb-blood-type"
+                  v-model="form.bloodType"
+                  :options="['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((t) => ({ value: t, label: t }))"
+                  placeholder="Select blood type"
+                  :invalid="Boolean(errors.bloodType)"
+                />
                 <span v-if="errors.bloodType" class="eb-error-msg">{{ errors.bloodType }}</span>
               </div>
               <div class="eb-field">
-                <label class="eb-label">Blood Component <span class="eb-required">*</span></label>
-                <select v-model="form.component" class="eb-input" :class="{ 'has-error': errors.component }">
-                  <option value="" disabled>Select component</option>
-                  <option value="Whole Blood">Whole Blood</option>
-                  <option value="Packed Red Blood Cells (PRBC)">Packed Red Blood Cells (PRBC)</option>
-                  <option value="Platelet Concentrate">Platelet Concentrate</option>
-                  <option value="Fresh Frozen Plasma">Fresh Frozen Plasma</option>
-                  <option value="Cryoprecipitate">Cryoprecipitate</option>
-                </select>
+                <label class="eb-label" for="eb-component">Blood Component <span class="eb-required">*</span></label>
+                <SelectField
+                  id="eb-component"
+                  v-model="form.component"
+                  :options="['Whole Blood', 'Packed Red Blood Cells (PRBC)', 'Platelet Concentrate', 'Fresh Frozen Plasma', 'Cryoprecipitate'].map((c) => ({ value: c, label: c }))"
+                  placeholder="Select component"
+                  :invalid="Boolean(errors.component)"
+                />
                 <span v-if="errors.component" class="eb-error-msg">{{ errors.component }}</span>
               </div>
               <div class="eb-field">
@@ -306,6 +309,8 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { computed, reactive, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],

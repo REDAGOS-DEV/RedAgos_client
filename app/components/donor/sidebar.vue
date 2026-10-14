@@ -626,12 +626,10 @@ nav::-webkit-scrollbar {
   }
 }
 
-/* No blur, or less transparency requested: a solid rail. */
+/* No blur available: a solid rail. (Reduced transparency keeps the glass: the
+   rail sits over a still gradient, not over content.) */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .sidebar { background: var(--rb-page-bg, #F7F8FA) !important; }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .sidebar { background: var(--rb-surface, #FFFFFF) !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

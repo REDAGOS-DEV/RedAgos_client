@@ -14,7 +14,7 @@ export default defineNuxtConfig({
       standalone: false,
     },
   },
-  css: ['~/assets/css/main.css'],
+  css: ['~/assets/css/main.css', '~/assets/css/ui.css'],
 
   app: {
     head: {

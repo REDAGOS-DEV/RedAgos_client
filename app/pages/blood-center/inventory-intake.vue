@@ -1,12 +1,8 @@
 <template>
   <div class="intake">
     <!-- ================= HEADER: title + the two steps as tabs ================= -->
-    <header class="intake__header">
-      <div>
-        <h1 class="intake__title">Stock Intake</h1>
-        <p class="intake__subtitle">Book processed bags into quarantine, then release and label them once testing clears.</p>
-      </div>
-
+    <PageHeader title="Stock Intake" subtitle="Book processed bags into quarantine, then release and label them once testing clears.">
+      <template #actions>
       <div class="tabs" role="tablist" aria-label="Stock intake steps">
         <button
           type="button"
@@ -33,7 +29,8 @@
           <span v-if="released.length" class="tab__count tab__count--done">{{ released.length }}</span>
         </button>
       </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="error" class="alert alert--error" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
@@ -99,13 +96,13 @@
           </li>
         </ul>
 
-        <div v-else-if="!queue.length" class="queue-empty">
-          <AssetIcon :name="activeBarcode ? 'search-x' : 'circle-check-big'" :size="18" />
-          <p>
-            <template v-if="activeBarcode">No donation waiting to be booked in has this barcode.</template>
-            <template v-else>All caught up. Every processed donation is on the shelf.</template>
-          </p>
-        </div>
+        <EmptyState
+          v-else-if="!queue.length"
+          :icon="activeBarcode ? 'search-x' : 'circle-check-big'"
+          :title="activeBarcode ? 'No donation waiting to be booked in has this barcode.' : 'All caught up'"
+          :description="activeBarcode ? undefined : 'Every processed donation is on the shelf.'"
+          compact
+        />
 
         <ul v-else class="queue">
           <li v-for="row in queue" :key="row.donation_id">
@@ -242,25 +239,22 @@
                   </span>
                 </div>
 
-                <select
+                <SelectField
                   v-else
-                  v-model.number="row.component_id"
-                  class="field__input"
+                  v-model="row.component_id"
+                  :options="shelvable.map((c) => ({ value: c.component_id, label: `${c.component} (${remainingFor(c.component_id)} left)` }))"
+                  placeholder="Select a component"
                   :aria-label="`Bag ${index + 1} component`"
                   @change="applyExpiry(row)"
-                >
-                  <option :value="null" disabled>Select a component</option>
-                  <option v-for="c in shelvable" :key="c.component_id" :value="c.component_id">
-                    {{ c.component }} ({{ remainingFor(c.component_id) }} left)
-                  </option>
-                </select>
+                />
 
-                <input v-model="row.expiry_date" type="date" class="field__input" :aria-label="`Bag ${index + 1} expiry date`">
+                <DatePicker v-model="row.expiry_date" :aria-label="`Bag ${index + 1} expiry date`" />
 
-                <select v-model="row.storage_location" class="field__input" :aria-label="`Bag ${index + 1} storage location`">
-                  <option value="">Not recorded</option>
-                  <option v-for="loc in storageLocations" :key="loc" :value="loc">{{ loc }}</option>
-                </select>
+                <SelectField
+                  v-model="row.storage_location"
+                  :options="[{ value: '', label: 'Not recorded' }, ...storageLocations.map((loc) => ({ value: loc, label: loc }))]"
+                  :aria-label="`Bag ${index + 1} storage location`"
+                />
 
                 <input
                   v-if="!row.bag_number"
@@ -306,11 +300,11 @@
 
           <!-- Stays in reach while a long batch scrolls -->
           <div v-if="shelvable.length" class="bench__actions">
-            <button v-if="!barcoded" type="button" class="btn" :disabled="!canAddRow" @click="addUnitRow">
+            <button v-if="!barcoded" type="button" class="ui-btn" :disabled="!canAddRow" @click="addUnitRow">
               <AssetIcon name="plus" :size="14" />
               Add bag
             </button>
-            <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submit">
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy || blockers.length > 0" @click="submit">
               {{ busy ? 'Saving…' : `Book ${unitRows.length} bag${unitRows.length === 1 ? '' : 's'} into quarantine` }}
               <AssetIcon v-if="!busy" name="arrow-right" :size="14" />
             </button>
@@ -333,7 +327,7 @@
               <p class="released__name">{{ item.barcode ? `Barcode ${item.barcode}` : `Donation #${item.donationId}` }}</p>
               <p class="released__meta">{{ item.count }} bag{{ item.count === 1 ? '' : 's' }}: <span class="mono">{{ item.units.join(', ') }}</span></p>
             </div>
-            <button type="button" class="btn btn--sm" :disabled="busy" @click="reprint(item.donationId)">
+            <button type="button" class="ui-btn ui-btn--sm" :disabled="busy" @click="reprint(item.donationId)">
               <AssetIcon name="printer" :size="14" />
               Reprint labels
             </button>
@@ -355,6 +349,10 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 import { normalizeBarcode } from '~/utils/phlebotomy'
 import { finalLabelsFrom } from '~/utils/bagLabels'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 /**
  * Issuance's two steps with a donation's bags: book them into quarantine, then
@@ -733,9 +731,6 @@ onMounted(async () => {
 }
 
 /* ---------- header + tabs ---------- */
-.intake__header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
-.intake__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.intake__subtitle { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 
 .tabs {
   display: inline-flex;
@@ -1235,4 +1230,7 @@ onMounted(async () => {
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }
 }
+
+/* Panels in the shared SectionCard's shape (2026-10-15). */
+.queue-panel, .bench { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>

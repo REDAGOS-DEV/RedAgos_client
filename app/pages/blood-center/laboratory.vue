@@ -294,10 +294,11 @@
               <div v-for="(row, index) in componentRows" :key="index" class="component-row">
                 <label class="field">
                   <span class="field__label">Component</span>
-                  <select v-model.number="row.component_id" class="field__input">
-                    <option :value="null" disabled>Select</option>
-                    <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
-                  </select>
+                  <SelectField
+                    v-model="row.component_id"
+                    :options="components.map((c) => ({ value: c.id, label: c.name }))"
+                    placeholder="Select"
+                  />
                 </label>
 
                 <label class="field field--qty">
@@ -420,6 +421,7 @@ import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
 import { baseLabelsFrom } from '~/utils/bagLabels'
+import SelectField from '~/components/common/SelectField.vue'
 
 /**
  * The Processing department's side of a donation.

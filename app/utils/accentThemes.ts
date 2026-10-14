@@ -1,5 +1,6 @@
 /**
- * Colour themes a donor can pick in Settings → Appearance.
+ * Colour themes a user can pick in Settings → Appearance (donor and blood
+ * center portals).
  *
  * Every theme is from the blue / blue-green family (the team's "shades of
  * blue green" chart), so RedAgos still reads as RedAgos. The gradient uses

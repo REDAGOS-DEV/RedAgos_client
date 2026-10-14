@@ -115,46 +115,31 @@
 
         <div v-show="filtersOpen" class="filter-panel">
           <div class="filter-field">
-            <label class="filter-field__label">Status</label>
-            <select v-model="filters.status" class="filter-select">
-              <option value="">All statuses</option>
-              <option v-for="(v, k) in statusMap" :key="k" :value="k">{{ v.label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-status">Status</label>
+            <SelectField id="hbr-status" v-model="filters.status" :options="[{ value: '', label: 'All statuses' }, ...Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Source</label>
-            <select v-model="filters.source" class="filter-select">
-              <option value="">All sources</option>
-              <option v-for="(label, value) in REQUEST_SOURCE_LABELS" :key="value" :value="value">{{ label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-source">Source</label>
+            <SelectField id="hbr-source" v-model="filters.source" :options="[{ value: '', label: 'All sources' }, ...Object.entries(REQUEST_SOURCE_LABELS).map(([value, label]) => ({ value, label }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Blood Type</label>
-            <select v-model="filters.bloodType" class="filter-select">
-              <option value="">All types</option>
-              <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-blood-type">Blood Type</label>
+            <SelectField id="hbr-blood-type" v-model="filters.bloodType" :options="[{ value: '', label: 'All types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Blood Component</label>
-            <select v-model="filters.component" class="filter-select">
-              <option value="">All components</option>
-              <option v-for="c in components" :key="c" :value="c">{{ c }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-component">Blood Component</label>
+            <SelectField id="hbr-component" v-model="filters.component" :options="[{ value: '', label: 'All components' }, ...components.map((c) => ({ value: c, label: c }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Priority</label>
-            <select v-model="filters.priority" class="filter-select">
-              <option value="">All priorities</option>
-              <option v-for="(v, k) in priorityMap" :key="k" :value="k">{{ v.label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-priority">Priority</label>
+            <SelectField id="hbr-priority" v-model="filters.priority" :options="[{ value: '', label: 'All priorities' }, ...Object.entries(priorityMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
           </div>
           <div class="filter-field">
             <label class="filter-field__label">Date Range</label>
             <div class="filter-field__range">
-              <input v-model="filters.dateFrom" type="date" class="filter-select filter-select--date" />
+              <DatePicker id="hbr-from" v-model="filters.dateFrom" :max="filters.dateTo || undefined" aria-label="From" size="sm" />
               <span class="filter-field__range-sep">–</span>
-              <input v-model="filters.dateTo" type="date" class="filter-select filter-select--date" />
+              <DatePicker id="hbr-to" v-model="filters.dateTo" :min="filters.dateFrom || undefined" aria-label="To" size="sm" />
             </div>
           </div>
           <div class="filter-actions">
@@ -258,11 +243,9 @@
           <div class="pagination">
             <div class="pagination__rows">
               <label for="rowsPerPage">Rows per page</label>
-              <select id="rowsPerPage" v-model.number="rowsPerPage" class="filter-select filter-select--sm">
-                <option :value="10">10</option>
-                <option :value="25">25</option>
-                <option :value="50">50</option>
-              </select>
+              <div class="rows-select">
+                <SelectField id="rowsPerPage" v-model="rowsPerPage" :options="[10, 25, 50].map((n) => ({ value: n, label: String(n) }))" size="sm" />
+              </div>
             </div>
             <div class="pagination__nav">
               <button type="button" class="pagination__btn" :disabled="currentPage === 1" @click="currentPage--">
@@ -425,6 +408,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -961,14 +946,6 @@ onUnmounted(() => {
 .filter-field__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
 .filter-field__range { display: flex; align-items: center; gap: 6px; }
 .filter-field__range-sep { color: var(--text-muted); font-size: 12px; }
-.filter-select {
-  height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--border);
-  background: #f8fafc; font-family: inherit; font-size: 13px; color: var(--text-primary);
-  outline: none; transition: border-color 0.15s ease; width: 100%;
-}
-.filter-select:focus { border-color: var(--primary); }
-.filter-select--date { min-width: 0; }
-.filter-select--sm { height: 32px; font-size: 12.5px; width: auto; }
 .filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
 
 /* Export row */
@@ -1188,4 +1165,5 @@ onUnmounted(() => {
 :global(.dark .requests-page .req-row:hover), :global(.dark .requests-page .action-menu__item:hover), :global(.dark .requests-page .pagination__page:hover) { background: #263449; }
 :global(.dark .requests-page .empty-state__icon) { background: #263449; }
 :global(.dark .requests-page .type-chip) { background: rgba(66,165,245,0.14); }
+.rows-select { width: 84px; }
 </style>

@@ -58,12 +58,13 @@
               aria-label="Search patient transfusion requests"
             >
           </div>
-          <select v-model.number="ptrId" class="input" aria-label="Patient transfusion request" :disabled="ptrLoading">
-            <option :value="null">{{ ptrLoading ? 'Loading…' : openRequests.length ? 'Choose a request…' : 'No open requests' }}</option>
-            <option v-for="ptr in openRequests" :key="ptr.id" :value="ptr.id">
-              {{ ptr.reference_number }} — {{ ptr.patient?.full_name || 'Patient' }} · {{ ptr.blood_type?.code }}
-            </option>
-          </select>
+          <SelectField
+            v-model="ptrId"
+            :options="openRequests.map((ptr) => ({ value: ptr.id, label: `${ptr.reference_number} · ${ptr.patient?.full_name || 'Patient'} · ${ptr.blood_type?.code ?? ''}` }))"
+            :placeholder="ptrLoading ? 'Loading…' : openRequests.length ? 'Choose a request…' : 'No open requests'"
+            aria-label="Patient transfusion request"
+            :disabled="ptrLoading"
+          />
         </div>
         <p v-if="ptrError" class="field-error" role="alert">{{ ptrError }}</p>
 
@@ -194,10 +195,13 @@
         <div class="field-grid">
           <div class="field">
             <label for="ext-source" class="field-label">Source facility <span class="req">*</span></label>
-            <select id="ext-source" v-model.number="form.external_blood_source_id" class="input" :class="{ 'input--error': fieldErrors.external_blood_source_id }">
-              <option :value="null">Select a blood service…</option>
-              <option v-for="source in sources" :key="source.id" :value="source.id">{{ source.name }}</option>
-            </select>
+            <SelectField
+              id="ext-source"
+              v-model="form.external_blood_source_id"
+              :options="sources.map((source) => ({ value: source.id, label: source.name }))"
+              placeholder="Select a blood service…"
+              :invalid="Boolean(fieldErrors.external_blood_source_id)"
+            />
             <button type="button" class="link-btn" @click="addingSource = !addingSource">
               {{ addingSource ? 'Cancel' : 'Source not listed? Add it' }}
             </button>
@@ -206,19 +210,25 @@
 
           <div class="field">
             <label for="ext-comp" class="field-label">Blood component <span class="req">*</span></label>
-            <select id="ext-comp" v-model.number="form.component_id" class="input" :class="{ 'input--error': fieldErrors.component_id }">
-              <option :value="null">Select…</option>
-              <option v-for="component in components" :key="component.id" :value="component.id">{{ component.name }}</option>
-            </select>
+            <SelectField
+              id="ext-comp"
+              v-model="form.component_id"
+              :options="components.map((component) => ({ value: component.id, label: component.name }))"
+              placeholder="Select…"
+              :invalid="Boolean(fieldErrors.component_id)"
+            />
             <p v-if="fieldErrors.component_id" class="field-error">{{ fieldErrors.component_id }}</p>
           </div>
 
           <div class="field">
             <label for="ext-type" class="field-label">Blood type <span class="req">*</span></label>
-            <select id="ext-type" v-model.number="form.blood_type_id" class="input" :class="{ 'input--error': fieldErrors.blood_type_id }">
-              <option :value="null">Select…</option>
-              <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
-            </select>
+            <SelectField
+              id="ext-type"
+              v-model="form.blood_type_id"
+              :options="bloodTypes.map((type) => ({ value: type.id, label: type.code }))"
+              placeholder="Select…"
+              :invalid="Boolean(fieldErrors.blood_type_id)"
+            />
             <p v-if="fieldErrors.blood_type_id" class="field-error">{{ fieldErrors.blood_type_id }}</p>
           </div>
 
@@ -230,19 +240,19 @@
 
           <div class="field">
             <label for="ext-coll" class="field-label">Collection date <span class="optional">if on the label</span></label>
-            <input id="ext-coll" v-model="form.collection_date" type="date" class="input" :max="todayLocal()" :class="{ 'input--error': fieldErrors.collection_date }">
+            <DatePicker id="ext-coll" v-model="form.collection_date" :max="todayLocal()" :invalid="Boolean(fieldErrors.collection_date)" />
             <p v-if="fieldErrors.collection_date" class="field-error">{{ fieldErrors.collection_date }}</p>
           </div>
 
           <div class="field">
             <label for="ext-exp" class="field-label">Expiration date <span class="req">*</span></label>
-            <input id="ext-exp" v-model="form.expiry_date" type="date" class="input" :min="todayLocal()" :class="{ 'input--error': fieldErrors.expiry_date }">
+            <DatePicker id="ext-exp" v-model="form.expiry_date" :min="todayLocal()" :invalid="Boolean(fieldErrors.expiry_date)" />
             <p v-if="fieldErrors.expiry_date" class="field-error">{{ fieldErrors.expiry_date }}</p>
           </div>
 
           <div class="field">
             <label for="ext-at" class="field-label">Date / time received</label>
-            <input id="ext-at" v-model="form.received_at" type="datetime-local" class="input" :max="nowLocal()" :class="{ 'input--error': fieldErrors.received_at }">
+            <DateTimeField id="ext-at" v-model="form.received_at" :max="nowLocal()" :invalid="Boolean(fieldErrors.received_at)" />
             <p v-if="fieldErrors.received_at" class="field-error">{{ fieldErrors.received_at }}</p>
           </div>
 
@@ -376,6 +386,9 @@ import { useUser } from '~/composables/useUser'
 import { HOSPITAL_UNIT_STATUS_LABELS, HOSPITAL_UNIT_STATUS_TONES } from '~/types/hospitalInventory'
 import { RECEIVING_REFUSAL_MESSAGES } from '~/types/receiving'
 import { awaitingBagsFor, matchScannedBag, normalizeUnitNumber, UNIT_NUMBER_PATTERN } from '~/utils/receiving'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import DateTimeField from '~/components/common/DateTimeField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.receiving.direct' })
 

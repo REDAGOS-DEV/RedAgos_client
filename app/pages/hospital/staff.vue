@@ -52,16 +52,16 @@
                   <span class="cell-sub">{{ member.email }}</span>
                 </td>
                 <td>
-                  <select
-                    v-if="!member.deleted_at"
-                    class="field-input field-input--select"
-                    :value="member.hospital_role"
-                    :disabled="busy === member.uuid"
-                    :aria-label="`Role of ${member.full_name}`"
-                    @change="changeRole(member, $event.target.value)"
-                  >
-                    <option v-for="role in roles" :key="role.value" :value="role.value">{{ role.label }}</option>
-                  </select>
+                  <div v-if="!member.deleted_at" class="role-select">
+                    <SelectField
+                      :model-value="member.hospital_role"
+                      :options="roles.map((role) => ({ value: role.value, label: role.label }))"
+                      :disabled="busy === member.uuid"
+                      :aria-label="`Role of ${member.full_name}`"
+                      size="sm"
+                      @change="(value) => changeRole(member, value)"
+                    />
+                  </div>
                   <span v-else class="muted">{{ member.hospital_role_label }}</span>
                 </td>
                 <td>{{ member.position || '—' }}</td>
@@ -187,6 +187,7 @@
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
 
@@ -408,7 +409,7 @@ onUnmounted(() => clearTimeout(toastTimer))
   font: inherit; font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface);
 }
 .field-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-.field-input--select { height: 32px; min-width: 170px; }
+.role-select { min-width: 170px; }
 .field-error, .form-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 .hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
 

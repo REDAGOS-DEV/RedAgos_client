@@ -51,12 +51,12 @@
           <div class="grid">
             <label class="field field--wide">
               <span class="field__label">Patient's hospital blood bank *</span>
-              <select v-model.number="form.hospitalId" class="field__input" :disabled="isContinuing">
-                <option :value="null" disabled>Select the hospital</option>
-                <option v-for="hospital in reference.hospitals" :key="hospital.id" :value="hospital.id">
-                  {{ hospital.name }}
-                </option>
-              </select>
+              <SelectField
+                v-model="form.hospitalId"
+                :options="reference.hospitals.map((hospital) => ({ value: hospital.id, label: hospital.name }))"
+                placeholder="Select the hospital"
+                :disabled="isContinuing"
+              />
               <span v-if="!reference.hospitals.length" class="field__hint">
                 No hospital blood bank is registered in RedAgos yet. A walk-in can only be recorded for a registered one.
               </span>
@@ -73,10 +73,11 @@
 
             <label class="field">
               <span class="field__label">Blood type</span>
-              <select v-model.number="form.bloodTypeId" class="field__input" :disabled="isContinuing">
-                <option :value="null">Not known yet</option>
-                <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-              </select>
+              <SelectField
+                v-model="form.bloodTypeId"
+                :options="[{ value: null, label: 'Not known yet' }, ...reference.blood_types.map((type) => ({ value: type.id, label: type.code }))]"
+                :disabled="isContinuing"
+              />
             </label>
             <label class="field">
               <span class="field__label">Reference on the watcher's paperwork</span>
@@ -202,7 +203,7 @@
             </label>
             <label class="field">
               <span class="field__label">Confirmed at *</span>
-              <input v-model="form.verification.verifiedAt" type="datetime-local" class="field__input" :max="nowInput">
+              <DateTimeField v-model="form.verification.verifiedAt" :max="nowInput" aria-label="Confirmed at" />
             </label>
             <label class="field field--wide">
               <span class="field__label">What was confirmed (optional)</span>
@@ -229,25 +230,27 @@
               </label>
               <label class="field">
                 <span class="field__label">Sex *</span>
-                <select v-model="form.patient.sex" class="field__input">
-                  <option value="" disabled>Select</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
+                <SelectField
+                  v-model="form.patient.sex"
+                  :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                  placeholder="Select"
+                />
               </label>
               <label class="field">
                 <span class="field__label">Blood type *</span>
-                <select v-model.number="form.bloodTypeId" class="field__input">
-                  <option :value="null" disabled>Select</option>
-                  <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-                </select>
+                <SelectField
+                  v-model="form.bloodTypeId"
+                  :options="reference.blood_types.map((type) => ({ value: type.id, label: type.code }))"
+                  placeholder="Select"
+                />
               </label>
             </template>
             <label class="field">
               <span class="field__label">Priority *</span>
-              <select v-model="form.urgency" class="field__input">
-                <option v-for="priority in reference.priorities" :key="priority.value" :value="priority.value">{{ priority.label }}</option>
-              </select>
+              <SelectField
+                v-model="form.urgency"
+                :options="reference.priorities.map((priority) => ({ value: priority.value, label: priority.label }))"
+              />
             </label>
             <label class="field">
               <span class="field__label">Attending physician</span>
@@ -268,10 +271,13 @@
             <div v-for="(line, index) in form.lines" :key="index" class="line">
               <label class="field">
                 <span class="field__label">Component</span>
-                <select v-model.number="line.componentId" class="field__input" :disabled="isContinuing" @change="line.indicationCode = ''">
-                  <option :value="null" disabled>Select</option>
-                  <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
-                </select>
+                <SelectField
+                  v-model="line.componentId"
+                  :options="reference.components.map((component) => ({ value: component.id, label: component.name }))"
+                  placeholder="Select"
+                  :disabled="isContinuing"
+                  @change="line.indicationCode = ''"
+                />
               </label>
               <label class="field field--narrow">
                 <span class="field__label">Units{{ line.maxQuantity !== null ? ` (max ${line.maxQuantity})` : '' }}</span>
@@ -280,12 +286,11 @@
               <template v-if="!isContinuing">
                 <label v-if="indicationsFor(line).length" class="field field--grow">
                   <span class="field__label">Indication</span>
-                  <select v-model="line.indicationCode" class="field__input">
-                    <option value="" disabled>Select the clinical indication</option>
-                    <option v-for="code in indicationsFor(line)" :key="code.code" :value="code.code">
-                      {{ code.label }} — {{ code.description }}
-                    </option>
-                  </select>
+                  <SelectField
+                    v-model="line.indicationCode"
+                    :options="indicationsFor(line).map((code) => ({ value: code.code, label: `${code.label} — ${code.description}` }))"
+                    placeholder="Select the clinical indication"
+                  />
                 </label>
                 <label v-if="needsExplanation(line)" class="field field--grow">
                   <span class="field__label">Specify</span>
@@ -330,10 +335,10 @@
             </label>
             <label class="field">
               <span class="field__label">ID presented</span>
-              <select v-model="form.representative.idType" class="field__input">
-                <option value="">None</option>
-                <option v-for="type in reference.id_types" :key="type.value" :value="type.value">{{ type.label }}</option>
-              </select>
+              <SelectField
+                v-model="form.representative.idType"
+                :options="[{ value: '', label: 'None' }, ...reference.id_types.map((type) => ({ value: type.value, label: type.label }))]"
+              />
             </label>
             <label v-if="form.representative.idType" class="field">
               <span class="field__label">ID number *</span>
@@ -424,6 +429,8 @@ import {
   toLocalInputValue,
   walkInStepProblems,
 } from '~/utils/requestFulfilment'
+import SelectField from '~/components/common/SelectField.vue'
+import DateTimeField from '~/components/common/DateTimeField.vue'
 
 const emit = defineEmits(['close', 'created', 'open-existing'])
 

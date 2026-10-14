@@ -1,5 +1,18 @@
 <template>
-  <div>
+  <div class="bc-shell">
+    <!--
+      Same backdrop as the donor portal: a soft gradient in the portal colour
+      behind everything. The frosted sidebar picks its tint up from here, so
+      the two rails look the same. Pages paint their own background over it.
+    -->
+    <div class="bc-backdrop" aria-hidden="true" />
+    <!--
+      The page's glass: the same frosted layer as the top bar and the sidebar
+      (same white, opacity, blur and colour boost), filling the space beside
+      the rail and under the bar, so all three are one colour. It follows the
+      rail's width like the top bar does.
+    -->
+    <div class="bc-frost" :class="railExpanded ? 'lg:left-64' : 'lg:left-[72px]'" aria-hidden="true" />
     <BloodCenterSidebar />
 
     <!-- Sentinel sa pinakataas sa document: kung dili na makita, naka-scroll na -->
@@ -11,10 +24,10 @@
       that both reserves the space and reflows the children inside it, which is
       what keeps the widened sidebar beside the page rather than over it.
     -->
-    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
+    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'">
       <header
         class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
-        :class="[railExpanded ? 'lg:left-64' : 'lg:left-20', { 'topbar--scrolled': isScrolled }]"
+        :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'topbar--scrolled': isScrolled }]"
         :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
         <!--
           Same as the donor portal: the bar shares the page and sidebar canvas
@@ -66,7 +79,7 @@
         <div
           v-show="searchOpenMobile || true"
           v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[#1565C0]/40 focus-within:ring-2 focus-within:ring-[#1565C0]/10 transition-colors px-3 py-2 relative"
+          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[color:rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-2 focus-within:ring-[color:rgba(var(--rb-primary-rgb),0.1)] transition-colors px-3 py-2 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
@@ -120,6 +133,7 @@
               >
                 <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                 <span class="truncate">{{ item.label }}</span>
+                <span v-if="item.isHelp" class="search-help-tag">Help</span>
               </NuxtLink>
             </div>
 
@@ -154,7 +168,12 @@
           -->
           <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
 
-          <div class="relative">
+          <!--
+            Opens on hover with a mouse (closing after a short delay, so
+            crossing the gap to the menu does not shut it), like the donor
+            portal. Click, tap and the keyboard still toggle it.
+          -->
+          <div class="relative" @mouseenter="openMenuOnHover" @mouseleave="closeMenuOnHover">
             <button
               ref="userMenuTrigger"
               class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
@@ -165,7 +184,7 @@
             >
               <div
                 class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
-                style="background:#1565C0"
+                style="background: var(--rb-primary)"
               >
                 <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                 <span v-else>{{ initials }}</span>
@@ -193,55 +212,50 @@
                 v-if="showUserMenu"
                 ref="userMenuEl"
                 v-click-outside="closeUserMenu"
-                class="account-menu absolute right-0 top-full mt-2 w-[296px] rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 z-40 shadow-lg"
-                :style="{ borderColor: headerBorderColor }"
+                class="acct"
                 role="menu"
                 aria-label="Account"
                 @keydown.esc.prevent="closeUserMenu(true)"
                 @keydown.down.prevent="moveMenuFocus(1)"
                 @keydown.up.prevent="moveMenuFocus(-1)"
               >
-                <!-- Who is signed in: name, email, then role and where they work as plain text -->
-                <div class="px-4 pt-4 pb-3 border-b dark:border-slate-700" :style="{ borderColor: headerBorderColor }">
-                  <div class="flex items-center gap-3">
-                    <div
-                      class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-                      style="background:#1565C0"
-                    >
-                      <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                      <span v-else>{{ initials }}</span>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100 capitalize">{{ displayName }}</p>
-                      <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
-                    </div>
+                <!-- Who is signed in, and at what level (a shared counter PC needs both) -->
+                <div class="acct__head">
+                  <div class="acct__avatar">
+                    <img v-if="user?.avatar" :src="user.avatar" alt="">
+                    <span v-else>{{ initials }}</span>
                   </div>
-                  <div v-if="roleLabel || workplaceLabel" class="mt-3 rounded-lg px-3 py-2 bg-[#F7F8FA] dark:bg-slate-800/60">
-                    <p v-if="roleLabel" class="text-[12.5px] font-semibold leading-snug text-gray-800 dark:text-slate-100">{{ roleLabel }}</p>
-                    <p v-if="workplaceLabel" class="text-[11.5px] leading-snug text-gray-500 dark:text-slate-400 mt-0.5">{{ workplaceLabel }}</p>
+                  <div class="acct__who">
+                    <p class="acct__name">{{ displayName }}</p>
+                    <p class="acct__email">{{ user?.email }}</p>
+                    <p v-if="roleLabel || workplaceLabel" class="acct__role">
+                      {{ [roleLabel, workplaceLabel].filter(Boolean).join(' · ') }}
+                    </p>
                   </div>
                 </div>
 
-                <div class="py-1.5">
+                <div class="acct__list">
                   <NuxtLink
                     v-for="item in userMenuItems"
                     :key="item.path"
                     :to="item.path"
                     role="menuitem"
-                    class="account-menu__item flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                    class="account-menu__item acct__item"
                     @click="closeUserMenu()"
                   >
-                    <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500" />
-                    <span class="truncate">{{ item.path === '/blood-center/settings' ? 'Account settings' : item.label }}</span>
+                    <AssetIcon :name="item.icon" :size="16" class="acct__item-icon" />
+                    <span class="acct__item-label">{{ item.path === '/blood-center/settings' ? 'Account settings' : item.label }}</span>
                   </NuxtLink>
+                </div>
 
-                  <!-- Theme: three choices, Light / Dark / System (follows the computer) -->
-                  <div class="flex items-center justify-between gap-3 px-4 py-2">
-                    <span class="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">
-                      <AssetIcon name="palette" :size="16" class="text-gray-400 dark:text-slate-500" />
+                <!-- Theme: Light / Dark / System (same as the browser) -->
+                <div class="acct__theme">
+                  <div class="acct__theme-row">
+                    <span class="acct__theme-label">
+                      <AssetIcon :name="isDark ? 'moon' : 'sun'" :size="15" />
                       Theme
                     </span>
-                    <div class="inline-flex p-0.5 gap-0.5 rounded-lg bg-[#F1F5F9] dark:bg-slate-800" role="group" aria-label="Theme">
+                    <div class="acct__seg" role="group" aria-label="Theme">
                       <button
                         v-for="option in THEME_OPTIONS"
                         :key="option.value"
@@ -250,27 +264,26 @@
                         :aria-checked="themeMode === option.value"
                         :aria-label="option.label"
                         :title="option.label"
-                        class="account-menu__item w-7 h-7 rounded-md flex items-center justify-center transition-colors"
-                        :class="themeMode === option.value
-                          ? 'bg-white dark:bg-slate-600 text-[#1565C0] dark:text-sky-300 shadow-sm'
-                          : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100'"
+                        class="account-menu__item acct__seg-btn"
+                        :class="{ 'acct__seg-btn--on': themeMode === option.value }"
                         @click="setThemeMode(option.value)"
                       >
                         <AssetIcon :name="option.icon" :size="14" />
                       </button>
                     </div>
                   </div>
+                  <p class="acct__theme-hint">{{ themeHint }}</p>
                 </div>
 
-                <div class="border-t dark:border-slate-700 py-1.5" :style="{ borderColor: headerBorderColor }">
+                <div class="acct__foot">
                   <!-- Neutral: signing out is routine, not destructive. Red only on hover. -->
                   <button
                     type="button"
                     role="menuitem"
-                    class="account-menu__item flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 transition-colors hover:bg-red-50 hover:text-[#D32F2F] dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                    class="account-menu__item acct__logout"
                     @click="handleLogout"
                   >
-                    <AssetIcon name="log-out" :size="16" />
+                    <AssetIcon name="log-out" :size="15" />
                     <span>Log out</span>
                   </button>
                 </div>
@@ -291,14 +304,14 @@
       </header>
 
       <!--
-        The page background is the token, not bg-white. Every blood-centre page
-        paints itself with --rb-page-bg inside a centred max-width, so a white
-        main left a pale band down both margins in light mode and a near-black
-        one in dark.
+        Transparent, like the donor layout: the backdrop behind it shows
+        through the frosted top bar and around each page, and every
+        blood-centre page still paints its own --rb-page-bg.
       -->
       <main class="min-h-screen transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
+
     </div>
   </div>
 </template>
@@ -311,6 +324,8 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useSidebar } from '~/composables/useSidebar.js'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterNotificationBell from '~/components/BloodCenter/NotificationBell.vue'
+import { HELP_GUIDES, guideVisible, searchGuides } from '~/utils/bloodCenterHelp'
+import { useAccentTheme } from '~/composables/useAccentTheme'
 
 const router = useRouter()
 const route = useRoute()
@@ -324,7 +339,7 @@ const { isDark, themeMode, setThemeMode } = useDarkMode()
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: 'sun' },
   { value: 'dark', label: 'Dark', icon: 'moon' },
-  { value: 'system', label: 'System (follows your computer)', icon: 'monitor' },
+  { value: 'system', label: 'System (same as your browser)', icon: 'monitor' },
 ]
 const { railExpanded, openMobile } = useSidebar('blood-center')
 
@@ -343,6 +358,13 @@ const headerShadow = computed(() => (
 onMounted(() => {
   ensureUser()
 })
+
+// The colour theme picked in Settings → Appearance (shared by the donor and
+// blood center portals on this device). Removed on the way out, so portals
+// without the picker keep the standard blue.
+const accent = useAccentTheme()
+onMounted(() => accent.init())
+onUnmounted(() => accent.clear())
 
 // The path as the nav knows it, with the one query that picks a view.
 const navPath = computed(() => (route.query.test ? `${route.path}?test=${route.query.test}` : route.path))
@@ -438,6 +460,28 @@ const closeUserMenu = (returnFocus = false) => {
   showUserMenu.value = false
 }
 
+// Hover only where hovering exists; on touch screens the tap toggles it.
+// Opening on hover does not move focus (that stays a keyboard/click thing).
+let menuTimer = null
+const canHover = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+function openMenuOnHover() {
+  if (!canHover()) return
+  clearTimeout(menuTimer)
+  showUserMenu.value = true
+}
+function closeMenuOnHover() {
+  if (!canHover()) return
+  clearTimeout(menuTimer)
+  menuTimer = setTimeout(() => closeUserMenu(), 220)
+}
+onUnmounted(() => clearTimeout(menuTimer))
+
+const themeHint = computed(() => (
+  themeMode.value === 'system'
+    ? `Following your browser (${isDark.value ? 'dark' : 'light'})`
+    : `Always ${themeMode.value}`
+))
+
 const searchOpenMobile = ref(false)
 
 function openMobileSearch() {
@@ -468,9 +512,16 @@ const filteredResults = computed(() => {
   if (!q) return []
   // searchablePages kay gi-filter na daan sa permissions, so dili gyud
   // makasulod sa results ang page nga dili niya maabot.
-  return searchablePages.value.filter(p =>
+  const pages = searchablePages.value.filter(p =>
     p.label.toLowerCase().includes(q) || (p.keywords ?? '').includes(q)
   )
+  // Then the help guides that answer it, for pages this account can open, so
+  // "void" or "quarantine" finds how-to as well as where to go.
+  const allowed = new Set(searchablePages.value.map(p => p.path.split('?')[0]))
+  const help = searchGuides(q, HELP_GUIDES.filter(g => guideVisible(g, allowed)))
+    .slice(0, 4)
+    .map(g => ({ label: g.title, path: `/blood-center/help?guide=${g.id}`, icon: 'life-buoy', isHelp: true }))
+  return [...pages, ...help]
 })
 
 function closeSearchResults() {
@@ -562,28 +613,241 @@ const handleLogout = async () => {
   transition: padding-left 200ms ease-out;
 }
 
+/* ── Account menu: plain and quiet ── */
+.acct {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: 280px;
+  overflow: hidden;
+  border: 1px solid var(--rb-border, #E5EAF0);
+  border-radius: 16px;
+  background: var(--rb-surface, #FFFFFF);
+  box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.3);
+}
+
+/* An invisible bridge over the 8px gap, so moving the pointer from the
+   avatar down to the menu does not count as leaving it. */
+.acct::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.acct__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rb-border, #E5EAF0);
+}
+
+.acct__avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--rb-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.acct__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.acct__who { min-width: 0; }
+
+.acct__name,
+.acct__email,
+.acct__role { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.acct__name { font-size: 14px; font-weight: 700; color: var(--rb-text-primary, #1F2937); text-transform: capitalize; }
+.acct__email { font-size: 12px; color: var(--rb-text-secondary, #64748B); }
+.acct__role { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); }
+
+.acct__list { display: flex; flex-direction: column; padding: 6px; }
+
+.acct__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--rb-text-primary, #1F2937);
+  font-size: 13.5px;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.acct__item-icon { flex-shrink: 0; color: var(--rb-text-secondary, #94A3B8); transition: color 0.15s ease; }
+.acct__item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.acct__item:hover,
+.acct__item:focus-visible { background: var(--rb-surface-hover, #F1F5F9); color: var(--rb-primary-text); outline: none; }
+.acct__item:hover .acct__item-icon,
+.acct__item:focus-visible .acct__item-icon { color: var(--rb-primary-text); }
+
+.acct__theme { padding: 8px 16px 10px; border-top: 1px solid var(--rb-border, #E5EAF0); }
+.acct__theme-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.acct__theme-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--rb-text-primary, #1F2937);
+}
+
+.acct__theme-label :deep(svg) { color: var(--rb-text-secondary, #94A3B8); }
+
+.acct__seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--rb-surface-alt, #F1F5F9); }
+
+.acct__seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--rb-text-secondary, #64748B);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.acct__seg-btn:hover:not(.acct__seg-btn--on) { color: var(--rb-text-primary, #1F2937); }
+.acct__seg-btn--on { background: var(--rb-surface, #FFFFFF); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
+.acct__seg-btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
+
+.acct__theme-hint { margin: 2px 0 0 28px; font-size: 11.5px; color: var(--rb-text-secondary, #94A3B8); }
+
+.acct__foot { padding: 6px; border-top: 1px solid var(--rb-border, #E5EAF0); }
+
+.acct__logout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--rb-text-primary, #1F2937);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.acct__logout:hover,
+.acct__logout:focus-visible { background: rgba(198, 40, 40, 0.08); color: #C62828; outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .acct__item, .acct__item-icon, .acct__seg-btn, .acct__logout { transition: none; }
+}
+
+:global(.dark .bc-shell .acct) { box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7); }
+:global(.dark .bc-shell .acct__logout:hover),
+:global(.dark .bc-shell .acct__logout:focus-visible) { background: rgba(239, 83, 80, 0.14); color: #EF9A9A; }
+
+/*
+ * Every blood-centre page paints its root with --rb-page-bg. Inside this
+ * portal that is see-through, so the pages sit on the same tinted backdrop as
+ * the frosted top bar and sidebar instead of a flat grey that never matched
+ * them. Cards keep --rb-surface. Teleported modals are outside .bc-shell and
+ * keep the normal value.
+ */
+.bc-shell {
+  --rb-page-bg: transparent;
+}
+
+/* ── Backdrop: the donor portal's, in the portal colour ── */
+.bc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /*
+   * A neutral canvas with the portal colour only as a faint glow in the top
+   * corner (2026-10-15). The full-strength gradient tinted the whole working
+   * area with saturated themes (teal, green); the colour now belongs to the
+   * buttons, the active nav item and the links, where it means something.
+   */
+  background:
+    radial-gradient(46% 50% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 14%, transparent), transparent 70%),
+    radial-gradient(38% 44% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 12%, transparent), transparent 70%),
+    #F6F8FB;
+}
+:global(.dark .bc-shell .bc-backdrop) {
+  background:
+    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
+    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
+    #0B1220;
+}
+
+/*
+ * Frosted glass over the backdrop, exactly like the sidebar (same white at
+ * the same opacity), so the two read as one frame. The landing-style gradient
+ * comes through from the backdrop behind both.
+ */
 .topbar {
-  background-color: var(--rb-page-bg, #F7F8FA);
+  background-color: rgba(255, 255, 255, 0.55);
+  /* Blur only: saturating would bring the colour back up. */
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
   will-change: left;
 }
+.topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
+:global(.dark .bc-shell .topbar) { background-color: rgba(15, 23, 42, 0.6); }
+:global(.dark .bc-shell .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.78); }
 
-.topbar--scrolled {
-  background-color: rgba(247, 248, 250, 0.82);
-  -webkit-backdrop-filter: saturate(180%) blur(10px);
-  backdrop-filter: saturate(180%) blur(10px);
-}
-
-:global(.dark .topbar--scrolled) {
-  background-color: rgba(15, 23, 42, 0.82);
-}
-
+/* No blur, or less transparency requested: a solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topbar--scrolled { background-color: var(--rb-page-bg, #F7F8FA); }
+  .topbar { background-color: var(--rb-surface, #FFFFFF); }
+}
+/* Reduced transparency: the glass stays (it sits over a still gradient, not
+   over content), only the scrolled bar, with content sliding under it,
+   turns solid. */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar--scrolled { background-color: var(--rb-surface, #FFFFFF); }
 }
 
 main {
-  background: var(--rb-page-bg);
+  background: transparent;
+}
+
+.bc-frost {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgba(255, 255, 255, 0.55);
+  /* Blur only: saturating would bring the colour back up. */
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  transition: left 200ms ease-out;
+}
+@media (min-width: 640px) {
+  .bc-frost { top: 64px; }
+}
+:global(.dark .bc-shell .bc-frost) { background-color: rgba(15, 23, 42, 0.6); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bc-frost { background-color: var(--rb-surface, #FFFFFF); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-frost { transition: none; }
 }
 
 .search-panel {
@@ -628,4 +892,17 @@ input:focus {
 a, button {
   touch-action: manipulation;
 }
+
+/* A help guide among the search results. */
+.search-help-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--rb-primary-text);
+  background: rgba(var(--rb-primary-rgb), 0.1);
+}
+
 </style>

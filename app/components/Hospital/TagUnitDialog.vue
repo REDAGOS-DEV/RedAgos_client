@@ -23,12 +23,17 @@
 
       <label class="field">
         <span class="field__label">Patient Transfusion Request (optional)</span>
-        <select v-model="requirementId" class="field__input" :disabled="requirementsLoading">
-          <option :value="null">No request — enter the patient below</option>
-          <option v-for="option in requirementOptions" :key="option.id" :value="option.id">
-            {{ option.reference_number }} · {{ option.patient?.full_name || 'Unnamed patient' }} · {{ option.blood_type?.code || '—' }}
-          </option>
-        </select>
+        <SelectField
+          v-model="requirementId"
+          :options="[
+            { value: null, label: 'No request — enter the patient below' },
+            ...requirementOptions.map((option) => ({
+              value: option.id,
+              label: `${option.reference_number} · ${option.patient?.full_name || 'Unnamed patient'} · ${option.blood_type?.code || '—'}`,
+            })),
+          ]"
+          :disabled="requirementsLoading"
+        />
         <span v-if="suggested && requirementId === suggested.id" class="field__hint">
           This bag was received for {{ suggested.reference || 'this request' }}.
         </span>
@@ -66,11 +71,11 @@
         </label>
         <label class="field">
           <span class="field__label">Sex<span v-if="!requirementId" aria-hidden="true"> *</span></span>
-          <select v-model="form.patient_sex" class="field__input" :required="!requirementId">
-            <option value="">Select</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-          </select>
+          <SelectField
+            v-model="form.patient_sex"
+            :options="[{ value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }]"
+            placeholder="Select"
+          />
           <span v-if="fieldError('patient_sex')" class="field__hint field__hint--error">{{ fieldError('patient_sex') }}</span>
         </label>
         <label class="field">
@@ -110,6 +115,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeMismatch, suggestedRequirement } from '~/utils/tagDeadline'
+import SelectField from '~/components/common/SelectField.vue'
 
 const props = defineProps({
   unit: { type: Object, required: true },

@@ -148,16 +148,13 @@
 
               <div class="field">
                 <label for="p-sex" class="field-label">Sex <span class="req">*</span></label>
-                <select
+                <SelectField
                   id="p-sex"
                   v-model="form.patient_sex"
-                  class="input"
-                  :class="{ 'input--error': errors.patient_sex }"
-                >
-                  <option value="">Select…</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
+                  :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                  placeholder="Select…"
+                  :invalid="Boolean(errors.patient_sex)"
+                />
                 <p v-if="errors.patient_sex" class="field-error">{{ errors.patient_sex }}</p>
               </div>
             </div>
@@ -197,15 +194,13 @@
                   Patient's blood type
                   <span class="req">*</span>
                 </label>
-                <select
+                <SelectField
                   id="btype"
-                  v-model.number="form.blood_type_id"
-                  class="input"
-                  :class="{ 'input--error': errors.blood_type_id }"
-                >
-                  <option :value="null">Select…</option>
-                  <option v-for="t in bloodTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-                </select>
+                  v-model="form.blood_type_id"
+                  :options="bloodTypes.map((t) => ({ value: t.id, label: t.label }))"
+                  placeholder="Select…"
+                  :invalid="Boolean(errors.blood_type_id)"
+                />
                 <p v-if="errors.blood_type_id" class="field-error">{{ errors.blood_type_id }}</p>
               </div>
 
@@ -268,23 +263,14 @@
               <div class="field-grid">
                 <div class="field field--wide">
                   <label :for="`c-${index}`" class="field-label">Blood component <span class="req">*</span></label>
-                  <select
+                  <SelectField
                     :id="`c-${index}`"
-                    v-model.number="line.component_id"
-                    class="input"
-                    :class="{ 'input--error': lineErrors[index]?.component_id }"
+                    v-model="line.component_id"
+                    :options="components.map((c) => ({ value: c.id, label: c.name, disabled: isComponentTaken(c.id, index) }))"
+                    placeholder="Select…"
+                    :invalid="Boolean(lineErrors[index]?.component_id)"
                     @change="onComponentChange(line)"
-                  >
-                    <option :value="null">Select…</option>
-                    <option
-                      v-for="c in components"
-                      :key="c.id"
-                      :value="c.id"
-                      :disabled="isComponentTaken(c.id, index)"
-                    >
-                      {{ c.name }}
-                    </option>
-                  </select>
+                  />
                   <p v-if="lineErrors[index]?.component_id" class="field-error">
                     {{ lineErrors[index].component_id }}
                   </p>
@@ -311,20 +297,14 @@
                     Indication for transfusion
                     <span v-if="codesFor(line.component_id).length" class="req">*</span>
                   </label>
-                  <select
+                  <SelectField
                     :id="`i-${index}`"
                     v-model="line.indication_code"
-                    class="input"
-                    :class="{ 'input--error': lineErrors[index]?.indication_code }"
+                    :options="codesFor(line.component_id).map((code) => ({ value: code.code, label: `${code.label} — ${code.description}` }))"
+                    :placeholder="line.component_id ? 'Select an indication…' : 'Choose a component first'"
+                    :invalid="Boolean(lineErrors[index]?.indication_code)"
                     :disabled="!line.component_id || !codesFor(line.component_id).length"
-                  >
-                    <option :value="null">
-                      {{ line.component_id ? 'Select an indication…' : 'Choose a component first' }}
-                    </option>
-                    <option v-for="code in codesFor(line.component_id)" :key="code.code" :value="code.code">
-                      {{ code.label }} — {{ code.description }}
-                    </option>
-                  </select>
+                  />
                   <p v-if="lineErrors[index]?.indication_code" class="field-error">
                     {{ lineErrors[index].indication_code }}
                   </p>
@@ -453,6 +433,7 @@ import {
   buildTransfusionPayload,
   suggestedSplit,
 } from '~/utils/transfusionSourcing'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.manage' })
 

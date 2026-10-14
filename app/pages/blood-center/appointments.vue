@@ -26,9 +26,7 @@
               {{ isToday ? 'Today' : 'Viewing' }}
             </span>
             <div class="date-filter-wrap">
-              <input type="date" v-model="datePickerValue" class="date-filter" aria-label="Appointment date"
-                @change="onDateFilterChange" />
-              <AssetIcon name="calendar" :size="16" class="form-input-icon__icon" />
+              <DatePicker id="appt-date" v-model="datePickerValue" aria-label="Appointment date" size="sm" @update:model-value="onDateFilterChange" />
             </div>
           </div>
 
@@ -156,19 +154,30 @@
 
           <div class="toolbar">
             <div class="filters-row">
-              <select v-model="statusFilter" class="form-input filter-select" aria-label="Filter by status">
-                <option value="all">All Status</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="in-progress">In progress</option>
-                <option value="collected">Collected</option>
-                <option value="deferred">Deferred</option>
-                <option value="no-show">No-show</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-              <select v-model="bloodTypeFilter" class="form-input filter-select" aria-label="Filter by blood type">
-                <option value="all">All Blood Types</option>
-                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-              </select>
+              <div class="filter-select">
+                <SelectField
+                  v-model="statusFilter"
+                  :options="[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'scheduled', label: 'Scheduled' },
+                    { value: 'in-progress', label: 'In progress' },
+                    { value: 'collected', label: 'Collected' },
+                    { value: 'deferred', label: 'Deferred' },
+                    { value: 'no-show', label: 'No-show' },
+                    { value: 'cancelled', label: 'Cancelled' },
+                  ]"
+                  aria-label="Filter by status"
+                  size="sm"
+                />
+              </div>
+              <div class="filter-select">
+                <SelectField
+                  v-model="bloodTypeFilter"
+                  :options="[{ value: 'all', label: 'All Blood Types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]"
+                  aria-label="Filter by blood type"
+                  size="sm"
+                />
+              </div>
               <button v-if="selectedSlotId" type="button" class="filter-chip" @click="selectedSlotId = null">
                 Slot: {{ formatSlotTime(selectedSlotId) }}
                 <AssetIcon name="x" :size="12" />
@@ -363,9 +372,7 @@
             <div class="form-group">
               <label class="form-label" for="slots-date">Date</label>
               <div class="form-input-icon">
-                <input id="slots-date" v-model="slotsForm.date" type="date" class="form-input"
-                  @change="fetchSlotsForForm" />
-                <AssetIcon name="calendar" :size="14" class="form-input-icon__icon" />
+                <DatePicker id="slots-date" v-model="slotsForm.date" @update:model-value="fetchSlotsForForm" />
               </div>
             </div>
 
@@ -445,6 +452,8 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1180,28 +1189,7 @@ onBeforeUnmount(() => {
   color: var(--rb-primary-text);
 }
 
-.date-filter-wrap {
-  position: relative;
-  width: 150px;
-}
-
-.date-filter {
-  width: 100%;
-  height: 38px;
-  padding: 0 40px 0 10px;
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--rb-text-primary);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.date-filter:focus {
-  outline: none;
-}
+.date-filter-wrap { width: 170px; }
 
 /* Our calendar icon is drawn beside these; the browser's own would double it.
    It stays clickable, stretched invisibly over the whole field. */
@@ -1819,20 +1807,7 @@ onBeforeUnmount(() => {
  * background-image to none, and the dark override for .form-input is exactly
  * such a rule.
  */
-.filter-select {
-  flex: 0 0 190px;
-  height: 36px;
-  padding-top: 0;
-  padding-bottom: 0;
-  font-weight: 600;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-  background-size: 10px 6px;
-  padding-right: 32px;
-}
+.filter-select { flex: 0 0 190px; }
 
 .form-input-icon {
   position: relative;
@@ -2674,18 +2649,8 @@ onBeforeUnmount(() => {
   border-color: #334155;
 }
 
-/* After the rule above, whose `background` shorthand would otherwise reset
-   the caret to none. */
-:global(.dark .appointments-page .filter-select) {
-  background: #1E293B url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-  background-size: 10px 6px;
-  border-color: #334155;
-  color: #F1F5F9;
-}
-
 :global(.dark .appointments-page .btn-outline),
-:global(.dark .appointments-page .row-action:not(.row-action--primary)),
-:global(.dark .appointments-page .date-filter) {
+:global(.dark .appointments-page .row-action:not(.row-action--primary)) {
   color: #F1F5F9;
 }
 

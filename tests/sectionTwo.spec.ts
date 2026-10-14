@@ -347,7 +347,8 @@ describe('the staff roster', () => {
     // Title and role are pick-or-type fields (ComboInput, which replaced the
     // unstylable <datalist>): the suggestions still come from the catalogue.
     expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.position"\s+:options="titles"/)
-    expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
+    // The department is the system's SelectField, its choices from the same list.
+    expect(page).toMatch(/v-model="form\.department"\s+:options="\[\{ value: '', label: 'Select a department' \}, \.\.\.departments\.map\(\(group\) => \(\{ value: group\.department, label: group\.label \}\)\)\]"/)
     expect(page).toMatch(/<ComboInput\s+id="staff-role"\s+v-model="form\.role"\s+:options="departmentRoles\.map/)
     expect(page).toContain('v-model="form.staff_privileges" type="checkbox"')
   })

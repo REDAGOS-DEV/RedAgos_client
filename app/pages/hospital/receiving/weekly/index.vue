@@ -137,10 +137,16 @@
         <div class="add-centre">
           <h3 class="add-centre__title">Add a blood center</h3>
           <div class="add-centre__row">
-            <select v-model.number="adding.target" class="filter-select" aria-label="Blood center" :disabled="savingSchedule">
-              <option :value="null">{{ unscheduled.length ? 'Choose a blood center…' : 'Every eligible center has request days' }}</option>
-              <option v-for="facility in unscheduled" :key="facility.id" :value="facility.id">{{ facility.name }}</option>
-            </select>
+            <div class="filter-select">
+              <SelectField
+                v-model="adding.target"
+                :options="unscheduled.map((facility) => ({ value: facility.id, label: facility.name }))"
+                :placeholder="unscheduled.length ? 'Choose a blood center…' : 'Every eligible center has request days'"
+                aria-label="Blood center"
+                :disabled="savingSchedule"
+                size="sm"
+              />
+            </div>
             <HospitalWeekdayPicker v-model="adding.days" label="Request days for the new center" :disabled="savingSchedule" />
             <button
               type="button"
@@ -243,6 +249,7 @@ import HospitalWeekdayPicker from '~/components/Hospital/WeekdayPicker.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeCodes } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS, WEEKLY_STATUS_TONES } from '~/types/receiving'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -514,12 +521,7 @@ function formatDay(value, withWeekday = false) {
   font: inherit; font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
 }
 .search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong); min-width: 220px;
-  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); cursor: pointer; appearance: none;
-  background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
+.filter-select { width: 260px; }
 
 .list-state { padding: 18px 16px; }
 .list-state--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); font-size: 13px; }

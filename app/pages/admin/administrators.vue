@@ -187,14 +187,15 @@
               <label class="group">
                 <span class="label">Role <span class="req">*</span></span>
                 <span class="select-wrap">
-                  <select v-model="form.role" class="input select" @change="applyRole($event.target.value)">
-                    <option v-if="canGrantSuper" value="super_admin">Super Administrator</option>
-                    <option v-for="preset in presets" :key="preset.name" :value="preset.name">
-                      {{ adminRoleLabel(preset.name) }}
-                    </option>
-                    <option value="custom">Custom</option>
-                  </select>
-                  <AssetIcon name="chevron-down" :size="14" class="select__caret" />
+                  <SelectField
+                    :model-value="form.role"
+                    :options="[
+                      ...(canGrantSuper ? [{ value: 'super_admin', label: 'Super Administrator' }] : []),
+                      ...presets.map((preset) => ({ value: preset.name, label: adminRoleLabel(preset.name) })),
+                      { value: 'custom', label: 'Custom' },
+                    ]"
+                    @change="applyRole"
+                  />
                 </span>
                 <span class="hint">{{ roleHint }}</span>
               </label>
@@ -273,6 +274,7 @@ import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminAccountService } from '~/api/admin/AdminAccountService'
 import { useUser } from '~/composables/useUser'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
   middleware: 'auth',

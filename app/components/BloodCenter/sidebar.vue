@@ -2,22 +2,26 @@
   <div>
     <!--
       Mobile overlay. The trigger that opens the drawer lives in the layout
-      header now, not floating over the page: a fixed button at top-4 left-4
-      forced the header to carry a `pl-16` gutter at every breakpoint, which is
-      what pushed the desktop breadcrumb out of alignment with the rail.
+      header, not floating over the page.
     -->
     <Transition name="scrim">
       <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-slate-900/50" @click="closeMobile" />
     </Transition>
 
+    <!--
+      Same rail as the donor portal. The left edge never moves: every icon
+      (logo, pages, folders, settings) sits on the same 36px axis in both
+      states, and the labels are not removed when collapsing; the rail's right
+      edge slides over them. Only the width animates.
+    -->
     <aside
       aria-label="Blood Center navigation"
-      class="sidebar fixed top-0 left-0 h-screen z-50 flex flex-col overflow-hidden w-[272px] lg:translate-x-0"
+      class="sidebar fixed top-0 left-0 h-screen z-50 flex flex-col w-[272px] lg:translate-x-0"
       :class="[
         mobileOpen ? 'translate-x-0' : '-translate-x-full',
-        railCollapsed ? 'lg:w-20' : 'lg:w-64'
+        railCollapsed ? 'lg:w-[72px]' : 'lg:w-64'
       ]"
-      :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow }"
+      :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow, '--sb-hover': SIDEBAR_HOVER_SOFT }"
       @mouseenter="handleSidebarEnter"
       @mouseleave="handleSidebarLeave"
       @focusin="handleSidebarEnter"
@@ -33,102 +37,124 @@
       </button>
 
       <!--
-        The brand row is height-matched to the topbar (h-14 / sm:h-16) so the
-        sidebar's divider lines up with the header's instead of sitting a few
-        pixels adrift, which is what the old pt-3/pb-3 did.
+        Height-matched to the topbar (h-14 / sm:h-16) so the dividers line up.
+        px-4 + a 40px mark puts the logo's centre on the 36px axis.
       -->
       <div
-        class="brand px-5 h-14 sm:h-16 flex items-center gap-3 border-b flex-shrink-0 transition-colors duration-150 cursor-pointer select-none"
-        :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
+        class="brand px-4 h-14 sm:h-16 flex items-center gap-3 border-b flex-shrink-0 cursor-pointer select-none overflow-hidden"
         :style="{ borderColor: SIDEBAR_BORDER }"
         role="link"
         tabindex="0"
-        :aria-label="'RedAgos — go to ' + homeLabel"
+        :aria-label="'RedAgos, go to ' + homeLabel"
         @click="goHome"
         @keydown.enter.prevent="goHome"
         @keydown.space.prevent="goHome">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative"
-          style="background: #1565C0">
+          style="background: var(--rb-primary)">
           <img v-if="!navigatingHome" :src="logo" alt="RedAgos" class="logo-image">
           <span v-else class="logo-spinner" />
         </div>
 
-        <div v-if="showLabels" class="min-w-0 whitespace-nowrap">
-          <h1 class="font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
+        <div class="label min-w-0 whitespace-nowrap" :class="{ 'label--hidden': !showLabels }">
+          <p class="logo-name font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
             Red<span style="color:#D32F2F">Agos</span>
-          </h1>
-          <p class="text-[11px] mt-0.5 truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
+          </p>
+          <p class="text-[12px] mt-0.5 truncate max-w-[160px]" :style="{ color: SIDEBAR_IDLE_TEXT }">
             {{ portalLabel }}
           </p>
         </div>
       </div>
 
-      <!-- Navigation -->
-      <nav
-        class="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4"
-        :class="[isDark ? 'nav-dark' : '', railCollapsed && !isMobile ? 'nav-rail' : '']">
-        <template v-for="(group, gIndex) in navGroups" :key="group.label || gIndex">
-          <!--
-            A collapsed rail has no room for a group heading, so the groups are
-            separated by a rule instead. Group collapsing is therefore only
-            honoured while the labels are readable — hiding icons behind a
-            heading nobody can see would strand the pages under it.
-          -->
-          <div v-if="!showLabels" class="group-rule" :class="gIndex === 0 ? 'is-first' : ''"
-            :style="{ background: SIDEBAR_BORDER }" />
+      <!-- Navigation: nav px-3 + item px-3 + a 24px icon box = 36px axis -->
+      <nav class="flex-1 flex flex-col overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4" :class="isDark ? 'nav-dark' : ''">
+        <!-- Main: each department's dashboard, as top-level rows -->
+        <NuxtLink v-for="item in topItems" :key="item.path" :to="item.path"
+          class="nav-item"
+          :class="{ 'is-current': isActive(item.path) }"
+          :title="railCollapsed && !isMobile ? item.label : null"
+          :aria-current="isActive(item.path) ? 'page' : null"
+          :style="navStyle(item.path)"
+          @click="closeMobile"
+          @mouseenter="hoveredPath = item.path"
+          @mouseleave="hoveredPath = null">
+          <span class="icon-box">
+            <AssetIcon :name="item.icon" :size="18" />
+            <span v-if="!showLabels && badgeFor(item)" class="status-dot" :style="dotStyle(item.badge)" />
+          </span>
+          <span class="label flex-1 min-w-0 truncate" :class="{ 'label--hidden': !showLabels }">{{ item.label }}</span>
+          <span v-if="showLabels && badgeFor(item)" class="count-pill" :style="badgeStyle(item.badge)">
+            {{ badgeFor(item) }}
+          </span>
+        </NuxtLink>
 
-          <button v-else-if="group.label" type="button"
-            class="group-header w-full flex items-center justify-between gap-1.5 px-3 py-1 mb-1 rounded-md transition-colors"
-            :class="gIndex === 0 ? 'mt-1' : 'mt-4'"
-            :style="{ color: SIDEBAR_IDLE_TEXT }"
-            :aria-expanded="!isGroupCollapsed(group.label)"
-            @click="toggleGroup(group.label)">
-            <span class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
-              <span class="w-3 h-[2px] rounded-full flex-shrink-0"
-                :style="{ background: isDark ? '#475569' : '#CBD5E1' }" />
-              {{ group.label }}
-              <!-- Dot indicator when a collapsed group hides something pending -->
-              <span v-if="isGroupCollapsed(group.label) && groupHasBadge(group)"
-                class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: #D32F2F" />
+        <!--
+          Departments as folders. Pages sit indented under their folder. The
+          folder holding the current page gets a blue icon; on the slim rail,
+          where its pages are hidden, it also gets the soft pill so staff can
+          still see where they are. A closed folder (or the slim rail) shows a
+          dot when a page inside has something waiting.
+        -->
+        <div v-for="folder in folders" :key="folder.key" class="folder">
+          <button
+            type="button"
+            class="folder-head"
+            :class="{ 'has-current': folderHasActive(folder) }"
+            :aria-expanded="isOpen(folder.key)"
+            :aria-controls="`folder-${folder.key}`"
+            :title="railCollapsed && !isMobile ? folder.label : null"
+            :style="folderStyle(folder)"
+            @click="toggleFolder(folder.key)">
+            <span class="icon-box">
+              <AssetIcon :name="folder.icon" :size="18" />
+              <span v-if="(!showLabels || !isOpen(folder.key)) && folderBadge(folder)" class="status-dot"
+                :style="dotStyle(folderBadge(folder))" />
             </span>
-            <AssetIcon name="chevron-down" :size="12" class="flex-shrink-0 transition-transform duration-200"
-              :class="isGroupCollapsed(group.label) ? '-rotate-90' : ''" />
+            <span class="label flex-1 min-w-0 truncate text-left" :class="{ 'label--hidden': !showLabels }">{{ folder.label }}</span>
+            <AssetIcon name="chevron-down" :size="14" class="label folder-chevron"
+              :class="{ 'label--hidden': !showLabels, 'folder-chevron--closed': !isOpen(folder.key) }" />
           </button>
 
-          <div v-show="!showLabels || !isGroupCollapsed(group.label)">
-            <NuxtLink v-for="item in group.items" :key="item.path" :to="item.path"
-              class="nav-item flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-colors duration-150"
-              :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
-              :title="railCollapsed && !isMobile ? item.label : null"
+          <div
+            v-show="isOpen(folder.key) && showLabels"
+            :id="`folder-${folder.key}`"
+            class="folder-body">
+            <NuxtLink v-for="item in folder.items" :key="item.path" :to="item.path"
+              class="nav-item nav-item--child"
+              :class="{ 'is-current': isActive(item.path) }"
               :aria-current="isActive(item.path) ? 'page' : null"
-              :style="navStyle(item.path)"
+              :style="childStyle(item.path)"
               @click="closeMobile"
               @mouseenter="hoveredPath = item.path"
               @mouseleave="hoveredPath = null">
-              <span
-                class="relative flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors duration-150"
-                :style="{ background: isActive(item.path) ? '#1565C0' : 'transparent' }">
-                <AssetIcon :name="item.icon" :size="14"
-                  :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
-                <!-- A count pill does not fit the rail, so it becomes a dot -->
-                <span v-if="!showLabels && item.badge && badgeCounts[item.badge]"
-                  class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
-                  :style="{
-                    background: item.badge === 'urgent' ? '#D32F2F' : '#F57C00',
-                    boxShadow: '0 0 0 2px ' + SIDEBAR_BG
-                  }" />
+              <span class="icon-box">
+                <AssetIcon :name="item.icon" :size="18" />
               </span>
-
-              <span v-if="showLabels" class="flex-1 min-w-0 truncate whitespace-nowrap">{{ item.label }}</span>
-
-              <span v-if="showLabels && item.badge && badgeCounts[item.badge]"
-                class="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
-                :style="badgeStyle(item.badge)">
-                {{ badgeCounts[item.badge] > 99 ? '99+' : badgeCounts[item.badge] }}
+              <span class="label flex-1 min-w-0 truncate">{{ item.label }}</span>
+              <span v-if="badgeFor(item)" class="count-pill" :style="badgeStyle(item.badge)">
+                {{ badgeFor(item) }}
               </span>
             </NuxtLink>
           </div>
-        </template>
+        </div>
+
+        <!-- Account (Help Center, Settings): kept at the bottom, with room above it. -->
+        <div v-if="bottomItems.length" class="account-spacer" aria-hidden="true" />
+        <div v-if="bottomItems.length" class="account-group border-t pt-3" :style="{ borderColor: SIDEBAR_BORDER }">
+          <NuxtLink v-for="item in bottomItems" :key="item.path" :to="item.path"
+            class="nav-item"
+            :class="{ 'is-current': isActive(item.path) }"
+            :title="railCollapsed && !isMobile ? item.label : null"
+            :aria-current="isActive(item.path) ? 'page' : null"
+            :style="navStyle(item.path)"
+            @click="closeMobile"
+            @mouseenter="hoveredPath = item.path"
+            @mouseleave="hoveredPath = null">
+            <span class="icon-box">
+              <AssetIcon :name="item.icon" :size="18" />
+            </span>
+            <span class="label flex-1 min-w-0 truncate" :class="{ 'label--hidden': !showLabels }">{{ item.label }}</span>
+          </NuxtLink>
+        </div>
       </nav>
     </aside>
   </div>
@@ -145,6 +171,7 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { departmentHome } from '~/composables/useBloodCenterNav'
 
 const {
+  collapsed,
   hoverExpanded,
   railExpanded,
   expandOnHover,
@@ -205,6 +232,10 @@ const handleEscape = (e) => {
 }
 
 onMounted(() => {
+  // Hover rail: always starts collapsed, like the donor portal.
+  collapsed.value = true
+  restoreFolders()
+
   isDark.value = document.documentElement.classList.contains('dark')
   themeObserver = new MutationObserver(() => {
     isDark.value = document.documentElement.classList.contains('dark')
@@ -233,15 +264,17 @@ watch(mobileOpen, (open) => {
   else document.body.style.removeProperty('overflow')
 })
 
-// Light/dark theme tokens — the same palette the donor rail uses, so the two
-// portals read as one product rather than two.
-const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
+// Light/dark theme tokens: the donor rail's, so the portals read as one product.
+const SIDEBAR_BG = computed(() => (isDark.value ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.55)'))
 const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
-const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? 'rgba(66,165,245,0.16)' : 'rgba(21,101,192,0.08)'))
-const SIDEBAR_HOVER_BG = computed(() => (isDark.value ? 'rgba(148,163,184,0.12)' : 'rgba(21,101,192,0.06)'))
-const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
+const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? 'var(--rb-primary-text)' : 'var(--rb-primary)'))
+// Two text levels. Primary: top-level rows and folder names. Secondary: pages
+// inside a folder.
 const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
+const SIDEBAR_FOLDER_TEXT = computed(() => (isDark.value ? '#E2E8F0' : '#334155'))
 const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
+const SIDEBAR_CURRENT_BG = computed(() => (isDark.value ? 'color-mix(in srgb, var(--rb-primary-text) 14%, transparent)' : 'color-mix(in srgb, var(--rb-primary) 10%, white)'))
+const SIDEBAR_HOVER_SOFT = computed(() => (isDark.value ? 'rgba(148,163,184,0.10)' : '#EEF1F5'))
 const sidebarShadow = computed(() =>
   isDark.value
     ? '1px 0 0 ' + SIDEBAR_BORDER.value + ', 4px 0 24px rgba(0,0,0,0.35)'
@@ -270,24 +303,87 @@ const badgeStyle = (badge) => {
 // naka-login, so ang sidebar dili na mo-decide og kinsa makakita og unsa.
 const { navGroups } = useBloodCenterNav()
 
-// --- Collapsible groups ---
-// Naka-default open tanan group; i-toggle per label pag naay click sa header
-const collapsedGroups = ref({})
-
-const toggleGroup = (label) => {
-  if (!label) return
-  collapsedGroups.value[label] = !collapsedGroups.value[label]
+// --- Main rows, department folders, Account at the bottom ---
+// The groups come from useBloodCenterNav (already filtered by permission and
+// ordered by department); the sidebar only decides how they are drawn.
+const FOLDER_ICONS = {
+  'Donor / Collection': 'users',
+  Testing: 'flask-conical',
+  Processing: 'package',
+  Issuance: 'box',
+  Billing: 'receipt',
+  Management: 'briefcase',
 }
 
-const isGroupCollapsed = (label) => {
-  if (!label) return false
-  return !!collapsedGroups.value[label]
+const topItems = computed(() => navGroups.value.find(g => g.label === 'Main')?.items ?? [])
+const bottomItems = computed(() => navGroups.value.find(g => g.label === 'Account')?.items ?? [])
+const folders = computed(() =>
+  navGroups.value
+    .filter(g => g.label && g.label !== 'Main' && g.label !== 'Account')
+    .map(g => ({ key: g.label, label: g.label, icon: FOLDER_ICONS[g.label] || 'folder', items: g.items }))
+)
+
+// ── Folder open/closed state, remembered across reloads ──
+const FOLDERS_KEY = 'redagos:blood-center-sidebar-folders'
+const openFolders = ref({})
+
+function restoreFolders() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FOLDERS_KEY) || 'null')
+    if (stored && typeof stored === 'object') openFolders.value = stored
+  } catch {
+    // Unreadable or blocked: every folder starts open.
+  }
+  openActiveFolder()
 }
 
-/** True when a group holds an item with a live count — drives the collapsed dot. */
-const groupHasBadge = (group) => {
-  return group.items.some((item) => item.badge && badgeCounts.value[item.badge] > 0)
+function saveFolders() {
+  try {
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(openFolders.value))
+  } catch {
+    // Storage blocked: the folders still work for this visit.
+  }
 }
+
+// Folders start open; only an explicit close is remembered.
+const isOpen = key => openFolders.value[key] !== false
+const folderHasActive = folder => folder.items.some(item => isActive(item.path))
+
+function toggleFolder(key) {
+  openFolders.value = { ...openFolders.value, [key]: !isOpen(key) }
+  saveFolders()
+}
+
+// The current page must never be hidden inside a closed folder.
+function openActiveFolder() {
+  const folder = folders.value.find(f => folderHasActive(f))
+  if (folder && !isOpen(folder.key)) {
+    openFolders.value = { ...openFolders.value, [folder.key]: true }
+    saveFolders()
+  }
+}
+
+watch(() => route.fullPath, () => openActiveFolder())
+// Permissions arrive after the user loads, which can add the active folder.
+watch(folders, () => openActiveFolder())
+
+// ── Badges ──
+const badgeFor = (item) => {
+  const n = item.badge ? badgeCounts.value[item.badge] : 0
+  return n ? (n > 99 ? '99+' : n) : null
+}
+
+// The most pressing badge inside a folder: urgent beats the rest.
+const folderBadge = (folder) => {
+  const live = folder.items.filter(item => item.badge && badgeCounts.value[item.badge] > 0).map(item => item.badge)
+  if (!live.length) return null
+  return live.includes('urgent') ? 'urgent' : live[0]
+}
+
+const dotStyle = badge => ({
+  background: badge === 'urgent' ? '#D32F2F' : '#F57C00',
+  boxShadow: '0 0 0 2px ' + (isDark.value ? '#0F172A' : '#FFFFFF'),
+})
 
 const loadUser = async () => {
   try {
@@ -330,18 +426,29 @@ const isActive = (path) => {
   return true
 }
 
-const navStyle = (path) => {
-  const active = isActive(path)
-  const hovered = hoveredPath.value === path
-
-  let background = 'transparent'
-  if (active) background = SIDEBAR_ACTIVE_BG.value
-  else if (hovered) background = SIDEBAR_HOVER_BG.value
-
+// Current page: soft pill with blue text (the icon chip carries the strong
+// colour, see .is-current in the styles). Hover: a light grey.
+const rowStyle = (active, hovered, level) => {
+  if (active) return { background: SIDEBAR_CURRENT_BG.value, color: SIDEBAR_ACTIVE_TEXT.value, fontWeight: '700' }
+  const primary = level === 'primary'
   return {
-    background,
-    color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
-    fontWeight: active ? '700' : '500'
+    background: hovered ? SIDEBAR_HOVER_SOFT.value : 'transparent',
+    color: primary || hovered ? SIDEBAR_FOLDER_TEXT.value : SIDEBAR_IDLE_TEXT.value,
+    fontWeight: primary ? '600' : '500'
+  }
+}
+
+const navStyle = path => rowStyle(isActive(path), hoveredPath.value === path, 'primary')
+const childStyle = path => rowStyle(isActive(path), hoveredPath.value === path, 'secondary')
+
+// The folder holding the current page: a blue icon. On the slim rail its pages
+// are hidden, so it takes the soft pill there instead.
+const folderStyle = (folder) => {
+  const holds = folderHasActive(folder)
+  return {
+    background: holds && !showLabels.value ? SIDEBAR_CURRENT_BG.value : undefined,
+    color: SIDEBAR_FOLDER_TEXT.value,
+    fontWeight: '600'
   }
 }
 
@@ -368,14 +475,97 @@ const goHome = async () => {
 
 <style scoped>
 /*
- * Width and transform are the only animated properties, and they share the
- * layout's 200ms/ease-out so the rail and the content padding that tracks it
- * move as one. Animating anything that repaints the whole nav during the same
- * window is what makes a hover rail read as flicker.
+ * The donor rail's styles. Width and transform are the only animated
+ * properties, and they share the layout's 200ms/ease-out so the rail and the
+ * content padding that tracks it move as one.
  */
 .sidebar {
+  /* Blur only, as the top bar: saturating would tint it with the backdrop. */
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   will-change: width, transform;
   transition: width 200ms ease-out, transform 200ms ease-out;
+}
+
+/* ── Rows: icon on the fixed axis, label clipped by the rail's edge ── */
+.nav-item,
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--rb-fs-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.icon-box {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  margin: -2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition: background-color 150ms ease;
+}
+.label { transition: opacity 150ms ease; }
+.label--hidden { opacity: 0; }
+
+/* ── Folders ── */
+.folder { margin-top: 6px; }
+.folder-head { cursor: pointer; }
+.folder-head:hover { background: var(--sb-hover, #EEF1F5); }
+
+/* Current page: the icon sits in a solid blue rounded square. */
+.is-current .icon-box {
+  border-radius: 8px;
+  background: var(--rb-primary);
+  color: #FFFFFF;
+  box-shadow: 0 4px 10px -4px rgba(var(--rb-primary-rgb), 0.7);
+}
+.has-current .icon-box { color: var(--rb-primary); }
+.folder-chevron {
+  flex-shrink: 0;
+  transition: transform 180ms ease, opacity 150ms ease;
+}
+.folder-chevron--closed { transform: rotate(-90deg); }
+/* A folder's pages sit indented under it (no guide line). */
+.folder-body {
+  margin: 2px 0 6px;
+  padding-left: 22px;
+}
+.nav-item--child {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: var(--rb-fs-body);
+}
+
+/* Badges: a count pill when there is room, a dot on the icon when there is not. */
+.count-pill {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
 }
 
 .logo-image {
@@ -398,76 +588,31 @@ const goHome = async () => {
   to { transform: rotate(360deg); }
 }
 
-/* Divider standing in for the group heading while the rail is collapsed. */
-.group-rule {
-  height: 1px;
-  margin: 10px 12px;
-  border-radius: 999px;
-}
-
-.group-rule.is-first {
-  display: none;
-}
-
-.group-header:hover {
-  background: rgba(100, 116, 139, 0.08);
-}
-
 /*
  * The focus ring reads its colour from the token rather than a second
  * :global(.dark) rule. This build's scoped-CSS transform drops the descendant
  * half of `:global(.dark) .x` and emits a bare `.dark { … }`, which puts the
- * declaration on <html> instead — the trap bloodrequests.vue already warns
- * about. The token flips on its own, so no second rule is needed.
+ * declaration on <html> instead. The token flips on its own.
  */
 .brand:focus-visible,
 .nav-item:focus-visible,
-.group-header:focus-visible {
+.folder-head:focus-visible {
   outline: 2px solid var(--rb-primary-text);
   outline-offset: -2px;
 }
 
-/* Sidebar navigation scrollbar */
-nav {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-}
-
 /*
- * No scrollbar gutter while the rail is collapsed. A 5px track inside an 80px
- * rail takes its 5px off the content box, so the centred icons rendered 2.5px
- * left of centre while the brand mark above them — which sits outside this
- * scroller — stayed on 40px. The nav still scrolls; it just does not reserve
- * the gutter at a width where losing it is visible.
+ * No scrollbar gutter, open or collapsed: a track would take its width off
+ * the content box and nudge every icon off the shared axis. The nav still
+ * scrolls (the blood centre list is long).
  */
-.nav-rail {
+nav {
   scrollbar-width: none;
 }
 
-.nav-rail::-webkit-scrollbar {
+nav::-webkit-scrollbar {
   width: 0;
   height: 0;
-}
-
-nav::-webkit-scrollbar {
-  width: 5px;
-}
-
-nav::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 999px;
-}
-
-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.nav-dark::-webkit-scrollbar-thumb {
-  background-color: #334155;
-}
-
-.nav-dark {
-  scrollbar-color: #334155 transparent;
 }
 
 .scrim-enter-active,
@@ -487,12 +632,20 @@ nav::-webkit-scrollbar-track {
   }
 
   .nav-item:active {
-    background: rgba(21, 101, 192, 0.10) !important;
-    color: #1565C0 !important;
+    background: rgba(var(--rb-primary-rgb), 0.10) !important;
+    color: var(--rb-primary) !important;
   }
 }
 
+/* No blur available: a solid rail. (Reduced transparency keeps the glass: the
+   rail sits over a still gradient, not over content.) */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar { background: var(--rb-surface, #FFFFFF) !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .folder-chevron,
+  .label,
   .sidebar,
   .scrim-enter-active,
   .scrim-leave-active {
@@ -507,4 +660,12 @@ nav::-webkit-scrollbar-track {
 a, button {
   touch-action: manipulation;
 }
+
+/* Pushes the Account group to the bottom, and keeps at least 20px above it
+   when the departments fill the sidebar. */
+.account-spacer { flex: 1 0 20px; }
+/* The nav is a column only so the spacer can push Account down. Its rows keep
+   their size and the nav scrolls; without this, a long list squeezes them. */
+.sidebar nav > * { flex-shrink: 0; }
+.account-group { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; }
 </style>

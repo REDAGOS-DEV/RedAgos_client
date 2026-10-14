@@ -206,22 +206,35 @@
           </div>
 
           <template v-if="tab !== 'history'">
-            <select v-model="filters.blood_type_id" class="filter-select" aria-label="Blood type">
-              <option :value="null">All blood types</option>
-              <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-            </select>
-            <select v-model="filters.component_id" class="filter-select" aria-label="Component">
-              <option :value="null">All components</option>
-              <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
-            </select>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.blood_type_id"
+                :options="[{ value: null, label: 'All blood types' }, ...reference.blood_types.map((type) => ({ value: type.id, label: type.code }))]"
+                aria-label="Blood type"
+                size="sm"
+              />
+            </div>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.component_id"
+                :options="[{ value: null, label: 'All components' }, ...reference.components.map((component) => ({ value: component.id, label: component.name }))]"
+                aria-label="Component"
+                size="sm"
+              />
+            </div>
           </template>
 
-          <select v-else v-model="filters.event_status" class="filter-select" aria-label="Outcome">
-            <option :value="null">All outcomes</option>
-            <option value="untagged_assigned">{{ UNIT_TAG_STATUS_LABELS.untagged_assigned }}</option>
-            <option value="untagged_crossmatched">{{ UNIT_TAG_STATUS_LABELS.untagged_crossmatched }}</option>
-            <option value="transfused">{{ UNIT_TAG_STATUS_LABELS.transfused }}</option>
-          </select>
+          <div v-else class="filter-select">
+            <SelectField
+              v-model="filters.event_status"
+              :options="[
+                { value: null, label: 'All outcomes' },
+                ...['untagged_assigned', 'untagged_crossmatched', 'transfused'].map((value) => ({ value, label: UNIT_TAG_STATUS_LABELS[value] })),
+              ]"
+              aria-label="Outcome"
+              size="sm"
+            />
+          </div>
         </div>
 
         <p class="tab-hint">{{ tabHint }}</p>
@@ -496,6 +509,7 @@ import {
   UNIT_TAG_STATUS_TONES,
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
@@ -1084,12 +1098,7 @@ function formatDateTime(value) {
   font: inherit; font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
 }
 .search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
-  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); cursor: pointer; appearance: none;
-  background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
+.filter-select { width: 190px; }
 .tab-hint { margin: 0; padding: 0 16px 12px; font-size: 12px; color: var(--rb-text-secondary); }
 
 .list-state { padding: 18px 16px; }

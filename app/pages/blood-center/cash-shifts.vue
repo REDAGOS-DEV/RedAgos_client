@@ -34,8 +34,8 @@
             {{ s.label }}
           </button>
         </div>
-        <label class="filter"><span>From</span><input v-model="from" type="date" class="input"></label>
-        <label class="filter"><span>To</span><input v-model="to" type="date" class="input"></label>
+        <label class="filter"><span>From</span><DatePicker id="shift-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" /></label>
+        <label class="filter"><span>To</span><DatePicker id="shift-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" /></label>
       </section>
 
       <div class="cs-grid">
@@ -174,6 +174,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { journalAmount, pesos, saveBlob, shiftVariance, transactionTone } from '~/utils/billing'
+import DatePicker from '~/components/common/DatePicker.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],

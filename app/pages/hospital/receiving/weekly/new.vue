@@ -56,17 +56,13 @@
 
             <div class="field field--grow">
               <label for="wr-centre" class="field-label">Blood center <span class="req">*</span></label>
-              <select
+              <SelectField
                 id="wr-centre"
-                v-model.number="target"
-                class="input"
-                :class="{ 'input--error': errors.target }"
-              >
-                <option :value="null">Select a blood center…</option>
-                <option v-for="entry in dueCentres" :key="entry.schedule.target_facility.id" :value="entry.schedule.target_facility.id">
-                  {{ entry.schedule.target_facility.name }} — request days {{ entry.schedule.days_label }}
-                </option>
-              </select>
+                v-model="target"
+                :options="dueCentres.map((entry) => ({ value: entry.schedule.target_facility.id, label: `${entry.schedule.target_facility.name} · request days ${entry.schedule.days_label}` }))"
+                placeholder="Select a blood center…"
+                :invalid="Boolean(errors.target)"
+              />
               <p v-if="errors.target" class="field-error">{{ errors.target }}</p>
             </div>
           </div>
@@ -94,29 +90,25 @@
             <div v-for="(line, index) in lines" :key="line.key" class="lines__row">
               <div class="lines__col-component">
                 <label :for="`wr-c-${line.key}`" class="sr-only">Blood component, line {{ index + 1 }}</label>
-                <select
+                <SelectField
                   :id="`wr-c-${line.key}`"
-                  v-model.number="line.component_id"
-                  class="input"
-                  :class="{ 'input--error': lineErrors[index]?.component_id }"
-                >
-                  <option :value="null">Select a component…</option>
-                  <option v-for="component in components" :key="component.id" :value="component.id">{{ component.name }}</option>
-                </select>
+                  v-model="line.component_id"
+                  :options="components.map((component) => ({ value: component.id, label: component.name }))"
+                  placeholder="Select a component…"
+                  :invalid="Boolean(lineErrors[index]?.component_id)"
+                />
                 <p v-if="lineErrors[index]?.component_id" class="field-error">{{ lineErrors[index].component_id }}</p>
               </div>
 
               <div class="lines__col-type">
                 <label :for="`wr-t-${line.key}`" class="sr-only">Blood type, line {{ index + 1 }}</label>
-                <select
+                <SelectField
                   :id="`wr-t-${line.key}`"
-                  v-model.number="line.blood_type_id"
-                  class="input"
-                  :class="{ 'input--error': lineErrors[index]?.blood_type_id }"
-                >
-                  <option :value="null">Select…</option>
-                  <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
-                </select>
+                  v-model="line.blood_type_id"
+                  :options="bloodTypes.map((type) => ({ value: type.id, label: type.code }))"
+                  placeholder="Select…"
+                  :invalid="Boolean(lineErrors[index]?.blood_type_id)"
+                />
                 <p v-if="lineErrors[index]?.blood_type_id" class="field-error">{{ lineErrors[index].blood_type_id }}</p>
               </div>
 
@@ -189,6 +181,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { RECEIVING_REFUSAL_MESSAGES } from '~/types/receiving'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.manage' })
 

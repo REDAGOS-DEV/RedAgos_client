@@ -1,14 +1,20 @@
 import { ACCENT_THEMES, DEFAULT_ACCENT, accentTheme } from '~/utils/accentThemes'
 
 /**
- * The donor's chosen colour theme (Settings → Appearance).
+ * The chosen colour theme (Settings → Appearance in the donor or blood center
+ * portal).
  *
+ * One choice for every portal on this device: picking a colour in either
+ * Settings page recolours both, so their sidebars and buttons always match.
  * Applied as CSS variables on <html>, so everything that reads --rb-primary
- * and friends follows it. Saved per device in localStorage; there is no server
- * field for it. The donor layout applies it on mount and removes it on the
- * way out, so the other portals keep the standard RedAgos blue.
+ * and friends follows it. Saved in localStorage; there is no server field for
+ * it. Each themed portal's layout applies it on mount and removes it on the
+ * way out, so portals without the picker keep the standard RedAgos blue.
  */
-const STORAGE_KEY = 'redagos:donor-accent'
+const STORAGE_KEY = 'redagos:portal-accent'
+
+// Each portal used to save its own; the first one found is carried over.
+const LEGACY_KEYS = ['redagos:donor-accent', 'redagos:blood-center-accent']
 
 const VARS = [
   '--rb-primary',
@@ -21,7 +27,7 @@ const VARS = [
 ] as const
 
 export function useAccentTheme() {
-  const current = useState<string>('donor-accent', () => DEFAULT_ACCENT)
+  const current = useState<string>('portal-accent', () => DEFAULT_ACCENT)
 
   function apply(key: string) {
     if (typeof document === 'undefined') return
@@ -41,7 +47,9 @@ export function useAccentTheme() {
   function init() {
     let key = DEFAULT_ACCENT
     try {
-      key = localStorage.getItem(STORAGE_KEY) || DEFAULT_ACCENT
+      key = localStorage.getItem(STORAGE_KEY)
+        || LEGACY_KEYS.map(k => localStorage.getItem(k)).find(Boolean)
+        || DEFAULT_ACCENT
     } catch {
       // Storage blocked: the default theme.
     }
@@ -59,7 +67,7 @@ export function useAccentTheme() {
     }
   }
 
-  /** Remove the theme's variables (leaving the donor portal). */
+  /** Remove the theme's variables (leaving the portal). */
   function clear() {
     if (typeof document === 'undefined') return
     const root = document.documentElement.style

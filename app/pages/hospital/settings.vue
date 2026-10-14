@@ -292,33 +292,22 @@
 
               <label class="field">
                 <span class="field-label">Language</span>
-                <select v-model="systemPrefs.language" class="field-input">
-                  <option value="en">English</option>
-                </select>
+                <SelectField v-model="systemPrefs.language" :options="[{ value: 'en', label: 'English' }]" />
               </label>
 
               <label class="field">
                 <span class="field-label">Timezone</span>
-                <select v-model="systemPrefs.timezone" class="field-input">
-                  <option value="Asia/Manila">Asia/Manila</option>
-                </select>
+                <SelectField v-model="systemPrefs.timezone" :options="[{ value: 'Asia/Manila', label: 'Asia/Manila' }]" />
               </label>
 
               <label class="field">
                 <span class="field-label">Date Format</span>
-                <select v-model="systemPrefs.date_format" class="field-input">
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
+                <SelectField v-model="systemPrefs.date_format" :options="[{ value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' }, { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' }, { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' }]" />
               </label>
 
               <label class="field">
                 <span class="field-label">Time Format</span>
-                <select v-model="systemPrefs.time_format" class="field-input">
-                  <option value="12h">12-Hour</option>
-                  <option value="24h">24-Hour</option>
-                </select>
+                <SelectField v-model="systemPrefs.time_format" :options="[{ value: '12h', label: '12-Hour' }, { value: '24h', label: '24-Hour' }]" />
               </label>
             </div>
 
@@ -376,6 +365,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 

@@ -86,12 +86,14 @@
 
         <label v-if="addableFor(line).length" class="sourcing__add">
           <span class="sr-only">Ask another facility for {{ line.component.name }}</span>
-          <select class="sourcing__select" :value="''" @change="addFacility(line, $event)">
-            <option value="">Ask a facility with none listed…</option>
-            <option v-for="facility in addableFor(line)" :key="facility.id" :value="facility.id">
-              {{ facility.name }}
-            </option>
-          </select>
+          <SelectField
+            class="sourcing__select"
+            :model-value="''"
+            :options="[{ value: '', label: 'Ask a facility with none listed…' }, ...addableFor(line).map((facility) => ({ value: facility.id, label: facility.name }))]"
+            :aria-label="`Ask another facility for ${line.component.name}`"
+            size="sm"
+            @update:model-value="(id) => addFacility(line, { target: { value: id } })"
+          />
         </label>
       </section>
 
@@ -126,6 +128,7 @@ import {
   setShare,
   units,
 } from '~/utils/transfusionSourcing'
+import SelectField from '~/components/common/SelectField.vue'
 
 const props = defineProps({
   plan: { type: Object, default: null },
@@ -388,15 +391,7 @@ function formatTime(value) {
   align-self: flex-start;
 }
 
-.sourcing__select {
-  padding: 7px 10px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 8px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 12.5px;
-}
+.sourcing__select { width: 260px; max-width: 100%; }
 
 .sourcing__messages {
   display: flex;

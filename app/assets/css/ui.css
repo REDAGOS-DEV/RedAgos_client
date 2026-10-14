@@ -1,0 +1,57 @@
+/*
+ * Staff portals (blood center, hospital, admin): the shared button.
+ *
+ * A class rather than a component, because the same button is a <button> in
+ * one place and a <NuxtLink> in another. Pages redesigned from 2026-10-15 use
+ * these; older pages keep their own .btn until they are moved over. Built only
+ * from the --rb-* tokens, so dark mode and the portal colour follow.
+ *
+ *   ui-btn                  the base (outline look)
+ *   ui-btn--primary         the page's main action, one per area
+ *   ui-btn--ghost           low-key actions inside cards and rows
+ *   ui-btn--danger          destructive confirmations
+ *   ui-btn--sm              toolbars, rows, pagination
+ *   ui-btn--icon            square, icon only (give it an aria-label)
+ */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font-family: inherit;
+  font-size: var(--rb-fs-small, 13px);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s var(--rb-ease-out), border-color .15s var(--rb-ease-out), color .15s var(--rb-ease-out);
+}
+.ui-btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.ui-btn:active:not(:disabled) { transform: translateY(1px); }
+.ui-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.ui-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.ui-btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+.ui-btn--primary:hover:not(:disabled) { background: var(--rb-primary); filter: brightness(.94); }
+
+.ui-btn--ghost { background: transparent; border-color: transparent; color: var(--rb-primary-text); }
+.ui-btn--ghost:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), .08); }
+
+.ui-btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
+.ui-btn--danger:hover:not(:disabled) { background: var(--rb-accent); filter: brightness(.94); }
+
+.ui-btn--sm { height: 32px; padding: 0 11px; border-radius: 8px; font-size: var(--rb-fs-caption, 12px); }
+.ui-btn--icon { width: 38px; padding: 0; }
+.ui-btn--sm.ui-btn--icon { width: 32px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn { transition: none; }
+  .ui-btn:active:not(:disabled) { transform: none; }
+}
