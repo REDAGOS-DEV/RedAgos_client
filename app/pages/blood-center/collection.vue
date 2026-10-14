@@ -1159,8 +1159,9 @@ function finishVisit() {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--rb-primary) 12%, transparent);
-  color: var(--rb-primary-text);
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
 }
 
 .lookup {
@@ -1202,7 +1203,7 @@ function finishVisit() {
   color: var(--rb-text-primary);
 }
 
-.checkin__checks li :deep(svg) { color: var(--rb-success); flex-shrink: 0; }
+.checkin__checks li :deep(svg) { color: var(--rb-text-muted); flex-shrink: 0; }
 
 /* --- forms --- */
 .vitals {

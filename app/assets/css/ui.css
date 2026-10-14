@@ -37,6 +37,16 @@
 .ui-btn:active:not(:disabled) { transform: translateY(1px); }
 .ui-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .ui-btn:disabled { opacity: .55; cursor: not-allowed; }
+/* A disabled main or destructive action is grey, not a paler colour, so it
+   never reads as a secondary button that can be clicked. */
+.ui-btn--primary:disabled,
+.ui-btn--danger:disabled {
+  opacity: 1;
+  background: var(--rb-surface-alt);
+  border-color: var(--rb-border-strong);
+  color: var(--rb-text-muted);
+  filter: none;
+}
 
 .ui-btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 .ui-btn--primary:hover:not(:disabled) { background: var(--rb-primary); filter: brightness(.94); }

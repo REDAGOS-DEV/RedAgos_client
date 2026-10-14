@@ -491,9 +491,9 @@ const goHome = async () => {
  * content padding that tracks it move as one.
  */
 .sidebar {
-  /* Blur only, as the top bar: saturating would tint it with the backdrop. */
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  /* As the top bar: a mild colour boost, so the glow behind shows through. */
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
   will-change: width, transform;
   transition: width 200ms ease-out, transform 200ms ease-out;
 }

@@ -23,7 +23,7 @@ withDefaults(defineProps<{
 <style scoped>
 .es { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--rb-space-12) var(--rb-space-5); text-align: center; }
 .es--compact { padding: var(--rb-space-8) var(--rb-space-4); }
-.es__icon { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 4px; border-radius: 50%; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .08); }
+.es__icon { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 4px; border-radius: 50%; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
 .es--compact .es__icon { width: 44px; height: 44px; }
 .es__title { margin: 0; font-size: var(--rb-fs-body); font-weight: 700; color: var(--rb-text-primary); }
 .es__desc { margin: 0; max-width: 48ch; font-size: var(--rb-fs-small); line-height: 1.5; color: var(--rb-text-secondary); }

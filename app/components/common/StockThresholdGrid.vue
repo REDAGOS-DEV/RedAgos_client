@@ -15,7 +15,7 @@
         </thead>
         <tbody>
           <tr v-for="row in matrix" :key="row.type.id">
-            <th scope="row" class="grid__type">{{ row.type.code }}</th>
+            <th scope="row" class="grid__type" :class="`grid__type--${aboOf(row.type.code)}`">{{ row.type.code }}</th>
             <td
               v-for="item in row.items"
               :key="item.component.id"
@@ -197,6 +197,12 @@ function discard(): void {
 
 watch(() => props.status.cells, () => seed(true), { immediate: true })
 watch(() => changes.value.length > 0, (dirty) => emit('dirty', dirty), { immediate: true })
+
+// The ABO group of a code ("AB+" -> "ab"), for the same band colours as the
+// Daily Stock Report: A blue, B yellow, O grey, AB pink.
+function aboOf(code: string | null | undefined): string {
+  return String(code || '').replace(/[+\-−\s]/g, '').toLowerCase()
+}
 </script>
 
 <style scoped>
@@ -399,4 +405,12 @@ tbody tr:last-child .grid__type { border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .min-input, .bell, .btn { transition: none; }
 }
+
+/* Each blood type's band, as on the Daily Stock Report (DOH sheet colours).
+   Only the type cell: the stock cells keep their own status tints. The tint
+   sits over the solid surface, since the cell stays put when the grid scrolls. */
+.grid__type--a { background: linear-gradient(rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0.16)), var(--rb-surface) !important; }
+.grid__type--b { background: linear-gradient(rgba(250, 204, 21, 0.2), rgba(250, 204, 21, 0.2)), var(--rb-surface) !important; }
+.grid__type--o { background: linear-gradient(rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.2)), var(--rb-surface) !important; }
+.grid__type--ab { background: linear-gradient(rgba(244, 114, 182, 0.18), rgba(244, 114, 182, 0.18)), var(--rb-surface) !important; }
 </style>

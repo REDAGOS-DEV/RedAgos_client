@@ -767,6 +767,32 @@ const handleLogout = async () => {
  */
 .bc-shell {
   --rb-page-bg: transparent;
+
+  /*
+   * Colour for work screens (2026-10-15). Hints and placeholders meet WCAG AA
+   * (4.5:1) on white; secondary text is a step darker so the two still differ;
+   * card edges stay visible on dim counter monitors.
+   */
+  --rb-text-secondary: #526075;
+  --rb-text-muted: #64748B;
+  --rb-placeholder: #64748B;
+  --rb-border: #E4E9F0;
+  --rb-border-strong: #D5DCE6;
+}
+/* Every field's placeholder in the readable grey, including fields whose page
+   sets none (Tailwind's own default is too faint for a counter screen). */
+:global(.bc-shell input::placeholder),
+:global(.bc-shell textarea::placeholder) {
+  color: var(--rb-placeholder);
+  opacity: 1;
+}
+
+:global(.dark .bc-shell) {
+  --rb-text-secondary: #94A3B8;
+  --rb-text-muted: #8391A6;
+  --rb-placeholder: #8391A6;
+  --rb-border: #334155;
+  --rb-border-strong: #3E4C63;
 }
 
 /* ── Backdrop: the donor portal's, in the portal colour ── */
@@ -776,21 +802,22 @@ const handleLogout = async () => {
   z-index: -1;
   pointer-events: none;
   /*
-   * A neutral canvas with the portal colour only as a faint glow in the top
-   * corner (2026-10-15). The full-strength gradient tinted the whole working
-   * area with saturated themes (teal, green); the colour now belongs to the
-   * buttons, the active nav item and the links, where it means something.
+   * The landing hero's glow, in the portal colour (2026-10-15): a soft wash
+   * of the portal colour at the top that fades to the neutral canvas, a glow
+   * in the top-right corner and a faint brand red one on the left. The glass
+   * of the top bar and the sidebar sits on the coloured top, so it shows;
+   * the working area further down stays neutral.
    */
   background:
-    radial-gradient(46% 50% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 14%, transparent), transparent 70%),
-    radial-gradient(38% 44% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 12%, transparent), transparent 70%),
-    #F6F8FB;
+    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 32%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.06), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 70%, #F6F8FB) 0%, #F6F8FB 55%);
 }
 :global(.dark .bc-shell .bc-backdrop) {
   background:
-    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
-    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
-    #0B1220;
+    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 18%, transparent), transparent 72%),
+    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.08), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 8%, #0B1220) 0%, #0B1220 55%);
 }
 
 /*
@@ -800,9 +827,9 @@ const handleLogout = async () => {
  */
 .topbar {
   background-color: rgba(255, 255, 255, 0.55);
-  /* Blur only: saturating would bring the colour back up. */
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  /* A mild colour boost, so the glow behind shows through the glass. */
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
   transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
   will-change: left;
 }
@@ -834,9 +861,9 @@ main {
   z-index: -1;
   pointer-events: none;
   background-color: rgba(255, 255, 255, 0.55);
-  /* Blur only: saturating would bring the colour back up. */
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  /* A mild colour boost, so the glow behind shows through the glass. */
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
   transition: left 200ms ease-out;
 }
 @media (min-width: 640px) {

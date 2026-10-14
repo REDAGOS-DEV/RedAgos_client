@@ -432,7 +432,7 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .banner--inset { margin: 12px 16px 0; }
 .inline-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
-.empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .08); margin-bottom: 4px; }
+.empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); margin-bottom: 4px; }
 .empty { text-align: center; padding: 56px 20px; color: var(--rb-text-secondary); display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .empty h2 { font-size: 15px; color: var(--rb-text-primary); margin: 4px 0 0; }
 .empty p { font-size: 13px; margin: 0; max-width: 52ch; }

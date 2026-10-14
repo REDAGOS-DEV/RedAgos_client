@@ -472,7 +472,7 @@ onMounted(() => load())
 .banner--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .25); }
 
 .empty { text-align: center; padding: 56px 20px; color: var(--rb-text-secondary); display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .08); margin-bottom: 4px; }
+.empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); margin-bottom: 4px; }
 .empty h3 { font-size: 15px; color: var(--rb-text-primary); margin: 0; }
 .empty p { font-size: 13px; margin: 0; }
 
