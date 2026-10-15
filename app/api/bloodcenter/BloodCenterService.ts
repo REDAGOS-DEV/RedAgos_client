@@ -310,6 +310,12 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory/summary`, 'GET')
   }
 
+  // The centre's own stock movements, newest first; `unit_id` narrows it to
+  // one bag's history.
+  async inventoryActivity(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/inventory/activity`, 'GET', params)
+  }
+
   // --- Stock thresholds ---
   //
   // The minimum stock per blood type and component. Anyone who can see the

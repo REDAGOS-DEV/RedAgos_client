@@ -9,11 +9,11 @@
 
 <script setup lang="ts">
 /**
- * A hospital blood bank's minimum stock per blood type and component.
+ * A hospital blood bank's PAR and critical stock levels per blood type and component.
  *
  * Counted against the blood bank's own shelf: bags in available custody — so
  * stocked in — not held for a patient and not past their date, refreshed every
- * minute. Every role watches it; inventory staff and the Head set the minimums
+ * minute. Every role watches it; inventory staff and the Head set the levels
  * (hospital roles, project owner 2026-10-11).
  */
 import { hospitalService } from '~/api/hospital/HospitalService'

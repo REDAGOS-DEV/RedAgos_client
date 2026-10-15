@@ -1,90 +1,98 @@
 <template>
   <div class="panel">
-    <header class="panel__header">
-      <div>
-        <h1 class="panel__title">Stock Thresholds</h1>
-        <p class="panel__subtitle">
-          The fewest units of each blood type and component the {{ facilityNoun }} should keep on its shelf. When stock
-          falls below a minimum, a red banner shows on the inventory pages and the staff who watch the shelf are notified.
+    <header class="page-head">
+      <div class="page-head__text">
+        <h1 class="page-head__title">Stock Thresholds</h1>
+        <p class="page-head__subtitle">
+          Set the PAR and critical levels for each blood type and component the {{ facilityNoun }} keeps. They help
+          restock on time and warn staff before a shelf runs out.
         </p>
+
+        <div class="scope">
+          <span v-if="status" class="scope__item">
+            <AssetIcon name="building-2" :size="14" />
+            Levels for <strong>{{ status.facility.name }}</strong> only.
+          </span>
+          <span v-if="status && !editable" class="scope__item scope__item--note">
+            <AssetIcon name="eye" :size="14" />
+            {{ readOnlyNote }}
+          </span>
+          <button type="button" class="refresh" :disabled="busy || savingLevel !== null" @click="loadStatus(false)">
+            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+            {{ busy ? 'Loading…' : 'Refresh' }}
+          </button>
+        </div>
       </div>
 
-      <button type="button" class="btn btn--ghost" :disabled="busy || saving" @click="loadStatus(false)">
-        <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-        {{ busy ? 'Loading…' : 'Refresh' }}
-      </button>
+      <aside class="guide" aria-label="What the levels mean">
+        <span class="guide__icon" aria-hidden="true"><AssetIcon name="info" :size="18" /></span>
+        <dl class="guide__list">
+          <div>
+            <dt>PAR Level</dt>
+            <dd>The target stock level to keep for smooth operations.</dd>
+          </div>
+          <div>
+            <dt>Critical Level</dt>
+            <dd>The minimum stock level before a low-stock alert is sent.</dd>
+          </div>
+        </dl>
+      </aside>
     </header>
 
-    <div v-if="status" class="scope">
-      <span class="scope__item">
-        <AssetIcon name="building-2" :size="14" />
-        Minimums for <strong>{{ status.facility.name }}</strong> only.
-      </span>
-      <span v-if="!editable" class="scope__item scope__item--note">
-        <AssetIcon name="info" :size="14" />
-        {{ readOnlyNote }}
-      </span>
-    </div>
-
-    <div v-if="banner" class="alert" :class="`alert--${bannerKind}`" :role="bannerKind === 'error' ? 'alert' : 'status'">
-      <AssetIcon :name="bannerKind === 'success' ? 'circle-check-big' : 'circle-alert'" :size="16" />
-      <span>{{ banner }}</span>
+    <div v-if="loadError" class="alert" role="alert">
+      <AssetIcon name="circle-alert" :size="16" />
+      <span>{{ loadError }}</span>
     </div>
 
     <template v-if="status">
-      <!-- The headline numbers -->
-      <dl class="kpis">
-        <div class="kpi">
-          <dt>Monitored</dt>
-          <dd>{{ status.totals.monitored }}</dd>
-        </div>
-        <div class="kpi kpi--ok">
-          <dt>Healthy</dt>
-          <dd>{{ status.totals.ok }}</dd>
-        </div>
-        <div class="kpi kpi--low">
-          <dt>Below minimum</dt>
-          <dd>{{ status.totals.low }}</dd>
-        </div>
-        <div class="kpi kpi--critical">
-          <dt>Out of stock</dt>
-          <dd>{{ status.totals.critical }}</dd>
-        </div>
-      </dl>
-
       <LowStockBanner :cells="status.low" />
 
-      <p v-if="!status.totals.monitored" class="callout">
+      <p v-if="!anyLevelSet" class="callout">
         <AssetIcon name="info" :size="15" />
         <span>
-          No minimums are set yet, so nothing is being watched.
-          {{ editable ? 'Type a minimum into any cell below, then save.' : 'Until one is set, stock is shown without a target.' }}
+          No levels are set yet, so nothing is being watched.
+          {{ editable ? 'Type a level into any cell, then save that table.' : 'Until one is set, stock is shown without a target.' }}
         </span>
       </p>
 
       <p v-if="!status.components.length" class="empty">No blood components are defined.</p>
 
-      <StockThresholdGrid
-        v-else
-        :status="status"
-        :editable="editable"
-        :saving="saving"
-        @save="save"
-        @dirty="dirty = $event"
-      />
+      <template v-else>
+        <StockLevelCard
+          v-for="level in LEVELS"
+          :key="level"
+          :level="level"
+          :rows="rows"
+          :components="components"
+          :editable="editable"
+          :saving="savingLevel === level"
+          :locked="savingLevel !== null"
+          :change-count="changes[level].length"
+          :problems="problems[level]"
+          :flagged="flagged[level]"
+          :feedback="feedback[level]"
+          @input="(key, value) => edit(level, key, value)"
+          @toggle-alerts="toggleAlerts"
+          @save="save(level)"
+          @discard="discard(level)"
+        />
+
+        <StockThresholdGrid :status="status" />
+      </template>
 
       <p class="footnote">
         <AssetIcon name="info" :size="14" />
         <span>
-          Counts are issuable units only: available and not past their date. The bell switches notifications off for one
-          stock; the colours and the banner still show its true level. Updated {{ asOf }}.
+          Counts are issuable units only: available and not past their date. An alert goes out when stock falls below a
+          critical level; PAR is a target and never alerts. Muting a stock's bell stops its notifications, but the
+          colours and the banner still show its true level.
         </span>
       </p>
     </template>
 
     <!-- First load -->
-    <div v-else-if="busy" class="skeleton-grid" aria-hidden="true">
-      <span v-for="n in 4" :key="n" class="skeleton" />
+    <div v-else-if="busy" class="skeletons" aria-hidden="true">
+      <span v-for="n in 2" :key="n" class="skeleton" />
     </div>
   </div>
 </template>
@@ -93,17 +101,44 @@
 /**
  * The stock-threshold screen, for either portal.
  *
- * A blood centre and a hospital blood bank show the same thing — every blood
- * type against every component, the stock now and the minimum — so both pages
- * are a thin wrapper that supplies how to fetch, how to save, and whether the
- * signed-in account may edit. The server decides every level.
+ * A blood centre and a hospital blood bank show the same thing: every blood
+ * type against every component, in a PAR table and a critical table, then the
+ * stock now against both. Both pages are a thin wrapper that supplies how to
+ * fetch, how to save, and whether the signed-in account may edit. The server
+ * decides every status and re-checks every rule on save.
+ *
+ * The two tables save apart. One set of drafts holds both levels of a cell, so
+ * the critical-above-PAR rule can be checked against what is on screen, and a
+ * save in one table re-seeds only that table's side: unsaved edits in the
+ * other survive it.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import StockLevelCard from '~/components/common/StockLevelCard.vue'
 import StockThresholdGrid from '~/components/common/StockThresholdGrid.vue'
-import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
+import type {
+  SaveStockThresholdsPayload,
+  StockLevelRow,
+  StockThresholdDraft,
+  StockThresholdStatus,
+  ThresholdLevel,
+} from '~/types/stockThreshold'
+import {
+  cellKey,
+  diffCritical,
+  diffPar,
+  draftFor,
+  levelConflict,
+  orderBloodTypes,
+  orderComponents,
+  thresholdProblems,
+} from '~/utils/stockThreshold'
+
+type Feedback = { kind: 'success' | 'error'; text: string }
 
 const POLL_MS = 60_000
+const LEVELS: ThresholdLevel[] = ['par', 'critical']
+const LEVEL_NAMES: Record<ThresholdLevel, string> = { par: 'PAR levels', critical: 'critical levels' }
 
 const props = withDefaults(defineProps<{
   /** How to read the status. Named apart from `loadStatus` below so the two cannot be confused. */
@@ -117,23 +152,120 @@ const props = withDefaults(defineProps<{
 }>(), {
   editable: false,
   facilityNoun: 'facility',
-  readOnlyNote: 'You can see how stock stands against each minimum, but not change one.',
+  readOnlyNote: 'You can see the levels and the stock against them, but not change them.',
 })
 
 const status = ref<StockThresholdStatus | null>(null)
+const drafts = reactive<Record<string, StockThresholdDraft>>({})
 const busy = ref(false)
-const saving = ref(false)
-const dirty = ref(false)
-const banner = ref('')
-const bannerKind = ref<'success' | 'error'>('success')
+const loadError = ref('')
+const savingLevel = ref<ThresholdLevel | null>(null)
+const feedback = reactive<Record<ThresholdLevel, Feedback | null>>({ par: null, critical: null })
 
-const asOf = computed(() => {
-  const at = status.value ? new Date(status.value.as_of) : null
+const cells = computed(() => status.value?.cells ?? [])
+const components = computed(() => orderComponents(status.value?.components ?? []))
 
-  return at && !Number.isNaN(at.getTime())
-    ? at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-    : ''
+const byKey = computed(() => new Map(
+  cells.value.map((cell) => [cellKey(cell.blood_type_id, cell.component_id), cell] as const),
+))
+
+/** One row per blood type, one item per component, each holding its cell and its draft. */
+const rows = computed<StockLevelRow[]>(() =>
+  orderBloodTypes(status.value?.blood_types ?? []).map((type) => ({
+    type,
+    items: components.value.flatMap((component) => {
+      const key = cellKey(type.id, component.id)
+      const cell = byKey.value.get(key)
+      const draft = drafts[key]
+
+      return cell && draft ? [{ key, component, cell, draft }] : []
+    }),
+  })),
+)
+
+const changes = computed(() => ({
+  par: diffPar(cells.value, drafts),
+  critical: diffCritical(cells.value, drafts),
+}))
+
+const problems = computed(() => ({
+  par: thresholdProblems('par', cells.value, drafts),
+  critical: thresholdProblems('critical', cells.value, drafts),
+}))
+
+/**
+ * Cells to outline in each table: its own problems, and any pair on screen
+ * with the critical level above PAR, in both tables, so the two numbers read
+ * as the pair they are.
+ */
+const flagged = computed(() => {
+  const conflicts = Object.keys(drafts).filter((key) => byKey.value.has(key) && levelConflict(drafts[key]!))
+  const of = (level: ThresholdLevel) => new Set([...problems.value[level].map((p) => p.key), ...conflicts])
+
+  return { par: of('par'), critical: of('critical') }
 })
+
+const dirty = computed(() => changes.value.par.length > 0 || changes.value.critical.length > 0)
+
+const anyLevelSet = computed(() => cells.value.some((cell) => cell.minimum_units !== null || cell.par_units !== null))
+
+function keysOf(level: ThresholdLevel): Set<string> {
+  return new Set([
+    ...changes.value[level].map((change) => cellKey(change.blood_type_id, change.component_id)),
+    ...problems.value[level].map((problem) => problem.key),
+  ])
+}
+
+/**
+ * Start each level of each draft from what is saved.
+ *
+ * `keep` names the levels whose unsaved edits survive. A refresh keeps both,
+ * so a poll or a save in one table never wipes typing in the other; a save
+ * or a discard re-seeds only its own table.
+ */
+function seed(keep: ThresholdLevel[]): void {
+  const keepPar = keep.includes('par') ? keysOf('par') : new Set<string>()
+  const keepCritical = keep.includes('critical') ? keysOf('critical') : new Set<string>()
+
+  for (const cell of cells.value) {
+    const key = cellKey(cell.blood_type_id, cell.component_id)
+    const saved = draftFor(cell)
+    const draft = drafts[key]
+
+    drafts[key] = draft
+      ? {
+          par: keepPar.has(key) ? draft.par : saved.par,
+          minimum: keepCritical.has(key) ? draft.minimum : saved.minimum,
+          alerts_enabled: keepCritical.has(key) ? draft.alerts_enabled : saved.alerts_enabled,
+        }
+      : saved
+  }
+}
+
+function edit(level: ThresholdLevel, key: string, value: string): void {
+  const draft = drafts[key]
+
+  if (!draft) return
+
+  if (level === 'par') draft.par = value
+  else draft.minimum = value
+
+  feedback[level] = null
+}
+
+function toggleAlerts(key: string): void {
+  const draft = drafts[key]
+
+  if (!draft) return
+
+  draft.alerts_enabled = !draft.alerts_enabled
+  feedback.critical = null
+}
+
+function discard(level: ThresholdLevel): void {
+  seed(LEVELS.filter((other) => other !== level))
+  feedback[level] = null
+}
 
 function failure(err: any, fallback: string): string {
   return err?.data?.message || (Object.values(err?.data?.errors ?? {}).flat() as string[])[0] || fallback
@@ -147,37 +279,51 @@ function failure(err: any, fallback: string): string {
  */
 async function loadStatus(quiet: boolean): Promise<void> {
   busy.value = !quiet
-  if (!quiet) banner.value = ''
+  if (!quiet) loadError.value = ''
 
   try {
     status.value = await props.fetchStatus()
   } catch (err) {
-    if (!quiet) {
-      bannerKind.value = 'error'
-      banner.value = failure(err, 'The stock thresholds could not be loaded.')
-    }
+    if (!quiet) loadError.value = failure(err, 'The stock thresholds could not be loaded.')
   } finally {
     busy.value = false
   }
 }
 
-async function save(payload: SaveStockThresholdsPayload): Promise<void> {
-  saving.value = true
-  banner.value = ''
+/**
+ * Save one table's changes, and only that table's.
+ *
+ * On failure the drafts stay as typed, so nothing is lost and the user can
+ * retry. On success the fresh status re-seeds this table; the other keeps
+ * its unsaved edits.
+ */
+async function save(level: ThresholdLevel): Promise<void> {
+  const thresholds = changes.value[level]
+
+  if (!thresholds.length || problems.value[level].length || savingLevel.value !== null) return
+
+  savingLevel.value = level
+  feedback[level] = null
 
   try {
-    status.value = await props.saveStatus(payload)
+    // The watch below re-seeds from the fresh status: this table's drafts now
+    // match what is saved, and the other table's edits are kept.
+    status.value = await props.saveStatus({ thresholds })
 
-    const count = payload.thresholds.length
-    bannerKind.value = 'success'
-    banner.value = `Saved ${count} change${count === 1 ? '' : 's'}.`
+    const count = thresholds.length
+    feedback[level] = { kind: 'success', text: `Saved ${count} change${count === 1 ? '' : 's'} to the ${LEVEL_NAMES[level]}.` }
   } catch (err) {
-    bannerKind.value = 'error'
-    banner.value = failure(err, 'The thresholds could not be saved.')
+    feedback[level] = {
+      kind: 'error',
+      text: `${failure(err, `The ${LEVEL_NAMES[level]} could not be saved.`)} Your changes are still here; try again.`,
+    }
   } finally {
-    saving.value = false
+    savingLevel.value = null
   }
 }
+
+// A new status from a load or a poll keeps every unsaved edit.
+watch(() => status.value?.cells, () => seed(LEVELS), { immediate: true })
 
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -185,9 +331,9 @@ onMounted(() => {
   void loadStatus(false)
 
   // Keep the counts current, but never while there are unsaved edits or a save
-  // in flight: the grid would be re-seeded underneath the person typing.
+  // in flight: the tables would be re-seeded underneath the person typing.
   timer = setInterval(() => {
-    if (!dirty.value && !saving.value && !busy.value) void loadStatus(true)
+    if (!dirty.value && savingLevel.value === null && !busy.value) void loadStatus(true)
   }, POLL_MS)
 })
 
@@ -205,18 +351,65 @@ onBeforeUnmount(() => {
   background: var(--rb-page-bg);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   color: var(--rb-text-primary);
+  min-width: 0;
 }
 
-.panel__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
-.panel__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.panel__subtitle { margin: 4px 0 0; max-width: 76ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+/* heading and the guide beside it */
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+.page-head__text { flex: 1 1 auto; min-width: 0; }
+.page-head__title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.page-head__subtitle { margin: 6px 0 0; max-width: 66ch; font-size: var(--rb-text-base); line-height: 1.6; color: var(--rb-text-secondary); }
 
-.scope { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.scope { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin-top: 12px; }
 .scope__item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--rb-text-secondary); }
 .scope__item strong { color: var(--rb-text-primary); }
 .scope__item--note { padding: 3px 11px; border-radius: 999px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); font-weight: 600; }
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.refresh:hover:not(:disabled) { color: var(--rb-text-primary); border-color: var(--rb-border-hover); }
+.refresh:disabled { opacity: 0.45; cursor: not-allowed; }
+.refresh:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 0 1 460px;
+  padding: 14px 18px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.28);
+  border-radius: var(--rb-radius-md);
+  background: rgba(var(--rb-primary-rgb), 0.06);
+}
+.guide__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--rb-primary);
+  color: #fff;
+}
+.guide__list { display: grid; gap: 10px; margin: 0; }
+.guide__list dt { font-size: var(--rb-text-base); font-weight: 700; color: var(--rb-primary-text); }
+.guide__list dd { margin: 1px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .alert {
   display: flex;
@@ -224,26 +417,14 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin: 0;
   padding: 11px 14px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.25);
   border-radius: 10px;
+  background: rgba(var(--rb-accent-rgb), 0.08);
+  color: var(--rb-accent-text);
   font-size: 13px;
   line-height: 1.5;
 }
-.alert :deep(svg) { flex-shrink: 0; }
-.alert--success { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), 0.25); }
-.alert--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
-
-.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
-.kpi {
-  padding: 12px 16px;
-  border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  background: var(--rb-surface);
-}
-.kpi dt { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rb-text-secondary); }
-.kpi dd { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.kpi--ok dd { color: var(--rb-success-text); }
-.kpi--low dd { color: var(--rb-warning-text); }
-.kpi--critical dd { color: var(--rb-accent-text); }
+.alert :deep(.asset-icon) { flex-shrink: 0; }
 
 .callout {
   display: flex;
@@ -258,7 +439,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   line-height: 1.5;
 }
-.callout :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+.callout :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
 
 .empty { margin: 0; padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
 
@@ -267,42 +448,18 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 7px;
   margin: 0;
-  max-width: 90ch;
+  max-width: 100ch;
   font-size: 12px;
   line-height: 1.5;
   color: var(--rb-text-secondary);
 }
-.footnote :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+.footnote :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 16px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.btn--ghost { border-color: transparent; background: transparent; color: var(--rb-text-secondary); }
-.btn--ghost:hover:not(:disabled) { color: var(--rb-text-primary); }
-
-.skeleton-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.skeletons { display: grid; gap: 18px; }
 .skeleton {
   display: block;
-  height: 64px;
-  border-radius: 12px;
+  height: 280px;
+  border-radius: var(--rb-radius-md);
   background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
   animation: panel-shimmer 1.4s ease infinite;
@@ -315,13 +472,20 @@ onBeforeUnmount(() => {
 .spin { animation: panel-spin 0.9s linear infinite; }
 @keyframes panel-spin { to { transform: rotate(360deg); } }
 
+@media (max-width: 1100px) {
+  .page-head { flex-direction: column; }
+  .guide { flex-basis: auto; width: 100%; max-width: 640px; }
+}
+
 @media (max-width: 760px) {
-  .panel__header { flex-direction: column; }
-  .kpis, .skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel { padding: 16px 16px 32px; gap: 14px; }
+  .page-head__title { font-size: 22px; }
+  .page-head__subtitle { font-size: var(--rb-text-sm); }
+  .guide { padding: 12px 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }
-  .btn { transition: none; }
+  .refresh { transition: none; }
 }
 </style>

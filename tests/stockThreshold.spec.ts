@@ -7,24 +7,32 @@ import {
   cellKey,
   chipLabel,
   describeCell,
-  diffDrafts,
+  diffCritical,
+  diffPar,
   draftFor,
+  isValidLevel,
   isValidMinimum,
+  levelConflict,
   minimumOf,
   orderBloodTypes,
+  orderComponents,
+  parOf,
   sortLow,
   stockStatusLabel,
+  thresholdProblems,
   typeHealth,
   typeHealthByCode,
 } from '~/utils/stockThreshold'
 
 /**
- * Minimum stock per blood type and component, for both portals.
+ * PAR and critical stock levels per blood type and component, for both portals.
  *
- * What is locked in: the grid only ever sends what changed, an empty field
- * means "no minimum" rather than zero, a blood type is graded by its worst
- * monitored component, each portal's calls reach the right endpoint, and the
- * pages carry the right gates and are linked from both navigations.
+ * What is locked in: each table only ever sends what changed, and only its own
+ * level; an empty field means "no level" rather than zero; a critical level
+ * above PAR is stopped before it is sent, with the table to save first named
+ * when the order matters; a blood type is graded by its worst monitored
+ * component; each portal's calls reach the right endpoint; and the pages carry
+ * the right gates and are linked from both navigations.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -61,9 +69,11 @@ function cell(over: Partial<StockThresholdCell> = {}): StockThresholdCell {
     component_name: 'Packed RBC',
     available: 4,
     minimum_units: 10,
+    par_units: null,
     alerts_enabled: true,
     status: 'low',
     shortfall: 6,
+    to_par: 0,
     alerted_at: null,
     updated_by: null,
     updated_at: null,
@@ -76,25 +86,28 @@ function drafts(cells: StockThresholdCell[]): Record<string, StockThresholdDraft
 }
 
 describe('drafts and what gets saved', () => {
-  it('starts a draft as what is saved, and an unset minimum as an empty field', () => {
-    expect(draftFor(cell())).toEqual({ minimum: '10', alerts_enabled: true })
-    expect(draftFor(cell({ minimum_units: null, status: 'unmonitored', shortfall: 0 }))).toEqual({ minimum: '', alerts_enabled: true })
+  it('starts a draft as what is saved, and an unset level as an empty field', () => {
+    expect(draftFor(cell({ par_units: 20 }))).toEqual({ minimum: '10', par: '20', alerts_enabled: true })
+    expect(draftFor(cell({ minimum_units: null, status: 'unmonitored', shortfall: 0 }))).toEqual({ minimum: '', par: '', alerts_enabled: true })
   })
 
-  it('reads an empty field as no minimum, never as zero', () => {
-    expect(minimumOf({ minimum: '', alerts_enabled: true })).toBeNull()
-    expect(minimumOf({ minimum: '   ', alerts_enabled: true })).toBeNull()
-    expect(minimumOf({ minimum: '12', alerts_enabled: true })).toBe(12)
+  it('reads an empty field as no level, never as zero', () => {
+    expect(minimumOf({ minimum: '', par: '', alerts_enabled: true })).toBeNull()
+    expect(minimumOf({ minimum: '   ', par: '', alerts_enabled: true })).toBeNull()
+    expect(minimumOf({ minimum: '12', par: '', alerts_enabled: true })).toBe(12)
+    expect(parOf({ minimum: '', par: '', alerts_enabled: true })).toBeNull()
+    expect(parOf({ minimum: '', par: '30', alerts_enabled: true })).toBe(30)
   })
 
   it('accepts what Vue hands back for a number input, which may be a number', () => {
-    expect(minimumOf({ minimum: 12, alerts_enabled: true })).toBe(12)
-    expect(isValidMinimum({ minimum: 12, alerts_enabled: true })).toBe(true)
-    expect(isValidMinimum({ minimum: 0, alerts_enabled: true })).toBe(false)
+    expect(minimumOf({ minimum: 12, par: '', alerts_enabled: true })).toBe(12)
+    expect(isValidMinimum({ minimum: 12, par: '', alerts_enabled: true })).toBe(true)
+    expect(isValidMinimum({ minimum: 0, par: '', alerts_enabled: true })).toBe(false)
+    expect(isValidLevel(0)).toBe(false)
   })
 
   it('accepts only whole numbers from 1 to 9999, or nothing', () => {
-    const valid = (minimum: string) => isValidMinimum({ minimum, alerts_enabled: true })
+    const valid = (minimum: string) => isValidMinimum({ minimum, par: '', alerts_enabled: true })
 
     expect(valid('')).toBe(true)
     expect(valid('1')).toBe(true)
@@ -109,7 +122,8 @@ describe('drafts and what gets saved', () => {
   it('sends nothing when nothing changed', () => {
     const cells = [cell(), cell({ blood_type_id: 2, blood_type_code: 'A+' })]
 
-    expect(diffDrafts(cells, drafts(cells))).toEqual([])
+    expect(diffCritical(cells, drafts(cells))).toEqual([])
+    expect(diffPar(cells, drafts(cells))).toEqual([])
   })
 
   it('sends only the cells that changed', () => {
@@ -117,9 +131,34 @@ describe('drafts and what gets saved', () => {
     const edited = drafts(cells)
     edited[cellKey(1, 10)]!.minimum = '15'
 
-    expect(diffDrafts(cells, edited)).toEqual([
+    expect(diffCritical(cells, edited)).toEqual([
       { blood_type_id: 1, component_id: 10, minimum_units: 15, alerts_enabled: true },
     ])
+  })
+
+  it('keeps the two tables apart: each sends only its own level', () => {
+    const cells = [cell({ par_units: 20 })]
+    const edited = drafts(cells)
+    edited[cellKey(1, 10)]!.par = '25'
+
+    // The PAR table leaves the critical level out, so the server keeps it...
+    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: 25 }])
+    // ...and a PAR edit is not a change to the critical table.
+    expect(diffCritical(cells, edited)).toEqual([])
+
+    edited[cellKey(1, 10)]!.par = '20'
+    edited[cellKey(1, 10)]!.minimum = '12'
+
+    expect(diffPar(cells, edited)).toEqual([])
+    expect(diffCritical(cells, edited)[0]).not.toHaveProperty('par_units')
+  })
+
+  it('sends a null PAR to clear one that exists, and nothing for an empty cell left empty', () => {
+    const cells = [cell({ par_units: 20 }), cell({ blood_type_id: 2, blood_type_code: 'A+' })]
+    const edited = drafts(cells)
+    edited[cellKey(1, 10)]!.par = ''
+
+    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: null }])
   })
 
   it('sends a null minimum to clear a threshold that exists', () => {
@@ -127,7 +166,7 @@ describe('drafts and what gets saved', () => {
     const edited = drafts(cells)
     edited[cellKey(1, 10)]!.minimum = ''
 
-    expect(diffDrafts(cells, edited)).toEqual([
+    expect(diffCritical(cells, edited)).toEqual([
       { blood_type_id: 1, component_id: 10, minimum_units: null, alerts_enabled: true },
     ])
   })
@@ -137,7 +176,7 @@ describe('drafts and what gets saved', () => {
     const edited = drafts(cells)
     edited[cellKey(1, 10)]!.alerts_enabled = false
 
-    expect(diffDrafts(cells, edited)).toEqual([
+    expect(diffCritical(cells, edited)).toEqual([
       { blood_type_id: 1, component_id: 10, minimum_units: 10, alerts_enabled: false },
     ])
   })
@@ -147,7 +186,69 @@ describe('drafts and what gets saved', () => {
     const edited = drafts([empty])
     edited[cellKey(1, 10)]!.alerts_enabled = false
 
-    expect(diffDrafts([empty], edited)).toEqual([])
+    expect(diffCritical([empty], edited)).toEqual([])
+  })
+})
+
+describe('the critical level never sits above PAR', () => {
+  const key = cellKey(1, 10)
+
+  it('sees a conflict only when both levels are set and the critical one is higher', () => {
+    expect(levelConflict({ minimum: '8', par: '5', alerts_enabled: true })).toBe(true)
+    expect(levelConflict({ minimum: '5', par: '5', alerts_enabled: true })).toBe(false)
+    expect(levelConflict({ minimum: '8', par: '', alerts_enabled: true })).toBe(false)
+    expect(levelConflict({ minimum: '', par: '5', alerts_enabled: true })).toBe(false)
+    // A value that is not a level yet is a typing problem, not a conflict.
+    expect(levelConflict({ minimum: '8', par: '2.5', alerts_enabled: true })).toBe(false)
+  })
+
+  it('stops a table whose changed cell puts the critical level above PAR on screen', () => {
+    const cells = [cell({ minimum_units: 3, par_units: 10 })]
+    const edited = drafts(cells)
+    edited[key]!.minimum = '12'
+
+    expect(thresholdProblems('critical', cells, edited)).toEqual([
+      { key, message: 'O+ Packed RBC: the critical level (12) is above the PAR level (10).' },
+    ])
+    // The PAR table did not change that cell, so it may still save its own.
+    expect(thresholdProblems('par', cells, edited)).toEqual([])
+  })
+
+  it('names the table to save first when the fix is split across both', () => {
+    const cells = [cell({ minimum_units: 3, par_units: 10 })]
+
+    // Both raised: fine on screen, but the saved PAR (10) is under the new critical level.
+    const raised = drafts(cells)
+    raised[key]!.par = '20'
+    raised[key]!.minimum = '15'
+
+    expect(thresholdProblems('par', cells, raised)).toEqual([])
+    expect(thresholdProblems('critical', cells, raised)[0]!.message).toContain('save the PAR Level first')
+
+    // Both lowered: fine on screen, but the saved critical level (3) is over the new PAR.
+    const lowered = drafts(cells)
+    lowered[key]!.par = '2'
+    lowered[key]!.minimum = '1'
+
+    expect(thresholdProblems('critical', cells, lowered)).toEqual([])
+    expect(thresholdProblems('par', cells, lowered)[0]!.message).toContain('save the Critical Level first')
+  })
+
+  it('stops a table holding a value the server would refuse', () => {
+    const cells = [cell()]
+    const edited = drafts(cells)
+    edited[key]!.par = '0'
+
+    expect(thresholdProblems('par', cells, edited)).toEqual([
+      { key, message: 'O+ Packed RBC: enter a whole number from 1 to 9999, or leave it blank.' },
+    ])
+  })
+
+  it('has nothing to say about what is saved and untouched', () => {
+    const cells = [cell({ minimum_units: 3, par_units: 10 })]
+
+    expect(thresholdProblems('par', cells, drafts(cells))).toEqual([])
+    expect(thresholdProblems('critical', cells, drafts(cells))).toEqual([])
   })
 })
 
@@ -156,6 +257,20 @@ describe('reading the grid', () => {
     const codes = orderBloodTypes([{ code: 'O-' }, { code: 'XX' }, { code: 'A+' }, { code: 'AB+' }, { code: 'B-' }]).map((t) => t.code)
 
     expect(codes).toEqual(['A+', 'B-', 'AB+', 'O-', 'XX'])
+  })
+
+  it('lists components whole blood first and plasma products last, unknown codes after by name', () => {
+    const names = orderComponents([
+      { code: 'CRYO', name: 'Cryoprecipitate' },
+      { code: 'FFP', name: 'Fresh Frozen Plasma' },
+      { code: 'ZZ', name: 'Beta Product' },
+      { code: 'PC', name: 'Platelet Concentrate' },
+      { code: 'WB', name: 'Whole Blood' },
+      { code: 'XX', name: 'Alpha Product' },
+      { code: 'PRBC', name: 'Packed RBC' },
+    ]).map((c) => c.code)
+
+    expect(names).toEqual(['WB', 'PRBC', 'PC', 'FFP', 'CRYO', 'XX', 'ZZ'])
   })
 
   it('orders shortages with empty shelves first, then the biggest gap', () => {
@@ -365,12 +480,29 @@ describe('pages and navigation', () => {
     expect(clashes).toEqual([])
   })
 
-  it('keeps the grid\'s notification toggle labelled and its state off colour alone', () => {
-    const grid = source('app/components/common/StockThresholdGrid.vue')
+  it('keeps the critical table\'s notification toggle labelled and its state off colour alone', () => {
+    const card = source('app/components/common/StockLevelCard.vue')
 
-    expect(grid).toContain(':aria-pressed=')
-    expect(grid).toContain('notifications ${item.draft.alerts_enabled')
+    expect(card).toContain(':aria-pressed=')
+    expect(card).toContain('notifications ${item.draft.alerts_enabled')
     // The mute is drawn as a slash, not just a dimmer bell.
-    expect(grid).toContain('.bell--muted::after')
+    expect(card).toContain('.st-bell--muted::after')
+  })
+
+  it('gives each level its own table and its own save, never one that sends both', () => {
+    const panel = source('app/components/common/StockThresholdsPanel.vue')
+
+    expect(panel).toContain("const LEVELS: ThresholdLevel[] = ['par', 'critical']")
+    expect(panel).toContain('@save="save(level)"')
+    expect(panel).toContain('par: diffPar(cells.value, drafts)')
+    expect(panel).toContain('critical: diffCritical(cells.value, drafts)')
+    expect(panel).toContain('const thresholds = changes.value[level]')
+  })
+
+  it('keeps every input labelled with its blood type, component and level', () => {
+    const card = source('app/components/common/StockLevelCard.vue')
+
+    expect(card).toContain(':aria-label="`${row.type.code} ${item.component.name} ${title}, units`"')
+    expect(card).toContain(':aria-invalid="flagged.has(item.key)"')
   })
 })

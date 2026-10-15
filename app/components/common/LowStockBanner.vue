@@ -11,7 +11,7 @@
 
     <div class="low-banner__body">
       <p class="low-banner__title">{{ title }}</p>
-      <ul class="low-banner__chips" aria-label="Blood stocks below their minimum">
+      <ul class="low-banner__chips" aria-label="Blood stocks below their critical level">
         <li
           v-for="cell in shown"
           :key="`${cell.blood_type_id}:${cell.component_id}`"
@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 /**
- * A red banner for blood stocks that have fallen below their minimum.
+ * A red banner for blood stocks that have fallen below their critical level.
  *
  * Shows nothing when nothing is short, so a page can place it unconditionally.
  * The cells are the server's `low` list, already ordered with empty shelves
@@ -61,7 +61,7 @@ const hasCritical = computed(() => props.cells.some((cell) => cell.status === 'c
 const title = computed(() => {
   const count = props.cells.length
   const empty = props.cells.filter((cell) => cell.status === 'critical').length
-  const base = count === 1 ? '1 blood stock is below its minimum' : `${count} blood stocks are below their minimum`
+  const base = count === 1 ? '1 blood stock is below its critical level' : `${count} blood stocks are below their critical level`
 
   return empty > 0 ? `${base} (${empty} out of stock)` : base
 })
