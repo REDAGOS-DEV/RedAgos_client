@@ -25,6 +25,14 @@ export type Department = 'collection' | 'processing' | 'testing' | 'issuance' | 
 export type StaffPrivilege = 'read' | 'write' | 'update' | 'delete'
 
 /**
+ * A blood-centre account's level above (or instead of) a staff role, from the
+ * server's `ManagementLevel` enum. The Admin runs staff accounts, roles and the
+ * centre's settings; the Supervisor only watches: dashboard, reports and the
+ * view-only monitoring pages. Neither does department work.
+ */
+export type ManagementLevel = 'admin' | 'supervisor'
+
+/**
  * The predefined blood-centre staff roles, from the server's `StaffRole` enum.
  */
 export type StaffRole =
@@ -93,7 +101,7 @@ export interface AppUser {
 
   department: Department | null
   department_label: string | null
-  /** Null for donors, admins, blood-bank staff, a custom role and a management-only supervisor. */
+  /** Null for donors, admins, blood-bank staff, a custom role, and an Admin or Supervisor with no post. */
   staff_role: StaffRole | null
   staff_role_label: string | null
   /** A typed role, when none of the predefined ones fits. */
@@ -102,7 +110,10 @@ export interface AppUser {
   role_label: string | null
   /** The privileges in force; all four for an account that never had them set. */
   staff_privileges: StaffPrivilege[]
-  is_supervisor: boolean
+  /** admin, supervisor, or null. Not the Laboratory or Billing Supervisor, which are staff roles. */
+  management_level: ManagementLevel | null
+  /** "Blood Center Admin" or "Supervisor". */
+  management_level_label: string | null
 
   /**
    * Unrestricted platform admin. Holds every `admin.*` privilege without any of

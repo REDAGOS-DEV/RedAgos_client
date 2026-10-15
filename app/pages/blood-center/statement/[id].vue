@@ -784,6 +784,15 @@ function reviewPaymentCorrection() {
 async function onPaymentCorrectionSent(response) {
   paymentCorrection.value = null
   editingPayment.value = null
+
+  // The Billing Supervisor's own correction is applied at once, and may
+  // change what the statement still owes.
+  if (response?.data?.status === 'approved') {
+    toast('Correction Applied', 'success', response?.message ?? 'The payment is corrected.')
+    await loadAll()
+    return
+  }
+
   toast('Correction Requested', 'success', response?.message ?? 'It is applied once it is approved.')
   await loadPayments()
 }
@@ -806,9 +815,16 @@ async function submitVoid() {
 
   try {
     const response = await bloodCenterService.requestPaymentVoid(voidFor.value.id, voidReason.value)
-    toast('Void Requested', 'success', response?.message ?? 'It is applied once the Billing Supervisor approves it.')
     voidFor.value = null
-    await loadPayments()
+
+    // The Billing Supervisor's own void is applied at once.
+    if (response?.data?.status === 'approved') {
+      toast('Payment Voided', 'success', response?.message ?? 'The payment is voided.')
+      await loadAll()
+    } else {
+      toast('Void Requested', 'success', response?.message ?? 'It is applied once the Billing Supervisor approves it.')
+      await loadPayments()
+    }
   } catch (err) {
     voidError.value = err?.message || 'The void could not be requested.'
   } finally {

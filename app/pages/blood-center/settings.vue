@@ -97,8 +97,8 @@
                   <input :value="profileForm.bloodCenter" type="text" class="form-input form-input--icon" disabled />
                 </div>
               </div>
-              <!-- The role (and what it may do) is set by a supervisor in Staff
-                   Accounts; the title is the person's own label, e.g. RMT. -->
+              <!-- The role (and what it may do) is set by the Blood Center Admin in
+                   Staff Accounts; the title is the person's own label, e.g. RMT. -->
               <div class="form-group">
                 <label class="form-label">Role</label>
                 <div class="input-icon-wrap">
@@ -117,14 +117,14 @@
                   :disabled="!editingProfile"
                 />
               </div>
-              <!-- Read-only: the sign-in address is changed by a supervisor, not here. -->
+              <!-- Read-only: the sign-in address is changed by the Admin, not here. -->
               <div class="form-group">
                 <label class="form-label">Email Address</label>
                 <div class="input-icon-wrap">
                   <AssetIcon name="mail" :size="15" class="input-icon" />
                   <input :value="profileForm.email" type="email" class="form-input form-input--icon" disabled />
                 </div>
-                <p v-if="editingProfile" class="form-hint">Ask your supervisor to change your sign-in email.</p>
+                <p v-if="editingProfile" class="form-hint">Ask your Blood Center Admin to change your sign-in email.</p>
               </div>
               <div class="form-group">
                 <label class="form-label">Contact Number</label>
@@ -147,7 +147,7 @@
 
           </section>
 
-          <!-- BLOOD CENTER: the centre's own settings, for supervisors (center.configure). -->
+          <!-- BLOOD CENTER: the centre's own settings, for the Blood Center Admin (center.configure). -->
           <section v-if="activeTab === 'center'" class="settings-panel">
             <div class="panel-heading">
               <div>
@@ -486,12 +486,12 @@ const profileSuccess = ref('')
 // Suggestions for the title, as on the Add Staff form; any other is typed.
 const TITLE_OPTIONS = ['RMT', 'RN']
 
-// The person's role, as a supervisor set it in Staff Accounts. Shown, not edited.
+// The person's role, as the Admin set it in Staff Accounts. Shown, not edited.
 const roleText = computed(() => {
   const u = sessionUser.value
   if (!u) return ''
   const role = u.staff_role_label || u.role_label || u.custom_role || ''
-  const parts = [u.is_supervisor ? 'Supervisor' : '', role].filter(Boolean)
+  const parts = [u.management_level_label || '', role].filter(Boolean)
   return parts.join(' · ') || u.department_label || 'No role yet'
 })
 

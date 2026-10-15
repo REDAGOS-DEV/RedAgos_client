@@ -377,13 +377,13 @@ const initials = computed(() => {
   return letters.toUpperCase()
 })
 
-// "Supervisor", "Lab Supervisor", "Supervisor · Phlebotomist", or the
+// "Blood Center Admin", "Lab Supervisor", "Supervisor · Phlebotomist", or the
 // department when nothing more specific is set.
 const roleLabel = computed(() => {
   const u = user.value
   if (!u) return ''
   const role = u.staff_role_label || u.role_label || u.custom_role || ''
-  const parts = [u.is_supervisor ? 'Supervisor' : '', role].filter(Boolean)
+  const parts = [u.management_level_label || '', role].filter(Boolean)
   const unique = parts.filter((part, i) => parts.findIndex(p => p.toLowerCase() === part.toLowerCase()) === i)
   return unique.join(' · ') || u.department_label || ''
 })
@@ -407,7 +407,7 @@ const greeting = computed(() => {
 
 // "Processing · Sub-National Blood Center": where this person works.
 const workplaceLabel = computed(() =>
-  [user.value?.is_supervisor ? null : user.value?.department_label, facilityName.value]
+  [user.value?.management_level ? null : user.value?.department_label, facilityName.value]
     .filter(Boolean)
     .join(' · ')
 )

@@ -44,6 +44,12 @@
       <div><dt>Balance before</dt><dd>{{ pesos(receipt.balance_before) }}</dd></div>
       <div class="t-big"><dt>AMOUNT RECEIVED</dt><dd>{{ pesos(receipt.amount_paid) }}</dd></div>
       <div><dt>Method</dt><dd>{{ receipt.payment?.method_label || receipt.payment_method_label || '—' }}</dd></div>
+      <!-- A payment split across methods: each part, on this one receipt. -->
+      <template v-if="parts.length > 1">
+        <div v-for="(part, i) in parts" :key="i" class="t-part">
+          <dt>{{ part.method_label }}</dt><dd>{{ pesos(part.amount_paid) }}</dd>
+        </div>
+      </template>
       <template v-if="receipt.payment?.amount_tendered">
         <div><dt>Cash tendered</dt><dd>{{ pesos(receipt.payment.amount_tendered) }}</dd></div>
         <div><dt>Change</dt><dd>{{ pesos(receipt.payment.change_given) }}</dd></div>
@@ -89,6 +95,7 @@ const props = defineProps<{ receipt: PaymentReceiptSummary }>()
 const emit = defineEmits<{ ready: [] }>()
 
 const issuer = computed(() => props.receipt.issuing_facility ?? null)
+const parts = computed(() => props.receipt.tenders ?? [])
 const initials = computed(() => facilityInitials(issuer.value?.name))
 const logoFailed = ref(false)
 
@@ -131,6 +138,8 @@ onMounted(() => {
 .t-totals .t-big { font-size: 13px; font-weight: 800; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 0; margin: 2px 0; }
 .t-totals .t-big dd { font-weight: 800; }
 .t-strong { font-weight: 800; }
+.t-part dt { padding-left: 3mm; }
+.t-part dd { font-weight: 400; }
 .t-note { margin: 6px 0 0; font-size: 10px; text-align: center; }
 .t-foot { margin: 8px 0 0; font-size: 9.5px; text-align: center; }
 </style>

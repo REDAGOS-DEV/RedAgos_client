@@ -45,11 +45,11 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { logoProblem } from '~/utils/stockReport'
 
 /**
- * A supervisor's upload of their own facility's logo.
+ * The Blood Center Admin's upload of their own facility's logo.
  *
- * Self-gating on `center.configure`, the same supervisor-only ability that
- * sets shelf life and price. The facility is never chosen here: the server
- * takes it from the signed-in account.
+ * Self-gating on `center.configure`, an ability only the Admin level holds.
+ * The facility is never chosen here: the server takes it from the signed-in
+ * account.
  */
 
 const { can } = useUser()

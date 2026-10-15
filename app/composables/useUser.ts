@@ -57,7 +57,10 @@ export function useUser() {
         // A hospital blood bank account's role: head, inventory_staff or requesting_staff.
         hospital_role: payload.hospital_role ?? null,
         hospital_role_label: payload.hospital_role_label ?? null,
-        is_supervisor: Boolean(payload.is_supervisor),
+        // Admin or Supervisor, the levels above a staff role. Presentation
+        // only, like the permissions below.
+        management_level: payload.management_level ?? null,
+        management_level_label: payload.management_level_label ?? null,
         // Admin privileges. Sama sa department permissions sa ibabaw: ang
         // server gihapon ang gate, presentation ra ni nga kopya para sa nav.
         is_super_admin: Boolean(payload.is_super_admin),

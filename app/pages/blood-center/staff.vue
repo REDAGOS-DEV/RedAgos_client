@@ -22,6 +22,7 @@
     <!-- At-a-glance counts for the current view -->
     <div v-if="!loading && rows.length" class="summary">
       <span class="summary__item"><strong>{{ activeRows.length }}</strong> staff</span>
+      <span class="summary__item"><strong>{{ adminCount }}</strong> admin{{ adminCount === 1 ? '' : 's' }}</span>
       <span class="summary__item"><strong>{{ supervisorCount }}</strong> supervisor{{ supervisorCount === 1 ? '' : 's' }}</span>
       <span v-if="unverifiedCount" class="summary__item summary__item--warning">
         <strong>{{ unverifiedCount }}</strong> waiting to verify email
@@ -65,7 +66,7 @@
       </div>
     </div>
 
-    <!-- Nobody yet: the supervisor's first step -->
+    <!-- Nobody yet: the Admin's first step -->
     <div v-else-if="!rows.length && !hasFilters" class="empty empty--onboarding">
       <span class="empty__icon"><AssetIcon name="users" :size="22" /></span>
       <p class="empty__title">Add your first team member</p>
@@ -115,7 +116,9 @@
                 <div class="person__text">
                   <p class="cell-strong">
                     {{ row.full_name }}
-                    <span v-if="row.is_supervisor" class="pill pill--supervisor">Supervisor</span>
+                    <span v-if="row.management_level" class="pill" :class="`pill--${row.management_level}`">
+                      {{ row.management_level === 'admin' ? 'Admin' : 'Supervisor' }}
+                    </span>
                   </p>
                   <p class="cell-sub">{{ row.email }}</p>
                 </div>
@@ -123,13 +126,16 @@
             </td>
             <td>
               <p class="cell-strong">
-                {{ row.role_label || (row.is_supervisor ? 'Management' : 'No role yet') }}
+                {{ row.role_label || (row.management_level ? 'Management' : 'No role yet') }}
                 <span v-if="row.custom_role" class="tag">custom</span>
               </p>
               <p v-if="row.position" class="cell-sub">{{ row.position }}</p>
             </td>
             <td>
-              <span v-if="row.is_supervisor" class="cell-sub">All</span>
+              <!-- A level is not capped by privileges; they cap a role, and this account has none. -->
+              <span v-if="row.management_level && !row.role_label" class="cell-sub">
+                {{ row.management_level === 'admin' ? 'Admin access' : 'View only' }}
+              </span>
               <span v-else class="privs">
                 <span
                   v-for="p in PRIVILEGE_ORDER"
@@ -300,7 +306,7 @@
                   A custom role: it can do what the {{ departmentLabel }} department does, within the privileges ticked below.
                 </template>
                 <template v-else>
-                  A supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
+                  An Admin or Supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
                 </template>
               </p>
 
@@ -315,17 +321,24 @@
                     </span>
                   </label>
                 </div>
-                <small>They cap the role: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
+                <small>They cap the role, not the access level below: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
                 <em v-if="errors.staff_privileges">{{ errors.staff_privileges[0] }}</em>
               </fieldset>
 
-              <label class="toggle toggle--block">
-                <input v-model="form.is_supervisor" type="checkbox" >
-                <span>
-                  <strong>Supervisor</strong>
-                  <small>Can manage staff and see the whole Blood Center overview.</small>
-                </span>
-              </label>
+              <!-- Above the role, not instead of it: an account may hold both. -->
+              <fieldset class="form__field levels">
+                <legend>Access level</legend>
+                <div class="levels__list">
+                  <label v-for="level in levelOptions" :key="level.key || 'staff'" class="privilege level">
+                    <input v-model="form.management_level" type="radio" name="management_level" :value="level.key" >
+                    <span>
+                      <strong>{{ level.label }}</strong>
+                      <small>{{ level.description }}</small>
+                    </span>
+                  </label>
+                </div>
+                <em v-if="errors.management_level">{{ errors.management_level[0] }}</em>
+              </fieldset>
 
               <label v-if="editing" class="form__field">
                 <span>Account status</span>
@@ -366,6 +379,8 @@ definePageMeta({
 
 useHead({ title: 'Staff Accounts · RedAgos' })
 
+const { user, fetchUser } = useUser()
+
 const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
 
 /**
@@ -374,6 +389,7 @@ const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
  * permission matrix enforces.
  */
 const departments = ref([])
+const levels = ref([])
 const privileges = ref([])
 const titles = ref(['RMT', 'RN'])
 const catalogueError = ref('')
@@ -396,12 +412,32 @@ async function loadCatalogue() {
   try {
     const response = await bloodCenterService.staffRoles()
     departments.value = response?.data?.departments ?? []
+    levels.value = response?.data?.levels ?? []
     privileges.value = response?.data?.privileges ?? []
     if (response?.data?.titles?.length) titles.value = response.data.titles
   } catch (error) {
     catalogueError.value = error?.message || 'Could not load the list of roles.'
   }
 }
+
+/**
+ * The access levels, least first. The two management levels take their words
+ * from the server's catalogue, so the form describes them as the matrix
+ * enforces them; the fallback covers a catalogue that failed to load.
+ */
+const LEVEL_FALLBACK = {
+  supervisor: { label: 'Supervisor', description: 'Sees the dashboard, the reports and the view-only monitoring pages. Cannot record, approve or manage anyone.' },
+  admin: { label: 'Blood Center Admin', description: 'Creates staff accounts, assigns roles and privileges, and sets the centre\'s logo. Sees the dashboard and reports; no department pages and no corrections.' },
+}
+
+const levelOptions = computed(() => [
+  { key: '', label: 'Staff', description: 'Does the work of their role, within the privileges above. No management access.' },
+  ...['supervisor', 'admin'].map((key) => {
+    const served = levels.value.find((level) => level.key === key)
+
+    return { key, label: served?.label ?? LEVEL_FALLBACK[key].label, description: served?.description ?? LEVEL_FALLBACK[key].description }
+  }),
+])
 
 /** A predefined role is sent as its key; anything else as a custom role. */
 function rolePayload() {
@@ -458,7 +494,7 @@ function blankForm() {
   return {
     first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
     phone: '', employee_id: '', position: '', department: '', role: '',
-    staff_privileges: [...PRIVILEGE_ORDER], is_supervisor: false,
+    staff_privileges: [...PRIVILEGE_ORDER], management_level: '',
     account_status: 'active',
   }
 }
@@ -513,7 +549,7 @@ function openEdit(row) {
     department: row.department || '',
     role: row.role_label || '',
     staff_privileges: [...(row.staff_privileges ?? PRIVILEGE_ORDER)],
-    is_supervisor: row.is_supervisor,
+    management_level: row.management_level ?? '',
     account_status: row.account_status === 'pending_verification' ? 'active' : row.account_status,
   })
   modalOpen.value = true
@@ -533,16 +569,25 @@ async function submit() {
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],
-        is_supervisor: form.is_supervisor,
+        management_level: form.management_level || null,
       }
 
-      // Ang pending_verification kay dili ma-set balik sa supervisor, so
+      // Ang pending_verification kay dili ma-set balik sa Admin, so
       // ipadala ra kung nausab gyud.
       if (form.account_status !== editing.value.account_status) {
         payload.account_status = form.account_status
       }
 
       await bloodCenterService.updateStaff(editing.value.uuid, payload)
+
+      // An Admin who just stepped down can no longer open this page.
+      if (editing.value.uuid === user.value?.uuid && payload.management_level !== 'admin') {
+        await fetchUser()
+        modalOpen.value = false
+        await navigateTo(departmentHome(user.value))
+        return
+      }
+
       showBanner('Account updated.', 'success')
     } else {
       const { role: _role, ...fields } = form
@@ -555,6 +600,7 @@ async function submit() {
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],
+        management_level: form.management_level || null,
       })
       showBanner('Staff account created. A verification email has been sent.', 'success')
     }
@@ -566,7 +612,7 @@ async function submit() {
       errors.value = error.errors || {}
       formError.value = error.message || 'Please correct the highlighted fields.'
     } else if (error?.status === 409) {
-      // last_supervisor — ang facility mahibilin nga walay makadumala.
+      // last_admin — ang facility mahibilin nga walay makadumala sa staff.
       formError.value = error.message
     } else {
       formError.value = error?.message || 'Something went wrong.'
@@ -609,13 +655,14 @@ function showBanner(message, kind) {
 const hasFilters = computed(() => Boolean(search.value.trim() || departmentFilter.value || includeDeleted.value))
 
 const activeRows = computed(() => rows.value.filter((row) => !row.deleted_at))
-const supervisorCount = computed(() => activeRows.value.filter((row) => row.is_supervisor).length)
+const adminCount = computed(() => activeRows.value.filter((row) => row.management_level === 'admin').length)
+const supervisorCount = computed(() => activeRows.value.filter((row) => row.management_level === 'supervisor').length)
 const unverifiedCount = computed(() => activeRows.value.filter((row) => !row.email_verified).length)
 
 /**
  * Rows grouped by department, in the catalogue's order, so the roster reads
- * the way the sidebar does. Accounts without a department (usually
- * supervisors) come first, under Management.
+ * the way the sidebar does. Accounts without a department (usually the
+ * Admin and Supervisors) come first, under Management.
  */
 const groupedRows = computed(() => {
   const groups = [{ key: '__none', label: 'Management / no department', rows: [] }]
@@ -969,6 +1016,7 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-secondary);
 }
 
+.pill--admin { background: var(--rb-primary); color: #fff; }
 .pill--supervisor { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
 .pill--success { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .pill--warning { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
@@ -1280,6 +1328,23 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-secondary);
   font-size: 10px;
   font-weight: 600;
+}
+
+.levels {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.levels legend {
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.levels__list {
+  display: grid;
+  gap: 6px;
 }
 
 @media (max-width: 560px) {

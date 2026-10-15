@@ -14,7 +14,11 @@
         Request a correction
       </h2>
 
-      <p class="dialog__body">
+      <p v-if="isHead" class="dialog__body">
+        The {{ label }} is already saved, so it is not changed directly. As the department head, your correction needs
+        no other approval: it is <strong>applied as soon as you send it</strong>, and kept with your reason.
+      </p>
+      <p v-else class="dialog__body">
         The {{ label }} is already saved, so it is not changed directly. Your corrected values go to
         <strong>{{ approverText }}</strong> to approve. Nothing changes until they do.
       </p>
@@ -38,7 +42,7 @@
 
       <div class="dialog__actions">
         <button type="button" class="btn btn--primary" :disabled="busy || !reason.trim()" @click="submit">
-          {{ busy ? 'Sending…' : 'Send for approval' }}
+          {{ busy ? 'Sending…' : (isHead ? 'Apply correction' : 'Send for approval') }}
         </button>
         <button type="button" class="btn" :disabled="busy" @click="$emit('close')">Cancel</button>
       </div>
@@ -99,14 +103,13 @@ const HEADS = {
 
 const label = computed(() => SUBJECTS[props.subject]?.label ?? 'record')
 
-// A head's own request goes to the Center Admin, never to a colleague.
-const approverText = computed(() => {
-  const head = HEADS[SUBJECTS[props.subject]?.department]
+const head = computed(() => HEADS[SUBJECTS[props.subject]?.department] ?? null)
 
-  if (!head || user.value?.staff_role === head.role) return 'the Center Admin'
+// The head's own correction needs nobody else's approval; the server applies
+// it as it is filed.
+const isHead = computed(() => Boolean(head.value) && user.value?.staff_role === head.value.role)
 
-  return `${head.title} or the Center Admin`
-})
+const approverText = computed(() => head.value?.title ?? "the department's head")
 
 const changedFields = computed(() => {
   if (!props.previous) return []

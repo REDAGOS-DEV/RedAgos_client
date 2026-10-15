@@ -238,7 +238,8 @@ import {
 } from '~/utils/stockReport'
 
 /**
- * The Daily Blood Stock Inventory: Issuance's live view and printable sheet.
+ * The Daily Blood Stock Inventory: Issuance's live view and printable sheet,
+ * which the Supervisor and the Admin also read (`inventory.stock_report`).
  *
  * The numbers are the server's, already grouped into the sheet's tables; this
  * page only draws them. The PDF is rendered by the server from the same data,
@@ -248,11 +249,12 @@ import {
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'inventory.create',
+  requires: 'inventory.stock_report',
 })
 
 const { can } = useUser()
-const canConfigure = computed(() => can('center.configure'))
+// Shelf life is Processing's to set, on Blood Components.
+const canConfigure = computed(() => can('components.configure'))
 
 const report = ref(null)
 

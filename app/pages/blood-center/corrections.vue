@@ -4,7 +4,8 @@
       <h1 class="corrections__title">Corrections</h1>
       <p class="corrections__subtitle">
         Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
-        approver or the Center Admin decides. An approved correction is applied under the same rules as the original.
+        head decides; the head's own correction is applied as soon as it is sent. An approved correction is applied
+        under the same rules as the original.
         A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
         directly, and everyone else files a correction.
       </p>
@@ -162,11 +163,12 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
- * Correction requests: the caller's own, and — for a department approver or
- * the Center Admin — those waiting on their decision.
+ * Correction requests: the caller's own, and — for a department's head —
+ * those waiting on their decision.
  *
- * The server decides who may decide (`can_decide`): never the requester, and
- * for an approver's own request only the Center Admin. Approving applies the
+ * The server decides who may decide (`can_decide`): the department's head,
+ * never a peer head, and nobody else for their own request. A head's own
+ * correction is applied as it is filed, so it never waits here. Approving applies the
  * change through the original write, so a request whose record has since been
  * cleared or rejected is refused and stays pending until someone rejects it.
  */
@@ -279,7 +281,7 @@ function switchScope(next) {
 
 const REFUSALS = {
   self_approval: 'You cannot decide on your own correction request.',
-  not_the_approver: 'This correction is decided by the department approver or the Center Admin.',
+  not_the_approver: "This correction is decided by the department's head.",
   correction_decided: 'This correction has already been decided.',
   results_cleared: 'The record was cleared since this was requested, so it can no longer be corrected. Reject it.',
   results_locked: 'The donation was rejected since this was requested. Reject the correction.',

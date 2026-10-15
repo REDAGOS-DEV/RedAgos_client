@@ -697,9 +697,17 @@ function reviewCorrection() {
   }
 }
 
-function onDispatchCorrectionSent(response) {
+async function onDispatchCorrectionSent(response) {
   dispatchCorrection.value = null
   correctFor.value = null
+
+  // The Inventory Control Officer's own correction is applied at once.
+  if (response?.data?.status === 'approved') {
+    toast('Correction Applied', 'success', response?.message ?? 'The dispatch record is corrected.')
+    await load()
+    return
+  }
+
   toast('Correction Requested', 'success', response?.message ?? 'It is applied once it is approved.')
 }
 

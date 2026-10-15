@@ -22,7 +22,7 @@ vi.stubGlobal('departmentHome', (user: any) => {
     billing: '/blood-center/billing',
   }
   if (user?.department && homes[user.department]) return homes[user.department]
-  return user?.is_supervisor ? '/blood-center/dashboard' : '/blood-center/settings'
+  return user?.management_level ? '/blood-center/dashboard' : '/blood-center/settings'
 })
 
 // Mirrors the server's StaffRole enum. Every role must land on a page of its
@@ -132,8 +132,10 @@ describe('portalHomeFor', () => {
       .toBe('/blood-center/storage')
   })
 
-  it('sends a departmentless supervisor to the overview, others to settings', () => {
-    expect(portalHomeFor({ roles: ['blood_center'], is_supervisor: true } as any))
+  it('sends a departmentless Admin or Supervisor to the overview, others to settings', () => {
+    expect(portalHomeFor({ roles: ['blood_center'], management_level: 'admin' } as any))
+      .toBe('/blood-center/dashboard')
+    expect(portalHomeFor({ roles: ['blood_center'], management_level: 'supervisor' } as any))
       .toBe('/blood-center/dashboard')
     expect(portalHomeFor({ roles: ['blood_center'] } as any))
       .toBe('/blood-center/settings')
@@ -207,8 +209,9 @@ describe('departmentHome', () => {
     expect(departmentHome({ staff_role: 'it_data_clerk', department: 'issuance' })).toBe('/blood-center/inventory')
   })
 
-  it('sends a supervisor who holds a role to that role\'s page', () => {
-    expect(departmentHome({ staff_role: 'lab_supervisor', is_supervisor: true })).toBe('/blood-center/testing')
-    expect(departmentHome({ is_supervisor: true })).toBe('/blood-center/dashboard')
+  it('sends an Admin or Supervisor who holds a role to that role\'s page', () => {
+    expect(departmentHome({ staff_role: 'lab_supervisor', management_level: 'supervisor' })).toBe('/blood-center/testing')
+    expect(departmentHome({ management_level: 'admin' })).toBe('/blood-center/dashboard')
+    expect(departmentHome({ management_level: 'supervisor' })).toBe('/blood-center/dashboard')
   })
 })

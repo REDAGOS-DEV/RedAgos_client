@@ -384,7 +384,7 @@ describe('corrections', () => {
     expect(service).toContain('`${this.resource}/payments/${paymentId}/corrections`')
   })
 
-  it('names every department\'s head, and tells a head their own request goes to the Center Admin', () => {
+  it('names every department\'s head, and tells a head their own correction applies at once', () => {
     for (const title of [
       'the Donor Screening Physician',
       'the Component Laboratory Medical Technologist',
@@ -395,7 +395,9 @@ describe('corrections', () => {
       expect(dialog).toContain(title)
     }
 
-    expect(dialog).toContain("user.value?.staff_role === head.role")
+    expect(dialog).toContain("user.value?.staff_role === head.value.role")
+    expect(dialog).toContain('applied as soon as you send it')
+    expect(dialog).not.toContain('Center Admin')
     // The consultant role was withdrawn with its department.
     expect(dialog).not.toContain('Reference Laboratory Consultant')
   })

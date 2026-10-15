@@ -31,8 +31,10 @@
           <!--
             A donation needs a verified donor, a screening and a collection, so
             it is recorded at the counter rather than from a dashboard modal.
+            Only for someone who works the counter: the Admin and the
+            Supervisor who read this overview do not.
           -->
-          <NuxtLink to="/blood-center/collection" class="btn-primary">
+          <NuxtLink v-if="canCollect" to="/blood-center/collection" class="btn-primary">
             <AssetIcon name="plus" :size="15" />
             Record Donation
           </NuxtLink>
@@ -40,9 +42,9 @@
       </div>
 
       <!-- ============ KPI CARDS ============ -->
-      <!-- Each card opens the page that owns the number. -->
+      <!-- Each card opens the page that owns the number, for whoever may open it. -->
       <div class="stats-grid">
-        <NuxtLink to="/blood-center/inventory" class="stat-card">
+        <component :is="canViewInventory ? NuxtLink : 'div'" v-bind="canViewInventory ? { to: '/blood-center/inventory' } : {}" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Total Blood Units</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
@@ -55,9 +57,10 @@
             <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
             {{ Math.abs(weeklyChangePercent) }}% this week
           </span>
-        </NuxtLink>
+        </component>
 
-        <NuxtLink to="/blood-center/collection" class="stat-card">
+        <!-- A link only for someone the counter would let in. -->
+        <component :is="canCollect ? NuxtLink : 'div'" v-bind="canCollect ? { to: '/blood-center/collection' } : {}" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Donations Today</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
@@ -70,9 +73,9 @@
             <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
             {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
           </span>
-        </NuxtLink>
+        </component>
 
-        <NuxtLink to="/blood-center/bloodrequests" class="stat-card">
+        <component :is="canViewRequests ? NuxtLink : 'div'" v-bind="canViewRequests ? { to: '/blood-center/bloodrequests' } : {}" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Pending Hospital Requests</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
@@ -81,9 +84,14 @@
           </div>
           <p class="stat-card__value">{{ pendingRequestsCount }}</p>
           <span class="stat-chip stat-chip--neutral">{{ pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting' }}</span>
-        </NuxtLink>
+        </component>
 
-        <NuxtLink to="/blood-center/inventory" class="stat-card" :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }">
+        <component
+          :is="canViewInventory ? NuxtLink : 'div'"
+          v-bind="canViewInventory ? { to: '/blood-center/inventory' } : {}"
+          class="stat-card"
+          :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }"
+        >
           <div class="stat-card__top">
             <p class="stat-card__label">Critical Blood Types</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-accent-rgb), 0.08)' }">
@@ -93,7 +101,7 @@
           <!-- Red only when something is actually critical. -->
           <p class="stat-card__value" :style="criticalTypesCount ? 'color: var(--rb-accent-text)' : ''">{{ criticalTypesCount }}</p>
           <span class="stat-chip stat-chip--neutral truncate-chip">{{ criticalTypesLabel }}</span>
-        </NuxtLink>
+        </component>
       </div>
 
       <!-- ============ LOW STOCK ============ -->
@@ -118,7 +126,7 @@
                 <p class="attention-item__title">{{ item.title }}</p>
                 <p class="attention-item__detail">{{ item.detail }}</p>
               </div>
-              <NuxtLink :to="item.to" class="panel-link attention-item__link">
+              <NuxtLink v-if="canOpen(item.to)" :to="item.to" class="panel-link attention-item__link">
                 {{ item.action }}
                 <AssetIcon name="chevron-right" :size="13" />
               </NuxtLink>
@@ -136,7 +144,7 @@
           <template v-if="waitingRequests.length">
             <div class="subsection-header">
               <p class="subsection-title">Waiting hospital requests</p>
-              <NuxtLink to="/blood-center/bloodrequests" class="panel-link">
+              <NuxtLink v-if="canViewRequests" to="/blood-center/bloodrequests" class="panel-link">
                 View all ({{ requests.length }})
               </NuxtLink>
             </div>
@@ -163,7 +171,7 @@
                     <span class="status-pill__dot" />
                     {{ req.status }}
                   </span>
-                  <button type="button" class="btn-primary btn-primary--sm" @click="openConfirmModal(req)">
+                  <button v-if="canDecideRequests" type="button" class="btn-primary btn-primary--sm" @click="openConfirmModal(req)">
                     {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
                   </button>
                 </div>
@@ -178,14 +186,15 @@
               <h2 class="panel-title">Stock by blood type</h2>
               <p class="panel-subtitle">Total units across components.</p>
             </div>
-            <NuxtLink to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
+            <NuxtLink v-if="canViewInventory" to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
           </div>
 
           <div v-if="stockTiles.length" class="stock-grid">
-            <NuxtLink
+            <component
+              :is="canViewInventory ? NuxtLink : 'div'"
               v-for="row in stockTiles"
               :key="row.blood_type"
-              :to="`/blood-center/inventory?type=${encodeURIComponent(row.blood_type)}`"
+              v-bind="canViewInventory ? { to: `/blood-center/inventory?type=${encodeURIComponent(row.blood_type)}` } : {}"
               class="stock-tile"
               :class="`stock-tile--${row.status}`"
               :title="`${row.blood_type}: ${row.total} units, ${statusLabel(row.status)}`"
@@ -193,7 +202,7 @@
               <span class="stock-tile__type">{{ row.blood_type }}</span>
               <span class="stock-tile__value">{{ row.total }}</span>
               <span class="stock-tile__status">{{ statusLabel(row.status) }}</span>
-            </NuxtLink>
+            </component>
           </div>
           <div v-else class="empty-state">
             <AssetIcon name="droplets" :size="32" style="color: var(--rb-border-strong)" />
@@ -462,6 +471,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
+import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({
@@ -471,6 +481,21 @@ definePageMeta({
 })
 
 const { user, can } = useUser()
+
+// The overview is read by the Admin and the Supervisor, who record and decide
+// nothing, and the Admin sees no department page at all: its shortcuts into
+// department pages show only to those who can open them.
+const NuxtLink = resolveComponent('NuxtLink')
+const canCollect = computed(() => can(COLLECTION_ABILITIES))
+const canDecideRequests = computed(() => can('requests.approve'))
+const canViewInventory = computed(() => can('inventory.view'))
+const canViewRequests = computed(() => can('requests.view'))
+
+function canOpen(path) {
+  if (path.startsWith('/blood-center/inventory')) return canViewInventory.value
+  if (path.startsWith('/blood-center/bloodrequests')) return canViewRequests.value
+  return true
+}
 const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'Blood Center')
 
 const loading = ref(true)
@@ -782,6 +807,9 @@ const exportReport = async () => {
 const lowStock = ref([])
 
 onMounted(async () => {
+  // Read behind inventory.view; the Admin does not hold it.
+  if (!canViewInventory.value) return
+
   try {
     lowStock.value = (await bloodCenterService.stockThresholds()).low ?? []
   } catch (err) {

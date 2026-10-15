@@ -130,8 +130,15 @@
           <div class="payment-box">
             <h3>Payment received</h3>
             <div class="kv"><span>Payment method</span><strong>{{ receipt.payment?.method_label || receipt.payment_method_label || '—' }}</strong></div>
+            <!-- A payment split across methods: each part, on this one receipt. -->
+            <template v-if="parts.length > 1">
+              <div v-for="(part, i) in parts" :key="i" class="kv kv--part">
+                <span>{{ part.method_label }}</span>
+                <strong>{{ pesos(part.amount_paid) }}<span v-if="part.reference_number" class="mono"> · Ref. {{ part.reference_number }}</span></strong>
+              </div>
+            </template>
             <div class="kv"><span>Amount received</span><strong>{{ pesos(receipt.amount_paid) }}</strong></div>
-            <div class="kv"><span>Payment reference</span><strong class="mono">{{ paymentReference || '—' }}</strong></div>
+            <div v-if="parts.length <= 1" class="kv"><span>Payment reference</span><strong class="mono">{{ paymentReference || '—' }}</strong></div>
             <div class="kv"><span>Payment date</span><strong>{{ when(receipt.payment?.paid_at || receipt.issued_at) }}</strong></div>
             <div class="kv"><span>Received by</span><strong>{{ receipt.received_by || 'Confirmed by the payment provider' }}</strong></div>
           </div>
@@ -200,6 +207,9 @@
  * centre's initials — never by a shared mark. RedAgos is named in the footer.
  */
 import type { PaymentReceiptSummary, StatementRevision } from '~/types/bloodRequest'
+
+/** One part of a payment split across methods, as this document lists it. */
+type ReceiptPart = { method_label: string | null; amount_paid: string | null; reference_number?: string | null }
 import { facilityInitials, pesos, statementFigures, statementStamp } from '~/utils/billing'
 
 const props = defineProps<{
@@ -207,7 +217,11 @@ const props = defineProps<{
   receipt?: PaymentReceiptSummary | null
   /** The payment's reference, which only staff who may record payments are given. */
   paymentReference?: string | null
+  /** Each part of a split with its reference, given to the same staff. Without it, the parts show unreferenced. */
+  paymentParts?: ReceiptPart[] | null
 }>()
+
+const parts = computed<ReceiptPart[]>(() => props.paymentParts?.length ? props.paymentParts : (props.receipt?.tenders ?? []))
 
 const title = computed(() => (props.revision ? 'STATEMENT OF ACCOUNT' : 'PAYMENT ACKNOWLEDGEMENT RECEIPT'))
 
@@ -291,6 +305,8 @@ th, td { padding: 10px; border-bottom: 1px solid var(--rb-border); }
 .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 12px; }
 .kv span { color: var(--rb-text-secondary); }
 .kv strong { text-align: right; overflow-wrap: anywhere; }
+.kv--part > span { padding-left: 12px; }
+.kv--part strong { font-weight: 600; }
 .callout { background: rgba(var(--rb-success-rgb), .08); border-color: rgba(var(--rb-success-rgb), .3); }
 .callout strong { color: var(--rb-success-text); font-size: 15px; }
 .callout p { font-size: 11.5px; margin: 7px 0 0; color: var(--rb-text-secondary); }

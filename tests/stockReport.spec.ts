@@ -115,7 +115,7 @@ describe('the facility logo', () => {
     expect(logoProblem(null)).toBe('Choose an image to upload.')
   })
 
-  it('is shown only to supervisors, who alone may change it', () => {
+  it('is shown only to the Blood Center Admin, who alone may change it', () => {
     const card = source('app/components/BloodCenter/FacilityLogoCard.vue')
 
     expect(card).toContain("can('center.configure')")
@@ -158,12 +158,33 @@ describe('endpoints', () => {
 })
 
 describe('pages and navigation', () => {
-  it('keeps the stock report with Issuance', () => {
+  it('keeps the stock report with Issuance, readable by the Supervisor and the Admin', () => {
     const page = source('app/pages/blood-center/stock-report.vue')
     const nav = source('app/composables/useBloodCenterNav.ts')
 
-    expect(page).toContain("requires: 'inventory.create'")
-    expect(nav).toMatch(/label: 'Daily Stock Report', path: '\/blood-center\/stock-report'[^}]*requires: 'inventory\.create'/)
+    // Its own read ability, so monitoring it never needs inventory.create.
+    expect(page).toContain("requires: 'inventory.stock_report'")
+    expect(nav).toMatch(/label: 'Daily Stock Report', path: '\/blood-center\/stock-report'[^}]*requires: 'inventory\.stock_report'/)
+  })
+
+  it('puts Blood Components under Processing and prices under Billing', () => {
+    const nav = source('app/composables/useBloodCenterNav.ts').replace(/\r\n/g, '\n')
+    // The items of one nav group: from its label to the end of its list.
+    const group = (label: string) => nav.split(`label: '${label}',\n    items: [`)[1]?.split('\n    ],')[0] ?? ''
+
+    expect(group('Management')).toContain("path: '/blood-center/staff'")
+
+    expect(group('Processing')).toContain("path: '/blood-center/blood-components'")
+    expect(group('Processing')).toContain("requires: 'components.configure'")
+    expect(group('Billing')).toContain("path: '/blood-center/component-prices'")
+    expect(group('Billing')).toContain("requires: 'billing.prices'")
+    expect(group('Management')).not.toContain('blood-components')
+
+    expect(source('app/pages/blood-center/blood-components.vue')).toContain("requires: 'components.configure'")
+    expect(source('app/pages/blood-center/component-prices.vue')).toContain("requires: 'billing.prices'")
+    // Each page sends only its own field.
+    expect(source('app/pages/blood-center/blood-components.vue')).not.toMatch(/\bprice:/)
+    expect(source('app/pages/blood-center/component-prices.vue')).not.toContain('shelf_life_days')
   })
 
   it('records a volume per bag in Processing, not a count', () => {

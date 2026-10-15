@@ -724,8 +724,12 @@ const previousBreakdown = computed(() => (selected.value?.components?.length
   ? { components: selected.value.components.map((c) => ({ component_id: c.component_id, volume_ml: c.volume_ml })) }
   : null))
 
-function onCorrectionSent(response) {
+async function onCorrectionSent(response) {
   correction.value = null
+
+  // A head's own correction is applied at once: show the donation as it now stands.
+  if (response?.data?.status === 'approved' && selected.value) await openDonation(selected.value.id)
+
   notice.value = response?.message ?? 'Correction requested.'
 }
 

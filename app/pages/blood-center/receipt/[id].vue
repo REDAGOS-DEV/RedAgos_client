@@ -70,7 +70,7 @@
           <button role="tab" class="view-tab" :class="{ 'view-tab--on': view === 'printed' }" :aria-selected="view === 'printed'" @click="view = 'printed'">As printed</button>
         </div>
 
-        <BillingDocument v-if="view === 'printed'" :receipt="receipt" :payment-reference="paymentReference" />
+        <BillingDocument v-if="view === 'printed'" :receipt="receipt" :payment-reference="paymentReference" :payment-parts="paymentParts" />
 
         <template v-else>
           <div class="facts-row">
@@ -92,6 +92,17 @@
               <h2 id="summary-title" class="card-title">Payment summary</h2>
               <dl class="summary">
                 <div><dt>Method</dt><dd>{{ receipt.payment?.method_label || receipt.payment_method_label || '—' }}</dd></div>
+                <!-- A payment split across methods: each part, on this one receipt. -->
+                <template v-if="paymentParts.length > 1">
+                  <div v-for="(part, i) in paymentParts" :key="i" class="part">
+                    <dt>{{ part.method_label }}</dt>
+                    <dd>
+                      {{ pesos(part.amount_paid) }}
+                      <span v-if="part.reference_number" class="part-ref mono">{{ part.reference_number }}</span>
+                      <span v-if="part.additional_information" class="part-ref">{{ part.additional_information }}</span>
+                    </dd>
+                  </div>
+                </template>
                 <div><dt>Amount received</dt><dd class="strong">{{ pesos(receipt.amount_paid) }}</dd></div>
                 <div v-if="receipt.payment?.amount_tendered"><dt>Cash handed over</dt><dd>{{ pesos(receipt.payment.amount_tendered) }}</dd></div>
                 <div v-if="receipt.payment?.amount_tendered"><dt>Change given</dt><dd>{{ pesos(receipt.payment.change_given) }}</dd></div>
@@ -189,6 +200,8 @@ const receipt = ref(null)
 const paymentReference = ref(null)
 // A card payment's additional information (the cardholder's last name), like the reference, on screen only.
 const paymentInfo = ref(null)
+// Each part of a payment split across methods, with its reference, on screen only.
+const paymentParts = ref([])
 const loading = ref(true)
 const loadError = ref('')
 const view = ref('details')
@@ -251,6 +264,7 @@ async function load() {
     receipt.value = response?.receipt ?? null
     paymentReference.value = response?.payment_reference ?? null
     paymentInfo.value = response?.payment_additional_information ?? null
+    paymentParts.value = response?.payment_parts ?? []
   } catch (err) {
     loadError.value = err?.status === 404 ? 'No receipt with that number was issued by this centre.' : (err?.message || 'Please try again.')
   } finally {
@@ -319,6 +333,8 @@ onMounted(load)
 .summary div:last-child { border-bottom: 0; padding-bottom: 0; }
 .summary dt { color: var(--rb-text-secondary); }
 .summary dd { margin: 0; color: var(--rb-text-primary); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.summary .part dt { padding-left: 12px; }
+.part-ref { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
 
 .ack { display: flex; gap: 14px; align-items: flex-start; padding: 20px; border-radius: 14px; border: 1px solid; }
 .ack-mark { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex: none; color: #fff; }

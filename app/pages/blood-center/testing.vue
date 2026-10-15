@@ -852,8 +852,12 @@ const previousPanel = computed(() => {
   return panel
 })
 
-function onCorrectionSent(response) {
+async function onCorrectionSent(response) {
   correction.value = null
+
+  // A head's own correction is applied at once: show the donation as it now stands.
+  if (response?.data?.status === 'approved' && selected.value) await openDonation(selected.value.id)
+
   notice.value = response?.message ?? 'Correction requested.'
 }
 

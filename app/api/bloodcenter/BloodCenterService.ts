@@ -239,22 +239,54 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}/health-questionnaire`, 'GET', params)
   }
 
-  // --- Component settings (supervisor only) ---
+  // --- Component settings ---
   //
   // Shelf life and price, held per facility. blood_components has no
   // facility_id and four facilities share it, so a value written there would
   // decide another centre's expiry dates — and a price switches on the
   // payment-before-release gate, which one centre must not turn on for another.
+  //
+  // Each is its own department's: Processing adds components and sets their
+  // shelf life (components.configure), Billing prices them (billing.prices).
+  // Neither endpoint accepts the other's field.
 
   async componentSettings(): Promise<any> {
     return this.request(`${this.resource}/blood-components`, 'GET')
   }
 
-  async updateComponentSetting(componentId: number, payload: Record<string, any> = {}): Promise<any> {
+  async updateComponentSetting(componentId: number, payload: { shelf_life_days: number | null }): Promise<any> {
     return this.request(`${this.resource}/blood-components/${componentId}`, 'PATCH', payload)
   }
 
-  // --- Facility logo (supervisor only) ---
+  /**
+   * Add a component to the shared catalogue. Every centre sees it, as not
+   * configured until it sets its own shelf life.
+   */
+  async addComponent(payload: {
+    name: string
+    code: string
+    storage_temperature?: string | null
+    shelf_life_days?: number | null
+  }): Promise<any> {
+    return this.request(`${this.resource}/blood-components`, 'POST', payload)
+  }
+
+  async componentPrices(): Promise<any> {
+    return this.request(`${this.resource}/component-prices`, 'GET')
+  }
+
+  /**
+   * Save every component's price at once. Each line is a price above zero or
+   * an explicit no charge; the server writes nothing unless every component
+   * ends up with one or the other (422 `prices_incomplete`).
+   */
+  async saveComponentPrices(payload: {
+    prices: Array<{ component_id: number, no_charge: boolean, price: number | null }>
+  }): Promise<any> {
+    return this.request(`${this.resource}/component-prices`, 'PUT', payload)
+  }
+
+  // --- Facility logo (Blood Center Admin only) ---
   //
   // Ang facility kay gikan sa token sa staff, dili gikan sa request. FormData,
   // so ang BaseService mobiya sa Content-Type para ang browser ang mobutang sa

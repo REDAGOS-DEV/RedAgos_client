@@ -721,8 +721,24 @@ export interface PaymentReceiptSummary {
     change_given?: string | null
     cash_session_number?: string | null
   }
+  /**
+   * Each part of what was handed over, in the order it was recorded: one, or
+   * every part of a payment split across methods, all on this one receipt.
+   * Without references, like `payment`. Empty on a receipt issued before
+   * receipts listed their parts.
+   */
+  tenders?: ReceiptTender[]
   /** Empty on a receipt issued before receipts carried their lines. */
   lines?: StatementLine[]
+}
+
+/** One part of the payment a receipt acknowledges. Amounts are decimal strings. */
+export interface ReceiptTender {
+  method_label: string | null
+  amount_paid: string | null
+  /** The cash part only: what was handed over, and the change given back. */
+  amount_tendered: string | null
+  change_given: string | null
 }
 
 /**

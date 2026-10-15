@@ -52,8 +52,8 @@ export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohemat
  *
  * Checked before the department, because roles in one department do different
  * work: a receptionist starts at the appointment list, a physician at the
- * counter. A supervisor who also holds a role lands where that role does; the
- * overview stays one click away in the sidebar.
+ * counter. An Admin or Supervisor who also holds a role lands where that role
+ * does; the overview stays one click away in the sidebar.
  */
 const ROLE_HOME: Record<string, string> = {
   screening_physician: '/blood-center/collection',
@@ -108,7 +108,8 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
     return home
   }
 
-  return user.is_supervisor ? BLOOD_CENTER_OVERVIEW : '/blood-center/settings'
+  // The Admin and the Supervisor both start at the overview they monitor.
+  return user.management_level ? BLOOD_CENTER_OVERVIEW : '/blood-center/settings'
 }
 
 /*
@@ -150,6 +151,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     label: 'Processing',
     items: [
       { label: 'Component Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
+      // Processing defines the components and how long each keeps; the price
+      // is Billing's, under Component Prices.
+      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'components.configure', keywords: 'component add new shelf life expiry days code catalogue settings' },
     ],
   },
   {
@@ -158,7 +162,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
       { label: 'Stock Thresholds', path: '/blood-center/stock-thresholds', icon: 'sliders-horizontal', requires: 'inventory.view', keywords: 'threshold minimum low stock alert shortage reorder level notification' },
       { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
-      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.create', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
+      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.stock_report', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
       { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
     ],
@@ -172,6 +176,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Statements', path: '/blood-center/billing', icon: 'file-text', requires: 'billing.view', keywords: 'billing bills statement of account soa invoice patient weekly hospital settlement subsidy balance' },
       { label: 'Receipts', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', keywords: 'receipt acknowledgement ar reprint print 80mm pdf void' },
       { label: 'Billing Transactions', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', keywords: 'transactions journal ledger history export csv void correction' },
+      // Price configuration is Billing's alone (the Billing Supervisor).
+      { label: 'Component Prices', path: '/blood-center/component-prices', icon: 'sliders-horizontal', requires: 'billing.prices', keywords: 'price pricing component fee charge unit cost peso settings' },
     ],
   },
   {
@@ -180,7 +186,6 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
       { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
       { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
-      { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'center.configure', keywords: 'shelf life expiry price component settings' },
     ],
   },
   {
@@ -219,15 +224,15 @@ export function useBloodCenterNav() {
    * Groups the current user may see, with empty groups dropped.
    *
    * Arranged by role, presentation only (what is visible is still decided by
-   * `requires`). A supervisor sees the groups in their fixed order; anyone
-   * else sees their own department right after Main.
+   * `requires`). An Admin or Supervisor sees the groups in their fixed order;
+   * anyone else sees their own department right after Main.
    */
   const navGroups = computed<BloodCenterNavGroup[]>(() => {
     const visible = NAV_GROUPS
       .map((group) => ({ ...group, items: group.items.filter((item) => can(item.requires)) }))
       .filter((group) => group.items.length > 0)
 
-    if (!user.value || user.value.is_supervisor) return visible
+    if (!user.value || user.value.management_level) return visible
 
     // Main (dashboards) first and Account (Settings) last for everyone; between
     // them, a staff member's own department comes before the rest.

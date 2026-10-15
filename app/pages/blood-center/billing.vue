@@ -31,7 +31,7 @@
           <template v-if="can('center.configure')">
             Upload one in <NuxtLink to="/blood-center/settings" class="inline-link">Settings</NuxtLink>.
           </template>
-          <template v-else>A supervisor can upload one in Settings.</template>
+          <template v-else>Your Blood Center Admin can upload one in Settings.</template>
         </span>
       </p>
 

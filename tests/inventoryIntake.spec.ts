@@ -87,7 +87,7 @@ describe('BloodCenterService inventory intake', () => {
 
   it('sends a cleared shelf life as null rather than omitting it', async () => {
     fetchMock.mockResolvedValueOnce({})
-    await service.updateComponentSetting(4, { shelf_life_days: null, price: 0 })
+    await service.updateComponentSetting(4, { shelf_life_days: null })
 
     const [url, config] = fetchMock.mock.calls[0]!
 
@@ -95,7 +95,39 @@ describe('BloodCenterService inventory intake', () => {
     expect(config.method).toBe('PATCH')
     // Null means "not configured", which intake refuses on. Dropping the key
     // would read as "leave it alone" and the clear would silently not happen.
-    expect(config.body).toEqual({ shelf_life_days: null, price: 0 })
+    // No price: that is Billing's, and the server refuses it here.
+    expect(config.body).toEqual({ shelf_life_days: null })
+  })
+
+  it('adds a component through the same Processing endpoint', async () => {
+    fetchMock.mockResolvedValueOnce({})
+    await service.addComponent({ name: 'Washed Platelets', code: 'WPC', shelf_life_days: 5 })
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe('/blood-center/blood-components')
+    expect(config.method).toBe('POST')
+    expect(config.body).toEqual({ name: 'Washed Platelets', code: 'WPC', shelf_life_days: 5 })
+  })
+
+  it('reads and sets prices under Billing, apart from shelf life', async () => {
+    fetchMock.mockResolvedValueOnce({ data: [] })
+    await service.componentPrices()
+    expect(fetchMock.mock.calls[0]![0]).toBe('/blood-center/component-prices')
+
+    const prices = [
+      { component_id: 4, no_charge: true, price: null },
+      { component_id: 5, no_charge: false, price: 1500 },
+    ]
+
+    fetchMock.mockResolvedValueOnce({})
+    await service.saveComponentPrices({ prices })
+
+    const [url, config] = fetchMock.mock.calls[1]!
+
+    expect(url).toBe('/blood-center/component-prices')
+    expect(config.method).toBe('PUT')
+    expect(config.body).toEqual({ prices })
   })
 
   it('discards a unit through the unit-scoped route', async () => {

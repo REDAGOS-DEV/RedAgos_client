@@ -245,21 +245,27 @@
           <!-- DONE: the receipt to hand over -->
           <div v-if="done" class="done">
             <div class="done-mark"><AssetIcon name="check" :size="18" /></div>
-            <h3 class="done-title">{{ done.receipts.length > 1 ? `Payment recorded in ${done.receipts.length} parts` : 'Payment recorded' }}</h3>
-            <p v-for="r in done.receipts" :key="r.id" class="done-sub">
-              Receipt <NuxtLink :to="`/blood-center/receipt/${r.id}`" class="link mono">{{ r.receipt_number }}</NuxtLink>
-              · {{ r.payment_method_label }} {{ pesos(r.amount_paid) }}
-            </p>
+            <h3 class="done-title">{{ done.parts > 1 ? `Payment recorded in ${done.parts} parts` : 'Payment recorded' }}</h3>
+            <template v-if="done.receipt">
+              <p class="done-sub">
+                Receipt <NuxtLink :to="`/blood-center/receipt/${done.receipt.id}`" class="link mono">{{ done.receipt.receipt_number }}</NuxtLink>
+                · {{ done.receipt.payment_method_label }} {{ pesos(done.receipt.amount_paid) }}
+              </p>
+              <!-- A split is one receipt; its parts are listed on it. -->
+              <p v-if="done.parts > 1" class="done-sub">
+                {{ done.receipt.tenders.map((t) => `${t.method_label} ${pesos(t.amount_paid)}`).join(' · ') }}
+              </p>
+            </template>
             <div v-if="done.change !== null" class="change-row">
               <span class="field-label">Change to give back</span>
               <strong class="change-box">{{ pesos(done.change) }}</strong>
             </div>
-            <button class="btn btn-primary btn-block" @click="printReceipts(done.receipts)">
+            <button class="btn btn-primary btn-block" :disabled="!done.receipt" @click="printReceipt(done.receipt)">
               <AssetIcon name="printer" :size="15" />
-              {{ done.receipts.length > 1 ? 'Print receipts (80mm)' : 'Print receipt (80mm)' }}
+              Print receipt (80mm)
             </button>
             <div class="pair">
-              <button class="btn btn-outline" :disabled="downloadingReceipt" @click="downloadReceipts(done.receipts)">
+              <button class="btn btn-outline" :disabled="downloadingReceipt || !done.receipt" @click="downloadReceipt(done.receipt)">
                 <AssetIcon name="download" :size="15" />
                 A4 PDF
               </button>
@@ -1072,8 +1078,10 @@ async function takePayment() {
       ? await bloodCenterService.recordSplitPayment(bill.value.request_id, { tenders: [...parts.value.map((p) => asPayment(p)), last], ...payer })
       : await bloodCenterService.recordPayment(bill.value.request_id, { ...last, ...payer })
 
+    // One receipt, however many parts the payment was split into.
     done.value = {
-      receipts: response?.receipts ?? (response?.receipt ? [response.receipt] : []),
+      receipt: response?.receipt ?? null,
+      parts: response?.receipt?.tenders?.length || 1,
       change: response?.change_given == null ? null : Number(response.change_given),
     }
     parts.value = []
@@ -1163,24 +1171,18 @@ async function submitSettlement() {
 const downloadingReceipt = ref(false)
 
 // The 80mm receipt prints from its own page, sized for the counter's printer.
-// A split payment's receipts print together, one after another on the roll.
-function printReceipts(receipts) {
-  const [first, ...rest] = (receipts ?? []).filter((r) => r?.id)
-  if (!first) return
+function printReceipt(receipt) {
+  if (!receipt?.id) return
 
-  const also = rest.length ? `&with=${rest.map((r) => r.id).join(',')}` : ''
-  window.open(`/blood-center/receipt-print/${first.id}?auto=1${also}`, '_blank')
+  window.open(`/blood-center/receipt-print/${receipt.id}?auto=1`, '_blank')
 }
 
-async function downloadReceipts(receipts) {
-  const list = (receipts ?? []).filter((r) => r?.id)
-  if (!list.length) return
+async function downloadReceipt(receipt) {
+  if (!receipt?.id) return
   downloadingReceipt.value = true
 
   try {
-    for (const receipt of list) {
-      saveBlob(await bloodCenterService.downloadReceipt(receipt.id), `${receipt.receipt_number}.pdf`)
-    }
+    saveBlob(await bloodCenterService.downloadReceipt(receipt.id), `${receipt.receipt_number}.pdf`)
   } catch (err) {
     toast('Download Failed', 'danger', err?.message || 'The receipt could not be downloaded.')
   } finally {
