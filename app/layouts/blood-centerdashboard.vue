@@ -28,7 +28,7 @@
       <header
         class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
         :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'topbar--scrolled': isScrolled }]"
-        :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
+        :style="{ boxShadow: isScrolled ? headerShadow : 'none' }">
         <!--
           Same as the donor portal: the bar shares the page and sidebar canvas
           (--rb-page-bg) so only the white cards stand out, and turns
@@ -826,6 +826,8 @@ const handleLogout = async () => {
  * comes through from the backdrop behind both.
  */
 .topbar {
+  /* The token, not a bound colour: a bound one keeps the server's light value after hydration. */
+  border-color: var(--rb-border);
   background-color: rgba(255, 255, 255, 0.55);
   /* A mild colour boost, so the glow behind shows through the glass. */
   -webkit-backdrop-filter: blur(18px) saturate(140%);

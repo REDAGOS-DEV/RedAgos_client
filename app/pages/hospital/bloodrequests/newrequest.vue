@@ -2,19 +2,14 @@
   <div class="nr-page">
     <div class="nr-inner">
       <!-- HEADER -->
-      <header class="page-header fade-in" style="--delay:0ms">
-        <div>
-          <NuxtLink to="/hospital/bloodrequests" class="back-link">
-            <AssetIcon name="arrow-left" :size="14" />
-            Back to Blood Requests
-          </NuxtLink>
-          <h1 class="page-title">New Blood Request</h1>
-          <p class="page-subtitle">
-            Each facility asked receives its own copy of the DOH Blood Request Form (Adult), which you can download from
-            that facility's allocation once the request is sent.
-          </p>
-        </div>
-      </header>
+      <NuxtLink to="/hospital/bloodrequests" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Back to Blood Requests
+      </NuxtLink>
+      <PageHeader
+        class="page-header"
+        title="New Blood Request"
+        subtitle="Each facility asked receives its own copy of the DOH Blood Request Form (Adult), which you can download from that facility's allocation once the request is sent." />
 
       <!-- LOADING -->
       <div v-if="loadingReference" class="panel">
@@ -43,10 +38,10 @@
           still unallocated. You can ask another facility from the request's page.
         </p>
         <div class="success-actions">
-          <NuxtLink :to="`/hospital/transfusion-requests/${submitted.request.id}`" class="btn-primary">
+          <NuxtLink :to="`/hospital/transfusion-requests/${submitted.request.id}`" class="ui-btn ui-btn--primary">
             View request
           </NuxtLink>
-          <button type="button" class="btn-secondary" @click="startAnother">Raise another</button>
+          <button type="button" class="ui-btn" @click="startAnother">Raise another</button>
         </div>
       </section>
 
@@ -236,7 +231,7 @@
               </div>
               <button
                 type="button"
-                class="btn-secondary btn-sm"
+                class="ui-btn ui-btn--sm"
                 :disabled="!canAddLine"
                 @click="addLine"
               >
@@ -341,8 +336,8 @@
 
           <!-- ACTIONS -->
           <div class="action-bar">
-            <NuxtLink to="/hospital/bloodrequests" class="btn-secondary">Cancel</NuxtLink>
-            <button type="button" class="btn-primary" :disabled="planLoading" @click="findFacilities">
+            <NuxtLink to="/hospital/bloodrequests" class="ui-btn">Cancel</NuxtLink>
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="planLoading" @click="findFacilities">
               <AssetIcon name="search" :size="16" />
               {{ planLoading ? 'Searching…' : 'Find facilities' }}
             </button>
@@ -368,8 +363,8 @@
           </section>
 
           <div class="action-bar">
-            <button type="button" class="btn-secondary" @click="step = 'details'">Back</button>
-            <button type="button" class="btn-primary" :disabled="!plan || splitProblems.length > 0" @click="step = 'review'">
+            <button type="button" class="ui-btn" @click="step = 'details'">Back</button>
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="!plan || splitProblems.length > 0" @click="step = 'review'">
               Review request
             </button>
           </div>
@@ -410,8 +405,8 @@
           </section>
 
           <div class="action-bar">
-            <button type="button" class="btn-secondary" :disabled="submitting" @click="step = 'sourcing'">Back</button>
-            <button type="submit" class="btn-primary" :disabled="submitting">
+            <button type="button" class="ui-btn" :disabled="submitting" @click="step = 'sourcing'">Back</button>
+            <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
               <AssetIcon name="send" :size="16" />
               {{ submitting ? 'Sending…' : 'Send request' }}
             </button>
@@ -423,6 +418,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SourcingPanel from '~/components/Hospital/SourcingPanel.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -766,30 +762,32 @@ function startAnother() {
   min-height: 100%;
   background: var(--rb-page-bg);
   font-family: var(--rb-font-sans);
-  padding: 20px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
-.nr-inner { max-width: 880px; margin: 0 auto; }
+/* The full content width, like every staff page (2026-10-15). */
+.nr-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
-.page-header { margin-bottom: 18px; }
+.page-header { margin-bottom: 20px; }
 .back-link {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 13px; color: var(--rb-text-secondary); text-decoration: none; margin-bottom: 8px;
 }
 .back-link:hover { color: var(--rb-primary-text); }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 62ch; }
 
 .nr-form { display: flex; flex-direction: column; gap: 16px; }
 
 .panel {
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
-  border-radius: 14px;
+  border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm);
   padding: 20px;
 }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 4px; }
 .panel-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; max-width: 64ch; }
+/* A card that is only a title and a note ends at the note, with no gap under it. */
+.panel > .panel-hint:last-child { margin-bottom: 0; }
 
 .banner {
   display: flex; align-items: center; gap: 8px;

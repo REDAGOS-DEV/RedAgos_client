@@ -6,23 +6,12 @@
         <AssetIcon name="arrow-left" :size="16" class="eb-back-arrow" /> Back to Request Details
       </NuxtLink>
 
-      <div class="eb-header-row">
-        <div class="eb-header-titles">
-          <h1 class="eb-title">Edit Blood Request</h1>
-          <p class="eb-subtitle">Update request information before it is processed by the Blood Center.</p>
-        </div>
-
-        <div v-if="originalRequest" class="eb-header-actions">
-          <span v-if="isEditable" class="eb-status-badge" :style="statusStyle('Pending')">
-            <span class="eb-status-dot" :style="statusDotStyle('Pending')"></span>
-            Pending
-          </span>
-          <span v-else class="eb-status-badge eb-status-disabled">
-            <span class="eb-status-dot eb-status-dot-disabled"></span>
-            Editing Disabled
-          </span>
-        </div>
-      </div>
+      <PageHeader class="eb-header-row" title="Edit Blood Request" subtitle="Update request information before it is processed by the Blood Center.">
+        <template v-if="originalRequest" #actions>
+          <StatusBadge v-if="isEditable" :tone="statusTone('Pending')">Pending</StatusBadge>
+          <StatusBadge v-else tone="neutral">Editing Disabled</StatusBadge>
+        </template>
+      </PageHeader>
     </div>
 
     <!-- ====== LOADING ====== -->
@@ -33,24 +22,24 @@
     </div>
 
     <!-- ======= ERROR ======= -->
-    <div v-else-if="loadError" class="eb-card eb-error-state">
-      <AssetIcon name="triangle-alert" :size="28" class="eb-error-icon" style="color: var(--eb-danger)" />
-      <p class="eb-error-text">{{ loadError }}</p>
-      <button class="eb-btn eb-btn-outline" @click="loadRequest">Try Again</button>
+    <div v-else-if="loadError" class="eb-card">
+      <EmptyState icon="triangle-alert" title="Couldn't load this request" :description="loadError">
+        <button class="ui-btn" @click="loadRequest">Try Again</button>
+      </EmptyState>
     </div>
 
     <!-- ======== EMPTY ====== -->
-    <div v-else-if="!originalRequest" class="eb-card eb-empty-state">
-      <AssetIcon name="droplets" :size="28" class="eb-empty-icon" style="color: var(--eb-text-muted)" />
-      <p class="eb-empty-text">This blood request could not be found.</p>
-      <NuxtLink to="/hospital/bloodrequests" class="eb-btn eb-btn-outline">Back to Blood Requests</NuxtLink>
+    <div v-else-if="!originalRequest" class="eb-card">
+      <EmptyState icon="droplets" title="This blood request could not be found.">
+        <NuxtLink to="/hospital/bloodrequests" class="ui-btn">Back to Blood Requests</NuxtLink>
+      </EmptyState>
     </div>
 
     <!-- ====== CONTENT ====== -->
     <template v-else>
       <!-- Locked banner -->
       <div v-if="!isEditable" class="eb-locked-banner">
-        <AssetIcon name="lock" :size="20" class="eb-locked-icon" style="color: #7a4b00" />
+        <AssetIcon name="lock" :size="20" class="eb-locked-icon" />
         <div class="eb-locked-text">
           <strong>This request can no longer be edited.</strong>
           <span>
@@ -181,7 +170,7 @@
               <p v-else class="eb-doc-empty">No supporting documents attached yet.</p>
 
               <label v-if="isEditable" class="eb-upload-btn">
-                <AssetIcon name="paperclip" :size="14" /> Attach Document
+                <AssetIcon name="file-plus" :size="14" /> Attach Document
                 <input type="file" multiple class="eb-upload-input" @change="handleFileSelect" />
               </label>
             </div>
@@ -195,7 +184,7 @@
                 <span class="eb-change-label">{{ change.label }}</span>
                 <div class="eb-change-values">
                   <span class="eb-change-prev">{{ change.previous }}</span>
-                  <AssetIcon name="arrow-down" :size="14" class="eb-change-arrow" />
+                  <AssetIcon name="chevron-down" :size="14" class="eb-change-arrow" />
                   <span class="eb-change-updated">{{ change.updated }}</span>
                 </div>
               </div>
@@ -236,10 +225,9 @@
         <aside class="eb-sidebar">
           <div class="eb-card eb-side-card">
             <h3 class="eb-side-title">Current Status</h3>
-            <span class="eb-status-badge" :style="statusStyle(originalRequest.status)">
-              <span class="eb-status-dot" :style="statusDotStyle(originalRequest.status)"></span>
+            <StatusBadge :tone="statusTone(originalRequest.status)">
               {{ originalRequest.status }}
-            </span>
+            </StatusBadge>
             <div class="eb-side-row">
               <span class="eb-side-label">Reference Number</span>
               <span class="eb-side-value eb-mono">{{ originalRequest.referenceNumber }}</span>
@@ -289,16 +277,16 @@
       <span v-if="saveError" class="eb-save-error">{{ saveError }}</span>
       <div class="eb-action-bar-buttons">
         <template v-if="isEditable">
-          <button type="button" class="eb-btn eb-btn-outline" @click="handleCancel">Cancel</button>
-          <button type="button" class="eb-btn eb-btn-outline" :disabled="isSavingDraft" @click="handleSaveDraft">
+          <button type="button" class="ui-btn" @click="handleCancel">Cancel</button>
+          <button type="button" class="ui-btn" :disabled="isSavingDraft" @click="handleSaveDraft">
             {{ isSavingDraft ? 'Saving Draft…' : 'Save Draft' }}
           </button>
-          <button type="button" class="eb-btn eb-btn-primary" :disabled="isSavingChanges || !hasChanges" @click="handleSaveChanges">
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="isSavingChanges || !hasChanges" @click="handleSaveChanges">
             {{ isSavingChanges ? 'Saving…' : 'Save Changes' }}
           </button>
         </template>
         <template v-else>
-          <button type="button" class="eb-btn eb-btn-primary" @click="handleReturnToDetails">Return to Request Details</button>
+          <button type="button" class="ui-btn ui-btn--primary" @click="handleReturnToDetails">Return to Request Details</button>
         </template>
       </div>
     </div>
@@ -306,6 +294,9 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatusBadge from '~/components/ui/StatusBadge.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { computed, reactive, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -454,22 +445,18 @@ onMounted(() => {
 const isEditable = computed(() => originalRequest.value?.status === 'Pending')
 
 const statusMeta = {
-  Pending:            { bg: '#FFF4E5', fg: '#B45309', dot: '#F57C00' },
-  Approved:           { bg: '#E8F0FE', fg: '#1565C0', dot: '#1565C0' },
-  Processing:         { bg: '#EDE7F6', fg: '#5E35B1', dot: '#5E35B1' },
-  'Ready for Pickup': { bg: '#E3F2FD', fg: '#0277BD', dot: '#0277BD' },
-  Completed:          { bg: '#E8F5E9', fg: '#2E7D32', dot: '#2E7D32' },
-  Rejected:           { bg: '#FDECEA', fg: '#D32F2F', dot: '#D32F2F' },
-  Cancelled:          { bg: '#F1F1F1', fg: '#616161', dot: '#9E9E9E' }
+  Pending:            { tone: 'warning' },
+  Approved:           { tone: 'info' },
+  Processing:         { tone: 'purple' },
+  'Ready for Pickup': { tone: 'info' },
+  Completed:          { tone: 'success' },
+  Rejected:           { tone: 'danger' },
+  Cancelled:          { tone: 'neutral' }
 }
 
-function statusStyle(status) {
-  const m = statusMeta[status] || statusMeta.Pending
-  return { backgroundColor: m.bg, color: m.fg }
-}
-function statusDotStyle(status) {
-  const m = statusMeta[status] || statusMeta.Pending
-  return { backgroundColor: m.dot }
+// Each status as a StatusBadge tone, so the colours match every staff page.
+function statusTone(status) {
+  return statusMeta[status]?.tone ?? statusMeta.Pending.tone
 }
 
 
@@ -609,22 +596,22 @@ function formatDateTime(iso) {
 
 <style scoped>
 .eb-page {
-  --eb-primary: var(--rb-primary, #1565c0);
-  --eb-primary-hover: #0d47a1;
-  --eb-warning: var(--rb-warning, #F57C00);
-  --eb-success: var(--rb-success, #2e7d32);
-  --eb-danger: var(--rb-accent, #d32f2f);
-  --eb-bg: #f7f9fc;
-  --eb-card: #ffffff;
-  --eb-border: #e5eaf0;
-  --eb-border-dark: #2a3447;
-  --eb-text: #1a2233;
-  --eb-text-muted: #6b7789;
+  --eb-primary: var(--rb-primary);
+  --eb-primary-hover: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  --eb-warning: var(--rb-warning);
+  --eb-success: var(--rb-success);
+  --eb-danger: var(--rb-accent);
+  --eb-bg: var(--rb-page-bg);
+  --eb-card: var(--rb-surface);
+  --eb-border: var(--rb-border);
+  --eb-border-dark: var(--rb-border-strong);
+  --eb-text: var(--rb-text-primary);
+  --eb-text-muted: var(--rb-text-secondary);
 
   font-family: var(--rb-font-sans);
   background: var(--eb-bg);
   min-height: 100%;
-  padding: 24px 28px 110px;
+  padding: 24px var(--rb-gutter, 24px) 110px;
   color: var(--eb-text);
   animation: eb-page-in 0.35s ease;
 }
@@ -641,7 +628,7 @@ function formatDateTime(iso) {
   gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--eb-primary);
+  color: var(--rb-primary-text);
   text-decoration: none;
   margin-bottom: 10px;
 }
@@ -690,14 +677,14 @@ function formatDateTime(iso) {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  background: #fff4e5;
-  border: 1px solid #f5d9a8;
+  background: rgba(var(--rb-warning-rgb), 0.1);
+  border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
   border-radius: 14px;
   padding: 16px 20px;
   margin-bottom: 20px;
 }
-.eb-locked-icon { flex-shrink: 0; margin-top: 1px; }
-.eb-locked-text { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: #7a4b00; }
+.eb-locked-icon { flex-shrink: 0; margin-top: 1px; color: var(--rb-warning-text); }
+.eb-locked-text { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--rb-warning-text); }
 
 /* ---------- buttons ---------- */
 .eb-btn {
@@ -716,13 +703,13 @@ function formatDateTime(iso) {
 }
 .eb-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .eb-btn-outline {
-  background: #fff;
+  background: var(--rb-surface);
   border-color: var(--eb-border);
   color: var(--eb-text);
 }
 .eb-btn-outline:hover:not(:disabled) {
-  border-color: var(--eb-primary);
-  color: var(--eb-primary);
+  border-color: var(--rb-primary-text);
+  color: var(--rb-primary-text);
 }
 .eb-btn-primary {
   background: var(--eb-primary);
@@ -740,7 +727,7 @@ function formatDateTime(iso) {
   box-shadow: 0 2px 10px rgba(21, 101, 192, 0.04);
 }
 fieldset.eb-card { border: 1px solid var(--eb-border); }
-fieldset.eb-card:disabled { background: #fbfcfe; }
+fieldset.eb-card:disabled { background: var(--rb-surface-alt); }
 .eb-section-title { font-size: 18px; font-weight: 700; margin: 0 0 18px; }
 
 /* ---------- form ---------- */
@@ -759,13 +746,13 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   padding: 10px 12px;
   border: 1px solid var(--eb-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--rb-surface);
   color: var(--eb-text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .eb-input:focus {
   outline: none;
-  border-color: var(--eb-primary);
+  border-color: var(--rb-primary-text);
   box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
 }
 .eb-input.has-error { border-color: var(--eb-danger); }
@@ -783,9 +770,9 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   padding: 10px 14px;
   border: 1px solid var(--eb-border);
   border-radius: 12px;
-  background: #fbfcfe;
+  background: var(--rb-surface-alt);
 }
-.eb-doc-item-new { border-color: var(--eb-primary); background: #eef5fd; }
+.eb-doc-item-new { border-color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), 0.06); }
 .eb-doc-icon { flex-shrink: 0; }
 .eb-doc-info { display: flex; flex-direction: column; flex: 1; gap: 2px; }
 .eb-doc-name { font-size: 14px; font-weight: 600; }
@@ -805,7 +792,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   gap: 6px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--eb-primary);
+  color: var(--rb-primary-text);
   border: 1px dashed var(--eb-primary);
   border-radius: 10px;
   padding: 9px 14px;
@@ -815,7 +802,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-upload-input { display: none; }
 
 /* ---------- change summary ---------- */
-.eb-change-card { border-color: #bcd6f2; }
+.eb-change-card { border-color: rgba(var(--rb-primary-rgb), 0.35); }
 .eb-change-list { display: flex; flex-direction: column; gap: 14px; }
 .eb-change-row {
   display: flex;
@@ -830,7 +817,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-change-label { font-size: 13px; font-weight: 700; color: var(--eb-text-muted); min-width: 160px; }
 .eb-change-values { display: flex; align-items: center; gap: 10px; font-size: 14px; flex-wrap: wrap; }
 .eb-change-prev { color: var(--eb-text-muted); text-decoration: line-through; }
-.eb-change-arrow { color: var(--eb-primary); flex-shrink: 0; }
+.eb-change-arrow { color: var(--rb-primary-text); flex-shrink: 0; }
 .eb-change-updated { color: var(--eb-success); font-weight: 700; }
 
 /* ---------- audit timeline ---------- */
@@ -861,7 +848,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-audit-date { font-size: 12px; color: var(--eb-text-muted); }
 .eb-audit-values { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .eb-audit-prev { color: var(--eb-text-muted); text-decoration: line-through; }
-.eb-audit-arrow { color: var(--eb-primary); flex-shrink: 0; }
+.eb-audit-arrow { color: var(--rb-primary-text); flex-shrink: 0; }
 .eb-audit-new { color: var(--eb-success); font-weight: 600; }
 .eb-audit-by { font-size: 12px; color: var(--eb-text-muted); }
 
@@ -886,7 +873,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-availability-row { display: grid; grid-template-columns: 40px 1fr 30px; align-items: center; gap: 10px; }
 .eb-availability-type { font-size: 13px; font-weight: 700; color: var(--eb-text-muted); }
 .eb-availability-type.is-match { color: var(--eb-danger); }
-.eb-availability-bar-track { height: 6px; border-radius: 999px; background: #eef1f6; overflow: hidden; }
+.eb-availability-bar-track { height: 6px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
 .eb-availability-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--eb-success); }
 .eb-availability-units { font-size: 13px; font-weight: 700; text-align: right; }
 
@@ -898,7 +885,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   left: 0;
   right: 0;
   bottom: 0;
-  background: #fff;
+  background: var(--rb-surface);
   border-top: 1px solid var(--eb-border);
   padding: 14px 28px;
   display: flex;
@@ -927,7 +914,7 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
 .eb-skeleton-wrap { display: flex; flex-direction: column; gap: 20px; }
 .eb-skeleton {
   border-radius: 18px;
-  background: linear-gradient(90deg, #eef1f6 25%, #f6f8fb 37%, #eef1f6 63%);
+  background: linear-gradient(90deg, var(--rb-surface-alt) 25%, var(--rb-surface-hover) 37%, var(--rb-surface-alt) 63%);
   background-size: 400% 100%;
   animation: eb-shimmer 1.4s ease infinite;
 }
@@ -954,29 +941,4 @@ fieldset.eb-card:disabled { background: #fbfcfe; }
   .eb-action-bar-buttons .eb-btn { width: 100%; }
 }
 
-/* ---------- dark mode ---------- */
-:global(.dark .eb-page) { background: #0f1420; color: #e6eaf2; }
-:global(.dark .eb-page .eb-card) { background: #161d2c; border-color: var(--eb-border-dark); box-shadow: none; }
-:global(.dark .eb-page .eb-change-card) { border-color: #2c4a70; }
-:global(.dark .eb-page .eb-input) { background: #131a27; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-page .eb-subtitle),
-:global(.dark .eb-page .eb-label),
-:global(.dark .eb-page .eb-side-label),
-:global(.dark .eb-page .eb-doc-size),
-:global(.dark .eb-page .eb-hint),
-:global(.dark .eb-page .eb-empty-inline),
-:global(.dark .eb-page .eb-audit-date),
-:global(.dark .eb-page .eb-audit-by),
-:global(.dark .eb-page .eb-rules-list),
-:global(.dark .eb-page .eb-availability-type),
-:global(.dark .eb-page .eb-change-label) { color: #8b95a8; }
-:global(.dark .eb-page .eb-btn-outline) { background: #161d2c; border-color: var(--eb-border-dark); color: #e6eaf2; }
-:global(.dark .eb-page .eb-doc-item) { background: #131a27; border-color: var(--eb-border-dark); }
-:global(.dark .eb-page .eb-side-row),
-:global(.dark .eb-page .eb-change-row) { border-color: var(--eb-border-dark); }
-:global(.dark .eb-page .eb-availability-bar-track) { background: #232c3f; }
-:global(.dark .eb-page .eb-action-bar) { background: #161d2c; border-color: var(--eb-border-dark); }
-:global(.dark .eb-page .eb-audit-item::before) { background: var(--eb-border-dark); }
-:global(.dark .eb-page .eb-locked-banner) { background: #2a2314; border-color: #4a3a12; }
-:global(.dark fieldset.eb-card:disabled) { background: #12182a; }
 </style>

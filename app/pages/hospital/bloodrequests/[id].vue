@@ -15,24 +15,19 @@
         <span class="crumb-current">Request Details</span>
       </nav> -->
 
-      <div class="page-header__row">
-        <div class="page-header__titles">
-          <h1 class="page-title">Blood Request Details</h1>
-          <p class="page-subtitle">View the complete information and progress of this blood request.</p>
-        </div>
-
-        <div class="page-header__actions" v-if="!isLoadingRequest && request">
+      <PageHeader title="Blood Request Details" subtitle="View the complete information and progress of this blood request.">
+        <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
-          <button class="btn btn--outline" type="button" @click="handleDownloadPdf">
-            <AssetIcon name="download" />
+          <button class="ui-btn" type="button" @click="handleDownloadPdf">
+            <AssetIcon name="download" :size="15" />
             <span>Download PDF</span>
           </button>
-          <button class="btn btn--outline" type="button" @click="handlePrint">
-            <AssetIcon name="printer" />
+          <button class="ui-btn" type="button" @click="handlePrint">
+            <AssetIcon name="printer" :size="15" />
             <span>Print</span>
           </button>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
     </div>
 
     <!-- ============== LOADING SKELETON ============== -->
@@ -49,20 +44,18 @@
     </div>
 
     <!-- ============== ERROR STATE ============== -->
-    <div v-else-if="requestError" class="empty-state empty-state--error">
-      <AssetIcon name="alert-triangle" />
-      <h3>We couldn't load this request</h3>
-      <p>Something went wrong while fetching the request details. Please try again.</p>
-      <button class="btn btn--primary" type="button" @click="fetchRequest">Retry</button>
-    </div>
+    <section v-else-if="requestError" class="card">
+      <EmptyState icon="triangle-alert" title="We couldn't load this request" description="Something went wrong while fetching the request details. Please try again.">
+        <button class="ui-btn ui-btn--primary" type="button" @click="fetchRequest">Retry</button>
+      </EmptyState>
+    </section>
 
     <!-- ============== EMPTY STATE (not found) ============== -->
-    <div v-else-if="!request" class="empty-state">
-      <AssetIcon name="file-search" />
-      <h3>Request not found</h3>
-      <p>This blood request may have been removed, or the link is incorrect.</p>
-      <button class="btn btn--primary" type="button" @click="goBack">Back to Blood Requests</button>
-    </div>
+    <section v-else-if="!request" class="card">
+      <EmptyState icon="search-x" title="Request not found" description="This blood request may have been removed, or the link is incorrect.">
+        <button class="ui-btn ui-btn--primary" type="button" @click="goBack">Back to Blood Requests</button>
+      </EmptyState>
+    </section>
 
     <!-- ============== MAIN CONTENT ============== -->
     <template v-else>
@@ -181,7 +174,7 @@
               ({{ requestStatusLabel(request.transfusion_request) }}). The patient needs {{ requiredSummary }}; other
               facilities may be asked for the rest.
             </p>
-            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="btn btn--outline btn--sm">
+            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="ui-btn ui-btn--sm">
               <span>Open the Patient Transfusion Request</span>
             </NuxtLink>
           </section>
@@ -199,7 +192,7 @@
               The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
               dispatches.
             </p>
-            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="btn btn--outline btn--sm">
+            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="ui-btn ui-btn--sm">
               <span>Open the weekly request</span>
             </NuxtLink>
           </section>
@@ -376,7 +369,7 @@
                         <td>{{ formatCurrency(s.amount_due) }}</td>
                         <td>
                           <button
-                            class="btn btn--outline btn--sm"
+                            class="ui-btn ui-btn--sm"
                             type="button"
                             :disabled="downloadingId === `soa-${s.id}`"
                             @click="downloadStatement(s)"
@@ -414,7 +407,7 @@
                         <td>{{ formatCurrency(r.amount_paid) }}</td>
                         <td>
                           <button
-                            class="btn btn--outline btn--sm"
+                            class="ui-btn ui-btn--sm"
                             type="button"
                             :disabled="downloadingId === `ar-${r.id}`"
                             @click="downloadReceipt(r)"
@@ -541,19 +534,19 @@
           <section class="card side-card">
             <h3 class="side-card__title">Quick Actions</h3>
             <div class="quick-actions">
-              <button class="btn btn--outline btn--full" type="button" @click="handleDownloadPdf">
+              <button class="ui-btn btn--full" type="button" @click="handleDownloadPdf">
                 <AssetIcon name="download" />
                 <span>Download PDF</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="handlePrint">
+              <button class="ui-btn btn--full" type="button" @click="handlePrint">
                 <AssetIcon name="printer" />
                 <span>Print</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="scrollToTimeline">
+              <button class="ui-btn btn--full" type="button" @click="scrollToTimeline">
                 <AssetIcon name="map-pin" />
                 <span>Track Request</span>
               </button>
-              <button v-if="showBillingSection" class="btn btn--outline btn--full" type="button" @click="scrollToBilling">
+              <button v-if="showBillingSection" class="ui-btn btn--full" type="button" @click="scrollToBilling">
                 <AssetIcon name="clipboard-list" />
                 <span>View Billing</span>
               </button>
@@ -565,7 +558,7 @@
       <!-- ============== PAYMENT TOAST ============== -->
       <Transition name="toast">
         <div v-if="toastMessage" class="toast" role="status">
-          <AssetIcon name="check-circle" :size="16" style="color:#346538" />
+          <AssetIcon name="check-circle" :size="16" style="color: var(--rb-success-text)" />
           {{ toastMessage }}
         </div>
       </Transition>
@@ -633,7 +626,7 @@
               : 'Nothing selected — confirming will accept every dispatched unit.' }}
           </span>
           <button
-            class="btn btn--primary"
+            class="ui-btn ui-btn--primary"
             type="button"
             :disabled="confirmingReceipt"
             @click="handleConfirmReceipt"
@@ -648,14 +641,14 @@
 
       <!-- ============== BOTTOM ACTIONS ============== -->
       <div class="bottom-actions">
-        <button class="btn btn--outline" type="button" @click="goBack">Back to Blood Requests</button>
-        <button class="btn btn--outline" type="button" @click="scrollToTimeline">Track Request</button>
-        <button class="btn btn--outline" type="button" @click="handleDownloadPdf">Download PDF</button>
-        <button class="btn btn--outline" type="button" @click="handlePrint">Print</button>
+        <button class="ui-btn" type="button" @click="goBack">Back to Blood Requests</button>
+        <button class="ui-btn" type="button" @click="scrollToTimeline">Track Request</button>
+        <button class="ui-btn" type="button" @click="handleDownloadPdf">Download PDF</button>
+        <button class="ui-btn" type="button" @click="handlePrint">Print</button>
         <NuxtLink
           v-if="canEdit"
           :to="`/hospital/bloodrequests/edit/${requestId}`"
-          class="btn btn--primary"
+          class="ui-btn ui-btn--primary"
         >
           Edit
         </NuxtLink>
@@ -676,6 +669,8 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -688,17 +683,6 @@ definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
   requires: 'hospital.requests.view',
-})
-
-// Editorial serif for headings only — scoped to this page, does not touch
-// the app-wide font set in nuxt.config.ts.
-useHead({
-  link: [
-    {
-      rel: 'stylesheet',
-      href: 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&display=swap',
-    },
-  ],
 })
 
 const route = useRoute()
@@ -976,21 +960,11 @@ function scrollToTimeline() {
 
 <style scoped>
 .request-details-page {
-  --rb-canvas: #FBF9F6;
-  --rb-surface: #FFFFFF;
-  --rb-border: #EAE7E1;
-  --rb-text: #1F1D1B;
-  --rb-text-muted: #78746D;
-  padding: 24px;
-  background: var(--rb-canvas);
+  max-width: var(--rb-content-max, 1600px);
+  margin: 0 auto;
+  padding: 24px var(--rb-gutter, 24px) 40px;
+  background: var(--rb-page-bg);
   min-height: 100%;
-}
-:global(.dark .request-details-page) {
-  --rb-canvas: #14120F;
-  --rb-surface: #1C1A17;
-  --rb-border: #2E2B26;
-  --rb-text: #EDEAE5;
-  --rb-text-muted: #A19C93;
 }
 
 /* ---------- Header ---------- */
@@ -1000,7 +974,7 @@ function scrollToTimeline() {
   gap: 6px;
   background: none;
   border: none;
-  color: #1565c0;
+  color: var(--rb-primary-text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1013,19 +987,20 @@ function scrollToTimeline() {
 
 .breadcrumb {
   font-size: 13px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   margin-bottom: 16px;
   display: flex;
   gap: 6px;
 }
 .crumb-sep {
-  color: #b7c0cc;
+  color: var(--rb-text-muted);
 }
 .crumb-current {
-  color: #1a2233;
+  color: var(--rb-text-primary);
   font-weight: 600;
 }
 
+.page-header :deep(.ph) { margin-bottom: 24px; }
 .page-header__row {
   display: flex;
   justify-content: space-between;
@@ -1035,17 +1010,17 @@ function scrollToTimeline() {
   margin-bottom: 24px;
 }
 .page-title {
-  font-family: 'Newsreader', var(--rb-font-sans);
+  font-family: var(--rb-font-sans);
   font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 4px;
 }
 .page-subtitle {
   font-size: 14px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   margin: 0;
 }
 .page-header__actions {
@@ -1077,20 +1052,20 @@ function scrollToTimeline() {
   cursor: not-allowed;
 }
 .btn--primary {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: #0f4f9c;
+  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
 }
 .btn--outline {
   background: var(--rb-surface);
-  color: #1565c0;
+  color: var(--rb-primary-text);
   border-color: var(--rb-border);
 }
 .btn--outline:hover {
-  background: #f1f6fb;
-  border-color: #1565c0;
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border-color: var(--rb-primary);
 }
 .btn--full {
   width: 100%;
@@ -1104,6 +1079,8 @@ function scrollToTimeline() {
 /* ---------- Status badges ---------- */
 .status-badge {
   display: inline-flex;
+  width: fit-content;
+  justify-self: start;
   align-items: center;
   padding: 6px 14px;
   border-radius: 999px;
@@ -1117,38 +1094,33 @@ function scrollToTimeline() {
   letter-spacing: 0.05em;
 }
 .badge--success {
-  background: #EDF3EC;
-  color: #346538;
+  background: rgba(var(--rb-success-rgb), .1);
+  color: var(--rb-success-text);
 }
 .badge--warning {
-  background: #FBF3DB;
-  color: #956400;
+  background: rgba(var(--rb-warning-rgb), .14);
+  color: var(--rb-warning-text);
 }
 .badge--danger {
-  background: #FDEBEC;
-  color: #9F2F2D;
+  background: rgba(var(--rb-accent-rgb), .09);
+  color: var(--rb-accent-text);
 }
 .badge--info {
-  background: #E1F3FE;
-  color: #1F6C9F;
+  background: rgba(var(--rb-primary-rgb), .1);
+  color: var(--rb-primary-text);
 }
 .badge--neutral {
-  background: #F0EEE9;
-  color: #6B675F;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
 }
-:global(.dark .request-details-page .badge--success) { background: #1D2B1E; color: #8FCB94; }
-:global(.dark .request-details-page .badge--warning) { background: #322A12; color: #E4B54B; }
-:global(.dark .request-details-page .badge--danger) { background: #331A19; color: #E58E8B; }
-:global(.dark .request-details-page .badge--info) { background: #122733; color: #7EC1EE; }
-:global(.dark .request-details-page .badge--neutral) { background: #2A2721; color: #B3AEA4; }
 
 /* ---------- Cards ---------- */
 .card {
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
-  border-radius: 12px;
+  border-radius: var(--rb-radius-lg);
   padding: 24px;
-  box-shadow: none;
+  box-shadow: var(--rb-shadow-sm);
   margin-bottom: 20px;
   transition: box-shadow 0.2s ease;
 }
@@ -1168,7 +1140,7 @@ function scrollToTimeline() {
 }
 .summary-label {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -1176,18 +1148,18 @@ function scrollToTimeline() {
 .summary-value {
   font-size: 15px;
   font-weight: 600;
-  color: #1a2233;
+  color: var(--rb-text-primary);
 }
 .summary-value--mono {
   font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 .section-title {
-  font-family: 'Newsreader', var(--rb-font-sans);
+  font-family: var(--rb-font-sans);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 18px;
 }
 
@@ -1222,14 +1194,14 @@ function scrollToTimeline() {
 }
 .info-label {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 .info-value {
   font-size: 14px;
-  color: #2a3447;
+  color: var(--rb-text-primary);
   line-height: 1.5;
 }
 .info-value--mono {
@@ -1238,7 +1210,7 @@ function scrollToTimeline() {
 .info-value--emphasis {
   font-size: 20px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 
 /* ---------- Documents ---------- */
@@ -1257,20 +1229,20 @@ function scrollToTimeline() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #f1f6fb;
-  border: 1px solid #e5eaf0;
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border: 1px solid var(--rb-border);
   border-radius: 10px;
   padding: 8px 12px;
   font-size: 13px;
-  color: #1565c0;
+  color: var(--rb-primary-text);
   text-decoration: none;
 }
 .document-chip:hover {
-  border-color: #1565c0;
+  border-color: var(--rb-primary);
 }
 .documents-empty {
   font-size: 13px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   margin: 0;
 }
 
@@ -1297,7 +1269,7 @@ function scrollToTimeline() {
   top: 24px;
   bottom: 0;
   width: 2px;
-  background: #e5eaf0;
+  background: var(--rb-border);
 }
 .timeline-step:last-child::before {
   display: none;
@@ -1310,8 +1282,8 @@ function scrollToTimeline() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef0f3;
-  color: #8792a2;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
   z-index: 1;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -1322,14 +1294,14 @@ function scrollToTimeline() {
   background: currentColor;
 }
 .timeline-step--completed .timeline-marker {
-  background: #2e7d32;
+  background: var(--rb-success);
   color: #fff;
 }
 .timeline-step--completed::before {
-  background: #2e7d32;
+  background: var(--rb-success);
 }
 .timeline-step--current .timeline-marker {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
   box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.15);
 }
@@ -1342,15 +1314,15 @@ function scrollToTimeline() {
 .timeline-label {
   font-size: 14px;
   font-weight: 600;
-  color: #1a2233;
+  color: var(--rb-text-primary);
 }
 .timeline-step--upcoming .timeline-label {
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 500;
 }
 .timeline-timestamp {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
 }
 
 /* ---------- History table ---------- */
@@ -1367,19 +1339,19 @@ function scrollToTimeline() {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   padding: 10px 12px;
-  border-bottom: 1px solid #e5eaf0;
+  border-bottom: 1px solid var(--rb-border);
 }
 .history-table td {
   padding: 12px;
-  border-bottom: 1px solid #f1f3f6;
-  color: #2a3447;
+  border-bottom: 1px solid var(--rb-border);
+  color: var(--rb-text-primary);
 }
 .table-empty {
   text-align: center;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   padding: 24px 12px;
 }
 
@@ -1387,7 +1359,7 @@ function scrollToTimeline() {
 .side-card__title {
   font-size: 16px;
   font-weight: 700;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 14px;
 }
 .side-card__row {
@@ -1400,20 +1372,20 @@ function scrollToTimeline() {
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #eef0f3;
+  background: var(--rb-surface-alt);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 8px;
 }
 .progress-bar__fill {
   height: 100%;
-  background: #1565c0;
+  background: var(--rb-primary);
   border-radius: 999px;
   transition: width 0.5s ease;
 }
 .progress-percent {
   font-size: 13px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   font-weight: 600;
 }
 
@@ -1431,15 +1403,15 @@ function scrollToTimeline() {
   align-items: center;
   padding: 8px 10px;
   border-radius: 10px;
-  background: #f7f9fc;
+  background: var(--rb-surface-alt);
   font-size: 13px;
 }
 .availability-type {
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 .availability-units {
-  color: #55606e;
+  color: var(--rb-text-secondary);
 }
 
 .quick-actions {
@@ -1512,7 +1484,7 @@ function scrollToTimeline() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--rb-text);
+  color: var(--rb-text-primary);
 }
 .toast-enter-active,
 .toast-leave-active {
@@ -1541,11 +1513,11 @@ function scrollToTimeline() {
   justify-content: center;
   text-align: center;
   padding: 80px 20px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
 }
 .empty-state h3 {
   font-size: 18px;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 12px 0 4px;
 }
 .empty-state p {
@@ -1553,12 +1525,12 @@ function scrollToTimeline() {
   margin: 0 0 20px;
 }
 .empty-state--error h3 {
-  color: #d32f2f;
+  color: var(--rb-accent-text);
 }
 
 /* ---------- Skeletons ---------- */
 .skeleton {
-  background: linear-gradient(90deg, var(--rb-border) 25%, var(--rb-canvas) 37%, var(--rb-border) 63%);
+  background: linear-gradient(90deg, var(--rb-border) 25%, var(--rb-surface-hover) 37%, var(--rb-border) 63%);
   background-size: 400% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
   border-radius: 12px;
@@ -1610,58 +1582,8 @@ function scrollToTimeline() {
 /* .request-details-page / .card / .skeleton already read the warm --rb-*
    tokens redefined near the top of this file, so no hardcoded overrides
    are needed for those here. */
-:global(.dark .request-details-page .page-title),
-:global(.dark .request-details-page .crumb-current),
-:global(.dark .request-details-page .section-title),
-:global(.dark .request-details-page .side-card__title),
-:global(.dark .request-details-page .summary-value),
-:global(.dark .request-details-page .info-value),
-:global(.dark .request-details-page .timeline-label) {
-  color: var(--rb-text);
-}
-:global(.dark .request-details-page .page-subtitle),
-:global(.dark .request-details-page .breadcrumb),
-:global(.dark .request-details-page .info-label),
-:global(.dark .request-details-page .summary-label),
-:global(.dark .request-details-page .documents-empty),
-:global(.dark .request-details-page .timeline-timestamp),
-:global(.dark .request-details-page .progress-percent) {
-  color: var(--rb-text-muted);
-}
-:global(.dark .request-details-page .btn--outline) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: #6fa8dc;
-}
-:global(.dark .request-details-page .btn--outline:hover) {
-  background: #262319;
-}
-:global(.dark .request-details-page .history-table th) {
-  color: var(--rb-text-muted);
-  border-color: var(--rb-border);
-}
-:global(.dark .request-details-page .history-table td) {
-  color: var(--rb-text);
-  border-color: var(--rb-border);
-}
-:global(.dark .request-details-page .document-chip),
-:global(.dark .request-details-page .availability-item) {
-  background: #262319;
-  border-color: var(--rb-border);
-}
 :global(.dark) .timeline-step::before {
   background: var(--rb-border);
-}
-:global(.dark .request-details-page .timeline-marker) {
-  background: #262319;
-}
-:global(.dark .request-details-page .billing-gated) {
-  color: var(--rb-text-muted);
-}
-:global(.dark .request-details-page .toast) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: var(--rb-text);
 }
 
 /* ---------- Responsive ---------- */

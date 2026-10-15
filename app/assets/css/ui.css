@@ -65,3 +65,84 @@
   .ui-btn { transition: none; }
   .ui-btn:active:not(:disabled) { transform: none; }
 }
+
+/*
+ * Staff portal shell (hospital, admin): the blood center's glow and glass,
+ * shared so the portals read as one product. The blood center layout keeps
+ * its own copy (.bc-shell) for now.
+ */
+.staff-shell {
+  /* Pages paint their root with --rb-page-bg; here it is see-through, so they sit on the glow. */
+  --rb-page-bg: transparent;
+  /* Readable greys (WCAG AA on white) and card edges that show on dim monitors. */
+  --rb-text-secondary: #526075;
+  --rb-text-muted: #64748B;
+  --rb-placeholder: #64748B;
+  --rb-border: #E4E9F0;
+  --rb-border-strong: #D5DCE6;
+}
+.dark .staff-shell {
+  --rb-text-secondary: #94A3B8;
+  --rb-text-muted: #8391A6;
+  --rb-placeholder: #8391A6;
+  --rb-border: #334155;
+  --rb-border-strong: #3E4C63;
+}
+.staff-shell input::placeholder,
+.staff-shell textarea::placeholder {
+  color: var(--rb-placeholder);
+  opacity: 1;
+}
+
+/* The landing hero's glow: a wash of the portal colour at the top, a glow top-right, faint red on the left. */
+.staff-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 32%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.06), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 70%, #F6F8FB) 0%, #F6F8FB 55%);
+}
+.dark .staff-backdrop {
+  background:
+    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 18%, transparent), transparent 72%),
+    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.08), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 8%, #0B1220) 0%, #0B1220 55%);
+}
+
+/* Glass: the top bar, the page layer and the rail. */
+.staff-glass {
+  background-color: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+.dark .staff-glass { background-color: rgba(15, 23, 42, 0.6); }
+.staff-topbar { border-color: var(--rb-border); }
+.staff-topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
+.dark .staff-topbar--scrolled { background-color: rgba(15, 23, 42, 0.78); }
+
+/* The page layer beside the rail and under the bar. */
+.staff-frost {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+  transition: left 200ms ease-out;
+}
+@media (min-width: 640px) {
+  .staff-frost { top: 64px; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .staff-glass { background-color: var(--rb-surface, #FFFFFF) !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .staff-topbar--scrolled { background-color: var(--rb-surface, #FFFFFF); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .staff-frost { transition: none; }
+}

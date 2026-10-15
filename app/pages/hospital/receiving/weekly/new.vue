@@ -1,19 +1,13 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <header class="page-header">
-        <div>
-          <NuxtLink to="/hospital/receiving/weekly" class="back-link">
-            <AssetIcon name="arrow-left" :size="14" />
-            Weekly Request
-          </NuxtLink>
-          <h1 class="page-title">New weekly request</h1>
-          <p class="page-subtitle">
-            Ask a blood center for this week's restock. It supplies what it can — you may be sent all, part or none of
-            what you ask for — and only the units you actually receive are added to your inventory.
-          </p>
-        </div>
-      </header>
+      <NuxtLink to="/hospital/receiving/weekly" class="back-link">
+        <AssetIcon name="arrow-left" :size="14" />
+        Weekly Request
+      </NuxtLink>
+      <PageHeader title="New weekly request">
+        <template #subtitle>Ask a blood center for this week's restock. It supplies what it can — you may be sent all, part or none of what you ask for — and only the units you actually receive are added to your inventory.</template>
+      </PageHeader>
 
       <div v-if="loading" class="panel list-state" aria-busy="true">
         <div class="skeleton" style="width:50%" />
@@ -41,8 +35,8 @@
           </template>
         </p>
         <div class="empty-state__actions">
-          <NuxtLink to="/hospital/receiving/weekly" class="btn">Back to Weekly Request</NuxtLink>
-          <NuxtLink to="/hospital/bloodrequests/newrequest" class="btn">New patient transfusion request</NuxtLink>
+          <NuxtLink to="/hospital/receiving/weekly" class="ui-btn">Back to Weekly Request</NuxtLink>
+          <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn">New patient transfusion request</NuxtLink>
         </div>
       </section>
 
@@ -142,7 +136,7 @@
           </div>
 
           <div class="lines__foot">
-            <button type="button" class="btn btn--sm" :disabled="lines.length >= 80" @click="addLine">
+            <button type="button" class="ui-btn ui-btn--sm" :disabled="lines.length >= 80" @click="addLine">
               <AssetIcon name="plus" :size="13" />
               Add line
             </button>
@@ -156,8 +150,8 @@
         </div>
 
         <div class="form-actions">
-          <NuxtLink to="/hospital/receiving/weekly" class="btn">Cancel</NuxtLink>
-          <button type="button" class="btn btn--primary" :disabled="submitting" @click="submit">
+          <NuxtLink to="/hospital/receiving/weekly" class="ui-btn">Cancel</NuxtLink>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="submitting" @click="submit">
             <AssetIcon name="send" :size="14" />
             {{ submitting ? 'Sending…' : 'Send weekly request' }}
           </button>
@@ -168,6 +162,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * Sending a blood center this week's restock.
  *
@@ -329,20 +324,22 @@ function formatDay(value) {
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css; nothing is redeclared here. */
-.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 20px; }
-.rcv-inner { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; margin-bottom: 6px; }
 .back-link:hover { text-decoration: underline; }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+/* Sits just above the title, not a full gap away, and only as wide as its words. */
+.rcv-inner > .back-link { align-self: flex-start; margin-bottom: -10px; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 76ch; }
 
 .banner { display: flex; align-items: center; gap: 8px; margin: 0; padding: 11px 14px; border-radius: 10px; font-size: 13px; }
 .banner--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 .panel--pad { padding: 16px; }
 .panel__head { padding: 16px 16px 8px; }
@@ -399,17 +396,6 @@ function formatDay(value) {
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit; text-decoration: none;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 
 .skeleton {
   height: 13px; border-radius: 6px; margin-bottom: 10px;
@@ -429,6 +415,6 @@ function formatDay(value) {
   .lines__row--head { display: none; }
   .lines__row { grid-template-columns: 1fr 1fr 36px; }
   .lines__col-component { grid-column: 1 / -1; }
-  .form-actions > .btn { flex: 1; }
+  .form-actions > .ui-btn { flex: 1; }
 }
 </style>

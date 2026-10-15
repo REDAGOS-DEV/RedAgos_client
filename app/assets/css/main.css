@@ -181,6 +181,15 @@ html {
    * transition.
    */
   scrollbar-gutter: stable;
+  /*
+   * The reserved gutter paints with the root's own background. Without one it
+   * showed as a white strip down the right edge of any page too short to
+   * scroll (2026-10-15); the staff canvas colour makes it disappear.
+   */
+  background-color: #F6F8FB;
+}
+html.dark {
+  background-color: #0B1220;
 }
 
 /*

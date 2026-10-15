@@ -1,15 +1,9 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Direct Distribution</h1>
-          <p class="page-subtitle">
-            Receive blood delivered from outside RedAgos, under the identifier its sender gave it — such as
-            <span class="mono">PRC-920923323</span>. RedAgos keeps that identifier as is and does not issue a barcode of its own.
-          </p>
-        </div>
-      </header>
+      <PageHeader title="Direct Distribution">
+        <template #subtitle>Receive blood delivered from outside RedAgos, under the identifier its sender gave it — such as <span class="mono">PRC-920923323</span>. RedAgos keeps that identifier as is and does not issue a barcode of its own.</template>
+      </PageHeader>
 
       <div class="modes" role="tablist" aria-label="How the blood is being received">
         <button
@@ -88,7 +82,7 @@
         <h2 id="scan-title" class="panel__title">2. Blood unit</h2>
 
         <div class="scan">
-          <button type="button" class="btn btn--primary scan__button" :disabled="!ptr || busy" @click="armScanner">
+          <button type="button" class="ui-btn ui-btn--primary scan__button" :disabled="!ptr || busy" @click="armScanner">
             <AssetIcon name="scan-line" :size="16" />
             Scan Blood Unit
           </button>
@@ -119,7 +113,7 @@
               @blur="scannerArmed = false"
             >
           </div>
-          <button type="submit" class="btn" :disabled="!ptr || busy || !entry.trim()">Receive</button>
+          <button type="submit" class="ui-btn" :disabled="!ptr || busy || !entry.trim()">Receive</button>
         </form>
         <p class="field-hint">Typing is optional — use it only when a unit cannot be scanned.</p>
 
@@ -269,7 +263,7 @@
         <form v-if="addingSource" class="add-source" @submit.prevent="addSource">
           <input v-model.trim="newSource.name" type="text" class="input" maxlength="150" placeholder="Name of the blood service" aria-label="New blood service name">
           <input v-model.trim="newSource.code" type="text" class="input input--code mono" maxlength="20" placeholder="Code" aria-label="Code, optional">
-          <button type="submit" class="btn" :disabled="savingSource || !newSource.name">{{ savingSource ? 'Adding…' : 'Add source' }}</button>
+          <button type="submit" class="ui-btn" :disabled="savingSource || !newSource.name">{{ savingSource ? 'Adding…' : 'Add source' }}</button>
           <p v-if="sourceError" class="field-error">{{ sourceError }}</p>
         </form>
 
@@ -279,8 +273,8 @@
         </div>
 
         <div class="form-actions">
-          <button v-if="mode === 'ptr'" type="button" class="btn" :disabled="busy" @click="cancelPending">Cancel</button>
-          <button type="button" class="btn btn--primary" :disabled="busy" @click="receiveExternal">
+          <button v-if="mode === 'ptr'" type="button" class="ui-btn" :disabled="busy" @click="cancelPending">Cancel</button>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="receiveExternal">
             <AssetIcon name="package-check" :size="14" />
             {{ busy ? 'Receiving…' : receiveLabel }}
           </button>
@@ -373,6 +367,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * Direct Distribution: receiving blood for one patient's transfusion request.
  *
@@ -770,16 +765,16 @@ function formatDateTime(value) {
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css; nothing is redeclared here. */
-.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 20px; }
-.rcv-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 78ch; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 .panel--pad { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .panel--off { opacity: 0.55; }
@@ -882,16 +877,6 @@ function formatDateTime(value) {
 }
 .link-btn:hover { text-decoration: underline; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
-  padding: 0 16px; font-size: 13px; font-weight: 600; font-family: inherit; text-decoration: none;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .scan__button { height: auto; }
 
 .toast {
@@ -922,7 +907,7 @@ function formatDateTime(value) {
   .field-grid { grid-template-columns: 1fr; }
   .field--wide { grid-column: auto; }
   .modes { grid-template-columns: 1fr; }
-  .form-actions > .btn, .scan__button { flex: 1; }
+  .form-actions > .ui-btn, .scan__button { flex: 1; }
   .ptr-pick .input, .search-box { min-width: 0; width: 100%; }
 }
 </style>
