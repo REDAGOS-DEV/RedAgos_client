@@ -33,9 +33,4 @@ const expired = computed(() => route.query.reason === 'session_expired')
   line-height: 1.55;
 }
 
-.dark .session-notice {
-  border-color: #7C5E10;
-  background: #2A2312;
-  color: #FDE68A;
-}
 </style>

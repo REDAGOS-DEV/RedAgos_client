@@ -1,30 +1,28 @@
 <template>
-  <section class="quarantine" aria-labelledby="quarantine-title">
-    <header class="quarantine__header">
-      <div>
-        <h2 id="quarantine-title" class="quarantine__title">
-          <AssetIcon name="shield-check" :size="16" />
-          In quarantine
-          <span class="quarantine__count">{{ units.length }}</span>
-        </h2>
-        <p class="quarantine__hint">
-          Booked in, not yet issuable. A donation's bags leave quarantine together, and only once TTI Testing and
-          Immunohematology have both cleared it.
-          <template v-if="!allowRelease">They are released and given their final labels at Stock Intake.</template>
-          <template v-else>Releasing prints each bag's final label.</template>
-        </p>
-      </div>
-      <button type="button" class="quarantine__refresh" :disabled="loading" @click="load">
+  <SectionCard class="quarantine">
+    <template #title>
+      <AssetIcon name="shield-check" :size="16" class="quarantine__title-icon" />
+      In quarantine
+      <span class="quarantine__count">{{ units.length }}</span>
+    </template>
+    <template #subtitle>
+      Booked in, not yet issuable. A donation's bags leave quarantine together, once TTI testing and
+      immunohematology have both cleared it.
+      <template v-if="!allowRelease">They are released and labelled at Stock Intake.</template>
+      <template v-else>Releasing prints each bag's final label.</template>
+    </template>
+    <template #actions>
+      <button type="button" class="ui-btn ui-btn--sm" :disabled="loading" @click="load">
         <AssetIcon name="refresh-cw" :size="13" />
         Refresh
       </button>
-    </header>
+    </template>
 
     <p v-if="error" class="quarantine__alert quarantine__alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="quarantine__alert" role="status">{{ notice }}</p>
 
     <p v-if="loading && !groups.length" class="quarantine__empty">Loading…</p>
-    <p v-else-if="!groups.length" class="quarantine__empty">Nothing is waiting in quarantine.</p>
+    <EmptyState v-else-if="!groups.length" icon="shield-check" title="Nothing is waiting in quarantine" compact />
 
     <ul v-else class="quarantine__list">
       <li v-for="group in groups" :key="group.donationId" class="quarantine__row">
@@ -60,7 +58,7 @@
         <button
           v-if="canRelease && !group.state.locked"
           type="button"
-          class="quarantine__release"
+          class="ui-btn ui-btn--primary ui-btn--sm"
           :disabled="busy === group.donationId || !group.state.releasable"
           :title="group.state.releasable ? '' : 'Waiting for testing to clear this donation'"
           @click="release(group)"
@@ -69,7 +67,7 @@
         </button>
       </li>
     </ul>
-  </section>
+  </SectionCard>
 </template>
 
 <script setup>
@@ -86,6 +84,8 @@
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SectionCard from '~/components/ui/SectionCard.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 const props = defineProps({
   allowRelease: { type: Boolean, default: false },
@@ -169,32 +169,8 @@ defineExpose({ load })
 </script>
 
 <style scoped>
-.quarantine {
-  border: 1px solid var(--rb-border);
-  border-radius: 14px;
-  background: var(--rb-surface);
-  padding: 1rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.quarantine__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.quarantine__title {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--rb-text-primary);
-}
+.quarantine__title-icon { color: var(--rb-text-secondary); }
+.quarantine :deep(.sc__body) { display: flex; flex-direction: column; gap: 0.75rem; }
 
 .quarantine__count {
   min-width: 1.4rem;
@@ -204,26 +180,6 @@ defineExpose({ load })
   color: var(--rb-warning-text);
   font-size: 12px;
   text-align: center;
-}
-
-.quarantine__hint {
-  margin: 0.25rem 0 0;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-  max-width: 60ch;
-}
-
-.quarantine__refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--rb-text-secondary);
-  font-size: 12.5px;
-  cursor: pointer;
 }
 
 .quarantine__alert {
@@ -305,22 +261,6 @@ defineExpose({ load })
   border-color: transparent;
   background: rgba(var(--rb-accent-rgb), 0.14);
   color: var(--rb-accent-text);
-}
-
-.quarantine__release {
-  padding: 0.4rem 0.9rem;
-  border: 0;
-  border-radius: 8px;
-  background: var(--rb-primary);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.quarantine__release:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .mono {

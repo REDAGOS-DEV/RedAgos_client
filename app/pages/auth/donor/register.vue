@@ -1,198 +1,157 @@
 <template>
-  <div class="register-page">
-    <!-- LEFT SIDE -->
-    <aside class="brand-panel">
-      <div class="brand-lockup">
-        <div class="brand-mark">
-          <img :src="logo" alt="RedAgos Logo" class="logo-image" />
-        </div>
+  <AuthShell :hero="hero" wide>
+    <template #brand-extra>
+      <ul class="perks">
+        <li v-for="perk in perks" :key="perk.label">
+          <span class="perk-icon"><AssetIcon :name="perk.icon" :size="16" /></span>
+          {{ perk.label }}
+        </li>
+      </ul>
+    </template>
 
-        <div>
-          <p class="brand-name">
-            Red<span>Agos</span>
-          </p>
-          <p class="brand-subtitle">Blood Bank System</p>
-        </div>
-      </div>
+    <!--
+      Ang email verification kay parte na sa registration, dili na sa ulahi.
+      Human ma-submit, dinhi ra ta mo-puyo hangtod ma-verify. Walay redirect
+      padulong sa login, kay dili man gyud siya makasulod kung wala pa
+      na-verify ang address.
+    -->
+    <section v-if="registeredEmail" class="verify-step" aria-live="polite">
+      <span class="verify-icon"><AssetIcon name="mail" :size="26" /></span>
 
-      <section class="brand-copy">
-        <h2>
-          Become a<br />
-          Life Saver
-        </h2>
-
-        <p>
-          Register as a donor to schedule donations, track your<br />
-          history, and help save lives in Davao City.
-        </p>
-      </section>
-
-      <div class="what-you-get">
-        <p class="wyg-label">What You Get</p>
-
-        <ul class="wyg-list">
-          <li class="wyg-item">
-            <span class="wyg-icon">
-              <AssetIcon name="calendar" :size="18" />
-            </span>
-            <span>Book donation appointments</span>
-          </li>
-
-          <li class="wyg-item">
-            <span class="wyg-icon">
-              <AssetIcon name="qr-code" :size="18" />
-            </span>
-            <span>QR-based check-in</span>
-          </li>
-
-          <li class="wyg-item">
-            <span class="wyg-icon">
-              <AssetIcon name="clock" :size="18" />
-            </span>
-            <span>Donation history tracking</span>
-          </li>
-        </ul>
-      </div>
-
-    </aside>
-
-    <!-- RIGHT SIDE -->
-    <main class="form-panel">
-      <div class="form-topbar">
-        <NuxtLink to="/auth/role-selection" class="back-link">
-          <AssetIcon name="chevron-left" :size="16" />
-        </NuxtLink>
-
-        <span class="role-badge">
-          <AssetIcon name="heart" :size="16" />
-          Donor
-        </span>
-      </div>
-
-      <!--
-        Ang email verification kay parte na sa registration, dili na sa ulahi.
-        Human ma-submit, dinhi ra ta mo-puyo hangtod ma-verify — walay
-        redirect padulong sa login, kay dili man gyud siya makasulod kung wala
-        pa na-verify ang address.
-      -->
-      <section v-if="registeredEmail" class="verify-step">
-        <div class="verify-step-icon">
-          <AssetIcon name="mail" :size="26" />
-        </div>
-
+      <header class="au-header">
         <h1>Check your email</h1>
+        <p>We sent a verification link to</p>
+      </header>
 
-        <p class="verify-step-lead">
-          We sent a verification link to
-        </p>
+      <p class="verify-email">{{ registeredEmail }}</p>
 
-        <div class="verify-step-chip">
-          <span class="verify-step-chip-email">{{ registeredEmail }}</span>
-        </div>
+      <p class="verify-lead">
+        Open it to activate your account. You can sign in once your email is verified.
+      </p>
+      <p class="au-hint verify-hint">
+        The link is valid for 60 minutes. No email? Check your spam folder first.
+      </p>
 
-        <p class="verify-step-lead">
-          Open it to activate your account — you will not be able to sign in until you do.
-        </p>
+      <button
+        type="button"
+        class="au-btn au-btn--outline"
+        :disabled="isResending"
+        @click="resendVerification"
+      >
+        <AssetIcon name="refresh-cw" :size="16" :class="{ 'au-spinner': isResending }" />
+        {{ isResending ? 'Sending...' : 'Resend verification email' }}
+      </button>
 
-        <p class="verify-step-hint">
-          The link is valid for 60 minutes. No email? Check your spam folder first.
-        </p>
+      <p
+        v-if="resendMessage"
+        class="verify-note"
+        :class="{ 'verify-note--error': resendFailed }"
+        role="status"
+      >
+        {{ resendMessage }}
+      </p>
 
-        <button
-          type="button"
-          class="resend-btn"
-          :disabled="isResending"
-          @click="resendVerification"
-        >
-          <AssetIcon name="refresh-cw" :size="15" />
-          {{ isResending ? 'Sending...' : 'Resend verification email' }}
-        </button>
+      <p class="au-footer">
+        Already verified?
+        <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
+      </p>
+    </section>
 
-        <p
-          v-if="resendMessage"
-          class="verify-step-note"
-          :class="{ 'verify-step-note--error': resendFailed }"
-        >
-          {{ resendMessage }}
-        </p>
+    <template v-else>
+      <header class="au-header">
+        <h1>Create your donor account</h1>
+        <p>It takes about two minutes. You will verify your email next.</p>
+      </header>
 
-        <p class="signin-row">
-          Already verified?
-          <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
-        </p>
-      </section>
-
-      <template v-else>
-      <div class="form-header">
-        <h1>Create Donor Account</h1>
-        <p>Fill in your details to get started</p>
-      </div>
-
-      <form class="donor-form" @submit.prevent="handleSubmit">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="firstName">First Name</label>
-            <input id="firstName" v-model="form.firstName" type="text" placeholder="yannie" />
-            <p v-if="fieldErrors.first_name" class="field-error">{{ fieldErrors.first_name }}</p>
-          </div>
-          <div class="form-field">
-            <label for="lastName">Last Name</label>
-            <input id="lastName" v-model="form.lastName" type="text" placeholder="chen" />
-            <p v-if="fieldErrors.last_name" class="field-error">{{ fieldErrors.last_name }}</p>
-          </div>
-        </div>
-
-        <div class="form-field">
-          <label for="email">Email Address</label>
-          <input id="email" v-model="form.email" type="email" placeholder="yanchen@email.com" />
-          <p v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</p>
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="phone">Phone Number</label>
-            <input id="phone" v-model="form.phone" type="tel" placeholder="+63 9XX XXX XXXX" />
-            <p v-if="fieldErrors.phone" class="field-error">{{ fieldErrors.phone }}</p>
-          </div>
-          <div class="form-field">
-            <label for="bloodType">Blood Type</label>
-            <div class="select-wrap">
-              <select id="bloodType" v-model="form.bloodType">
-                <option value="">I don't know yet</option>
-                <option v-for="type in bloodTypes" :key="type" :value="type">{{ type }}</option>
-              </select>
+      <form class="au-form" novalidate @submit.prevent="handleSubmit">
+        <!-- About you -->
+        <div class="au-row">
+          <div class="au-field">
+            <label for="firstName">First name</label>
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.first_name }">
+              <input id="firstName" v-model="form.firstName" type="text" placeholder="e.g. Maria" autocomplete="given-name">
             </div>
-            <p class="field-hint">Leave this if you are unsure. It is recorded for you from the laboratory test on your first donation.</p>
-            <p v-if="fieldErrors.blood_type" class="field-error">{{ fieldErrors.blood_type }}</p>
+            <p v-if="fieldErrors.first_name" class="au-error">{{ fieldErrors.first_name }}</p>
+          </div>
+          <div class="au-field">
+            <label for="lastName">Last name</label>
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.last_name }">
+              <input id="lastName" v-model="form.lastName" type="text" placeholder="e.g. Santos" autocomplete="family-name">
+            </div>
+            <p v-if="fieldErrors.last_name" class="au-error">{{ fieldErrors.last_name }}</p>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-field">
-            <label for="dob">Date of Birth</label>
-            <div class="input-icon-wrap">
-              <input id="dob" v-model="form.dob" type="date" placeholder="mm/dd/yyyy" />
-            </div>
-            <p v-if="fieldErrors.birth_date" class="field-error">{{ fieldErrors.birth_date }}</p>
+        <div class="au-row">
+          <div class="au-field">
+            <label for="dob">Date of birth</label>
+            <DatePicker
+              id="dob"
+              v-model="form.dob"
+              size="lg"
+              theme="light"
+              placeholder="Select your birth date"
+              :max="todayIso"
+              :invalid="Boolean(fieldErrors.birth_date)"
+            />
+            <p v-if="fieldErrors.birth_date" class="au-error">{{ fieldErrors.birth_date }}</p>
           </div>
-          <div class="form-field">
+          <div class="au-field">
             <label for="gender">Gender</label>
-            <div class="select-wrap">
-              <select id="gender" v-model="form.gender">
-                <option value="" disabled selected>Select</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <p v-if="fieldErrors.gender" class="field-error">{{ fieldErrors.gender }}</p>
+            <AuthSelect
+              id="gender"
+              v-model="form.gender"
+              :options="genders"
+              placeholder="Select"
+              :invalid="Boolean(fieldErrors.gender)"
+            />
+            <p v-if="fieldErrors.gender" class="au-error">{{ fieldErrors.gender }}</p>
           </div>
         </div>
 
-        <div class="form-field">
+        <div class="au-field">
+          <label for="bloodType">Blood type</label>
+          <AuthSelect
+            id="bloodType"
+            v-model="form.bloodType"
+            :options="bloodTypeOptions"
+            icon="blood-drop"
+            describedby="bloodTypeHint"
+            :invalid="Boolean(fieldErrors.blood_type)"
+          />
+          <p id="bloodTypeHint" class="au-hint">
+            Not sure? Leave it as “I don’t know yet”. The lab records it from your first donation.
+          </p>
+          <p v-if="fieldErrors.blood_type" class="au-error">{{ fieldErrors.blood_type }}</p>
+        </div>
+
+        <!-- How to reach you -->
+        <div class="au-row">
+          <div class="au-field">
+            <label for="email">Email address</label>
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.email }">
+              <AssetIcon name="mail" :size="18" class="au-icon" />
+              <input id="email" v-model="form.email" type="email" placeholder="you@example.com" autocomplete="email">
+            </div>
+            <p v-if="fieldErrors.email" class="au-error">{{ fieldErrors.email }}</p>
+          </div>
+          <div class="au-field">
+            <label for="phone">Phone number</label>
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.phone }">
+              <AssetIcon name="phone" :size="18" class="au-icon" />
+              <input id="phone" v-model="form.phone" type="tel" placeholder="09XX XXX XXXX" autocomplete="tel">
+            </div>
+            <p v-if="fieldErrors.phone" class="au-error">{{ fieldErrors.phone }}</p>
+          </div>
+        </div>
+
+        <div class="au-field">
           <label for="address">Address</label>
-          <input id="address" v-model="form.address" type="text" placeholder="Barangay, City, Province" />
-          <p v-if="fieldErrors.address" class="field-error">{{ fieldErrors.address }}</p>
+          <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.address }">
+            <AssetIcon name="map-pin" :size="18" class="au-icon" />
+            <input id="address" v-model="form.address" type="text" placeholder="Barangay, City, Province" autocomplete="street-address">
+          </div>
+          <p v-if="fieldErrors.address" class="au-error">{{ fieldErrors.address }}</p>
         </div>
 
         <!--
@@ -200,88 +159,120 @@
           ang number ra, para makit-an dayon sa counter ang donor pinaagi sa ID
           nga iyang dala.
         -->
-        <div class="form-row">
-          <div class="form-field">
-            <label for="validIdType">Valid ID <span class="optional-tag">optional</span></label>
-            <div class="select-wrap">
-              <select id="validIdType" v-model="form.validIdType">
-                <option value="">Select an ID</option>
-                <option v-for="option in validIdTypes" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
+        <div class="au-field">
+          <div class="au-row">
+            <div class="au-field">
+              <label for="validIdType">Valid ID <span class="au-optional">Optional</span></label>
+              <AuthSelect
+                id="validIdType"
+                v-model="form.validIdType"
+                :options="validIdTypes"
+                placeholder="Select an ID"
+                icon="id-card"
+                :invalid="Boolean(fieldErrors.valid_id_type)"
+              />
+              <p v-if="fieldErrors.valid_id_type" class="au-error">{{ fieldErrors.valid_id_type }}</p>
             </div>
-            <p v-if="fieldErrors.valid_id_type" class="field-error">{{ fieldErrors.valid_id_type }}</p>
+            <div class="au-field">
+              <label for="validIdNumber">ID number</label>
+              <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.valid_id_number }">
+                <input id="validIdNumber" v-model="form.validIdNumber" type="text" placeholder="As printed on the card">
+              </div>
+              <p v-if="fieldErrors.valid_id_number" class="au-error">{{ fieldErrors.valid_id_number }}</p>
+            </div>
           </div>
-
-          <div class="form-field">
-            <label for="validIdNumber">ID Number</label>
-            <input id="validIdNumber" v-model="form.validIdNumber" type="text" placeholder="As printed on the card" />
-            <p v-if="fieldErrors.valid_id_number" class="field-error">{{ fieldErrors.valid_id_number }}</p>
-          </div>
+          <p class="au-hint">Speeds up check-in at the donation counter. You can add it later from your profile.</p>
         </div>
-        <p class="field-hint">Speeds up check-in at the donation counter. You can add this later from your profile.</p>
 
-        <div class="form-row">
-          <div class="form-field">
+        <!-- Password -->
+        <div class="au-row">
+          <div class="au-field">
             <label for="password">Password</label>
-            <div class="input-icon-wrap">
-              <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-              <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'"
-                placeholder="********" class="has-left-icon" />
-              <button type="button" class="toggle-visibility" @click="showPassword = !showPassword">
-                <AssetIcon v-if="!showPassword" name="eye-off" :size="16" />
-                <AssetIcon v-else name="eye" :size="16" />
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.password }">
+              <AssetIcon name="lock" :size="18" class="au-icon" />
+              <input
+                id="password"
+                v-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Create a password"
+                autocomplete="new-password"
+              >
+              <button
+                type="button"
+                class="au-icon-btn"
+                :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                @click="showPassword = !showPassword"
+              >
+                <AssetIcon :name="showPassword ? 'eye' : 'eye-off'" :size="18" />
               </button>
             </div>
-            <p v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</p>
+            <p v-if="fieldErrors.password" class="au-error">{{ fieldErrors.password }}</p>
           </div>
-
-          <div class="form-field">
-            <label for="confirmPassword">Confirm Password</label>
-            <div class="input-icon-wrap">
-              <AssetIcon class="field-icon field-icon-left" name="lock" :size="16" />
-              <input id="confirmPassword" v-model="form.confirmPassword"
-                :type="showConfirmPassword ? 'text' : 'password'" placeholder="********" class="has-left-icon" />
-              <button type="button" class="toggle-visibility" @click="showConfirmPassword = !showConfirmPassword">
-                <AssetIcon v-if="!showConfirmPassword" name="eye-off" :size="16" />
-                <AssetIcon v-else name="eye" :size="16" />
+          <div class="au-field">
+            <label for="confirmPassword">Confirm password</label>
+            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.password_confirmation }">
+              <AssetIcon name="lock" :size="18" class="au-icon" />
+              <input
+                id="confirmPassword"
+                v-model="form.confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                placeholder="Re-enter your password"
+                autocomplete="new-password"
+              >
+              <button
+                type="button"
+                class="au-icon-btn"
+                :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+                @click="showConfirmPassword = !showConfirmPassword"
+              >
+                <AssetIcon :name="showConfirmPassword ? 'eye' : 'eye-off'" :size="18" />
               </button>
             </div>
-            <p v-if="fieldErrors.password_confirmation" class="field-error">{{ fieldErrors.password_confirmation }}</p>
+            <p v-if="fieldErrors.password_confirmation" class="au-error">{{ fieldErrors.password_confirmation }}</p>
           </div>
         </div>
 
-        <label class="terms-row">
-          <input type="checkbox" v-model="form.agreedToTerms" />
+        <label class="terms">
+          <input v-model="form.agreedToTerms" type="checkbox">
           <span>
             I agree to the
-            <NuxtLink to="/terms">Terms of Service</NuxtLink>
+            <NuxtLink to="/legal/terms" target="_blank">Terms of Service</NuxtLink>
             and
-            <NuxtLink to="/privacy">Privacy Policy</NuxtLink>
+            <NuxtLink to="/legal/privacy" target="_blank">Privacy Policy</NuxtLink>
           </span>
         </label>
-        <p v-if="fieldErrors.terms_accepted" class="field-error">{{ fieldErrors.terms_accepted }}</p>
-        <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+        <p v-if="fieldErrors.terms_accepted" class="au-error">{{ fieldErrors.terms_accepted }}</p>
 
-        <button type="submit" class="submit-btn" :disabled="!form.agreedToTerms || isSubmitting">
-          {{ isSubmitting ? 'Submitting...' : 'Submit Registration' }}
+        <div v-if="submitError" class="submit-error" role="alert">
+          <AssetIcon name="octagon-alert" :size="16" />
+          <span>{{ submitError }}</span>
+        </div>
+
+        <button type="submit" class="au-btn" :disabled="!form.agreedToTerms || isSubmitting">
+          <AssetIcon
+            :name="isSubmitting ? 'loader' : 'user-check'"
+            :size="18"
+            :class="{ 'au-spinner': isSubmitting }"
+          />
+          {{ isSubmitting ? 'Creating account...' : 'Create account' }}
         </button>
-
-        <p class="signin-row">
-          Already have an account?
-          <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
-        </p>
       </form>
-      </template>
-    </main>
-  </div>
+
+      <p class="au-footer">
+        Already have an account?
+        <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
+      </p>
+    </template>
+  </AuthShell>
 </template>
 
 <script setup>
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import logo from '~/assets/images/RedAgosLogo.png'
+import AuthShell from '~/components/auth/AuthShell.vue'
+import AuthSelect from '~/components/auth/AuthSelect.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import { authPhoto } from '~/utils/authPhotos'
 import { donorService } from '~/api/donor/DonorService'
 import { authService } from '~/api/auth/AuthService'
 
@@ -290,7 +281,37 @@ definePageMeta({
   alias: ['/register/donor'],
 })
 
+// Brand panel copy for the shared AuthShell frame.
+const hero = {
+  lead: 'Become a',
+  accent: 'lifesaver',
+  desc: 'Register as a donor to schedule donations, track your history, and help save lives in Davao City.',
+  ...authPhoto('drive'),
+}
+
+// What a donor account unlocks, shown under the brand panel copy.
+const perks = [
+  { icon: 'calendar-check', label: 'Book donation appointments' },
+  { icon: 'qr-code', label: 'QR check-in at the blood center' },
+  { icon: 'history', label: 'Your full donation history' },
+]
+
+// A birth date cannot be in the future.
+const todayIso = new Date().toLocaleDateString('en-CA')
+
+const genders = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
+
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+
+// "I don't know yet" is the empty value: it is sent as null (see handleSubmit).
+const bloodTypeOptions = [
+  { value: '', label: "I don't know yet" },
+  ...bloodTypes.map(type => ({ value: type, label: type })),
+]
 
 const form = reactive({
   firstName: '',
@@ -466,594 +487,118 @@ function applyValidationErrors(error) {
 </script>
 
 <style scoped>
-.register-page {
-  display: grid;
-  grid-template-columns: 480px 1fr;
-  min-height: 100vh;
-}
+/*
+  The frame, fields and buttons come from AuthShell (.au-*). Only what is
+  specific to registration lives here.
+*/
 
-@media (max-width: 1023px) {
-  .register-page {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ===== LEFT PANEL (BRANDING) ===== */
-.brand-panel {
+/* ── Brand panel perks ── */
+.perks {
   position: relative;
-  display: block;
-  overflow: hidden;
-  padding: 48px;
-  background: #206fbd;
-  color: #ffffff;
-}
-
-.brand-mark {
-  display: flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.brand-name {
-  margin: 0;
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-
-.brand-name span { color: #ff2f55; }
-
-.brand-subtitle {
-  margin: 8px 0 0;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 3px;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.brand-copy {
-  position: relative;
-  z-index: 1;
-  max-width: 390px;
-  margin-top: 76px;
-}
-
-.brand-copy h2 {
-  margin: 0;
-  color: #ffffff;
-  font-size: 37px;
-  font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1.62;
-}
-
-.brand-copy p {
-  margin: 28px 0 0;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 14px;
-  line-height: 2.15;
-}
-
-.what-you-get {
-  position: absolute;
-  z-index: 1;
-  left: 48px;
-  bottom: 56px;
-  right: 48px;
-}
-
-.wyg-label {
-  margin: 0 0 16px;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.wyg-list {
   list-style: none;
-  margin: 0;
+  margin: -8px 0 28px;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  gap: 10px;
 }
-
-.wyg-item {
+.perks li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  color: #ffffff;
+  gap: 10px;
   font-size: 14px;
   font-weight: 600;
+  color: var(--au-text);
 }
-
-.wyg-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+.perk-icon {
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-}
-
-@media (max-width: 1023px) {
-  .brand-panel { display: none; }
-}
-
-/* ===== RIGHT PANEL (FORM) ===== */
-.form-panel {
-  padding: 48px 64px;
-  background: #eef4fb;
-  min-height: 100%;
-}
-
-.form-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 32px;
-}
-
-.back-link {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.back-link:hover { color: #374151; }
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: 999px;
-  background: #fff5f5;
-  color: #ff2f55;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.role-badge svg { color: #ff2f55; }
-
-.form-header { margin-bottom: 28px; }
-
-.form-header h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.form-header p {
-  margin: 6px 0 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.donor-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  max-width: 720px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.optional-tag {
-  font-weight: 400;
-  color: #94a3b8;
-  font-size: 11px;
-}
-
-.field-hint {
-  margin: -6px 0 0;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.form-field label {
-  color: #111827;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-/* Base input & select layout */
-.form-field input,
-.form-field select {
-  width: 100%;
-  height: 48px;
-  padding: 0 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 14px;
-  font-family: inherit;
-  line-height: normal;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  box-sizing: border-box;
-}
-
-.form-field input::placeholder { color: #9ca3af; }
-
-.form-field input:focus,
-.form-field select:focus {
-  outline: none;
-  border-color: #206fbd;
-  box-shadow: 0 0 0 3px rgba(32, 111, 189, 0.12);
-}
-
-/* DROPDOWN (SELECT) FIXES */
-.select-wrap {
-  position: relative;
-  width: 100%;
-}
-
-.form-field select {
-  padding-right: 38px;
-  cursor: pointer;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.select-wrap::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid #6b7280;
-  border-bottom: 2px solid #6b7280;
-  transform: translateY(-65%) rotate(45deg);
-  pointer-events: none;
-}
-
-/* NATIVE DROPDOWN OPTIONS LIST CONTROL */
-.form-field select option {
-  font-size: 13px;
-  padding: 8px 10px;
-  background-color: #ffffff;
-  color: #111827;
-}
-
-/* DATE PICKER (CALENDAR) FIXES */
-.form-field input[type='date'] {
-  padding-right: 12px;
-  color: #111827;
-}
-
-.form-field input[type='date']::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.6;
-  padding: 4px;
-  margin: 0;
-  border-radius: 4px;
-}
-
-.form-field input[type='date']::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-  background-color: #f3f4f6;
-}
-
-/* ICON INPUT WRAPPERS */
-.input-icon-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.field-icon {
-  position: absolute;
-  right: 14px;
-  color: #9ca3af;
-  pointer-events: none;
-}
-
-.field-icon-left {
-  left: 14px;
-  right: auto;
-}
-
-.input-icon-wrap input.has-left-icon {
-  padding-left: 42px;
-  padding-right: 42px;
-}
-
-.toggle-visibility {
-  position: absolute;
-  right: 12px;
-  display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 6px;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--au-accent-text);
+  box-shadow: 0 1px 2px rgba(11, 31, 58, 0.06);
 }
 
-.toggle-visibility:hover { color: #6b7280; }
-
-.terms-row {
+/* ── Terms ── */
+.terms {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 13px;
-  color: #374151;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--au-text-2);
   cursor: pointer;
 }
-
-.terms-row input[type='checkbox'] {
-  margin-top: 2px;
-  width: 16px;
-  height: 16px;
-  accent-color: #206fbd;
+.terms input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--au-accent);
   cursor: pointer;
 }
-
-.terms-row a {
-  color: #206fbd;
+.terms a {
+  color: var(--au-accent-text);
   font-weight: 600;
   text-decoration: none;
 }
+.terms a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-.terms-row a:hover { text-decoration: underline; }
-
-.field-error,
 .submit-error {
-  margin: 0;
-  color: #C62828;
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-.submit-btn {
-  width: 100%;
-  height: 48px;
-  margin-top: 4px;
-  border: none;
-  border-radius: 12px;
-  background: #206fbd;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-
-.submit-btn:hover:not(:disabled) { background: #1a5c9c; }
-
-.submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.signin-row {
-  margin: 4px 0 0;
-  text-align: center;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-/* PENDING EMAIL VERIFICATION */
-.verify-step {
-  max-width: 460px;
-  margin: 24px auto 0;
-  padding: 36px 32px;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #ffffff;
-  text-align: center;
-}
-.verify-step-icon {
   display: flex;
-  width: 56px;
-  height: 56px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #F5C2C0;
+  border-radius: var(--au-radius);
+  background: #FEF3F2;
+  color: var(--au-danger);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.submit-error :deep(svg) { margin-top: 2px; }
+
+/* ── Verification step ── */
+.verify-step { text-align: center; }
+.verify-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 18px;
-  border-radius: 999px;
-  background: #e8f1fb;
-  color: #206fbd;
+  border-radius: 20px;
+  background: var(--au-accent-soft);
+  color: var(--au-accent-text);
 }
-.verify-step h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.verify-step-lead {
-  margin: 12px 0 0;
-  color: #4b5563;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.verify-step-chip {
-  display: inline-flex;
-  align-items: center;
-  margin: 10px 0;
-  padding: 8px 14px;
-  border: 1px solid #dbe6f3;
-  border-radius: 999px;
-  background: #f4f8fd;
+.verify-step .au-header { margin-bottom: 12px; }
+.verify-email {
+  display: inline-block;
   max-width: 100%;
+  margin: 0 0 20px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--au-panel);
+  color: var(--au-text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
-
-.verify-step-chip-email {
-  color: #111827;
+.verify-lead {
+  max-width: 40ch;
+  margin: 0 auto 8px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--au-text-2);
+}
+.verify-hint { margin-bottom: 24px; }
+.verify-note {
+  margin: 12px 0 0;
   font-size: 13.5px;
-  font-weight: 700;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--au-text-2);
 }
-
-.verify-step-hint {
-  margin: 10px 0 22px;
-  color: #6b7280;
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-/* Secondary/outline style: this is a recovery action, not the primary
-   next step (opening the email is), so it should read as subordinate
-   to the "Submit Registration" button's visual weight. */
-.resend-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  height: 46px;
-  border: 1px solid #206fbd;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #206fbd;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-
-.resend-btn:hover:not(:disabled) { background: #f0f6fc; }
-
-.resend-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.verify-step-note {
-  margin: 14px 0 0;
-  color: #166534;
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-.verify-step-note--error { color: #dc2626; }
-.verify-step .signin-row { margin-top: 18px; }
-
-.signin-row a {
-  color: #206fbd;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.signin-row a:hover { text-decoration: underline; }
-
-/* TABLET RESPONSIVE */
-@media (max-width: 860px) {
-  .form-row {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-}
-
-/* MOBILE RESPONSIVE */
-@media (max-width: 640px) {
-  .form-panel {
-    padding: 24px 16px 40px;
-  }
-
-  .form-topbar {
-    margin-bottom: 24px;
-  }
-
-  .form-header {
-    margin-bottom: 24px;
-  }
-
-  .form-header h1 {
-    font-size: 24px;
-  }
-
-  .role-badge {
-    padding: 8px 14px;
-    font-size: 12px;
-  }
-
-  /* Input & select mobile sizing */
-  .form-field input,
-  .form-field select {
-    height: 44px;
-    font-size: 14px;
-    padding-left: 12px;
-    padding-right: 12px;
-    border-radius: 10px;
-  }
-
-  .form-field select {
-    padding-right: 34px;
-  }
-
-  .form-field select option {
-    font-size: 13px;
-    padding: 6px 10px;
-  }
-
-  .input-icon-wrap input.has-left-icon {
-    padding-left: 40px;
-    padding-right: 40px;
-  }
-
-  .submit-btn {
-    height: 46px;
-    font-size: 14px;
-  }
-
-  .verify-step {
-    padding: 28px 20px;
-  }
-
-  .verify-step-chip {
-    max-width: 100%;
-  }
-
-  .verify-step-chip-email {
-    max-width: 180px;
-  }
-}
-
-.submit-btn:focus-visible,
-.resend-btn:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
-}
+.verify-note--error { color: var(--au-danger); font-weight: 600; }
 </style>

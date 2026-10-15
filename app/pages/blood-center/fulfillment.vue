@@ -12,24 +12,19 @@
       </div>
 
       <!-- HEADER -->
-      <header class="page-header fade-in" style="--delay:0ms">
-        <div>
-          <h1 class="page-title">Fulfillment</h1>
-          <p class="page-subtitle">
-            Dispatch the units held for each request. Releasing them is what fulfils it, partly or fully; the
-            hospital then confirms each unit arrived.
-          </p>
-        </div>
-        <button class="btn btn-outline" :disabled="loading" @click="load">
-          <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
-          Refresh
-        </button>
-      </header>
+      <PageHeader title="Fulfillment" subtitle="Dispatch the units held for each request; the hospital then confirms each one arrived.">
+        <template #actions>
+          <button class="ui-btn" :disabled="loading" @click="load">
+            <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
+            Refresh
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="error" class="banner banner--error">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ error }}</span>
-        <button class="btn btn-outline btn-sm" @click="load">Retry</button>
+        <button class="ui-btn ui-btn--sm" @click="load">Retry</button>
       </div>
 
       <!-- TABS on the left, the three unit states on the right -->
@@ -70,15 +65,13 @@
       </div>
 
       <div v-else-if="requests.length === 0" class="card">
-        <div class="empty">
-          <span class="empty__icon"><AssetIcon :name="activeTab === 'awaiting_release' ? 'truck' : 'inbox'" :size="20" /></span>
-          <h3>{{ activeTab === 'awaiting_release' ? 'Nothing to dispatch' : 'Nothing awaiting confirmation' }}</h3>
-          <p>
-            {{ activeTab === 'awaiting_release'
-              ? 'Approve a request on the Incoming Requests page to hold stock for it.'
-              : 'Units you dispatch appear here until the hospital confirms they arrived.' }}
-          </p>
-        </div>
+        <EmptyState
+          :icon="activeTab === 'awaiting_release' ? 'truck' : 'inbox'"
+          :title="activeTab === 'awaiting_release' ? 'Nothing to dispatch' : 'Nothing awaiting confirmation'"
+          :description="activeTab === 'awaiting_release'
+            ? 'Approve a request on the Incoming Requests page to hold stock for it.'
+            : 'Units you dispatch appear here until the hospital confirms they arrived.'"
+        />
       </div>
 
       <div v-else class="request-list">
@@ -204,7 +197,7 @@
                     <button
                       v-if="allocation.status === 'released'"
                       type="button"
-                      class="btn btn-outline btn-sm"
+                      class="ui-btn ui-btn--sm"
                       :aria-label="`Request a correction to the dispatch record of unit ${allocation.unit_id}`"
                       @click="openCorrect(request, allocation)"
                     >
@@ -226,14 +219,14 @@
                 : 'Nothing selected — Dispatch sends every reserved unit.' }}
             </span>
             <button
-              class="btn btn-outline btn-sm"
+              class="ui-btn ui-btn--sm"
               :disabled="busyId === request.id || reservedCount(request) === 0"
               @click="openReturn(request)"
             >
               Return to Stock
             </button>
             <button
-              class="btn btn-primary btn-sm"
+              class="ui-btn ui-btn--primary ui-btn--sm"
               :disabled="busyId === request.id || reservedCount(request) === 0 || !gateFor(request).ok"
               @click="openDispatch(request)"
             >
@@ -309,8 +302,8 @@
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="busyId" @click="closeDispatch">Cancel</button>
-            <button class="btn btn-primary" :disabled="busyId" @click="confirmDispatch">
+            <button class="ui-btn" :disabled="busyId" @click="closeDispatch">Cancel</button>
+            <button class="ui-btn ui-btn--primary" :disabled="busyId" @click="confirmDispatch">
               {{ busyId ? 'Dispatching…' : 'Dispatch' }}
             </button>
           </div>
@@ -334,7 +327,7 @@
 
           <div class="field">
             <label for="corrected-released-at" class="field-label">Left at</label>
-            <input id="corrected-released-at" v-model="correctForm.releasedAt" type="datetime-local" class="input">
+            <DateTimeField id="corrected-released-at" v-model="correctForm.releasedAt" />
           </div>
 
           <div class="field">
@@ -347,8 +340,8 @@
           <p v-if="correctError" class="field-error field-error--block">{{ correctError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" @click="closeCorrect">Cancel</button>
-            <button class="btn btn-primary" @click="reviewCorrection">Review correction</button>
+            <button class="ui-btn" @click="closeCorrect">Cancel</button>
+            <button class="ui-btn ui-btn--primary" @click="reviewCorrection">Review correction</button>
           </div>
         </div>
       </div>
@@ -391,8 +384,8 @@
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="busyId" @click="closeReturn">Cancel</button>
-            <button class="btn btn-primary" :disabled="busyId || !returnReason" @click="confirmReturn">
+            <button class="ui-btn" :disabled="busyId" @click="closeReturn">Cancel</button>
+            <button class="ui-btn ui-btn--primary" :disabled="busyId || !returnReason" @click="confirmReturn">
               {{ busyId ? 'Returning…' : 'Return to Stock' }}
             </button>
           </div>
@@ -408,6 +401,9 @@ import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.v
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bloodTypeCodes, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
+import DateTimeField from '~/components/common/DateTimeField.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -752,9 +748,8 @@ onMounted(load)
 .fx-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .fx-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
+/* The shared PageHeader, with the space below it the old header kept. */
+.fx-inner > .ph { margin-bottom: 16px; }
 
 /* tabs + legend */
 .tabbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -943,4 +938,7 @@ onMounted(load)
   .units-table th, .units-table td { padding: 6px 6px; }
   .request-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* Cards in the shared SectionCard's shape (2026-10-15). */
+.card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>

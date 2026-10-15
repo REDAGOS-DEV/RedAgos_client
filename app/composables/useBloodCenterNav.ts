@@ -186,7 +186,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'Account',
     items: [
-      // Always last, for everyone.
+      // For everyone; Settings stays last.
+      { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
     ],
   },

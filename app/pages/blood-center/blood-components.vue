@@ -1,19 +1,13 @@
 <template>
   <div class="components-page">
-    <header class="components-page__header">
-      <div>
-        <h1 class="components-page__title">Blood Components</h1>
-        <p class="components-page__subtitle">
-          Shelf life and price for each component. Every unit's expiry date comes from its shelf life, so a component
-          without one cannot be booked into stock.
-        </p>
-      </div>
-
-      <button type="button" class="btn btn--ghost" :disabled="busy" @click="load">
-        <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-        {{ busy ? 'Loading…' : 'Refresh' }}
-      </button>
-    </header>
+    <PageHeader title="Blood Components" subtitle="Shelf life and price for each component. A component without a shelf life cannot be booked into stock.">
+      <template #actions>
+        <button type="button" class="ui-btn" :disabled="busy" @click="load">
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+          {{ busy ? 'Loading…' : 'Refresh' }}
+        </button>
+      </template>
+    </PageHeader>
 
     <!-- Whose settings these are, and how far along they are -->
     <div class="scope">
@@ -104,7 +98,7 @@
                 <button
                   v-if="isDirty(row)"
                   type="button"
-                  class="btn btn--ghost btn--sm"
+                  class="ui-btn ui-btn--ghost ui-btn--sm"
                   :disabled="savingId === row.id"
                   @click="seedDraft(row)"
                 >
@@ -112,7 +106,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn--primary btn--sm"
+                  class="ui-btn ui-btn--primary ui-btn--sm"
                   :disabled="savingId === row.id || !isDirty(row)"
                   @click="save(row)"
                 >
@@ -138,6 +132,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
  * A blood centre's own settings for each blood component.

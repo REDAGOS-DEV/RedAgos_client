@@ -1,40 +1,29 @@
 <template>
   <div class="dept">
-    <header class="dept__header">
-      <div>
-        <h1 class="dept__title">{{ title }}</h1>
-        <p v-if="subtitle" class="dept__subtitle">{{ subtitle }}</p>
-      </div>
+    <PageHeader :title="title" :subtitle="subtitle">
       <!-- Page-level actions (e.g. a primary button), when a department has one. -->
-      <div v-if="$slots.actions" class="dept__actions">
+      <template v-if="$slots.actions" #actions>
         <slot name="actions" />
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <section class="dept__stats" :aria-busy="loading">
       <template v-if="loading">
         <div v-for="n in stats.length || 4" :key="n" class="stat stat--skeleton" />
       </template>
-      <template v-else>
-        <component
-          :is="stat.to ? NuxtLink : 'article'"
+      <StatStrip v-else :columns="stats.length || 4" class="dept__strip">
+        <StatItem
           v-for="stat in stats"
           :key="stat.label"
+          :label="stat.label"
+          :value="stat.value"
+          :hint="stat.caption"
+          :icon="stat.icon"
+          :tone="toneName(stat.tone)"
+          :alert="Boolean(stat.alert)"
           :to="stat.to"
-          class="stat"
-          :class="{ 'stat--link': stat.to, 'stat--alert': stat.alert }"
-          :style="{ '--tone': stat.tone }"
-        >
-          <div class="stat__top">
-            <p class="stat__label">{{ stat.label }}</p>
-            <span class="stat__badge"><AssetIcon :name="stat.icon" :size="14" /></span>
-          </div>
-          <p class="stat__value" :class="{ 'stat__value--empty': stat.value === null || stat.value === undefined }">
-            {{ stat.value ?? 'No data' }}
-          </p>
-          <p class="stat__caption">{{ stat.caption }}</p>
-        </component>
-      </template>
+        />
+      </StatStrip>
     </section>
 
     <section class="dept__panels">
@@ -61,11 +50,7 @@
         <slot v-else-if="panel.key && $slots[panel.key] && !panel.empty" :name="panel.key" />
 
         <!-- Otherwise, an empty state written for the people using the page. -->
-        <div v-else class="panel__empty">
-          <AssetIcon :name="panel.icon" :size="24" />
-          <p class="panel__empty-title">{{ panel.emptyTitle }}</p>
-          <p v-if="panel.emptyBody" class="panel__empty-body">{{ panel.emptyBody }}</p>
-        </div>
+        <EmptyState v-else :icon="panel.icon" :title="panel.emptyTitle" :description="panel.emptyBody" compact />
       </article>
     </section>
   </div>
@@ -73,6 +58,22 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
+
+// A department gives each figure's colour as a CSS colour; the shared strip
+// takes a tone name.
+function toneName(cssColour) {
+  const c = String(cssColour || '')
+  if (c.includes('warning')) return 'warning'
+  if (c.includes('accent') || c.includes('danger')) return 'danger'
+  if (c.includes('success') || c.includes('teal')) return 'success'
+  if (c.includes('purple')) return 'purple'
+  if (c.includes('primary')) return 'primary'
+  return 'neutral'
+}
 
 // Stat cards with a `to` render as links; the rest as plain articles.
 const NuxtLink = resolveComponent('NuxtLink')
@@ -311,4 +312,13 @@ defineProps({
   .dept__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dept__panels { grid-template-columns: 1fr; }
 }
+
+/* The shared header, with the space below it the old header kept; the strip
+   takes the stats row's place inside it. */
+.dept > .ph { margin-bottom: 20px; }
+.dept__stats { display: block; }
+.dept__stats:has(.stat--skeleton) { display: grid; }
+
+/* Panels in the shared SectionCard's shape (2026-10-15). */
+.panel { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>

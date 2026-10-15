@@ -27,8 +27,8 @@
         <h2>This receipt could not be opened</h2>
         <p>{{ loadError }}</p>
         <div class="empty-actions">
-          <NuxtLink to="/blood-center/receipts" class="btn btn-outline">Back to receipts</NuxtLink>
-          <button class="btn btn-primary" @click="load">Try again</button>
+          <NuxtLink to="/blood-center/receipts" class="ui-btn">Back to receipts</NuxtLink>
+          <button class="ui-btn ui-btn--primary" @click="load">Try again</button>
         </div>
       </div>
 
@@ -42,15 +42,15 @@
             </div>
           </div>
           <div class="header-actions">
-            <button class="btn btn-outline" :disabled="receipt.voided" @click="printThermal">
+            <button class="ui-btn" :disabled="receipt.voided" @click="printThermal">
               <AssetIcon name="printer" :size="15" />
               Print (80mm)
             </button>
-            <button class="btn btn-outline" :disabled="downloading" @click="download">
+            <button class="ui-btn" :disabled="downloading" @click="download">
               <AssetIcon name="download" :size="15" />
               Download PDF
             </button>
-            <NuxtLink v-if="receipt.request_id" :to="`/blood-center/statement/${receipt.request_id}`" class="btn btn-primary">
+            <NuxtLink v-if="receipt.request_id" :to="`/blood-center/statement/${receipt.request_id}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="file-text" :size="15" />
               Open statement
             </NuxtLink>

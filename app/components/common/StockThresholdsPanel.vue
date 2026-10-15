@@ -1,19 +1,17 @@
 <template>
   <div class="panel">
-    <header class="panel__header">
-      <div>
-        <h1 class="panel__title">Stock Thresholds</h1>
-        <p class="panel__subtitle">
-          The fewest units of each blood type and component the {{ facilityNoun }} should keep on its shelf. When stock
-          falls below a minimum, a red banner shows on the inventory pages and the staff who watch the shelf are notified.
-        </p>
-      </div>
-
-      <button type="button" class="btn btn--ghost" :disabled="busy || saving" @click="loadStatus(false)">
-        <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-        {{ busy ? 'Loading…' : 'Refresh' }}
-      </button>
-    </header>
+    <PageHeader title="Stock Thresholds">
+      <template #subtitle>
+        The fewest units of each blood type and component the {{ facilityNoun }} should keep. Below a minimum, a red
+        banner shows on the inventory pages and the shelf staff are notified.
+      </template>
+      <template #actions>
+        <button type="button" class="ui-btn" :disabled="busy || saving" @click="loadStatus(false)">
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+          {{ busy ? 'Loading…' : 'Refresh' }}
+        </button>
+      </template>
+    </PageHeader>
 
     <div v-if="status" class="scope">
       <span class="scope__item">
@@ -33,24 +31,12 @@
 
     <template v-if="status">
       <!-- The headline numbers -->
-      <dl class="kpis">
-        <div class="kpi">
-          <dt>Monitored</dt>
-          <dd>{{ status.totals.monitored }}</dd>
-        </div>
-        <div class="kpi kpi--ok">
-          <dt>Healthy</dt>
-          <dd>{{ status.totals.ok }}</dd>
-        </div>
-        <div class="kpi kpi--low">
-          <dt>Below minimum</dt>
-          <dd>{{ status.totals.low }}</dd>
-        </div>
-        <div class="kpi kpi--critical">
-          <dt>Out of stock</dt>
-          <dd>{{ status.totals.critical }}</dd>
-        </div>
-      </dl>
+      <StatStrip>
+        <StatItem label="Monitored" :value="status.totals.monitored" hint="Minimums set" icon="sliders-horizontal" tone="primary" />
+        <StatItem label="Healthy" :value="status.totals.ok" hint="At or above the minimum" icon="shield-check" tone="success" />
+        <StatItem label="Below minimum" :value="status.totals.low" hint="Restock soon" icon="trending-down" tone="warning" :alert="status.totals.low > 0" />
+        <StatItem label="Out of stock" :value="status.totals.critical" hint="None on the shelf" icon="circle-x" tone="danger" :alert="status.totals.critical > 0" />
+      </StatStrip>
 
       <LowStockBanner :cells="status.low" />
 
@@ -102,6 +88,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import StockThresholdGrid from '~/components/common/StockThresholdGrid.vue'
 import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 const POLL_MS = 60_000
 

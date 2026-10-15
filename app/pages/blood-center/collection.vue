@@ -1,13 +1,6 @@
 <template>
   <div class="collection">
-    <header class="collection__header">
-      <div>
-        <h1 class="collection__title">Donation Counter</h1>
-        <p class="collection__subtitle">
-          Scan the donor once on arrival. The rest of the visit carries on from that scan.
-        </p>
-      </div>
-    </header>
+    <PageHeader title="Donation Counter" subtitle="Scan the donor once on arrival. The rest of the visit carries on from that scan." />
 
     <!-- The verified context, held for the whole visit. -->
     <section v-if="donor" class="donor-bar" aria-label="Verified donor">
@@ -38,7 +31,7 @@
         </div>
       </div>
 
-      <button type="button" class="btn" :disabled="busy" @click="finishVisit">
+      <button type="button" class="ui-btn" :disabled="busy" @click="finishVisit">
         {{ stage === 'done' ? 'Next donor' : 'Cancel visit' }}
       </button>
     </section>
@@ -127,7 +120,7 @@
             >
           </label>
 
-          <button type="submit" class="btn btn--primary" :disabled="busy || !lookupValue.trim()">
+          <button type="submit" class="ui-btn ui-btn--primary" :disabled="busy || !lookupValue.trim()">
             {{ busy ? 'Searching…' : 'Find donor' }}
           </button>
         </form>
@@ -163,18 +156,18 @@
         <button
           v-if="appointment && appointment.status === 'scheduled'"
           type="button"
-          class="btn btn--primary"
+          class="ui-btn ui-btn--primary"
           :disabled="busy"
           @click="checkIn"
         >
           Check in
         </button>
 
-        <button v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
+        <button v-if="canRegister" type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="openDonation">
           {{ busy ? 'Working…' : 'Open donation' }}
         </button>
 
-        <button v-if="appointment" type="button" class="btn" :disabled="busy" @click="markNoShow">
+        <button v-if="appointment" type="button" class="ui-btn" :disabled="busy" @click="markNoShow">
           Mark no-show
         </button>
       </div>
@@ -194,7 +187,7 @@
         anything else can be recorded.
       </p>
       <div class="actions">
-        <button type="button" class="btn" @click="finishVisit">Next donor</button>
+        <button type="button" class="ui-btn" @click="finishVisit">Next donor</button>
       </div>
     </section>
 
@@ -338,30 +331,30 @@
         <button
           v-if="!deferring"
           type="button"
-          class="btn btn--primary"
+          class="ui-btn ui-btn--primary"
           :disabled="busy"
           @click="submitScreening('accepted')"
         >
           {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accepted — continue' }}
         </button>
 
-        <button v-if="!deferring" type="button" class="btn btn--danger" :disabled="busy" @click="deferring = true">
+        <button v-if="!deferring" type="button" class="ui-btn ui-btn--danger" :disabled="busy" @click="deferring = true">
           Defer donor
         </button>
 
         <template v-else>
           <button
             type="button"
-            class="btn btn--danger"
+            class="ui-btn ui-btn--danger"
             :disabled="busy || !screeningForm.deferral_reason.trim()"
             @click="submitScreening(screeningForm.outcome)"
           >
             {{ busy ? 'Saving…' : `Confirm — ${selectedDeferralLabel}` }}
           </button>
-          <button type="button" class="btn" :disabled="busy" @click="deferring = false">Back</button>
+          <button type="button" class="ui-btn" :disabled="busy" @click="deferring = false">Back</button>
         </template>
 
-        <button v-if="correcting === 'screening'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+        <button v-if="correcting === 'screening'" type="button" class="ui-btn" :disabled="busy" @click="correcting = null">
           Cancel correction
         </button>
       </div>
@@ -375,8 +368,8 @@
         The donor has been accepted. The phlebotomist records the bag, barcode and times at the chair.
       </p>
       <div class="actions">
-        <button type="button" class="btn" @click="finishVisit">Next donor</button>
-        <button v-if="canScreen && donation?.screening" type="button" class="btn" @click="startScreeningCorrection">
+        <button type="button" class="ui-btn" @click="finishVisit">Next donor</button>
+        <button v-if="canScreen && donation?.screening" type="button" class="ui-btn" @click="startScreeningCorrection">
           <AssetIcon name="pencil" :size="13" />
           Correct the screening
         </button>
@@ -440,7 +433,7 @@
           <span class="field__label">Time started</span>
           <span class="time-row">
             <input ref="startedInput" v-model="collectionForm.started_time" type="time" class="field__input" >
-            <button type="button" class="btn btn--small" @click="collectionForm.started_time = timeNow()">Now</button>
+            <button type="button" class="ui-btn ui-btn--sm" @click="collectionForm.started_time = timeNow()">Now</button>
           </span>
         </label>
 
@@ -448,7 +441,7 @@
           <span class="field__label">Time ended</span>
           <span class="time-row">
             <input v-model="collectionForm.ended_time" type="time" class="field__input" >
-            <button type="button" class="btn btn--small" @click="collectionForm.ended_time = timeNow()">Now</button>
+            <button type="button" class="ui-btn ui-btn--sm" @click="collectionForm.ended_time = timeNow()">Now</button>
           </span>
         </label>
 
@@ -468,15 +461,15 @@
       </ul>
 
       <div class="actions">
-        <button type="button" class="btn btn--primary" :disabled="busy" @click="submitCollection">
+        <button type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="submitCollection">
           {{ busy ? 'Saving…' : correcting === 'collection' ? 'Request correction' : 'Complete donation' }}
         </button>
 
-        <button v-if="canClose && correcting !== 'collection'" type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
+        <button v-if="canClose && correcting !== 'collection'" type="button" class="ui-btn ui-btn--danger" :disabled="busy" @click="abandonCollection">
           Collection unsuccessful
         </button>
 
-        <button v-if="correcting === 'collection'" type="button" class="btn" :disabled="busy" @click="correcting = null">
+        <button v-if="correcting === 'collection'" type="button" class="ui-btn" :disabled="busy" @click="correcting = null">
           Cancel correction
         </button>
       </div>
@@ -508,12 +501,12 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn btn--primary" @click="finishVisit">Next donor</button>
-        <NuxtLink to="/blood-center/appointments" class="btn">Back to the queue</NuxtLink>
+        <button type="button" class="ui-btn ui-btn--primary" @click="finishVisit">Next donor</button>
+        <NuxtLink to="/blood-center/appointments" class="ui-btn">Back to the queue</NuxtLink>
         <button
           v-if="canCollect && !isDeferred && donation?.collection"
           type="button"
-          class="btn"
+          class="ui-btn"
           @click="startCollectionCorrection"
         >
           <AssetIcon name="pencil" :size="13" />
@@ -545,6 +538,7 @@ import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { atTimeOn, normalizeBarcode, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
  * The counter's one continuous donation transaction.
@@ -1165,8 +1159,9 @@ function finishVisit() {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--rb-primary) 12%, transparent);
-  color: var(--rb-primary-text);
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
 }
 
 .lookup {
@@ -1208,7 +1203,7 @@ function finishVisit() {
   color: var(--rb-text-primary);
 }
 
-.checkin__checks li :deep(svg) { color: var(--rb-success); flex-shrink: 0; }
+.checkin__checks li :deep(svg) { color: var(--rb-text-muted); flex-shrink: 0; }
 
 /* --- forms --- */
 .vitals {

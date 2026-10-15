@@ -14,16 +14,14 @@
 
     <!-- ============ LIST VIEW ============ -->
     <div v-else-if="!selectedUuid" class="donors-inner">
-      <header class="header-row">
-        <div>
-          <h1 class="page-title">Donors</h1>
-          <p class="page-subtitle">{{ listSummary }}</p>
-        </div>
-        <button v-if="canManage" type="button" class="btn-primary" @click="openAddDonor">
-          <AssetIcon name="plus" :size="15" />
-          Register walk-in
-        </button>
-      </header>
+      <PageHeader title="Donors" :subtitle="listSummary">
+        <template v-if="canManage" #actions>
+          <button type="button" class="ui-btn ui-btn--primary" @click="openAddDonor">
+            <AssetIcon name="plus" :size="15" />
+            Register walk-in
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="loadError" class="error-banner" role="alert">
         <span>{{ loadError }}</span>
@@ -36,41 +34,14 @@
         <button type="button" class="btn-link" @click="listNotice = ''">Dismiss</button>
       </div>
 
-      <!-- KPI cards, as on Inventory -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Total Donors</p>
-            <span class="stat-card__badge stat-card__badge--primary"><AssetIcon name="users" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ pager.total }}</p>
-          <span class="stat-chip">Booked or donated here</span>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Eligible Now</p>
-            <span class="stat-card__badge stat-card__badge--success"><AssetIcon name="shield-check" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ eligibleCount }}</p>
-          <span class="stat-chip">Of the {{ donors.length }} shown</span>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Waiting Period</p>
-            <span class="stat-card__badge stat-card__badge--warning"><AssetIcon name="calendar" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ waitingCount }}</p>
-          <span class="stat-chip">Not yet due to donate again</span>
-        </div>
-      </div>
+      <!-- Figures, as on Inventory -->
+      <StatStrip :columns="3">
+        <StatItem label="Total donors" :value="pager.total" hint="Booked or donated here" icon="users" tone="primary" />
+        <StatItem label="Eligible now" :value="eligibleCount" :hint="`Of the ${donors.length} shown`" icon="shield-check" tone="success" />
+        <StatItem label="Waiting period" :value="waitingCount" hint="Not yet due to donate again" icon="calendar" tone="warning" />
+      </StatStrip>
 
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Donor records</h2>
-            <p class="panel-subtitle">Sorted by last name.</p>
-          </div>
-        </div>
+      <SectionCard title="Donor records" subtitle="Sorted by last name." flush>
 
         <!-- Search is the server's; eligibility narrows the page shown. -->
         <div class="toolbar">
@@ -86,16 +57,15 @@
             >
           </label>
 
-          <select
-            v-if="bloodTypeOptions.length"
-            v-model="bloodTypeId"
-            class="select"
-            aria-label="Filter by blood type"
-            @change="loadDonors()"
-          >
-            <option value="">All blood types</option>
-            <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
-          </select>
+          <div v-if="bloodTypeOptions.length" class="select">
+            <SelectField
+              v-model="bloodTypeId"
+              :options="[{ value: '', label: 'All blood types' }, ...bloodTypeOptions.map((bt) => ({ value: bt.id, label: bt.code }))]"
+              aria-label="Filter by blood type"
+              size="sm"
+              @change="loadDonors()"
+            />
+          </div>
 
           <div class="chips" role="group" aria-label="Filter by eligibility">
             <button
@@ -130,23 +100,25 @@
             </div>
           </template>
 
-          <div v-else-if="!donors.length" class="empty-state">
-            <span class="empty-state__icon"><AssetIcon name="users" :size="20" /></span>
-            <p class="empty-state__title">{{ search || bloodTypeId ? 'No donors match' : 'No donors yet' }}</p>
-            <p class="empty-state__text">
-              {{ search || bloodTypeId
-                ? 'Try another name, donor ID or blood type.'
-                : 'Donors appear here once they book or donate at this centre.' }}
-            </p>
-            <button v-if="search || bloodTypeId" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
-          </div>
+          <EmptyState
+            v-else-if="!donors.length"
+            icon="users"
+            :title="search || bloodTypeId ? 'No donors match' : 'No donors yet'"
+            :description="search || bloodTypeId
+              ? 'Try another name, donor ID or blood type.'
+              : 'Donors appear here once they book or donate at this centre.'"
+          >
+            <button v-if="search || bloodTypeId" type="button" class="ui-btn" @click="clearFilters">Clear filters</button>
+          </EmptyState>
 
-          <div v-else-if="!visibleDonors.length" class="empty-state">
-            <span class="empty-state__icon"><AssetIcon name="search" :size="20" /></span>
-            <p class="empty-state__title">None on this page</p>
-            <p class="empty-state__text">No donor shown here matches that eligibility filter.</p>
-            <button type="button" class="btn-outline" @click="eligibilityFilter = 'all'">Show all</button>
-          </div>
+          <EmptyState
+            v-else-if="!visibleDonors.length"
+            icon="search"
+            title="None on this page"
+            description="No donor shown here matches that eligibility filter."
+          >
+            <button type="button" class="ui-btn" @click="eligibilityFilter = 'all'">Show all</button>
+          </EmptyState>
 
           <template v-else>
             <component
@@ -211,7 +183,7 @@
             </button>
           </div>
         </footer>
-      </section>
+      </SectionCard>
     </div>
 
     <!-- ============ DETAIL VIEW ============ -->
@@ -451,17 +423,21 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="d-birth">Birth date</label>
-                <input id="d-birth" v-model="addDonorForm.birth_date" type="date" class="form-input" :max="todayIso" required>
+                <DatePicker id="d-birth" v-model="addDonorForm.birth_date" :max="todayIso" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="d-sex">Sex <span class="form-optional">optional</span></label>
-                <select id="d-sex" v-model="addDonorForm.gender" class="form-input select">
-                  <option value="">Not given</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
-                </select>
+                <SelectField
+                  id="d-sex"
+                  v-model="addDonorForm.gender"
+                  :options="[
+                    { value: '', label: 'Not given' },
+                    { value: 'male', label: 'Male' },
+                    { value: 'female', label: 'Female' },
+                    { value: 'other', label: 'Other' },
+                    { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+                  ]"
+                />
               </div>
             </div>
 
@@ -485,10 +461,11 @@
             <div class="form-row">
               <div v-if="bloodTypeOptions.length" class="form-group">
                 <label class="form-label" for="d-bt">Blood type <span class="form-optional">if known</span></label>
-                <select id="d-bt" v-model="addDonorForm.blood_type_id" class="form-input select">
-                  <option value="">Unknown</option>
-                  <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
-                </select>
+                <SelectField
+                  id="d-bt"
+                  v-model="addDonorForm.blood_type_id"
+                  :options="[{ value: '', label: 'Unknown' }, ...bloodTypeOptions.map((bt) => ({ value: bt.id, label: bt.code }))]"
+                />
               </div>
               <div class="form-group">
                 <label class="form-label" for="d-address">Address <span class="form-optional">optional</span></label>
@@ -513,6 +490,13 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import SectionCard from '~/components/ui/SectionCard.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1163,24 +1147,7 @@ onMounted(async () => {
 .search__input::placeholder { color: var(--rb-placeholder); }
 .search__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
-.select {
-  height: 36px;
-  padding: 0 30px 0 12px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background-color: var(--rb-surface);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 10px 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--rb-text-primary);
-  appearance: none;
-  cursor: pointer;
-}
-
-.select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.select { width: 180px; }
 
 .chips {
   display: flex;

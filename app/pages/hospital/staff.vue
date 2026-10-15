@@ -1,21 +1,25 @@
 <template>
   <div class="staff-page">
     <div class="staff-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Staff</h1>
-          <p class="page-subtitle">Your blood bank's accounts and what each person may do.</p>
-        </div>
-        <button type="button" class="btn btn--primary" @click="openAdd">
-          <AssetIcon name="user-check" :size="14" />
-          Add staff
-        </button>
-      </header>
+      <PageHeader title="Staff" subtitle="Your blood bank's accounts and what each person may do.">
+        <template #actions>
+          <button type="button" class="ui-btn ui-btn--primary" @click="openAdd">
+            <AssetIcon name="user-check" :size="15" />
+            Add staff
+          </button>
+        </template>
+      </PageHeader>
 
       <!-- What each role covers, from the server. -->
       <section class="roles" aria-label="Roles">
         <article v-for="role in roles" :key="role.value" class="role-card">
-          <h2 class="role-card__title">{{ role.label }}</h2>
+          <div class="role-card__top">
+            <span class="role-card__icon" :class="`role-card__icon--${role.value}`">
+              <AssetIcon :name="ROLE_ICONS[role.value] || 'user-circle'" :size="18" />
+            </span>
+            <h2 class="role-card__title">{{ role.label }}</h2>
+            <span class="role-card__count">{{ roleCount(role.value) }}</span>
+          </div>
           <p class="role-card__desc">{{ role.description }}</p>
         </article>
       </section>
@@ -30,7 +34,7 @@
 
         <div v-else-if="loadError" class="list-state list-state--error" role="alert">
           <p>{{ loadError }}</p>
-          <button type="button" class="btn" @click="load">Try again</button>
+          <button type="button" class="ui-btn" @click="load">Try again</button>
         </div>
 
         <div v-else class="table-wrap">
@@ -52,16 +56,16 @@
                   <span class="cell-sub">{{ member.email }}</span>
                 </td>
                 <td>
-                  <select
-                    v-if="!member.deleted_at"
-                    class="field-input field-input--select"
-                    :value="member.hospital_role"
-                    :disabled="busy === member.uuid"
-                    :aria-label="`Role of ${member.full_name}`"
-                    @change="changeRole(member, $event.target.value)"
-                  >
-                    <option v-for="role in roles" :key="role.value" :value="role.value">{{ role.label }}</option>
-                  </select>
+                  <div v-if="!member.deleted_at" class="role-select">
+                    <SelectField
+                      :model-value="member.hospital_role"
+                      :options="roles.map((role) => ({ value: role.value, label: role.label }))"
+                      :disabled="busy === member.uuid"
+                      :aria-label="`Role of ${member.full_name}`"
+                      size="sm"
+                      @change="(value) => changeRole(member, value)"
+                    />
+                  </div>
                   <span v-else class="muted">{{ member.hospital_role_label }}</span>
                 </td>
                 <td>{{ member.position || '—' }}</td>
@@ -72,16 +76,26 @@
                   <button
                     v-if="member.deleted_at"
                     type="button"
-                    class="btn btn--sm"
+                    class="ui-btn ui-btn--sm"
                     :disabled="busy === member.uuid"
                     @click="restore(member)"
                   >
                     Restore
                   </button>
                   <button
-                    v-else
+                    v-if="!member.deleted_at"
                     type="button"
-                    class="btn btn--sm btn--quiet"
+                    class="ui-btn ui-btn--sm"
+                    :disabled="busy === member.uuid"
+                    @click="openEdit(member)"
+                  >
+                    <AssetIcon name="pencil" :size="13" />
+                    Edit
+                  </button>
+                  <button
+                    v-if="!member.deleted_at"
+                    type="button"
+                    class="ui-btn ui-btn--sm btn-remove"
                     :disabled="busy === member.uuid || member.is_you"
                     :title="member.is_you ? 'Another Head can remove your account' : null"
                     @click="remove(member)"
@@ -101,7 +115,7 @@
       <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-title" @submit.prevent="submitAdd">
         <header class="dialog__head">
           <h2 id="add-title" class="dialog__title">Add staff</h2>
-          <button type="button" class="icon-btn" aria-label="Close" @click="closeAdd"><AssetIcon name="x" :size="16" /></button>
+          <button type="button" class="ui-btn ui-btn--icon ui-btn--sm" aria-label="Close" @click="closeAdd"><AssetIcon name="x" :size="16" /></button>
         </header>
 
         <div class="dialog__body">
@@ -165,10 +179,71 @@
         </div>
 
         <footer class="dialog__foot">
-          <button type="button" class="btn" @click="closeAdd">Cancel</button>
-          <button type="submit" class="btn btn--primary" :disabled="saving">{{ saving ? 'Adding…' : 'Add staff' }}</button>
+          <button type="button" class="ui-btn" @click="closeAdd">Cancel</button>
+          <button type="submit" class="ui-btn ui-btn--primary" :disabled="saving">{{ saving ? 'Adding…' : 'Add staff' }}</button>
         </footer>
       </form>
+    </div>
+
+    <!-- EDIT: a colleague's role and title (name and email are their own to change) -->
+    <div v-if="editing" class="dialog-backdrop" @click.self="closeEdit">
+      <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title" @submit.prevent="submitEdit">
+        <header class="dialog__head">
+          <h2 id="edit-title" class="dialog__title">Edit {{ editing.full_name }}</h2>
+          <button type="button" class="ui-btn ui-btn--icon ui-btn--sm" aria-label="Close" @click="closeEdit"><AssetIcon name="x" :size="16" /></button>
+        </header>
+
+        <div class="dialog__body">
+          <div class="edit-who">
+            <span class="edit-who__avatar">{{ initialsOf(editing.full_name) }}</span>
+            <span class="edit-who__text">
+              <strong>{{ editing.full_name }}</strong>
+              <span>{{ editing.email }}</span>
+            </span>
+          </div>
+
+          <label class="field">
+            <span class="field-label">Title <span class="optional">(optional)</span></span>
+            <input v-model.trim="editForm.position" class="field-input" maxlength="100" placeholder="e.g. RMT">
+            <span v-if="editErrors.position" class="field-error">{{ editErrors.position }}</span>
+          </label>
+
+          <fieldset class="field">
+            <legend class="field-label">Role</legend>
+            <label v-for="role in roles" :key="role.value" class="role-option" :class="{ 'role-option--on': editForm.hospital_role === role.value }">
+              <input v-model="editForm.hospital_role" type="radio" name="edit_hospital_role" :value="role.value" required>
+              <span>
+                <strong>{{ role.label }}</strong>
+                <span class="role-option__desc">{{ role.description }}</span>
+              </span>
+            </label>
+            <span v-if="editErrors.hospital_role" class="field-error">{{ editErrors.hospital_role }}</span>
+          </fieldset>
+
+          <p class="hint">Only the role and title can be changed here. Their name, email and mobile number stay as they signed up.</p>
+          <p v-if="editError" class="form-error" role="alert">{{ editError }}</p>
+        </div>
+
+        <footer class="dialog__foot">
+          <button type="button" class="ui-btn" @click="closeEdit">Cancel</button>
+          <button type="submit" class="ui-btn ui-btn--primary" :disabled="savingEdit || !editChanged">{{ savingEdit ? 'Saving…' : 'Save changes' }}</button>
+        </footer>
+      </form>
+    </div>
+
+    <!-- REMOVE: confirmed here rather than in the browser's own box -->
+    <div v-if="removing" class="dialog-backdrop" @click.self="removing = null">
+      <div class="dialog dialog--sm" role="alertdialog" aria-modal="true" aria-labelledby="remove-title" aria-describedby="remove-desc">
+        <div class="dialog__body dialog__body--confirm">
+          <span class="confirm-icon"><AssetIcon name="user-x" :size="20" /></span>
+          <h2 id="remove-title" class="dialog__title">Remove {{ removing.full_name }}'s account?</h2>
+          <p id="remove-desc" class="confirm-text">They are signed out at once. You can restore it later.</p>
+        </div>
+        <footer class="dialog__foot">
+          <button type="button" class="ui-btn" @click="removing = null">Cancel</button>
+          <button type="button" class="ui-btn ui-btn--danger" @click="confirmRemove">Remove account</button>
+        </footer>
+      </div>
     </div>
 
     <transition name="toast">
@@ -178,6 +253,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * A hospital blood bank's staff, kept by its Head (project owner, 2026-10-11).
  *
@@ -187,6 +263,7 @@
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
 
@@ -260,8 +337,87 @@ async function changeRole(member, role) {
   }
 }
 
-async function remove(member) {
-  if (!window.confirm(`Remove ${member.full_name}'s account? They are signed out at once. You can restore it later.`)) return
+// ── Role cards ──
+const ROLE_ICONS = {
+  head: 'shield-check',
+  inventory_staff: 'package',
+  requesting_staff: 'clipboard-list',
+}
+// Active accounts in a role, for the card's count.
+function roleCount(role) {
+  const n = staff.value.filter((member) => !member.deleted_at && member.hospital_role === role).length
+  return n === 1 ? '1 person' : `${n} people`
+}
+
+function initialsOf(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0][0]).toUpperCase()
+}
+
+// ── Edit: role and title, through the same PATCH the role menu uses ──
+const editing = ref(null)
+const editForm = reactive({ hospital_role: '', position: '' })
+const editErrors = reactive({})
+const editError = ref('')
+const savingEdit = ref(false)
+
+const editChanged = computed(() => Boolean(editing.value) && (
+  editForm.hospital_role !== editing.value.hospital_role
+  || (editForm.position || '') !== (editing.value.position || '')
+))
+
+function openEdit(member) {
+  editing.value = member
+  editForm.hospital_role = member.hospital_role
+  editForm.position = member.position || ''
+  editError.value = ''
+  for (const key of Object.keys(editErrors)) delete editErrors[key]
+}
+
+function closeEdit() {
+  editing.value = null
+}
+
+async function submitEdit() {
+  const member = editing.value
+  if (!member || !editChanged.value) return
+
+  savingEdit.value = true
+  editError.value = ''
+  for (const key of Object.keys(editErrors)) delete editErrors[key]
+
+  // Only what changed, so a title edit cannot trip the last-Head rule.
+  const payload = {}
+  if (editForm.hospital_role !== member.hospital_role) payload.hospital_role = editForm.hospital_role
+  if ((editForm.position || '') !== (member.position || '')) payload.position = editForm.position || null
+
+  try {
+    const response = await hospitalService.updateStaff(member.uuid, payload)
+    Object.assign(member, response.data)
+    showToast(response.message)
+    editing.value = null
+  } catch (err) {
+    for (const [key, value] of Object.entries(err?.errors ?? {})) {
+      editErrors[key] = Array.isArray(value) ? value[0] : value
+    }
+    editError.value = Object.keys(editErrors).length ? '' : firstError(err)
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+// The member waiting on the confirm dialog.
+const removing = ref(null)
+
+function remove(member) {
+  removing.value = member
+}
+
+async function confirmRemove() {
+  const member = removing.value
+  removing.value = null
+  if (!member) return
 
   busy.value = member.uuid
 
@@ -350,19 +506,45 @@ onUnmounted(() => clearTimeout(toastTimer))
 
 <style scoped>
 /* The same frame as Blood Bank Inventory. */
-.staff-page { min-height: 100%; padding: 20px; background: var(--rb-page-bg); font-family: var(--rb-font-sans); color: var(--rb-text-primary); }
-.staff-inner { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.staff-page { min-height: 100%; padding: 24px var(--rb-gutter, 24px) 40px; background: var(--rb-page-bg); font-family: var(--rb-font-sans); color: var(--rb-text-primary); }
+.staff-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .page-title { margin: 0; font-size: 24px; font-weight: 700; }
 .page-subtitle { margin: 4px 0 0; font-size: 13.5px; color: var(--rb-text-secondary); max-width: 70ch; }
 
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.role-card { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rb-border); background: var(--rb-surface); }
-.role-card__title { margin: 0; font-size: 13.5px; font-weight: 700; }
-.role-card__desc { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+.role-card { padding: 14px 16px; border-radius: var(--rb-radius-lg); border: 1px solid var(--rb-border); background: var(--rb-surface); box-shadow: var(--rb-shadow-sm); }
+.role-card__top { display: flex; align-items: center; gap: 10px; }
+.role-card__icon {
+  display: flex; flex-shrink: 0; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 11px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.role-card__icon--head { background: rgba(var(--rb-purple-rgb), 0.1); color: var(--rb-purple-text); }
+.role-card__icon--inventory_staff { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.role-card__title { flex: 1; min-width: 0; margin: 0; font-size: 14px; font-weight: 700; }
+.role-card__count {
+  flex-shrink: 0; padding: 2px 9px; border-radius: 999px;
+  background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-size: 11.5px; font-weight: 600;
+}
+.role-card__desc { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
-.panel { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden; }
+.actions-col .ui-btn + .ui-btn { margin-left: 6px; }
+
+.edit-who {
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;
+  background: var(--rb-surface-alt);
+}
+.edit-who__avatar {
+  display: flex; flex-shrink: 0; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 12px; background: var(--rb-primary); color: #fff;
+  font-size: 13px; font-weight: 800;
+}
+.edit-who__text { display: flex; flex-direction: column; min-width: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.edit-who__text strong { font-size: 14px; color: var(--rb-text-primary); }
+
+.panel { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 .staff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .staff-table th {
@@ -386,18 +568,6 @@ onUnmounted(() => clearTimeout(toastTimer))
 .list-state--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); font-size: 13px; }
 .skeleton { height: 14px; border-radius: 6px; margin: 8px 0; background: var(--rb-skeleton-a); }
 
-.btn {
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 9px; cursor: pointer;
-  font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-text-primary); background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
-.btn--primary { color: #fff; background: var(--rb-primary); border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: var(--rb-primary); filter: brightness(.95); }
-.btn--sm { height: 28px; padding: 0 10px; font-size: 12px; }
-.btn--quiet { color: var(--rb-accent-text); }
 
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 0; margin: 0; padding: 0; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -408,7 +578,7 @@ onUnmounted(() => clearTimeout(toastTimer))
   font: inherit; font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface);
 }
 .field-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-.field-input--select { height: 32px; min-width: 170px; }
+.role-select { min-width: 170px; }
 .field-error, .form-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 .hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
 
@@ -420,7 +590,7 @@ onUnmounted(() => clearTimeout(toastTimer))
 .role-option__desc { display: block; font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .45); }
-.dialog { width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 14px; background: var(--rb-surface); box-shadow: 0 20px 50px -12px rgba(15, 23, 42, .35); }
+.dialog { width: min(560px, 100%); border: 1px solid var(--rb-border); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 18px; background: var(--rb-surface); box-shadow: 0 20px 50px -12px rgba(15, 23, 42, .35); }
 .dialog__head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--rb-border); }
 .dialog__title { margin: 0; font-size: 16px; font-weight: 700; }
 .dialog__body { padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
@@ -441,4 +611,16 @@ onUnmounted(() => clearTimeout(toastTimer))
 @media (max-width: 640px) {
   .field-pair { grid-template-columns: 1fr; }
 }
+
+/* Remove sits in red text until confirmed in the dialog. */
+.btn-remove { color: var(--rb-accent-text); }
+.btn-remove:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.08); }
+
+.dialog--sm { width: min(420px, 100%); }
+.dialog__body--confirm { align-items: flex-start; gap: 6px; padding: 20px 20px 16px; }
+.confirm-icon {
+  display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; margin-bottom: 6px;
+  border-radius: 12px; background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text);
+}
+.confirm-text { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 </style>

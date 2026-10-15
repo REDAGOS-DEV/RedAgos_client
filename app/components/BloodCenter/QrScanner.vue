@@ -322,7 +322,7 @@ defineExpose({ stop, reset })
   border-radius: 16px;
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
-  color: var(--rb-primary-text);
+  color: var(--rb-text-secondary);
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
 }
 

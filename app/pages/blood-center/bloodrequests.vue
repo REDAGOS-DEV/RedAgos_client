@@ -11,34 +11,27 @@
     </div>
 
     <!-- HEADER -->
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">Incoming Requests</h1>
-        <p class="page-subtitle">
-          Review and process blood requests from hospital blood banks, sent through the Blood Bank Portal or brought
-          in by a watcher.
-        </p>
-      </div>
-      <div class="header-actions">
+    <PageHeader title="Incoming Requests" subtitle="Blood requests from hospital blood banks, sent through the portal or brought in by a watcher.">
+      <template #actions>
         <!--
           A watcher who came here instead of the hospital blood bank. Issuance
           phones the hospital first; the request is only recorded once the
           hospital confirms it.
         -->
-        <button class="btn btn-outline" @click="handleExportAll">
+        <button class="ui-btn" @click="handleExportAll">
           <AssetIcon name="download" :size="15" />
           Export
         </button>
-        <button class="btn btn-outline" @click="handleRefresh" :disabled="loading">
+        <button class="ui-btn" @click="handleRefresh" :disabled="loading">
           <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
           Refresh
         </button>
-        <button v-if="canRecord" class="btn btn-primary" @click="showWalkIn = true">
+        <button v-if="canRecord" class="ui-btn ui-btn--primary" @click="showWalkIn = true">
           <AssetIcon name="clipboard-plus" :size="15" />
           New Walk-in Request
         </button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <!-- ERROR / RETRY BANNER -->
     <div v-if="error" class="retry-banner">
@@ -93,34 +86,28 @@
       </div>
     </transition>
 
-    <!-- SUMMARY CARDS -->
-    <section class="summary-grid">
-      <template v-if="summaryLoading">
-        <div v-for="n in 4" :key="'sk-' + n" class="summary-card skeleton-card" />
-      </template>
-      <template v-else>
-        <!-- Red only when there is an emergency to act on, not by default. -->
-        <div
-          v-for="stat in summaryStats"
-          :key="stat.key"
-          class="summary-card"
-          :class="{ 'is-danger': stat.danger && stat.value > 0 }"
-        >
-          <div class="summary-top">
-            <p class="summary-label">{{ stat.label }}</p>
-            <span class="summary-icon" :class="{ 'is-danger': stat.danger }">
-              <AssetIcon :name="stat.icon" :size="14" />
-            </span>
-          </div>
-          <p class="summary-value">{{ stat.value }}</p>
-          <p class="summary-trend" :class="{ up: stat.trendUp === true, down: stat.trendUp === false }">
-            <AssetIcon v-if="stat.trendUp === true" name="trending-up" :size="12" />
-            <AssetIcon v-else-if="stat.trendUp === false" name="trending-down" :size="12" />
-            {{ stat.trend }}
-          </p>
-        </div>
-      </template>
-    </section>
+    <!-- SUMMARY -->
+    <div v-if="summaryLoading" class="summary-grid">
+      <div v-for="n in 4" :key="'sk-' + n" class="summary-card skeleton-card" />
+    </div>
+    <StatStrip v-else>
+      <!-- Red only when there is an emergency to act on, not by default. -->
+      <StatItem
+        v-for="stat in summaryStats"
+        :key="stat.key"
+        :label="stat.label"
+        :value="stat.value"
+        :icon="stat.icon"
+        :tone="SUMMARY_TONE[stat.key] || 'primary'"
+        :alert="Boolean(stat.danger && stat.value > 0)"
+      >
+        <template #hint>
+          <AssetIcon v-if="stat.trendUp === true" name="trending-up" :size="12" />
+          <AssetIcon v-else-if="stat.trendUp === false" name="trending-down" :size="12" />
+          {{ stat.trend }}
+        </template>
+      </StatItem>
+    </StatStrip>
 
     <!--
       The queue: status pills, source, the filter bar and the table in one card,
@@ -178,18 +165,15 @@
       </div>
 
       <!-- The first option names the filter, so a chosen value keeps its meaning. -->
-      <select v-model="toolbarFilters.hospital" aria-label="Hospital">
-        <option value="">All hospitals</option>
-        <option v-for="h in hospitalOptions" :key="h" :value="h">{{ h }}</option>
-      </select>
-      <select v-model="toolbarFilters.bloodType" aria-label="Blood type">
-        <option value="">All blood types</option>
-        <option v-for="b in bloodTypeOptions" :key="b" :value="b">{{ b }}</option>
-      </select>
-      <select v-model="toolbarFilters.component" aria-label="Blood component">
-        <option value="">All components</option>
-        <option v-for="c in componentOptions" :key="c" :value="c">{{ c }}</option>
-      </select>
+      <div class="toolbar-select">
+        <SelectField v-model="toolbarFilters.hospital" :options="[{ value: '', label: 'All hospitals' }, ...hospitalOptions.map((h) => ({ value: h, label: h }))]" aria-label="Hospital" size="sm" />
+      </div>
+      <div class="toolbar-select">
+        <SelectField v-model="toolbarFilters.bloodType" :options="[{ value: '', label: 'All blood types' }, ...bloodTypeOptions.map((b) => ({ value: b, label: b }))]" aria-label="Blood type" size="sm" />
+      </div>
+      <div class="toolbar-select">
+        <SelectField v-model="toolbarFilters.component" :options="[{ value: '', label: 'All components' }, ...componentOptions.map((c) => ({ value: c, label: c }))]" aria-label="Blood component" size="sm" />
+      </div>
 
       <button
         type="button"
@@ -210,27 +194,19 @@
       </div>
 
       <div v-show="showMoreFilters" class="toolbar-row toolbar-row--more">
-      <select v-model="toolbarFilters.priority" aria-label="Priority">
-        <option value="">Any priority</option>
-        <option>Routine</option>
-        <option>Emergency</option>
-      </select>
-      <select v-model="toolbarFilters.status" aria-label="Status">
-        <option value="">Any status</option>
-        <option>Pending</option>
-        <option>Processing</option>
-        <option>Partial</option>
-        <option>Fulfilled</option>
-        <option>Rejected</option>
-        <option>Cancelled</option>
-      </select>
+      <div class="toolbar-select">
+        <SelectField v-model="toolbarFilters.priority" :options="[{ value: '', label: 'Any priority' }, ...['Routine', 'Emergency'].map((p) => ({ value: p, label: p }))]" aria-label="Priority" size="sm" />
+      </div>
+      <div class="toolbar-select">
+        <SelectField v-model="toolbarFilters.status" :options="[{ value: '', label: 'Any status' }, ...['Pending', 'Processing', 'Partial', 'Fulfilled', 'Rejected', 'Cancelled'].map((s) => ({ value: s, label: s }))]" aria-label="Status" size="sm" />
+      </div>
       <label class="date-field">
         <span>Requested</span>
-        <input v-model="toolbarFilters.date" type="date" />
+        <DatePicker id="br-requested" v-model="toolbarFilters.date" aria-label="Requested" size="sm" />
       </label>
       <label class="date-field">
         <span>Needed by</span>
-        <input v-model="toolbarFilters.neededBy" type="date" />
+        <DatePicker id="br-needed-by" v-model="toolbarFilters.neededBy" aria-label="Needed by" size="sm" />
       </label>
       </div>
     </div>
@@ -253,19 +229,23 @@
         <div v-for="n in 5" :key="n" class="skeleton-row" />
       </div>
 
-      <div v-else-if="!error && visibleRequests.length === 0 && activeFilterCount === 0 && !searchQuery" class="empty-state">
-        <AssetIcon name="inbox" :size="32" />
-        <h3>No incoming requests</h3>
-        <p>Hospital requests waiting for review will appear here.</p>
-        <button class="btn btn-outline btn-sm" @click="handleRefresh">Refresh</button>
-      </div>
+      <EmptyState
+        v-else-if="!error && visibleRequests.length === 0 && activeFilterCount === 0 && !searchQuery"
+        icon="inbox"
+        title="No incoming requests"
+        description="Hospital requests waiting for review will appear here."
+      >
+        <button class="ui-btn ui-btn--sm" @click="handleRefresh">Refresh</button>
+      </EmptyState>
 
-      <div v-else-if="!error && visibleRequests.length === 0" class="empty-state">
-        <AssetIcon name="search-x" :size="32" />
-        <h3>No requests match these filters</h3>
-        <p>Change a filter or clear the search to see more.</p>
-        <button class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
-      </div>
+      <EmptyState
+        v-else-if="!error && visibleRequests.length === 0"
+        icon="search-x"
+        title="No requests match these filters"
+        description="Change a filter or clear the search to see more."
+      >
+        <button class="ui-btn ui-btn--sm" @click="resetFilters">Clear filters</button>
+      </EmptyState>
 
       <table v-else-if="!error" class="request-table">
         <thead>
@@ -341,7 +321,7 @@
                 </button>
                 <div class="menu-wrap">
                   <button class="icon-btn" @click="toggleMenu(r.id)" :aria-label="`More actions for ${r.code}`" aria-haspopup="menu" :aria-expanded="openMenuId === r.id">
-                    <AssetIcon name="move-vertical" :size="16" />
+                    <AssetIcon name="more-vertical" :size="16" />
                   </button>
                   <div v-if="openMenuId === r.id" v-click-outside="() => (openMenuId = null)" class="context-menu">
                     <!-- One entry per action: "View Details", "Review Request" and
@@ -435,14 +415,13 @@
     </section>
 
     <!-- RECENT ACTIVITY -->
-    <section class="activity-card">
-      <h2 class="section-title">Recent Request Activity</h2>
+    <SectionCard title="Recent request activity">
 
       <div v-if="activityLoading" class="activity-skeleton">
         <div v-for="n in 4" :key="n" class="skeleton-row" />
       </div>
 
-      <p v-else-if="activity.length === 0" class="activity-empty">No recent activity yet.</p>
+      <EmptyState v-else-if="activity.length === 0" icon="activity" title="No recent activity yet" compact />
 
       <ul v-else class="activity-list">
         <li v-for="item in activity" :key="item.id" class="activity-item">
@@ -455,7 +434,7 @@
           </div>
         </li>
       </ul>
-    </section>
+    </SectionCard>
 
     <!-- REVIEW DRAWER -->
     <transition name="drawer">
@@ -697,15 +676,13 @@
         <h2 class="modal-title">Reject Blood Request?</h2>
         <p class="modal-desc">{{ requestToReject?.id }} — {{ requestToReject?.hospital }}</p>
         <div class="field">
-          <label class="field-label">Rejection Reason *</label>
-          <select v-model="rejectReason" class="field-select">
-            <option value="" disabled>Select a reason</option>
-            <option>Insufficient Inventory</option>
-            <option>Invalid Request</option>
-            <option>Duplicate Request</option>
-            <option>Request Cancelled by Hospital</option>
-            <option>Other</option>
-          </select>
+          <label class="field-label" for="reject-reason">Rejection Reason *</label>
+          <SelectField
+            id="reject-reason"
+            v-model="rejectReason"
+            :options="['Insufficient Inventory', 'Invalid Request', 'Duplicate Request', 'Request Cancelled by Hospital', 'Other'].map((r) => ({ value: r, label: r }))"
+            placeholder="Select a reason"
+          />
         </div>
         <div class="field">
           <label class="field-label">Additional Notes</label>
@@ -765,6 +742,13 @@ import {
   requestStatusLabel,
 } from '~/types/bloodRequest'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import SectionCard from '~/components/ui/SectionCard.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
   requires: 'requests.view',
@@ -1162,6 +1146,9 @@ const summaryStats = computed(() => {
 })
 
 /* EMERGENCY BANNER */
+// Each figure's colour in the summary strip.
+const SUMMARY_TONE = { pending: 'warning', emergency: 'danger', review: 'purple', ready: 'success' }
+
 const emergencyRequests = computed(() =>
   requests.value.filter((r) => r.priority === 'Emergency' && !dismissedAlertIds.value.includes(r.id))
 )
@@ -1715,10 +1702,10 @@ onMounted(() => {
   border-bottom: 1px solid var(--border); background: var(--card);
 }
 .toolbar-row { display: flex; align-items: center; gap: 8px; }
-.toolbar .toolbar-row > select { flex: 1 1 0; min-width: 0; max-width: 220px; }
+.toolbar .toolbar-row > .toolbar-select { flex: 1 1 0; min-width: 0; max-width: 220px; }
 .toolbar-row > .date-field { flex: 0 0 auto; }
 .toolbar-row--more { padding-top: 8px; border-top: 1px dashed var(--border); }
-.toolbar-row--more > select { flex: 0 1 180px !important; }
+.toolbar-row--more > .toolbar-select { flex: 0 1 180px !important; }
 
 .more-filters { flex-shrink: 0; }
 .more-filters.is-on { border-color: var(--primary); color: var(--primary); }
@@ -1730,10 +1717,10 @@ onMounted(() => {
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
 .toolbar-search input { width: 100%; height: 36px; padding: 0 12px 0 32px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); }
 .toolbar select { height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); max-width: 180px; }
-.toolbar-search input:focus, .toolbar select:focus, .date-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12); }
-.date-field { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.toolbar-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12); }
+.date-field { display: inline-flex; align-items: center; gap: 8px; }
+.date-field > :not(span) { width: 160px; }
 .date-field span { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
-.date-field input { height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
 .toolbar-buttons { display: flex; gap: 6px; margin-left: auto; }
 .toolbar-meta { padding: 10px 18px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
 .toolbar-meta strong { color: var(--text); }
@@ -2002,7 +1989,6 @@ onMounted(() => {
 :global(.dark .scope-blood-center-bloodrequests .field-textarea),
 :global(.dark .scope-blood-center-bloodrequests .toolbar-search input),
 :global(.dark .scope-blood-center-bloodrequests .toolbar select),
-:global(.dark .scope-blood-center-bloodrequests .toolbar input[type="date"]) { background: #1c2536; }
 :global(.dark .scope-blood-center-bloodrequests .context-menu),
 :global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 
@@ -2043,4 +2029,7 @@ onMounted(() => {
   color: var(--rb-text-secondary);
   margin: 6px 0 12px;
 }
+
+/* The queue card in the shared SectionCard's shape (2026-10-15). */
+.queue-card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>
