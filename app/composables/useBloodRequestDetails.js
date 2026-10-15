@@ -1,6 +1,5 @@
 import { hospitalService } from '~/api/hospital/HospitalService'
 import {
-  REQUEST_STATUSES as CANONICAL_STATUSES,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONES,
   requestStage,
@@ -16,8 +15,6 @@ import {
  * set now lives in ~/types/bloodRequest and is re-exported here so existing
  * imports keep working.
  */
-
-export const REQUEST_STATUSES = CANONICAL_STATUSES
 
 /**
  * Map a request status to the badge classes the detail pages use.

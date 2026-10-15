@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": "^22.12.0 || ^24.11.0 || >=26.0.0"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "build": "nuxt build",
@@ -20,18 +20,21 @@
   },
   "dependencies": {
     "jsqr": "^1.4.0",
-    "nuxt": "^4.5.1",
+    "nuxt": "^4.6.1",
     "qrcode": "^1.5.4",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nuxt/eslint": "^1.17.0",
     "@nuxt/test-utils": "^4.2.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
     "@types/node": "^26.0.0",
-    "eslint": "^9.39.5",
+    "@typescript-eslint/parser": "^8.71.2",
+    "eslint": "^10.12.0",
     "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.13.0",
     "happy-dom": "^20.13.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11",

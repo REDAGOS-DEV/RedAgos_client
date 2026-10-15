@@ -1,3 +1,4 @@
+import type { HospitalRole } from './hospitalStaff'
 /**
  * The shape `GET /api/user` actually returns.
  *
@@ -103,6 +104,8 @@ export interface AppUser {
   department_label: string | null
   /** Null for donors, admins, blood-bank staff, a custom role, and an Admin or Supervisor with no post. */
   staff_role: StaffRole | null
+  hospital_role: HospitalRole | null
+  hospital_role_label: string | null
   staff_role_label: string | null
   /** A typed role, when none of the predefined ones fits. */
   custom_role: string | null
