@@ -42,8 +42,7 @@
                 @input="onSearchInput"
               >
             </label>
-            <input v-model="fromDate" type="date" class="date-input" aria-label="From date" :max="toDate || undefined" @change="load()">
-            <input v-model="toDate" type="date" class="date-input" aria-label="To date" :min="fromDate || undefined" @change="load()">
+            <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" @change="load()" />
             <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="load()">
               <option value="">All statuses</option>
               <option v-for="s in APPOINTMENT_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -391,6 +390,7 @@
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { APPOINTMENT_STATUSES, appointmentTone, exactIdentifier, isoDaysFromToday, slotOptionLabel } from '~/utils/appointments'
 import { eligibilityBadge, formatPhone, formatShortDate } from '~/utils/donorRecords'
@@ -962,7 +962,9 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.search { position: relative; flex: 1 1 220px; min-width: 170px; max-width: 280px; }
+/* A small basis, so the filters and buttons share one line until the list
+   is narrow; the search is what gives way. */
+.search { position: relative; flex: 1 1 180px; min-width: 160px; max-width: 280px; }
 
 .search__icon {
   position: absolute;
@@ -974,7 +976,6 @@ onBeforeUnmount(() => {
 }
 
 .search__input,
-.date-input,
 .select {
   height: 36px;
   border: 1px solid var(--rb-border-strong);
@@ -986,9 +987,10 @@ onBeforeUnmount(() => {
 }
 
 .search__input { width: 100%; padding: 0 12px 0 34px; }
-.date-input { padding: 0 10px; color-scheme: light dark; }
 
+/* As wide as the chosen option, not the longest one (where supported). */
 .select {
+  field-sizing: content;
   padding: 0 30px 0 12px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -1001,7 +1003,6 @@ onBeforeUnmount(() => {
 .search__input::placeholder { color: var(--rb-placeholder); }
 
 .search__input:focus,
-.date-input:focus,
 .select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 /* ---------- Table ---------- */

@@ -14,6 +14,12 @@
           <h1 class="page-title">Donations</h1>
           <p class="page-subtitle">{{ listSummary }}</p>
         </div>
+        <!-- A remote drive's paper records, typed in after the drive. Up here
+             so the list's toolbar fits on one line. -->
+        <NuxtLink v-if="canRecordPaper" to="/blood-center/paper-records" class="btn-outline">
+          <AssetIcon name="file-text" :size="14" />
+          Paper Records
+        </NuxtLink>
       </header>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -50,8 +56,7 @@
               <option value="">All groups</option>
               <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
             </select>
-            <input v-model="fromDate" type="date" class="date-input" aria-label="From date" :max="toDate || undefined" @change="load()">
-            <input v-model="toDate" type="date" class="date-input" aria-label="To date" :min="fromDate || undefined" @change="load()">
+            <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" @change="load()" />
           </div>
 
           <div class="toolbar__actions">
@@ -67,11 +72,6 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
               Refresh
             </button>
-            <!-- A remote drive's paper records, typed in after the drive. -->
-            <NuxtLink v-if="canRecordPaper" to="/blood-center/paper-records" class="btn-outline">
-              <AssetIcon name="file-text" :size="14" />
-              Paper Records
-            </NuxtLink>
             <NuxtLink v-if="canUseCounter" to="/blood-center/donation" class="btn-primary">
               <AssetIcon name="plus" :size="15" />
               Donation Counter
@@ -324,6 +324,7 @@
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { DONATION_STATUS_FILTERS, donationTone } from '~/utils/donationRecords'
 import { formatShortDate, orderBloodGroups } from '~/utils/donorRecords'
@@ -680,7 +681,9 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.search { position: relative; flex: 1 1 220px; min-width: 170px; max-width: 280px; }
+/* A small basis, so the filters and buttons share one line until the list
+   is narrow; the search is what gives way. */
+.search { position: relative; flex: 1 1 180px; min-width: 160px; max-width: 280px; }
 
 .search__icon {
   position: absolute;
@@ -692,7 +695,6 @@ onBeforeUnmount(() => {
 }
 
 .search__input,
-.date-input,
 .select {
   height: 36px;
   border: 1px solid var(--rb-border-strong);
@@ -704,9 +706,10 @@ onBeforeUnmount(() => {
 }
 
 .search__input { width: 100%; padding: 0 12px 0 34px; }
-.date-input { padding: 0 10px; color-scheme: light dark; }
 
+/* As wide as the chosen option, not the longest one (where supported). */
 .select {
+  field-sizing: content;
   padding: 0 30px 0 12px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -719,7 +722,6 @@ onBeforeUnmount(() => {
 .search__input::placeholder { color: var(--rb-placeholder); }
 
 .search__input:focus,
-.date-input:focus,
 .select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 /* ---------- Table ---------- */
