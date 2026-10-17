@@ -18,7 +18,7 @@
           </div>
 
           <div class="dhq__header-actions">
-            <button type="button" class="dhq__btn" @click="print">Print</button>
+            <button type="button" class="dhq__btn" @click="$emit('print')">Print</button>
             <button type="button" class="dhq__btn dhq__btn--icon" aria-label="Close" @click="$emit('close')">×</button>
           </div>
         </header>
@@ -203,7 +203,8 @@ const intakeFields = [
 
 // `update-intake` rather than writing into the prop: the counter owns this
 // state, because the screening form has to send it and both have to agree.
-defineEmits(['close', 'update-intake'])
+// `print` opens the A4 sheet the desk prints, so paper from either reads alike.
+defineEmits(['close', 'update-intake', 'print'])
 
 const activeTab = ref('personal')
 
@@ -284,10 +285,6 @@ function longDate(value) {
   if (!value) return '—'
 
   return new Date(value).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function print() {
-  window.print()
 }
 
 onMounted(() => {

@@ -245,7 +245,7 @@ describe('the Processing page', () => {
 })
 
 describe('the counter', () => {
-  const page = source('app/pages/blood-center/collection.vue')
+  const page = source('app/pages/blood-center/donation.vue')
 
   it('sends the whole phlebotomist box, with the barcode normalised', () => {
     expect(page).toContain('blood_bag_type: collectionForm.blood_bag_type')
@@ -307,9 +307,9 @@ describe('navigation', () => {
    * A nav item gated differently from its page either hides a page the user
    * may open or offers one that bounces them. Both of these did the latter.
    */
-  it('gates the collection link exactly as the collection page is gated', () => {
+  it('gates the Donation link exactly as the Donation page is gated', () => {
     expect(nav).toContain("export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const")
-    expect(nav).toMatch(/label: 'Collection', path: '\/blood-center\/collection'[^}]*requires: COLLECTION_ABILITIES/)
+    expect(nav).toMatch(/label: 'Donation Counter', path: '\/blood-center\/donation'[^}]*requires: COLLECTION_ABILITIES/)
   })
 
   it('gates the fulfillment link on the ability the fulfillment page requires', () => {
@@ -323,7 +323,7 @@ describe('navigation', () => {
     const page = source('app/pages/blood-center/donors.vue')
 
     expect(page).toContain("requires: 'donors.view_contact'")
-    expect(nav).toMatch(/label: 'Donors'[^}]*requires: 'donors\.view_contact'/)
+    expect(nav).toMatch(/label: 'Donor Management'[^}]*requires: 'donors\.view_contact'/)
     expect(page).toContain("const canViewHistory = computed(() => can('donors.view_clinical'))")
   })
 })
@@ -348,13 +348,21 @@ describe('the staff roster', () => {
     // unstylable <datalist>): the suggestions still come from the catalogue.
     expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.position"\s+:options="titles"/)
     expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
-    expect(page).toMatch(/<ComboInput\s+id="staff-role"\s+v-model="form\.role"\s+:options="departmentRoles\.map/)
+    // Several roles per person, all from the chosen department's catalogue
+    // (project owner, 2026-10-17), plus an optional custom one.
+    expect(page).toMatch(/<label v-for="role in departmentRoles"[^>]*>\s*<input v-model="form\.roles" type="checkbox" :value="role\.key"/)
+    expect(page).toContain('id="staff-custom-role"')
     expect(page).toContain('v-model="form.staff_privileges" type="checkbox"')
   })
 
-  it('sends a picked role as its key and a typed one as a custom role', () => {
-    expect(page).toContain('? { staff_role: matchedRole.value.key, custom_role: null }')
-    expect(page).toContain(': { staff_role: null, custom_role: typed }')
+  it('sends the main role, the others and a custom one', () => {
+    expect(page).toContain('staff_role: main,')
+    expect(page).toContain('additional_staff_roles: ordered.filter((key) => key !== main),')
+    expect(page).toContain('custom_role: form.custom_role.trim() || null,')
+  })
+
+  it('keeps every ticked role in the one department', () => {
+    expect(page).toContain('const keys = new Set(departmentRoles.value.map((role) => role.key))')
   })
 
   it('can generate the temporary password, like the super admin form', () => {
@@ -395,7 +403,8 @@ describe('corrections', () => {
       expect(dialog).toContain(title)
     }
 
-    expect(dialog).toContain("user.value?.staff_role === head.value.role")
+    // Head by any of their roles, not only the main one.
+    expect(dialog).toContain('(user.value?.staff_roles ?? []).includes(head.value.role)')
     expect(dialog).toContain('applied as soon as you send it')
     expect(dialog).not.toContain('Center Admin')
     // The consultant role was withdrawn with its department.
@@ -441,7 +450,7 @@ describe('corrections', () => {
 
   it('is reached from every page that saves a correctable record', () => {
     expect(source('app/pages/blood-center/laboratory.vue')).toContain('subject="components"')
-    expect(source('app/pages/blood-center/collection.vue')).toContain('startScreeningCorrection')
-    expect(source('app/pages/blood-center/collection.vue')).toContain('startCollectionCorrection')
+    expect(source('app/pages/blood-center/donation.vue')).toContain('startScreeningCorrection')
+    expect(source('app/pages/blood-center/donation.vue')).toContain('startCollectionCorrection')
   })
 })

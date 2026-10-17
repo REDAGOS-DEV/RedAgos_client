@@ -1,438 +1,386 @@
 <template>
   <div class="appointments-page">
-    <!-- Skeleton loading state, the same as the other pages -->
     <div v-if="initialLoading" class="appointments-inner" aria-busy="true" aria-label="Loading appointments">
       <div class="skeleton-head">
         <div class="skeleton skeleton--header" />
         <div class="skeleton skeleton--sub" />
       </div>
-      <div class="stats-row">
-        <div v-for="n in 4" :key="'skc-' + n" class="skeleton skeleton--card" />
-      </div>
-      <div class="skeleton skeleton--panel" style="height: 460px" />
+      <div class="skeleton skeleton--panel" />
     </div>
 
     <div v-else class="appointments-inner">
-      <!-- Header -->
       <header class="header-row">
-        <div class="header-copy">
+        <div>
           <h1 class="page-title">Appointments</h1>
-          <p class="page-subtitle">{{ headerSummary }}</p>
-        </div>
-
-        <div class="header-actions">
-          <div class="date-control">
-            <span class="date-control__chip" :class="{ 'date-control__chip--today': isToday }">
-              {{ isToday ? 'Today' : 'Viewing' }}
-            </span>
-            <div class="date-filter-wrap">
-              <input type="date" v-model="datePickerValue" class="date-filter" aria-label="Appointment date"
-                @change="onDateFilterChange" />
-              <AssetIcon name="calendar" :size="16" class="form-input-icon__icon" />
-            </div>
-          </div>
-
-          <button v-if="!isToday" type="button" class="btn-outline" @click="resetToToday">
-            Back to today
-          </button>
-
-          <!-- The slot list is read-only, so this opens a view, not an editor. -->
-          <button type="button" class="btn-outline" @click="openManageSlots">
-            <AssetIcon name="clock" :size="14" />
-            Time Slots
-          </button>
+          <p class="page-subtitle">{{ listSummary }}</p>
         </div>
       </header>
 
-      <!-- Error banner -->
-      <div v-if="loadError" class="error-banner" role="alert">
-        <span>{{ loadError }}</span>
-        <button type="button" class="error-banner__retry" @click="loadAll">Retry</button>
+      <div v-if="loadError" class="banner banner--error" role="alert">
+        <AssetIcon name="circle-alert" :size="16" />
+        <p class="banner__text">{{ loadError }}</p>
+        <button type="button" class="btn-link" @click="load(pager.page)">Retry</button>
       </div>
 
-      <!-- Stat cards -->
-      <div class="stats-row">
-        <div v-for="card in statCards" :key="card.key" class="stat-card" :class="`stat-card--${card.tone}`">
-          <div class="stat-card__top">
-            <p class="stat-card__label">{{ card.label }}</p>
-            <span class="stat-card__icon">
-              <AssetIcon :name="card.icon" :size="14" />
+      <div v-if="notice" class="banner" :class="`banner--${notice.tone}`" role="status">
+        <AssetIcon :name="notice.tone === 'error' ? 'circle-alert' : 'circle-check-big'" :size="16" />
+        <p class="banner__text">{{ notice.text }}</p>
+        <button type="button" class="btn-link" @click="notice = null">Dismiss</button>
+      </div>
+
+      <section class="panel">
+        <div class="toolbar">
+          <div class="toolbar__filters">
+            <label class="search">
+              <AssetIcon name="search" :size="15" class="search__icon" />
+              <input
+                v-model="search"
+                type="search"
+                class="search__input"
+                placeholder="Search donor / drive…"
+                aria-label="Search by donor, drive or appointment ID"
+                @input="onSearchInput"
+              >
+            </label>
+            <input v-model="fromDate" type="date" class="date-input" aria-label="From date" :max="toDate || undefined" @change="load()">
+            <input v-model="toDate" type="date" class="date-input" aria-label="To date" :min="fromDate || undefined" @change="load()">
+            <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="load()">
+              <option value="">All statuses</option>
+              <option v-for="s in APPOINTMENT_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+          </div>
+
+          <div class="toolbar__actions">
+            <span v-if="updatedAt" class="updated">
+              <AssetIcon name="clock" :size="13" />
+              Updated {{ updatedAtLabel }}
             </span>
+            <button type="button" class="btn-outline" :disabled="exporting || !pager.total" @click="exportList">
+              <AssetIcon name="download" :size="14" />
+              {{ exporting ? 'Exporting…' : 'Export' }}
+            </button>
+            <button type="button" class="btn-outline" :disabled="loading" @click="load(pager.page)">
+              <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
+              Refresh
+            </button>
+            <button v-if="canManage" type="button" class="btn-primary" @click="openBooking">
+              <AssetIcon name="plus" :size="15" />
+              New Appointment
+            </button>
           </div>
-          <p class="stat-card__value" :class="{ skeleton: loadingStats }">{{ loadingStats ? '' : card.value }}</p>
-          <span class="stat-card__hint">{{ loadingStats ? '\u00A0' : card.hint }}</span>
-        </div>
-      </div>
-
-      <!-- Main panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Appointment Overview</h2>
-            <p class="panel-subtitle">{{ selectedDateLabel }}</p>
-          </div>
-        </div>
-
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" class="tab" :class="{ 'tab--active': activeTab === 'walkin' }"
-            :aria-selected="activeTab === 'walkin'" @click="activeTab = 'walkin'">
-            Walk-in Appointments
-            <span class="tab-count">{{ walkInAppointments.length }}</span>
-          </button>
-          <button type="button" role="tab" class="tab" :class="{ 'tab--active': activeTab === 'drives' }"
-            :aria-selected="activeTab === 'drives'" @click="activeTab = 'drives'">
-            Blood Drive Registrations
-            <span class="tab-count">{{ bloodDrives.length }}</span>
-          </button>
         </div>
 
-        <!-- WALK-IN APPOINTMENTS TAB -->
-        <section v-if="activeTab === 'walkin'" class="tab-content">
-          <div class="section-head">
-            <div>
-              <p class="section-label">Time slots</p>
-              <p v-if="slotSummary" class="section-hint">{{ slotSummary }}</p>
-            </div>
-            <div class="section-head__right">
-              <div class="slot-legend" aria-hidden="true">
-                <span class="legend-item"><i class="legend-dot legend-dot--open" />Open</span>
-                <span class="legend-item"><i class="legend-dot legend-dot--busy" />Filling up</span>
-                <span class="legend-item"><i class="legend-dot legend-dot--full" />Full</span>
-              </div>
-              <button v-if="selectedSlotId" type="button" class="btn-link" @click="selectedSlotId = null">
-                Show all slots
-              </button>
-            </div>
-          </div>
+        <div class="table-wrap" :class="{ 'table-wrap--busy': loading && rows.length }">
+          <table class="appt-table">
+            <caption class="sr-only">Appointments at this centre and its drives</caption>
+            <thead>
+              <tr>
+                <th scope="col" class="c-id">ID</th>
+                <th scope="col" class="c-donor">Donor</th>
+                <th scope="col" class="c-date">Date</th>
+                <th scope="col" class="c-slot">Slot</th>
+                <th scope="col" class="c-place">Drive / Center</th>
+                <th scope="col" class="c-status">Status</th>
+                <th scope="col" class="c-actions">Actions</th>
+              </tr>
+            </thead>
 
-          <div v-if="loadingSlots" class="time-slot-grid">
-            <div v-for="n in 6" :key="'sk-' + n" class="time-slot-card skeleton-block" />
-          </div>
+            <tbody v-if="loading && !rows.length">
+              <tr v-for="n in 6" :key="'sk-' + n">
+                <td colspan="7"><span class="skeleton skeleton--line" /></td>
+              </tr>
+            </tbody>
 
-          <div v-else-if="timeSlots.length === 0" class="empty-state empty-state--inline">
-            <span class="empty-state__icon"><AssetIcon name="clock" :size="18" /></span>
-            <p class="empty-state__title">No time slots</p>
-            <p class="empty-state__text">This centre has no bookable time slots configured.</p>
-          </div>
-
-          <!-- Morning and afternoon apart: how the counter plans its day. -->
-          <div v-else class="slot-periods">
-            <div v-for="period in slotPeriods" :key="period.key" class="slot-period">
-              <p class="slot-period__head">
-                <span class="slot-period__name">{{ period.label }}</span>
-                <span class="slot-period__meta">{{ period.booked }}/{{ period.capacity }} booked</span>
-              </p>
-
-              <div class="time-slot-grid">
-                <button v-for="slot in period.slots" :key="slot.id" type="button" class="time-slot-card"
-                  :class="[
-                    `time-slot-card--${slot.level}`,
-                    {
-                      'time-slot-card--selected': selectedSlotId === slot.id,
-                      'time-slot-card--past': slot.past,
-                      'time-slot-card--now': slot.current,
-                    },
-                  ]"
-                  :aria-pressed="selectedSlotId === slot.id" @click="toggleSlot(slot.id)">
-                  <span class="slot-head">
-                    <span class="slot-time">
-                      <i class="legend-dot" :class="`legend-dot--${slot.level}`" aria-hidden="true" />
-                      {{ slot.label }}
-                    </span>
-                    <span v-if="slot.current" class="slot-tag slot-tag--now">Now</span>
-                    <span v-else-if="slot.past" class="slot-tag">Past</span>
-                  </span>
-                  <span class="slot-meter">
-                    <span class="slot-meter__fill" :style="{ width: slot.pct + '%' }" />
-                  </span>
-                  <span class="slot-count">
-                    <strong>{{ slot.booked }}</strong>/{{ slot.capacity }}
-                    {{ slot.level === 'full' ? 'Full' : 'booked' }}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="toolbar">
-            <div class="filters-row">
-              <select v-model="statusFilter" class="form-input filter-select" aria-label="Filter by status">
-                <option value="all">All Status</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="in-progress">In progress</option>
-                <option value="collected">Collected</option>
-                <option value="deferred">Deferred</option>
-                <option value="no-show">No-show</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-              <select v-model="bloodTypeFilter" class="form-input filter-select" aria-label="Filter by blood type">
-                <option value="all">All Blood Types</option>
-                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-              </select>
-              <button v-if="selectedSlotId" type="button" class="filter-chip" @click="selectedSlotId = null">
-                Slot: {{ formatSlotTime(selectedSlotId) }}
-                <AssetIcon name="x" :size="12" />
-              </button>
-            </div>
-
-            <div class="toolbar-meta">
-              <span v-if="!loadingAppointments" class="result-count">
-                Showing <strong>{{ filteredAppointments.length }}</strong> of {{ walkInAppointments.length }}
-              </span>
-              <button v-if="hasActiveFilters" type="button" class="btn-link" @click="clearFilters">
-                Clear filters
-              </button>
-            </div>
-          </div>
-
-          <div class="appointment-list">
-            <template v-if="loadingAppointments">
-              <div v-for="n in 4" :key="'skap-' + n" class="appointment-card skeleton-block" />
-            </template>
-
-            <div v-else-if="walkInAppointments.length === 0" class="empty-state">
-              <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
-              <p class="empty-state__title">No appointments on {{ selectedDateLabel }}</p>
-              <p class="empty-state__text">Bookings made in the donor portal for this centre will appear here.</p>
-            </div>
-
-            <div v-else-if="filteredAppointments.length === 0" class="empty-state">
-              <span class="empty-state__icon"><AssetIcon name="user-x" :size="20" /></span>
-              <p class="empty-state__title">No matches</p>
-              <p class="empty-state__text">No appointments match the current filters.</p>
-              <button type="button" class="btn-outline btn-outline--sm" @click="clearFilters">Clear filters</button>
-            </div>
-
-            <template v-else>
-              <article v-for="appt in filteredAppointments" :key="appt.id" class="appointment-card"
-                :class="[`appointment-card--${appt.statusKey}`, { 'appointment-card--next': appt.id === nextUpId }]">
-                <div class="appt-time">
-                  <span class="appt-time__clock">{{ appt.slotTime.split(' ')[0] }}</span>
-                  <span class="appt-time__period">{{ appt.slotTime.split(' ')[1] }}</span>
-                </div>
-
-                <span class="appt-avatar" aria-hidden="true">{{ initials(appt.donorName) }}</span>
-
-                <div class="appt-info">
-                  <div class="appt-name-row">
-                    <span class="appt-name">{{ appt.donorName }}</span>
-                    <span class="pill pill--blood">{{ appt.bloodType }}</span>
-                    <span v-if="appt.id === nextUpId" class="next-tag">Up next</span>
-                  </div>
-                  <div class="appt-meta">
-                    <span class="appt-code">{{ appt.donorCode }}</span>
-                    <span class="meta-sep" aria-hidden="true">&middot;</span>
-                    <span class="kind-tag" :class="`kind-tag--${appt.kindKey}`">{{ appt.kind }}</span>
-                    <template v-if="appt.phone">
-                      <span class="meta-sep" aria-hidden="true">&middot;</span>
-                      <a :href="`tel:${appt.phone}`" class="appt-phone">{{ appt.phone }}</a>
-                    </template>
-                  </div>
-                </div>
-
-                <div class="appt-status-col">
-                  <span class="pill pill--status" :class="'pill--' + appt.statusKey">
-                    <span class="status-dot" />
-                    {{ appt.status }}
-                  </span>
-
-                  <div class="appt-actions">
-                    <button v-if="appt.canMarkNoShow" type="button" class="row-action row-action--ghost"
-                      :disabled="rowBusyId === appt.id" @click="markNoShow(appt)">
-                      No-show
+            <tbody v-else-if="!rows.length">
+              <tr>
+                <td colspan="7" class="empty-cell">
+                  <div class="empty-state">
+                    <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'calendar'" :size="20" /></span>
+                    <p class="empty-state__title">{{ hasFilters ? 'No appointments match' : 'No appointments yet' }}</p>
+                    <p class="empty-state__text">
+                      {{ hasFilters
+                        ? 'Try another donor or drive, or widen the dates.'
+                        : 'Bookings donors make in the portal, and ones the desk takes by phone, appear here.' }}
+                    </p>
+                    <button v-if="hasFilters" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
+                    <button v-else-if="canManage" type="button" class="btn-primary" @click="openBooking">
+                      <AssetIcon name="plus" :size="15" />
+                      New Appointment
                     </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
 
-                    <button v-if="appt.canCheckIn" type="button" class="row-action row-action--primary"
-                      :disabled="rowBusyId === appt.id" @click="checkInAppointment(appt)">
-                      <span v-if="rowBusyId === appt.id" class="btn-spinner" />
-                      {{ rowBusyId === appt.id ? 'Working…' : 'Check in' }}
+            <tbody v-else>
+              <tr v-for="row in rows" :key="row.id" class="appt-row" :class="{ 'appt-row--today': row.date === todayIso }">
+                <td class="c-id"><span class="code">{{ row.code }}</span></td>
+                <td class="c-donor">
+                  <div class="donor">
+                    <span class="donor__name">{{ row.donor?.full_name || 'Unknown donor' }}</span>
+                    <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
+                  </div>
+                  <span v-if="row.booked_by" class="sub" :title="row.notes || undefined">
+                    Booked by {{ row.booked_by }}<template v-if="row.notes"> · has a note</template>
+                  </span>
+                </td>
+                <td class="c-date nowrap">{{ formatShortDate(row.date) }}</td>
+                <td class="c-slot nowrap">{{ row.slot_start }} - {{ row.slot_end }}</td>
+                <td class="c-place">{{ row.place }}</td>
+                <td class="c-status">
+                  <span class="badge" :class="`badge--${appointmentTone(row.status, row.status_label)}`">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ row.status_label }}
+                  </span>
+                </td>
+                <td class="c-actions">
+                  <!-- A scheduled row always shows its four actions, as the
+                       mock-up does; one that does not apply yet is greyed out
+                       and says why. The server's `can` decides which. -->
+                  <div class="row-actions">
+                    <button
+                      v-if="canVerify && (row.status === 'scheduled' || row.status === 'confirmed')"
+                      type="button"
+                      class="icon-btn"
+                      :disabled="busyId === row.id || !row.can.collect"
+                      :aria-label="`Mark ${row.donor?.full_name} as collected`"
+                      :title="collectHint(row)"
+                      @click="markCollected(row)"
+                    >
+                      <AssetIcon name="check" :size="15" />
                     </button>
-
-                    <NuxtLink v-else-if="appt.canOpenCounter" to="/blood-center/collection"
-                      class="row-action row-action--primary">
-                      Open counter
-                      <AssetIcon name="arrow-right" :size="12" />
+                    <NuxtLink
+                      v-if="row.can.open_counter && canOpenCounter"
+                      to="/blood-center/donation"
+                      class="icon-btn"
+                      :aria-label="`Open the donation counter for ${row.donor?.full_name}`"
+                      title="In progress: open the donation counter"
+                    >
+                      <AssetIcon name="arrow-right" :size="15" />
                     </NuxtLink>
+                    <button
+                      v-if="canVerify && (row.status === 'scheduled' || row.status === 'confirmed')"
+                      type="button"
+                      class="icon-btn"
+                      :disabled="busyId === row.id || !row.can.no_show"
+                      :aria-label="`Mark ${row.donor?.full_name} as a no-show`"
+                      :title="row.can.no_show ? 'Mark no-show' : 'A no-show can be marked from the appointment day'"
+                      @click="ask('no_show', row)"
+                    >
+                      <AssetIcon name="user-x" :size="15" />
+                    </button>
+                    <button
+                      v-if="canManage && row.status === 'scheduled'"
+                      type="button"
+                      class="icon-btn"
+                      :disabled="busyId === row.id || !row.can.cancel"
+                      :aria-label="`Cancel ${row.donor?.full_name}'s appointment`"
+                      title="Cancel appointment"
+                      @click="ask('cancel', row)"
+                    >
+                      <AssetIcon name="x" :size="15" />
+                    </button>
+                    <button
+                      v-if="canDelete && row.status !== 'confirmed'"
+                      type="button"
+                      class="icon-btn icon-btn--danger"
+                      :disabled="busyId === row.id || !row.can.delete"
+                      :aria-label="row.can.delete ? `Delete appointment ${row.code}` : `${row.code} is kept with its donation record`"
+                      :title="row.can.delete ? 'Delete appointment' : 'Kept: a visit was recorded against it'"
+                      @click="ask('delete', row)"
+                    >
+                      <AssetIcon name="trash-2" :size="15" />
+                    </button>
                   </div>
-                </div>
-              </article>
-            </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="pager">
+          <span class="pager__info">{{ pager.total }} record(s)</span>
+          <div class="pager__btns">
+            <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loading" @click="load(pager.page - 1)">
+              <AssetIcon name="chevron-left" :size="14" />
+              Prev
+            </button>
+            <span class="pager__page">Page {{ pager.page }} / {{ pager.lastPage }}</span>
+            <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page >= pager.lastPage || loading" @click="load(pager.page + 1)">
+              Next
+              <AssetIcon name="chevron-right" :size="14" />
+            </button>
           </div>
-        </section>
-
-        <!-- BLOOD DRIVE REGISTRATIONS TAB -->
-        <section v-else class="tab-content">
-          <div class="drives-header">
-            <div>
-              <p class="section-label">Mobile blood drives</p>
-              <p class="section-hint">Registrations donors made through the portal.</p>
-            </div>
-            <!-- KEPT YANNIE'S VERSION – simplified path -->
-            <NuxtLink to="/blood-center/drives" class="btn-outline-blue">
-              Go to Mobile Drives
-              <AssetIcon name="arrow-right" :size="14" />
-            </NuxtLink>
-          </div>
-
-          <template v-if="loadingDrives">
-            <div v-for="n in 2" :key="'skd-' + n" class="drive-card skeleton-block" style="height: 200px" />
-          </template>
-
-          <div v-else-if="bloodDrives.length === 0" class="empty-state">
-            <span class="empty-state__icon"><AssetIcon name="droplets" :size="20" /></span>
-            <p class="empty-state__title">No upcoming drives</p>
-            <p class="empty-state__text">Drives this centre schedules in Donation Drives will show their registrations here.</p>
-          </div>
-
-          <div v-else class="drive-grid">
-            <div v-for="drive in bloodDrives" :key="drive.id" class="drive-card">
-              <div class="drive-card__top">
-                <div>
-                  <p class="drive-card__title">{{ drive.name }}</p>
-                  <p class="drive-card__meta">{{ drive.dateLabel }}</p>
-                </div>
-                <span class="status-badge" :class="`status-badge--${drive.statusKey}`">{{ drive.status || '—' }}</span>
-              </div>
-
-              <div class="drive-progress">
-                <div class="drive-progress__head">
-                  <span class="drive-progress-label">Registered donors</span>
-                  <span v-if="drive.capacity" class="drive-progress__pct">{{ driveProgressPct(drive) }}%</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" :class="{ 'progress-fill--full': driveProgressPct(drive) >= 100 }"
-                    :style="{ width: driveProgressPct(drive) + '%' }" />
-                </div>
-                <div class="progress-meta">
-                  <span><strong>{{ drive.registered }}</strong> registered</span>
-                  <span>{{ drive.capacity ? `${drive.capacity} capacity` : 'No limit set' }}</span>
-                </div>
-              </div>
-
-              <p v-if="drive.status === 'Open'" class="drive-note drive-note--open">
-                Registration is open. Donors can book in the portal.
-              </p>
-
-              <template v-if="drive.previewDonors.length">
-                <p class="preview-label">Registered Donors (Preview)</p>
-                <div class="donor-preview-list">
-                  <div v-for="donor in drive.previewDonors" :key="donor.id" class="donor-row">
-                    <span class="donor-row__avatar" :style="{ background: colorFor(donor.name) }">{{
-                      initials(donor.name) }}</span>
-                    <div class="donor-row__info">
-                      <p class="donor-row__name">{{ donor.name }}</p>
-                      <p class="donor-row__meta">{{ donor.bloodType }} &middot; Registered {{
-                        donor.registeredDate }} &middot; Screening: {{ donor.screeningStatus }}</p>
-                    </div>
-                    <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status }}</span>
-                  </div>
-                </div>
-              </template>
-
-              <p v-else class="drive-note">The donor list for each drive is not available yet.</p>
-
-              <div class="drive-card__actions">
-                <button type="button" class="btn-outline btn-outline--sm" disabled title="Not available yet"
-                  @click="openViewDonors(drive)">View all {{ drive.registered }} donors</button>
-                <button type="button" class="btn-outline-blue" disabled title="Not available yet"
-                  @click="openManageDrive(drive)">Manage Drive &amp; Attendance</button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+        </footer>
+      </section>
     </div>
 
-    <!-- TIME SLOTS MODAL (read-only) -->
+    <!-- ============ CONFIRM ============ -->
     <Transition name="modal">
-      <div v-if="showManageSlotsModal" class="modal-overlay" @click.self="closeManageSlots">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="slots-modal-title">
+      <div v-if="confirm.open" class="modal-overlay" @click.self="closeConfirm">
+        <div class="modal-card modal-card--sm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
           <div class="modal-card__header">
-            <h2 id="slots-modal-title" class="modal-card__title">Time Slots</h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="closeManageSlots">
+            <h2 id="confirm-title" class="modal-card__title">
+              <AssetIcon name="triangle-alert" :size="17" />
+              {{ confirmCopy.title }}
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeConfirm">
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
-
-          <div class="modal-form">
-            <div class="info-note">
-              These are the slots donors choose from when booking in the portal. View only: hours and
-              capacity are set by the system administrator.
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="slots-date">Date</label>
-              <div class="form-input-icon">
-                <input id="slots-date" v-model="slotsForm.date" type="date" class="form-input"
-                  @change="fetchSlotsForForm" />
-                <AssetIcon name="calendar" :size="14" class="form-input-icon__icon" />
-              </div>
-            </div>
-
-            <div class="slot-readout-head">
-              <span class="form-label">Time slots &amp; capacity</span>
-              <span v-if="!loadingSlotForm && slotsForm.slots.length" class="slot-readout-total">
-                {{ slotsFormTotal }} donors / day
-              </span>
-            </div>
-
-            <div v-if="loadingSlotForm" class="slot-readout">
-              <div v-for="n in 5" :key="'skf-' + n" class="slot-readout__row skeleton-block" />
-            </div>
-            <div v-else-if="slotsForm.slots.length" class="slot-readout">
-              <div v-for="slot in slotsForm.slots" :key="slot.id" class="slot-readout__row">
-                <span class="slot-readout__time">
-                  <AssetIcon name="clock" :size="14" />
-                  {{ formatSlotTime(slot.time) }}
-                </span>
-                <span class="slot-readout__cap"><strong>{{ slot.capacity }}</strong> max donors</span>
-              </div>
-            </div>
-            <p v-else-if="!saveSlotsError" class="modal-empty">No slots are configured for this date.</p>
-
-            <p v-if="saveSlotsError" class="modal-error">{{ saveSlotsError }}</p>
-
-            <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeManageSlots">Close</button>
-            </div>
+          <div class="modal-card__body">
+            <p id="confirm-text" class="modal-text">{{ confirmCopy.text }}</p>
+            <p v-if="confirm.error" class="form-error" role="alert">{{ confirm.error }}</p>
+          </div>
+          <div class="modal-card__footer">
+            <button type="button" class="btn-outline" @click="closeConfirm">Back</button>
+            <button type="button" class="btn-primary" :class="{ 'btn-primary--danger': confirm.action === 'delete' }" :disabled="confirm.busy" @click="runConfirmed">
+              {{ confirm.busy ? 'Working…' : confirmCopy.button }}
+            </button>
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- VIEW DONORS MODAL (Blood Drive) -->
+    <!-- ============ NEW APPOINTMENT ============ -->
     <Transition name="modal">
-      <div v-if="showDonorsModal" class="modal-overlay" @click.self="closeViewDonors">
-        <div class="modal-card modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="donors-modal-title">
+      <div v-if="booking.open" class="modal-overlay" @click.self="closeBooking">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="booking-title">
           <div class="modal-card__header">
-            <h2 id="donors-modal-title" class="modal-card__title">{{ selectedDrive?.name }} &middot; Registered Donors</h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="closeViewDonors">
+            <h2 id="booking-title" class="modal-card__title">
+              <AssetIcon name="calendar" :size="17" />
+              New Appointment
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closeBooking">
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
 
-          <div class="modal-form">
-            <div v-if="loadingDriveDonors" class="donor-list">
-              <div v-for="n in 5" :key="'skdd-' + n" class="donor-row skeleton-block" />
-            </div>
-            <div v-else class="donor-list">
-              <p v-if="driveDonors.length === 0" class="modal-empty">The donor list for this drive is not
-                available yet.</p>
-              <div v-for="donor in driveDonors" :key="donor.id" class="donor-row">
-                <span class="donor-row__avatar" :style="{ background: colorFor(donor.name) }">{{
-                  initials(donor.name) }}</span>
-                <div class="donor-row__info">
-                  <p class="donor-row__name">{{ donor.name }}</p>
-                  <p class="donor-row__meta">{{ donor.bloodType }} &middot; Registered {{
-                    donor.registeredDate }} &middot; Screening: {{ donor.screeningStatus }}</p>
+          <form id="booking-form" class="modal-card__body modal-form" novalidate @submit.prevent="submitBooking">
+            <p class="form-hint">For a donor who phones in. They get the same confirmation as a portal booking.</p>
+            <p v-if="booking.error" class="form-error" role="alert">{{ booking.error }}</p>
+
+            <!-- Donor -->
+            <div class="form-group">
+              <label class="form-label" for="b-donor">Donor <span class="req">*</span></label>
+              <div v-if="booking.donor" class="picked">
+                <div class="picked__text">
+                  <span class="picked__name">{{ booking.donor.name }}</span>
+                  <span class="picked__meta">
+                    {{ booking.donor.code }}<template v-if="booking.donor.bloodType"> · {{ booking.donor.bloodType }}</template><template v-if="booking.donor.phone"> · {{ booking.donor.phone }}</template>
+                  </span>
+                  <span v-if="booking.donor.standing" class="badge" :class="`badge--${booking.donor.standing.tone}`">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ booking.donor.standing.key === 'waiting' ? `Can donate ${booking.donor.standing.label.toLowerCase()}` : booking.donor.standing.label }}
+                  </span>
                 </div>
-                <span class="pill" :class="'pill--' + donor.status.toLowerCase()">{{ donor.status }}</span>
+                <button type="button" class="btn-link" @click="clearDonor">Change</button>
+              </div>
+              <div v-else class="combo">
+                <input
+                  id="b-donor"
+                  v-model="donorSearch.term"
+                  type="search"
+                  class="form-input"
+                  placeholder="Search donor by name, phone, email or ID…"
+                  autocomplete="off"
+                  @input="onDonorInput"
+                >
+                <ul v-if="donorSearch.term.trim().length >= 2" class="combo__list" role="listbox" aria-label="Matching donors">
+                  <li v-if="donorSearch.loading" class="combo__note">Searching…</li>
+                  <template v-else-if="donorSearch.results.length">
+                    <li v-for="d in donorSearch.results" :key="d.uuid">
+                      <button type="button" class="combo__option" role="option" @click="pickDonor(d)">
+                        <span class="combo__main">{{ d.name }}<span v-if="d.bloodType" class="blood">{{ d.bloodType }}</span></span>
+                        <span class="combo__sub">{{ d.code }}<template v-if="d.phone"> · {{ d.phone }}</template><template v-if="d.standing"> · {{ d.standing.label }}</template></span>
+                      </button>
+                    </li>
+                  </template>
+                  <li v-else class="combo__note">
+                    No donor on your list matches. Try their donor ID, email or mobile number, or
+                    <NuxtLink to="/blood-center/donors" class="inline-link">register them as a new donor</NuxtLink> first.
+                  </li>
+                </ul>
+              </div>
+              <p v-if="fieldError('donor_uuid')" class="field-error">{{ fieldError('donor_uuid') }}</p>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="b-date">Date <span class="req">*</span></label>
+                <input
+                  id="b-date"
+                  v-model="booking.date"
+                  type="date"
+                  class="form-input"
+                  :min="todayIso"
+                  :max="horizonIso"
+                  :disabled="Boolean(booking.drive)"
+                  @change="loadSlots"
+                >
+                <p v-if="booking.drive" class="form-hint">The drive's date.</p>
+                <p v-if="fieldError('date')" class="field-error">{{ fieldError('date') }}</p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="b-slot">Time Slot <span class="req">*</span></label>
+                <select id="b-slot" v-model="booking.timeSlot" class="form-input form-select" :disabled="booking.loadingSlots || !slotChoices.length">
+                  <option v-if="booking.loadingSlots" value="">Loading slots…</option>
+                  <option v-else-if="!slotChoices.length" value="">No slots this day</option>
+                  <option v-for="slot in slotChoices" :key="slot.time" :value="slot.time" :disabled="slot.disabled">{{ slot.label }}</option>
+                </select>
+                <p v-if="fieldError('time_slot')" class="field-error">{{ fieldError('time_slot') }}</p>
               </div>
             </div>
 
-            <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeViewDonors">Close</button>
+            <!-- Drive: one of this centre's mobile blood drives. -->
+            <div class="form-group">
+              <label class="form-label" for="b-drive">Drive <span class="form-optional">optional</span></label>
+              <div v-if="booking.drive" class="picked">
+                <div class="picked__text">
+                  <span class="picked__name">{{ booking.drive.name }}</span>
+                  <span class="picked__meta">
+                    {{ formatShortDate(booking.drive.date) }}<template v-if="booking.drive.start_time"> · {{ booking.drive.start_time }}–{{ booking.drive.end_time }}</template><template v-if="booking.drive.location"> · {{ booking.drive.location }}</template>
+                    · {{ booking.drive.registered }}{{ booking.drive.max_capacity ? ` / ${booking.drive.max_capacity}` : '' }} registered
+                  </span>
+                </div>
+                <button type="button" class="btn-link" @click="clearDrive">Use {{ centerName }}</button>
+              </div>
+              <div v-else class="combo">
+                <input
+                  id="b-drive"
+                  v-model="driveSearch"
+                  type="search"
+                  class="form-input"
+                  :placeholder="`${centerName} (default) - search drive…`"
+                  autocomplete="off"
+                >
+                <ul v-if="driveSearch.trim()" class="combo__list" role="listbox" aria-label="Upcoming drives">
+                  <template v-if="driveMatches.length">
+                    <li v-for="drive in driveMatches" :key="drive.id">
+                      <button type="button" class="combo__option" role="option" @click="pickDrive(drive)">
+                        <span class="combo__main">{{ drive.name }}</span>
+                        <span class="combo__sub">{{ formatShortDate(drive.date) }}<template v-if="drive.location"> · {{ drive.location }}</template></span>
+                      </button>
+                    </li>
+                  </template>
+                  <li v-else class="combo__note">No upcoming drive matches.</li>
+                </ul>
+              </div>
+              <p v-if="fieldError('drive_id')" class="field-error">{{ fieldError('drive_id') }}</p>
             </div>
+
+            <div class="form-group">
+              <label class="form-label" for="b-notes">Notes</label>
+              <textarea id="b-notes" v-model="booking.notes" class="form-input form-textarea" rows="3" maxlength="1000" placeholder="e.g. Called at 10am; prefers the morning" />
+            </div>
+          </form>
+
+          <div class="modal-card__footer">
+            <button type="button" class="btn-outline" @click="closeBooking">Cancel</button>
+            <button type="submit" form="booking-form" class="btn-primary" :disabled="booking.saving || !canSaveBooking">
+              <AssetIcon name="check" :size="15" />
+              {{ booking.saving ? 'Saving…' : 'Save Appointment' }}
+            </button>
           </div>
         </div>
       </div>
@@ -441,10 +389,12 @@
 </template>
 
 <script setup>
-import AssetIcon from '~/components/common/AssetIcon.vue'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
+import AssetIcon from '~/components/common/AssetIcon.vue'
+import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
+import { APPOINTMENT_STATUSES, appointmentTone, exactIdentifier, isoDaysFromToday, slotOptionLabel } from '~/utils/appointments'
+import { eligibilityBadge, formatPhone, formatShortDate } from '~/utils/donorRecords'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -452,840 +402,482 @@ definePageMeta({
   requires: 'appointments.view',
 })
 
+const { can, user } = useUser()
+
+// The centre's own name, where a booking is not at one of its drives
+// (project owner, 2026-10-17). The booking options carry it too.
+const servedCenterName = ref('')
+const centerName = computed(() => servedCenterName.value || user.value?.facility?.name || 'this centre')
+const canManage = computed(() => can('appointments.manage'))
+const canDelete = computed(() => can('appointments.delete'))
+const canVerify = computed(() => can('appointments.verify'))
+
+// The ✓ marks the booking collected (project owner, 2026-10-17): from the
+// appointment day on, a late arrival included; greyed out only before the day.
+function collectHint(row) {
+  if (row.can.collect) return row.date < todayIso ? 'Mark collected (late arrival)' : 'Mark collected'
+  return 'Can be marked collected on the appointment day'
+}
+const canOpenCounter = computed(() => can(COLLECTION_ABILITIES))
+
 /**
- * API SHAPE
+ * API SHAPE (/api/blood-center/appointments)
  * -------------------------------------------------------------------------
- * Tinuod na nga mga ruta karon — dili na ang `/api/bloodcenter/*` nga wala
- * gyud gitutok sa server.
- *
- *  GET /api/blood-center/collection/queue?date=YYYY-MM-DD
- *    -> { date,
- *         appointments: [{ id, appointment_datetime, status, event_id,
- *                          donor: { uuid, donor_code, full_name, blood_type, phone } }],
- *         in_progress: [...] }
- *    Facility-scoped gikan sa token: ang staff makakita ra sa kaugalingon
- *    nilang center, so walay center_id nga i-pasa diri.
- *
- *  GET /api/time-slots?center_id=&date=YYYY-MM-DD
- *    -> [{ time, available, total }]
- *
- *  GET /api/blood-drives
- *    -> [{ id, name, location, date, registered, total_slots, status }]
- *
- * WALA PAY BACKEND: pag-save sa per-slot capacity, ug ang listahan sa mga
- * donor kada drive. Gi-disable ang maong mga control imbis mo-call og ruta
- * nga mo-404.
+ *  GET    /appointments?search=&from=&to=&status=&page=   -> paginator; rows:
+ *         { id, code, date, slot_start, slot_end, status, status_label,
+ *           place, drive, notes, booked_by, donor: {...}, can: { collect,
+ *           no_show, cancel, delete, open_counter } }
+ *  GET    /appointments/export?(same filters)             -> CSV
+ *  GET    /appointments/options?date=&drive_id=           -> { date, slots, drives }
+ *  POST   /appointments  { donor_uuid, date?, time_slot, drive_id?, notes? }
+ *  POST   /appointments/{id}/cancel
+ *  DELETE /appointments/{id}
+ *  POST   /appointments/{id}/collected | /no-show (the ✓; no-show is the counter's)
+ * A "drive" is one of this centre's mobile blood drives (MobileEvent).
  * -------------------------------------------------------------------------
  */
 
-const { user, can } = useUser()
+const PER_PAGE = 20
+const HORIZON_DAYS = 90
 
-// Ang /time-slots kay donor-facing, so kinahanglan gyud og center_id. Ang
-// queue dili — gikuha na niya ang facility gikan sa token.
-const facilityId = computed(() => user.value?.facility?.id ?? null)
-
-// Lima ka status ang gi-store sa server. Ang counter naay kaugalingon nga
-// pinulongan, so usa ra ka lugar ang mo-translate. Ang `key` kay slug para sa
-// pill class ug sa filter — ang label "In progress" naay space.
-const STATUSES = {
-  scheduled: { key: 'scheduled', label: 'Scheduled' },
-  // Gi-scan na ang QR (o gi-check in), so nagsugod na ang visit.
-  confirmed: { key: 'in-progress', label: 'In progress' },
-  completed: { key: 'collected', label: 'Collected' },
-  no_show: { key: 'no-show', label: 'No-show' },
-  cancelled: { key: 'cancelled', label: 'Cancelled' },
-}
-
-// Ang deferred nga donor kay `completed` usab ang appointment — ang donation
-// ra ang mo-ingon nga wala diay nakuhaan og dugo.
-const DEFERRED = { key: 'deferred', label: 'Deferred' }
-
-function displayStatus(row) {
-  if (row.status === 'completed' && row.donation_status === 'rejected') return DEFERRED
-  return STATUSES[row.status] ?? { key: row.status, label: row.status }
-}
-
-// Parehas sa `bookedCountsByTime()` sa server: ang scheduled ug confirmed ra
-// ang mo-hawid og slot. Ang cancelled ug no_show mo-libre pagbalik sa lugar.
-const HOLDS_A_SLOT = ['scheduled', 'confirmed']
-
-// A slot reads "Filling up" from this share of its capacity onward.
-const BUSY_THRESHOLD = 75
-
-// Slots carry only a start time. Until the API returns a duration, a slot is
-// treated as an hour long when deciding whether it is already past.
-const ASSUMED_SLOT_MINUTES = 60
-
-const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
-
-function todayIso() {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function slotKeyOf(date) {
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-/** "HH:MM" minutes since midnight, or null when the string isn't a time. */
-function minutesOf(hhmm) {
-  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || '')
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null
-}
-
-/** "13:30" -> "1:30 PM". Anything unexpected passes through untouched. */
-function formatSlotTime(hhmm) {
-  const total = minutesOf(hhmm)
-  if (total === null) return hhmm
-  const h = Math.floor(total / 60)
-  const mm = String(total % 60).padStart(2, '0')
-  return `${h % 12 || 12}:${mm} ${h >= 12 ? 'PM' : 'AM'}`
-}
-
-/**
- * Ang queue mo-return og server field names; lahi ang gidahom sa template.
- * Usa ra ka lugar ang mo-tabok aron dili magkatag ang mapping.
- */
-function mapAppointment(row) {
-  const at = new Date(row.appointment_datetime)
-  const status = displayStatus(row)
-  const isWalkIn = row.event_id === null
-
-  return {
-    id: row.id,
-    rawStatus: row.status,
-    donorUuid: row.donor?.uuid || null,
-    donorName: row.donor?.full_name || 'Unknown donor',
-    donorCode: row.donor?.donor_code || '—',
-    bloodType: row.donor?.blood_type || '—',
-    phone: row.donor?.phone || '',
-    kind: isWalkIn ? 'Walk-in' : 'Mobile drive',
-    kindKey: isWalkIn ? 'walkin' : 'drive',
-    slotKey: slotKeyOf(at),
-    slotTime: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    dateDay: at.getDate(),
-    dateMonth: at.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-    status: status.label,
-    statusKey: status.key,
-
-    canCheckIn: row.status === 'scheduled',
-    canOpenCounter: row.status === 'confirmed',
-    canMarkNoShow: row.status === 'scheduled' || row.status === 'confirmed',
-  }
-}
-
-/**
- * Ang stats gikan ra sa parehas nga queue payload — walay separate nga
- * endpoint, ug wala man kinahanglana: naa na ang tanan nga row diri.
- */
-function deriveStats(rows) {
-  const count = (key) => rows.filter((r) => r.statusKey === key).length
-
-  return {
-    todayWalkIns: rows.filter((r) => r.kind === 'Walk-in').length,
-    inProgress: count('in-progress'),
-    collectedToday: count('collected'),
-    noShows: count('no-show'),
-  }
-}
+const todayIso = isoDaysFromToday(0)
+const horizonIso = isoDaysFromToday(HORIZON_DAYS)
 
 const initialLoading = ref(true)
-const activeTab = ref('walkin')
+const loading = ref(false)
 const loadError = ref('')
+const notice = ref(null)
+const updatedAt = ref(null)
+const rows = ref([])
+const pager = reactive({ page: 1, lastPage: 1, total: 0 })
 
-const stats = reactive({ todayWalkIns: 0, inProgress: 0, collectedToday: 0, noShows: 0 })
-const loadingStats = ref(false)
+const search = ref('')
+const fromDate = ref('')
+const toDate = ref('')
+const statusFilter = ref('')
 
-// Which row is mid-request, so only that row's buttons disable rather than
-// the whole queue freezing.
-const rowBusyId = ref(null)
+const hasFilters = computed(() => Boolean(search.value.trim() || fromDate.value || toDate.value || statusFilter.value))
+const updatedAtLabel = computed(() => updatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
+const listSummary = computed(() => (hasFilters.value
+  ? `${pager.total} appointment${pager.total === 1 ? '' : 's'} match the filters`
+  : 'Bookings at this centre and its drives, newest day first.'))
 
-const timeSlots = ref([])
-const loadingSlots = ref(false)
-const selectedSlotId = ref(null)
-
-const statusFilter = ref('all')
-const bloodTypeFilter = ref('all')
-const bloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
-
-const walkInAppointments = ref([])
-const loadingAppointments = ref(false)
-
-const bloodDrives = ref([])
-const loadingDrives = ref(false)
-
-// Time Slots modal
-const showManageSlotsModal = ref(false)
-const loadingSlotForm = ref(false)
-const saveSlotsError = ref('')
-const slotsForm = reactive({ date: '', slots: [] })
-
-// View Donors modal (blood drive)
-const showDonorsModal = ref(false)
-const loadingDriveDonors = ref(false)
-const selectedDrive = ref(null)
-const driveDonors = ref([])
-
-// Ticks once a minute so slots fade to "Past" while the page stays open.
-const now = ref(new Date())
-let clockTimer = null
-
-// Ang queue kay usa ka adlaw ra ang gi-serve niya, so wala nay 'all dates'
-// diri — mo-default ta karong adlawa, sama sa server pag walay `date`.
-const selectedDateFilter = ref(todayIso())
-
-const isToday = computed(() => selectedDateFilter.value === todayIso())
-
-const datePickerValue = computed({
-  get: () => selectedDateFilter.value,
-  set: (val) => {
-    selectedDateFilter.value = val || todayIso()
-  },
-})
-
-function resetToToday() {
-  selectedDateFilter.value = todayIso()
-  onDateFilterChange()
+function filterParams() {
+  const params = {}
+  if (search.value.trim()) params.search = search.value.trim()
+  if (fromDate.value) params.from = fromDate.value
+  if (toDate.value) params.to = toDate.value
+  if (statusFilter.value) params.status = statusFilter.value
+  return params
 }
 
-// `new Date('YYYY-MM-DD')` parses as UTC midnight, which lands on the previous
-// day in any timezone west of UTC. Appending a time makes it local.
-const selectedDateLabel = computed(() => {
-  const d = new Date(`${selectedDateFilter.value}T00:00:00`)
-  if (isNaN(d.getTime())) return selectedDateFilter.value
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-})
+function errorMessage(err, fallback) {
+  return Object.values(err?.errors ?? err?.data?.errors ?? {}).flat()[0] || err?.message || fallback
+}
 
-/**
- * Pila ka booking kada oras. Gikuha sa queue imbis sa /time-slots kay ang
- * `available` didto mo-report og 0 sa mga oras nga milabay na — sakto na sa
- * donor nga mo-book, apan sa counter mo-basa unta nga "Full" ang usa ka slot
- * nga walay bisan usa ka tawo.
- */
-const slotBookings = computed(() => {
-  const counts = {}
-
-  for (const appt of walkInAppointments.value) {
-    if (!HOLDS_A_SLOT.includes(appt.rawStatus)) continue
-    counts[appt.slotKey] = (counts[appt.slotKey] || 0) + 1
+async function load(page = 1) {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await bloodCenterService.staffAppointments({ ...filterParams(), page, per_page: PER_PAGE })
+    rows.value = res?.data ?? []
+    Object.assign(pager, { page: res?.current_page ?? page, lastPage: Math.max(1, res?.last_page ?? 1), total: res?.total ?? rows.value.length })
+    updatedAt.value = new Date()
+  } catch (err) {
+    loadError.value = errorMessage(err, 'Could not load appointments.')
+  } finally {
+    loading.value = false
+    initialLoading.value = false
   }
+}
 
-  return counts
-})
+let searchTimer = null
 
-/** Slots with everything the card needs to draw itself. */
-const decoratedSlots = computed(() => {
-  const nowMinutes = now.value.getHours() * 60 + now.value.getMinutes()
-  // A slot lasts until the next one starts; the list is evenly spaced.
-  const firstTwo = timeSlots.value.slice(0, 2).map((s) => minutesOf(s.time))
-  const step = firstTwo.length === 2 && firstTwo[1] > firstTwo[0] ? firstTwo[1] - firstTwo[0] : ASSUMED_SLOT_MINUTES
-
-  return timeSlots.value.map((slot) => {
-    const booked = slotBookings.value[slot.time] || 0
-    const capacity = slot.capacity || 0
-    const isFull = booked >= capacity
-    const pct = capacity ? Math.min(100, Math.round((booked / capacity) * 100)) : 100
-    const start = minutesOf(slot.time)
-
-    return {
-      ...slot,
-      booked,
-      pct,
-      level: isFull ? 'full' : pct >= BUSY_THRESHOLD ? 'busy' : 'open',
-      label: formatSlotTime(slot.time),
-      past: isToday.value && start !== null && start + step <= nowMinutes,
-      current: isToday.value && start !== null && start <= nowMinutes && nowMinutes < start + step,
-    }
-  })
-})
-
-/** The slots split at noon, each half with its own tally. */
-const slotPeriods = computed(() => {
-  const periods = [
-    { key: 'morning', label: 'Morning', slots: decoratedSlots.value.filter((s) => (minutesOf(s.time) ?? 0) < 12 * 60) },
-    { key: 'afternoon', label: 'Afternoon', slots: decoratedSlots.value.filter((s) => (minutesOf(s.time) ?? 0) >= 12 * 60) },
-  ]
-
-  return periods
-    .filter((period) => period.slots.length)
-    .map((period) => ({
-      ...period,
-      booked: period.slots.reduce((sum, s) => sum + s.booked, 0),
-      capacity: period.slots.reduce((sum, s) => sum + (s.capacity || 0), 0),
-    }))
-})
-
-const slotSummary = computed(() => {
-  if (loadingSlots.value || !decoratedSlots.value.length) return ''
-  const booked = decoratedSlots.value.reduce((sum, s) => sum + s.booked, 0)
-  const capacity = decoratedSlots.value.reduce((sum, s) => sum + (s.capacity || 0), 0)
-  const open = decoratedSlots.value.filter((s) => s.level !== 'full' && !s.past).length
-  return `${booked} of ${capacity} seats booked · ${open} slot${open === 1 ? '' : 's'} still open`
-})
-
-const filteredAppointments = computed(() => {
-  return walkInAppointments.value.filter((appt) => {
-    const statusOk = statusFilter.value === 'all' || appt.statusKey === statusFilter.value
-    const bloodOk = bloodTypeFilter.value === 'all' || appt.bloodType === bloodTypeFilter.value
-    // A picked slot card narrows the list to its donors.
-    const slotOk = !selectedSlotId.value || appt.slotKey === selectedSlotId.value
-    return statusOk && bloodOk && slotOk
-  })
-})
-
-/**
- * The scheduled donor the counter should expect next: the earliest booking,
- * today, whose slot has not ended. Display only.
- */
-const nextUpId = computed(() => {
-  if (!isToday.value) return null
-  const open = new Set(decoratedSlots.value.filter((s) => !s.past).map((s) => s.time))
-  const next = walkInAppointments.value
-    .filter((a) => a.statusKey === 'scheduled' && open.has(a.slotKey))
-    .sort((x, y) => x.slotKey.localeCompare(y.slotKey))[0]
-  return next?.id ?? null
-})
-
-/** One line under the title: the day at a glance. */
-const headerSummary = computed(() => {
-  const rows = walkInAppointments.value
-  const booked = rows.filter((r) => r.statusKey !== 'cancelled').length
-  const day = isToday.value ? 'today' : `on ${selectedDateLabel.value}`
-  const parts = [`${booked} donor${booked === 1 ? '' : 's'} booked ${day}`]
-  const next = rows.find((r) => r.id === nextUpId.value)
-  if (next) parts.push(`next at ${next.slotTime}`)
-  else if (isToday.value && booked && !stats.inProgress) parts.push('no one waiting')
-  return parts.join(' · ')
-})
-
-const hasActiveFilters = computed(
-  () => statusFilter.value !== 'all' || bloodTypeFilter.value !== 'all' || !!selectedSlotId.value,
-)
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => load(), 300)
+}
 
 function clearFilters() {
-  statusFilter.value = 'all'
-  bloodTypeFilter.value = 'all'
-  selectedSlotId.value = null
+  search.value = ''
+  fromDate.value = ''
+  toDate.value = ''
+  statusFilter.value = ''
+  load()
 }
 
-function toggleSlot(id) {
-  selectedSlotId.value = selectedSlotId.value === id ? null : id
+/* ---------- export ---------- */
+
+const exporting = ref(false)
+
+async function exportList() {
+  exporting.value = true
+  try {
+    const blob = await bloodCenterService.exportAppointments(filterParams())
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `appointments-${todayIso}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch {
+    notice.value = { tone: 'error', text: 'Could not export the appointments. Please try again.' }
+  } finally {
+    exporting.value = false
+  }
 }
 
-const statCards = computed(() => {
-  const rows = walkInAppointments.value
-  const live = rows.filter((r) => r.statusKey !== 'cancelled').length
-  const collectedPct = live ? Math.round((stats.collectedToday / live) * 100) : 0
+/* ---------- row actions ---------- */
 
-  return [
-    {
-      key: 'walkins',
-      label: isToday.value ? "Today's Walk-ins" : 'Walk-ins',
-      value: stats.todayWalkIns,
-      icon: 'user-check',
-      tone: 'blue',
-      hint: `${rows.length} appointment${rows.length === 1 ? '' : 's'} in total`,
-    },
-    {
-      key: 'progress',
-      label: 'In Progress',
-      value: stats.inProgress,
-      icon: 'clock',
-      tone: 'orange',
-      hint: stats.inProgress ? 'Checked in, at the counter' : 'Nobody at the counter',
-    },
-    {
-      key: 'collected',
-      label: isToday.value ? 'Collected Today' : 'Collected',
-      value: stats.collectedToday,
-      icon: 'droplets',
-      tone: 'green',
-      hint: live ? `${collectedPct}% of booked donors` : 'No bookings yet',
-    },
-    {
-      key: 'noshows',
-      label: 'No-shows',
-      value: stats.noShows,
-      icon: 'user-x',
-      tone: 'red',
-      hint: stats.noShows ? 'Their slots were released' : 'Everyone showed up so far',
-    },
-  ]
+const busyId = ref(null)
+
+async function markCollected(row) {
+  busyId.value = row.id
+  try {
+    await bloodCenterService.markAppointmentCollected(row.id)
+    notice.value = { tone: 'success', text: `${row.donor?.full_name ?? 'The donor'} is marked as collected.` }
+    await load(pager.page)
+  } catch (err) {
+    notice.value = { tone: 'error', text: errorMessage(err, 'Could not mark this appointment collected.') }
+  } finally {
+    busyId.value = null
+  }
+}
+
+const confirm = reactive({ open: false, action: '', row: null, busy: false, error: '' })
+
+const CONFIRM = {
+  no_show: { title: 'Mark as no-show?', button: 'Mark no-show', run: (row) => bloodCenterService.markAppointmentNoShow(row.id), done: 'Marked as a no-show.' },
+  cancel: { title: 'Cancel this appointment?', button: 'Cancel appointment', run: (row) => bloodCenterService.cancelAppointment(row.id), done: 'Appointment cancelled.' },
+  delete: { title: 'Delete this appointment?', button: 'Delete', run: (row) => bloodCenterService.deleteAppointment(row.id), done: 'Appointment deleted.' },
+}
+
+const confirmCopy = computed(() => {
+  const row = confirm.row
+  const who = row?.donor?.full_name ?? 'this donor'
+  const when = row ? `${formatShortDate(row.date)} at ${row.slot_start}` : ''
+  const base = CONFIRM[confirm.action] ?? CONFIRM.cancel
+  const text = {
+    no_show: `${who} did not come for ${when}. The slot is freed and the booking is closed.`,
+    cancel: `${who}'s appointment on ${when} is cancelled and the slot is freed. Their check-in QR stops working.`,
+    delete: `${row?.code} is removed from the list. Use this for a booking entered by mistake; to call one off, cancel it instead.`,
+  }[confirm.action] ?? ''
+  return { ...base, text }
 })
 
-const slotsFormTotal = computed(() =>
-  slotsForm.slots.reduce((sum, s) => sum + (Number(s.capacity) || 0), 0),
-)
-
-function driveProgressPct(drive) {
-  if (!drive.capacity) return 0
-  return Math.min(100, Math.round((drive.registered / drive.capacity) * 100))
+function ask(action, row) {
+  Object.assign(confirm, { open: true, action, row, busy: false, error: '' })
 }
 
-function initials(name) {
-  if (!name) return '?'
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+function closeConfirm() {
+  if (confirm.busy) return
+  confirm.open = false
 }
 
-/**
- * Same person, same colour — keyed on the donor rather than the row index, so
- * an avatar doesn't change colour every time a filter reorders the list.
- */
-function colorFor(seed) {
-  let h = 0
-  for (const ch of String(seed || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
-/**
- * Usa ra ka call ang mo-hatag sa listahan ug sa stat cards. Ang stats gi-derive
- * gikan sa parehas nga rows aron dili gyud sila magkalahi ang gi-ihap.
- */
-async function loadQueue() {
-  loadingAppointments.value = true
-  loadingStats.value = true
-
+async function runConfirmed() {
+  const { action, row } = confirm
+  confirm.busy = true
+  confirm.error = ''
+  busyId.value = row.id
   try {
-    const data = await bloodCenterService.collectionQueue({ date: selectedDateFilter.value })
-
-    const rows = (data?.appointments ?? []).map(mapAppointment)
-
-    walkInAppointments.value = rows
-    Object.assign(stats, deriveStats(rows))
+    await CONFIRM[action].run(row)
+    confirm.busy = false
+    confirm.open = false
+    notice.value = { tone: 'success', text: CONFIRM[action].done }
+    await load(pager.page)
   } catch (err) {
-    walkInAppointments.value = []
-    Object.assign(stats, { todayWalkIns: 0, inProgress: 0, collectedToday: 0, noShows: 0 })
-    loadError.value = err?.message || 'Could not load the appointment queue.'
-    console.error('Failed to load collection queue:', err)
+    confirm.error = errorMessage(err, 'That did not work. Please try again.')
+    confirm.busy = false
   } finally {
-    loadingAppointments.value = false
-    loadingStats.value = false
+    busyId.value = null
   }
 }
 
-async function loadTimeSlots() {
-  if (!facilityId.value) {
-    timeSlots.value = []
+/* ---------- new appointment ---------- */
+
+const booking = reactive({
+  open: false,
+  donor: null,
+  date: todayIso,
+  timeSlot: '',
+  drive: null,
+  drives: [],
+  slots: [],
+  notes: '',
+  loadingSlots: false,
+  saving: false,
+  error: '',
+  errors: {},
+})
+
+const donorSearch = reactive({ term: '', results: [], loading: false })
+const driveSearch = ref('')
+
+const canSaveBooking = computed(() => Boolean(booking.donor && booking.timeSlot && (booking.drive || booking.date)))
+
+function fieldError(field) {
+  return booking.errors?.[field]?.[0] ?? ''
+}
+
+/** Slots as the picker lists them: full and already-past ones shown, not chosen. */
+const slotChoices = computed(() => {
+  const now = new Date()
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const day = booking.drive?.date ?? booking.date
+
+  return booking.slots.map((slot) => {
+    const past = day === todayIso && slot.time <= nowTime
+    const full = slot.available !== null && slot.available !== undefined && slot.available <= 0
+    return { ...slot, label: slotOptionLabel(slot, past), disabled: past || full }
+  })
+})
+
+const driveMatches = computed(() => {
+  const term = driveSearch.value.trim().toLowerCase()
+  return booking.drives.filter((drive) => !term || drive.name.toLowerCase().includes(term) || (drive.location ?? '').toLowerCase().includes(term)).slice(0, 8)
+})
+
+function mapCandidate(row) {
+  return {
+    uuid: row.uuid,
+    name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' '),
+    code: row.donor_code,
+    bloodType: row.blood_type || '',
+    phone: formatPhone(row.phone),
+    standing: row.eligibility ? eligibilityBadge(row) : null,
+  }
+}
+
+let donorTimer = null
+
+function onDonorInput() {
+  clearTimeout(donorTimer)
+  const term = donorSearch.term.trim()
+  if (term.length < 2) {
+    donorSearch.results = []
     return
   }
-
-  loadingSlots.value = true
-
-  try {
-    const rows = await bookingCatalogService.timeSlots({
-      center_id: facilityId.value,
-      date: selectedDateFilter.value,
-    })
-
-    // Ang `total` ra ang gikuha diri — ang `booked` gikan sa queue, tan-awa
-    // ang komento sa `slotBookings`.
-    timeSlots.value = (rows ?? []).map((slot) => ({
-      id: slot.time,
-      time: slot.time,
-      capacity: slot.total,
-    }))
-  } catch (err) {
-    timeSlots.value = []
-    loadError.value = err?.message || 'Could not load time slots.'
-    console.error('Failed to load time slots:', err)
-  } finally {
-    loadingSlots.value = false
-  }
+  donorSearch.loading = true
+  donorTimer = setTimeout(() => findDonors(term), 300)
 }
 
 /**
- * This centre's own drives, from the same facility-scoped list the Donation
- * Drives page reads. The donor-facing /blood-drives is every centre's
- * catalogue, which is why other centres' drives showed up here.
+ * The centre's own Donors list first. Failing that, an exact ID, email or
+ * mobile number reaches a donor who has only given elsewhere.
  */
-async function loadBloodDrives() {
-  if (!can('drives.view')) {
-    bloodDrives.value = []
-    return
-  }
+async function findDonors(term) {
+  try {
+    const res = await bloodCenterService.donors({ search: term, per_page: 8 })
+    let results = (res?.data ?? []).map(mapCandidate)
 
-  loadingDrives.value = true
+    const exact = exactIdentifier(term)
+    if (!results.length && exact) {
+      try {
+        const found = await bloodCenterService.lookupDonor(exact)
+        if (found?.uuid) results = [mapCandidate({ ...found, ...(found.donation_summary ?? {}) })]
+      } catch {
+        // Not found: the empty list says so.
+      }
+    }
+
+    if (donorSearch.term.trim() === term) donorSearch.results = results
+  } catch (err) {
+    donorSearch.results = []
+    booking.error = errorMessage(err, 'Could not search donors.')
+  } finally {
+    donorSearch.loading = false
+  }
+}
+
+function pickDonor(donor) {
+  booking.donor = donor
+  donorSearch.term = ''
+  donorSearch.results = []
+  const { donor_uuid: _gone, ...rest } = booking.errors
+  booking.errors = rest
+}
+
+function clearDonor() {
+  booking.donor = null
+}
+
+async function loadSlots() {
+  booking.loadingSlots = true
+  try {
+    const params = booking.drive ? { drive_id: booking.drive.id } : { date: booking.date }
+    const res = await bloodCenterService.appointmentOptions(params)
+    booking.slots = res?.slots ?? []
+    booking.drives = res?.drives ?? booking.drives
+    if (res?.center_name) servedCenterName.value = res.center_name
+    if (!booking.slots.some((s) => s.time === booking.timeSlot)) booking.timeSlot = ''
+    if (!booking.timeSlot) booking.timeSlot = slotChoices.value.find((s) => !s.disabled)?.time ?? ''
+  } catch (err) {
+    booking.slots = []
+    booking.error = errorMessage(err, 'Could not load the time slots.')
+  } finally {
+    booking.loadingSlots = false
+  }
+}
+
+function pickDrive(drive) {
+  booking.drive = drive
+  driveSearch.value = ''
+  booking.timeSlot = ''
+  loadSlots()
+}
+
+function clearDrive() {
+  booking.drive = null
+  booking.timeSlot = ''
+  loadSlots()
+}
+
+function openBooking() {
+  Object.assign(booking, {
+    open: true, donor: null, date: todayIso, timeSlot: '', drive: null, slots: [], notes: '',
+    loadingSlots: false, saving: false, error: '', errors: {},
+  })
+  donorSearch.term = ''
+  donorSearch.results = []
+  driveSearch.value = ''
+  loadSlots()
+}
+
+function closeBooking() {
+  if (booking.saving) return
+  booking.open = false
+}
+
+async function submitBooking() {
+  if (!canSaveBooking.value || booking.saving) return
+  booking.saving = true
+  booking.error = ''
+  booking.errors = {}
 
   try {
-    const data = await bloodCenterService.drives()
-
-    bloodDrives.value = (data?.drives ?? [])
-      // Registrations only matter for drives that have not happened yet.
-      .filter((drive) => drive.status !== 'Completed')
-      .sort((x, y) => String(x.event_date).localeCompare(String(y.event_date)))
-      .map((drive) => ({
-        id: drive.id,
-        name: drive.name,
-        location: drive.location,
-        dateLabel: [
-          drive.event_date
-            ? new Date(`${drive.event_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : null,
-          drive.location,
-        ].filter(Boolean).join(' · '),
-        status: drive.status,
-        statusKey: String(drive.status || 'closed').toLowerCase(),
-        registered: drive.registered_count ?? 0,
-        capacity: drive.capacity ?? null,
-        previewDonors: drive.donor_preview ?? [],
-      }))
+    const payload = {
+      donor_uuid: booking.donor.uuid,
+      time_slot: booking.timeSlot,
+      notes: booking.notes.trim() || null,
+      ...(booking.drive ? { drive_id: booking.drive.id } : { date: booking.date }),
+    }
+    const res = await bloodCenterService.bookAppointment(payload)
+    booking.saving = false
+    booking.open = false
+    notice.value = { tone: 'success', text: res?.message || 'Appointment booked.' }
+    await load(1)
   } catch (err) {
-    bloodDrives.value = []
-    loadError.value = err?.message || 'Could not load blood drive registrations.'
-    console.error('Failed to load blood drives:', err)
+    booking.errors = err?.errors ?? err?.data?.errors ?? {}
+    booking.error = err?.message || 'Could not book this appointment.'
+    // Someone else took the slot meanwhile: show what is left.
+    if (err?.data?.code === 'slot_unavailable' || err?.data?.code === 'drive_full') loadSlots()
   } finally {
-    loadingDrives.value = false
+    booking.saving = false
   }
 }
 
-async function loadAll() {
-  loadError.value = ''
-  await Promise.all([loadQueue(), loadTimeSlots(), loadBloodDrives()])
+/* ---------- keyboard and lifecycle ---------- */
+
+function onKeydown(event) {
+  if (event.key !== 'Escape') return
+  if (confirm.open) closeConfirm()
+  else if (booking.open) closeBooking()
 }
 
-function onDateFilterChange() {
-  selectedSlotId.value = null
-  loadError.value = ''
-  loadQueue()
-  loadTimeSlots()
-}
-
-/**
- * Mark an expected donor as arrived, then hand over to the counter.
- *
- * The queue only starts the visit. Everything after check-in — screening,
- * collection, completion — belongs to the one continuous transaction on
- * /blood-center/collection, which holds the donor context the QR scan verified.
- */
-async function checkInAppointment(appt) {
-  rowBusyId.value = appt.id
-  loadError.value = ''
-
-  try {
-    await bloodCenterService.checkInAppointment(appt.id)
-    await loadQueue()
-  } catch (err) {
-    loadError.value = err?.data?.code === 'appointment_not_pending'
-      ? 'This appointment has already been checked in or closed.'
-      : err?.message || 'The donor could not be checked in.'
-  } finally {
-    rowBusyId.value = null
-  }
-}
-
-async function markNoShow(appt) {
-  if (!window.confirm(`Mark ${appt.donorName} as a no-show?`)) return
-
-  rowBusyId.value = appt.id
-  loadError.value = ''
-
-  try {
-    await bloodCenterService.markAppointmentNoShow(appt.id)
-    await loadQueue()
-  } catch (err) {
-    loadError.value = err?.message || 'The appointment could not be updated.'
-  } finally {
-    rowBusyId.value = null
-  }
-}
-
-async function openManageSlots() {
-  showManageSlotsModal.value = true
-  saveSlotsError.value = ''
-  // Pre-fill with the date the page is showing (already YYYY-MM-DD, which is
-  // what <input type="date"> expects).
-  slotsForm.date = selectedDateFilter.value
-  await fetchSlotsForForm()
-}
-
-async function fetchSlotsForForm() {
-  if (!facilityId.value || !slotsForm.date) {
-    slotsForm.slots = []
-    return
-  }
-
-  loadingSlotForm.value = true
-  saveSlotsError.value = ''
-
-  try {
-    const rows = await bookingCatalogService.timeSlots({
-      center_id: facilityId.value,
-      date: slotsForm.date,
-    })
-
-    slotsForm.slots = (rows ?? []).map((slot) => ({
-      id: slot.time,
-      time: slot.time,
-      capacity: slot.total,
-    }))
-  } catch (err) {
-    slotsForm.slots = []
-    saveSlotsError.value = err?.message || 'Could not load slots for this date.'
-    console.error('Failed to load slots for the form:', err)
-  } finally {
-    loadingSlotForm.value = false
-  }
-}
-
-function closeManageSlots() {
-  showManageSlotsModal.value = false
-}
-
-// Ang per-drive nga listahan sa donor walay ruta sa server, so ang modal
-// mo-abli nga blangko imbis mo-call og endpoint nga mo-404.
-function openViewDonors(drive) {
-  selectedDrive.value = drive
-  showDonorsModal.value = true
-  loadingDriveDonors.value = false
-  driveDonors.value = []
-}
-
-function closeViewDonors() {
-  showDonorsModal.value = false
-  selectedDrive.value = null
-  driveDonors.value = []
-}
-
-function openManageDrive(drive) {
-  // Placeholder: wala pay backend para sa drive attendance.
-  if (import.meta.dev) {
-    console.warn('[Appointments] openManageDrive is not wired up yet', drive.id)
-  }
-}
-
-// ESC closes whichever modal is open, same as the backdrop click.
-function onKeydown(e) {
-  if (e.key !== 'Escape') return
-  if (showDonorsModal.value) closeViewDonors()
-  else if (showManageSlotsModal.value) closeManageSlots()
-}
-
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  clockTimer = setInterval(() => { now.value = new Date() }, 60_000)
-  await loadAll()
-  initialLoading.value = false
+  load()
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(searchTimer)
+  clearTimeout(donorTimer)
   window.removeEventListener('keydown', onKeydown)
-  clearInterval(clockTimer)
 })
 </script>
 
 <style scoped>
 .appointments-page {
-  /* Local names kept; the values are the shared tokens, as on every other page. */
-  --primary: var(--rb-primary);
-  --accent: var(--rb-accent);
-  --success: var(--rb-success);
-  --warning: var(--rb-warning);
-  --text-primary: var(--rb-text-primary);
-  --text-secondary: var(--rb-text-secondary);
   max-width: var(--rb-content-max, 1600px);
   background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px var(--rb-gutter, 24px) 40px;
   font-family: var(--rb-font-sans);
-  color: var(--text-primary);
+  color: var(--rb-text-primary);
 }
 
-/* ---------- Loading ---------- */
-.btn-spinner {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  animation: spin 0.8s linear infinite;
+.appointments-inner { display: flex; flex-direction: column; gap: 16px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* ---------- Skeletons ---------- */
+.skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  border-radius: 14px;
+  animation: shimmer 1.4s ease infinite;
 }
 
-.appointments-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
+.skeleton-head { display: flex; flex-direction: column; gap: 8px; }
+.skeleton--header { height: 28px; max-width: 220px; border-radius: 8px; }
+.skeleton--sub { height: 14px; max-width: 320px; border-radius: 6px; }
+.skeleton--panel { height: 480px; }
+.skeleton--line { height: 16px; width: 100%; border-radius: 6px; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 /* ---------- Header ---------- */
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.page-subtitle {
-  font-size: 13.5px;
-  color: var(--text-secondary);
-  margin: 6px 0 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.date-control {
-  display: flex;
-  align-items: center;
-  height: 40px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  background: var(--rb-surface);
-  padding-left: 5px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.date-control:focus-within {
-  border-color: var(--primary);
-  box-shadow: var(--rb-focus-ring);
-}
-
-.date-control__chip {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: var(--rb-surface-alt);
-  color: var(--text-secondary);
-}
-
-.date-control__chip--today {
-  background: rgba(var(--rb-primary-rgb), 0.1);
-  color: var(--rb-primary-text);
-}
-
-.date-filter-wrap {
-  position: relative;
-  width: 150px;
-}
-
-.date-filter {
-  width: 100%;
-  height: 38px;
-  padding: 0 40px 0 10px;
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--rb-text-primary);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.date-filter:focus {
-  outline: none;
-}
-
-/* Our calendar icon is drawn beside these; the browser's own would double it.
-   It stays clickable, stretched invisibly over the whole field. */
-.date-filter::-webkit-calendar-picker-indicator,
-.form-input-icon input[type='date']::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-}
+.header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 /* ---------- Buttons ---------- */
+.btn-primary,
 .btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 12px;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  border: 1px solid var(--rb-border-strong);
-  cursor: pointer;
-  text-decoration: none;
   white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: var(--rb-surface-hover);
-  border-color: var(--rb-border-hover);
-}
-
-.btn-outline:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn-outline:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-outline--sm {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 10px;
-  font-size: 12.5px;
-}
-
-.btn-outline-blue {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-  border: none;
-  cursor: pointer;
   text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.15s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.btn-outline-blue:hover:not(:disabled) {
-  background: rgba(var(--rb-primary-rgb), 0.15);
-}
+.btn-primary { color: #fff; background: var(--rb-primary); border: 1px solid var(--rb-primary); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary--danger { background: var(--rb-accent); border-color: var(--rb-accent); }
+.btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
-.btn-outline-blue:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+.btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
+.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline--sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 8px; gap: 4px; }
 
 .btn-link {
   background: none;
@@ -1293,1690 +885,461 @@ onBeforeUnmount(() => {
   padding: 0;
   color: var(--rb-primary-text);
   font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.btn-link:hover {
-  text-decoration: underline;
+.btn-link:hover { text-decoration: underline; }
+.inline-link { color: var(--rb-primary-text); font-weight: 600; }
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-link:focus-visible,
+.icon-btn:focus-visible,
+.modal-card__close:focus-visible,
+.combo__option:focus-visible,
+.inline-link:focus-visible {
+  outline: none;
+  box-shadow: var(--rb-focus-ring);
 }
 
-/* ---------- Error banner ---------- */
-.error-banner {
-  background: #FDF1F1;
-  color: #C62828;
-  border: 1px solid #F2D2D2;
-  border-left: 4px solid #D32F2F;
-  border-radius: 12px;
-  padding: 12px 16px;
+.spin { animation: spin 0.9s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Banners ---------- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
   font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
 }
 
-.error-banner__retry {
-  flex-shrink: 0;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
+.banner > :deep(.asset-icon) { flex-shrink: 0; }
+.banner__text { flex: 1; margin: 0; line-height: 1.45; color: var(--rb-text-primary); }
+.banner--success > :deep(.asset-icon) { color: var(--rb-success-text); }
+.banner--error > :deep(.asset-icon) { color: var(--rb-accent-text); }
+.banner--error { border-color: rgba(var(--rb-accent-rgb), 0.35); }
 
-.error-banner__retry:hover {
-  background: rgba(211, 47, 47, 0.08);
-}
-
-/* ---------- Stat cards ---------- */
-/* auto-fit, not a fixed count: the content column changes width when the
-   rail expands, so the grid answers to its container, not the viewport. */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-}
-
-.stat-card {
-  --tone-rgb: var(--rb-primary-rgb);
-  --tone-text: var(--rb-primary-text);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--rb-surface);
-  border-radius: 14px;
-  border: 1px solid var(--rb-border);
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
-  padding: 16px;
-}
-
-/* Coloured cap so the four numbers read as four different things at a glance. */
-.stat-card--blue { --tone: var(--rb-primary); --tone-rgb: var(--rb-primary-rgb); --tone-text: var(--rb-primary-text); }
-.stat-card--orange { --tone: var(--rb-warning); --tone-rgb: var(--rb-warning-rgb); --tone-text: var(--rb-warning-text); }
-.stat-card--green { --tone: var(--rb-success); --tone-rgb: var(--rb-success-rgb); --tone-text: var(--rb-success-text); }
-.stat-card--red { --tone: var(--rb-accent); --tone-rgb: var(--rb-accent-rgb); --tone-text: var(--rb-accent-text); }
-
-.stat-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.stat-card__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.stat-card__icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: rgba(var(--tone-rgb), 0.08);
-  color: var(--tone-text);
-}
-
-.stat-card__value {
-  min-height: 24px;
-  font-size: 24px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  margin: 0;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.stat-card__value.skeleton {
-  width: 48px;
-}
-
-/* The chip under the number, as on Inventory. */
-.stat-card__hint {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--rb-surface-alt);
-  color: var(--text-secondary);
-}
-
-/* ---------- Panel ---------- */
+/* ---------- Panel and toolbar ---------- */
 .panel {
+  container-type: inline-size;
   background: var(--rb-surface);
-  border-radius: 14px;
   border: 1px solid var(--rb-border);
+  border-radius: 14px;
   box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
   overflow: hidden;
 }
 
-.panel-header {
+.toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  padding: 18px 22px 14px;
-}
-
-.panel-title {
-  font-size: 16px;
-  font-weight: 800;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.panel-subtitle {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 3px 0 0;
-}
-
-/* Tabs share the panel's 22px gutter: label and underline land on one line. */
-.tabs {
-  display: flex;
-  justify-content: flex-start;
-  gap: 28px;
-  border-top: 1px solid var(--rb-border);
+  gap: 10px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--rb-border);
-  padding: 0 22px;
-  background: var(--rb-surface-alt);
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  padding: 14px 0 12px;
-  font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 3px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
+.toolbar__filters,
+.toolbar__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar__filters { flex: 1 1 auto; min-width: 0; }
+.toolbar__actions { justify-content: flex-end; margin-left: auto; }
 
-.tab:focus-visible {
-  outline: 2px solid var(--rb-primary-text);
-  outline-offset: -2px;
-}
-
-.tab:hover {
-  color: var(--text-primary);
-}
-
-.tab--active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-.tab-count {
-  min-width: 22px;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--rb-border);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.tab--active .tab-count {
-  background: var(--primary);
-  color: #fff;
-}
-
-.tab-content {
-  padding: 22px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0 0 12px;
-}
-
-.section-head__right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.section-label {
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.section-hint {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 4px 0 0;
-}
-
-.slot-legend {
-  display: flex;
-  gap: 12px;
-}
-
-.legend-item {
+.updated {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.legend-dot--open { background: var(--rb-success); }
-.legend-dot--busy { background: var(--rb-warning); }
-.legend-dot--full { background: var(--rb-accent); }
-
-/* ---------- Time slots ---------- */
-.time-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-}
-
-.slot-periods {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-bottom: 24px;
-}
-
-.slot-period__head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 8px;
-}
-
-.slot-period__name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.slot-period__meta {
+  margin-right: 4px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.slot-time .legend-dot {
-  display: inline-block;
-  margin-right: 6px;
-  vertical-align: middle;
-}
+.search { position: relative; flex: 1 1 220px; min-width: 170px; max-width: 280px; }
 
-/* Open slots show their colour too, not only once someone books. */
-.time-slot-card--open {
-  border-color: rgba(var(--rb-success-rgb), 0.3);
-}
-
-.time-slot-card--busy {
-  border-color: rgba(var(--rb-warning-rgb), 0.45);
-}
-
-.time-slot-card {
-  --meter: var(--rb-success);
-  position: relative;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: var(--rb-surface);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.time-slot-card:hover {
-  border-color: rgba(var(--rb-primary-rgb), 0.5);
-  background: var(--rb-surface-hover);
-}
-
-/* The slot the counter is in right now. */
-.time-slot-card--now {
-  border-color: rgba(var(--rb-primary-rgb), 0.55);
-}
-
-.time-slot-card:focus-visible {
-  outline: none;
-  box-shadow: var(--rb-focus-ring);
-}
-
-.time-slot-card--busy { --meter: var(--rb-warning); }
-
-.time-slot-card--full {
-  --meter: var(--rb-accent);
-  border-color: rgba(var(--rb-accent-rgb), 0.35);
-  background: rgba(var(--rb-accent-rgb), 0.05);
-}
-
-.time-slot-card--past {
-  opacity: 0.6;
-}
-
-.time-slot-card--selected,
-.time-slot-card--selected:hover {
-  opacity: 1;
-  border-color: var(--primary);
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  box-shadow: none;
-}
-
-.time-slot-grid .skeleton-block {
-  min-height: 78px;
-}
-
-.slot-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.slot-time {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.slot-tag {
-  font-size: 9.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: var(--rb-surface-alt);
-  color: var(--text-secondary);
-}
-
-.slot-tag--now {
-  background: var(--rb-primary);
-  color: #fff;
-}
-
-.slot-meter {
-  display: block;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--rb-surface-alt);
-  overflow: hidden;
-}
-
-.slot-meter__fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--meter);
-  transition: width 0.4s ease;
-}
-
-.slot-count {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.slot-count strong {
-  color: var(--text-primary);
-  font-weight: 800;
-}
-
-.time-slot-card--full .slot-count,
-.time-slot-card--full .slot-count strong {
-  color: var(--rb-accent-text);
-  font-weight: 800;
-}
-
-/* ---------- Toolbar / filters ---------- */
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px;
-  margin-bottom: 14px;
-  border-radius: 14px;
-  background: var(--rb-surface-alt);
-  border: 1px solid var(--rb-border);
-}
-
-.filters-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.toolbar-meta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.result-count {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.result-count strong {
-  color: var(--text-primary);
-}
-
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.35);
-  background: rgba(var(--rb-primary-rgb), 0.1);
-  color: var(--rb-primary-text);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.filter-chip:hover {
-  background: rgba(var(--rb-primary-rgb), 0.16);
-}
-
-.form-input {
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: var(--text-primary);
-  background: var(--rb-surface);
-  font-family: inherit;
-  transition: border-color 0.15s ease;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: var(--rb-focus-ring);
-}
-
-/*
- * One caret, drawn by us. The `background` shorthand is deliberate, and so is
- * repeating it in the dark rule: a later `background: <colour>` resets
- * background-image to none, and the dark override for .form-input is exactly
- * such a rule.
- */
-.filter-select {
-  flex: 0 0 190px;
-  height: 36px;
-  padding-top: 0;
-  padding-bottom: 0;
-  font-weight: 600;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-  background-size: 10px 6px;
-  padding-right: 32px;
-}
-
-.form-input-icon {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.form-input-icon .form-input {
-  width: 100%;
-  padding-right: 32px;
-}
-
-.form-input-icon__icon {
+.search__icon {
   position: absolute;
-  right: 14px;
+  left: 11px;
   top: 50%;
   transform: translateY(-50%);
+  color: var(--rb-text-secondary);
   pointer-events: none;
-  color: #6b7280;
 }
 
-/* ---------- Appointment rows ---------- */
-.appointment-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/*
- * The status stripe is an inset shadow rather than a border-left so the card
- * keeps its radius; the hover rule repeats it because box-shadow doesn't stack
- * across rules.
- */
-.appointment-card {
-  --stripe: var(--rb-border-strong);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  padding: 12px 16px 12px 20px;
-  background: var(--rb-surface);
-  box-shadow: inset 4px 0 0 var(--stripe);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.appointment-card:hover {
-  border-color: var(--rb-border-strong);
-  box-shadow:
-    inset 4px 0 0 var(--stripe),
-    0 1px 3px rgba(var(--rb-shadow-rgb), 0.06),
-    0 10px 22px -14px rgba(var(--rb-shadow-rgb), 0.3);
-}
-
-.appointment-card--scheduled { --stripe: var(--rb-warning); }
-.appointment-card--in-progress { --stripe: var(--rb-primary); }
-.appointment-card--collected { --stripe: var(--rb-success); }
-.appointment-card--deferred,
-.appointment-card--no-show { --stripe: var(--rb-accent); }
-.appointment-card--cancelled { --stripe: var(--rb-border-strong); }
-
-/* The donor the counter should expect next. */
-.appointment-card--next {
-  border-color: rgba(var(--rb-primary-rgb), 0.45);
-  background: rgba(var(--rb-primary-rgb), 0.03);
-}
-
-.next-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--rb-primary);
-  color: #fff;
-}
-
-.appointment-card--cancelled .appt-name,
-.appointment-card--no-show .appt-name {
-  color: var(--text-secondary);
-}
-
-.appointment-card--cancelled .appt-name {
-  text-decoration: line-through;
-}
-
-.appointment-list .skeleton-block {
-  min-height: 78px;
-  box-shadow: none;
-}
-
-.appt-time {
-  width: 64px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding-right: 14px;
-  border-right: 1px solid var(--rb-border);
-}
-
-.appt-time__clock {
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-}
-
-.appt-time__period {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  margin-top: 4px;
-  color: var(--text-secondary);
-}
-
-.appt-avatar {
-  width: 36px;
+.search__input,
+.date-input,
+.select {
   height: 36px;
-  border-radius: 999px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--rb-primary-rgb), 0.1);
-  color: var(--rb-primary-text);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.appt-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.appt-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.appt-name {
-  font-weight: 800;
-  font-size: 14.5px;
-  text-transform: capitalize;
-  color: var(--text-primary);
-  line-height: 1.35;
-}
-
-.appt-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 5px 0 0;
-}
-
-.appt-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.meta-sep {
-  opacity: 0.6;
-}
-
-.kind-tag {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1px 8px;
-  border-radius: 6px;
-}
-
-.kind-tag--walkin {
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-}
-
-.kind-tag--drive {
-  background: rgba(var(--rb-success-rgb), 0.1);
-  color: var(--rb-success-text);
-}
-
-.appt-phone {
-  color: inherit;
-  text-decoration: none;
-  font-variant-numeric: tabular-nums;
-}
-
-.appt-phone:hover {
-  color: var(--rb-primary-text);
-  text-decoration: underline;
-}
-
-.appt-status-col {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-}
-
-.appt-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.row-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 34px;
-  min-width: 92px;
   border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
   border-radius: 10px;
-  padding: 0 14px;
+  background-color: var(--rb-surface);
   font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  text-decoration: none;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.search__input { width: 100%; padding: 0 12px 0 34px; }
+.date-input { padding: 0 10px; color-scheme: light dark; }
+
+.select {
+  padding: 0 30px 0 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  appearance: none;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.row-action:hover:not(:disabled) {
-  background: var(--rb-surface-hover);
-  border-color: var(--rb-border-hover);
-}
+.search__input::placeholder { color: var(--rb-placeholder); }
 
-.row-action:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+.search__input:focus,
+.date-input:focus,
+.select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
-.row-action--ghost {
-  min-width: 0;
-  color: var(--text-secondary);
-}
+/* ---------- Table ---------- */
+.table-wrap { position: relative; overflow-x: auto; transition: opacity 0.15s ease; }
+.table-wrap--busy { opacity: 0.55; }
 
-.row-action--ghost:hover:not(:disabled) {
-  color: var(--rb-accent-text);
-  border-color: rgba(var(--rb-accent-rgb), 0.4);
-  background: rgba(var(--rb-accent-rgb), 0.06);
-}
+.appt-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
 
-.row-action--primary {
-  background: var(--rb-primary);
-  border-color: var(--rb-primary);
-  color: #fff;
-  box-shadow: 0 4px 10px -6px rgba(var(--rb-primary-rgb), 0.8);
-}
-
-.row-action--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--rb-primary) 86%, #000);
-  border-color: color-mix(in srgb, var(--rb-primary) 86%, #000);
-  color: #fff;
-}
-
-/* ---------- Pills ---------- */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pill--status {
-  min-width: 104px;
-  justify-content: center;
-  padding: 6px 12px;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.pill--in-progress .status-dot {
-  animation: pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.8); }
-}
-
-.pill--blood { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-.pill--in-progress,
-.pill--confirmed,
-.pill--attended { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
-.pill--collected { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.pill--no-show,
-.pill--deferred { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-.pill--pending,
-.pill--scheduled { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
-.pill--cancelled { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-
-/* ---------- Empty states ---------- */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 36px 16px;
-  border: 1px dashed var(--rb-border-strong);
-  border-radius: 14px;
-}
-
-.empty-state--inline {
-  grid-column: 1 / -1;
-  padding: 22px 16px;
-}
-
-.empty-state__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-}
-
-.empty-state__title {
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.empty-state__text {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 0 0 6px;
-  max-width: 360px;
-}
-
-/* ---------- Blood drives ---------- */
-.drives-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.drive-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 14px;
-}
-
-.drive-card {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--rb-border);
-  border-radius: 16px;
-  padding: 18px 20px;
-  background: var(--rb-surface);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.drive-card:hover {
-  border-color: var(--rb-border-strong);
-  box-shadow: 0 10px 22px -14px rgba(var(--rb-shadow-rgb), 0.3);
-}
-
-.drive-card__top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  gap: 12px;
-}
-
-.drive-card__heading {
-  display: flex;
-  gap: 12px;
-  min-width: 0;
-}
-
-.drive-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--rb-accent-rgb), 0.1);
-  color: var(--rb-accent-text);
-}
-
-.drive-card__title {
-  font-weight: 800;
-  font-size: 15px;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.drive-card__meta {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 4px 0 0;
-}
-
-.status-badge {
+.appt-table thead th {
+  padding: 10px;
+  background: var(--rb-surface-alt);
+  border-bottom: 1px solid var(--rb-border);
+  text-align: left;
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 5px 10px;
-  border-radius: 999px;
-  flex-shrink: 0;
+  color: var(--rb-text-secondary);
   white-space: nowrap;
 }
 
-.status-badge--upcoming { background: #e3f2fd; color: var(--primary); }
-.status-badge--open { background: #e8f5e9; color: var(--success); }
-.status-badge--closed { background: #f3f4f6; color: #6b7280; }
-.status-badge--full { background: #fdeaea; color: var(--accent); }
-
-.drive-progress {
-  padding: 14px;
-  border-radius: 12px;
-  background: var(--rb-surface-alt);
-}
-
-.drive-progress__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px;
-}
-
-.drive-progress-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.drive-progress__pct {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.progress-track {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--rb-border);
+.appt-table tbody td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--rb-border);
+  vertical-align: middle;
+  color: var(--rb-text-primary);
   overflow: hidden;
 }
 
-.progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--primary);
-  transition: width 0.5s ease;
+.appt-table th:first-child,
+.appt-table td:first-child { padding-left: 16px; }
+
+.appt-table th:last-child,
+.appt-table td:last-child { padding-right: 16px; }
+
+.appt-table tbody tr:last-child td { border-bottom: 0; }
+.appt-row { transition: background 0.12s ease; }
+.appt-row:hover { background: var(--rb-surface-hover); }
+
+/* Today's bookings carry a marker on the edge, never a filled row. */
+.appt-row--today td:first-child { box-shadow: inset 3px 0 0 var(--rb-primary); }
+
+.c-id { width: 128px; }
+.c-date { width: 118px; }
+.c-slot { width: 118px; }
+.c-status { width: 124px; }
+.c-actions { width: 180px; }
+
+/* Too narrow for both names: the place goes, the donor stays. */
+@container (max-width: 860px) {
+  .c-place { display: none; }
 }
 
-.progress-fill--full {
-  background: var(--success);
-}
+.code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
+.donor { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.donor__name { font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
+.nowrap { white-space: nowrap; }
 
-.progress-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 8px 0 0;
-}
-
-.progress-meta strong {
-  color: var(--text-primary);
-}
-
-.drive-note {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 14px 0 0;
-}
-
-.drive-note--open {
-  padding: 9px 12px;
-  border-radius: 10px;
-  background: rgba(var(--rb-success-rgb), 0.08);
-  color: var(--rb-success-text);
-  font-weight: 600;
-}
-
-.preview-label {
-  font-size: 10.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  margin: 16px 0 10px;
-  border-top: 1px solid var(--rb-border);
-  padding-top: 14px;
-}
-
-.donor-preview-list,
-.donor-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.donor-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 0;
-}
-
-.donor-row__avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  flex-shrink: 0;
-  display: flex;
+.blood {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  min-width: 30px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-primary);
   font-size: 11px;
-  font-weight: 800;
-}
-
-.donor-row__info {
-  flex: 1;
-  min-width: 0;
-}
-
-.donor-row__name {
-  font-size: 13px;
   font-weight: 700;
-  margin: 0;
+  white-space: nowrap;
 }
 
-.donor-row__meta {
+/* Status: the colour lives on the dot, never on the badge's fill. */
+.badge {
+  --tone: var(--rb-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
   font-size: 11.5px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--rb-text-primary);
+  white-space: nowrap;
 }
 
-.drive-card__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 16px;
-  flex-wrap: wrap;
+.badge__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
+.badge--info { --tone: var(--rb-primary); }
+.badge--ok { --tone: var(--rb-success); }
+.badge--warn { --tone: var(--rb-warning); }
+.badge--crit { --tone: var(--rb-accent); }
+.badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
+
+.row-actions { display: flex; gap: 6px; }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
+
+.icon-btn:hover:not(:disabled) { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.icon-btn--danger:hover:not(:disabled) { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.45); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.empty-cell { padding: 0 !important; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 24px; text-align: center; }
+
+.empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
+}
+
+.empty-state__title { margin: 0; font-size: 14px; font-weight: 700; }
+.empty-state__text { margin: 0 0 8px; max-width: 46ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* ---------- Pager ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+
+.pager__btns { display: flex; align-items: center; gap: 8px; }
+.pager__page { font-variant-numeric: tabular-nums; }
 
 /* ---------- Modals ---------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(3px);
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 100;
+  background: var(--rb-overlay);
 }
 
 .modal-card {
-  background: var(--rb-surface);
-  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.35);
+  max-width: 600px;
+  max-height: calc(100vh - 40px);
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
 }
 
-.modal-card--wide {
-  max-width: 560px;
-}
+.modal-card--sm { max-width: 440px; }
 
 .modal-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  gap: 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--rb-border);
+  flex-shrink: 0;
 }
 
-.modal-card__heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.modal-card__icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--rb-primary-rgb), 0.1);
-  color: var(--rb-primary-text);
-}
-
-.modal-card__title {
-  font-size: 16px;
-  font-weight: 800;
-  margin: 0;
-}
+.modal-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; }
+.modal-card__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
 
 .modal-card__close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 6px;
-  border-radius: 8px;
-  display: flex;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.modal-card__close:hover {
-  color: var(--text-primary);
-  background: var(--rb-surface-hover);
-}
-
-.modal-form {
-  padding: 18px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.info-note {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--rb-primary-text);
-  background: rgba(var(--rb-primary-rgb), 0.07);
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.18);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.slot-readout-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.slot-readout-total {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--rb-primary-text);
-}
-
-.slot-readout {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: 8px;
+  background: none;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
 }
 
-.slot-readout__row {
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+
+.modal-card__body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; overflow-y: auto; min-height: 0; }
+
+.modal-card__footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 11px 14px;
-  font-size: 13px;
-}
-
-.slot-readout__row + .slot-readout__row {
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
   border-top: 1px solid var(--rb-border);
+  flex-shrink: 0;
 }
 
-.slot-readout__row:nth-child(even) {
+.modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.form-label { font-size: 12.5px; font-weight: 600; }
+.form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+.req { color: var(--rb-accent-text); }
+.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
+.field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-accent-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Anchored on the page root: other portals ship unscoped dark .form-input rules. */
+.appointments-page .form-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background-color: var(--rb-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+  color-scheme: light dark;
+}
+
+.appointments-page .form-input:disabled { background-color: var(--rb-surface-alt); color: var(--rb-text-secondary); cursor: not-allowed; }
+.appointments-page .form-input::placeholder { color: var(--rb-placeholder); }
+.appointments-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+
+.appointments-page .form-select {
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.appointments-page .form-textarea { height: auto; min-height: 76px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
+
+/* Search-and-pick for the donor and the drive. */
+.combo { position: relative; }
+
+.combo__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(var(--rb-shadow-rgb), 0.18);
+}
+
+.combo__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+
+.combo__option:hover { background: var(--rb-surface-hover); }
+.combo__main { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.combo__sub { font-size: 11.5px; color: var(--rb-text-secondary); }
+.combo__note { padding: 10px; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+
+.picked {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
   background: var(--rb-surface-alt);
 }
 
-.slot-readout .skeleton-block {
-  min-height: 42px;
-  border-radius: 0;
-}
-
-.slot-readout__time {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.slot-readout__cap {
-  color: var(--text-secondary);
-}
-
-.slot-readout__cap strong {
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.modal-empty {
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
-  padding: 18px 0;
-  margin: 0;
-}
-
-.modal-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.modal-error {
-  color: #C62828;
-  font-size: 12.5px;
-  font-weight: 600;
-  margin: 0;
-}
+.picked__text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.picked__name { font-size: 13.5px; font-weight: 700; }
+.picked__meta { font-size: 12px; color: var(--rb-text-secondary); overflow-wrap: anywhere; }
 
 .modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-enter-active .modal-card,
-.modal-leave-active .modal-card {
-  transition: transform 0.2s ease;
-}
+.modal-leave-active { transition: opacity 0.18s ease; }
 
 .modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
+.modal-leave-to { opacity: 0; }
 
-.modal-enter-from .modal-card,
-.modal-leave-to .modal-card {
-  transform: translateY(12px) scale(0.98);
-}
-
-/* ---------- Skeletons (the same page skeleton as Inventory) ---------- */
-.skeleton-head { display: flex; flex-direction: column; gap: 8px; }
-.skeleton--header { height: 28px; max-width: 220px; border-radius: 8px; }
-.skeleton--sub { height: 14px; max-width: 320px; border-radius: 6px; }
-.skeleton--card { height: 108px; border-radius: 14px; }
-.skeleton--panel { border-radius: 14px; }
-
-.skeleton,
-.skeleton-block {
-  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
-  background-size: 400% 100%;
-  animation: skeleton-loading 1.4s ease infinite;
-  border-radius: 8px;
-  color: transparent;
-  border-color: transparent;
-}
-
-.skeleton-block {
-  min-height: 60px;
-}
-
-@keyframes skeleton-loading {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
+@media (max-width: 760px) {
+  .toolbar__filters { flex-basis: 100%; }
+  .search { max-width: none; flex: 1 1 100%; }
+  .toolbar__actions { width: 100%; }
+  .form-row { grid-template-columns: 1fr; }
+  .modal-overlay { padding: 10px; align-items: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-spinner,
-  .pill--in-progress .status-dot,
   .skeleton,
-  .skeleton-block {
-    animation: none !important;
-  }
-
-}
-
-/* ============ DARK MODE ============ */
-:global(.dark .appointments-page) {
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  background: #0F172A;
-}
-
-:global(.dark .appointments-page .stat-card),
-:global(.dark .appointments-page .panel),
-:global(.dark .appointments-page .appointment-card),
-:global(.dark .appointments-page .drive-card),
-:global(.dark .appointments-page .modal-card),
-:global(.dark .appointments-page .date-control),
-:global(.dark .appointments-page .time-slot-card),
-:global(.dark .appointments-page .form-input),
-:global(.dark .appointments-page .btn-outline),
-:global(.dark .appointments-page .row-action:not(.row-action--primary)) {
-  background: #1E293B;
-  border-color: #334155;
-}
-
-/* After the rule above, whose `background` shorthand would otherwise reset
-   the caret to none. */
-:global(.dark .appointments-page .filter-select) {
-  background: #1E293B url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-  background-size: 10px 6px;
-  border-color: #334155;
-  color: #F1F5F9;
-}
-
-:global(.dark .appointments-page .btn-outline),
-:global(.dark .appointments-page .row-action:not(.row-action--primary)),
-:global(.dark .appointments-page .date-filter) {
-  color: #F1F5F9;
-}
-
-:global(.dark .appointments-page .btn-outline:hover:not(:disabled)),
-:global(.dark .appointments-page .row-action:not(.row-action--primary):hover:not(:disabled)) {
-  background: #263449;
-  border-color: #475569;
-}
-
-:global(.dark .appointments-page .row-action--ghost) {
-  color: #94A3B8;
-}
-
-:global(.dark .appointments-page .row-action--ghost:hover:not(:disabled)) {
-  color: #F87171;
-  border-color: rgba(248, 113, 113, 0.4);
-  background: rgba(248, 113, 113, 0.08);
-}
-
-:global(.dark .appointments-page .row-action--primary) {
-  background: #2563EB;
-  border-color: #2563EB;
-  box-shadow: none;
-}
-
-:global(.dark .appointments-page .row-action--primary:hover:not(:disabled)) {
-  background: #1D4ED8;
-  border-color: #1D4ED8;
-}
-
-:global(.dark .appointments-page .stat-card__value),
-:global(.dark .appointments-page .page-title),
-:global(.dark .appointments-page .panel-title),
-:global(.dark .appointments-page .section-label),
-:global(.dark .appointments-page .slot-time),
-:global(.dark .appointments-page .slot-count strong),
-:global(.dark .appointments-page .appt-name),
-:global(.dark .appointments-page .appt-time__clock),
-:global(.dark .appointments-page .drive-card__title),
-:global(.dark .appointments-page .drive-progress__pct),
-:global(.dark .appointments-page .donor-row__name),
-:global(.dark .appointments-page .modal-card__title),
-:global(.dark .appointments-page .empty-state__title),
-:global(.dark .appointments-page .slot-readout__time),
-:global(.dark .appointments-page .slot-readout__cap strong),
-:global(.dark .appointments-page .result-count strong),
-:global(.dark .appointments-page .progress-meta strong) {
-  color: #F1F5F9;
-}
-
-:global(.dark .appointments-page .stat-card__label),
-:global(.dark .appointments-page .stat-card__hint),
-:global(.dark .appointments-page .page-subtitle),
-:global(.dark .appointments-page .panel-subtitle),
-:global(.dark .appointments-page .section-hint),
-:global(.dark .appointments-page .appt-meta),
-:global(.dark .appointments-page .appt-time__period),
-:global(.dark .appointments-page .drive-card__meta),
-:global(.dark .appointments-page .drive-progress-label),
-:global(.dark .appointments-page .progress-meta),
-:global(.dark .appointments-page .drive-note),
-:global(.dark .appointments-page .preview-label),
-:global(.dark .appointments-page .donor-row__meta),
-:global(.dark .appointments-page .empty-state__text),
-:global(.dark .appointments-page .modal-empty),
-:global(.dark .appointments-page .form-label),
-:global(.dark .appointments-page .result-count),
-:global(.dark .appointments-page .legend-item),
-:global(.dark .appointments-page .loading-text) {
-  color: #94A3B8;
-}
-
-:global(.dark .appointments-page .tabs),
-:global(.dark .appointments-page .toolbar),
-:global(.dark .appointments-page .drive-progress) {
-  background: #0F172A;
-  border-color: #334155;
-}
-
-:global(.dark .appointments-page .tab) {
-  color: #94A3B8;
-}
-:global(.dark .appointments-page .tab:hover) {
-  color: #F1F5F9;
-}
-:global(.dark .appointments-page .tab--active) {
-  color: #60A5FA;
-  border-bottom-color: #60A5FA;
-}
-:global(.dark .appointments-page .tab-count) {
-  background: #334155;
-  color: #CBD5E1;
-}
-:global(.dark .appointments-page .tab--active .tab-count) {
-  background: #60A5FA;
-  color: #0F172A;
-}
-
-:global(.dark .appointments-page .date-control__chip) {
-  background: #0F172A;
-  color: #94A3B8;
-}
-:global(.dark .appointments-page .date-control__chip--today) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-
-:global(.dark .appointments-page .time-slot-card--full) {
-  background: rgba(248, 113, 113, 0.08);
-  border-color: rgba(248, 113, 113, 0.35);
-}
-:global(.dark .appointments-page .time-slot-card--selected) {
-  background: #1A3A5F;
-  border-color: #60A5FA;
-  box-shadow: none;
-}
-:global(.dark .appointments-page .time-slot-card--full .slot-count),
-:global(.dark .appointments-page .time-slot-card--full .slot-count strong) {
-  color: #F87171;
-}
-:global(.dark .appointments-page .slot-meter),
-:global(.dark .appointments-page .slot-tag) {
-  background: #0F172A;
-}
-
-:global(.dark .appointments-page .form-input:focus) {
-  border-color: #60A5FA;
-  background: #263449;
-}
-:global(.dark .appointments-page .form-input-icon__icon) {
-  color: #94A3B8;
-}
-
-:global(.dark .appointments-page .appt-time) {
-  border-right-color: #334155;
-}
-
-:global(.dark .appointments-page .filter-chip) {
-  background: #1A3A5F;
-  border-color: rgba(96, 165, 250, 0.4);
-  color: #60A5FA;
-}
-
-:global(.dark .appointments-page .kind-tag--walkin) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-:global(.dark .appointments-page .kind-tag--drive) {
-  background: #1A3A2A;
-  color: #34D399;
-}
-
-:global(.dark .appointments-page .pill--blood) {
-  background: #2D1A1A;
-  color: #F87171;
-}
-:global(.dark .appointments-page .pill--collected) {
-  background: #1A3A2A;
-  color: #34D399;
-}
-:global(.dark .appointments-page .pill--in-progress),
-:global(.dark .appointments-page .pill--confirmed),
-:global(.dark .appointments-page .pill--attended) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-:global(.dark .appointments-page .pill--no-show),
-:global(.dark .appointments-page .pill--deferred) {
-  background: #2D1A1A;
-  color: #F87171;
-}
-:global(.dark .appointments-page .pill--cancelled) {
-  background: rgba(156, 163, 175, 0.16);
-  color: #d1d5db;
-}
-:global(.dark .appointments-page .pill--pending),
-:global(.dark .appointments-page .pill--scheduled) {
-  background: #3E2C1A;
-  color: #FBBF24;
-}
-
-:global(.dark .appointments-page .empty-state) {
-  border-color: #334155;
-}
-:global(.dark .appointments-page .empty-state__icon),
-:global(.dark .appointments-page .modal-card__icon) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-
-:global(.dark .appointments-page .drive-card__icon) {
-  background: #2D1A1A;
-  color: #F87171;
-}
-
-:global(.dark .appointments-page .status-badge--upcoming) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-:global(.dark .appointments-page .status-badge--open) {
-  background: #1A3A2A;
-  color: #34D399;
-}
-:global(.dark .appointments-page .status-badge--closed) {
-  background: #0F172A;
-  color: #94A3B8;
-}
-:global(.dark .appointments-page .status-badge--full) {
-  background: #2D1A1A;
-  color: #F87171;
-}
-
-:global(.dark .appointments-page .progress-track) {
-  background: #334155;
-}
-:global(.dark .appointments-page .progress-fill) {
-  background: #60A5FA;
-}
-:global(.dark .appointments-page .progress-fill--full) {
-  background: #34D399;
-}
-
-:global(.dark .appointments-page .drive-note--open) {
-  background: #1A3A2A;
-  color: #34D399;
-}
-
-:global(.dark .appointments-page .preview-label) {
-  border-top-color: #334155;
-}
-
-:global(.dark .appointments-page .btn-outline-blue) {
-  background: #1A3A5F;
-  color: #60A5FA;
-}
-:global(.dark .appointments-page .btn-outline-blue:hover:not(:disabled)) {
-  background: #1E4A7A;
-}
-
-:global(.dark .appointments-page .btn-link) {
-  color: #60A5FA;
-}
-
-:global(.dark .appointments-page .modal-overlay) {
-  background: rgba(0, 0, 0, 0.7);
-}
-:global(.dark .appointments-page .modal-card__header) {
-  border-bottom-color: #334155;
-}
-:global(.dark .appointments-page .modal-card__close) {
-  color: #94A3B8;
-}
-:global(.dark .appointments-page .modal-card__close:hover) {
-  color: #F1F5F9;
-  background: #263449;
-}
-:global(.dark .appointments-page .info-note) {
-  background: #1A3A5F;
-  border-color: rgba(96, 165, 250, 0.3);
-  color: #93C5FD;
-}
-:global(.dark .appointments-page .slot-readout),
-:global(.dark .appointments-page .slot-readout__row + .slot-readout__row) {
-  border-color: #334155;
-}
-:global(.dark .appointments-page .slot-readout__row:nth-child(even)) {
-  background: #0F172A;
-}
-:global(.dark .appointments-page .slot-readout-total) {
-  color: #60A5FA;
-}
-:global(.dark .appointments-page .modal-error) {
-  color: #F87171;
-}
-
-:global(.dark .appointments-page .error-banner) {
-  background: rgba(239, 83, 80, 0.10);
-  color: #EF9A9A;
-  border-color: rgba(239, 83, 80, 0.24);
-  border-left-color: #EF5350;
-}
-
-/* ---------- Focus rings ---------- */
-.btn-outline:focus-visible,
-.btn-outline-blue:focus-visible,
-.btn-link:focus-visible,
-.row-action:focus-visible,
-.filter-chip:focus-visible,
-.error-banner__retry:focus-visible,
-.modal-card__close:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+  .spin { animation: none !important; }
 }
 </style>

@@ -224,6 +224,170 @@ class BloodCenterService extends BaseService {
   }
 
   /**
+   * Correct a donor's record. Only what is sent changes; the server decides
+   * which fields this centre may change for this donor (`editable` on the
+   * profile says the same in advance).
+   */
+  async updateDonor(uuid: string, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}`, 'PATCH', payload)
+  }
+
+  /** FormData with a `photo` file. */
+  async uploadDonorPhoto(uuid: string, form: FormData): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/photo`, 'POST', form)
+  }
+
+  /**
+   * The filtered donor list as a CSV that opens in Excel. requestBlob takes no
+   * params, so the filters ride in the query string.
+   */
+  async exportDonors(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/donors/export${query ? `?${query}` : ''}`)
+  }
+
+  /** Who the eligibility reminder would reach, without sending: { recipients, skipped }. */
+  async donorReminderPreview(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/eligibility-reminders`, 'GET', params)
+  }
+
+  async sendDonorReminders(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/eligibility-reminders`, 'POST', params)
+  }
+
+  /** template: 'thank_you' | 'eligibility_reminder' */
+  async emailDonor(uuid: string, template: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/email`, 'POST', { template })
+  }
+
+  // The centre's donor email wording, kept in Settings (center.configure).
+  async emailTemplates(): Promise<any> {
+    return this.request(`${this.resource}/facility/email-templates`, 'GET')
+  }
+
+  async saveEmailTemplate(template: string, payload: { subject: string, body: string }): Promise<any> {
+    return this.request(`${this.resource}/facility/email-templates/${template}`, 'PUT', payload)
+  }
+
+  async resetEmailTemplate(template: string): Promise<any> {
+    return this.request(`${this.resource}/facility/email-templates/${template}`, 'DELETE')
+  }
+
+  /**
+   * The Donor/Collection dashboard: today, the donor pool, the coming week
+   * and the last 30 days, for the caller's own centre. Counts only.
+   */
+  async collectionDashboard(): Promise<any> {
+    return this.request(`${this.resource}/collection/dashboard`, 'GET')
+  }
+
+  // --- Donations list ---
+  // Every visit opened at the counter. A visit left open is closed through
+  // updateDonationStatus(id, { status: 'rejected', rejection_reason }).
+
+  /** Paginated. Filters: search, status (a status or 'open'), blood_type_id, from, to. */
+  async donationRecords(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donation-records`, 'GET', params)
+  }
+
+  async exportDonationRecords(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/donation-records/export${query ? `?${query}` : ''}`)
+  }
+
+  // --- Paper records ---
+  // A remote drive's paper records, typed in after the drive. One sheet per
+  // drive and day; each donor on it becomes an ordinary donation dated on that
+  // day. The donor search is the counter's own (searchCounterDonors,
+  // lookupDonor).
+
+  /** Paginated sheets, the most recent drive first, with row counts. */
+  async paperSheets(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets`, 'GET', params)
+  }
+
+  /** { today, drives: [{ id, name, location, event_date, start_time }] }: drives already held. */
+  async paperSheetOptions(): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/options`, 'GET')
+  }
+
+  /** { mobile_event_id? | drive_name, location?, held_on, starts_at, screened_by_name?, phlebotomist_name?, notify_donors, notes? } */
+  async createPaperSheet(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets`, 'POST', payload)
+  }
+
+  /** The sheet and every donor typed from it (rows shaped like donationRecords). */
+  async paperSheet(sheetId: number | string): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/${sheetId}`, 'GET')
+  }
+
+  /** Only an empty sheet. */
+  async deletePaperSheet(sheetId: number | string): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/${sheetId}`, 'DELETE')
+  }
+
+  /** A donor named on the paper who is not in RedAgos yet: the counter's walk-in registration. */
+  async registerPaperDonor(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/donors`, 'POST', payload)
+  }
+
+  /** One donor's record: the screening fields, and `collection` when a bag was drawn. */
+  async recordPaperDonation(sheetId: number | string, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/${sheetId}/donations`, 'POST', payload)
+  }
+
+  /** Take back a record typed in error, before the laboratory has used it. */
+  async removePaperDonation(sheetId: number | string, donationId: number, payload: { reason: string }): Promise<any> {
+    return this.request(`${this.resource}/paper-sheets/${sheetId}/donations/${donationId}`, 'DELETE', payload)
+  }
+
+  // --- Appointments page (staff side) ---
+  // Every booking at the centre and its mobile blood drives, and the desk
+  // booking a donor who phones in. Check-in and no-show are above.
+
+  /** Paginated: { data, current_page, last_page, total }. Filters: search, from, to, status. */
+  async staffAppointments(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/appointments`, 'GET', params)
+  }
+
+  async exportAppointments(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/appointments/export${query ? `?${query}` : ''}`)
+  }
+
+  /** { date, slots: [{ time, end, available, total }], drives: [...] } for a date or a drive. */
+  async appointmentOptions(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/appointments/options`, 'GET', params)
+  }
+
+  /** { donor_uuid, date?, time_slot, drive_id?, notes? } */
+  async bookAppointment(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/appointments`, 'POST', payload)
+  }
+
+  /** The ✓ on the Appointments list: mark the booking collected. */
+  async markAppointmentCollected(appointmentId: number): Promise<any> {
+    return this.request(`${this.resource}/appointments/${appointmentId}/collected`, 'POST')
+  }
+
+  async cancelAppointment(appointmentId: number): Promise<any> {
+    return this.request(`${this.resource}/appointments/${appointmentId}/cancel`, 'POST')
+  }
+
+  async deleteAppointment(appointmentId: number): Promise<any> {
+    return this.request(`${this.resource}/appointments/${appointmentId}`, 'DELETE')
+  }
+
+  /**
    * The donor's health questionnaire, Sections I-A to I-C.
    *
    * Deliberately its own call rather than something the scan hands over. The
@@ -237,6 +401,32 @@ class BloodCenterService extends BaseService {
    */
   async donorHealthQuestionnaire(uuid: string, params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/donors/${uuid}/health-questionnaire`, 'GET', params)
+  }
+
+  /**
+   * The completed questionnaire as the printed DOH form: the answers without
+   * the review markers, which stay on the physician's read above.
+   */
+  async printableQuestionnaire(uuid: string, params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire/print`, 'GET', params)
+  }
+
+  /** The questions a walk-in answers onsite on the counter's device. */
+  async counterQuestionnaireForm(uuid: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire/form`, 'GET')
+  }
+
+  /** Same payload as the donor's own app submission; returns the reference only. */
+  async recordCounterQuestionnaire(uuid: string, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire`, 'POST', payload)
+  }
+
+  /**
+   * Find a walk-in by name, email or phone: { data: [...], truncated }.
+   * A POST so the name never sits in a URL.
+   */
+  async searchCounterDonors(q: string): Promise<any> {
+    return this.request(`${this.resource}/collection/donor-search`, 'POST', { q })
   }
 
   // --- Component settings ---

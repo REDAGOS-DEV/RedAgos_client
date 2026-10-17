@@ -104,6 +104,8 @@ export interface AppUser {
   department_label: string | null
   /** Null for donors, admins, blood-bank staff, a custom role, and an Admin or Supervisor with no post. */
   staff_role: StaffRole | null
+  /** Every predefined role held, the main one (staff_role) first. All in one department. */
+  staff_roles: StaffRole[]
   hospital_role: HospitalRole | null
   hospital_role_label: string | null
   staff_role_label: string | null

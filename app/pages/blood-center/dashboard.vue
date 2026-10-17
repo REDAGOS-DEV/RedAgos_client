@@ -34,7 +34,7 @@
             Only for someone who works the counter: the Admin and the
             Supervisor who read this overview do not.
           -->
-          <NuxtLink v-if="canCollect" to="/blood-center/collection" class="btn-primary">
+          <NuxtLink v-if="canCollect" to="/blood-center/donation" class="btn-primary">
             <AssetIcon name="plus" :size="15" />
             Record Donation
           </NuxtLink>
@@ -60,7 +60,7 @@
         </component>
 
         <!-- A link only for someone the counter would let in. -->
-        <component :is="canCollect ? NuxtLink : 'div'" v-bind="canCollect ? { to: '/blood-center/collection' } : {}" class="stat-card">
+        <component :is="canCollect ? NuxtLink : 'div'" v-bind="canCollect ? { to: '/blood-center/donation' } : {}" class="stat-card">
           <div class="stat-card__top">
             <p class="stat-card__label">Donations Today</p>
             <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">

@@ -172,6 +172,15 @@
                 </button>
                 <button type="button" class="btn-ghost-danger" @click="openCancelDialog(drive)">Cancel</button>
               </template>
+              <!-- A drive held on paper: type its records in once they are back. -->
+              <NuxtLink
+                v-if="canRecordPaper && (drive.status === 'Completed' || drive.status === 'Open')"
+                :to="`/blood-center/paper-records?drive=${drive.id}`"
+                class="btn-small"
+              >
+                <AssetIcon name="file-text" :size="13" />
+                Enter paper records
+              </NuxtLink>
             </div>
           </li>
         </ul>
@@ -339,6 +348,9 @@ definePageMeta({
   layout: 'blood-centerdashboard',
   requires: 'drives.manage',
 })
+
+const { can } = useUser()
+const canRecordPaper = computed(() => can('donations.record_paper'))
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -662,6 +674,7 @@ onMounted(loadDrives)
 }
 
 .btn-small:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+a.btn-small { text-decoration: none; }
 
 .btn-danger {
   display: inline-flex;

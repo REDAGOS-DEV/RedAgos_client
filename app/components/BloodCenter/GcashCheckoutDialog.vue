@@ -161,7 +161,7 @@ const { user } = useUser()
 
 // Resolving a checkout flagged for review is the Billing Supervisor's alone;
 // the server refuses anyone else, this only hides the buttons.
-const isBillingSupervisor = computed(() => user.value?.staff_role === 'billing_supervisor')
+const isBillingSupervisor = computed(() => (user.value?.staff_roles ?? []).includes('billing_supervisor'))
 
 const availability = ref(null)
 const attempt = ref(null)

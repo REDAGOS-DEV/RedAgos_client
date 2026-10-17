@@ -125,10 +125,14 @@
               </div>
             </td>
             <td>
-              <p class="cell-strong">
-                {{ row.role_label || (row.management_level ? 'Management' : 'No role yet') }}
-                <span v-if="row.custom_role" class="tag">custom</span>
-              </p>
+              <!-- Every role, the main one first; a custom one is tagged. -->
+              <template v-if="row.role_labels?.length">
+                <p v-for="(label, i) in row.role_labels" :key="label" :class="i === 0 ? 'cell-strong' : 'cell-role'">
+                  {{ label }}
+                  <span v-if="row.custom_role && label === row.custom_role" class="tag">custom</span>
+                </p>
+              </template>
+              <p v-else class="cell-strong">{{ row.management_level ? 'Management' : 'No role yet' }}</p>
               <p v-if="row.position" class="cell-sub">{{ row.position }}</p>
             </td>
             <td>
@@ -270,40 +274,68 @@
 
             <section class="form__section">
               <h3 class="form__section-title">Role and access</h3>
+              <label class="form__field">
+                <span>Department</span>
+                <select v-model="form.department">
+                  <option value="">Select a department</option>
+                  <option v-for="group in departments" :key="group.department" :value="group.department">
+                    {{ group.label }}
+                  </option>
+                </select>
+                <em v-if="errors.department">{{ errors.department[0] }}</em>
+                <em v-if="catalogueError">{{ catalogueError }}</em>
+              </label>
+
+              <!-- Several roles, all in this department (project owner, 2026-10-17). -->
+              <fieldset class="form__field roles">
+                <legend>Roles <i>tick every role they cover</i></legend>
+                <p v-if="!form.department" class="form__hint">Choose a department to see its roles.</p>
+                <div v-else class="roles__list">
+                  <label v-for="role in departmentRoles" :key="role.key" class="privilege role-option">
+                    <input v-model="form.roles" type="checkbox" :value="role.key" >
+                    <span>
+                      <strong>
+                        {{ role.label }}
+                        <span v-if="form.roles.length > 1 && form.main_role === role.key" class="tag tag--main">main</span>
+                      </strong>
+                      <small>{{ role.description }}</small>
+                    </span>
+                  </label>
+                </div>
+                <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
+                <em v-if="errors.additional_staff_roles">{{ errors.additional_staff_roles[0] }}</em>
+              </fieldset>
+
               <div class="form__row">
-                <label class="form__field">
-                  <span>Department</span>
-                  <select v-model="form.department">
-                    <option value="">Select a department</option>
-                    <option v-for="group in departments" :key="group.department" :value="group.department">
-                      {{ group.label }}
-                    </option>
+                <!-- Only asked when there is a choice to make. -->
+                <label v-if="form.roles.length > 1" class="form__field">
+                  <span>Main role</span>
+                  <select v-model="form.main_role">
+                    <option v-for="key in form.roles" :key="key" :value="key">{{ roleLabelOf(key) }}</option>
                   </select>
-                  <em v-if="errors.department">{{ errors.department[0] }}</em>
+                  <small>Where they start after signing in.</small>
                 </label>
 
-                <!-- Role: pick one of the department's roles, or type a custom one. -->
                 <!-- A div, not a label: a click on a suggestion would otherwise
                      refocus the field and reopen the list. -->
                 <div class="form__field">
-                  <label for="staff-role" class="form__label">Role</label>
-                  <ComboInput
-                    id="staff-role"
-                    v-model="form.role"
-                    :options="departmentRoles.map((role) => role.label)"
+                  <label for="staff-custom-role" class="form__label">Custom role <i>optional</i></label>
+                  <input
+                    id="staff-custom-role"
+                    v-model="form.custom_role"
+                    type="text"
                     maxlength="100"
-                    :placeholder="form.department ? 'Choose or type a role' : 'Choose a department first'"
-                    :disabled="!form.department && !form.role"
-                  />
-                  <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
+                    :placeholder="form.department ? 'e.g. Quality Lead' : 'Choose a department first'"
+                    :disabled="!form.department"
+                    @blur="adoptTypedRole"
+                  >
                   <em v-if="errors.custom_role">{{ errors.custom_role[0] }}</em>
-                  <em v-if="catalogueError">{{ catalogueError }}</em>
                 </div>
               </div>
               <p class="form__hint form__hint--role">
-                <template v-if="matchedRole">{{ matchedRole.description }}</template>
-                <template v-else-if="form.role.trim()">
-                  A custom role: it can do what the {{ departmentLabel }} department does, within the privileges ticked below.
+                <template v-if="form.roles.length || form.custom_role.trim()">
+                  They can do everything their roles allow<template v-if="form.custom_role.trim()">, and a custom role can do what the {{ departmentLabel }} department does</template>,
+                  within the privileges ticked below.
                 </template>
                 <template v-else>
                   An Admin or Supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
@@ -397,16 +429,36 @@ const catalogueError = ref('')
 const departmentRoles = computed(() => departments.value.find((group) => group.department === form.department)?.roles ?? [])
 const departmentLabel = computed(() => departments.value.find((group) => group.department === form.department)?.label ?? 'chosen')
 
-/** The predefined role the typed text names, if any — matched on its title. */
-const matchedRole = computed(() => {
-  const typed = form.role.trim().toLowerCase()
+const allRoles = computed(() => departments.value.flatMap((group) => group.roles.map((role) => ({ ...role, department: group.department }))))
 
+function roleLabelOf(key) {
+  return allRoles.value.find((role) => role.key === key)?.label ?? key
+}
+
+/** The listed role a typed name means, if any — matched on its title or key. */
+function roleNamed(text) {
+  const typed = text.trim().toLowerCase()
   if (!typed) return null
+  return allRoles.value.find((role) => role.label.toLowerCase() === typed || role.key === typed) ?? null
+}
 
-  return departments.value
-    .flatMap((group) => group.roles)
-    .find((role) => role.label.toLowerCase() === typed || role.key === typed) ?? null
-})
+/**
+ * A custom role typed as the name of a listed one is that role: tick it
+ * rather than keep a custom "Phlebotomist" beside the real one. One from
+ * another department moves the form there, but only while nothing is ticked.
+ */
+function adoptTypedRole() {
+  const role = roleNamed(form.custom_role)
+  if (!role) return
+
+  if (role.department !== form.department) {
+    if (form.roles.length) return
+    form.department = role.department
+  }
+
+  if (!form.roles.includes(role.key)) form.roles = [...form.roles, role.key]
+  form.custom_role = ''
+}
 
 async function loadCatalogue() {
   try {
@@ -439,15 +491,19 @@ const levelOptions = computed(() => [
   }),
 ])
 
-/** A predefined role is sent as its key; anything else as a custom role. */
+/**
+ * The roles as the server takes them: the main one, the others in the
+ * department's own order, and a custom one by name.
+ */
 function rolePayload() {
-  const typed = form.role.trim()
+  const ordered = departmentRoles.value.map((role) => role.key).filter((key) => form.roles.includes(key))
+  const main = ordered.includes(form.main_role) ? form.main_role : (ordered[0] ?? null)
 
-  if (!typed) return { staff_role: null, custom_role: null }
-
-  return matchedRole.value
-    ? { staff_role: matchedRole.value.key, custom_role: null }
-    : { staff_role: null, custom_role: typed }
+  return {
+    staff_role: main,
+    additional_staff_roles: ordered.filter((key) => key !== main),
+    custom_role: form.custom_role.trim() || null,
+  }
 }
 
 /*
@@ -493,7 +549,8 @@ const bannerKind = ref('success')
 function blankForm() {
   return {
     first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
-    phone: '', employee_id: '', position: '', department: '', role: '',
+    phone: '', employee_id: '', position: '', department: '',
+    roles: [], main_role: '', custom_role: '',
     staff_privileges: [...PRIVILEGE_ORDER], management_level: '',
     account_status: 'active',
   }
@@ -501,12 +558,19 @@ function blankForm() {
 
 const form = reactive(blankForm())
 
-// Picking a predefined role from another department moves the department to it.
-watch(matchedRole, (role) => {
-  if (role) {
-    const home = departments.value.find((group) => group.roles.some((r) => r.key === role.key))
-    if (home) form.department = home.department
-  }
+// One person's roles are all in one department: a new department keeps only
+// the ticked roles that belong to it.
+watch(() => form.department, () => {
+  // Nothing to judge by until the catalogue has loaded.
+  if (!departments.value.length) return
+  const keys = new Set(departmentRoles.value.map((role) => role.key))
+  const kept = form.roles.filter((key) => keys.has(key))
+  if (kept.length !== form.roles.length) form.roles = kept
+})
+
+// The main role is always one of the ticked ones; the first, until chosen.
+watch(() => form.roles, (roles) => {
+  if (!roles.includes(form.main_role)) form.main_role = roles[0] ?? ''
 })
 
 function resetForm() {
@@ -547,7 +611,9 @@ function openEdit(row) {
     employee_id: row.employee_id || '',
     position: row.position || '',
     department: row.department || '',
-    role: row.role_label || '',
+    roles: [...(row.staff_roles ?? (row.staff_role ? [row.staff_role] : []))],
+    main_role: row.staff_role || '',
+    custom_role: row.custom_role || '',
     staff_privileges: [...(row.staff_privileges ?? PRIVILEGE_ORDER)],
     management_level: row.management_level ?? '',
     account_status: row.account_status === 'pending_verification' ? 'active' : row.account_status,
@@ -590,7 +656,7 @@ async function submit() {
 
       showBanner('Account updated.', 'success')
     } else {
-      const { role: _role, ...fields } = form
+      const { roles: _roles, main_role: _main, custom_role: _custom, ...fields } = form
 
       await bloodCenterService.createStaff({
         ...fields,
@@ -1330,6 +1396,38 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   font-weight: 600;
 }
 
+/* The department's roles, as ticks: same cards as the privileges. */
+.roles {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.roles legend {
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.roles legend i { font-style: normal; font-weight: 400; color: var(--rb-text-secondary); }
+
+.roles__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.role-option strong { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+.tag--main {
+  margin-left: 0;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+
+/* A person's other roles, under the main one. */
+.cell-role { margin: 1px 0 0; font-size: 12.5px; color: var(--rb-text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
 .levels {
   border: 0;
   margin: 0;
@@ -1348,7 +1446,8 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
 }
 
 @media (max-width: 560px) {
-  .privileges__grid {
+  .privileges__grid,
+  .roles__list {
     grid-template-columns: 1fr;
   }
 }

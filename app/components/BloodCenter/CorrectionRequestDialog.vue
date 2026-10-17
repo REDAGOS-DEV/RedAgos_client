@@ -107,7 +107,8 @@ const head = computed(() => HEADS[SUBJECTS[props.subject]?.department] ?? null)
 
 // The head's own correction needs nobody else's approval; the server applies
 // it as it is filed.
-const isHead = computed(() => Boolean(head.value) && user.value?.staff_role === head.value.role)
+// The head's role may be any of theirs, not only the main one.
+const isHead = computed(() => Boolean(head.value) && (user.value?.staff_roles ?? []).includes(head.value.role))
 
 const approverText = computed(() => head.value?.title ?? "the department's head")
 

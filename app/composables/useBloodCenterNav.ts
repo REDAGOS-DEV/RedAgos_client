@@ -32,7 +32,8 @@ export interface BloodCenterNavGroup {
 }
 
 /**
- * The abilities that open the collection page, any one of which will do.
+ * The abilities that open the Donation page (the Collection department's
+ * counter), any one of which will do.
  *
  * The counter is one page worked by three roles: the receptionist opens the
  * donation, the physician screens, the chair collects. Shared by the nav item
@@ -56,9 +57,9 @@ export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohemat
  * does; the overview stays one click away in the sidebar.
  */
 const ROLE_HOME: Record<string, string> = {
-  screening_physician: '/blood-center/collection',
-  phlebotomist: '/blood-center/collection',
-  apheresis_specialist: '/blood-center/collection',
+  screening_physician: '/blood-center/donation',
+  phlebotomist: '/blood-center/donation',
+  apheresis_specialist: '/blood-center/donation',
   medical_receptionist: '/blood-center/appointments',
   component_technologist: '/blood-center/laboratory',
   processing_assistant: '/blood-center/laboratory',
@@ -78,7 +79,7 @@ const ROLE_HOME: Record<string, string> = {
  * its department decides.
  */
 const DEPARTMENT_HOME: Record<string, string> = {
-  collection: '/blood-center/collection',
+  collection: '/blood-center/donation',
   // Each laboratory department has its own page. TTI Testing records the
   // serology panel and works its referral list; Processing separates the
   // unit and completes or rejects it.
@@ -113,29 +114,41 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
 }
 
 /*
- * Main first: every department's dashboard, so each person starts from their
- * own. Then each department's working pages, then management, then Account
- * (Settings) at the very bottom.
+ * Overview first: the dashboards, so each person starts from their own. Then
+ * each department's working pages, then management, then Account (Settings)
+ * at the very bottom.
  *
- * Every `requires` is unchanged; only the grouping moved. Group labels for the
- * departments follow Department::label() on the server.
+ * The Donor/Collection department is two groups (owner, 2026-10-16): Donor for
+ * the people, Collection for the donations. Other department group labels
+ * follow Department::label() on the server.
  */
 const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
-    label: 'Main',
+    label: 'Overview',
     items: [
-      // Every department's dashboard first: where each person starts their day.
-      { label: 'Center Overview', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall' },
-      { label: 'Collection', path: '/blood-center/collection', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation screening phlebotomy apheresis' },
+      // The dashboards: where each person starts their day. The centre-wide
+      // one is management's; the Donor/Collection one is the counter's own
+      // (donations.view, held by every role there and no one else).
+      { label: 'Center Dashboard', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall center overview' },
+      { label: 'Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
       { label: 'Issuance', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
     ],
   },
   {
-    label: 'Donor / Collection',
+    label: 'Donor',
     items: [
+      { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donors donor records profile history contact recruitment export remind eligible' },
       { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
-      { label: 'Donors', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donor profile history contact recruitment' },
-      { label: 'Donation Drives', path: '/blood-center/drives', icon: 'heart', requires: 'drives.manage', keywords: 'mobile drive event' },
+    ],
+  },
+  {
+    label: 'Collection',
+    items: [
+      // The list of every visit (project owner, 2026-10-17), and the counter
+      // where a visit is recorded.
+      { label: 'Donations', path: '/blood-center/donations', icon: 'list', requires: 'donations.view', keywords: 'donations records list history visits open in progress bag export' },
+      { label: 'Donation Counter', path: '/blood-center/donation', icon: 'heart', requires: COLLECTION_ABILITIES, keywords: 'donor collection donation counter qr scan walk-in dhq health questionnaire screening phlebotomy apheresis' },
+      { label: 'Blood Donation Drive', path: '/blood-center/drives', icon: 'route', requires: 'drives.manage', keywords: 'mobile drive event donation drives' },
     ],
   },
   {
@@ -207,13 +220,13 @@ const USER_MENU_PATHS = [
   '/blood-center/staff',
 ]
 
-/** Each department's own nav group, so a member's group can be put first. */
-const DEPARTMENT_GROUP: Record<string, string> = {
-  collection: 'Donor / Collection',
-  testing: 'Testing',
-  processing: 'Processing',
-  issuance: 'Issuance',
-  billing: 'Billing',
+/** Each department's own nav groups, so a member's groups can be put first. */
+const DEPARTMENT_GROUPS: Record<string, readonly string[]> = {
+  collection: ['Donor', 'Collection'],
+  testing: ['Testing'],
+  processing: ['Processing'],
+  issuance: ['Issuance'],
+  billing: ['Billing'],
 }
 
 
@@ -225,7 +238,7 @@ export function useBloodCenterNav() {
    *
    * Arranged by role, presentation only (what is visible is still decided by
    * `requires`). An Admin or Supervisor sees the groups in their fixed order;
-   * anyone else sees their own department right after Main.
+   * anyone else sees their own department's groups right after Overview.
    */
   const navGroups = computed<BloodCenterNavGroup[]>(() => {
     const visible = NAV_GROUPS
@@ -234,18 +247,18 @@ export function useBloodCenterNav() {
 
     if (!user.value || user.value.management_level) return visible
 
-    // Main (dashboards) first and Account (Settings) last for everyone; between
-    // them, a staff member's own department comes before the rest.
-    const home = DEPARTMENT_GROUP[user.value.department ?? '']
-    const main = visible.filter((group) => group.label === 'Main')
-    const other = visible.filter((group) => group.label === 'Account')
-    const middle = visible.filter((group) => group.label !== 'Main' && group.label !== 'Account')
+    // Overview (dashboards) first and Account (Settings) last for everyone;
+    // between them, a staff member's own department comes before the rest.
+    const home = DEPARTMENT_GROUPS[user.value.department ?? ''] ?? []
+    const overview = visible.filter((group) => group.label === 'Overview')
+    const account = visible.filter((group) => group.label === 'Account')
+    const middle = visible.filter((group) => group.label !== 'Overview' && group.label !== 'Account')
 
     return [
-      ...main,
-      ...middle.filter((group) => group.label === home),
-      ...middle.filter((group) => group.label !== home),
-      ...other,
+      ...overview,
+      ...middle.filter((group) => home.includes(group.label ?? '')),
+      ...middle.filter((group) => !home.includes(group.label ?? '')),
+      ...account,
     ]
   })
 

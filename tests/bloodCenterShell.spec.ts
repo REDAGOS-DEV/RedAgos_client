@@ -174,7 +174,7 @@ describe('page gutters', () => {
    * flush into the layout edges and fulfillment.vue was full-bleed.
    */
   const PAGES = [
-    'appointments', 'bloodrequests', 'collection', 'dashboard', 'donors',
+    'appointments', 'bloodrequests', 'donation', 'dashboard', 'donors',
     'drives', 'fulfillment', 'inventory', 'reports', 'settings', 'staff',
     'laboratory', 'testing', 'stock-report', 'corrections',
   ]

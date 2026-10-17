@@ -15,6 +15,13 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 export type TransactionStage = 'scan' | 'verified' | 'screening' | 'collection' | 'done'
 
+/**
+ * How the donor reached the counter. A booked donor is scanned and brings the
+ * questionnaire they answered in the Donor Portal; a walk-in is found by name,
+ * email or phone and answers it onsite.
+ */
+export type TransactionArrival = 'qr' | 'walk_in'
+
 export interface TransactionDonor {
   uuid: string
   donor_code: string
@@ -29,6 +36,10 @@ export interface TransactionAppointment {
   status: string
   status_label: string
   event_id: number | null
+  /** When the donor made the booking in the Donor Portal. */
+  booked_at?: string | null
+  /** The mobile drive the booking is for, if any. */
+  event?: { name: string, location: string | null } | null
 }
 
 /**
@@ -47,6 +58,23 @@ export interface QuestionnaireMeta {
   screened_on: string | null
   valid_until: string | null
   consent_captured: boolean
+  /** Where the donor answered it: the Donor Portal or the counter's device. */
+  completed_via?: 'donor_portal' | 'counter' | null
+}
+
+/**
+ * Whether a questionnaire is on file and still within its validity.
+ *
+ * What the physician needs before accepting a donor. A superseded version
+ * still counts: the drawer says so, and the physician asks the rest.
+ */
+export function questionnaireOnFile(meta: QuestionnaireMeta | null | undefined, today: Date = new Date()): boolean {
+  if (!meta?.available) return false
+  if (!meta.valid_until) return true
+
+  const until = new Date(`${meta.valid_until}T23:59:59`)
+
+  return Number.isNaN(until.getTime()) || until >= today
 }
 
 /**
@@ -94,6 +122,7 @@ export function useDonationTransaction() {
   const service = bloodCenterService
 
   const donor = ref<TransactionDonor | null>(null)
+  const arrival = ref<TransactionArrival | null>(null)
   const appointment = ref<TransactionAppointment | null>(null)
   const donation = ref<TransactionDonation | null>(null)
 
@@ -176,9 +205,9 @@ export function useDonationTransaction() {
 
     switch (code) {
       case 'qr_invalid':
-        return 'That QR code is not valid. Ask for the donor’s valid ID instead.'
+        return 'That QR code is not valid. Find the donor by name, email or phone instead.'
       case 'donor_not_found':
-        return 'No donor matches that code. Ask for their valid ID instead.'
+        return 'No donor matches that code. Find them by name, email or phone instead.'
       case 'appointment_not_found':
         return 'That appointment is not booked at this facility.'
       case 'appointment_not_pending':
@@ -198,7 +227,7 @@ export function useDonationTransaction() {
       case 'donor_not_presented':
         return 'This donor has not presented here yet. Open their donation first, then review the questionnaire.'
       case 'questionnaire_not_found':
-        return 'This donor has not completed the health questionnaire in the app.'
+        return 'This donor has not completed the health questionnaire yet.'
       case 'questionnaire_unavailable':
         return 'The questionnaire is temporarily unavailable. Try again shortly.'
       default:
@@ -269,6 +298,7 @@ export function useDonationTransaction() {
     if (!result) return false
 
     donor.value = result.data?.donor ?? null
+    arrival.value = 'qr'
     appointment.value = result.data?.appointment ?? null
     donation.value = result.data?.open_donation ?? null
     questionnaireMeta.value = result.data?.health_questionnaire ?? null
@@ -284,23 +314,25 @@ export function useDonationTransaction() {
   }
 
   /**
-   * Adopt a donor the staff member found by valid ID instead of a scan.
+   * Adopt a walk-in the staff member found by name, email or phone.
    */
   function adoptDonor(
     found: TransactionDonor,
     existing: TransactionAppointment | null = null,
     deferral: PriorDeferral | null = null,
+    reference: QuestionnaireMeta | null = null,
   ) {
     donor.value = found
+    arrival.value = 'walk_in'
     appointment.value = existing
     donation.value = null
     error.value = null
     notice.value = null
 
-    // Found by ID rather than scanned, so there is no pinned screening and no
-    // metadata to draw the strip from. The questionnaire is still reachable --
-    // the server resolves which one -- but only once loadQuestionnaire() asks.
-    questionnaireMeta.value = null
+    // Found by search rather than scanned, so there is no pinned screening. The
+    // lookup carries the same metadata the scan does -- whether one is on file,
+    // never the answers -- and the server resolves which one when asked.
+    questionnaireMeta.value = reference
     questionnaire.value = null
     questionnaireError.value = null
 
@@ -334,6 +366,23 @@ export function useDonationTransaction() {
       const result = await service.donorHealthQuestionnaire(donor.value.uuid, params)
       questionnaire.value = result.data ?? null
 
+      // A donor who answered onsite on another counter's device since this
+      // one found them: the document is the fresher word on what is on file.
+      if (questionnaire.value && !questionnaireMeta.value?.available) {
+        const doc: any = questionnaire.value
+        questionnaireMeta.value = {
+          available: true,
+          screening_id: doc.screening_id ?? null,
+          question_version: doc.question_version ?? null,
+          is_current_version: doc.is_current_version ?? null,
+          question_count: doc.question_count ?? null,
+          screened_on: doc.screened_at ?? null,
+          valid_until: doc.valid_until ?? null,
+          consent_captured: Boolean(doc.consent?.captured),
+          completed_via: doc.completed_via ?? null,
+        }
+      }
+
       return true
     } catch (err: any) {
       questionnaireError.value = messageFor(err)
@@ -341,6 +390,19 @@ export function useDonationTransaction() {
     } finally {
       questionnaireLoading.value = false
     }
+  }
+
+  /**
+   * Take the reference the onsite questionnaire returned.
+   *
+   * Any document already fetched is dropped, so the physician's next open
+   * reads the answers just given rather than the ones before them.
+   */
+  function adoptQuestionnaireReference(reference: QuestionnaireMeta | null) {
+    questionnaireMeta.value = reference
+    questionnaire.value = null
+    questionnaireOpen.value = false
+    questionnaireError.value = null
   }
 
   async function checkIn() {
@@ -426,6 +488,7 @@ export function useDonationTransaction() {
    */
   function reset() {
     donor.value = null
+    arrival.value = null
     appointment.value = null
     donation.value = null
     error.value = null
@@ -440,6 +503,7 @@ export function useDonationTransaction() {
 
   return {
     donor,
+    arrival,
     appointment,
     donation,
     stage,
@@ -457,6 +521,7 @@ export function useDonationTransaction() {
     questionnaireError,
     questionnaireLoading,
     loadQuestionnaire,
+    adoptQuestionnaireReference,
     verifyQr,
     adoptDonor,
     checkIn,

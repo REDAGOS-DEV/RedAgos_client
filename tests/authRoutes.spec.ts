@@ -15,7 +15,7 @@ import { departmentHome } from '~/composables/useBloodCenterNav'
 // tests with no composable context.
 vi.stubGlobal('departmentHome', (user: any) => {
   const homes: Record<string, string> = {
-    collection: '/blood-center/collection',
+    collection: '/blood-center/donation',
     testing: '/blood-center/testing',
     processing: '/blood-center/laboratory',
     issuance: '/blood-center/storage',
@@ -170,7 +170,7 @@ describe('portalHomeFor', () => {
 // enum declares must land somewhere, or its staff would be sent to settings.
 describe('departmentHome', () => {
   it.each([
-    ['collection', '/blood-center/collection'],
+    ['collection', '/blood-center/donation'],
     // Each laboratory department has its own page now.
     ['testing', '/blood-center/testing'],
     ['processing', '/blood-center/laboratory'],
@@ -197,7 +197,7 @@ describe('departmentHome', () => {
     // A receptionist starts at the appointment list; the physician and the
     // chair start at the counter.
     expect(departmentHome({ staff_role: 'medical_receptionist', department: 'collection' })).toBe('/blood-center/appointments')
-    expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/collection')
+    expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/donation')
     expect(departmentHome({ staff_role: 'dispatch_coordinator', department: 'issuance' })).toBe('/blood-center/fulfillment')
   })
 

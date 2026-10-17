@@ -29,7 +29,7 @@ vi.stubGlobal('localStorage', {
   removeItem(k: string) { this.store.delete(k) },
 })
 
-const { useDonationTransaction } = await import('~/composables/useDonationTransaction')
+const { useDonationTransaction, questionnaireOnFile } = await import('~/composables/useDonationTransaction')
 const { bloodCenterService } = await import('~/api/bloodcenter/BloodCenterService')
 
 const DONOR = {
@@ -132,7 +132,7 @@ describe('useDonationTransaction', () => {
     expect(ok).toBe(false)
     expect(tx.donor.value).toBeNull()
     // Staff need to know what to do next, not what the server called it.
-    expect(tx.error.value).toContain('valid ID')
+    expect(tx.error.value).toContain('name, email or phone')
   })
 
   it('names the donation already open rather than refusing blankly', async () => {
@@ -563,5 +563,141 @@ describe('a prior deferral at the counter', () => {
     expect(ok).toBe(false)
     expect(tx.stage.value).toBe('collection')
     expect(tx.error.value).toBe('A collection is already recorded for this donation.')
+  })
+})
+
+/**
+ * The two ways in. A booked donor is scanned and brings the questionnaire they
+ * answered in the Donor Portal; a walk-in is found by name, email or phone and
+ * answers it onsite. Either way the physician may accept only once one is on
+ * file.
+ */
+describe('booked donors and walk-ins', () => {
+  const ONSITE = {
+    available: true,
+    screening_id: 77,
+    question_version: 2,
+    is_current_version: true,
+    question_count: 30,
+    screened_on: '2026-10-16',
+    valid_until: '2027-01-14',
+    consent_captured: true,
+    completed_via: 'counter' as const,
+  }
+
+  it('records how the donor arrived', async () => {
+    fetchMock.mockResolvedValueOnce({ data: { donor: DONOR, appointment: APPOINTMENT, open_donation: null } })
+
+    const scanned = useDonationTransaction()
+    await scanned.verifyQr('raw-token')
+    expect(scanned.arrival.value).toBe('qr')
+
+    const walkIn = useDonationTransaction()
+    walkIn.adoptDonor(DONOR)
+    expect(walkIn.arrival.value).toBe('walk_in')
+
+    walkIn.reset()
+    expect(walkIn.arrival.value).toBeNull()
+  })
+
+  it('takes the questionnaire reference the lookup carries for a walk-in', () => {
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR, null, null, ONSITE)
+
+    expect(tx.questionnaireMeta.value).toEqual(ONSITE)
+    // A reference, not the answers: nothing is fetched until someone asks.
+    expect(tx.questionnaire.value).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('drops a fetched document when the donor answers again onsite', async () => {
+    fetchMock.mockResolvedValueOnce({ data: { screening_id: 51, sections: [] } })
+
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.loadQuestionnaire()
+    tx.questionnaireOpen.value = true
+
+    tx.adoptQuestionnaireReference(ONSITE)
+
+    expect(tx.questionnaireMeta.value).toEqual(ONSITE)
+    expect(tx.questionnaire.value).toBeNull()
+    expect(tx.questionnaireOpen.value).toBe(false)
+  })
+
+  it('learns a questionnaire is on file from the document when it had no reference', async () => {
+    fetchMock.mockResolvedValueOnce({
+      data: {
+        screening_id: 77, question_version: 2, is_current_version: true, question_count: 30,
+        screened_at: '2026-10-16', valid_until: '2027-01-14', consent: { captured: true }, completed_via: 'counter',
+      },
+    })
+
+    const tx = useDonationTransaction()
+    tx.adoptDonor(DONOR)
+    await tx.loadQuestionnaire(true)
+
+    expect(tx.questionnaireMeta.value?.available).toBe(true)
+    expect(tx.questionnaireMeta.value?.screening_id).toBe(77)
+    expect(tx.questionnaireMeta.value?.completed_via).toBe('counter')
+  })
+})
+
+describe('questionnaireOnFile', () => {
+  const today = new Date('2026-10-16T10:00:00')
+
+  it('needs an answered questionnaire', () => {
+    expect(questionnaireOnFile(null, today)).toBe(false)
+    expect(questionnaireOnFile({ available: false } as any, today)).toBe(false)
+  })
+
+  it('counts one still within its validity, through the whole last day', () => {
+    expect(questionnaireOnFile({ available: true, valid_until: '2026-12-01' } as any, today)).toBe(true)
+    expect(questionnaireOnFile({ available: true, valid_until: '2026-10-16' } as any, today)).toBe(true)
+  })
+
+  it('does not count one past its validity date', () => {
+    expect(questionnaireOnFile({ available: true, valid_until: '2026-10-15' } as any, today)).toBe(false)
+  })
+})
+
+describe('BloodCenterService walk-in and questionnaire endpoints', () => {
+  const service = bloodCenterService
+
+  it('searches by POST, so a name never sits in a URL', async () => {
+    fetchMock.mockResolvedValueOnce({ data: [], truncated: false })
+    await service.searchCounterDonors('Ana Cruz')
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe('/blood-center/collection/donor-search')
+    expect(config.method).toBe('POST')
+    expect(config.body).toEqual({ q: 'Ana Cruz' })
+  })
+
+  it('prints from its own read, pinned to the scanned questionnaire', async () => {
+    fetchMock.mockResolvedValueOnce({ data: {} })
+    await service.printableQuestionnaire('donor-uuid', { screening_id: 51 })
+
+    const [url, config] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe('/blood-center/donors/donor-uuid/health-questionnaire/print')
+    expect(config.method).toBe('GET')
+  })
+
+  it('loads the onsite form and records the answers on the donor', async () => {
+    fetchMock.mockResolvedValueOnce({ data: {} })
+    await service.counterQuestionnaireForm('donor-uuid')
+    expect(fetchMock.mock.calls[0]![0]).toBe('/blood-center/donors/donor-uuid/health-questionnaire/form')
+
+    const payload = { question_version: 2, answers: [], consent: { version: 'doh-2023-07', accepted: true } }
+    fetchMock.mockResolvedValueOnce({ data: {} })
+    await service.recordCounterQuestionnaire('donor-uuid', payload)
+
+    const [url, config] = fetchMock.mock.calls[1]!
+
+    expect(url).toBe('/blood-center/donors/donor-uuid/health-questionnaire')
+    expect(config.method).toBe('POST')
+    expect(config.body).toEqual(payload)
   })
 })

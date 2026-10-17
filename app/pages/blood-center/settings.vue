@@ -156,6 +156,7 @@
               </div>
             </div>
             <BloodCenterFacilityLogoCard />
+            <BloodCenterDonorEmailTemplatesCard />
           </section>
 
           <!-- SECURITY -->
@@ -370,6 +371,7 @@ import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
+import BloodCenterDonorEmailTemplatesCard from '~/components/BloodCenter/DonorEmailTemplatesCard.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 definePageMeta({
@@ -449,7 +451,11 @@ const tabs = computed(() => [
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
   ...(canDo('center.configure') ? [{ id: 'center', label: 'Blood Center', icon: 'building-2' }] : []),
 ])
-const activeTab = ref('profile')
+
+// ?tab=center opens a tab directly, as the Donors page's email dialog links to
+// the donor email templates. A tab the viewer cannot see falls back to profile.
+const route = useRoute()
+const activeTab = ref(tabs.value.some((tab) => tab.id === route.query.tab) ? String(route.query.tab) : 'profile')
 
 const AVATAR_COLORS = ['#1565C0', '#2E7D32', '#F57C00', '#D32F2F', '#6D4C41', '#5E35B1']
 
