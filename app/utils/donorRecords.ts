@@ -100,7 +100,7 @@ export type DonorBadgeTone = 'ok' | 'info' | 'warn' | 'crit' | 'neutral'
 interface StandingLike {
   eligibility?: string | null
   next_eligible_date?: string | null
-  deferral?: { kind?: string | null, outcome_label?: string | null, recorded_on?: string | null } | null
+  deferral?: { kind?: string | null, outcome_label?: string | null, recorded_on?: string | null, ends_on?: string | null } | null
 }
 
 const DEFERRAL_HINT: Record<string, string> = {
@@ -119,11 +119,16 @@ export function eligibilityBadge(row: StandingLike): { key: string, label: strin
   if (row.eligibility === 'deferred') {
     const kind = row.deferral?.kind ?? ''
     const since = row.deferral?.recorded_on ? ` since ${formatShortDate(row.deferral.recorded_on)}` : ''
+    // One recorded on the Deferrals page says when it ends; a screening's
+    // holds until the donor is screened again.
+    const hint = kind === 'temporary' && row.deferral?.ends_on
+      ? `Temporarily deferred until ${formatShortDate(row.deferral.ends_on)}`
+      : `${DEFERRAL_HINT[kind] ?? 'Deferred'}${since}`
     return {
       key: 'deferred',
       label: 'Deferred',
       tone: kind === 'temporary' ? 'warn' : 'crit',
-      hint: `${DEFERRAL_HINT[kind] ?? 'Deferred'}${since}`,
+      hint,
     }
   }
 

@@ -134,6 +134,35 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/serology`, 'POST', payload)
   }
 
+  /**
+   * A technologist's reactive panel waits for the Laboratory Supervisor:
+   * verifying it rejects the donation, defers and refers the donor; returning
+   * it clears the panel for re-entry. Both need `lab.verify_serology`.
+   */
+  async verifySerology(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/serology/verify`, 'POST')
+  }
+
+  async returnSerology(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/serology/return`, 'POST')
+  }
+
+  /**
+   * Every serology panel recorded at this centre, marker by marker (TTI
+   * Testing only). Each row says whether it can still be corrected.
+   */
+  async serologyResults(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/serology-results`, 'GET', params)
+  }
+
+  async exportSerologyResults(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/laboratory/serology-results/export${query ? `?${query}` : ''}`)
+  }
+
   /** Donors with a reactive result the Testing department must follow up. */
   // --- Correction requests ---
   //
@@ -188,6 +217,16 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/laboratory/referrals/${referralId}`, 'PATCH', payload)
   }
 
+  /** How many referrals nobody has acted on, for the sidebar. Not audited, unlike the list. */
+  async counsellingReferralsSummary(): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals/summary`, 'GET')
+  }
+
+  /** The mail icon: ask the donor to contact the centre, by email (if any) and in the app. */
+  async requestReferralContact(referralId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/referrals/${referralId}/contact-request`, 'POST')
+  }
+
   async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/components`, 'POST', payload)
   }
@@ -195,6 +234,19 @@ class BloodCenterService extends BaseService {
   /** Clear for issue, or reject. The only two outcomes the laboratory may set. */
   async updateLaboratoryStatus(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/status`, 'PATCH', payload)
+  }
+
+  /** Processing's Processed list: every donation with a recorded breakdown, where it is handed over. */
+  async processedDonations(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/laboratory/processed`, 'GET', params)
+  }
+
+  async exportProcessedDonations(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/laboratory/processed/export${query ? `?${query}` : ''}`)
   }
 
   // --- Donor management (Collection department) ---
@@ -261,6 +313,24 @@ class BloodCenterService extends BaseService {
   /** template: 'thank_you' | 'eligibility_reminder' */
   async emailDonor(uuid: string, template: string): Promise<any> {
     return this.request(`${this.resource}/donors/${uuid}/email`, 'POST', { template })
+  }
+
+  // --- Deferrals ---
+  // Deferrals recorded on a donor by hand, outside a visit's screening. Every
+  // other screen hears of them through the donor's standing, never from here.
+
+  /** Paginated, this centre's own (donors.view_clinical). Filters: search, status (active | expired | lifted). */
+  async deferrals(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/deferrals`, 'GET', params)
+  }
+
+  /** { donor_uuid, outcome, reason, deferred_on, ends_on }. ends_on counts only for temporarily_deferred. */
+  async recordDeferral(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/deferrals`, 'POST', payload)
+  }
+
+  async liftDeferral(id: number, reason: string): Promise<any> {
+    return this.request(`${this.resource}/deferrals/${id}/lift`, 'POST', { reason })
   }
 
   // The centre's donor email wording, kept in Settings (center.configure).
@@ -644,6 +714,15 @@ class BloodCenterService extends BaseService {
     return this.request('/blood-center/blood-requests', 'GET', params)
   }
 
+  /** The queue as CSV, with the list's filters (search, status/open, from, to). */
+  async exportIncomingRequests(params: Record<string, any> = {}): Promise<Blob> {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => [k, String(v)]),
+    ).toString()
+
+    return this.requestBlob(`${this.resource}/blood-requests/export${query ? `?${query}` : ''}`)
+  }
+
   /** Queue counters for the dashboard. */
   async incomingRequestsSummary(): Promise<any> {
     return this.request('/blood-center/blood-requests/summary', 'GET')
@@ -678,13 +757,32 @@ class BloodCenterService extends BaseService {
     id: number | string,
     quantity?: number,
     requestItemId?: number,
+    unitIds?: string[],
   ): Promise<any> {
-    const payload: Record<string, number> = {}
+    const payload: Record<string, number | string[]> = {}
 
     if (quantity) payload.quantity = quantity
     if (requestItemId) payload.request_item_id = requestItemId
+    // The bags staff picked: held exactly, or the pick is refused unit by unit.
+    if (unitIds?.length) payload.unit_ids = unitIds
 
     return this.request(`/blood-center/blood-requests/${id}/allocate`, 'POST', payload)
+  }
+
+  /**
+   * The referral slip for a watcher: the patient's request and what is still
+   * needed from another blood centre. Audited on the server, as it is printed.
+   */
+  async referralSlip(id: number | string): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/referral-slip`, 'GET')
+  }
+
+  /**
+   * The units staff may pick for each line of a request, first-expiring first.
+   * Reading holds nothing.
+   */
+  async requestUnits(id: number | string): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/units`, 'GET')
   }
 
   /** Refuse a request. The reason is required and reaches the requester. */
@@ -731,9 +829,9 @@ class BloodCenterService extends BaseService {
   // ---------------------------------------------------------------------
   // Walk-in Patient Transfusion requests.
   //
-  // A watcher who came to the centre instead of the hospital blood bank.
-  // Issuance phones the hospital and records the request only once the
-  // hospital confirms it; a "no" is never sent.
+  // A watcher who came to the centre instead of the hospital blood bank,
+  // recorded on the hospital's behalf. The phone confirmation was dropped
+  // on 2026-10-19.
   // ---------------------------------------------------------------------
 
   /** Hospitals, components, indications and ID types for the walk-in form. */
@@ -747,7 +845,8 @@ class BloodCenterService extends BaseService {
    * A POST so the patient's name never sits in a URL or an access log.
    */
   async checkWalkInDuplicates(criteria: {
-    hospital_id: number
+    hospital_id?: number | null
+    hospital_name?: string | null
     patient_surname?: string | null
     patient_first_name?: string | null
     blood_type_id?: number | null
@@ -756,7 +855,7 @@ class BloodCenterService extends BaseService {
     return this.request('/blood-center/blood-requests/walk-in/duplicates', 'POST', criteria)
   }
 
-  /** Record a walk-in the hospital has confirmed by phone. */
+  /** Record a walk-in a watcher brought. */
   async createWalkInRequest(payload: CreateWalkInPayload): Promise<{ message: string; request: BloodRequest }> {
     return this.request('/blood-center/blood-requests/walk-in', 'POST', payload)
   }
@@ -785,7 +884,9 @@ class BloodCenterService extends BaseService {
    *
    * Zero-rates the statement and clears the request for release without
    * recording a payment, because none was taken. Money already collected is
-   * left alone.
+   * left alone. The response carries the hospital's Statement of Account
+   * issued with it (`statement`). Issuance applies it at the point of issue
+   * (billing.subsidise, project owner 2026-10-19).
    */
   async applySubsidy(requestId: number | string, reason?: string): Promise<any> {
     return this.request(

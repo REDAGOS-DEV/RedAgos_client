@@ -144,6 +144,22 @@ describe('the donation barcode', () => {
   })
 })
 
+describe('the printed label', () => {
+  const sheet = source('app/components/BloodCenter/BagLabelSheet.vue')
+
+  it('prints on a 100 × 150 mm waybill page, not A4 (project owner, 2026-10-19)', () => {
+    expect(sheet).toMatch(/@page bag-label \{\s*size: 100mm 150mm;/)
+    expect(sheet).toContain('page: bag-label;')
+    expect(sheet).toMatch(/\.bag-label \{[^}]*width: 100mm;[^}]*height: 150mm;/)
+  })
+
+  it('carries a QR of its own unit or bag number, built before the print dialog opens', () => {
+    expect(sheet).toContain("QRCode.create(String(text), { errorCorrectionLevel: 'M' })")
+    expect(sheet).toContain(':d="qrFor(label.unit_id).path"')
+    expect(sheet).toContain(':d="qrFor(label.bag_number).path"')
+  })
+})
+
 describe('where labelling happens', () => {
   it('releases and prints final labels at Stock Intake', () => {
     const intake = source('app/pages/blood-center/inventory-intake.vue')
@@ -163,9 +179,12 @@ describe('where labelling happens', () => {
   it('keeps Processing to the base label and the hand-over', () => {
     const processing = source('app/pages/blood-center/laboratory.vue')
 
-    expect(processing).toContain('Hand-over to Issuance')
     expect(processing).not.toContain('Labeling &amp; hand-over')
     expect(processing).toContain("printLabels(phaseOneLabels.value, 'base')")
+    // The hand-over itself moved to the Processed list (project owner, 2026-10-19).
+    expect(processing).toContain('View or edit on the Processed list')
+    expect(processing).not.toContain('Next: hand-over to Issuance')
+    expect(source('app/pages/blood-center/processed.vue')).toContain('Hand over to Issuance')
   })
 
   it('books a numbered bag without sending a unit number', () => {

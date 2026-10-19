@@ -10,36 +10,10 @@
       </div>
     </header>
 
-    <div class="tabs" role="tablist" aria-label="Testing">
-      <button
-        type="button"
-        role="tab"
-        class="tab"
-        :class="{ 'tab--on': tab === 'queue' }"
-        :aria-selected="tab === 'queue'"
-        @click="switchTab('queue')"
-      >
-        Testing queue
-      </button>
-      <button
-        v-if="canSeeReferrals"
-        type="button"
-        role="tab"
-        class="tab"
-        :class="{ 'tab--on': tab === 'referrals' }"
-        :aria-selected="tab === 'referrals'"
-        @click="switchTab('referrals')"
-      >
-        Counselling referrals
-        <span v-if="pendingReferrals" class="tab__badge">{{ pendingReferrals }}</span>
-      </button>
-    </div>
-
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
     <!-- ============================ TESTING QUEUE ============================ -->
-    <template v-if="tab === 'queue'">
       <section v-if="!selected" class="card">
         <div class="card__head">
           <div>
@@ -120,7 +94,11 @@
                 <AssetIcon v-if="row.clearances?.immunohematology" name="check" :size="11" />
                 Typing
               </span>
-              <span class="chip" :class="row.clearances?.tti ? 'chip--done' : ''">
+              <span v-if="row.serology?.awaiting_verification" class="chip chip--wait" title="Saved as reactive, waiting for the Laboratory Supervisor">
+                <AssetIcon name="clock" :size="11" />
+                Serology awaiting verification
+              </span>
+              <span v-else class="chip" :class="row.clearances?.tti ? 'chip--done' : ''">
                 <AssetIcon v-if="row.clearances?.tti" name="check" :size="11" />
                 Serology
               </span>
@@ -187,9 +165,9 @@
 
           <div class="actions">
             <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
-            <button v-if="isReactive && canSeeReferrals" type="button" class="btn" @click="switchTab('referrals')">
-              Open Counselling referrals
-            </button>
+            <NuxtLink v-if="isReactive && canSeeReferrals" to="/blood-center/counselling-referrals" class="btn">
+              Open Counselling Referrals
+            </NuxtLink>
           </div>
         </section>
 
@@ -288,20 +266,39 @@
           <section v-if="canSerology" class="card card--serology">
             <div class="card__titles">
               <h2 class="card__title">Serology</h2>
+              <span v-if="selected.serology?.awaiting_verification" class="pill pill--waiting">Awaiting verification</span>
               <span
-                v-if="selected.serology"
+                v-else-if="selected.serology"
                 class="pill"
                 :class="selected.serology.outcome === 'reactive' ? 'pill--rejected' : 'pill--collected'"
               >
                 {{ selected.serology.outcome_label }}
               </span>
             </div>
+            <div v-if="selected.serology?.awaiting_verification" class="held" role="status">
+              <p>
+                Saved as reactive. It takes effect only when the Laboratory Supervisor verifies it against the bench
+                record. Until then the donation is not rejected, the donor is not deferred and the unit stays in
+                quarantine.
+              </p>
+              <NuxtLink v-if="canVerify" to="/blood-center/serology-results?outcome=awaiting_verification" class="btn btn--primary">
+                <AssetIcon name="shield-check" :size="14" />
+                Verify or return
+              </NuxtLink>
+            </div>
             <p class="card__hint">
               The final reading for each marker, after any repeat testing at the bench. Every marker is required.
             </p>
 
             <div class="panel">
-              <fieldset v-for="marker in markers" :key="marker.value" class="marker" :disabled="isFinal || busy">
+              <!-- Recorded once here. A saved panel is only shown: it is corrected on
+                   Serology Results, and a held one changes only by the supervisor's Return. -->
+              <fieldset
+                v-for="marker in markers"
+                :key="marker.value"
+                class="marker"
+                :disabled="isFinal || busy || Boolean(selected.serology)"
+              >
                 <legend class="marker__name">{{ marker.label }}</legend>
                 <div class="marker__choices">
                   <label
@@ -324,9 +321,12 @@
 
             <p v-if="selected.serology" class="screened">
               Screened by {{ selected.serology.recorded_by || '—' }} · {{ formatDate(selected.serology.recorded_at) }}
+              <template v-if="selected.serology.verified_by && selected.serology.verified_by !== selected.serology.recorded_by">
+                · Verified by {{ selected.serology.verified_by }}
+              </template>
             </p>
 
-            <div v-if="!isFinal" class="actions">
+            <div v-if="!isFinal && !selected.serology" class="actions">
               <button
                 type="button"
                 class="btn"
@@ -334,122 +334,24 @@
                 :disabled="busy || !panelIsComplete"
                 @click="submitSerology"
               >
-                {{ busy ? 'Saving…' : selected.serology ? 'Request correction' : 'Record serology' }}
+                {{ busy ? 'Saving…' : 'Record serology' }}
               </button>
               <span v-if="!panelIsComplete" class="card__hint">Record a reading for all five markers.</span>
-              <span v-else-if="selected.serology" class="card__hint">Saved panels change only with approval.</span>
+            </div>
+
+            <!-- Saved: view it here, change it there, where the Laboratory Supervisor approves it. -->
+            <div v-else-if="selected.serology && !selected.serology.awaiting_verification" class="actions">
+              <NuxtLink :to="`/blood-center/serology-results?donation=${selected.id}`" class="btn">
+                <AssetIcon :name="isFinal ? 'eye' : 'pencil'" :size="14" />
+                {{ isFinal ? 'View in Serology Results' : 'View or edit in Serology Results' }}
+              </NuxtLink>
+              <span v-if="!isFinal" class="card__hint">
+                A saved panel changes only through a correction the Laboratory Supervisor approves there.
+              </span>
             </div>
           </section>
         </div>
       </template>
-    </template>
-
-    <!-- ========================= COUNSELLING REFERRALS ========================= -->
-    <section v-else-if="tab === 'referrals'" class="card">
-      <div class="confidential" role="note">
-        <AssetIcon name="shield-check" :size="16" />
-        <p>
-          Confidential. This list names which infection each donor was reactive for. Per the donor's consent, no result
-          is issued to them — contact them, refer them for counselling and further management, and record what
-          happened.
-        </p>
-      </div>
-
-      <div class="filters" role="group" aria-label="Filter referrals">
-        <button
-          v-for="option in referralFilters"
-          :key="option.value"
-          type="button"
-          class="filter"
-          :class="{ 'filter--on': referralFilter === option.value }"
-          @click="setReferralFilter(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-
-      <p v-if="loadingReferrals" class="card__hint">Loading referrals…</p>
-
-      <div v-else-if="!referrals.length" class="empty">
-        <AssetIcon name="life-buoy" :size="28" />
-        <p>{{ referralFilter === 'open' ? 'No donors are waiting to be followed up.' : 'No referrals match this filter.' }}</p>
-      </div>
-
-      <ul v-else class="referrals">
-        <li v-for="referral in referrals" :key="referral.id" class="referral">
-          <div class="referral__head">
-            <div>
-              <p class="referral__name">{{ referral.donor?.full_name || 'Unknown donor' }}</p>
-              <p class="referral__meta">
-                {{ referral.donor?.donor_code || '—' }}
-                <template v-if="referral.donor?.phone"> · {{ referral.donor.phone }}</template>
-                <template v-if="referral.donor?.email"> · {{ referral.donor.email }}</template>
-              </p>
-              <p v-if="referral.donor?.contact_person" class="referral__meta">
-                Contact person: {{ referral.donor.contact_person }}
-                <template v-if="referral.donor.contact_person_number"> · {{ referral.donor.contact_person_number }}</template>
-              </p>
-            </div>
-            <span class="pill" :class="`pill--ref-${referral.status}`">{{ referral.status_label }}</span>
-          </div>
-
-          <div class="referral__facts">
-            <span v-for="marker in referral.reactive_markers" :key="marker.value" class="chip chip--alarm">
-              {{ marker.label }}
-            </span>
-            <span class="referral__meta">
-              Donation #{{ referral.donation?.id }} · {{ formatDate(referral.donation?.donation_date) }}
-              <template v-if="referral.donation?.donation_barcode"> · Barcode <span class="mono">{{ referral.donation.donation_barcode }}</span></template>
-            </span>
-            <span class="referral__meta">
-              Screened by {{ referral.screened_by || '—' }} · {{ formatDate(referral.screened_at) }}
-            </span>
-          </div>
-
-          <p v-if="referral.note" class="referral__note">
-            {{ referral.note }}
-            <span v-if="referral.updated_by" class="referral__meta">— {{ referral.updated_by }}</span>
-          </p>
-
-          <!-- Moving it on. Forward only; closing needs a note. -->
-          <div v-if="referral.is_open" class="referral__actions">
-            <template v-if="editing?.id === referral.id">
-              <label class="field">
-                <span class="field__label">
-                  Note
-                  <span class="field__optional">{{ editing.status === 'closed' ? 'required to close' : 'optional' }}</span>
-                </span>
-                <textarea v-model="editing.note" class="field__input" rows="2" maxlength="500" />
-              </label>
-              <div class="actions">
-                <button
-                  type="button"
-                  class="btn btn--primary"
-                  :disabled="busy || (editing.status === 'closed' && !editing.note.trim())"
-                  @click="submitReferral"
-                >
-                  {{ busy ? 'Saving…' : `Mark ${statusLabel(editing.status).toLowerCase()}` }}
-                </button>
-                <button type="button" class="btn" :disabled="busy" @click="editing = null">Cancel</button>
-              </div>
-            </template>
-
-            <div v-else class="actions">
-              <button
-                v-for="next in nextStatuses(referral.status)"
-                :key="next"
-                type="button"
-                class="btn"
-                :disabled="busy"
-                @click="startReferralUpdate(referral, next)"
-              >
-                {{ next === 'closed' ? 'Close…' : `Mark ${statusLabel(next).toLowerCase()}` }}
-              </button>
-            </div>
-          </div>
-        </li>
-      </ul>
-    </section>
 
     <BloodCenterCorrectionRequestDialog
       v-if="correction && selected"
@@ -478,20 +380,34 @@
           Record a reactive result?
         </h2>
         <div id="reactive-body" class="dialog__body">
-          <p>
-            Reactive for <strong>{{ pendingReactive.join(', ') }}</strong>. Saving this will:
-          </p>
-          <ul>
-            <li>reject the donation, so it can never become stock;</li>
-            <li>permanently defer the donor at every blood centre;</li>
-            <li>add the donor to Counselling referrals;</li>
-            <li>ask the donor, without saying why, to contact the centre.</li>
-          </ul>
-          <p>It cannot be undone here. Check the readings against the bench record first.</p>
+          <template v-if="canVerify">
+            <p>
+              Reactive for <strong>{{ pendingReactive.join(', ') }}</strong>. As the Laboratory Supervisor, your entry
+              is verified as you save it. Saving this will:
+            </p>
+            <ul>
+              <li>reject the donation, so it can never become stock;</li>
+              <li>permanently defer the donor at every blood centre;</li>
+              <li>add the donor to Counselling referrals, where you send them a contact request.</li>
+            </ul>
+            <p>It cannot be undone here. Check the readings against the bench record first.</p>
+          </template>
+          <template v-else>
+            <p>
+              Reactive for <strong>{{ pendingReactive.join(', ') }}</strong>. Saving this sends it to the Laboratory
+              Supervisor, who checks it against the bench record. Nothing happens until they verify it. Then:
+            </p>
+            <ul>
+              <li>the donation is rejected, so it can never become stock;</li>
+              <li>the donor is permanently deferred at every blood centre;</li>
+              <li>the donor is added to Counselling referrals.</li>
+            </ul>
+            <p>If the reading is wrong, the supervisor returns it to be entered again.</p>
+          </template>
         </div>
         <div class="actions">
           <button type="button" class="btn btn--danger" :disabled="busy" @click="confirmReactive">
-            {{ busy ? 'Saving…' : 'Confirm reactive result' }}
+            {{ busy ? 'Saving…' : (canVerify ? 'Confirm reactive result' : 'Save for verification') }}
           </button>
           <button type="button" class="btn" :disabled="busy" @click="confirmingReactive = false">Go back</button>
         </div>
@@ -517,8 +433,10 @@ import {
 } from '~/utils/serology'
 
 /**
- * The testing page: Section II's Immunohematology and Serology tables, and the
- * follow-up the donor consented to in Section I-C.
+ * The testing page: Section II's Immunohematology and Serology tables.
+ *
+ * The Serology Results list and the Counselling Referrals follow-up are pages
+ * of their own in the sidebar (project owner, 2026-10-18).
  *
  * One page for two departments. Immunohematology records the typing and TTI
  * Testing the serology panel; each card shows only to the role that records
@@ -537,13 +455,18 @@ definePageMeta({
 })
 
 const route = useRoute()
-const { user, can } = useUser()
-const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+const { can } = useUser()
 const canSeeReferrals = computed(() => can('lab.referrals'))
+
+// The sidebar counts referrals and results waiting for verification; a saved
+// result can change both.
+const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 
 // Two departments, one page: TTI Testing records serology, Immunohematology
 // types the unit. Each card shows only to the role that records it.
 const canSerology = computed(() => can('lab.record_serology'))
+// The second person on a reactive result: the Laboratory Supervisor.
+const canVerify = computed(() => can('lab.verify_serology'))
 const canType = computed(() => can('lab.record_immunohematology'))
 
 // --- which test's queue is on screen (?test=typing | serology, from the sidebar) ---
@@ -589,7 +512,6 @@ const viewCopy = computed(() => VIEW_COPY[testView.value])
 
 const service = bloodCenterService
 
-const tab = ref('queue')
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
@@ -818,13 +740,8 @@ function confirmReactive() {
 async function saveSerology(confirmed) {
   const panel = serologyPayload(readings, confirmed, markers.value)
 
-  // A saved panel is never saved over: the same values become a correction
-  // request for the Laboratory Supervisor.
-  if (selected.value.serology) {
-    confirmingReactive.value = false
-    correction.value = { subject: 'serology', changes: panel, previous: previousPanel.value }
-    return
-  }
+  // Recorded once. A saved panel is corrected on Serology Results, never here.
+  if (selected.value.serology) return
 
   const res = await run(() => service.recordSerology(selected.value.id, panel))
 
@@ -835,22 +752,12 @@ async function saveSerology(confirmed) {
   adopt(res.data, ['serology'])
   notice.value = res.message ?? null
 
-  if (res.data?.status === 'rejected') loadReferrals()
+  badgeRefresh.value++
 }
 
 // --- corrections --------------------------------------------------------------
 
 const correction = ref(null)
-
-const previousPanel = computed(() => {
-  const saved = selected.value?.serology
-  if (!saved?.markers) return null
-
-  const panel = {}
-  for (const marker of saved.markers) panel[marker.marker] = marker.result
-
-  return panel
-})
 
 async function onCorrectionSent(response) {
   correction.value = null
@@ -859,85 +766,6 @@ async function onCorrectionSent(response) {
   if (response?.data?.status === 'approved' && selected.value) await openDonation(selected.value.id)
 
   notice.value = response?.message ?? 'Correction requested.'
-}
-
-// --- counselling referrals ---------------------------------------------------
-
-const referrals = ref([])
-const pendingReferrals = ref(0)
-const loadingReferrals = ref(false)
-const referralFilter = ref('open')
-const editing = ref(null)
-
-const referralFilters = [
-  { value: 'open', label: 'Open' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'referred', label: 'Referred' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'all', label: 'All' },
-]
-
-const STATUS_ORDER = ['pending', 'contacted', 'referred', 'closed']
-const STATUS_LABELS = { pending: 'Pending', contacted: 'Contacted', referred: 'Referred', closed: 'Closed' }
-
-function statusLabel(status) {
-  return STATUS_LABELS[status] ?? status
-}
-
-/** Forward only, and a step may be skipped. Matches ReferralStatus::canMoveTo. */
-function nextStatuses(status) {
-  return STATUS_ORDER.slice(STATUS_ORDER.indexOf(status) + 1)
-}
-
-async function loadReferrals() {
-  if (!canSeeReferrals.value) return
-
-  loadingReferrals.value = true
-
-  try {
-    const res = await service.counsellingReferrals({ status: referralFilter.value })
-
-    referrals.value = res?.data ?? []
-    pendingReferrals.value = res?.pending_count ?? 0
-  } catch (err) {
-    error.value = messageFor(err)
-  } finally {
-    loadingReferrals.value = false
-  }
-}
-
-function setReferralFilter(value) {
-  referralFilter.value = value
-  editing.value = null
-  loadReferrals()
-}
-
-function startReferralUpdate(referral, status) {
-  editing.value = { id: referral.id, status, note: referral.note ?? '' }
-}
-
-async function submitReferral() {
-  const { id, status, note } = editing.value
-
-  const res = await run(() => service.updateCounsellingReferral(id, {
-    status,
-    note: note.trim() || null,
-  }))
-
-  if (!res) return
-
-  editing.value = null
-  notice.value = res.message ?? null
-  await loadReferrals()
-}
-
-function switchTab(next) {
-  tab.value = next
-  error.value = null
-  notice.value = null
-
-  if (next === 'referrals') loadReferrals()
 }
 
 // --- shared -------------------------------------------------------------------
@@ -976,12 +804,10 @@ function messageFor(err) {
       return err?.data?.message || 'This typing disagrees with the donor’s record. Collection must correct it first.'
     case 'donation_not_found':
       return 'That donation was not found at your facility.'
-    case 'referral_transition_invalid':
-      return err?.data?.message || 'A referral can only move forward.'
-    case 'referral_closed':
-      return 'This referral is closed and can no longer be changed.'
-    case 'referral_not_found':
-      return 'That referral was not found at your facility.'
+    case 'nothing_to_verify':
+      return 'This result is no longer waiting for verification.'
+    case 'verification_pending':
+      return 'This reactive result is waiting for the Laboratory Supervisor, who verifies it or returns it for re-entry.'
     case 'facility_missing':
       return 'This account is not linked to a facility.'
     default:
@@ -1004,14 +830,20 @@ async function run(work) {
 }
 
 onMounted(async () => {
+  // The results and referrals were tabs here. A notification sent before they
+  // moved still links to ?tab=.
+  if (route.query.tab === 'results') {
+    const outcome = typeof route.query.outcome === 'string' ? `?outcome=${encodeURIComponent(route.query.outcome)}` : ''
+    return navigateTo(`/blood-center/serology-results${outcome}`, { replace: true })
+  }
+  if (route.query.tab === 'referrals') return navigateTo('/blood-center/counselling-referrals', { replace: true })
+
   await loadReference()
   await loadQueue()
 
   // Arrived from the Processing page's "Open on the Testing page".
   const linked = Number(route.query.donation)
   if (Number.isInteger(linked) && linked > 0) await openDonation(linked)
-
-  if (canSeeReferrals.value) loadReferrals()
 })
 </script>
 
@@ -1069,45 +901,6 @@ onMounted(async () => {
   background: var(--rb-surface);
   font-size: 12.5px;
   color: var(--rb-text-secondary);
-}
-
-/* --- tabs --- */
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--rb-border);
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.55rem 0.85rem;
-  margin-bottom: -1px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.tab:hover { color: var(--rb-text-primary); }
-.tab--on { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
-
-.tab:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 6px; }
-
-.tab__badge {
-  min-width: 1.25rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--rb-accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
 }
 
 /* --- cards --- */
@@ -1235,6 +1028,13 @@ onMounted(async () => {
   color: var(--rb-success-text);
 }
 
+.chip--wait {
+  border-style: solid;
+  border-color: transparent;
+  background: rgba(var(--rb-warning-rgb), 0.14);
+  color: var(--rb-warning-text);
+}
+
 .chip--alarm {
   border-style: solid;
   border-color: transparent;
@@ -1309,13 +1109,10 @@ onMounted(async () => {
 }
 
 .pill--collected,
-.pill--completed,
-.pill--ref-closed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: transparent; }
-.pill--tested,
-.pill--ref-contacted,
-.pill--ref-referred { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: transparent; }
-.pill--rejected,
-.pill--ref-pending { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
+.pill--completed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: transparent; }
+.pill--tested { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: transparent; }
+.pill--waiting { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); border-color: transparent; }
+.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
 
 /* --- sections --- */
 .references {
@@ -1463,67 +1260,22 @@ onMounted(async () => {
 .outcome--rejected { color: var(--rb-accent-text); }
 .outcome .card__title { color: var(--rb-text-primary); }
 
-/* --- referrals --- */
-.confidential {
+/* --- a reactive result held for verification --- */
+.held {
   display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
   padding: 0.7rem 0.85rem;
   border-radius: 10px;
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
+  border: 1px solid rgba(var(--rb-warning-rgb), 0.4);
   background: rgba(var(--rb-warning-rgb), 0.08);
   color: var(--rb-warning-text);
   font-size: 13px;
   line-height: 1.5;
 }
 
-.confidential p { margin: 0; }
-
-.filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-
-.filter {
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.filter:hover { color: var(--rb-text-primary); }
-.filter--on { background: var(--rb-text-primary); border-color: var(--rb-text-primary); color: var(--rb-surface); }
-.filter:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
-
-.referrals { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
-
-.referral {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.85rem 0.95rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface);
-}
-
-.referral__head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-.referral__name { margin: 0; font-weight: 700; font-size: 15px; color: var(--rb-text-primary); }
-.referral__meta { margin: 0.1rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.referral__facts { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; align-items: center; }
-
-.referral__note {
-  margin: 0;
-  padding: 0.5rem 0.7rem;
-  border-radius: 8px;
-  background: var(--rb-surface-alt);
-  font-size: 13px;
-  color: var(--rb-text-primary);
-}
-
-.referral__actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.held p { margin: 0; flex: 1 1 18rem; }
 
 /* --- confirm dialog --- */
 .dialog-backdrop {
@@ -1561,6 +1313,7 @@ onMounted(async () => {
 }
 
 .dialog__body { font-size: 14px; line-height: 1.55; color: var(--rb-text-primary); }
+
 .dialog__body p { margin: 0 0 0.4rem; }
 .dialog__body ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
 

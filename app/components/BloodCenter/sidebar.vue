@@ -251,7 +251,7 @@ const sidebarShadow = computed(() =>
 const portalLabel = computed(() => user.value?.facility?.facility_name || 'Blood Center')
 
 // // Dev note: pending/urgent counts naka-fetch sa blood center dashboard summary endpoint
-const badgeCounts = ref({ pending: 0, urgent: 0, corrections: 0 })
+const badgeCounts = ref({ pending: 0, urgent: 0, corrections: 0, verification: 0, referrals: 0, handover: 0 })
 
 const badgeStyle = (badge) => {
   const urgent = badge === 'urgent'
@@ -299,6 +299,10 @@ const loadUser = async () => {
     return
   }
 
+  await loadCounts()
+}
+
+const loadCounts = async () => {
   // Each count is loaded on its own, and only for a user who may open the page
   // it sits on, so one refusal or failure never hides the others.
   const counts = []
@@ -318,12 +322,45 @@ const loadUser = async () => {
     }))
   }
 
+  // Serology Results: what waits for the Laboratory Supervisor there, reactive
+  // results to verify and corrections to decide.
+  if (can('lab.verify_serology')) {
+    counts.push(Promise.all([
+      bloodCenterService.serologyResults({ outcome: 'awaiting_verification', per_page: 1 }),
+      bloodCenterService.serologyResults({ outcome: 'correction_pending', per_page: 1 }),
+    ]).then(([waiting, corrections]) => {
+      badgeCounts.value.verification = (waiting?.total ?? 0) + (corrections?.total ?? 0)
+    }))
+  }
+
+  // Counselling Referrals: donors nobody has acted on yet. The summary route,
+  // not the list, which is audited on every read.
+  if (can('lab.referrals')) {
+    counts.push(bloodCenterService.counsellingReferralsSummary().then((summary) => {
+      badgeCounts.value.referrals = summary?.pending_count ?? 0
+    }))
+  }
+
+  // Processed: units with their breakdown recorded, waiting to be handed over
+  // to Issuance. Counted for the one role that hands them over.
+  if (can('lab.update_status') && can('lab.record_components')) {
+    counts.push(bloodCenterService.processedDonations({ status: 'awaiting_handover', per_page: 1 }).then((waiting) => {
+      badgeCounts.value.handover = waiting?.total ?? 0
+    }))
+  }
+
   for (const result of await Promise.allSettled(counts)) {
     if (result.status === 'rejected') console.error(result.reason)
   }
 }
 
 onMounted(loadUser)
+
+// A page that changes what waits (a verification, a referral moved on) bumps
+// this, so the counts follow without a reload: the layout keeps the sidebar
+// mounted across pages.
+const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
+watch(badgeRefresh, () => loadCounts())
 
 const hoveredPath = ref(null)
 

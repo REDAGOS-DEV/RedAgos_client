@@ -62,7 +62,10 @@ export function buildTimeline(request) {
   const steps = [
     {
       key: 'submitted',
-      label: request.is_walk_in ? 'Recorded at blood center — confirmed by phone' : 'Submitted',
+      // "Confirmed by phone" only on a walk-in that was: the step was dropped on 2026-10-19.
+      label: request.is_walk_in
+        ? (request.walk_in?.verification ? 'Recorded at blood center — confirmed by phone' : 'Recorded at blood center')
+        : 'Submitted',
       done: true,
       timestamp: request.request_date,
     },

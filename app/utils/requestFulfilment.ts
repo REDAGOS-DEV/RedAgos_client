@@ -156,6 +156,8 @@ export interface WalkInLine {
 
 export interface WalkInForm {
   hospitalId: number | null
+  /** The hospital's name when it is not in the list (not on RedAgos). */
+  hospitalName: string
   presentedReference: string
   /** The Patient Transfusion Request this walk-in adds this centre's share to. */
   transfusionRequestId: number | null
@@ -180,16 +182,6 @@ export interface WalkInForm {
     idType: string
     idNumber: string
   }
-  verification: {
-    /** The hospital blood bank said yes on the phone. Nothing is saved otherwise. */
-    confirmed: boolean
-    verifierName: string
-    verifierPosition: string
-    verifierContact: string
-    /** A datetime-local value: YYYY-MM-DDTHH:mm, in the counter's own time. */
-    verifiedAt: string
-    notes: string
-  }
   duplicateAcknowledgement: string
 }
 
@@ -197,25 +189,10 @@ export function blankLine(): WalkInLine {
   return { componentId: null, requirementItemId: null, quantity: 1, maxQuantity: null, indicationCode: '', indicationOther: '' }
 }
 
-/** Render a date as a datetime-local input value, in local time. */
-export function toLocalInputValue(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0')
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-/** Read a datetime-local value back as an ISO timestamp the API can compare. */
-export function localInputToIso(value: string): string | null {
-  if (!value) return null
-
-  const parsed = new Date(value)
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-}
-
-export function blankWalkInForm(now: Date = new Date()): WalkInForm {
+export function blankWalkInForm(): WalkInForm {
   return {
     hospitalId: null,
+    hospitalName: '',
     presentedReference: '',
     transfusionRequestId: null,
     transfusionReference: null,
@@ -227,14 +204,6 @@ export function blankWalkInForm(now: Date = new Date()): WalkInForm {
     patientRecordNumber: '',
     lines: [blankLine()],
     representative: { name: '', relationship: '', contact: '', idType: '', idNumber: '' },
-    verification: {
-      confirmed: false,
-      verifierName: '',
-      verifierPosition: '',
-      verifierContact: '',
-      verifiedAt: toLocalInputValue(now),
-      notes: '',
-    },
     duplicateAcknowledgement: '',
   }
 }
@@ -278,7 +247,8 @@ export function clearContinuation(form: WalkInForm): WalkInForm {
   return { ...form, transfusionRequestId: null, transfusionReference: null, lines: [blankLine()] }
 }
 
-export type WalkInStep = 'lookup' | 'verify' | 'details'
+// The hospital-confirmation step was removed (project owner, 2026-10-19).
+export type WalkInStep = 'lookup' | 'details'
 
 function blank(value: unknown): boolean {
   return value === null || value === undefined || String(value).trim() === ''
@@ -295,33 +265,14 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
   const continuing = form.transfusionRequestId !== null
 
   if (step === 'lookup') {
-    if (!form.hospitalId) problems.push("Choose the patient's hospital blood bank.")
+    if (!form.hospitalId && blank(form.hospitalName)) problems.push("Choose the patient's hospital blood bank.")
 
+    // The four the first step requires (project owner, 2026-10-19); the
+    // reference on the watcher's paperwork is optional.
     if (!continuing) {
       if (blank(form.patient.surname)) problems.push('Enter the patient surname.')
       if (blank(form.patient.firstName)) problems.push('Enter the patient first name.')
-    }
-
-    return problems
-  }
-
-  if (step === 'verify') {
-    if (!form.verification.confirmed) {
-      problems.push('A walk-in request can only be recorded once the hospital blood bank has confirmed it.')
-
-      return problems
-    }
-
-    if (blank(form.verification.verifierName)) problems.push('Enter who at the hospital confirmed the request.')
-    if (blank(form.verification.verifierPosition)) problems.push('Enter their position.')
-    if (blank(form.verification.verifierContact)) problems.push('Enter the number you called.')
-
-    const at = localInputToIso(form.verification.verifiedAt)
-
-    if (!at) {
-      problems.push('Enter when the hospital confirmed the request.')
-    } else if (new Date(at).getTime() > Date.now() + 5 * 60 * 1000) {
-      problems.push('The confirmation cannot be in the future.')
+      if (!form.bloodTypeId) problems.push('Select the blood type required.')
     }
 
     return problems
@@ -381,16 +332,14 @@ function optional(value: string | null | undefined): string | null {
 
 /**
  * The payload POST /blood-center/blood-requests/walk-in takes.
- *
- * `verification.confirmed` is always true here: the dialog only reaches this
- * after the hospital said yes, and a "no" leaves nothing to send.
  */
 export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
   const continuing = form.transfusionRequestId !== null
   const lines = form.lines.filter((line) => line.componentId !== null || line.requirementItemId !== null)
 
   const payload: CreateWalkInPayload = {
-    hospital_id: Number(form.hospitalId),
+    // One or the other: the hospital chosen, or the name of one not on RedAgos.
+    ...(form.hospitalId ? { hospital_id: Number(form.hospitalId) } : { hospital_name: form.hospitalName.trim() }),
     urgency_level: form.urgency,
     presented_reference: optional(form.presentedReference),
     attending_physician: optional(form.attendingPhysician),
@@ -410,14 +359,6 @@ export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
       contact: form.representative.contact.trim(),
       id_type: optional(form.representative.idType),
       id_number: optional(form.representative.idNumber),
-    },
-    verification: {
-      confirmed: true,
-      verifier_name: form.verification.verifierName.trim(),
-      verifier_position: form.verification.verifierPosition.trim(),
-      verifier_contact: form.verification.verifierContact.trim(),
-      verified_at: localInputToIso(form.verification.verifiedAt) ?? '',
-      notes: optional(form.verification.notes),
     },
     duplicate_acknowledgement: optional(form.duplicateAcknowledgement),
   }

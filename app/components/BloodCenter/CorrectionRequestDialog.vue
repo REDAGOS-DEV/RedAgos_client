@@ -141,6 +141,7 @@ const REFUSALS = {
   correction_pending: 'A correction to this record is already waiting for a decision.',
   results_cleared: 'This result has already been cleared and can no longer be corrected.',
   not_correctable: 'A reactive result can never be corrected.',
+  verification_pending: 'This reactive result is waiting for the Laboratory Supervisor, who verifies it or returns it for re-entry.',
   not_your_record: 'Your role does not file corrections to this record.',
   nothing_to_correct: 'Nothing is saved yet — record it directly instead.',
   unit_not_editable: 'This unit can no longer be edited. An expired unit takes a new expiry date only.',

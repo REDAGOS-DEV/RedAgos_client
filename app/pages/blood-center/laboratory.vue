@@ -4,8 +4,8 @@
       <div>
         <h1 class="laboratory__title">Processing</h1>
         <p class="laboratory__subtitle">
-          Record what each unit was separated into, then clear it for issue or reject it. Testing's outcome shows here
-          as it is recorded.
+          Record what each unit was separated into and print its base labels. A processed unit moves to the Processed
+          list, where it is handed over to Issuance. Testing's outcome shows here as it is recorded.
         </p>
       </div>
     </header>
@@ -64,7 +64,10 @@
           <AssetIcon :name="statusFilter ? 'search-x' : 'circle-check-big'" :size="18" />
           <p>
             <template v-if="statusFilter">Nothing matches this filter yet.</template>
-            <template v-else>All caught up. Donations appear here once the counter records a collection.</template>
+            <template v-else>
+              All caught up. Donations appear here once the counter records a collection; processed ones are on the
+              <NuxtLink to="/blood-center/processed" class="queue-empty__link">Processed list</NuxtLink>.
+            </template>
           </p>
         </div>
 
@@ -100,7 +103,7 @@
           <span class="bench__idle-icon"><AssetIcon name="flask-conical" :size="26" /></span>
           <p class="bench__idle-title">Pick a unit to start</p>
           <p class="bench__idle-text">
-            Choose a donation from the list. Its testing outcome, component breakdown and hand-over open here.
+            Choose a donation from the list. Its testing outcome and component breakdown open here.
           </p>
         </div>
 
@@ -175,8 +178,9 @@
 
         <div class="actions">
           <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
-          <NuxtLink v-if="selected.status === 'completed'" to="/blood-center/inventory" class="btn">
-            Go to inventory
+          <!-- Processing does not read inventory (project owner, 2026-10-19): its list says what Issuance booked in. -->
+          <NuxtLink v-if="selected.status === 'completed'" :to="`/blood-center/processed?donation=${selected.id}`" class="btn">
+            View on the Processed list
           </NuxtLink>
         </div>
       </section>
@@ -221,10 +225,14 @@
 
               <div class="fact">
                 <span class="fact__label">Serology</span>
+                <!-- awaiting_verification (a reading Testing has not yet verified) stays neutral. -->
                 <span
                   v-if="selected.serology"
                   class="pill"
-                  :class="selected.serology.outcome === 'reactive' ? 'pill--rejected' : 'pill--collected'"
+                  :class="{
+                    'pill--rejected': selected.serology.outcome === 'reactive',
+                    'pill--collected': selected.serology.outcome === 'non_reactive',
+                  }"
                 >
                   {{ selected.serology.outcome_label }}
                 </span>
@@ -286,8 +294,23 @@
               </span>
             </div>
 
-            <p v-if="!canRecordComponents" class="card__hint">
-              {{ selected.components?.length ? 'Recorded by the Processing department.' : 'Waiting for the Processing department to record the breakdown.' }}
+            <!--
+              A saved breakdown is shown, not edited, here. It is viewed and
+              corrected on the Processed list (project owner, 2026-10-19), as a
+              saved serology panel is on Serology Results.
+            -->
+            <div v-if="selected.components?.length" class="actions">
+              <NuxtLink :to="`/blood-center/processed?donation=${selected.id}&open=edit`" class="btn">
+                <AssetIcon name="pencil" :size="14" />
+                View or edit on the Processed list
+              </NuxtLink>
+              <span class="card__hint">
+                A saved breakdown changes only through a correction the component technologist approves there.
+              </span>
+            </div>
+
+            <p v-else-if="!canRecordComponents" class="card__hint">
+              Waiting for the Processing department to record the breakdown.
             </p>
 
             <template v-else>
@@ -340,39 +363,30 @@
                   :disabled="busy || !validComponents"
                   @click="submitComponents"
                 >
-                  {{ selected.components?.length ? 'Request correction' : 'Record components' }}
+                  Record components
                 </button>
               </div>
-              <p v-if="selected.components?.length" class="card__hint">
-                A saved breakdown changes only with the component technologist's approval.
-              </p>
             </template>
           </section>
         </div>
 
         <!--
-          THE HAND-OVER. Final labelling is not here: it is Issuance's, at Stock
-          Intake, once testing has cleared the donation.
+          THE HAND-OVER is on the Processed list (project owner, 2026-10-19),
+          where a unit waits once its breakdown is recorded; the Processing
+          card links there. Final labelling is not here either: it is
+          Issuance's, at Stock Intake, once testing has cleared the donation.
+
+          A unit that cannot be separated never reaches the Processed list, so
+          it is rejected here.
         -->
-        <section class="card">
-          <h2 class="card__title">Hand-over to Issuance</h2>
+        <section v-if="!hasComponents && canUpdateStatus" class="card">
+          <h2 class="card__title">Cannot be processed?</h2>
           <p class="card__hint">
-            Complete processing to send the bags to Stock Intake, where they are booked into quarantine. Their final
-            labels (verified blood type, expiry, clearance) are printed there once testing clears the donation.
+            Reject a unit that cannot be separated, such as a clotted or leaking bag. Once a breakdown is recorded, the
+            hand-over and any rejection are made on the Processed list.
           </p>
 
-          <ul v-if="blockers.length" class="blockers">
-            <li v-for="blocker in blockers" :key="blocker">
-              <AssetIcon name="circle-alert" :size="14" />
-              {{ blocker }}
-            </li>
-          </ul>
-
-          <p v-if="!canUpdateStatus" class="card__hint">
-            The component technologist completes or rejects this donation.
-          </p>
-
-          <div v-else-if="rejecting" class="defer">
+          <div v-if="rejecting" class="defer">
             <label class="field">
               <span class="field__label">Why is this unit not being issued?</span>
               <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
@@ -386,9 +400,6 @@
           </div>
 
           <div v-else class="actions">
-            <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submitRelease">
-              {{ busy ? 'Saving…' : 'Complete processing' }}
-            </button>
             <button type="button" class="btn btn--danger" :disabled="busy" @click="rejecting = true">
               Reject this unit
             </button>
@@ -399,23 +410,12 @@
       </section>
     </div>
 
-    <BloodCenterCorrectionRequestDialog
-      v-if="correction"
-      :donation-id="selected.id"
-      subject="components"
-      :changes="correction"
-      :previous="previousBreakdown"
-      @close="correction = null"
-      @submitted="onCorrectionSent"
-    />
-
     <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
@@ -426,8 +426,10 @@ import { baseLabelsFrom } from '~/utils/bagLabels'
  *
  * The counter leaves every donation at `collected`; the Testing department
  * records immunohematology and serology on its own page, and a donation that
- * passes both becomes `tested`. From there `completed` — *cleared for issue to
- * a patient* — is Processing's to set, here. Testing's work shows on this page
+ * passes both becomes `tested`. Processing records the breakdown here; from
+ * there `completed` — handed over to Issuance — is Processing's to set, on the
+ * Processed list (pages/blood-center/processed.vue, project owner
+ * 2026-10-19), where a processed unit waits. Testing's work shows on this page
  * read-only, as its outcome: which serology marker was reactive never reaches
  * this department. Everything on this page is a record of what a medical
  * technologist found at the bench — nothing here performs or interprets a test.
@@ -440,7 +442,11 @@ definePageMeta({
 })
 
 const { user, can } = useUser()
+const route = useRoute()
 const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+
+// The sidebar counts units waiting for their hand-over; recording a breakdown adds one.
+const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 
 // Processing records the breakdown and makes the final call. A supervisor
 // holds every ability, so can also jump across to the Testing page.
@@ -455,17 +461,17 @@ const queue = ref([])
 const selected = ref(null)
 const components = ref([])
 
-// Empty means the laboratory's own working queue: collected and tested, which
-// is what the endpoint returns when no status is given.
+// Empty means Processing's own working queue: drawn donations with no
+// breakdown yet (stage=processing). A processed one waits on the Processed list.
 const statusFilter = ref('')
 
 // The filter as chips. Same values the select carried; picking one reloads,
 // exactly as the select's @change did.
 const STATUS_OPTIONS = [
-  { value: '', label: 'Awaiting', title: 'Awaiting the laboratory' },
+  { value: '', label: 'Awaiting', title: 'Not yet processed' },
   { value: 'collected', label: 'With Testing', title: 'With Testing, not yet tested' },
   { value: 'tested', label: 'Ready', title: 'Tested, ready for processing' },
-  { value: 'completed', label: 'Cleared', title: 'Cleared for issue' },
+  { value: 'completed', label: 'Handed over', title: 'Handed over to Issuance' },
   { value: 'rejected', label: 'Rejected', title: 'Rejected' },
 ]
 
@@ -535,21 +541,9 @@ const initials = computed(() => donorInitials(selected.value?.donor) || '—')
 const validComponents = computed(() => componentRows.value.length > 0
   && componentRows.value.every(isCompleteBag))
 
-/**
- * What still stands between this donation and completion.
- *
- * Mirrors the server's guardReadyToComplete: only the component breakdown.
- * Test results are not a condition — the bags go into quarantine, and the
- * clearances are what release them.
- */
-const blockers = computed(() => {
-  const list = []
-
-  if (!hasComponents.value) list.push('The component breakdown has not been recorded.')
-
-  return list
-})
-
+// Hand-over is next once the breakdown is recorded: the server's
+// guardReadyToComplete asks for nothing else. Test results are not a
+// condition — the bags go into quarantine, and the clearances release them.
 const steps = computed(() => {
   const done = (ok) => (ok ? 'step--done' : '')
 
@@ -561,7 +555,7 @@ const steps = computed(() => {
       key: 'release',
       index: 4,
       label: 'Hand-over',
-      state: isFinal.value ? 'step--done' : (blockers.value.length ? '' : 'step--current'),
+      state: isFinal.value ? 'step--done' : (hasComponents.value ? 'step--current' : ''),
     },
   ]
 })
@@ -584,7 +578,7 @@ function formatDate(value) {
  * The one line a technologist scanning the queue actually needs.
  */
 function nextStepFor(row) {
-  if (row.status === 'completed') return 'Cleared for issue'
+  if (row.status === 'completed') return 'Handed over'
   if (row.status === 'rejected') return row.rejection_reason || 'Rejected'
   if (row.test_result?.is_legacy) return 'Needs serology from Testing'
   if (row.test_result && !row.test_result.clears_for_issue) return 'Needs rejecting'
@@ -596,7 +590,7 @@ function nextStepFor(row) {
   if (!row.test_result) outstanding.push('testing')
   if (!row.components?.length) outstanding.push('processing')
 
-  return outstanding.length ? `Needs ${outstanding.join(' and ')}` : 'Ready to release'
+  return outstanding.length ? `Needs ${outstanding.join(' and ')}` : 'Hand over on the Processed list'
 }
 
 /**
@@ -683,16 +677,9 @@ function adopt(payload) {
   rejecting.value = false
   rejectReason.value = ''
 
-  if (!payload) return
-
-  // A breakdown recorded before volumes were kept has a count and no
-  // volume; it opens as that many rows, each waiting for its volume.
-  componentRows.value = payload.components?.length
-    ? payload.components.flatMap((c) => Array.from(
-      { length: c.volume_ml ? 1 : Math.max(1, Number(c.quantity) || 1) },
-      () => ({ component_id: c.component_id, volume_ml: c.volume_ml ?? null }),
-    ))
-    : [{ component_id: null, volume_ml: null }]
+  // The form is for a first breakdown only: a saved one is corrected on the
+  // Processed list.
+  componentRows.value = [{ component_id: null, volume_ml: null }]
 }
 
 async function openDonation(id) {
@@ -718,31 +705,10 @@ function addComponentRow() {
   componentRows.value.push({ component_id: null, volume_ml: null })
 }
 
-const correction = ref(null)
-
-const previousBreakdown = computed(() => (selected.value?.components?.length
-  ? { components: selected.value.components.map((c) => ({ component_id: c.component_id, volume_ml: c.volume_ml })) }
-  : null))
-
-async function onCorrectionSent(response) {
-  correction.value = null
-
-  // A head's own correction is applied at once: show the donation as it now stands.
-  if (response?.data?.status === 'approved' && selected.value) await openDonation(selected.value.id)
-
-  notice.value = response?.message ?? 'Correction requested.'
-}
-
 async function submitComponents() {
   const payload = componentRows.value
     .filter(isCompleteBag)
     .map((row) => ({ component_id: row.component_id, volume_ml: Number(row.volume_ml) }))
-
-  // A saved breakdown is never saved over: it becomes a correction request.
-  if (selected.value.components?.length) {
-    correction.value = { components: payload }
-    return
-  }
 
   const res = await run(() => service.declareComponents(selected.value.id, { components: payload }))
 
@@ -750,15 +716,11 @@ async function submitComponents() {
 
   adopt(res.data)
   notice.value = res.message ?? null
-}
 
-async function submitRelease() {
-  const res = await run(() => service.updateLaboratoryStatus(selected.value.id, { status: 'completed' }))
-
-  if (!res) return
-
-  adopt(res.data)
-  notice.value = res.message ?? null
+  // Processed: it leaves this queue for the Processed list, and the sidebar
+  // counts one more unit waiting for its hand-over.
+  badgeRefresh.value++
+  loadQueue()
 }
 
 async function submitReject() {
@@ -776,6 +738,11 @@ async function submitReject() {
 onMounted(async () => {
   await loadReference()
   await loadQueue()
+
+  // ?donation= from the Processed list: a processed unit is off the queue, but
+  // its breakdown is corrected and its labels reprinted here.
+  const wanted = Number(route.query.donation)
+  if (Number.isInteger(wanted) && wanted > 0) await openDonation(wanted)
 })
 </script>
 
@@ -1079,22 +1046,6 @@ onMounted(async () => {
 
 .component-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
 
-.blockers {
-  margin: 0;
-  padding: 0.7rem 0.85rem;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
-  border-radius: 10px;
-  background: rgba(var(--rb-warning-rgb), 0.06);
-  font-size: 13px;
-  color: var(--rb-warning-text);
-}
-
-.blockers li { display: flex; align-items: center; gap: 0.45rem; }
-
 .defer {
   display: flex;
   flex-direction: column;
@@ -1244,6 +1195,7 @@ onMounted(async () => {
 
 .queue-empty { display: flex; align-items: flex-start; gap: 10px; margin: 10px 12px 14px; padding: 12px; border-radius: 10px; background: var(--rb-surface-alt); color: var(--rb-success-text); }
 .queue-empty p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+.queue-empty__link { color: var(--rb-primary-text); font-weight: 600; }
 
 .bench { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 /* The open unit's identity reads as the workbench header, like the other cards. */

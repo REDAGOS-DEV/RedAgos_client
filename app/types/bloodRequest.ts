@@ -129,6 +129,8 @@ export type PaymentAttemptStatus =
 
 export interface FacilityStub {
   id: number
+  /** False for a hospital known only from a walk-in: no accounts, nobody notified. */
+  is_registered?: boolean
   name: string
   address: string | null
 }
@@ -142,6 +144,8 @@ export interface BloodTypeStub {
 export interface ComponentStub {
   id: number
   name: string | null
+  /** The code on its bag label (PRBC, FFP, PC), where the API sends it. */
+  code?: string | null
 }
 
 export interface RequestAllocation {
@@ -216,7 +220,7 @@ export interface TransfusionRequestStub {
   required: Array<{ transfusion_request_item_id: number; component_id: number; component: string | null; quantity: number }>
 }
 
-/** The watcher who presented a walk-in, and who at the hospital confirmed it. */
+/** The watcher who presented a walk-in, and, on one recorded before 2026-10-19, who at the hospital confirmed it. */
 export interface WalkInDetails {
   representative: {
     name: string
@@ -230,6 +234,7 @@ export interface WalkInDetails {
   attending_physician: string | null
   patient_ward: string | null
   patient_record_number: string | null
+  /** The hospital's phone confirmation: only on walk-ins recorded before 2026-10-19, when the step was removed. */
   verification: {
     method: 'phone'
     verifier_name: string
@@ -238,7 +243,7 @@ export interface WalkInDetails {
     verified_at: string | null
     recorded_by: string | null
     notes: string | null
-  }
+  } | null
   duplicate_acknowledgement: string | null
 }
 
@@ -397,7 +402,8 @@ export interface DuplicateMatch {
 
 /** GET /blood-center/blood-requests/walk-in/reference */
 export interface WalkInReference {
-  hospitals: Array<{ id: number; name: string; address: string | null; phone: string | null }>
+  /** registered is false for a hospital a centre named on an earlier walk-in. */
+  hospitals: Array<{ id: number; name: string; address: string | null; phone: string | null; registered?: boolean }>
   blood_types: Array<{ id: number; code: string; label: string }>
   components: ComponentOption[]
   priorities: Array<{ value: UrgencyLevel; label: string }>
@@ -407,7 +413,9 @@ export interface WalkInReference {
 }
 
 export interface CreateWalkInPayload {
-  hospital_id: number
+  /** The hospital chosen from the list, or hospital_name for one not on RedAgos. */
+  hospital_id?: number
+  hospital_name?: string
   /** Set to add this centre's share to an existing Patient Transfusion Request. */
   transfusion_request_id?: number | null
   urgency_level: UrgencyLevel
@@ -434,14 +442,6 @@ export interface CreateWalkInPayload {
     contact: string
     id_type?: string | null
     id_number?: string | null
-  }
-  verification: {
-    confirmed: true
-    verifier_name: string
-    verifier_position: string
-    verifier_contact: string
-    verified_at: string
-    notes?: string | null
   }
   duplicate_acknowledgement?: string | null
 }

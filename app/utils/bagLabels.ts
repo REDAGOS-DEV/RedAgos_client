@@ -10,9 +10,11 @@
  * The server only gives this for bags already released, so a "cleared" label
  * can never be printed for a bag that is not.
  *
- * Neither prints a barcode: every bag already carries the donation's
- * pre-printed sticker, and the bag number is that sticker plus the component.
- * Neither names the donor.
+ * Both print as a 100 × 150 mm courier-style waybill (project owner,
+ * 2026-10-19), with a QR of the bag or unit number beside it in large type.
+ * No 1-D barcode: every bag already carries the donation's pre-printed
+ * sticker, and the bag number is that sticker plus the component. Neither
+ * names the donor.
  */
 
 export type LabelVariant = 'base' | 'final'

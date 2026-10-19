@@ -203,10 +203,13 @@ describe('the Testing page', () => {
     expect(page).toContain('antibody_screen: typingForm.antibody_screen')
   })
 
-  it('never saves over a saved result: it becomes a correction request', () => {
-    expect(page).toMatch(/if \(selected\.value\.serology\) \{\s*confirmingReactive\.value = false\s*correction\.value = \{ subject: 'serology'/)
+  it('never saves over a saved result: typing becomes a correction, serology is corrected on Serology Results', () => {
     expect(page).toMatch(/if \(selected\.value\.immunohematology\) \{[\s\S]*?subject: 'immunohematology'/)
     expect(page).toContain(':subject="correction.subject"')
+    // A saved panel is only shown here, with the way to where it is changed.
+    expect(page).toContain('if (selected.value.serology) return')
+    expect(page).toContain(':disabled="isFinal || busy || Boolean(selected.serology)"')
+    expect(page).toContain('/blood-center/serology-results?donation=${selected.id}')
   })
 
   it('confirms a reactive panel before saving it', () => {
@@ -224,9 +227,15 @@ describe('the Testing page', () => {
     expect(page).not.toMatch(/typingForm\.blood_type_id\s*=.*donor\?\.blood_type/)
   })
 
-  it('keeps the referral list behind its own ability', () => {
+  it('keeps the referral list behind its own ability, on its own page', () => {
+    const referrals = source('app/pages/blood-center/counselling-referrals.vue')
+    const nav = source('app/composables/useBloodCenterNav.ts')
+
+    expect(referrals).toContain("requires: 'lab.referrals'")
+    expect(nav).toMatch(/label: 'Counselling Referrals', path: '\/blood-center\/counselling-referrals'[^}]*requires: 'lab\.referrals'/)
+    // The testing page only links to it, and only for its holder.
     expect(page).toContain("can('lab.referrals')")
-    expect(page).toMatch(/v-if="canSeeReferrals"[\s\S]*?Counselling referrals/)
+    expect(page).toMatch(/v-if="isReactive && canSeeReferrals" to="\/blood-center\/counselling-referrals"/)
   })
 })
 
@@ -449,7 +458,8 @@ describe('corrections', () => {
   })
 
   it('is reached from every page that saves a correctable record', () => {
-    expect(source('app/pages/blood-center/laboratory.vue')).toContain('subject="components"')
+    // A breakdown is corrected on the Processed list (project owner, 2026-10-19).
+    expect(source('app/pages/blood-center/processed.vue')).toContain("subject: 'components'")
     expect(source('app/pages/blood-center/donation.vue')).toContain('startScreeningCorrection')
     expect(source('app/pages/blood-center/donation.vue')).toContain('startCollectionCorrection')
   })

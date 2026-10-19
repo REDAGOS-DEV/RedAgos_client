@@ -32,14 +32,21 @@ describe('the quarantine panel', () => {
 
 describe('Processing after quarantine', () => {
   const page = source('app/pages/blood-center/laboratory.vue')
+  const processed = source('app/pages/blood-center/processed.vue')
 
-  it('completes on the component breakdown alone', () => {
-    const blockers = page.slice(page.indexOf('const blockers = computed'), page.indexOf('const steps = computed'))
+  it('hands over on the component breakdown alone', () => {
+    // The bench marks the hand-over as next once the breakdown is recorded,
+    // whatever Testing has done.
+    const handover = page.slice(page.indexOf("key: 'release'"), page.indexOf("key: 'release'") + 200)
 
-    expect(blockers).toContain('hasComponents')
-    expect(blockers).not.toContain('hasResult')
-    expect(page).toContain("'Complete processing'")
-    expect(page).not.toContain("'Clear for issue'")
+    expect(handover).toContain('hasComponents')
+    expect(handover).not.toContain('hasResult')
+
+    // The act is on the Processed list, offered on the server's say-so alone.
+    expect(processed).toContain("decide('handover', { status: 'completed' })")
+    expect(processed).toContain(':disabled="!row.can?.hand_over"')
+    expect(processed).not.toContain('clearances?.tti &&')
+    expect(processed).not.toContain("'Clear for issue'")
   })
 
   it('shows which departments have cleared the donation', () => {

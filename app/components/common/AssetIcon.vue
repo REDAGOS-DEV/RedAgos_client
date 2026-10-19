@@ -17,6 +17,7 @@ import arrowLeft from '~/assets/icons/arrow-left.svg?raw'
 import arrowRight from '~/assets/icons/arrow-right.svg?raw'
 import arrowUpRight from '~/assets/icons/arrow-up-right.svg?raw'
 import badgeCheck from '~/assets/icons/badge-check.svg?raw'
+import ban from '~/assets/icons/ban.svg?raw'
 import barChart from '~/assets/icons/bar-chart.svg?raw'
 import bell from '~/assets/icons/bell.svg?raw'
 import bloodDrop from '~/assets/icons/blood-drop.svg?raw'
@@ -121,6 +122,7 @@ import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
+import undo2 from '~/assets/icons/undo-2.svg?raw'
 import unlock from '~/assets/icons/unlock.svg?raw'
 import upload from '~/assets/icons/upload.svg?raw'
 import user from '~/assets/icons/user.svg?raw'
@@ -138,6 +140,7 @@ const icons = {
   'arrow-right': arrowRight,
   'arrow-up-right': arrowUpRight,
   'badge-check': badgeCheck,
+  ban,
   'bar-chart': barChart,
   bell,
   'blood-drop': bloodDrop,
@@ -242,6 +245,7 @@ const icons = {
   truck,
   sun,
   'trash-2': trash,
+  'undo-2': undo2,
   unlock,
   upload,
   user,

@@ -29,6 +29,13 @@ export interface BloodCenterNavItem {
 export interface BloodCenterNavGroup {
   label: string | null
   items: BloodCenterNavItem[]
+  /**
+   * Departments whose staff never see this group, whatever they hold. For a
+   * read a department keeps for one page's sake but should not browse to: the
+   * group is hidden, the ability (and so the page and its endpoint) stays.
+   * An Admin or Supervisor is never hidden from a group this way.
+   */
+  hiddenFrom?: readonly string[]
 }
 
 /**
@@ -119,8 +126,9 @@ export function departmentHome(user: Record<string, any> | null | undefined): st
  * at the very bottom.
  *
  * The Donor/Collection department is two groups (owner, 2026-10-16): Donor for
- * the people, Collection for the donations. Other department group labels
- * follow Department::label() on the server.
+ * the people, Collection for the donations. Issuance's group is headed "Stock
+ * and Supply" (owner, 2026-10-19). Other department group labels follow
+ * Department::label() on the server.
  */
 const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
@@ -131,7 +139,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // (donations.view, held by every role there and no one else).
       { label: 'Center Dashboard', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall center overview' },
       { label: 'Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
-      { label: 'Issuance', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
+      { label: 'Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
     ],
   },
   {
@@ -139,6 +147,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       { label: 'Donor Management', path: '/blood-center/donors', icon: 'users', requires: 'donors.view_contact', keywords: 'donors donor records profile history contact recruitment export remind eligible' },
       { label: 'Appointments', path: '/blood-center/appointments', icon: 'calendar', requires: 'appointments.view', keywords: 'booking schedule walk-in' },
+      // Deferrals recorded on a donor outside a visit (project owner,
+      // 2026-10-18). The list carries reasons, so the clinical record's holder.
+      { label: 'Deferrals', path: '/blood-center/deferrals', icon: 'user-x', requires: 'donors.view_clinical', keywords: 'deferral defer deferred lift temporary permanent indefinite reason ineligible' },
     ],
   },
   {
@@ -157,25 +168,33 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // One page, two views: each department's queue is its own link, gated
       // on that department's write, so a role holding one sees only its own.
       { label: 'Immunohematology', path: '/blood-center/testing?test=typing', icon: 'droplets', requires: 'lab.record_immunohematology', keywords: 'lab laboratory testing immunohematology typing abo rh forward reverse antibody screen barcode sticker' },
-      { label: 'Serology (TTI)', path: '/blood-center/testing?test=serology', icon: 'flask-conical', requires: 'lab.record_serology', keywords: 'lab laboratory testing tti serology hiv hbsag hcv syphilis malaria referral counselling barcode sticker' },
+      { label: 'Serology (TTI)', path: '/blood-center/testing?test=serology', icon: 'flask-conical', requires: 'lab.record_serology', keywords: 'lab laboratory testing tti serology hiv hbsag hcv syphilis vdrl malaria barcode sticker queue record' },
+      // Their own pages (project owner, 2026-10-18; they were tabs on the
+      // Testing page). The badge on each counts what waits for its holder.
+      { label: 'Serology Results', path: '/blood-center/serology-results', icon: 'clipboard-list', badge: 'verification', requires: 'lab.record_serology', keywords: 'tti serology results list reactive non-reactive export csv verify verification correction hiv hbsag hcv syphilis malaria' },
+      { label: 'Counselling Referrals', path: '/blood-center/counselling-referrals', icon: 'life-buoy', badge: 'referrals', requires: 'lab.referrals', keywords: 'counselling referrals reactive donor follow-up contact request email mail notify referred closed' },
     ],
   },
   {
     label: 'Processing',
     items: [
-      { label: 'Component Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation release clear' },
+      { label: 'Component Processing', path: '/blood-center/laboratory', icon: 'package-check', requires: 'lab.record_components', keywords: 'lab laboratory processing components separation breakdown bags label' },
+      // Every unit with its breakdown recorded, where the hand-over to
+      // Issuance is made (project owner, 2026-10-19). The badge counts what
+      // waits for the component technologist to hand over.
+      { label: 'Processed', path: '/blood-center/processed', icon: 'check-check', badge: 'handover', requires: 'lab.record_components', keywords: 'processed list components hand over handover issuance complete release reject bags export csv' },
       // Processing defines the components and how long each keeps; the price
       // is Billing's, under Component Prices.
       { label: 'Blood Components', path: '/blood-center/blood-components', icon: 'flask-conical', requires: 'components.configure', keywords: 'component add new shelf life expiry days code catalogue settings' },
     ],
   },
   {
-    label: 'Issuance',
+    // The Issuance department's pages, headed "Stock and Supply" in the
+    // sidebar (project owner, 2026-10-19). The department keeps its name.
+    label: 'Stock and Supply',
     items: [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
-      { label: 'Stock Thresholds', path: '/blood-center/stock-thresholds', icon: 'sliders-horizontal', requires: 'inventory.view', keywords: 'threshold minimum low stock alert shortage reorder level notification' },
       { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
-      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.stock_report', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
       { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
     ],
@@ -192,12 +211,23 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Price configuration is Billing's alone (the Billing Supervisor).
       { label: 'Component Prices', path: '/blood-center/component-prices', icon: 'sliders-horizontal', requires: 'billing.prices', keywords: 'price pricing component fee charge unit cost peso settings' },
     ],
+    // Not Issuance's (project owner, 2026-10-19). Its officer and dispatch
+    // coordinator keep billing.view, read-only, because Fulfillment reads each
+    // request's statement to say whether it is cleared for release; they just
+    // do not browse Billing's pages.
+    hiddenFrom: ['issuance'],
   },
   {
     label: 'Management',
     items: [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
       { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
+      // These two under Management rather than Stock and Supply (project
+      // owner, 2026-10-19). Their abilities are unchanged, so who sees each is
+      // too: the thresholds are read with inventory.view and set only with
+      // inventory.thresholds, the sheet is read with inventory.stock_report.
+      { label: 'Stock Thresholds', path: '/blood-center/stock-thresholds', icon: 'sliders-horizontal', requires: 'inventory.view', keywords: 'threshold minimum low stock alert shortage reorder level notification' },
+      { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.stock_report', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
       { label: 'Corrections', path: '/blood-center/corrections', icon: 'pencil', badge: 'corrections', requires: 'corrections.request', keywords: 'correction amend mistake approve reject edit request' },
     ],
   },
@@ -225,7 +255,7 @@ const DEPARTMENT_GROUPS: Record<string, readonly string[]> = {
   collection: ['Donor', 'Collection'],
   testing: ['Testing'],
   processing: ['Processing'],
-  issuance: ['Issuance'],
+  issuance: ['Stock and Supply'],
   billing: ['Billing'],
 }
 
@@ -241,7 +271,10 @@ export function useBloodCenterNav() {
    * anyone else sees their own department's groups right after Overview.
    */
   const navGroups = computed<BloodCenterNavGroup[]>(() => {
+    const department = user.value?.management_level ? null : user.value?.department ?? null
+
     const visible = NAV_GROUPS
+      .filter((group) => !(department && group.hiddenFrom?.includes(department)))
       .map((group) => ({ ...group, items: group.items.filter((item) => can(item.requires)) }))
       .filter((group) => group.items.length > 0)
 

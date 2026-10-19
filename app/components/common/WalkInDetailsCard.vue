@@ -1,16 +1,18 @@
 <template>
   <div class="walk-in">
     <p class="walk-in__lead">
-      <AssetIcon name="phone" :size="14" />
+      <AssetIcon :name="walkIn.verification ? 'phone' : 'clipboard-plus'" :size="14" />
       <span>
         Recorded at <strong>{{ centreName || 'the blood center' }}</strong>
         <template v-if="recorderName"> by {{ recorderName }}</template>
-        after the hospital blood bank confirmed it by phone.
+        <template v-if="walkIn.verification"> after the hospital blood bank confirmed it by phone.</template>
+        <template v-else> from the paperwork the watcher brought.</template>
       </span>
     </p>
 
     <div class="walk-in__grid">
-      <section class="walk-in__block">
+      <!-- Only on walk-ins recorded before the confirmation step was removed (2026-10-19). -->
+      <section v-if="walkIn.verification" class="walk-in__block">
         <h4 class="walk-in__heading">Hospital confirmation</h4>
         <dl>
           <div><dt>Confirmed by</dt><dd>{{ walkIn.verification.verifier_name }}</dd></div>
@@ -59,8 +61,9 @@
  * The part of a walk-in request that a portal request never has.
  *
  * The watcher is shown as who presented the request, never as the requester:
- * the hospital blood bank remains the institutional party, and the verifier is
- * the hospital staff member who vouched for it on the phone.
+ * the hospital blood bank remains the institutional party. A walk-in recorded
+ * before 2026-10-19 also names the hospital staff member who vouched for it on
+ * the phone; the project owner removed that step that day.
  */
 
 import { computed } from 'vue'

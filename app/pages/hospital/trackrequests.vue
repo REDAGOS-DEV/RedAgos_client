@@ -163,7 +163,7 @@
         <h2 class="section-title">Source &amp; Patient Transfusion Request</h2>
         <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
           A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
-          it after your blood bank confirmed it by phone.
+          it<template v-if="request.walk_in?.verification"> after your blood bank confirmed it by phone</template><template v-else> on your behalf</template>.
         </p>
         <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
           This is {{ request.target_facility?.name || 'one facility' }}'s share of

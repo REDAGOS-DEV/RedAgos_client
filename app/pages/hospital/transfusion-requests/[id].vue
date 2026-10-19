@@ -189,7 +189,7 @@
             <div><dt>{{ request.is_walk_in ? 'Recorded by' : 'Requested by' }}</dt><dd>{{ request.requester_name || request.recorder_name || '—' }}</dd></div>
             <div>
               <dt>Own stock checked</dt>
-              <dd>{{ request.internal_stock_checked_at ? formatDateTime(request.internal_stock_checked_at) : (request.is_walk_in ? 'Confirmed by phone' : '—') }}</dd>
+              <dd>{{ request.internal_stock_checked_at ? formatDateTime(request.internal_stock_checked_at) : (request.is_walk_in && request.walk_in?.verification ? 'Confirmed by phone' : '—') }}</dd>
             </div>
             <div v-if="request.fulfilled_at"><dt>Fulfilled</dt><dd>{{ formatDateTime(request.fulfilled_at) }}</dd></div>
           </dl>

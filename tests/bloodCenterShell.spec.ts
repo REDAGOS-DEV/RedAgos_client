@@ -176,7 +176,8 @@ describe('page gutters', () => {
   const PAGES = [
     'appointments', 'bloodrequests', 'donation', 'dashboard', 'donors',
     'drives', 'fulfillment', 'inventory', 'reports', 'settings', 'staff',
-    'laboratory', 'testing', 'stock-report', 'corrections',
+    'laboratory', 'testing', 'stock-report', 'corrections', 'serology-results', 'counselling-referrals',
+    'processed', 'storage',
   ]
 
   for (const page of PAGES) {
@@ -188,12 +189,6 @@ describe('page gutters', () => {
       expect(css).toMatch(/padding:\s*24px var\(--rb-gutter, 24px\) 40px/)
     })
   }
-
-  it('the four department dashboards inherit it from their shared shell', () => {
-    const shell = source('app/components/BloodCenter/DepartmentDashboard.vue')
-    expect(shell).toContain('max-width: var(--rb-content-max')
-    expect(shell).toMatch(/padding:\s*24px var\(--rb-gutter, 24px\) 40px/)
-  })
 
   /*
    * A page that also sets min-height:100vh inside a <main> already offset by

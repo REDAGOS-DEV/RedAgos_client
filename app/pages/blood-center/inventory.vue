@@ -1609,9 +1609,11 @@ onBeforeUnmount(() => {
    is kept for state alone (green healthy, amber low, red critical), and only
    on dots, icons, badges and text, never on a card or a panel.
 
-   Light mode reads the app's own tokens. Dark mode points those same tokens
-   at the page's palette, on this page's root only, so the children it hosts
-   (the quarantine panel, the threshold banner) follow without being edited.
+   Both modes read the app's own tokens, so dark mode has the sidebar's navy
+   surfaces (project owner, 2026-10-19; the page had a charcoal palette of
+   its own), and the children it hosts (the quarantine panel, the threshold
+   banner) follow without being edited. Dark mode lifts only the page's
+   state colours and row dividers, on this page's root.
    Teleported dialogs carry the class too. The dark selector sits whole
    inside :global(): Vue compiles `:global(.dark) .x` to plain `.dark`, which
    would declare these tokens on <html> and repaint the whole app. */
@@ -1631,21 +1633,8 @@ onBeforeUnmount(() => {
   --tone: var(--inv-muted);
 }
 :global(.dark .inv-tones) {
-  --rb-page-bg: #0F1115;
-  --rb-surface: #171A1F;
-  --rb-surface-alt: #1D2128;
-  --rb-surface-hover: #1D2128;
-  --rb-border: #2B313A;
-  --rb-border-strong: #2B313A;
-  --rb-border-hover: #3A414C;
-  --rb-text-primary: #F3F4F6;
-  --rb-text-secondary: #9CA3AF;
-  --rb-text-muted: #6B7280;
-  --rb-placeholder: #9CA3AF;
-  --rb-skeleton-a: #171A1F;
-  --rb-skeleton-b: #1D2128;
-  --inv-hover: #22262E;
-  --inv-border-soft: #23272E;
+  /* Row dividers a step softer than the app's #334155 border, on #1E293B. */
+  --inv-border-soft: #263345;
   --inv-ok: #4ADE80;
   --inv-warn: #FBBF24;
   --inv-crit: #F87171;
