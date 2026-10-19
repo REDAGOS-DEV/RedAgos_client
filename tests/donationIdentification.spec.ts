@@ -15,8 +15,9 @@ import path from 'node:path'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 
+// Line endings normalised: a Windows checkout (core.autocrlf) writes CRLF.
 function source(relative: string): string {
-  return readFileSync(path.join(root, relative), 'utf8')
+  return readFileSync(path.join(root, relative), 'utf8').replace(/\r\n/g, '\n')
 }
 
 describe('the Donation page', () => {

@@ -15,7 +15,7 @@
       <div v-else-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ loadError }}</span>
-        <button type="button" class="btn btn--sm" @click="load">Try again</button>
+        <button type="button" class="ui-btn ui-btn--sm" @click="load">Try again</button>
       </div>
 
       <template v-else-if="weekly">
@@ -33,7 +33,7 @@
               for {{ formatDay(weekly.request_day) }}<template v-if="weekly.requester_name">, sent by {{ weekly.requester_name }}</template>.
             </p>
           </div>
-          <button type="button" class="btn" :disabled="refreshing" @click="refresh">
+          <button type="button" class="ui-btn" :disabled="refreshing" @click="refresh">
             <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
             {{ refreshing ? 'Refreshing…' : 'Refresh' }}
           </button>
@@ -306,8 +306,8 @@ function formatDay(value) {
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css; nothing is redeclared here. */
-.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 20px; }
-.rcv-inner { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .back-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; }
 .back-link:hover { text-decoration: underline; }
@@ -334,8 +334,8 @@ function formatDay(value) {
 .stat-card__hint { font-size: 11.5px; color: var(--rb-text-secondary); }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 .panel__head { padding: 16px 16px 8px; }
 .panel__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
@@ -366,15 +366,6 @@ function formatDay(value) {
 
 .list-state { padding: 18px 16px; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit; text-decoration: none;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

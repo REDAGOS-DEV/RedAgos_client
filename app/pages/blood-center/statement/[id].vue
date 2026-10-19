@@ -10,7 +10,7 @@
         </transition-group>
       </div>
 
-      <nav class="crumbs" aria-label="Breadcrumb">
+      <nav class="crumbs">
         <NuxtLink to="/blood-center/billing">Statements</NuxtLink>
         <AssetIcon name="chevron-right" :size="14" />
         <span aria-current="page">{{ statement?.request?.reference_number || 'Statement' }}</span>
@@ -27,8 +27,8 @@
         <h2>This statement could not be opened</h2>
         <p>{{ loadError }}</p>
         <div class="empty-actions">
-          <NuxtLink to="/blood-center/billing" class="btn btn-outline">Back to statements</NuxtLink>
-          <button class="btn btn-primary" @click="loadAll">Try again</button>
+          <NuxtLink to="/blood-center/billing" class="ui-btn">Back to statements</NuxtLink>
+          <button class="ui-btn ui-btn--primary" @click="loadAll">Try again</button>
         </div>
       </div>
 
@@ -36,27 +36,28 @@
         <!-- HEADER: the document, its number and where it stands -->
         <header class="doc-header">
           <div class="doc-heading">
-            <h1 class="page-title">Statement of Account</h1>
+            <h1 class="kicker">Statement of Account</h1>
+            <p class="page-title" :class="{ mono: latestRevision }">{{ latestRevision?.document_number || 'Not issued yet' }}</p>
             <div class="doc-meta">
-              <span class="doc-number mono">{{ latestRevision?.document_number || 'Not issued yet' }}</span>
               <BillingBadge :tone="stamp.tone">{{ statement.status_label }}</BillingBadge>
               <BillingBadge v-if="statement.request?.is_emergency" tone="danger">STAT</BillingBadge>
+              <span v-if="latestRevision" class="doc-meta-text">Revision {{ latestRevision.revision_number }} · issued {{ when(latestRevision.issued_at) }}</span>
             </div>
           </div>
           <div class="header-actions">
-            <button class="btn btn-outline" :disabled="!selectedRevision || printing" @click="printRevision">
+            <button class="ui-btn" :disabled="!selectedRevision || printing" @click="printRevision">
               <AssetIcon name="printer" :size="15" />
               {{ printing ? 'Opening…' : 'Print' }}
             </button>
-            <button class="btn btn-outline" :disabled="!selectedRevision || downloading" @click="downloadRevision">
+            <button class="ui-btn" :disabled="!selectedRevision || downloading" @click="downloadRevision">
               <AssetIcon name="download" :size="15" />
               Download PDF
             </button>
-            <button v-if="canSeePayments" class="btn btn-outline" :disabled="issuing" @click="issueStatement">
+            <button v-if="canSeePayments" class="ui-btn" :disabled="issuing" @click="issueStatement">
               <AssetIcon name="file-text" :size="15" />
               {{ issuing ? 'Issuing…' : latestRevision ? 'Issue updated statement' : 'Issue statement' }}
             </button>
-            <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="btn btn-primary">
+            <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="credit-card" :size="15" />
               Take payment
             </NuxtLink>
@@ -96,40 +97,74 @@
         <section v-if="view === 'printed' && selectedRevision" class="printed">
           <div class="printed-bar">
             <label for="st-revision" class="field-label">Revision</label>
-            <select id="st-revision" v-model="selectedRevisionId" class="input input--select">
-              <option v-for="r in revisions" :key="r.id" :value="r.id">
-                {{ r.document_number }} · Revision {{ r.revision_number }} · {{ when(r.issued_at) }}
-              </option>
-            </select>
+            <div class="printed-select">
+              <SelectField
+                id="st-revision"
+                :model-value="String(selectedRevisionId ?? '')"
+                :options="revisionOptions"
+                icon="file-text"
+                size="sm"
+                @update:model-value="(v) => (selectedRevisionId = Number(v))"
+              />
+            </div>
           </div>
           <BillingDocument :revision="selectedRevision" />
         </section>
 
-        <!-- DETAILS -->
-        <template v-else>
-          <div class="facts-row">
-            <BillingFacts title="Issued by" :rows="issuerRows">
-              <template #lead>
-                <div class="issuer">
-                  <img v-if="issuer.logo_url && !logoFailed" :src="issuer.logo_url" alt="" class="issuer-logo" @error="logoFailed = true">
-                  <span v-else class="monogram" aria-hidden="true">{{ facilityInitials(issuer.name) }}</span>
-                  <strong>{{ issuer.name || 'Blood centre' }}</strong>
+        <!-- DETAILS: the bill on the left, what can be done about it on the right -->
+        <div v-else class="layout">
+          <div class="main-col">
+            <!-- WHO OWES IT, FOR WHAT, AND WHO ISSUED IT -->
+            <section class="card summary" aria-labelledby="billto-title">
+              <div class="summary-head">
+                <p class="cap">{{ weekly ? 'Bill to' : 'Bill to / patient' }}</p>
+                <h2 id="billto-title" class="summary-name">
+                  {{ weekly ? (statement.request?.requesting_facility || 'Requesting hospital') : (statement.request?.patient_name || 'Patient') }}
+                </h2>
+                <p class="summary-sub">
+                  <template v-if="weekly">Requesting hospital</template>
+                  <template v-else-if="statement.request?.requesting_facility">c/o {{ statement.request.requesting_facility }}</template>
+                </p>
+              </div>
+
+              <div class="summary-grid">
+                <dl class="kv-list" :aria-label="weekly ? 'Bill to' : 'Bill to / patient'">
+                  <div v-for="row in shown(billToRows).filter((r) => r.label !== 'Patient' && r.label !== 'Hospital')" :key="row.label" class="kv-row">
+                    <dt>{{ row.label }}</dt>
+                    <dd :class="{ mono: row.mono }">{{ row.value }}</dd>
+                  </div>
+                </dl>
+                <dl class="kv-list" aria-label="Statement details">
+                  <div v-for="row in shown(detailRows)" :key="row.label" class="kv-row">
+                    <dt>{{ row.label }}</dt>
+                    <dd :class="{ mono: row.mono }">{{ row.value }}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <footer class="issuer-strip" aria-label="Issued by">
+                <img v-if="issuer.logo_url && !logoFailed" :src="issuer.logo_url" alt="" class="issuer-logo" @error="logoFailed = true">
+                <span v-else class="monogram" aria-hidden="true">
+                  <template v-if="facilityInitials(issuer.name)">{{ facilityInitials(issuer.name) }}</template>
+                  <AssetIcon v-else name="building-2" :size="16" />
+                </span>
+                <div class="issuer-text">
+                  <p><span class="issuer-label">Issued by</span> <strong>{{ issuer.name || 'Blood centre' }}</strong></p>
+                  <p class="issuer-rows">
+                    <span v-for="row in shown(issuerRows)" :key="row.label">{{ row.label === 'DOH licence' ? `DOH licence ${row.value}` : row.value }}</span>
+                  </p>
                 </div>
-              </template>
-            </BillingFacts>
-            <BillingFacts :title="weekly ? 'Bill to' : 'Bill to / patient'" :rows="billToRows" />
-            <BillingFacts title="Statement details" :rows="detailRows" />
-          </div>
+              </footer>
+            </section>
 
-          <section class="card" aria-labelledby="lines-title">
-            <div class="card-head">
-              <h2 id="lines-title" class="card-title">Blood components</h2>
-              <p class="card-hint">The units held for this request, at this centre's prices.</p>
-            </div>
-            <BillingLines :lines="statement.lines" :totals="totalRows" />
-          </section>
+            <section class="card" aria-labelledby="lines-title">
+              <div class="card-head">
+                <h2 id="lines-title" class="card-title">Blood components</h2>
+                <p class="card-hint">The units held for this request, at this centre's prices.</p>
+              </div>
+              <BillingLines :lines="statement.lines" :totals="totalRows" />
+            </section>
 
-          <div class="split">
             <!-- PAYMENT HISTORY, or a weekly bill's settlement -->
             <section class="card" aria-labelledby="history-title">
               <div class="card-head">
@@ -200,7 +235,7 @@
                             <button
                               v-if="canCorrectPayment && p.can_request_correction && !p.pending_correction && !p.pending_void"
                               type="button"
-                              class="btn btn-ghost btn-sm"
+                              class="ui-btn ui-btn--ghost ui-btn--sm"
                               @click="openPaymentCorrection(p)"
                             >
                               Correct
@@ -208,7 +243,7 @@
                             <button
                               v-if="canVoidPayment && p.can_request_void && !p.pending_correction && !p.pending_void"
                               type="button"
-                              class="btn btn-ghost btn-sm btn-ghost--danger"
+                              class="ui-btn ui-btn--ghost ui-btn--sm btn-ghost--danger"
                               @click="openVoid(p)"
                             >
                               Void
@@ -242,8 +277,8 @@
                               </div>
                               <p v-if="fixError" class="field-error">{{ fixError }}</p>
                               <div class="inline-actions">
-                                <button type="button" class="btn btn-outline btn-sm" @click="closePaymentCorrection">Cancel</button>
-                                <button type="button" class="btn btn-primary btn-sm" @click="reviewPaymentCorrection">Review correction</button>
+                                <button type="button" class="ui-btn ui-btn--sm" @click="closePaymentCorrection">Cancel</button>
+                                <button type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="reviewPaymentCorrection">Review correction</button>
                               </div>
                             </div>
                           </td>
@@ -264,8 +299,8 @@
                               </label>
                               <p v-if="voidError" class="field-error">{{ voidError }}</p>
                               <div class="inline-actions">
-                                <button type="button" class="btn btn-outline btn-sm" :disabled="saving" @click="voidFor = null">Cancel</button>
-                                <button type="button" class="btn btn-danger btn-sm" :disabled="saving || voidReason.length < 3" @click="submitVoid">
+                                <button type="button" class="ui-btn ui-btn--sm" :disabled="saving" @click="voidFor = null">Cancel</button>
+                                <button type="button" class="ui-btn ui-btn--danger ui-btn--sm" :disabled="saving || voidReason.length < 3" @click="submitVoid">
                                   {{ saving ? 'Sending…' : 'Request void' }}
                                 </button>
                               </div>
@@ -278,15 +313,24 @@
                 </div>
               </template>
             </section>
+          </div>
 
+          <aside class="rail">
             <!-- PAYMENT INFORMATION: what is owed, and what can be done about it -->
-            <aside class="card pay-card" aria-labelledby="pay-title">
+            <section class="card pay-card" aria-labelledby="pay-title">
               <h2 id="pay-title" class="card-title">{{ weekly ? 'Hospital settlement' : 'Payment information' }}</h2>
 
               <div class="due" :class="`due--${dueTone}`">
-                <span>{{ dueLabel }}</span>
-                <strong>{{ pesos(weekly ? statement.total_amount : totals.balance) }}</strong>
-                <small>{{ dueNote }}</small>
+                <span class="due-label">{{ dueLabel }}</span>
+                <strong class="due-amount">{{ pesos(weekly ? statement.total_amount : totals.balance) }}</strong>
+                <small v-if="dueNote" class="due-note">{{ dueNote }}</small>
+                <!-- How much of the bill is in: shown only on a patient bill with something to collect. -->
+                <div v-if="paidShare !== null" class="due-meter">
+                  <div class="meter" role="img" :aria-label="`${pesos(totals.paid)} of ${pesos(totals.subtotal)} paid`">
+                    <span :style="{ width: `${paidShare}%` }" />
+                  </div>
+                  <p>{{ pesos(totals.paid) }} of {{ pesos(totals.subtotal) }} paid</p>
+                </div>
               </div>
 
               <dl v-if="lastPayment" class="last-payment">
@@ -299,15 +343,15 @@
               <!-- Patient bill: take the money at the counter, by QR, or waive it. -->
               <template v-if="!weekly && canSeePayments && takes">
                 <div class="pay-actions">
-                  <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="btn btn-primary btn-block">
+                  <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary btn-block">
                     <AssetIcon name="credit-card" :size="15" />
                     Take payment at the counter
                   </NuxtLink>
-                  <button class="btn btn-outline btn-block" @click="checkoutOpen = true">
+                  <button class="ui-btn btn-block" @click="checkoutOpen = true">
                     <AssetIcon name="qr-code" :size="15" />
                     GCash QR
                   </button>
-                  <button v-if="!subsidyOpen" class="btn btn-ghost btn-block" @click="openSubsidy">
+                  <button v-if="!subsidyOpen" class="ui-btn ui-btn--ghost btn-block" @click="openSubsidy">
                     Apply government subsidy
                   </button>
                 </div>
@@ -326,8 +370,8 @@
                   </label>
                   <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
                   <div class="inline-actions">
-                    <button class="btn btn-outline btn-sm" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
-                    <button class="btn btn-primary btn-sm" :disabled="saving" @click="submitSubsidy">
+                    <button class="ui-btn ui-btn--sm" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--sm" :disabled="saving" @click="submitSubsidy">
                       {{ saving ? 'Applying…' : 'Apply subsidy' }}
                     </button>
                   </div>
@@ -345,54 +389,66 @@
                     <input v-model.trim="settlement.settlement_reference" type="text" maxlength="100" class="input mono" placeholder="Cheque or transfer number" required>
                     <span v-if="settlementErrors.settlement_reference" class="field-error">{{ settlementErrors.settlement_reference }}</span>
                   </label>
-                  <label class="field">
-                    <span class="field-label">Date settled</span>
-                    <input v-model="settlement.settled_at" type="date" :max="todayIso" class="input" required>
+                  <div class="field">
+                    <label for="st-settled-at" class="field-label">Date settled</label>
+                    <DatePicker id="st-settled-at" v-model="settlement.settled_at" :max="todayIso" :invalid="Boolean(settlementErrors.settled_at)" aria-label="Date settled" />
                     <span v-if="settlementErrors.settled_at" class="field-error">{{ settlementErrors.settled_at }}</span>
-                  </label>
+                  </div>
                   <label class="field">
                     <span class="field-label">Note <span class="optional">(optional)</span></span>
                     <input v-model.trim="settlement.settlement_note" type="text" maxlength="500" class="input">
                   </label>
                   <p v-if="settlementError" class="field-error">{{ settlementError }}</p>
-                  <button type="submit" class="btn btn-primary btn-block" :disabled="saving || !settlement.settlement_reference">
+                  <button type="submit" class="ui-btn ui-btn--primary btn-block" :disabled="saving || !settlement.settlement_reference">
                     {{ saving ? 'Recording…' : 'Record settlement' }}
                   </button>
                 </form>
               </template>
-            </aside>
-          </div>
+            </section>
 
-          <!-- ISSUED STATEMENTS: each revision frozen as it was handed over -->
-          <section class="card" aria-labelledby="rev-title">
-            <div class="card-head">
-              <h2 id="rev-title" class="card-title">Issued statements</h2>
-              <p class="card-hint">Each statement is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.</p>
-            </div>
-            <div v-if="revisionsLoading" class="skeleton skeleton--row" />
-            <p v-else-if="!revisions.length" class="quiet">
-              No statement issued yet. {{ weekly ? 'Issue one to send this order to the hospital.' : 'Issue one to give the patient or their watcher the amount payable.' }}
-            </p>
-            <ul v-else class="revisions">
-              <li v-for="r in revisions" :key="r.id" class="revision">
-                <div>
-                  <span class="mono strong">{{ r.document_number }}</span>
-                  <span class="sub">Revision {{ r.revision_number }} · {{ when(r.issued_at) }}<template v-if="r.issued_by"> · {{ r.issued_by }}</template></span>
-                </div>
-                <span class="revision-amount">{{ pesos(r.amount_due) }} <small>{{ r.statement_only ? 'billed' : 'due' }}</small></span>
-                <button class="btn btn-ghost btn-sm" @click="showRevision(r)">View</button>
-                <button class="btn btn-ghost btn-sm" :disabled="downloading" @click="downloadRevision(r)">PDF</button>
-              </li>
-            </ul>
-          </section>
+            <!-- ISSUED STATEMENTS: each revision frozen as it was handed over, newest first -->
+            <section class="card" aria-labelledby="rev-title">
+              <div class="card-head">
+                <h2 id="rev-title" class="card-title">Issued statements</h2>
+                <p class="card-hint">Each statement is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.</p>
+              </div>
+              <div v-if="revisionsLoading" class="skeleton skeleton--row" />
+              <p v-else-if="!revisions.length" class="quiet">
+                No statement issued yet. {{ weekly ? 'Issue one to send this order to the hospital.' : 'Issue one to give the patient or their watcher the amount payable.' }}
+              </p>
+              <ol v-else class="revisions">
+                <li v-for="(r, i) in revisions" :key="r.id" class="revision" :class="{ 'revision--latest': i === 0 }">
+                  <span class="revision-dot" aria-hidden="true" />
+                  <div class="revision-body">
+                    <div class="revision-top">
+                      <span class="mono strong">{{ r.document_number }}</span>
+                      <span class="rev-chip">Rev. {{ r.revision_number }}</span>
+                      <span v-if="i === 0" class="rev-chip rev-chip--latest">Latest</span>
+                    </div>
+                    <span class="sub">{{ when(r.issued_at) }}<template v-if="r.issued_by"> · {{ r.issued_by }}</template></span>
+                    <div class="revision-foot">
+                      <span class="revision-amount">{{ pesos(r.amount_due) }} <small>{{ r.statement_only ? 'billed' : 'due' }}</small></span>
+                      <span class="revision-actions">
+                        <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="showRevision(r)">View</button>
+                        <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="downloading" @click="downloadRevision(r)">PDF</button>
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              </ol>
+            </section>
 
-          <section v-if="notes.length" class="card notes" aria-labelledby="notes-title">
-            <h2 id="notes-title" class="card-title">Notes</h2>
-            <ul>
-              <li v-for="note in notes" :key="note">{{ note }}</li>
-            </ul>
-          </section>
-        </template>
+            <section v-if="notes.length" class="card notes" aria-labelledby="notes-title">
+              <h2 id="notes-title" class="card-title">
+                <AssetIcon name="info" :size="15" />
+                Notes
+              </h2>
+              <ul>
+                <li v-for="note in notes" :key="note">{{ note }}</li>
+              </ul>
+            </section>
+          </aside>
+        </div>
       </template>
     </div>
 
@@ -424,6 +480,10 @@
  * One statement, laid out as a document: who issued it, who owes it, what it
  * bills, what has been paid, and what can still be done about it.
  *
+ * Laid out (2026-10-14) as the bill on the left — who owes it, the lines, the
+ * payments — and, on the right, what is owed and what can be done about it,
+ * with the issued revisions as a timeline beneath.
+ *
  * The page reads the live statement; the issued Statements of Account are its
  * frozen revisions, shown as they print and downloaded as the server's PDF.
  * Taking money happens at the counter (or by GCash QR from here); everything
@@ -433,10 +493,11 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
-import BillingFacts from '~/components/BloodCenter/BillingFacts.vue'
 import BillingLines from '~/components/BloodCenter/BillingLines.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import GcashCheckoutDialog from '~/components/BloodCenter/GcashCheckoutDialog.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { RECORDED_METHODS, facilityInitials, liveStatementTotals, needsReference, pesos, referenceName, saveBlob, statementStamp, takesPayment } from '~/utils/billing'
 
@@ -553,6 +614,12 @@ async function issueStatement() {
   }
 }
 
+// The revision picker above the printed view.
+const revisionOptions = computed(() => revisions.value.map((r) => ({
+  value: String(r.id),
+  label: `${r.document_number} · Revision ${r.revision_number} · ${when(r.issued_at)}`,
+})))
+
 function showRevision(revision) {
   selectedRevisionId.value = revision.id
   view.value = 'printed'
@@ -603,7 +670,11 @@ async function printRevision() {
   }
 }
 
-/* THE THREE FACT CARDS */
+/* THE SUMMARY CARD: a row with no value is left out rather than shown as a dash */
+function shown(rows) {
+  return rows.filter((row) => row.value !== null && row.value !== undefined && row.value !== '')
+}
+
 const issuer = computed(() => latestRevision.value?.issuer ?? issuerFallback.value)
 
 const issuerRows = computed(() => [
@@ -664,6 +735,13 @@ const totalRows = computed(() => {
     { label: 'Paid to date', value: t.paid > 0 ? `− ${pesos(t.paid)}` : pesos(0) },
     { label: 'Balance due', value: pesos(t.balance), emphasis: true, tone: t.balance > 0 ? 'danger' : 'success' },
   ]
+})
+
+// How much of a patient bill is in, for the meter under the amount due.
+const paidShare = computed(() => {
+  const t = totals.value
+  if (weekly.value || statement.value?.is_subsidised || !(t.subtotal > 0)) return null
+  return Math.min(100, Math.round((t.paid / t.subtotal) * 100))
 })
 
 const dueTone = computed(() => {
@@ -927,9 +1005,11 @@ onMounted(loadAll)
 .crumbs span[aria-current] { color: var(--rb-text-primary); font-weight: 600; font-family: var(--rb-font-mono); }
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: 22px; font-weight: 800; color: var(--rb-text-primary); margin: 0; letter-spacing: -0.01em; }
-.doc-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.doc-number { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.kicker { margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--rb-primary-text); }
+.page-title { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 4px 0 0; letter-spacing: -0.01em; }
+.page-title.mono { letter-spacing: 0; }
+.doc-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.doc-meta-text { font-size: 12.5px; color: var(--rb-text-secondary); }
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .header-actions .btn { text-decoration: none; }
 
@@ -939,26 +1019,46 @@ onMounted(loadAll)
 .view-tab--on { background: var(--rb-surface); color: var(--rb-text-primary); box-shadow: var(--rb-shadow-sm); }
 .view-tab:disabled { opacity: .5; cursor: not-allowed; }
 
-.facts-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.issuer { display: flex; align-items: center; gap: 10px; }
-.issuer strong { font-size: 14px; color: var(--rb-text-primary); }
-.issuer-logo { width: 40px; height: 40px; object-fit: contain; border-radius: 8px; }
-.monogram {
-  width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; flex: none;
-  font-weight: 800; font-size: 14px; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1);
-}
+/* The bill on the left; what is owed and what to do about it on the right. */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 16px; align-items: start; }
+.main-col, .rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; padding: 18px; min-width: 0; }
 .card-head { margin-bottom: 14px; }
-.card-title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.card-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
 .card-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 3px 0 0; max-width: 75ch; }
+.cap { margin: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--rb-text-secondary); }
 
-.split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+/* Summary: who owes it as the headline, the details beneath, the issuer as a quiet footer. */
+.summary { padding: 0; overflow: hidden; }
+.summary-head { padding: 18px 20px 14px; }
+.summary-name { margin: 4px 0 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); overflow-wrap: anywhere; }
+.summary-sub { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--rb-border); }
+.summary-grid .kv-list { padding: 14px 20px; }
+.summary-grid .kv-list + .kv-list { border-left: 1px solid var(--rb-border); }
+.kv-list { margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.kv-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+.kv-row dt { color: var(--rb-text-secondary); }
+.kv-row dd { margin: 0; color: var(--rb-text-primary); font-weight: 600; overflow-wrap: anywhere; }
+.kv-row dd.mono { font-size: 12.5px; }
+
+.issuer-strip { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
+.issuer-logo { width: 34px; height: 34px; object-fit: contain; border-radius: 8px; flex: none; }
+.monogram {
+  width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none;
+  font-weight: 800; font-size: 12.5px; color: #fff; background: var(--rb-primary);
+}
+.issuer-text { min-width: 0; }
+.issuer-text p { margin: 0; font-size: 12.5px; color: var(--rb-text-primary); }
+.issuer-label { color: var(--rb-text-secondary); }
+.issuer-rows { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 2px !important; color: var(--rb-text-secondary) !important; font-size: 12px !important; }
 
 .table-scroll { overflow-x: auto; }
 .history { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .history th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rb-text-secondary); padding: 8px 10px; border-bottom: 1px solid var(--rb-border); white-space: nowrap; }
 .history td { padding: 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.history tbody tr:last-child td { border-bottom: 0; }
 .history .sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
 .row--voided td { color: var(--rb-text-muted); }
 .row--voided .strong { text-decoration: line-through; }
@@ -973,38 +1073,57 @@ onMounted(loadAll)
 .inline-fields .field { min-width: 160px; }
 .inline-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-.pay-card { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 84px; }
-.due { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 12px; border: 1px solid; }
-.due span { font-size: 12.5px; font-weight: 700; }
-.due strong { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
-.due small { font-size: 12px; color: var(--rb-text-secondary); }
-.due--danger { background: rgba(var(--rb-accent-rgb), .06); border-color: rgba(var(--rb-accent-rgb), .22); }
-.due--danger span, .due--danger strong { color: var(--rb-accent-text); }
+/* Payment rail: the amount owed is the first thing on the page's right. */
+.pay-card { display: flex; flex-direction: column; gap: 14px; }
+.due { display: flex; flex-direction: column; gap: 2px; padding: 16px 18px; border-radius: 12px; border: 1px solid; }
+.due-label { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.due-amount { font-size: 30px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.due-note { font-size: 12px; color: var(--rb-text-secondary); }
+.due-meter { margin-top: 10px; }
+.due-meter p { margin: 5px 0 0; font-size: 11.5px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.meter { height: 6px; border-radius: 999px; background: rgba(var(--rb-shadow-rgb, 15, 23, 42), .08); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: inherit; background: var(--rb-success, #2E7D32); }
+.due--danger { background: rgba(var(--rb-accent-rgb), .05); border-color: rgba(var(--rb-accent-rgb), .2); }
+.due--danger .due-label, .due--danger .due-amount { color: var(--rb-accent-text); }
 .due--success { background: rgba(var(--rb-success-rgb), .07); border-color: rgba(var(--rb-success-rgb), .25); }
-.due--success span { color: var(--rb-success-text); }
+.due--success .due-label { color: var(--rb-success-text); }
 .due--purple { background: rgba(var(--rb-purple-rgb), .07); border-color: rgba(var(--rb-purple-rgb), .25); }
-.due--purple span { color: var(--rb-purple-text); }
+.due--purple .due-label { color: var(--rb-purple-text); }
 .due--info { background: rgba(var(--rb-primary-rgb), .06); border-color: rgba(var(--rb-primary-rgb), .2); }
-.due--info span { color: var(--rb-primary-text); }
+.due--info .due-label { color: var(--rb-primary-text); }
 
 .last-payment, .settled { margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.last-payment { padding-bottom: 2px; }
 .last-payment div, .settled div { display: flex; justify-content: space-between; gap: 12px; }
 .last-payment dt, .settled dt { color: var(--rb-text-secondary); }
 .last-payment dd, .settled dd { margin: 0; font-weight: 600; color: var(--rb-text-primary); text-align: right; }
-.pay-actions { display: flex; flex-direction: column; gap: 8px; }
+.pay-actions { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--rb-border); }
 
+/* Issued statements as a timeline, newest on top. */
 .revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.revision { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--rb-border); font-size: 13px; }
-.revision:last-child { border-bottom: 0; }
+.revision { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; padding-bottom: 14px; }
+.revision:last-child { padding-bottom: 0; }
+.revision::before { content: ''; position: absolute; left: 6px; top: 16px; bottom: 0; width: 2px; background: var(--rb-border); }
+.revision:last-child::before { display: none; }
+.revision-dot { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--rb-border-strong); background: var(--rb-surface); box-sizing: border-box; }
+.revision--latest .revision-dot { border-color: var(--rb-primary); background: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), .15); }
+.revision-body { min-width: 0; font-size: 13px; }
+.revision-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rev-chip { padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
+.rev-chip--latest { color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .08); border-color: rgba(var(--rb-primary-rgb), .2); }
 .revision .sub { display: block; font-size: 12px; color: var(--rb-text-secondary); margin-top: 2px; }
+.revision-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
 .revision-amount { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
 .revision-amount small { font-weight: 500; color: var(--rb-text-secondary); }
+.revision-actions { display: inline-flex; gap: 2px; }
 
-.notes ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--rb-text-secondary); }
+.notes { background: var(--rb-surface-alt); }
+.notes .card-title { font-size: 13.5px; color: var(--rb-text-secondary); }
+.notes ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .printed { display: flex; flex-direction: column; gap: 12px; }
 .printed-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.printed-bar .input { width: auto; min-width: 320px; }
+.printed-select { width: 400px; max-width: 100%; }
 
 .quiet { margin: 0; font-size: 13px; color: var(--rb-text-secondary); max-width: 70ch; }
 .quiet strong { color: var(--rb-text-primary); }
@@ -1025,7 +1144,6 @@ onMounted(loadAll)
   border: 1px solid var(--rb-border-strong); border-radius: 9px;
 }
 .input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-.input--select { cursor: pointer; }
 
 .segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid var(--rb-border-strong); }
 .segment { padding: 6px 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; }
@@ -1091,15 +1209,13 @@ onMounted(loadAll)
   .toast-enter-active, .toast-leave-active, .btn { transition: none; }
 }
 
-@media (max-width: 1100px) {
-  .split { grid-template-columns: 1fr; }
-  .pay-card { position: static; }
+@media (max-width: 1180px) {
+  .layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 860px) {
-  .facts-row { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: 1fr; }
+  .summary-grid .kv-list + .kv-list { border-left: 0; border-top: 1px solid var(--rb-border); }
   .doc-header { align-items: flex-start; }
-  .revision { grid-template-columns: 1fr auto; }
-  .printed-bar .input { min-width: 0; width: 100%; }
 }
 </style>

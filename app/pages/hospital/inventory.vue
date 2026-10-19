@@ -1,19 +1,15 @@
 <template>
   <div class="hinv-page">
     <div class="hinv-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Blood Bank Inventory</h1>
-          <p class="page-subtitle">
-            Bags your blood bank received — from a blood center or by direct distribution — first-expiring-first, and
-            the patients they are tagged to.
-          </p>
-        </div>
-        <button type="button" class="btn" :disabled="refreshing" @click="refresh">
-          <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
-          {{ refreshing ? 'Refreshing…' : 'Refresh' }}
-        </button>
-      </header>
+      <PageHeader title="Blood Bank Inventory">
+        <template #subtitle>Bags your blood bank received — from a blood center or by direct distribution — first-expiring-first, and the patients they are tagged to.</template>
+        <template #actions>
+          <button type="button" class="ui-btn" :disabled="refreshing" @click="refresh">
+            <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
+            {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="summaryError" class="banner banner--error" role="alert">
         <AssetIcon name="triangle-alert" :size="16" />
@@ -81,7 +77,7 @@
               placeholder="Location for the scanned bags"
               aria-label="Storage location for the scanned bags"
             />
-            <button type="submit" class="btn" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
+            <button type="submit" class="ui-btn" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
           </form>
         </div>
 
@@ -152,7 +148,7 @@
                   <div class="row-actions">
                     <button
                       type="button"
-                      class="btn btn--sm btn--quiet"
+                      class="ui-btn ui-btn--sm ui-btn--ghost"
                       :disabled="busyUnit === unit.unit_id"
                       @click="startAction('discard', unit)"
                     >
@@ -170,7 +166,7 @@
 
         <div v-if="canStockIn" class="stockin__foot">
           <p v-if="stockInError" class="stockin__error" role="alert">{{ stockInError }}</p>
-          <button type="button" class="btn btn--primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
             <AssetIcon name="package" :size="14" />
             {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} scanned bag${ticked.length === 1 ? '' : 's'}` }}
           </button>
@@ -211,7 +207,14 @@
             @click="selectTab(item.value)"
           >
             {{ item.label }}
-            <span v-if="item.count !== null" class="tabs__count">{{ item.count }}</span>
+            <span
+              v-if="item.count !== null"
+              class="tabs__count"
+              :class="{
+                'tabs__count--zero': !item.count,
+                'tabs__count--active': item.count && tab === item.value,
+                [`tabs__count--${item.tone}`]: item.count && item.tone && tab !== item.value,
+              }">{{ item.count }}</span>
           </button>
         </div>
 
@@ -228,22 +231,35 @@
           </div>
 
           <template v-if="tab !== 'history'">
-            <select v-model="filters.blood_type_id" class="filter-select" aria-label="Blood type">
-              <option :value="null">All blood types</option>
-              <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-            </select>
-            <select v-model="filters.component_id" class="filter-select" aria-label="Component">
-              <option :value="null">All components</option>
-              <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
-            </select>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.blood_type_id"
+                :options="[{ value: null, label: 'All blood types' }, ...reference.blood_types.map((type) => ({ value: type.id, label: type.code }))]"
+                aria-label="Blood type"
+                size="sm"
+              />
+            </div>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.component_id"
+                :options="[{ value: null, label: 'All components' }, ...reference.components.map((component) => ({ value: component.id, label: component.name }))]"
+                aria-label="Component"
+                size="sm"
+              />
+            </div>
           </template>
 
-          <select v-else v-model="filters.event_status" class="filter-select" aria-label="Outcome">
-            <option :value="null">All outcomes</option>
-            <option value="untagged_assigned">{{ UNIT_TAG_STATUS_LABELS.untagged_assigned }}</option>
-            <option value="untagged_crossmatched">{{ UNIT_TAG_STATUS_LABELS.untagged_crossmatched }}</option>
-            <option value="transfused">{{ UNIT_TAG_STATUS_LABELS.transfused }}</option>
-          </select>
+          <div v-else class="filter-select">
+            <SelectField
+              v-model="filters.event_status"
+              :options="[
+                { value: null, label: 'All outcomes' },
+                ...['untagged_assigned', 'untagged_crossmatched', 'transfused'].map((value) => ({ value, label: UNIT_TAG_STATUS_LABELS[value] })),
+              ]"
+              aria-label="Outcome"
+              size="sm"
+            />
+          </div>
         </div>
 
         <p class="tab-hint">{{ tabHint }}</p>
@@ -256,7 +272,7 @@
 
         <div v-else-if="listError" class="list-state list-state--error" role="alert">
           <p>{{ listError }}</p>
-          <button type="button" class="btn" @click="loadList">Try again</button>
+          <button type="button" class="ui-btn" @click="loadList">Try again</button>
         </div>
 
         <!-- ---------- HISTORY: tags that ended ---------- -->
@@ -394,7 +410,7 @@
                         v-for="action in allowedActions(unit)"
                         :key="action"
                         type="button"
-                        class="btn btn--sm"
+                        class="ui-btn ui-btn--sm"
                         :class="ACTION_STYLES[action]"
                         :disabled="busyUnit === unit.unit_id || (action !== 'release' && Boolean(unit.active_tag) && remainingFor(unit) <= 0)"
                         @click="startAction(action, unit)"
@@ -474,10 +490,10 @@
         <p class="dialog__body">{{ confirmCopy.body }}</p>
         <p v-if="dialogError" class="dialog__error" role="alert">{{ dialogError }}</p>
         <div class="dialog__actions">
-          <button type="button" class="btn btn--primary" :disabled="dialogBusy" @click="runConfirm">
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="dialogBusy" @click="runConfirm">
             {{ dialogBusy ? 'Working…' : confirmCopy.action }}
           </button>
-          <button type="button" class="btn" :disabled="dialogBusy" @click="closeDialog">Cancel</button>
+          <button type="button" class="ui-btn" :disabled="dialogBusy" @click="closeDialog">Cancel</button>
         </div>
       </div>
     </div>
@@ -491,6 +507,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The hospital blood bank's own stock: the bags it received, and the patients they are tagged to.
  *
@@ -518,6 +535,7 @@ import {
   UNIT_TAG_STATUS_TONES,
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
+import SelectField from '~/components/common/SelectField.vue'
 import { matchStockInScan } from '~/utils/stockIn'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
@@ -715,8 +733,9 @@ const cards = computed(() => [
 const tabs = computed(() => [
   { value: 'stock', label: 'In stock', count: totals.value.available ?? null },
   { value: 'tagged', label: 'Tagged', count: summary.value ? (totals.value.tag_assigned ?? 0) + (totals.value.tag_crossmatched ?? 0) : null },
-  { value: 'pending', label: 'Pending return', count: totals.value.pending_return ?? null },
-  { value: 'expired', label: 'Expired', count: totals.value.expired ?? null },
+  // The two that need someone to act carry a colour when they hold bags.
+  { value: 'pending', label: 'Pending return', count: totals.value.pending_return ?? null, tone: 'warning' },
+  { value: 'expired', label: 'Expired', count: totals.value.expired ?? null, tone: 'danger' },
   { value: 'history', label: 'History', count: null },
 ])
 
@@ -1073,12 +1092,12 @@ function formatDateTime(value) {
   min-height: 100%;
   background: var(--rb-page-bg);
   font-family: var(--rb-font-sans);
-  padding: 20px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
-.hinv-inner { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.hinv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 70ch; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .muted { color: var(--rb-text-secondary); }
@@ -1109,8 +1128,8 @@ function formatDateTime(value) {
 .stat-chip { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 
 /* overflow-y is clipped as well: with overflow-x set the other axis becomes auto, and the
@@ -1124,7 +1143,17 @@ function formatDateTime(value) {
 .tabs__tab:hover { color: var(--rb-text-primary); }
 .tabs__tab--active { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
 .tabs__tab:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; border-radius: 6px; }
-.tabs__count { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.tabs__count {
+  min-width: 20px; padding: 1px 7px; border-radius: 999px; text-align: center;
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--rb-surface-alt); color: var(--rb-text-secondary);
+}
+/* Nothing there: just a faint number, so a row of zeros does not compete. */
+.tabs__count--zero { background: transparent; color: var(--rb-text-muted); font-weight: 600; }
+.tabs__count--active { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text); }
+/* Bags waiting on someone: the colour of the action. */
+.tabs__count--warning { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
+.tabs__count--danger { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 16px 6px; }
 .search-box { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
@@ -1134,12 +1163,7 @@ function formatDateTime(value) {
   font: inherit; font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
 }
 .search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
-  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); cursor: pointer; appearance: none;
-  background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
+.filter-select { width: 190px; }
 .tab-hint { margin: 0; padding: 0 16px 12px; font-size: 12px; color: var(--rb-text-secondary); }
 
 .list-state { padding: 18px 16px; }
@@ -1182,7 +1206,13 @@ function formatDateTime(value) {
 .row--scanned td { background: rgba(var(--rb-success-rgb), 0.06); }
 .stockin__bulk { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .stockin__bulk .stockin__input { width: 230px; max-width: none; }
-/* A text field in the filter style, without the select's arrow. */
+/* A text field in the filter style, without the select's arrow. The look is
+   set here: .filter-select now only sizes the SelectField filters. */
+.stockin__input {
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
+  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); background: var(--rb-surface-alt);
+}
+.stockin__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .stockin__input { cursor: text; background-image: none; padding-right: 12px; min-width: 0; width: 100%; max-width: 220px; }
 .stockin__foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
 .stockin__error { margin: 0; margin-right: auto; font-size: 12.5px; color: var(--rb-accent-text); }
@@ -1212,18 +1242,6 @@ function formatDateTime(value) {
 }
 .link-btn:hover { text-decoration: underline; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn--quiet { color: var(--rb-accent-text); }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

@@ -21,16 +21,14 @@
 
     <div v-else class="page-inner">
       <!-- ===================== PAGE HEADER ===================== -->
-      <header class="notif-header fade-in" style="--delay:0ms">
-        <div>
-          <h1 class="notif-title">Notifications</h1>
-          <p class="notif-subtitle">Stay informed with updates about your blood requests, blood availability, billing, and system announcements.</p>
-        </div>
-        <button type="button" class="btn-primary" :disabled="unreadCount === 0 || marking" @click="markAllAsRead">
-          <AssetIcon name="check-check" :size="16" />
-          Mark All as Read
-        </button>
-      </header>
+      <PageHeader title="Notifications" subtitle="Stay informed with updates about your blood requests, blood availability, billing, and system announcements.">
+        <template #actions>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="unreadCount === 0 || marking" @click="markAllAsRead">
+            <AssetIcon name="check-check" :size="15" />
+            Mark All as Read
+          </button>
+        </template>
+      </PageHeader>
 
       <!-- ===================== SEARCH ===================== -->
       <div class="notif-search-wrap fade-in" style="--delay:40ms">
@@ -124,7 +122,7 @@
 
         <!-- LOAD MORE -->
         <div v-if="hasMore" class="notif-load-more fade-in" style="--delay:120ms">
-          <button type="button" class="btn-ghost" :disabled="loadingMore" @click="loadOlderNotifications">
+          <button type="button" class="ui-btn" :disabled="loadingMore" @click="loadOlderNotifications">
             <AssetIcon name="chevron-down" :size="16" />
             {{ loadingMore ? 'Loading…' : 'Load Older Notifications' }}
           </button>
@@ -132,28 +130,28 @@
       </template>
 
       <!-- ===================== EMPTY STATE ===================== -->
-      <div v-else class="notif-empty-state fade-in" style="--delay:100ms">
-        <div class="notif-empty-illustration">
-          <AssetIcon name="bell" :size="30" />
-        </div>
-        <h2 class="notif-empty-title">{{ hasActiveFilters ? 'No Matching Notifications' : "You're All Caught Up" }}</h2>
-        <p class="notif-empty-desc">
-          {{ hasActiveFilters
+      <section v-else class="notif-empty-card">
+        <EmptyState
+          icon="bell"
+          :title="hasActiveFilters ? 'No Matching Notifications' : 'You\'re All Caught Up'"
+          :description="hasActiveFilters
             ? 'No notifications match your search or filters. Try adjusting them.'
-            : 'No new notifications at the moment. Everything is up to date.' }}
-        </p>
-        <button v-if="hasActiveFilters" type="button" class="btn-ghost" @click="resetFilters">Reset Filters</button>
-        <NuxtLink v-else to="/hospital/dashboard" class="btn-primary">
-          <AssetIcon name="home" :size="16" />
-          Return to Dashboard
-        </NuxtLink>
-      </div>
+            : 'No new notifications at the moment. Everything is up to date.'">
+          <button v-if="hasActiveFilters" type="button" class="ui-btn" @click="resetFilters">Reset Filters</button>
+          <NuxtLink v-else to="/hospital/dashboard" class="ui-btn ui-btn--primary">
+            <AssetIcon name="house" :size="15" />
+            Return to Dashboard
+          </NuxtLink>
+        </EmptyState>
+      </section>
     </div>
   </div>
 </template>
 
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -182,14 +180,16 @@ const chipOptions = [
   { key: 'system', label: 'System' },
 ]
 
+// Colours from the shared tokens, so each category reads the same in dark mode.
 const categoryStyleMap = {
-  request: { color: '#1565C0', bg: '#1565C014', icon: 'clipboard-list' },
-  inventory: { color: '#D32F2F', bg: '#D32F2F14', icon: 'triangle-alert' },
-  blood_availability: { color: '#F57C00', bg: '#F57C0014', icon: 'droplets' },
-  pickup: { color: '#2E7D32', bg: '#2E7D3214', icon: 'package-check' },
-  billing: { color: '#7C3AED', bg: '#7C3AED14', icon: 'receipt' },
-  announcement: { color: '#0F766E', bg: '#0F766E14', icon: 'megaphone' },
-  system: { color: '#64748B', bg: '#64748B14', icon: 'settings' },
+  request: { color: 'var(--rb-primary-text)', bg: 'rgba(var(--rb-primary-rgb), 0.1)', icon: 'clipboard-list' },
+  inventory: { color: 'var(--rb-accent-text)', bg: 'rgba(var(--rb-accent-rgb), 0.09)', icon: 'triangle-alert' },
+  blood_availability: { color: 'var(--rb-warning-text)', bg: 'rgba(var(--rb-warning-rgb), 0.12)', icon: 'droplets' },
+  pickup: { color: 'var(--rb-success-text)', bg: 'rgba(var(--rb-success-rgb), 0.1)', icon: 'package-check' },
+  billing: { color: 'var(--rb-purple-text)', bg: 'rgba(var(--rb-purple-rgb), 0.1)', icon: 'receipt' },
+  // 'megaphone' is not in the icon set, so announcements drew no icon.
+  announcement: { color: 'var(--rb-primary-text)', bg: 'rgba(var(--rb-primary-rgb), 0.1)', icon: 'info' },
+  system: { color: 'var(--rb-text-secondary)', bg: 'var(--rb-surface-alt)', icon: 'settings' },
 }
 function categoryStyle(key) {
   return categoryStyleMap[key] || categoryStyleMap.system
@@ -360,46 +360,36 @@ onMounted(() => {
 
 <style scoped>
 .notif-page {
-  --np-primary: var(--rb-primary, #1565C0);
-  --np-primary-hover: #0D47A1;
-  --np-bg: #F7F9FC;
-  --np-card: #FFFFFF;
-  --np-border: #E5EAF0;
-  --np-text: #1E293B;
-  --np-text-secondary: var(--rb-text-secondary, #64748B);
-  --np-text-muted: var(--rb-text-muted, #94A3B8);
+  --np-primary: var(--rb-primary);
+  --np-primary-hover: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  --np-bg: var(--rb-page-bg);
+  --np-card: var(--rb-surface);
+  --np-border: var(--rb-border);
+  --np-text: var(--rb-text-primary);
+  --np-text-secondary: var(--rb-text-secondary);
+  --np-text-muted: var(--rb-text-muted);
   --np-success: var(--rb-success, #2E7D32);
   --np-warning: var(--rb-warning, #F57C00);
   --np-danger: var(--rb-accent, #D32F2F);
   --np-purple: var(--rb-purple, #7C3AED);
   --np-teal: var(--rb-teal, #0F766E);
-  --np-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
-  --np-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --np-shadow: var(--rb-shadow-sm);
+  --np-shadow-hover: 0 6px 18px -8px rgba(15, 23, 42, 0.18);
 
   font-family: var(--rb-font-sans);
   color: var(--np-text);
   background: var(--np-bg);
-  max-width: 1400px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 32px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
   box-sizing: border-box;
 }
 
-:global(.dark .notif-page) {
-  --np-bg: #0F172A;
-  --np-card: #1E293B;
-  --np-border: #2A3447;
-  --np-text: #F1F5F9;
-  --np-text-secondary: #94A3B8;
-  --np-text-muted: #64748B;
-  --np-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
-  --np-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.32);
-}
 
 .notif-page * { box-sizing: border-box; }
 
 .page-inner {
-  max-width: 1400px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
   display: flex;
@@ -451,7 +441,7 @@ onMounted(() => {
   border-radius: 12px; color: var(--np-text); font-weight: 600; font-size: 14px; cursor: pointer;
   display: inline-flex; align-items: center; gap: 8px; transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
-.btn-ghost:hover { color: var(--np-primary); border-color: var(--np-primary); transform: translateY(-1px); }
+.btn-ghost:hover { color: var(--rb-primary-text); border-color: var(--np-primary); transform: translateY(-1px); }
 .btn-ghost:disabled { opacity: 0.6; cursor: default; transform: none; }
 
 /* ---------- SEARCH ---------- */
@@ -503,7 +493,7 @@ onMounted(() => {
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.notif-chip:hover { background: color-mix(in srgb, var(--np-primary) 8%, var(--np-card)); color: var(--np-primary); }
+.notif-chip:hover { background: color-mix(in srgb, var(--np-primary) 8%, var(--np-card)); color: var(--rb-primary-text); }
 .notif-chip--active {
   background: var(--np-primary);
   border-color: var(--np-primary);
@@ -571,14 +561,14 @@ onMounted(() => {
 .notif-card-title { font-size: 16px; font-weight: 600; color: var(--np-text); margin: 0; }
 .notif-unread-badge {
   font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
-  background: #1565C014; color: var(--np-primary);
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
 }
 .notif-card-desc { font-size: 14px; color: var(--np-text-secondary); margin: 0 0 14px; line-height: 1.55; }
 .notif-card-bottom { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .notif-timestamp { font-size: 13px; font-weight: 500; color: var(--np-text-muted); }
 .notif-action-link {
   display: inline-flex; align-items: center; gap: 4px; border: none; background: none;
-  color: var(--np-primary); font-size: 13.5px; font-weight: 600; padding: 0; cursor: pointer;
+  color: var(--rb-primary-text); font-size: 13.5px; font-weight: 600; padding: 0; cursor: pointer;
   transition: gap 0.15s ease;
 }
 .notif-action-link:hover { text-decoration: underline; }
@@ -588,7 +578,7 @@ onMounted(() => {
   color: var(--np-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.notif-mark-btn:hover { background: var(--np-bg); border-color: var(--np-border); color: var(--np-primary); }
+.notif-mark-btn:hover { background: var(--np-bg); border-color: var(--np-border); color: var(--rb-primary-text); }
 
 /* ---------- LOAD MORE ---------- */
 .notif-load-more { display: flex; justify-content: center; padding-top: 4px; }
@@ -613,20 +603,12 @@ onMounted(() => {
   background: linear-gradient(90deg, var(--np-border) 25%, rgba(255,255,255,0.4) 37%, var(--np-border) 63%);
   background-size: 400% 100%; border-radius: 6px; animation: np-shimmer 1.4s ease infinite;
 }
-:global(.dark .notif-page .skeleton-line) {
-  background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
-  background-size: 400% 100%;
-}
 
 .skeleton {
   background: linear-gradient(90deg, var(--np-border) 25%, rgba(255,255,255,0.4) 37%, var(--np-border) 63%);
   background-size: 400% 100%;
   border-radius: 18px;
   animation: np-shimmer 1.4s ease infinite;
-}
-:global(.dark .notif-page .skeleton) {
-  background: linear-gradient(90deg, #2A3447 25%, #3A4763 37%, #2A3447 63%);
-  background-size: 400% 100%;
 }
 .skeleton--title { height: 56px; max-width: 380px; border-radius: 12px; margin-bottom: 4px; }
 .skeleton--search { height: 46px; border-radius: 14px; }
@@ -647,4 +629,12 @@ onMounted(() => {
   .notif-card { flex-wrap: wrap; padding: 18px; }
   .notif-mark-btn { order: -1; margin-left: auto; }
 }
+
+.notif-empty-card {
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  background: var(--rb-surface);
+  box-shadow: var(--rb-shadow-sm);
+}
+.page-inner > .ph { margin-bottom: 4px; }
 </style>

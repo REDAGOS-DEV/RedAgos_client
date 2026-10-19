@@ -1,25 +1,20 @@
 <template>
   <div class="stock">
-    <header class="stock__header">
-      <div>
-        <h1 class="stock__title">Daily Stock Report</h1>
-        <p class="stock__subtitle">Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.</p>
-      </div>
-
-      <div class="stock__actions">
+    <PageHeader title="Daily Stock Report" subtitle="Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.">
+      <template #actions>
         <span v-if="report" class="stock__stamp">
           As of {{ report.as_of_time }}<template v-if="updatedAgo"> · updated {{ updatedAgo }}</template>
         </span>
-        <button type="button" class="btn" :disabled="loading" @click="load">
+        <button type="button" class="ui-btn" :disabled="loading" @click="load">
           <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
           {{ loading ? 'Loading…' : 'Refresh' }}
         </button>
-        <button type="button" class="btn btn--primary" :disabled="downloading || !report" @click="download">
+        <button type="button" class="ui-btn ui-btn--primary" :disabled="downloading || !report" @click="download">
           <AssetIcon name="file-down" :size="14" />
           {{ downloading ? 'Preparing…' : 'Download PDF' }}
         </button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="error" class="alert alert--error" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
@@ -43,42 +38,43 @@
 
     <template v-if="report">
       <!-- The answers first: how much can go out, what expires, what is out. -->
-      <div class="summary">
-        <div class="summary__item">
-          <span class="summary__label">Issuable units</span>
-          <span class="summary__value">{{ totalIssuable }}</span>
-          <span class="summary__note">Available, not past expiry</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--critical': report.near_expiry.today }">
-          <span class="summary__label">Expire today</span>
-          <span class="summary__value">{{ report.near_expiry.today }}</span>
-          <span class="summary__note">{{ report.near_expiry.today ? 'Issue these first' : 'None' }}</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--warning': report.near_expiry.tomorrow }">
-          <span class="summary__label">Expire tomorrow</span>
-          <span class="summary__value">{{ report.near_expiry.tomorrow }}</span>
-          <span class="summary__note">{{ report.near_expiry.tomorrow ? 'Plan to issue next' : 'None' }}</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--critical': outOfStock.length && totalIssuable }">
-          <span class="summary__label">Out of stock</span>
-          <span class="summary__value">{{ outOfStock.length }}</span>
-          <!-- Every type, always in the same place: red has none, grey has stock.
-               Fixed size, so the card never grows or wraps. -->
-          <span class="type-strip" role="list" :aria-label="outOfStock.length ? `Out of stock: ${outOfStock.join(', ')}` : 'Every blood type has stock'">
-            <span
-              v-for="t in typeTotals"
-              :key="t.type"
-              role="listitem"
-              class="type-strip__cell"
-              :class="{ 'type-strip__cell--out': t.total === 0 }"
-              :title="t.total === 0 ? `${t.type}: none issuable` : `${t.type}: ${t.total} issuable`"
-            >{{ t.type }}</span>
-          </span>
-          <span class="summary__note">
-            {{ !outOfStock.length ? 'Every type has stock' : outOfStock.length === typeTotals.length ? 'No blood type has stock' : `${outOfStock.length} of ${typeTotals.length} types have none` }}
-          </span>
-        </div>
-      </div>
+      <StatStrip>
+        <StatItem label="Issuable units" :value="totalIssuable" hint="Available, not past expiry" icon="package-check" tone="primary" />
+        <StatItem
+          label="Expire today"
+          :value="report.near_expiry.today"
+          :hint="report.near_expiry.today ? 'Issue these first' : 'None'"
+          icon="clock"
+          tone="danger"
+          :alert="report.near_expiry.today > 0"
+        />
+        <StatItem
+          label="Expire tomorrow"
+          :value="report.near_expiry.tomorrow"
+          :hint="report.near_expiry.tomorrow ? 'Plan to issue next' : 'None'"
+          icon="calendar"
+          tone="warning"
+          :alert="report.near_expiry.tomorrow > 0"
+        />
+        <StatItem label="Out of stock" :value="outOfStock.length" icon="circle-x" tone="danger" :alert="Boolean(outOfStock.length && totalIssuable)">
+          <template #hint>
+            <span class="out-hint">
+              <!-- Every type, always in the same place: red has none, grey has stock. -->
+              <span class="type-strip" role="list" :aria-label="outOfStock.length ? `Out of stock: ${outOfStock.join(', ')}` : 'Every blood type has stock'">
+                <span
+                  v-for="t in typeTotals"
+                  :key="t.type"
+                  role="listitem"
+                  class="type-strip__cell"
+                  :class="{ 'type-strip__cell--out': t.total === 0 }"
+                  :title="t.total === 0 ? `${t.type}: none issuable` : `${t.type}: ${t.total} issuable`"
+                >{{ t.type }}</span>
+              </span>
+              {{ !outOfStock.length ? 'Every type has stock' : outOfStock.length === typeTotals.length ? 'No blood type has stock' : `${outOfStock.length} of ${typeTotals.length} types have none` }}
+            </span>
+          </template>
+        </StatItem>
+      </StatStrip>
 
       <!-- Nothing to issue at all: say so plainly; the zero sheet still prints. -->
       <div v-if="!totalIssuable" class="callout callout--info" role="status">
@@ -236,6 +232,9 @@ import {
   slotEntries,
   stockReportFilename,
 } from '~/utils/stockReport'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 /**
  * The Daily Blood Stock Inventory: Issuance's live view and printable sheet,
@@ -673,4 +672,7 @@ onMounted(load)
   .sheet__head { grid-template-columns: 48px minmax(0, 1fr) 48px; }
   .sheet__logo img { max-width: 44px; max-height: 44px; }
 }
+
+/* The shared header; the "As of" stamp sits with its actions. */
+.out-hint { display: flex; flex-direction: column; gap: 4px; }
 </style>

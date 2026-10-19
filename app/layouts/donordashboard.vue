@@ -1,5 +1,14 @@
 <template>
-  <div>
+  <div class="donor-portal">
+    <!--
+      The portal's backdrop: soft washes in the donor's theme colours, the
+      same treatment as the landing page and sign-in. Fixed and at z-index -1,
+      so it sits behind everything without creating a stacking context that
+      would trap the pages' modals. The sidebar and top bar are frosted glass
+      over it; the page cards stay solid for readability.
+    -->
+    <div class="donor-backdrop" aria-hidden="true" />
+
     <!-- `:donor` was never declared as a prop on the sidebar, so it only landed
          on its root div as donor="[object Object]". The component reads the
          user from useUser() itself. -->
@@ -14,7 +23,7 @@
     <!-- Sentinel sa pinakataas sa document: kung dili na makita, naka-scroll na -->
     <div ref="scrollSentinel" class="absolute top-0 left-0 h-px w-px pointer-events-none" aria-hidden="true" />
 
-    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
+    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'">
       <!-- Top bar -->
       <!--
         Same canvas as the sidebar and the page (--rb-page-bg), so the chrome
@@ -24,7 +33,7 @@
       -->
       <header
         class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
-        :class="[railExpanded ? 'lg:left-64' : 'lg:left-20', { 'topbar--scrolled': isScrolled }]"
+        :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'topbar--scrolled': isScrolled }]"
         :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
 
         <!--
@@ -41,9 +50,9 @@
         <div class="flex items-center gap-2 min-w-0">
           <!-- Mobile menu toggle -->
           <button @click="openMobile"
-            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
+            class="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
             aria-label="Open menu">
-            <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon name="menu" :size="20" class="text-[#475569] dark:text-slate-300" />
           </button>
 
           <!-- Dynamic Page Title (Mobile view) -->
@@ -51,30 +60,24 @@
             {{ pageLabels[route.path] || 'Dashboard' }}
           </span>
 
-          <!-- Breadcrumb + Greeting (Desktop & Tablet view) -->
+          <!--
+            Where am I: "Donor Portal" as secondary text over the page title as
+            primary text, the same two levels the sidebar uses. The greeting
+            moved to the dashboard's own header.
+          -->
           <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
-            <span class="hidden lg:block text-[11px] font-medium text-[#64748b] dark:text-slate-400 leading-tight">
-              {{ breadcrumb }}
+            <span class="text-[12px] font-medium leading-tight text-[#64748B] dark:text-slate-400">
+              Donor Portal
             </span>
-
-            <div class="flex items-center gap-2 leading-tight truncate">
-              <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">
-                {{ greeting }}
-              </span>
-              <!--
-                Valid ID status pill intentionally removed from here.
-                Status is now surfaced consistently via the small badge/dot
-                on the avatar (both desktop and mobile) and via the full
-                CTA inside the profile dropdown, avoiding duplicate/competing
-                signals next to the greeting text.
-              -->
-            </div>
+            <span class="text-[15px] font-semibold leading-tight truncate text-[#334155] dark:text-slate-100">
+              {{ pageLabels[route.path] || 'Dashboard' }}
+            </span>
           </div>
         </div>
 
         <!-- Search Bar (Desktop) -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[#1565C0]/40 focus-within:ring-2 focus-within:ring-[#1565C0]/10 transition-colors px-3 py-2 relative"
+          class="items-center gap-2 h-10 rounded-full bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-4 focus-within:ring-[rgba(var(--rb-primary-rgb),0.1)] transition-colors px-4 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
@@ -129,25 +132,18 @@
         <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <!-- Mobile Search Trigger -->
           <button @click="openMobileSearch"
-            class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
+            class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
             aria-label="Open search">
-            <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
-          </button>
-
-          <!-- Dark/Light Theme Switcher -->
-          <button @click="toggleTheme"
-            class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
-            :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
-            <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
+            <AssetIcon name="search" :size="18" class="text-[#475569] dark:text-slate-300" />
           </button>
 
           <!-- Notifications -->
           <NuxtLink to="/donor/notifications"
             :aria-label="unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'"
-            class="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]">
-            <AssetIcon name="bell" :size="18" class="text-[#64748b] dark:text-slate-300" />
+            class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]">
+            <AssetIcon name="bell" :size="18" class="text-[#475569] dark:text-slate-300" />
             <span v-if="unreadCount > 0"
-              class="absolute top-1 right-1 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
+              class="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
               style="background:#D32F2F">
               {{ unreadCount > 9 ? '9+' : unreadCount }}
             </span>
@@ -160,19 +156,23 @@
           -->
           <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#E2E8F0] dark:bg-[#334155]" />
 
-          <!-- Profile Menu Dropdown -->
-          <div class="relative">
+          <!--
+            Account menu. Opens on hover on devices with a mouse (closing after
+            a short delay so crossing the gap to the panel does not shut it);
+            click, tap and the keyboard still toggle it.
+          -->
+          <div class="relative" @mouseenter="openMenuOnHover" @mouseleave="closeMenuOnHover">
             <button @click="showUserMenu = !showUserMenu"
               :aria-expanded="showUserMenu ? 'true' : 'false'" aria-haspopup="menu" aria-label="Account menu"
-              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]">
+              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]">
 
               <!-- Outer Avatar Container -->
               <div class="relative flex-shrink-0">
                 <div
                   class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
-                  style="background:#1565C0;">
+                  style="background:var(--rb-primary);">
                   <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                  <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
+                  <span v-else>{{ userInitials }}</span>
                 </div>
 
                 <!--
@@ -218,13 +218,13 @@
                 <div class="flex items-center gap-3 px-4 py-4 border-b"
                   :style="{ borderColor: headerBorderColor }">
                   <div
-                    class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-                    style="background:#1565C0">
+                    class="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
+                    style="background:var(--rb-primary)">
                     <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
-                    <span v-else>{{ user?.full_name?.charAt(0) || 'D' }}</span>
+                    <span v-else>{{ userInitials }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate text-gray-900 dark:text-slate-100">
+                    <p class="text-sm font-semibold truncate capitalize text-gray-900 dark:text-slate-100">
                       {{ user?.full_name || 'Donor' }}
                     </p>
                     <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
@@ -265,6 +265,37 @@
                   </NuxtLink>
                 </div>
 
+                <!--
+                  Theme: Light / Dark / System, the same three choices as the
+                  blood center portal. System (the default) follows the
+                  browser or computer and switches with it.
+                -->
+                <div class="border-t py-2" :style="{ borderColor: headerBorderColor }">
+                  <div class="flex items-center justify-between gap-3 px-4 py-1.5">
+                    <span class="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">
+                      <AssetIcon :name="isDark ? 'moon' : 'sun'" :size="16" class="text-gray-400 dark:text-slate-500" />
+                      Theme
+                    </span>
+                    <div class="theme-seg" role="radiogroup" aria-label="Theme">
+                      <button
+                        v-for="option in THEME_OPTIONS"
+                        :key="option.value"
+                        type="button"
+                        role="radio"
+                        class="theme-seg__btn"
+                        :class="{ 'theme-seg__btn--on': themeMode === option.value }"
+                        :aria-checked="themeMode === option.value"
+                        :aria-label="option.label"
+                        :title="option.label"
+                        @click="setThemeMode(option.value)"
+                      >
+                        <AssetIcon :name="option.icon" :size="14" />
+                      </button>
+                    </div>
+                  </div>
+                  <p class="theme-seg__hint">{{ themeHint }}</p>
+                </div>
+
                 <div class="border-t py-2" :style="{ borderColor: headerBorderColor }">
                   <button @click="handleLogout"
                     class="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -284,9 +315,9 @@
 
         <!-- Mobile search close button -->
         <button v-if="searchOpenMobile" @click="closeMobileSearch"
-          class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#E9EDF2] dark:hover:bg-[#1E293B]"
+          class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
           aria-label="Close search">
-          <AssetIcon name="x" :size="18" class="text-[#64748b] dark:text-slate-300" />
+          <AssetIcon name="x" :size="18" class="text-[#475569] dark:text-slate-300" />
         </button>
         </div>
       </header>
@@ -312,12 +343,32 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
+import { useAccentTheme } from '~/composables/useAccentTheme'
 
 const { railExpanded, openMobile } = useSidebar()
+
+// The donor's colour theme (Settings → Appearance). Applied while the donor
+// portal is open and removed on the way out, so the other portals and the
+// sign-in screens keep the standard RedAgos blue.
+const accent = useAccentTheme()
+onMounted(() => accent.init())
+onUnmounted(() => accent.clear())
 const router = useRouter()
 const route = useRoute()
 const { user, fetchUser, logout } = useUser()
-const { isDark, toggleTheme } = useDarkMode()
+const { isDark, themeMode, setThemeMode } = useDarkMode()
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+  { value: 'system', label: 'System (same as your browser)', icon: 'monitor' },
+]
+
+const themeHint = computed(() => (
+  themeMode.value === 'system'
+    ? `Following your browser (${isDark.value ? 'dark' : 'light'})`
+    : `Always ${themeMode.value}`
+))
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 /*
@@ -370,7 +421,7 @@ const vClickOutside = {
   }
 }
 
-// --- Breadcrumb + greeting ---
+// --- Page title (top bar and mobile header) ---
 const pageLabels = {
   '/donor/dashboard': 'Dashboard',
   '/donor/appointments': 'Book Appointment',
@@ -380,15 +431,9 @@ const pageLabels = {
   '/donor/notifications': 'Notifications',
   '/donor/profile': 'My Profile',
   '/donor/settings': 'Settings',
+  '/donor/help': 'Help',
 }
-const breadcrumb = computed(() => `Donor Portal / ${pageLabels[route.path] || ''}`)
 
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-  const first = user.value?.full_name?.split(' ')[0] || 'Donor'
-  return `${time}, ${first}!`
-})
 
 // --- Notifications ---
 const unreadCount = ref(0)
@@ -427,6 +472,30 @@ const userMenuItems = [
 ]
 const closeUserMenu = () => { showUserMenu.value = false }
 
+// Hover only where hovering exists; on touch screens the tap toggles it.
+let menuTimer = null
+const canHover = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+const openMenuOnHover = () => {
+  if (!canHover()) return
+  clearTimeout(menuTimer)
+  showUserMenu.value = true
+}
+const closeMenuOnHover = () => {
+  if (!canHover()) return
+  clearTimeout(menuTimer)
+  menuTimer = setTimeout(closeUserMenu, 220)
+}
+onUnmounted(() => clearTimeout(menuTimer))
+
+// "Yana Cruz" -> "YC"; one name -> its first letter; nothing -> "D" (donor).
+const userInitials = computed(() => {
+  const parts = (user.value?.full_name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'D'
+  const first = parts[0].charAt(0)
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : ''
+  return (first + last).toUpperCase()
+})
+
 // --- Mobile search overlay ---
 const searchOpenMobile = ref(false)
 
@@ -458,6 +527,7 @@ const searchablePages = [
   { label: 'Notifications', path: '/donor/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'My Profile', path: '/donor/profile', icon: 'user-circle', keywords: 'profile account personal info' },
   { label: 'Settings', path: '/donor/settings', icon: 'settings', keywords: 'settings preferences password' },
+  { label: 'Help', path: '/donor/help', icon: 'help-circle', keywords: 'help faq support contact' },
 ]
 
 const searchQuery = ref('')
@@ -536,22 +606,45 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+/* ── Glass backdrop (see the template) ── */
+.donor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 55%, transparent), transparent 72%),
+    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 85%, transparent), transparent 72%),
+    radial-gradient(30% 36% at 62% 58%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 45%, #F7F9FC) 0%, #F7F9FC 100%);
+}
+:global(.dark .donor-backdrop) {
+  background:
+    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
+    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
+    #0B1220;
+}
+
+/* Frosted glass top bar. */
 .topbar {
-  background-color: var(--rb-page-bg, #F7F8FA);
+  background-color: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: saturate(170%) blur(18px);
+  backdrop-filter: saturate(170%) blur(18px);
 }
+.topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
+:global(.dark .topbar) { background-color: rgba(15, 23, 42, 0.55); }
+:global(.dark .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.78); }
 
-.topbar--scrolled {
-  background-color: rgba(247, 248, 250, 0.82);
-  -webkit-backdrop-filter: saturate(180%) blur(10px);
-  backdrop-filter: saturate(180%) blur(10px);
-}
-
-:global(.dark .topbar--scrolled) {
-  background-color: rgba(15, 23, 42, 0.82);
-}
-
+/* No blur, or the donor asked for less transparency: solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topbar--scrolled { background-color: var(--rb-page-bg, #F7F8FA); }
+  .topbar { background-color: var(--rb-page-bg, #F7F8FA); }
+}
+/* Reduced transparency: the glass stays (it sits over a still gradient, not
+   over content), only the scrolled bar, with content sliding under it,
+   turns solid. */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar--scrolled { background-color: rgba(255, 255, 255, 0.96); }
+  :global(.dark .donor-portal .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.96); }
 }
 
 /*
@@ -589,8 +682,9 @@ const handleLogout = async () => {
   will-change: left;
 }
 
+/* Transparent: the glass backdrop shows through between the cards. */
 main {
-  background: var(--rb-page-bg);
+  background: transparent;
 }
 
 input:focus {
@@ -651,4 +745,61 @@ a, button {
     transition: none;
   }
 }
+
+/* Theme choice in the account menu: three icon buttons, Light / Dark / System. */
+.theme-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: #F1F5F9;
+}
+.theme-seg__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.theme-seg__btn:hover:not(.theme-seg__btn--on) { color: #1E293B; }
+.theme-seg__btn--on {
+  background: #fff;
+  color: var(--rb-primary-text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.theme-seg__btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
+.theme-seg__hint { margin: 2px 16px 4px 44px; font-size: 11.5px; color: #94A3B8; }
+:global(.dark .theme-seg) { background: #1E293B; }
+:global(.dark .theme-seg__btn) { color: #94A3B8; }
+:global(.dark .theme-seg__btn:hover:not(.theme-seg__btn--on)) { color: #F1F5F9; }
+:global(.dark .theme-seg__btn--on) { background: #334155; color: var(--rb-primary-text); }
+@media (prefers-reduced-motion: reduce) {
+  .theme-seg__btn { transition: none; }
+}
 </style>
+
+<!--
+  Portal fonts, unscoped so they reach every donor page.
+  Inter for body text, labels and numbers (clearer at small sizes, digits
+  line up); Plus Jakarta Sans, the brand font, for headings so the portal
+  still feels like the landing page and sign-in.
+-->
+<style>
+.donor-portal {
+  font-family: var(--rb-font-ui);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.donor-portal :is(h1, h2, h3, .page-title, .panel-title, .hero__title, .step-label,
+  .modal-title, .onboarding-card__title, .qr-panel__title, .steps-panel__title,
+  .valid-gate__title, .logo-name) {
+  font-family: var(--rb-font-sans);
+}
+</style>
+

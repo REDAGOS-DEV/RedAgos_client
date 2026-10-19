@@ -106,8 +106,6 @@ export interface AppUser {
   staff_role: StaffRole | null
   /** Every predefined role held, the main one (staff_role) first. All in one department. */
   staff_roles: StaffRole[]
-  hospital_role: HospitalRole | null
-  hospital_role_label: string | null
   staff_role_label: string | null
   /** A typed role, when none of the predefined ones fits. */
   custom_role: string | null
@@ -119,6 +117,10 @@ export interface AppUser {
   management_level: ManagementLevel | null
   /** "Blood Center Admin" or "Supervisor". */
   management_level_label: string | null
+
+  /** A hospital blood bank account's role. Null for everyone else. */
+  hospital_role: HospitalRole | null
+  hospital_role_label: string | null
 
   /**
    * Unrestricted platform admin. Holds every `admin.*` privilege without any of

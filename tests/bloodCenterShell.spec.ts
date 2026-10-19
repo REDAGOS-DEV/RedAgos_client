@@ -41,14 +41,15 @@ describe('rail width and the space reserved for it', () => {
   const layout = source(LAYOUT)
 
   /*
-   * Tailwind's scale is the shared unit: w-20 is 5rem and pl-20/left-20 reserve
-   * exactly that, w-64 is 16rem and pl-64/left-64 match it. Asserting on the
-   * class names is asserting that the two files picked the same step.
+   * The rail is 72px collapsed (the donor portal's rail) and 16rem open:
+   * w-[72px] and pl-[72px]/left-[72px] reserve exactly the first, w-64 and
+   * pl-64/left-64 the second. Asserting on the class names is asserting that
+   * the two files picked the same widths.
    */
   it('gives the collapsed rail a width the content column also reserves', () => {
-    expect(sidebar).toContain('lg:w-20')
-    expect(layout).toContain('lg:pl-20')
-    expect(layout).toContain('lg:left-20')
+    expect(sidebar).toContain('lg:w-[72px]')
+    expect(layout).toContain('lg:pl-[72px]')
+    expect(layout).toContain('lg:left-[72px]')
   })
 
   it('gives the expanded rail a width the content column also reserves', () => {
@@ -58,9 +59,9 @@ describe('rail width and the space reserved for it', () => {
   })
 
   it('drives both widths from the one railExpanded flag', () => {
-    expect(sidebar).toContain("railCollapsed ? 'lg:w-20' : 'lg:w-64'")
-    expect(layout).toContain("railExpanded ? 'lg:pl-64' : 'lg:pl-20'")
-    expect(layout).toContain("railExpanded ? 'lg:left-64' : 'lg:left-20'")
+    expect(sidebar).toContain("railCollapsed ? 'lg:w-[72px]' : 'lg:w-64'")
+    expect(layout).toContain("railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'")
+    expect(layout).toContain("railExpanded ? 'lg:left-64' : 'lg:left-[72px]'")
   })
 
   it('reads that flag from the blood-centre bucket, not the donor one', () => {

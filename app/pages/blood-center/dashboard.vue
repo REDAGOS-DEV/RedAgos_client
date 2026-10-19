@@ -18,13 +18,9 @@
 
     <div v-else class="dashboard-inner">
       <!-- ============ HEADER ============ -->
-      <div class="header-row">
-        <div>
-          <h1 class="page-title">Blood Center Dashboard</h1>
-          <p class="page-subtitle">What needs attention today, and how stock is moving.</p>
-        </div>
-        <div class="header-actions">
-          <button type="button" class="btn-outline" @click="exportReport" :disabled="exporting">
+      <PageHeader title="Blood Center Dashboard" subtitle="What needs attention today, and how stock is moving.">
+        <template #actions>
+          <button type="button" class="ui-btn" :disabled="exporting" @click="exportReport">
             <AssetIcon name="download" :size="14" />
             {{ exporting ? 'Exporting…' : 'Export Report' }}
           </button>
@@ -34,75 +30,53 @@
             Only for someone who works the counter: the Admin and the
             Supervisor who read this overview do not.
           -->
-          <NuxtLink v-if="canCollect" to="/blood-center/donation" class="btn-primary">
+          <NuxtLink v-if="canCollect" to="/blood-center/donation" class="ui-btn ui-btn--primary">
             <AssetIcon name="plus" :size="15" />
             Record Donation
           </NuxtLink>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
 
-      <!-- ============ KPI CARDS ============ -->
-      <!-- Each card opens the page that owns the number, for whoever may open it. -->
-      <div class="stats-grid">
-        <component :is="canViewInventory ? NuxtLink : 'div'" v-bind="canViewInventory ? { to: '/blood-center/inventory' } : {}" class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Total Blood Units</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
-              <AssetIcon name="droplets" :size="14" style="color: var(--rb-primary-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalUnits === null }">{{ totalUnits ?? 'No data' }}</p>
-          <span class="stat-chip stat-chip--neutral">Across all components</span>
-          <span v-if="weeklyChangePercent !== null" class="stat-trend" :class="weeklyChangePercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
-            <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
-            {{ Math.abs(weeklyChangePercent) }}% this week
-          </span>
-        </component>
-
-        <!-- A link only for someone the counter would let in. -->
-        <component :is="canCollect ? NuxtLink : 'div'" v-bind="canCollect ? { to: '/blood-center/donation' } : {}" class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Donations Today</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
-              <AssetIcon name="trending-up" :size="14" style="color: var(--rb-success-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :class="{ 'stat-card__value--empty': donationsToday === null }">{{ donationsToday ?? 'No data' }}</p>
-          <span class="stat-chip stat-chip--neutral">{{ dailyGoal !== null ? `Goal: ${dailyGoal} units/day` : 'Daily goal not set' }}</span>
-          <span v-if="vsYesterdayPercent !== null" class="stat-trend" :class="vsYesterdayPercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
-            <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
-            {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
-          </span>
-        </component>
-
-        <component :is="canViewRequests ? NuxtLink : 'div'" v-bind="canViewRequests ? { to: '/blood-center/bloodrequests' } : {}" class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Pending Hospital Requests</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
-              <AssetIcon name="package" :size="14" style="color: var(--rb-warning-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value">{{ pendingRequestsCount }}</p>
-          <span class="stat-chip stat-chip--neutral">{{ pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting' }}</span>
-        </component>
-
-        <component
-          :is="canViewInventory ? NuxtLink : 'div'"
-          v-bind="canViewInventory ? { to: '/blood-center/inventory' } : {}"
-          class="stat-card"
-          :class="{ 'stat-card--emphasized': criticalTypesCount > 0 }"
-        >
-          <div class="stat-card__top">
-            <p class="stat-card__label">Critical Blood Types</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-accent-rgb), 0.08)' }">
-              <AssetIcon name="alert" :size="14" style="color: var(--rb-accent-text)" />
-            </div>
-          </div>
-          <!-- Red only when something is actually critical. -->
-          <p class="stat-card__value" :style="criticalTypesCount ? 'color: var(--rb-accent-text)' : ''">{{ criticalTypesCount }}</p>
-          <span class="stat-chip stat-chip--neutral truncate-chip">{{ criticalTypesLabel }}</span>
-        </component>
-      </div>
+      <!-- ============ FIGURES ============ -->
+      <!-- Each figure opens the page that owns the number, for whoever may open it. -->
+      <StatStrip>
+        <StatItem label="Total blood units" :value="totalUnits" icon="droplets" tone="primary" :to="canViewInventory ? '/blood-center/inventory' : undefined">
+          <template #hint>
+            Across all components
+            <span v-if="weeklyChangePercent !== null" class="stat-trend" :class="weeklyChangePercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
+              <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
+              {{ Math.abs(weeklyChangePercent) }}% this week
+            </span>
+          </template>
+        </StatItem>
+        <StatItem label="Donations today" :value="donationsToday" icon="trending-up" tone="success" :to="canCollect ? '/blood-center/donation' : undefined">
+          <template #hint>
+            {{ dailyGoal !== null ? `Goal: ${dailyGoal} units/day` : 'Daily goal not set' }}
+            <span v-if="vsYesterdayPercent !== null" class="stat-trend" :class="vsYesterdayPercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
+              <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
+              {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
+            </span>
+          </template>
+        </StatItem>
+        <StatItem
+          label="Pending hospital requests"
+          :value="pendingRequestsCount"
+          :hint="pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting'"
+          icon="package"
+          tone="warning"
+          :to="canViewRequests ? '/blood-center/bloodrequests' : undefined"
+        />
+        <!-- Red only when something is actually critical. -->
+        <StatItem
+          label="Critical blood types"
+          :value="criticalTypesCount"
+          :hint="criticalTypesLabel"
+          icon="triangle-alert"
+          tone="danger"
+          :alert="criticalTypesCount > 0"
+          :to="canViewInventory ? '/blood-center/inventory' : undefined"
+        />
+      </StatStrip>
 
       <!-- ============ LOW STOCK ============ -->
       <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" class="low-stock-banner" />
@@ -171,7 +145,7 @@
                     <span class="status-pill__dot" />
                     {{ req.status }}
                   </span>
-                  <button v-if="canDecideRequests" type="button" class="btn-primary btn-primary--sm" @click="openConfirmModal(req)">
+                  <button v-if="canDecideRequests" type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="openConfirmModal(req)">
                     {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
                   </button>
                 </div>
@@ -451,10 +425,10 @@
             </p>
 
             <div class="modal-actions">
-              <button type="button" class="btn-primary modal-actions__btn" :disabled="confirmSubmitting" @click="confirmAction">
+              <button type="button" class="ui-btn ui-btn--primary modal-actions__btn" :disabled="confirmSubmitting" @click="confirmAction">
                 {{ confirmSubmitting ? 'Please wait…' : (selectedRequest?.status === 'processing' ? 'Fulfill' : 'Process') }}
               </button>
-              <button type="button" class="btn-outline modal-actions__btn" @click="closeConfirmModal" :disabled="confirmSubmitting">
+              <button type="button" class="ui-btn modal-actions__btn" @click="closeConfirmModal" :disabled="confirmSubmitting">
                 Cancel
               </button>
             </div>
@@ -473,6 +447,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -1385,4 +1362,8 @@ a.stat-card:focus-visible { outline: 2px solid var(--rb-primary-text); outline-o
   .form-row { grid-template-columns: 1fr; }
   .donut-body { flex-direction: column; }
 }
+
+/* Panels in the shared SectionCard's shape (2026-10-15). */
+.panel { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
+.stat-trend { margin-left: 4px; }
 </style>

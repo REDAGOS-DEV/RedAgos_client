@@ -3,64 +3,59 @@
     <div class="footer-inner">
       <div class="footer-brand">
         <div class="footer-logo">
-          <img :src="logo" alt="RedAgos Logo" class="footer-logo-image" />
-          <span class="logo-text">Red<span class="logo-accent">Agos</span></span>
+          <img :src="logo" alt="" class="footer-logo-image" width="40" height="40" />
+          <span>
+            <span class="logo-text">Red<span class="logo-accent">Agos</span></span>
+            <span class="logo-sub">Blood Bank System</span>
+          </span>
         </div>
-        <p class="logo-sub">BLOOD BANK SYSTEM</p>
         <p class="footer-desc">
           An Integrated Online Blood Bank Information Management and Inventory
           Control System for Davao City's blood service network.
         </p>
         <p class="footer-cap">
-          <AssetIcon name="heart" class="cap-icon" :size="12" />
-          A Capstone Project — STI College Davao · BSIT 2026
+          <AssetIcon name="heart" class="cap-icon" :size="14" />
+          A capstone project of STI College Davao, BSIT 2026
         </p>
       </div>
 
-      <!-- Quick Links -->
-      <div class="footer-links">
-        <h4>QUICK LINKS</h4>
+      <nav class="footer-col" aria-label="Footer">
+        <h2 class="footer-title">Quick links</h2>
         <ul>
           <li v-for="link in quickLinks" :key="link.label">
-            <NuxtLink :to="link.to">{{ link.label }}</NuxtLink>
+            <a :href="link.to">{{ link.label }}</a>
           </li>
         </ul>
-      </div>
+      </nav>
 
-      <!-- Contact -->
-      <div class="footer-contact">
-        <h4>CONTACT</h4>
-        <ul>
+      <div class="footer-col">
+        <h2 class="footer-title">Contact</h2>
+        <ul class="contact-list">
           <li>
-            <AssetIcon name="map-pin" class="contact-icon" :size="18" />
+            <AssetIcon name="map-pin" class="contact-icon" :size="16" />
             <span>STI College Davao, Davao City, Philippines</span>
           </li>
           <li>
-            <AssetIcon name="mail" class="contact-icon" :size="18" />
+            <AssetIcon name="mail" class="contact-icon" :size="16" />
             <a href="mailto:support@redagos.ph">support@redagos.ph</a>
           </li>
           <li>
-            <AssetIcon name="phone" class="contact-icon" :size="18" />
+            <AssetIcon name="phone" class="contact-icon" :size="16" />
+            <!-- TODO: placeholder number, replace before launch -->
             <span>+63 (82) 000-0000</span>
           </li>
         </ul>
       </div>
-
     </div>
 
-    <!-- Bottom bar -->
-    <!-- Bottom bar -->
     <div class="footer-bottom">
       <span>© 2026 RedAgos. All rights reserved.</span>
-
       <div class="footer-bottom-links">
-        <NuxtLink to="/legal/privacy">
-          Privacy Policy
-        </NuxtLink>
-
-        <NuxtLink to="/legal/terms">
-          Terms of Service
-        </NuxtLink>
+        <NuxtLink to="/legal/privacy">Privacy Policy</NuxtLink>
+        <NuxtLink to="/legal/terms">Terms of Service</NuxtLink>
+        <!-- Staff portals (hospital, blood center, administrator) are kept out
+             of the main menu; the Get started page lists every sign-in. -->
+        <NuxtLink to="/auth/role-selection">Staff sign in</NuxtLink>
       </div>
     </div>
   </footer>
@@ -72,7 +67,8 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 const quickLinks = [
   { label: 'Home', to: '#home' },
-  { label: 'Features', to: '#features' },
+  { label: 'How It Works', to: '#features' },
+  { label: "Who It's For", to: '#roles' },
   { label: 'Donation Drives', to: '#drives' },
   { label: 'About', to: '#about' },
   { label: 'Contact', to: '#contact' },
@@ -80,208 +76,141 @@ const quickLinks = [
 </script>
 
 <style scoped>
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
+/* Deep brand navy, the page's closing frame. Every text colour below is
+   checked against #0B2A55: the lightest grey used is 5.6:1. */
 .footer {
-  background: #0d1117;
-  padding: 56px 2.5rem 0;
-  font-family: var(--rb-font-sans);
+  --ft-text: #F1F5FB;
+  --ft-text-2: #B7C6DB;
+  --ft-muted: #93A7C2;
+  --ft-line: rgba(255, 255, 255, 0.12);
+  padding: 72px 1.5rem 0;
+  background: var(--lp-navy);
 }
 
 .footer-inner {
-  max-width: 1280px;
+  max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr;
-  gap: 64px;
+  grid-template-columns: 2fr 1fr 1.4fr;
+  gap: 56px;
   padding-bottom: 48px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ── Brand ── */
-.footer-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.footer-logo-image {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-}
-
+.footer-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.footer-logo-image { width: 40px; height: 40px; object-fit: contain; }
 .logo-text {
+  display: block;
   font-size: 20px;
   font-weight: 800;
-  color: #ffffff;
+  line-height: 1.1;
+  color: var(--ft-text);
 }
-
-.logo-accent {
-  color: #e53935;
-}
-
+.logo-accent { color: #FF6B6B; }
 .logo-sub {
+  display: block;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.15em;
-  color: rgba(255, 255, 255, 0.4);
-  margin-bottom: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ft-muted);
 }
-
 .footer-desc {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  line-height: 1.7;
-  max-width: 240px;
-  margin-bottom: 20px;
+  max-width: 36ch;
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ft-text-2);
 }
-
 .footer-cap {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ft-muted);
 }
+.cap-icon { color: #FF6B6B; }
 
-.cap-icon {
-  color: #e53935;
-}
-
-/* ── Quick Links ── */
-.footer-links h4,
-.footer-contact h4 {
-  font-size: 11px;
+/* ── Columns ── */
+.footer-title {
+  margin: 0 0 16px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 16px;
+  color: var(--ft-text);
 }
-
-.footer-links ul {
+.footer-col ul {
   list-style: none;
-  display: flex;
-  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  display: grid;
   gap: 10px;
 }
-
-.footer-links li {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.footer-links li::before {
-  content: '•';
-  color: rgba(255, 255, 255, 0.25);
-  margin-right: 8px;
-  font-size: 10px;
-}
-
-.footer-links a {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
+.footer-col a {
+  font-size: 14px;
+  color: var(--ft-text-2);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
+.footer-col a:hover { color: #fff; }
+.footer-col a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
 
-.footer-links a:hover {
-  color: #ffffff;
-}
-
-/* ── Contact ── */
-.footer-contact ul {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.footer-contact li {
+.contact-list li {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
   line-height: 1.5;
+  color: var(--ft-text-2);
 }
-
-.contact-icon {
-  color: #2563eb;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.footer-contact a {
-  color: rgba(255, 255, 255, 0.55);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.footer-contact a:hover {
-  color: #ffffff;
-}
+.contact-icon { flex-shrink: 0; margin-top: 2px; color: #7AB0FF; }
 
 /* ── Bottom bar ── */
 .footer-bottom {
-  max-width: 1280px;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 20px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  gap: 12px;
+  border-top: 1px solid var(--ft-line);
+  font-size: 13px;
+  color: var(--ft-muted);
 }
+.footer-bottom-links { display: flex; gap: 24px; }
+.footer-bottom-links a { color: var(--ft-muted); text-decoration: none; }
+.footer-bottom-links a:hover { color: #fff; }
 
-.footer-bottom-links {
-  display: flex;
-  gap: 24px;
+@media (max-width: 960px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: 40px; }
+  .footer-brand { grid-column: 1 / -1; }
 }
+/* Phones: same content, packed tighter. Links go two per row, spacing and
+   type step down, and the bottom bar shrinks to two short lines. */
+@media (max-width: 600px) {
+  .footer { padding: 32px 1rem 0; }
+  .footer-inner { grid-template-columns: 1fr; gap: 22px; padding-bottom: 24px; }
 
-.footer-bottom-links a {
-  color: rgba(255, 255, 255, 0.3);
-  text-decoration: none;
-  transition: color 0.2s;
-}
+  .footer-logo { margin-bottom: 10px; }
+  .footer-logo-image { width: 34px; height: 34px; }
+  .logo-text { font-size: 18px; }
+  .footer-desc { margin-bottom: 10px; font-size: 13px; line-height: 1.55; }
+  .footer-cap { font-size: 12px; }
 
-.footer-bottom-links a:hover {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* ── Responsive ── */
-@media (max-width: 1024px) {
-  .footer-inner {
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-  }
-
-  .footer-brand {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 640px) {
-  .footer {
-    padding: 48px 1.25rem 0;
-  }
-
-  .footer-inner {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
+  .footer-title { margin-bottom: 10px; }
+  .footer-col ul { gap: 8px; }
+  nav.footer-col ul { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .footer-col a,
+  .contact-list li { font-size: 13px; }
 
   .footer-bottom {
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+    padding: 14px 0 18px;
+    font-size: 12px;
     text-align: center;
   }
+  .footer-bottom-links { flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
 }
 </style>

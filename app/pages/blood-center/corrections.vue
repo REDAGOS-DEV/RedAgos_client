@@ -1,15 +1,14 @@
 <template>
   <div class="corrections">
-    <header class="corrections__header">
-      <h1 class="corrections__title">Corrections</h1>
-      <p class="corrections__subtitle">
+    <PageHeader title="Corrections">
+      <template #subtitle>
         Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
         head decides; the head's own correction is applied as soon as it is sent. An approved correction is applied
         under the same rules as the original.
         A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
         directly, and everyone else files a correction.
-      </p>
-    </header>
+      </template>
+    </PageHeader>
 
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Corrections">
@@ -139,12 +138,12 @@
             />
           </label>
           <div class="actions">
-            <button type="button" class="btn btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
               {{ busy === item.id ? 'Working…' : 'Approve and apply' }}
             </button>
             <button
               type="button"
-              class="btn btn--danger"
+              class="ui-btn ui-btn--danger"
               :disabled="busy === item.id || !(notes[item.id] || '').trim()"
               @click="decide(item, 'reject')"
             >
@@ -161,6 +160,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
  * Correction requests: the caller's own, and — for a department's head —

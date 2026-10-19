@@ -18,10 +18,25 @@
         </div>
 
         <template v-else>
-            <div class="header-row">
-                <h1 class="page-title">We're here to help!</h1>
-                <p class="page-subtitle">Find answers to common questions or contact our support team for assistance.</p>
-            </div>
+            <!-- The page's one showpiece: ask a question, the answers filter as you type -->
+            <section class="help-hero" aria-labelledby="help-title">
+                <h1 id="help-title" class="page-title">How can we help?</h1>
+                <p class="page-subtitle">Search the common questions, or reach the support team below.</p>
+                <div class="help-search">
+                    <AssetIcon name="search" :size="18" class="help-search__icon" />
+                    <input
+                        v-model="query"
+                        type="search"
+                        class="help-search__input"
+                        placeholder="Try &quot;QR code&quot;, &quot;how often&quot;, or &quot;blood type&quot;"
+                        aria-label="Search help"
+                        aria-controls="faq-list"
+                    >
+                    <button v-if="query" type="button" class="help-search__clear" aria-label="Clear search" @click="query = ''">
+                        <AssetIcon name="x" :size="16" />
+                    </button>
+                </div>
+            </section>
 
             <!-- Quick help topics -->
             <div class="topics-grid">
@@ -34,10 +49,8 @@
                     <div class="topic-card__icon" :class="`topic-card__icon--${topic.tone}`">
                         <AssetIcon :name="topic.icon" :size="18" />
                     </div>
-                    <div class="topic-card__body">
-                        <p class="topic-card__title">{{ topic.title }}</p>
-                        <p class="topic-card__desc">{{ topic.desc }}</p>
-                    </div>
+                    <p class="topic-card__title">{{ topic.title }}</p>
+                    <p class="topic-card__desc">{{ topic.desc }}</p>
                     <AssetIcon name="arrow-right" :size="16" class="topic-card__arrow" />
                 </NuxtLink>
             </div>
@@ -47,27 +60,36 @@
                 <div class="col-left">
                     <div class="panel">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Frequently Asked Questions</h2>
+                            <h2 class="panel-title">Frequently asked questions</h2>
+                            <span v-if="query" class="panel-count" aria-live="polite">
+                                {{ filteredFaqs.length }} result{{ filteredFaqs.length === 1 ? '' : 's' }}
+                            </span>
                         </div>
-                        <div class="faq-list">
-                            <div v-for="faq in faqs" :key="faq.id" class="faq-item">
+                        <div id="faq-list" class="faq-list">
+                            <div v-for="faq in filteredFaqs" :key="faq.id" class="faq-item"
+                                :class="{ 'faq-item--open': isOpen(faq.id) }">
                                 <button
+                                    :id="`faq-q-${faq.id}`"
                                     type="button"
                                     class="faq-question"
-                                    :aria-expanded="openFaqId === faq.id"
+                                    :aria-expanded="isOpen(faq.id)"
+                                    :aria-controls="`faq-a-${faq.id}`"
                                     @click="toggleFaq(faq.id)"
                                 >
                                     <span>{{ faq.question }}</span>
-                                    <AssetIcon
-                                        name="chevron-down"
-                                        :size="16"
-                                        class="faq-question__chevron"
-                                        :class="{ 'faq-question__chevron--open': openFaqId === faq.id }"
-                                    />
+                                    <span class="faq-question__toggle" aria-hidden="true">
+                                        <AssetIcon :name="isOpen(faq.id) ? 'x' : 'plus'" :size="14" />
+                                    </span>
                                 </button>
-                                <div v-if="openFaqId === faq.id" class="faq-answer">
+                                <div v-if="isOpen(faq.id)" :id="`faq-a-${faq.id}`" class="faq-answer"
+                                    role="region" :aria-labelledby="`faq-q-${faq.id}`">
                                     <p>{{ faq.answer }}</p>
                                 </div>
+                            </div>
+
+                            <div v-if="!filteredFaqs.length" class="faq-empty">
+                                <p class="faq-empty__title">No answers match "{{ query }}"</p>
+                                <p class="faq-empty__sub">Try other words, or contact support and we'll help directly.</p>
                             </div>
                         </div>
                     </div>
@@ -77,35 +99,35 @@
                 <div class="col-right">
                     <div class="panel">
                         <div class="panel-header panel-header--simple">
-                            <h2 class="panel-title">Contact Support</h2>
+                            <h2 class="panel-title">Contact support</h2>
                         </div>
                         <div class="contact-list">
-                            <div class="contact-row">
-                                <div class="contact-row__icon">
+                            <a :href="`tel:${contactInfo.hotline}`" class="contact-row">
+                                <span class="contact-row__icon">
                                     <AssetIcon name="phone" :size="16" />
-                                </div>
-                                <div>
-                                    <p class="contact-row__label">Hotline</p>
-                                    <a :href="`tel:${contactInfo.hotline}`" class="contact-row__value">{{ contactInfo.hotlineLabel }}</a>
-                                </div>
-                            </div>
-                            <div class="contact-row">
-                                <div class="contact-row__icon">
+                                </span>
+                                <span>
+                                    <span class="contact-row__label">Hotline</span>
+                                    <span class="contact-row__value">{{ contactInfo.hotlineLabel }}</span>
+                                </span>
+                            </a>
+                            <a :href="`mailto:${contactInfo.email}`" class="contact-row">
+                                <span class="contact-row__icon">
                                     <AssetIcon name="mail" :size="16" />
-                                </div>
-                                <div>
-                                    <p class="contact-row__label">Email</p>
-                                    <a :href="`mailto:${contactInfo.email}`" class="contact-row__value">{{ contactInfo.email }}</a>
-                                </div>
-                            </div>
-                            <div class="contact-row">
-                                <div class="contact-row__icon">
+                                </span>
+                                <span>
+                                    <span class="contact-row__label">Email</span>
+                                    <span class="contact-row__value">{{ contactInfo.email }}</span>
+                                </span>
+                            </a>
+                            <div class="contact-row contact-row--static">
+                                <span class="contact-row__icon">
                                     <AssetIcon name="clock" :size="16" />
-                                </div>
-                                <div>
-                                    <p class="contact-row__label">Support hours</p>
-                                    <p class="contact-row__value">{{ contactInfo.hours }}</p>
-                                </div>
+                                </span>
+                                <span>
+                                    <span class="contact-row__label">Support hours</span>
+                                    <span class="contact-row__value">{{ contactInfo.hours }}</span>
+                                </span>
                             </div>
                         </div>
 
@@ -117,11 +139,13 @@
 
                     <div class="panel legal-panel">
                         <NuxtLink to="/legal/terms" class="legal-link">
-                            Terms of Service
+                            <AssetIcon name="file-text" :size="15" />
+                            <span class="legal-link__text">Terms of Service</span>
                             <AssetIcon name="arrow-right" :size="14" />
                         </NuxtLink>
                         <NuxtLink to="/legal/privacy" class="legal-link">
-                            Privacy Policy
+                            <AssetIcon name="shield" :size="15" />
+                            <span class="legal-link__text">Privacy Policy</span>
                             <AssetIcon name="arrow-right" :size="14" />
                         </NuxtLink>
                     </div>
@@ -161,7 +185,7 @@ const quickTopics = [
         icon: 'clipboard',
         tone: 'primary',
         title: 'Eligibility Screening',
-        desc: 'Retake the screening or check why you were deferred.',
+        desc: 'Answer or retake your health questionnaire.',
         route: '/donor/eligibility',
     },
     {
@@ -169,7 +193,7 @@ const quickTopics = [
         icon: 'qr-code',
         tone: 'success',
         title: 'QR Code & Appointments',
-        desc: "Your QR expired, or you need to book a visit.",
+        desc: 'Get a new check-in code, or book a visit.',
         route: '/donor/qrcode',
     },
     {
@@ -190,42 +214,78 @@ const quickTopics = [
     },
 ]
 
+// Copy checked against the server's config/donation.php: 56-day interval,
+// screening answers valid 90 days, check-in code valid 14 days, questionnaire
+// opens 1 day before an appointment, cancel any time before it.
 const faqs = reactive([
     {
         id: 'freq',
         question: 'How often can I donate blood?',
-        answer: "Whole blood donors can generally donate again after 90 days. Your exact next eligible date is shown on your Donation History page once a donation is recorded.",
+        answer: 'You can give whole blood again 56 days (8 weeks) after your last donation. Your next eligible date is on your Profile, and the booking page will not offer dates before it.',
+    },
+    {
+        id: 'when-questionnaire',
+        question: 'When do I answer the health questionnaire?',
+        answer: 'The day before your appointment. It opens one day before, and we email you a reminder. Your check-in QR code is generated as soon as you submit it.',
     },
     {
         id: 'deferred',
-        question: "What happens if I'm deferred during screening?",
-        answer: "A deferral just means you're not eligible right now, it's usually temporary (e.g. recent illness or travel). Check the reason shown after your screening, and you can retake it once the waiting period has passed.",
+        question: 'Does a "Yes" answer mean I cannot donate?',
+        answer: 'No. The questionnaire does not decide that on its own. Blood center staff go through your answers with you and do a short physical check (blood pressure, hemoglobin, weight) before deciding. If you cannot donate that day it is often temporary, and they will tell you when you can come back.',
     },
     {
         id: 'qr-validity',
         question: 'How long is my QR code valid for?',
-        answer: 'Your QR code is tied to your eligibility screening result and stays valid for a limited window after you pass. Once it expires, you just need to retake the screening to get a new one.',
+        answer: 'A check-in code is valid for 14 days once it is issued. That is separate from your questionnaire answers, which stay valid for 90 days. If the code runs out while your answers are still valid, get a new one from My QR Code without answering again.',
     },
     {
         id: 'qr-share',
         question: 'Is it safe to share my QR code with others?',
-        answer: "No, your QR code is personal and tied to your own eligibility result. Don't share it with anyone else; only present it to blood center staff when you arrive for your appointment.",
+        answer: 'No. Your QR code is personal and tied to your own screening answers. Do not share it with anyone; only show it to blood center staff when you arrive.',
     },
     {
         id: 'missed-appointment',
         question: 'What if I miss my appointment?',
-        answer: "No worries, your eligibility screening stays valid as long as it hasn't expired. Just book a new appointment for another available date and time.",
+        answer: 'Your questionnaire answers stay valid until they expire, so just book another date and time. You can also cancel or reschedule any time before the appointment starts.',
     },
     {
         id: 'wrong-blood-type',
         question: 'What if my blood type on record is incorrect?',
-        answer: 'Blood type on file is only confirmed through lab testing at the center. If something looks wrong, contact support below and our staff will help you get it corrected.',
+        answer: 'Blood type is only confirmed through lab testing at the center. If something looks wrong, contact support and our staff will help you get it corrected.',
     },
 ])
 
 const openFaqId = ref(null)
 
+// Search: every word typed has to appear in the question or the answer.
+const query = ref('')
+const filteredFaqs = computed(() => {
+    const words = query.value.toLowerCase().split(/\s+/).filter(Boolean)
+    if (!words.length) return faqs
+    return faqs.filter(faq => {
+        const text = `${faq.question} ${faq.answer}`.toLowerCase()
+        return words.every(word => text.includes(word))
+    })
+})
+
+// While searching, matches open by default so the answer is right there;
+// the donor can still fold any of them away.
+const foldedWhileSearching = ref(new Set())
+watch(query, () => { foldedWhileSearching.value = new Set() })
+
+function isOpen(id) {
+    if (query.value.trim()) return !foldedWhileSearching.value.has(id)
+    return openFaqId.value === id
+}
+
 function toggleFaq(id) {
+    if (query.value.trim()) {
+        const next = new Set(foldedWhileSearching.value)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        foldedWhileSearching.value = next
+        return
+    }
     openFaqId.value = openFaqId.value === id ? null : id
 }
 
@@ -263,12 +323,13 @@ onActivated(() => {
 
 <style scoped>
 .help-page {
-    --primary: #1565c0;
-    --accent: #d32f2f;
+    --primary: var(--rb-primary);
+    --accent: #C62828;
     --success: #2e7d32;
-    --warning: #f57c00;
+    --warning: #B45309;
     --text-primary: #1f2937;
-    --text-secondary: #9ca3af;
+    --text-secondary: #94A3B8;
+    --border: #eef0f3;
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
@@ -280,50 +341,20 @@ onActivated(() => {
 }
 
 /* Skeleton loading */
-.skeleton-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
+.skeleton-wrap { display: flex; flex-direction: column; gap: 20px; }
 
 .skeleton {
     background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
     background-size: 400% 100%;
-    border-radius: 14px;
+    border-radius: 20px;
     animation: shimmer 1.4s ease infinite;
 }
 
-.skeleton--header {
-    height: 40px;
-    max-width: 280px;
-}
-
-.skeleton-topics-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-}
-
-.skeleton--topic {
-    height: 76px;
-}
-
-.skeleton-main-grid {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 20px;
-    align-items: start;
-}
-
-.skeleton-col {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.skeleton--panel {
-    border-radius: 14px;
-}
+.skeleton--header { height: 150px; }
+.skeleton-topics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.skeleton--topic { height: 120px; }
+.skeleton-main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+.skeleton-col { display: flex; flex-direction: column; gap: 20px; }
 
 @keyframes shimmer {
     0% { background-position: 100% 50%; }
@@ -339,325 +370,344 @@ onActivated(() => {
     .skeleton-main-grid { grid-template-columns: 1fr; }
 }
 
-.header-row {
+/* ── Search hero ── */
+.help-hero {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    padding: 30px 24px 28px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background:
+        radial-gradient(120% 140% at 50% 0%, rgba(var(--rb-primary-rgb), 0.08), transparent 60%),
+        white;
+    text-align: center;
 }
 
 .page-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
     margin: 0;
+    font-size: var(--rb-fs-display);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
 }
 
-.page-subtitle {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
+.page-subtitle { margin: 4px 0 0; font-size: var(--rb-fs-small); color: #64748B; }
+
+.help-search {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 18px;
 }
 
-/* Quick topics */
-.topics-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+.help-search__icon {
+    position: absolute;
+    top: 50%;
+    left: 18px;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    pointer-events: none;
 }
 
-.topic-card {
-    background: white;
-    border-radius: 14px;
-    border: 1px solid #eef0f3;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-    padding: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    text-decoration: none;
-    transition: border-color 0.15s ease;
-}
-
-.topic-card:hover {
-    border-color: #d3e6fa;
-}
-
-.topic-card__icon {
-    width: 36px;
-    height: 36px;
+.help-search__input {
+    width: 100%;
+    height: 50px;
+    padding: 0 48px 0 48px;
+    border: 1px solid #e2e8f0;
     border-radius: 999px;
+    background: white;
+    font: inherit;
+    font-size: var(--rb-fs-body);
+    color: var(--text-primary);
+    box-shadow: 0 10px 28px -20px rgba(15, 23, 42, 0.45);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.help-search__input::placeholder { color: #94A3B8; }
+.help-search__input::-webkit-search-cancel-button { display: none; }
+
+.help-search__input:focus {
+    outline: none;
+    border-color: var(--rb-primary);
+    box-shadow: 0 0 0 4px rgba(var(--rb-primary-rgb), 0.14);
+}
+
+.help-search__clear {
+    position: absolute;
+    top: 50%;
+    right: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    transform: translateY(-50%);
+    border: none;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748B;
+    cursor: pointer;
 }
 
-.topic-card__icon--primary { background: #eaf3fc; color: var(--primary); }
-.topic-card__icon--success { background: #eaf6ea; color: var(--success); }
-.topic-card__icon--warning { background: #fff4e5; color: var(--warning); }
-.topic-card__icon--danger { background: #fbeaea; color: var(--accent); }
+.help-search__clear:hover { background: #e2e8f0; color: var(--text-primary); }
 
-.topic-card__body {
-    flex: 1;
-    min-width: 0;
-}
+/* ── Topic tiles ── */
+.topics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 
-.topic-card__title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.topic-card__desc {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin: 4px 0 0;
-    line-height: 1.4;
-}
-
-.topic-card__arrow {
-    color: var(--text-secondary);
-    flex-shrink: 0;
-    margin-top: 4px;
-}
-
-/* Layout */
-.main-grid {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 20px;
-    align-items: start;
-}
-
-.col-left,
-.col-right {
+.topic-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 4px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: white;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
+.topic-card:hover { border-color: rgba(var(--rb-primary-rgb), 0.4); transform: translateY(-1px); }
+.topic-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+.topic-card__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+}
+
+.topic-card__icon--primary { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.topic-card__icon--success { background: #eaf6ea; color: var(--success); }
+.topic-card__icon--warning { background: #fff4e5; color: var(--warning); }
+.topic-card__icon--danger { background: #fdecec; color: var(--accent); }
+
+.topic-card__title { margin: 0; font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); }
+.topic-card__desc { margin: 0; font-size: var(--rb-fs-caption); line-height: 1.45; color: #64748B; }
+
+.topic-card__arrow {
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    color: #CBD5E1;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.topic-card:hover .topic-card__arrow { color: var(--rb-primary-text); transform: translateX(2px); }
+
+/* ── Layout ── */
+.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.col-left, .col-right { display: flex; flex-direction: column; gap: 20px; }
+
 .panel {
+    border: 1px solid var(--border);
+    border-radius: 20px;
     background: white;
-    border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-    border: 1px solid #eef0f3;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
 }
 
 .panel-header--simple {
-    padding: 16px 20px;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.panel-title {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-/* FAQ accordion */
-.faq-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.faq-item {
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.faq-item:last-child {
-    border-bottom: none;
-}
-
-.faq-question {
-    width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 16px 20px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-title { margin: 0; font-size: var(--rb-fs-section); font-weight: 700; color: var(--text-primary); }
+.panel-count { font-size: var(--rb-fs-caption); font-weight: 600; color: #64748B; }
+
+/* ── FAQ accordion ── */
+.faq-list { display: flex; flex-direction: column; padding: 8px; }
+
+.faq-item { border-radius: 14px; transition: background-color 0.15s ease; }
+.faq-item + .faq-item { margin-top: 2px; }
+.faq-item--open { background: #f8fafc; }
+
+.faq-question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 14px;
     border: none;
+    border-radius: 14px;
     background: none;
+    font: inherit;
+    font-size: var(--rb-fs-body);
+    font-weight: 600;
     text-align: left;
-    font-size: 13.5px;
-    font-weight: 700;
     color: var(--text-primary);
     cursor: pointer;
 }
 
-.faq-question__chevron {
-    flex-shrink: 0;
-    color: var(--text-secondary);
-    transition: transform 0.2s ease;
-}
+.faq-question:hover { background: #f8fafc; }
+.faq-question:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
 
-.faq-question__chevron--open {
-    transform: rotate(180deg);
-}
-
-.faq-answer {
-    padding: 0 20px 18px;
-}
-
-.faq-answer p {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin: 0;
-}
-
-/* Contact support */
-.contact-list {
+.faq-question__toggle {
     display: flex;
-    flex-direction: column;
-    padding: 16px 20px 4px;
-    gap: 16px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748B;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
+
+.faq-item--open .faq-question__toggle { background: var(--rb-primary); color: #fff; }
+
+.faq-answer { padding: 0 54px 16px 14px; }
+.faq-answer p { margin: 0; font-size: var(--rb-fs-small); line-height: 1.65; color: #475569; }
+
+.faq-empty { padding: 28px 16px; text-align: center; }
+.faq-empty__title { margin: 0; font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); }
+.faq-empty__sub { margin: 4px 0 0; font-size: var(--rb-fs-small); color: #64748B; }
+
+/* ── Contact support ── */
+.contact-list { display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 6px; }
 
 .contact-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
+    padding: 10px;
+    border-radius: 14px;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
 }
+
+a.contact-row:hover { background: #f8fafc; }
+a.contact-row:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 
 .contact-row__icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    background: #eaf3fc;
-    color: var(--primary);
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: rgba(var(--rb-primary-rgb), 0.1);
+    color: var(--rb-primary-text);
 }
 
-.contact-row__label {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin: 0 0 2px;
-}
+.contact-row__label { display: block; font-size: var(--rb-fs-caption); color: #64748B; }
+.contact-row__value { display: block; font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); }
+a.contact-row:hover .contact-row__value { color: var(--rb-primary-text); }
 
-.contact-row__value {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-    text-decoration: none;
-    margin: 0;
-}
-
-a.contact-row__value:hover {
-    color: var(--primary);
-}
-
-/* Legal links */
-.legal-panel {
-    padding: 8px 4px;
-    display: flex;
-    flex-direction: column;
-}
+/* ── Legal links ── */
+.legal-panel { display: flex; flex-direction: column; padding: 8px; }
 
 .legal-link {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    font-size: 13px;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    font-size: var(--rb-fs-small);
     font-weight: 600;
     color: var(--text-primary);
     text-decoration: none;
 }
 
-.legal-link:hover {
-    color: var(--primary);
-}
+.legal-link__text { flex: 1; }
+.legal-link :deep(svg) { color: #94A3B8; }
+.legal-link:hover { background: #f8fafc; color: var(--rb-primary-text); }
+.legal-link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 
-/* Buttons */
+/* ── Buttons ── */
 .btn-primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     padding: 11px 20px;
-    border-radius: 10px;
-    font-size: 13px;
+    border: none;
+    border-radius: 999px;
+    background: var(--primary);
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: white;
-    background: var(--primary);
-    border: none;
-    cursor: pointer;
     text-decoration: none;
-    transition: opacity 0.15s ease;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
 }
 
-.btn-primary:hover {
-    opacity: 0.92;
+.btn-primary:hover { background: var(--rb-primary-hover); }
+.btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+.btn-block { width: calc(100% - 40px); margin: 6px 20px 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .topic-card, .topic-card__arrow, .faq-item, .faq-question__toggle, .help-search__input { transition: none; }
 }
 
-.btn-block {
-    width: calc(100% - 40px);
-    margin: 4px 20px 20px;
+@media (max-width: 1100px) {
+    .topics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 900px) {
-    .topics-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .main-grid {
-        grid-template-columns: 1fr;
-    }
+    .main-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
-    .help-page {
-        padding: 16px 16px 32px;
-    }
-
-    .topics-grid {
-        grid-template-columns: 1fr;
-    }
+    .help-page { padding: 16px 16px 32px; }
+    .help-hero { padding: 22px 16px; }
+    .page-title { font-size: var(--rb-fs-title); }
+    .topics-grid { gap: 10px; }
+    .topic-card { padding: 14px; }
+    .topic-card__desc { display: none; }
+    .topic-card__arrow { top: 16px; right: 14px; }
+    .faq-answer { padding-right: 14px; }
 }
 
 /* ============ Dark mode ============ */
 :global(.dark .help-page) {
     --text-primary: #F1F5F9;
     --text-secondary: #94A3B8;
+    --border: #334155;
     background: #0F172A;
 }
 
 :global(.dark .help-page .topic-card),
-:global(.dark .help-page .panel) {
-    background: #1E293B;
+:global(.dark .help-page .panel) { background: #1E293B; border-color: #334155; }
+:global(.dark .help-page .help-hero) {
+    background:
+        radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--rb-primary-text) 12%, transparent), transparent 60%),
+        #1E293B;
     border-color: #334155;
 }
+:global(.dark .help-page .help-search__input) { background: #0F172A; border-color: #334155; color: #F1F5F9; }
+:global(.dark .help-page .help-search__clear) { background: #263449; color: #CBD5E1; }
+:global(.dark .help-page .topic-card__icon--primary),
+:global(.dark .help-page .contact-row__icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .help-page .topic-card__icon--success) { background: rgba(102, 187, 106, 0.16); color: #81C784; }
+:global(.dark .help-page .topic-card__icon--warning) { background: rgba(255, 167, 38, 0.16); color: #FFB74D; }
+:global(.dark .help-page .topic-card__icon--danger) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }
+:global(.dark .help-page .panel-header--simple) { border-color: #334155; }
+:global(.dark .help-page .faq-item--open),
+:global(.dark .help-page .faq-question:hover),
+:global(.dark .help-page a.contact-row:hover),
+:global(.dark .help-page .legal-link:hover) { background: #263449; }
+:global(.dark .help-page .faq-question__toggle) { background: #263449; color: #CBD5E1; }
+:global(.dark .help-page .faq-item--open .faq-question__toggle) { background: var(--rb-primary); color: #fff; }
+:global(.dark .help-page .faq-answer p),
+:global(.dark .help-page .topic-card__desc),
+:global(.dark .help-page .page-subtitle) { color: #CBD5E1; }
 
-:global(.dark .help-page .topic-card:hover) {
-    border-color: #42A5F5;
-}
-
-:global(.dark .help-page .topic-card__icon--primary) { background: rgba(66,165,245,0.16); }
-:global(.dark .help-page .topic-card__icon--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .help-page .topic-card__icon--warning) { background: rgba(255,167,38,0.16); }
-:global(.dark .help-page .topic-card__icon--danger) { background: rgba(239,83,80,0.16); }
-
-:global(.dark .help-page .panel-header--simple),
-:global(.dark .help-page .faq-item) {
-    border-color: #334155;
-}
-
-:global(.dark .help-page .contact-row__icon) { background: rgba(66,165,245,0.16); }
-
-/* background-image, not the `background` shorthand: the shorthand resets
-   background-size to `auto`, which collapses the 400%-wide gradient to the
-   element width and leaves the shimmer keyframes with zero travel. */
+/* background-image, not the shorthand: keeps the 400% size for the shimmer. */
 :global(.dark .help-page .skeleton) {
     background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
-}
-
-.btn-primary:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
 }
 </style>

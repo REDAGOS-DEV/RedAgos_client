@@ -36,19 +36,18 @@
 
     <!-- ===================== EMPTY STATE ===================== -->
     <template v-else-if="!hasData">
-      <div class="ba-empty-state fade-in">
-        <div class="ba-empty-illustration">
-          <AssetIcon name="droplet-off" :size="56" />
-        </div>
-        <h2 class="ba-empty-title">No Blood Availability Data</h2>
-        <p class="ba-empty-desc">
-          {{ loadError || 'Blood availability information is currently unavailable.' }}<br />
-          Please refresh the page or try again later.
-        </p>
-        <button class="ba-btn-primary" @click="fetchInventory">
-          <AssetIcon name="refresh-cw" :size="18" />
-          Refresh Availability
-        </button>
+      <div class="ba-inner">
+        <section class="ba-panel">
+          <EmptyState
+            icon="droplet-off"
+            title="No Blood Availability Data"
+            :description="`${loadError || 'Blood availability information is currently unavailable.'} Please refresh the page or try again later.`">
+            <button class="ui-btn ui-btn--primary" @click="fetchInventory">
+              <AssetIcon name="refresh-cw" :size="15" />
+              Refresh Availability
+            </button>
+          </EmptyState>
+        </section>
       </div>
     </template>
 
@@ -56,18 +55,14 @@
     <template v-else>
       <div class="ba-inner">
         <!-- PAGE HEADER -->
-        <header class="ba-header fade-in" style="--delay: 0ms">
-          <div>
-            <h1 class="ba-title">Blood Availability</h1>
-            <p class="ba-subtitle">View the latest available blood units provided by the Blood Center.</p>
-          </div>
-          <div class="ba-header-actions">
+        <PageHeader title="Blood Availability" subtitle="View the latest available blood units provided by the Blood Center.">
+          <template #actions>
             <span class="ba-sync-badge" role="status">
               <span class="ba-sync-dot" aria-hidden="true"></span>
               Synced {{ syncedLabel }}
             </span>
             <button
-              class="ba-theme-toggle"
+              class="ui-btn ui-btn--icon"
               type="button"
               :aria-pressed="isDark"
               :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
@@ -77,16 +72,16 @@
               <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" />
             </button>
             <button
-              class="ba-btn-primary"
+              class="ui-btn ui-btn--primary"
               :class="{ 'is-refreshing': isRefreshing }"
               :disabled="isRefreshing"
               @click="fetchInventory"
             >
-              <AssetIcon name="refresh-cw" :size="16" />
+              <AssetIcon name="refresh-cw" :size="15" />
               Refresh Availability
             </button>
-          </div>
-        </header>
+          </template>
+        </PageHeader>
 
         <!-- SEARCH & FILTER PANEL -->
         <section class="ba-filter-panel fade-in" style="--delay: 60ms" aria-labelledby="ba-filter-title">
@@ -115,83 +110,37 @@
             </button>
 
             <div class="ba-filter-fields" :class="{ 'is-open': filtersOpen }">
-              <select v-model="filters.bloodType" class="ba-select" aria-label="Filter by blood type">
-                <option value="">Blood Type</option>
-                <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.bloodType" :options="[{ value: '', label: 'Blood Type' }, ...bloodTypeOptions.map((t) => ({ value: t, label: t }))]" aria-label="Filter by blood type" size="sm" />
+              </div>
 
-              <select v-model="filters.component" class="ba-select" aria-label="Filter by blood component">
-                <option value="">Blood Component</option>
-                <option v-for="c in componentOptions" :key="c" :value="c">{{ c }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.component" :options="[{ value: '', label: 'Blood Component' }, ...componentOptions.map((c) => ({ value: c, label: c }))]" aria-label="Filter by blood component" size="sm" />
+              </div>
 
-              <select v-model="filters.status" class="ba-select" aria-label="Filter by availability status">
-                <option value="">Availability Status</option>
-                <option value="Healthy">Healthy</option>
-                <option value="Low">Low</option>
-                <option value="Critical">Critical</option>
-                <option value="Unavailable">Unavailable</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.status" :options="[{ value: '', label: 'Availability Status' }, { value: 'Healthy', label: 'Healthy' }, { value: 'Low', label: 'Low' }, { value: 'Critical', label: 'Critical' }, { value: 'Unavailable', label: 'Unavailable' }]" aria-label="Filter by availability status" size="sm" />
+              </div>
 
-              <select v-model="filters.center" class="ba-select" aria-label="Filter by blood center">
-                <option value="">Blood Center</option>
-                <option v-for="c in centerOptions" :key="c" :value="c">{{ c }}</option>
-              </select>
+              <div class="ba-select">
+                <SelectField v-model="filters.center" :options="[{ value: '', label: 'Blood Center' }, ...centerOptions.map((c) => ({ value: c, label: c }))]" aria-label="Filter by blood center" size="sm" />
+              </div>
 
               <div class="ba-filter-actions">
-                <button class="ba-btn-ghost" @click="resetFilters">Reset Filters</button>
-                <button class="ba-btn-primary ba-btn-sm" @click="filtersOpen = false; fetchInventory()">Apply Filters</button>
+                <button class="ui-btn ui-btn--sm" @click="resetFilters">Reset Filters</button>
+                <button class="ui-btn ui-btn--primary ui-btn--sm" @click="filtersOpen = false; fetchInventory()">Apply Filters</button>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- SUMMARY KPI CARDS -->
-        <div class="ba-summary-grid">
-          <div class="ba-summary-card fade-in" style="--delay: 100ms">
-            <div class="ba-summary-top">
-              <div class="ba-summary-icon" style="background:#1565C014">
-                <AssetIcon name="droplets" :size="22" style="color:#1565C0" />
-              </div>
-              <span class="ba-summary-label">Total Available Units</span>
-            </div>
-            <p class="ba-summary-value">{{ totalUnitsDisplay }}</p>
-            <p class="ba-summary-helper">Across all blood types</p>
-          </div>
-
-          <div class="ba-summary-card fade-in" style="--delay: 150ms">
-            <div class="ba-summary-top">
-              <div class="ba-summary-icon" style="background:#2E7D3214">
-                <AssetIcon name="check-circle-2" :size="22" style="color:#2E7D32" />
-              </div>
-              <span class="ba-summary-label">Blood Types Available</span>
-            </div>
-            <p class="ba-summary-value" style="color:#2E7D32">{{ typesAvailableDisplay }}</p>
-            <p class="ba-summary-helper">Out of {{ bloodTypeOptions.length }} tracked types</p>
-          </div>
-
-          <div class="ba-summary-card fade-in" style="--delay: 200ms">
-            <div class="ba-summary-top">
-              <div class="ba-summary-icon" style="background:#D32F2F14">
-                <AssetIcon name="triangle-alert" :size="22" style="color:#D32F2F" />
-              </div>
-              <span class="ba-summary-label">Critical Blood Types</span>
-            </div>
-            <p class="ba-summary-value" style="color:#D32F2F">{{ criticalTypesDisplay }}</p>
-            <p class="ba-summary-helper">Needs urgent restocking</p>
-          </div>
-
-          <div class="ba-summary-card fade-in" style="--delay: 250ms">
-            <div class="ba-summary-top">
-              <div class="ba-summary-icon" style="background:#7C3AED14">
-                <AssetIcon name="clock" :size="22" style="color:#7C3AED" />
-              </div>
-              <span class="ba-summary-label">Last Inventory Update</span>
-            </div>
-            <p class="ba-summary-value ba-summary-value--sm">{{ lastUpdatedLabel || '—' }}</p>
-            <p class="ba-summary-helper">Synced from Blood Center</p>
-          </div>
-        </div>
+        <!-- SUMMARY FIGURES -->
+        <StatStrip>
+          <StatItem label="Total available units" :value="totalUnitsDisplay" hint="Across all blood types" icon="droplets" tone="primary" />
+          <StatItem label="Blood types available" :value="typesAvailableDisplay" :hint="`Out of ${bloodTypeOptions.length} tracked types`" icon="check-circle" tone="success" />
+          <StatItem label="Critical blood types" :value="criticalTypesDisplay" hint="Needs urgent restocking" icon="triangle-alert" tone="danger" :alert="Number(criticalTypesDisplay) > 0" />
+          <StatItem label="Last inventory update" :value="lastUpdatedLabel || '—'" hint="Synced from Blood Center" icon="clock" tone="purple" />
+        </StatStrip>
 
         <div class="ba-layout">
           <!-- MAIN COLUMN -->
@@ -276,7 +225,7 @@
             <section v-if="criticalAlerts.length" class="ba-panel ba-alert-panel fade-in" style="--delay: 380ms">
               <div class="ba-panel-header">
                 <div class="ba-alert-header">
-                  <AssetIcon name="alert-triangle" :size="20" class="ba-alert-header-icon" />
+                  <AssetIcon name="triangle-alert" :size="18" class="ba-alert-header-icon" />
                   <h2 class="ba-section-title" style="margin:0;">Critical Blood Availability</h2>
                 </div>
               </div>
@@ -441,7 +390,7 @@
 
             <div class="ba-side-card fade-in" style="--delay: 380ms">
               <h3 class="ba-side-title">Quick Actions</h3>
-              <NuxtLink to="/hospital/bloodrequest/" class="ba-side-action">
+              <NuxtLink to="/hospital/bloodrequests/newrequest" class="ba-side-action">
                 <span class="ba-side-action-icon">
                   <AssetIcon name="circle-plus" :size="16" />
                 </span>
@@ -468,16 +417,16 @@
               <h3 class="ba-side-title">Availability Legend</h3>
               <div class="ba-legend-chips">
                 <span class="ba-legend-chip badge-healthy">
-                  <span class="ba-legend-dot" style="background:#2E7D32;"></span> Healthy
+                  <span class="ba-legend-dot" style="background: var(--rb-success);"></span> Healthy
                 </span>
                 <span class="ba-legend-chip badge-low">
-                  <span class="ba-legend-dot" style="background:#F57C00;"></span> Low
+                  <span class="ba-legend-dot" style="background: var(--rb-warning);"></span> Low
                 </span>
                 <span class="ba-legend-chip badge-critical">
-                  <span class="ba-legend-dot" style="background:#D32F2F;"></span> Critical
+                  <span class="ba-legend-dot" style="background: var(--rb-accent);"></span> Critical
                 </span>
                 <span class="ba-legend-chip badge-unavailable">
-                  <span class="ba-legend-dot" style="background:#94A3B8;"></span> Unavailable
+                  <span class="ba-legend-dot" style="background: var(--rb-text-muted);"></span> Unavailable
                 </span>
               </div>
             </div>
@@ -489,9 +438,14 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -871,40 +825,30 @@ const donutSegments = computed(() => {
 
 <style scoped>
 .ba-page {
-  --ba-primary: var(--rb-primary, #1565C0);
-  --ba-primary-hover: #0D47A1;
-  --ba-bg: #F7F9FC;
-  --ba-card: #FFFFFF;
-  --ba-border: #E5EAF0;
-  --ba-text: #1E293B;
-  --ba-text-secondary: var(--rb-text-secondary, #64748B);
-  --ba-text-muted: var(--rb-text-muted, #94A3B8);
-  --ba-success: var(--rb-success, #2E7D32);
-  --ba-warning: var(--rb-warning, #F57C00);
-  --ba-danger: var(--rb-accent, #D32F2F);
-  --ba-purple: var(--rb-purple, #7C3AED);
-  --ba-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
-  --ba-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --ba-primary: var(--rb-primary);
+  --ba-primary-hover: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  --ba-bg: var(--rb-page-bg);
+  --ba-card: var(--rb-surface);
+  --ba-border: var(--rb-border);
+  --ba-text: var(--rb-text-primary);
+  --ba-text-secondary: var(--rb-text-secondary);
+  --ba-text-muted: var(--rb-text-muted);
+  --ba-success: var(--rb-success);
+  --ba-warning: var(--rb-warning);
+  --ba-danger: var(--rb-accent);
+  --ba-purple: var(--rb-purple);
+  --ba-shadow: var(--rb-shadow-sm);
+  --ba-shadow-hover: 0 6px 18px -8px rgba(15, 23, 42, 0.18);
 
   font-family: var(--rb-font-sans);
   color: var(--ba-text);
   background: var(--ba-bg); 
-  max-width: 1400px;
+  max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
  /* box-sizing: border-box; */
 }
 
-:global(.dark .ba-page) {
-  --ba-bg: #0F172A;
-  --ba-card: #1E293B;
-  --ba-border: #2A3447;
-  --ba-text: #F1F5F9;
-  --ba-text-secondary: #94A3B8;
-  --ba-text-muted: #64748B;
-  --ba-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
-  --ba-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.32);
-}
 
 .ba-inner {
   display: flex;
@@ -1005,7 +949,7 @@ const donutSegments = computed(() => {
   transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 .ba-theme-toggle:hover {
-  color: var(--ba-primary);
+  color: var(--rb-primary-text);
   border-color: var(--ba-primary);
   transform: translateY(-1px);
 }
@@ -1148,16 +1092,7 @@ const donutSegments = computed(() => {
   gap: 12px;
   align-items: center;
 }
-.ba-select {
-  height: 44px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--ba-border);
-  background: var(--ba-bg);
-  color: var(--ba-text);
-  font-size: 14px;
-  font-family: var(--rb-font-sans);
-}
+.ba-select { width: 190px; }
 .ba-filter-actions {
   display: flex;
   gap: 10px;
@@ -1240,7 +1175,7 @@ const donutSegments = computed(() => {
   margin-bottom: 16px;
 }
 .ba-section-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   margin: 0;
 }
@@ -1310,7 +1245,7 @@ const donutSegments = computed(() => {
 .fill-healthy { background: var(--ba-success); }
 .fill-low { background: var(--ba-warning); }
 .fill-critical { background: var(--ba-danger); }
-.fill-unavailable { background: #94A3B8; }
+.fill-unavailable { background: var(--rb-text-muted); }
 .ba-type-meta {
   display: flex;
   flex-direction: column;
@@ -1332,7 +1267,7 @@ const donutSegments = computed(() => {
   gap: 4px;
   border: none;
   background: none;
-  color: var(--ba-primary);
+  color: var(--rb-primary-text);
   font-size: 13px;
   font-weight: 600;
   padding: 0;
@@ -1372,7 +1307,7 @@ const donutSegments = computed(() => {
 .badge-healthy { background: rgba(46, 125, 50, 0.08); color: var(--ba-success); }
 .badge-low { background: rgba(245, 158, 11, 0.1); color: var(--ba-warning); }
 .badge-critical { background: rgba(211, 47, 47, 0.08); color: var(--ba-danger); }
-.badge-unavailable { background: rgba(148, 163, 184, 0.12); color: #64748B; }
+.badge-unavailable { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 /* ---------- TABLE ---------- */
 .ba-table-wrap {
@@ -1433,7 +1368,7 @@ const donutSegments = computed(() => {
 }
 .ba-alert-card.alert-critical { border-left-color: var(--ba-danger); }
 .ba-alert-card.alert-low { border-left-color: var(--ba-warning); }
-.ba-alert-card.alert-unavailable { border-left-color: #94A3B8; }
+.ba-alert-card.alert-unavailable { border-left-color: var(--rb-text-muted); }
 .ba-alert-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--ba-shadow-hover);
@@ -1503,7 +1438,7 @@ const donutSegments = computed(() => {
 }
 .ba-segmented-btn.active {
   background: var(--ba-card);
-  color: var(--ba-primary);
+  color: var(--rb-primary-text);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 .ba-trend-body {
@@ -1761,7 +1696,7 @@ const donutSegments = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ba-primary);
+  color: var(--rb-primary-text);
   flex-shrink: 0;
 }
 .ba-side-action-title {
@@ -1772,7 +1707,7 @@ const donutSegments = computed(() => {
   transition: color 0.15s ease, transform 0.15s ease;
 }
 .ba-side-action:hover .ba-side-action-chevron {
-  color: var(--ba-primary);
+  color: var(--rb-primary-text);
   transform: translateX(2px);
 }
 .ba-legend-chips {
@@ -1842,15 +1777,6 @@ const donutSegments = computed(() => {
   background-size: 400% 100%;
   border-radius: 6px;
   animation: ba-shimmer 1.4s ease infinite;
-}
-:global(.dark .ba-page .skeleton-line) {
-  background: linear-gradient(
-    90deg,
-    #2A3447 25%,
-    #3A4763 37%,
-    #2A3447 63%
-  );
-  background-size: 400% 100%;
 }
 @keyframes ba-shimmer {
   0% { background-position: 100% 50%; }

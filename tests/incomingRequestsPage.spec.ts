@@ -165,7 +165,7 @@ describe('a hospital not on RedAgos (project owner, 2026-10-19)', () => {
   const dialog = source('app/components/BloodCenter/WalkInRequestDialog.vue')
 
   it('can be typed by name on a walk-in, with no address asked for', () => {
-    expect(dialog).toContain('<option :value="NEW_HOSPITAL">Not in the list — type its name…</option>')
+    expect(dialog).toContain("{ value: NEW_HOSPITAL, label: 'Not in the list — type its name…' }")
     expect(dialog).toContain('<input v-model="form.hospitalName"')
     expect(dialog).not.toMatch(/hospitalAddress|hospital_address/)
   })

@@ -10,22 +10,18 @@
         </transition-group>
       </div>
 
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Receipts</h1>
-          <p class="page-subtitle">
-            Every acknowledgement receipt this centre has issued, one for each payment taken. A corrected
-            payment's old receipt stays here, voided, beside its replacement.
-          </p>
-        </div>
-        <div class="header-actions">
-          <NuxtLink to="/blood-center/pos" class="btn btn-primary">
+      <PageHeader title="Receipts" subtitle="Every receipt this centre has issued. A corrected payment's old receipt stays here, voided.">
+        <template #actions>
+          <NuxtLink to="/blood-center/billing" class="ui-btn">
+            <AssetIcon name="file-text" :size="15" />
+            Statements
+          </NuxtLink>
+          <NuxtLink to="/blood-center/pos" class="ui-btn ui-btn--primary">
             <AssetIcon name="credit-card" :size="15" />
             Billing counter
           </NuxtLink>
-          <NuxtLink to="/blood-center/billing" class="btn btn-outline">Statements</NuxtLink>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <section class="toolbar" aria-label="Filters">
         <div class="search">
@@ -44,25 +40,23 @@
             {{ s.label }}
           </button>
         </div>
-        <label class="filter"><span>From</span><input v-model="from" type="date" class="input" :max="to || undefined"></label>
-        <label class="filter"><span>To</span><input v-model="to" type="date" class="input" :min="from || undefined"></label>
+        <label class="filter"><span>From</span><DatePicker id="receipts-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" /></label>
+        <label class="filter"><span>To</span><DatePicker id="receipts-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" /></label>
       </section>
 
       <section class="card" aria-label="Receipts">
         <div v-if="loading" class="skeleton-wrap"><div v-for="n in 6" :key="n" class="skeleton" /></div>
 
-        <div v-else-if="error" class="empty">
-          <AssetIcon name="triangle-alert" :size="30" />
-          <h2>The receipts could not be loaded</h2>
-          <p>{{ error }}</p>
-          <button class="btn btn-outline" @click="load()">Try again</button>
-        </div>
+        <EmptyState v-else-if="error" icon="triangle-alert" title="The receipts could not be loaded" :description="error">
+          <button class="ui-btn" @click="load()">Try again</button>
+        </EmptyState>
 
-        <div v-else-if="!receipts.length" class="empty">
-          <AssetIcon name="receipt" :size="32" />
-          <h2>{{ filtered ? 'No receipt matches these filters' : 'No receipts yet' }}</h2>
-          <p>{{ filtered ? 'Clear the search or widen the dates.' : 'A receipt is issued the moment a payment is taken at the counter or confirmed by GCash.' }}</p>
-        </div>
+        <EmptyState
+          v-else-if="!receipts.length"
+          icon="receipt"
+          :title="filtered ? 'No receipt matches these filters' : 'No receipts yet'"
+          :description="filtered ? 'Clear the search or widen the dates.' : 'A receipt is issued the moment a payment is taken at the counter or confirmed by GCash.'"
+        />
 
         <div v-else class="table-scroll">
           <table class="rl-table">
@@ -99,10 +93,10 @@
                   <BillingBadge v-else tone="success">Paid in full</BillingBadge>
                 </td>
                 <td class="row-actions" @click.stop>
-                  <button class="btn btn-ghost btn-sm" :disabled="r.voided" :aria-label="`Print ${r.receipt_number} on the 80mm printer`" @click="printThermal(r)">
+                  <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="r.voided" :aria-label="`Print ${r.receipt_number} on the 80mm printer`" @click="printThermal(r)">
                     <AssetIcon name="printer" :size="14" />
                   </button>
-                  <button class="btn btn-ghost btn-sm" :disabled="downloadingId === r.id" :aria-label="`Download ${r.receipt_number} as PDF`" @click="download(r)">
+                  <button class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="downloadingId === r.id" :aria-label="`Download ${r.receipt_number} as PDF`" @click="download(r)">
                     <AssetIcon name="download" :size="14" />
                   </button>
                 </td>
@@ -112,9 +106,9 @@
         </div>
 
         <footer v-if="!loading && meta.last_page > 1" class="pager">
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
           <span>Page {{ meta.current_page }} of {{ meta.last_page }} · {{ meta.total }} receipts</span>
-          <button class="btn btn-outline btn-sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
         </footer>
       </section>
     </div>
@@ -132,6 +126,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -322,4 +319,7 @@ onMounted(() => load())
 @media (max-width: 640px) {
   .filter { width: calc(50% - 6px); }
 }
+
+/* Cards in the shared SectionCard's shape (2026-10-15). */
+.card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>
