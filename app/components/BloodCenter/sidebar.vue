@@ -315,13 +315,21 @@ const FOLDER_ICONS = {
   Management: 'briefcase',
 }
 
-const topItems = computed(() => navGroups.value.find(g => g.label === 'Main')?.items ?? [])
+// The server knows no user (the token lives in the browser), so it draws only
+// Account, which needs no ability. Hydration must draw the same: drawing the
+// folders then makes Vue hydrate them onto Account's nodes, and with two
+// folders a stale, light-themed copy of Account is left above the real one.
+// The rows and folders follow once mounted.
+const hydrated = ref(false)
+onMounted(() => { hydrated.value = true })
+
+const topItems = computed(() => (hydrated.value ? navGroups.value.find(g => g.label === 'Main')?.items ?? [] : []))
 const bottomItems = computed(() => navGroups.value.find(g => g.label === 'Account')?.items ?? [])
-const folders = computed(() =>
-  navGroups.value
+const folders = computed(() => (hydrated.value
+  ? navGroups.value
     .filter(g => g.label && g.label !== 'Main' && g.label !== 'Account')
     .map(g => ({ key: g.label, label: g.label, icon: FOLDER_ICONS[g.label] || 'folder', items: g.items }))
-)
+  : []))
 
 // ── Folder open/closed state, remembered across reloads ──
 const FOLDERS_KEY = 'redagos:blood-center-sidebar-folders'

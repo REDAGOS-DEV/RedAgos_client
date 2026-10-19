@@ -198,6 +198,10 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
       { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
     ],
+    // Not Billing's (project owner, 2026-10-20). Its clerk and supervisor keep
+    // requests.view, read-only, because a statement reads the request it bills
+    // for; they just do not browse Stock and Supply's pages.
+    hiddenFrom: ['billing'],
   },
   {
     label: 'Billing',

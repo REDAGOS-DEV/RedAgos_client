@@ -87,6 +87,22 @@ describe('rail width and the space reserved for it', () => {
   })
 })
 
+describe('the sidebar on hydration', () => {
+  const sidebar = source(SIDEBAR)
+
+  /*
+   * The server has no user, so it draws Account alone. Drawing the folders on
+   * the first client render hydrated them onto Account's nodes; with two
+   * folders (a Billing clerk's) a stale copy of Account stayed above the real
+   * one (2026-10-20).
+   */
+  it('draws the rows and folders only once mounted, as the server cannot', () => {
+    expect(sidebar).toContain('onMounted(() => { hydrated.value = true })')
+    expect(sidebar).toContain("const topItems = computed(() => (hydrated.value ? navGroups.value.find(g => g.label === 'Main')?.items ?? [] : []))")
+    expect(sidebar).toMatch(/const folders = computed\(\(\) => \(hydrated\.value\s+\? navGroups\.value/)
+  })
+})
+
 describe('scoped dark-mode rules', () => {
   /*
    * `:global(.dark) .thing { … }` looks right and compiles to `.dark { … }`:

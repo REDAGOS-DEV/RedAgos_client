@@ -82,6 +82,21 @@ describe('the Issuance department\'s group', () => {
     // Overview first for everyone, then the member's own department.
     expect(labels.slice(0, 2)).toEqual(['Overview', 'Stock and Supply'])
   })
+
+  it('is hidden from Billing even though it holds requests.view (project owner, 2026-10-20)', () => {
+    signIn({ department: 'billing', management_level: null }, ['billing.view', 'billing.create', 'billing.record_payment', 'requests.view'])
+    const nav = useBloodCenterNav()
+
+    expect(groupLabels()).not.toContain('Stock and Supply')
+    expect(nav.searchablePages.value.map((item) => item.path)).not.toContain('/blood-center/bloodrequests')
+    expect(nav.userMenuItems.value.map((item) => item.path)).not.toContain('/blood-center/bloodrequests')
+  })
+
+  it('stays for a Supervisor, whatever department they came from', () => {
+    signIn({ department: 'billing', management_level: 'supervisor' }, ['reports.view_all', 'requests.view', 'billing.view'])
+
+    expect(groupLabels()).toContain('Stock and Supply')
+  })
 })
 
 describe('Stock Thresholds and the Daily Stock Report', () => {
