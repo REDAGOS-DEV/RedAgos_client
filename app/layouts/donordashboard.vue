@@ -1,5 +1,5 @@
 <template>
-  <div class="donor-portal">
+  <div class="donor-portal" :class="{ 'donor-portal--fyp': route.path === '/donor/dashboard' }">
     <!--
       The portal's backdrop: soft washes in the donor's theme colours, the
       same treatment as the landing page and sign-in. Fixed and at z-index -1,
@@ -7,7 +7,8 @@
       would trap the pages' modals. The sidebar and top bar are frosted glass
       over it; the page cards stay solid for readability.
     -->
-    <div class="donor-backdrop" aria-hidden="true" />
+    <div class="donor-backdrop" aria-hidden="true"
+      :style="route.path === '/donor/dashboard' && isDark ? { background: '#0F172A' } : undefined" />
 
     <!-- `:donor` was never declared as a prop on the sidebar, so it only landed
          on its root div as donor="[object Object]". The component reads the
@@ -624,6 +625,7 @@ const handleLogout = async () => {
     radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
     #0B1220;
 }
+:global(html.dark) .donor-portal--fyp .donor-backdrop { background: #0F172A; }
 
 /* Frosted glass top bar. */
 .topbar {

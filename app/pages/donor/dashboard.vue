@@ -1,351 +1,69 @@
 <template>
-  <div class="dashboard scope-donor-dashboard">
-    <!-- Skeleton loading state -->
-    <div v-if="loading" class="dashboard-inner">
+  <div class="dashboard scope-donor-dashboard fyp-dashboard" :style="isDark ? { backgroundColor: '#0F172A' } : undefined">
+    <div v-if="loading" class="dashboard-inner fyp-inner" aria-busy="true" aria-label="Loading your feed">
       <div class="skeleton skeleton--header" />
-      <div class="stats-grid">
-        <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-      </div>
-      <div class="main-grid">
-        <div class="col-left">
-          <div class="skeleton skeleton--panel" style="height:220px" />
-          <div class="skeleton skeleton--panel" style="height:260px" />
-        </div>
-        <div class="col-right">
-          <div class="skeleton skeleton--panel" style="height:160px" />
-          <div class="skeleton skeleton--panel" style="height:200px" />
-          <div class="skeleton skeleton--panel" style="height:180px" />
-        </div>
-      </div>
+      <div class="fyp-skeleton-post skeleton" />
+      <div class="fyp-skeleton-post skeleton" />
     </div>
-
-    <div v-else class="dashboard-inner">
-      <!--
-        Hero: the donor's theme gradient with a soft glass glow. One greeting,
-        one line about where they stand, and ONE next step that changes with
-        their situation (screen, then book, then show QR). It replaced a plain
-        title, a separate "Book Appointment" button and the eligibility banner.
-      -->
-      <section class="hero" :class="`hero--${heroTone}`" aria-labelledby="hero-greeting">
-        <div class="hero__copy">
-          <p class="hero__eyebrow">{{ todayLabel }}</p>
-          <h1 id="hero-greeting" class="hero__title">{{ greeting }}</h1>
-          <p class="hero__status">{{ nextStep.status }}</p>
-          <NuxtLink :to="nextStep.to" class="hero__cta">
-            <AssetIcon :name="nextStep.icon" :size="16" />
-            {{ nextStep.label }}
-            <AssetIcon name="arrow-right" :size="15" class="hero__cta-arrow" />
-          </NuxtLink>
+    <div v-else class="dashboard-inner fyp-inner">
+      <header class="fyp-header">
+        <div>
+          <p class="fyp-eyebrow">{{ todayLabel }} · {{ bloodType !== '-' ? `Type ${bloodType}` : 'Blood donor community' }}</p>
+          <h1>For you<span>.</span></h1>
+          <p class="fyp-subtitle">Stories, nearby drives, and ways to make a difference.</p>
         </div>
+        <NuxtLink :to="nextStep.to" class="fyp-header-cta">
+          <AssetIcon :name="nextStep.icon" :size="17" /> {{ nextStep.label }}
+        </NuxtLink>
+      </header>
 
-        <!-- At a glance: blood type and QR status on frosted glass -->
-        <div class="hero__glass">
-          <div class="hero__fact">
-            <span class="hero__fact-icon hero__fact-icon--blood"><AssetIcon name="blood-drop" :size="18" /></span>
-            <span>
-              <span class="hero__fact-label">Blood type</span>
-              <span class="hero__fact-value">{{ bloodType }}</span>
-            </span>
-          </div>
-          <div class="hero__fact">
-            <span class="hero__fact-icon" :class="screeningDone ? 'hero__fact-icon--ok' : 'hero__fact-icon--warn'">
-              <AssetIcon :name="screeningDone ? 'shield-check' : 'clock'" :size="18" />
-            </span>
-            <span>
-              <span class="hero__fact-label">QR code</span>
-              <span class="hero__fact-value">{{ screeningDone ? 'Valid' : questionnaireStatus === 'expired' ? 'Expired' : 'Not yet' }}</span>
-            </span>
-          </div>
-          <NuxtLink to="/donor/qrcode" class="hero__qr-link">
-            View QR
-            <AssetIcon name="arrow-right" :size="14" />
-          </NuxtLink>
-        </div>
-      </section>
+      <nav class="fyp-tabs" aria-label="Feed categories">
+        <span class="fyp-tab fyp-tab--active">For you</span>
+        <NuxtLink to="/donor/appointments" class="fyp-tab">Blood drives</NuxtLink>
+        <NuxtLink to="/donor/history" class="fyp-tab">My impact</NuxtLink>
+      </nav>
 
-      <!-- Onboarding checklist -->
-      <div v-if="showOnboarding" class="onboarding-card">
-        <div class="onboarding-card__header">
-          <div>
-            <p class="onboarding-card__title">Get started with RedAgos</p>
-            <p class="onboarding-card__subtitle">{{ completedSteps }} of {{ onboardingSteps.length }} steps completed
-            </p>
-          </div>
-          <div class="onboarding-card__progress-ring">
-            <svg viewBox="0 0 36 36" class="progress-ring__svg">
-              <circle class="progress-ring__bg" cx="18" cy="18" r="15.5" />
-              <circle class="progress-ring__fill" cx="18" cy="18" r="15.5"
-                :style="{ strokeDasharray: `${progressPercent}, 100` }" />
-            </svg>
-            <span class="progress-ring__label">{{ Math.round(progressPercent) }}%</span>
-          </div>
-        </div>
-
-        <div class="onboarding-steps">
-          <NuxtLink v-for="(step, i) in onboardingSteps" :key="step.key" :to="step.done ? undefined : step.path"
-            class="onboarding-step"
-            :class="{ 'onboarding-step--done': step.done, 'onboarding-step--next': step.key === nextOnboardingKey }"
-            :aria-current="step.key === nextOnboardingKey ? 'step' : undefined">
-            <div class="onboarding-step__check">
-              <AssetIcon v-if="step.done" name="check" :size="12" />
-              <span v-else>{{ i + 1 }}</span>
+      <div class="fyp-layout">
+        <main class="fyp-feed" aria-label="For you feed">
+          <article class="fyp-post fyp-feature-post">
+            <div class="fyp-post-meta">
+              <span class="fyp-avatar fyp-avatar--brand"><AssetIcon name="heart" :size="18" /></span>
+              <div><strong>RedAgos Community</strong><span> · A little good goes a long way</span></div>
+              <span class="fyp-badge">YOUR IMPACT</span>
             </div>
-            <span class="onboarding-step__label">{{ step.label }}</span>
-            <span v-if="step.key === nextOnboardingKey" class="onboarding-step__next">Next</span>
-          </NuxtLink>
-        </div>
-      </div>
-
-      <!-- Stat cards -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Total Donations</p>
-            <div class="stat-card__badge stat-card__badge--primary">
-              <AssetIcon name="blood-drop" :size="14" />
+            <div class="fyp-impact-art"><span class="fyp-art-drop"><AssetIcon name="blood-drop" :size="42" /></span><span class="fyp-art-heart">♥</span></div>
+            <div class="fyp-post-copy">
+              <h2>{{ totalDonations ? 'You showed up. That matters.' : 'Your first donation can change everything.' }}</h2>
+              <p>{{ totalDonations ? `You’ve donated ${totalDonations} ${totalDonations === 1 ? 'time' : 'times'}—each whole blood donation may help up to three people.` : 'One donation can help up to three people. Take the first step when you’re ready.' }}</p>
+              <div class="fyp-post-actions"><span><AssetIcon name="heart" :size="16" /> {{ totalDonations * 3 }} lives potentially helped</span><NuxtLink to="/donor/history">See your journey <AssetIcon name="arrow-right" :size="14" /></NuxtLink></div>
             </div>
-          </div>
-          <p class="stat-card__value">{{ totalDonations }}</p>
-          <span class="stat-chip stat-chip--neutral">Lifetime</span>
-        </div>
+          </article>
 
-        <!-- Lives potentially helped: one whole-blood donation can help up to 3 patients. -->
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Lives Helped</p>
-            <div class="stat-card__badge stat-card__badge--accent">
-              <AssetIcon name="heart" :size="14" />
+          <section class="fyp-section-heading"><div><h2>Happening near you</h2><p>Upcoming blood drives from our centers</p></div><NuxtLink to="/donor/appointments">See all <AssetIcon name="arrow-right" :size="14" /></NuxtLink></section>
+          <article v-for="drive in featuredDrives" :key="drive.id" class="fyp-post fyp-drive-post">
+            <div class="fyp-post-meta">
+              <span class="fyp-avatar"><AssetIcon name="map-pin" :size="17" /></span>
+              <div><strong>{{ drive.facility_name || drive.organizer || 'Blood center' }}</strong><span> · Community blood drive</span></div>
             </div>
-          </div>
-          <p class="stat-card__value">{{ totalDonations * 3 }}</p>
-          <span class="stat-chip stat-chip--neutral">Up to 3 per donation</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Last Donation</p>
-            <div class="stat-card__badge stat-card__badge--success">
-              <AssetIcon name="history" :size="14" />
+            <div class="fyp-drive-art"><div class="fyp-drive-art__label"><AssetIcon name="calendar" :size="15" /> UPCOMING DRIVE</div><div class="fyp-drive-art__title">{{ drive.name }}</div><div class="fyp-drive-art__date">{{ formatDate(drive.date || drive.event_date, 'MMM D, YYYY') }}</div></div>
+            <div class="fyp-post-copy">
+              <p class="fyp-drive-location"><AssetIcon name="map-pin" :size="15" /> {{ drive.location || drive.address || 'Location details available when booking' }}</p>
+              <div class="fyp-post-actions"><span class="fyp-open-pill">{{ drive.status || 'Open' }}<template v-if="drive.total_slots"> · {{ Math.max(drive.total_slots - (drive.registered || 0), 0) }} spots left</template></span><NuxtLink to="/donor/appointments">Find a spot <AssetIcon name="arrow-right" :size="14" /></NuxtLink></div>
             </div>
-          </div>
-          <p class="stat-card__value stat-card__value--date">{{ lastDonationDate }}</p>
-          <span class="stat-chip stat-chip--neutral truncate-chip">
-            {{ lastDonation ? lastDonation.facility_name : 'No donations yet' }}
-          </span>
-        </div>
+          </article>
+          <div v-if="!featuredDrives.length" class="fyp-post fyp-empty-drives"><span class="fyp-avatar"><AssetIcon name="calendar" :size="18" /></span><div><strong>No upcoming drives posted yet</strong><p>Check back soon, or book at a blood center.</p></div><NuxtLink to="/donor/appointments">Browse centers <AssetIcon name="arrow-right" :size="14" /></NuxtLink></div>
 
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Next Appointment</p>
-            <div class="stat-card__badge stat-card__badge--secondary">
-              <AssetIcon name="calendar" :size="14" />
-            </div>
-          </div>
-          <p class="stat-card__value text-primary">{{ nextApptDate }}</p>
-          <span class="stat-chip stat-chip--neutral truncate-chip">
-            {{ upcomingAppointment ? upcomingAppointment.facility_name : 'No appointment scheduled' }}
-          </span>
-        </div>
-      </div>
+          <article v-if="recentDonations.length" class="fyp-post fyp-recent-post">
+            <div class="fyp-post-meta"><span class="fyp-avatar fyp-avatar--soft"><AssetIcon name="history" :size="17" /></span><div><strong>Your donor story</strong><span> · {{ formatDate(recentDonations[0].donation_date, 'MMM D, YYYY') }}</span></div></div>
+            <div class="fyp-post-copy"><h2>{{ recentDonations[0].status === 'completed' ? 'A moment worth remembering ❤️' : 'Your donation activity' }}</h2><p>{{ recentDonations[0].status === 'completed' ? `You donated at ${recentDonations[0].facility_name || 'your blood center'}. Thank you for being there for someone.` : `Your latest donation is ${recentDonations[0].status}. View your full donation history for details.` }}</p><div class="fyp-post-actions"><span><AssetIcon name="blood-drop" :size="15" /> {{ recentDonations[0].blood_type || bloodType }}</span><NuxtLink to="/donor/history">Donation history <AssetIcon name="arrow-right" :size="14" /></NuxtLink></div></div>
+          </article>
+        </main>
 
-      <!-- Main content grid -->
-      <div class="main-grid">
-        <!-- Left column -->
-        <div class="col-left">
-          <!-- Trend chart -->
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h2 class="panel-title">Donation Trend</h2>
-                <p class="panel-subtitle">Donations given over the last 12 months</p>
-              </div>
-              <span class="period-pill">Last 12 months</span>
-            </div>
-
-            <div class="trend-chart">
-              <div v-if="hasTrendData" class="chart">
-                <!-- Y axis -->
-                <div class="chart__yaxis">
-                  <span v-for="n in yTicks" :key="n">{{ n }}</span>
-                </div>
-
-                <!-- Bars -->
-                <div class="chart__plot">
-                  <div v-for="(m, i) in monthlyTrend" :key="m.key" class="chart__col" tabindex="0" role="button"
-                    :aria-label="`${m.month}: ${m.count} donation${m.count !== 1 ? 's' : ''}`"
-                    @mouseenter="hoveredMonth = i" @mouseleave="hoveredMonth = null" @focus="hoveredMonth = i"
-                    @blur="hoveredMonth = null" @click="hoveredMonth = hoveredMonth === i ? null : i">
-                    <div class="chart__tooltip" v-if="hoveredMonth === i">
-                      {{ m.count }} donation{{ m.count !== 1 ? 's' : '' }}
-                    </div>
-
-                    <div class="chart__track">
-                      <div class="chart__bar" :class="{
-                        'chart__bar--current': i === monthlyTrend.length - 1 && m.count > 0,
-                        'chart__bar--low': m.count > 0 && m.count <= lowThreshold && i !== monthlyTrend.length - 1,
-                        'chart__bar--empty': m.count === 0
-                      }" :style="{ height: `${barHeight(m.count)}%` }" />
-                    </div>
-
-                    <span class="chart__label" :class="{ 'chart__label--current': i === monthlyTrend.length - 1 }">{{
-                      m.month }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else class="trend-empty">
-                <div class="trend-empty__icon">
-                  <AssetIcon name="trending-up" :size="28" />
-                </div>
-                <p>Your donations will show here month by month.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent donation history -->
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h2 class="panel-title">Recent Donations</h2>
-                <p class="panel-subtitle">Your latest donation activity</p>
-              </div>
-              <NuxtLink to="/donor/history" class="panel-link">
-                View All
-                <AssetIcon name="chevron-right" :size="14" />
-              </NuxtLink>
-            </div>
-
-            <div v-if="recentDonations.length" class="donation-list">
-              <div v-for="d in recentDonations" :key="d.id" class="donation-item">
-                <div class="donation-item__left">
-                  <div class="donation-icon"
-                    :class="d.status === 'completed' ? 'donation-icon--success' : 'donation-icon--warning'">
-                    <AssetIcon name="blood-drop" :size="15" />
-                  </div>
-                  <div>
-                    <p class="donation-title">
-                      {{ d.status === 'completed' ? 'Successful Donation' : d.status === 'deferred' ? 'Deferred' :
-                        'Pending' }}
-                    </p>
-                    <p class="donation-meta">
-                      <strong class="donation-meta__highlight">{{ d.blood_type }}</strong> &middot; {{ d.facility_name }} &middot; {{
-                        d.donation_type === 'walk_in' ? 'Walk-in' : 'Booked' }}
-                    </p>
-                  </div>
-                </div>
-                <div class="donation-item__right">
-                  <p class="donation-date">{{ formatDate(d.donation_date, 'MMM D, YYYY') }}</p>
-                  <span class="badge capitalize"
-                    :class="d.status === 'completed' ? 'badge--success' : 'badge--warning'">
-                    {{ d.status === 'completed' ? 'Completed' : d.status }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <div class="empty-state__icon">
-                <AssetIcon name="history" :size="28" />
-              </div>
-              <p>No donations yet</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right column -->
-        <div class="col-right">
-          <!-- Upcoming appointment -->
-          <div class="panel">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Upcoming Appointment</h2>
-              <NuxtLink to="/donor/appointments" class="panel-link-plain">Manage</NuxtLink>
-            </div>
-
-            <div v-if="upcomingAppointment" class="appt-body">
-              <div class="appt-row">
-                <div class="appt-date-chip">
-                  <span class="appt-date-chip__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D')
-                  }}</span>
-                  <span class="appt-date-chip__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM')
-                  }}</span>
-                </div>
-                <div class="appt-info">
-                  <p class="appt-type">
-                    {{ upcomingAppointment.appointment_type === 'walk_in' ? 'Walk-in Donation' : 'Booked Donation' }}
-                  </p>
-                  <div class="appt-meta-row">
-                    <AssetIcon name="map-pin" :size="13" />
-                    <span class="truncate">{{ upcomingAppointment.facility_name }}</span>
-                  </div>
-                  <div class="appt-meta-row">
-                    <AssetIcon name="clock" :size="13" />
-                    {{ formatDate(upcomingAppointment.appointment_datetime, 'h:mm A') }}
-                  </div>
-                </div>
-              </div>
-              <div class="appt-notice">
-                <AssetIcon name="qr-code" :size="14" />
-                Present QR code on arrival
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <div class="empty-state__icon">
-                <AssetIcon name="calendar" :size="28" />
-              </div>
-              <p class="mb-3">Nothing booked yet</p>
-              <NuxtLink to="/donor/appointments" class="btn-outline">Find a time</NuxtLink>
-            </div>
-          </div>
-
-          <!-- Eligibility card -->
-          <div class="panel">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Eligibility Status</h2>
-            </div>
-            <div class="eligibility-body">
-              <div class="eligibility-status-row"
-                :class="screeningDone ? 'eligibility-status-row--eligible' : eligibilityStatus === 'deferred' ? 'eligibility-status-row--deferred' : 'eligibility-status-row--pending'">
-                <AssetIcon name="shield-check" :size="20" />
-                <div>
-                  <p class="eligibility-status">
-                    {{ QUESTIONNAIRE_LABELS[questionnaireStatus] ?? 'Not yet answered' }}
-                  </p>
-                  <p v-if="profile?.screening_valid_until" class="eligibility-until">
-                    Valid until {{ formatDate(profile.screening_valid_until, 'MMM D, YYYY') }}
-                  </p>
-                </div>
-              </div>
-
-              <div class="eligibility-details">
-                <div v-if="profile?.screening_date" class="eligibility-details__row">
-                  <span class="eligibility-details__label">Screening date</span>
-                  <span class="eligibility-details__value">{{ formatDate(profile.screening_date, 'MMM D, YYYY') }}</span>
-                </div>
-              </div>
-
-              <!-- Outline, not the old full-width red: red is the brand, not an action. -->
-              <NuxtLink to="/donor/eligibility" class="btn-outline btn-outline--block">
-                <AssetIcon name="clipboard-check" :size="15" />
-                {{ screeningDone ? 'Retake screening' : 'Take screening' }}
-              </NuxtLink>
-            </div>
-          </div>
-
-          <!-- Quick actions -->
-          <div class="panel">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Quick Actions</h2>
-            </div>
-            <div class="quick-actions">
-              <NuxtLink v-for="item in quickActions" :key="item.path" :to="item.path" class="quick-action">
-                <div class="quick-action__icon" :style="{ '--qa-color': item.color }">
-                  <AssetIcon :name="item.icon" :size="15" />
-                </div>
-                <span class="quick-action__label">{{ item.label }}</span>
-                <AssetIcon name="chevron-right" :size="14" class="quick-action__chevron" />
-              </NuxtLink>
-            </div>
-          </div>
-        </div>
+        <aside class="fyp-sidebar">
+          <section class="fyp-side-card fyp-next-card"><span class="fyp-side-kicker">YOUR NEXT STEP</span><h2>{{ nextStep.status }}</h2><NuxtLink :to="nextStep.to" class="fyp-side-button"><AssetIcon :name="nextStep.icon" :size="16" /> {{ nextStep.label }}</NuxtLink></section>
+          <section class="fyp-side-card"><h2>Your donor profile</h2><div class="fyp-profile-row"><span class="fyp-profile-blood">{{ bloodType }}</span><div><strong>Blood type</strong><span>{{ bloodType === '-' ? 'Add to your profile' : 'In your profile' }}</span></div><NuxtLink to="/donor/profile" aria-label="Edit profile"><AssetIcon name="chevron-right" :size="16" /></NuxtLink></div><div class="fyp-profile-row"><span class="fyp-profile-icon"><AssetIcon :name="screeningDone ? 'shield-check' : 'clock'" :size="17" /></span><div><strong>Eligibility screening</strong><span>{{ QUESTIONNAIRE_LABELS[questionnaireStatus] ?? 'Not yet answered' }}</span></div><NuxtLink to="/donor/eligibility" aria-label="View eligibility"><AssetIcon name="chevron-right" :size="16" /></NuxtLink></div></section>
+          <section class="fyp-side-card fyp-links-card"><h2>Keep in touch</h2><NuxtLink to="/donor/appointments"><AssetIcon name="calendar" :size="16" /> Book an appointment <AssetIcon name="chevron-right" :size="15" /></NuxtLink><NuxtLink to="/donor/qrcode"><AssetIcon name="qr-code" :size="16" /> Your donor QR <AssetIcon name="chevron-right" :size="15" /></NuxtLink><NuxtLink to="/donor/help"><AssetIcon name="help-circle" :size="16" /> Donor help <AssetIcon name="chevron-right" :size="15" /></NuxtLink></section>
+        </aside>
       </div>
     </div>
   </div>
@@ -362,8 +80,10 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import { useUser } from '~/composables/useUser'
 import { useAccentTheme } from '~/composables/useAccentTheme'
+import { useDarkMode } from '~/composables/useDarkMode'
 import { accentTheme } from '~/utils/accentThemes'
 
 const route = useRoute()
@@ -372,6 +92,7 @@ const loading = ref(true)
 
 // ── Hero ──
 const { user } = useUser()
+const { isDark } = useDarkMode()
 const { current: accentKey } = useAccentTheme()
 // Dark or white hero text, per theme (see utils/accentThemes.ts).
 const heroTone = computed(() => accentTheme(accentKey.value).headerText)
@@ -443,6 +164,8 @@ const bloodType = ref('-')
 const totalDonations = ref(0)
 const upcomingAppointment = ref(null)
 const recentDonations = ref([])
+const bloodDrives = ref([])
+const featuredDrives = computed(() => bloodDrives.value.slice(0, 4))
 // Hero shows blood type and QR status, so the stat cards show the history.
 const lastDonation = computed(() => recentDonations.value.find(d => d.status === 'completed') ?? null)
 const lastDonationDate = computed(() => (lastDonation.value ? formatDate(lastDonation.value.donation_date, 'MMM D, YYYY') : '-'))
@@ -566,8 +289,15 @@ async function load({ silent = false } = {}) {
   const request = ++latestRequest
   if (!silent) loading.value = true
   try {
-    const data = await donorService.dashboard()
+    const [data, drives] = await Promise.all([
+      donorService.dashboard(),
+      bookingCatalogService.bloodDrives().catch((err) => {
+        console.error('Failed to load donor feed blood drives:', err)
+        return []
+      }),
+    ])
     if (request !== latestRequest) return
+    bloodDrives.value = Array.isArray(drives) ? drives : []
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
     questionnaireStatus.value = data.questionnaire_status ?? 'not_answered'
@@ -1755,6 +1485,13 @@ watch(() => route.path, () => {
   --border: #334155;
   --card-bg: #1e293b;
   background: #0f172a;
+  max-width: none;
+  min-height: calc(100vh - 4rem);
+}
+:global(html.dark) .fyp-dashboard {
+  max-width: none;
+  min-height: calc(100vh - 4rem);
+  background: #0f172a;
 }
 
 :global(.dark .scope-donor-dashboard .panel-header) {
@@ -1805,5 +1542,97 @@ watch(() => route.path, () => {
 .btn-danger:focus-visible {
   outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
+}
+
+/* Donor FYP feed */
+.fyp-dashboard { max-width: none; }
+.fyp-inner { gap: 20px; max-width: 1160px; margin: 0 auto; }
+.fyp-skeleton-post { min-height: 260px; border-radius: 18px; }
+.fyp-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 12px 2px 4px; }
+.fyp-eyebrow { color: var(--rb-primary); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; }
+.fyp-header h1 { color: var(--text-primary); font-size: clamp(30px, 4vw, 42px); line-height: 1.05; letter-spacing: -.04em; margin: 0; font-weight: 850; }
+.fyp-header h1 span { color: var(--rb-primary); }
+.fyp-subtitle { color: var(--text-secondary); margin: 8px 0 0; font-size: 15px; }
+.fyp-header-cta,.fyp-side-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; border-radius: 999px; padding: 12px 18px; background: var(--rb-primary); color: white; text-decoration: none; font-weight: 800; font-size: 13px; box-shadow: 0 8px 20px rgba(var(--rb-primary-rgb),.2); }
+.fyp-header-cta:hover,.fyp-side-button:hover { filter: brightness(.95); }
+.fyp-tabs { display: flex; align-items: center; gap: 28px; border-bottom: 1px solid var(--border); }
+.fyp-tab { color: var(--text-secondary); text-decoration: none; padding: 12px 2px 13px; font-size: 14px; font-weight: 750; border-bottom: 2px solid transparent; }
+.fyp-tab--active { color: var(--rb-primary); border-color: var(--rb-primary); }
+.fyp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
+.fyp-feed { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.fyp-post,.fyp-side-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: 0 5px 22px rgba(15,23,42,.035); }
+.fyp-post-meta { min-height: 64px; display: flex; align-items: center; gap: 11px; padding: 13px 18px; color: var(--text-secondary); font-size: 12px; }
+.fyp-post-meta strong { color: var(--text-primary); font-size: 13px; }
+.fyp-post-meta > div { flex: 1; min-width: 0; }
+.fyp-avatar { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 50%; color: var(--rb-primary); background: color-mix(in srgb,var(--rb-primary) 10%,white); }
+.fyp-avatar--brand { color: white; background: linear-gradient(145deg,#ed5656,#a90e31); }
+.fyp-avatar--soft { color: #16855b; background: #e7f7ef; }
+.fyp-badge { color: var(--rb-primary); font-size: 10px; font-weight: 850; letter-spacing: .08em; }
+.fyp-impact-art { min-height: 190px; display: grid; place-items: center; position: relative; overflow: hidden; background: radial-gradient(circle at 52% 55%,#fff 0,#ffe8eb 33%,#f6bac5 100%); }
+.fyp-impact-art::before,.fyp-impact-art::after { content: ''; position: absolute; border: 1px solid rgba(173,20,55,.12); border-radius: 50%; width: 230px; height: 230px; }
+.fyp-impact-art::after { width: 310px; height: 310px; }
+.fyp-art-drop { z-index: 1; display: grid; place-items: center; width: 90px; height: 90px; border-radius: 28px 28px 32px 32px; color: white; background: linear-gradient(145deg,#df3452,#a20f35); transform: rotate(-8deg); box-shadow: 0 15px 35px rgba(142,12,43,.25); }
+.fyp-art-heart { position: absolute; z-index: 2; left: calc(50% + 24px); top: calc(50% + 23px); color: #fff; font-size: 28px; text-shadow: 0 2px 8px rgba(100,0,30,.35); }
+.fyp-post-copy { padding: 17px 19px 16px; }
+.fyp-post-copy h2 { color: var(--text-primary); font-size: 18px; margin: 0 0 6px; letter-spacing: -.02em; }
+.fyp-post-copy p { color: var(--text-secondary); font-size: 13px; line-height: 1.55; margin: 0; }
+.fyp-post-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); margin-top: 15px; padding-top: 13px; color: var(--text-secondary); font-size: 12px; font-weight: 750; }
+.fyp-post-actions > span,.fyp-post-actions > a,.fyp-section-heading > a { display: inline-flex; align-items: center; gap: 7px; }
+.fyp-post-actions > a,.fyp-section-heading > a { color: var(--rb-primary); text-decoration: none; font-weight: 800; white-space: nowrap; }
+.fyp-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 8px 2px 0; }
+.fyp-section-heading h2 { color: var(--text-primary); font-size: 20px; letter-spacing: -.02em; margin: 0; }
+.fyp-section-heading p { color: var(--text-secondary); font-size: 12px; margin: 4px 0 0; }
+.fyp-section-heading > a { font-size: 12px; }
+.fyp-drive-art { min-height: 166px; padding: 20px 22px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; color: white; background: radial-gradient(ellipse at 88% 5%,rgba(255,255,255,.26),transparent 37%), linear-gradient(120deg,#99223e,#da5263 58%,#f08982); }
+.fyp-drive-post:nth-of-type(odd) .fyp-drive-art { background: radial-gradient(ellipse at 88% 5%,rgba(255,255,255,.28),transparent 38%), linear-gradient(120deg,#6c315b,#a54672 60%,#db8a8b); }
+.fyp-drive-art__label { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 850; letter-spacing: .1em; opacity: .9; }
+.fyp-drive-art__title { font-size: clamp(20px,3vw,26px); line-height: 1.1; font-weight: 850; letter-spacing: -.03em; max-width: 80%; }
+.fyp-drive-art__date { font-size: 13px; font-weight: 700; opacity: .92; }
+.fyp-drive-location { display: flex; align-items: center; gap: 8px; margin: 0 !important; color: var(--text-primary) !important; }
+.fyp-open-pill { color: #16855b; background: #e7f7ef; border-radius: 999px; padding: 6px 10px; }
+.fyp-empty-drives { min-height: 100px; padding: 18px; display: flex; align-items: center; gap: 12px; }
+.fyp-empty-drives > div { flex: 1; }
+.fyp-empty-drives strong { color: var(--text-primary); font-size: 13px; }
+.fyp-empty-drives p { color: var(--text-secondary); font-size: 12px; margin: 4px 0 0; }
+.fyp-empty-drives > a { display: inline-flex; align-items: center; gap: 6px; color: var(--rb-primary); font-size: 12px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.fyp-recent-post .fyp-post-copy { padding-top: 4px; }
+.fyp-sidebar { display: flex; flex-direction: column; gap: 14px; }
+.fyp-side-card { padding: 18px; }
+.fyp-side-card h2 { color: var(--text-primary); font-size: 15px; margin: 0 0 14px; }
+.fyp-next-card { color: white; background: linear-gradient(145deg,#92213e,#ce4458); border: 0; }
+.fyp-side-kicker { font-size: 10px; letter-spacing: .1em; font-weight: 850; color: rgba(255,255,255,.76); }
+.fyp-next-card h2 { color: white; font-size: 17px; line-height: 1.35; margin: 9px 0 16px; }
+.fyp-next-card .fyp-side-button { background: white; color: #a01c39; box-shadow: none; padding: 10px 13px; font-size: 12px; }
+.fyp-profile-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-top: 1px solid var(--border); }
+.fyp-profile-blood,.fyp-profile-icon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: 0 0 36px; background: color-mix(in srgb,var(--rb-primary) 9%,white); color: var(--rb-primary); font-size: 13px; font-weight: 850; }
+.fyp-profile-icon { color: #138658; background: #e7f7ef; }
+.fyp-profile-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fyp-profile-row strong { color: var(--text-primary); font-size: 12px; }
+.fyp-profile-row span:not(.fyp-profile-blood):not(.fyp-profile-icon) { color: var(--text-secondary); font-size: 11px; }
+.fyp-profile-row > a { color: var(--text-secondary); }
+.fyp-links-card { padding-bottom: 9px; }
+.fyp-links-card a { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: var(--text-primary); text-decoration: none; font-size: 12px; font-weight: 700; border-top: 1px solid var(--border); }
+.fyp-links-card a svg:last-child { margin-left: auto; color: var(--text-secondary); }
+.fyp-links-card a svg:first-child { color: var(--rb-primary); }
+:global(.dark .fyp-dashboard) .fyp-impact-art { background: radial-gradient(circle at 52% 55%,#47303a 0,#46232f 40%,#2b1722 100%); }
+:global(.dark .fyp-dashboard) .fyp-avatar { background: color-mix(in srgb,var(--rb-primary) 22%,#1e293b); }
+:global(.dark .fyp-dashboard) .fyp-avatar--brand { background: linear-gradient(145deg,#ed5656,#a90e31); }
+:global(.dark .fyp-dashboard) .fyp-avatar--soft { color: #74d8a7; background: #18372e; }
+:global(.dark .fyp-dashboard) .fyp-open-pill { color: #8be0b4; background: #18372e; }
+@media (max-width: 900px) { .fyp-layout { grid-template-columns: minmax(0,1fr) 270px; gap: 16px; } }
+@media (max-width: 760px) { .fyp-layout { grid-template-columns: 1fr; } .fyp-sidebar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } .fyp-next-card { grid-column: 1 / -1; } }
+@media (max-width: 560px) {
+  .fyp-header { align-items: flex-start; flex-direction: column; }
+  .fyp-header-cta { padding: 10px 14px; }
+  .fyp-tabs { gap: 21px; }
+  .fyp-tab { font-size: 13px; }
+  .fyp-sidebar { display: flex; }
+  .fyp-impact-art { min-height: 155px; }
+  .fyp-drive-art { min-height: 145px; }
+  .fyp-post-meta { padding: 12px 14px; }
+  .fyp-post-copy { padding: 14px; }
+  .fyp-post-actions { align-items: flex-start; font-size: 11px; }
+  .fyp-empty-drives { flex-wrap: wrap; }
+  .fyp-empty-drives > a { margin-left: 50px; }
 }
 </style>
