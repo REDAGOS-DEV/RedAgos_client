@@ -47,6 +47,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
   }
 
+  // Signed in with the blood center desk's temporary password. The server
+  // refuses every portal endpoint until the donor sets their own, so the
+  // page would only fail: go and set it. /auth is not a portal route, so
+  // this cannot loop.
+  if (user.temporary_sign_in) {
+    return navigateTo('/auth/set-password')
+  }
+
   if (user.roles?.includes(required)) {
     return
   }

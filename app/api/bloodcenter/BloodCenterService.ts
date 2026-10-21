@@ -284,6 +284,15 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}`, 'PATCH', payload)
   }
 
+  /**
+   * Give a walk-in donor their app sign-in: { donor_code, email,
+   * temporary_password, reissued }. The password is in this answer only; the
+   * server keeps a hash. Giving it again replaces it and signs the donor out.
+   */
+  async issueDonorSignIn(uuid: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/sign-in`, 'POST')
+  }
+
   /** FormData with a `photo` file. */
   async uploadDonorPhoto(uuid: string, form: FormData): Promise<any> {
     return this.request(`${this.resource}/donors/${uuid}/photo`, 'POST', form)

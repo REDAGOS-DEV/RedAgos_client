@@ -63,6 +63,37 @@
         </div>
       </section>
 
+      <!--
+        A donor the blood center desk registered has no confirmed email: the
+        desk typed it (no link is mailed then), or there is none. Booking, the
+        check-in QR and a forgotten-password link all need one.
+      -->
+      <div v-if="emailPrompt" class="banner banner--warning" role="status">
+        <span class="banner-icon-wrapper"><AssetIcon name="mail" :size="16" class="banner-icon" /></span>
+        <p class="banner-text">
+          <template v-if="emailPrompt === 'add'">
+            Add your email address to book appointments online, get your check-in QR code and reset a forgotten password.
+          </template>
+          <template v-else-if="verifySent">
+            Sent. Open the link we emailed to <strong>{{ user?.email }}</strong> to confirm it.
+          </template>
+          <template v-else>
+            Confirm your email (<strong>{{ user?.email }}</strong>) to book appointments online, get your check-in QR code and reset a forgotten password.
+          </template>
+          <span v-if="verifyError" class="banner-error">{{ verifyError }}</span>
+        </p>
+        <NuxtLink v-if="emailPrompt === 'add'" to="/donor/profile" class="banner-link">Add email</NuxtLink>
+        <button
+          v-else-if="!verifySent"
+          type="button"
+          class="banner-link banner-link--button"
+          :disabled="verifySending"
+          @click="sendVerification"
+        >
+          {{ verifySending ? 'Sending…' : 'Send confirmation link' }}
+        </button>
+      </div>
+
       <!-- Onboarding checklist -->
       <div v-if="showOnboarding" class="onboarding-card">
         <div class="onboarding-card__header">
@@ -362,6 +393,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+import { authService } from '~/api/auth/AuthService'
 import { useUser } from '~/composables/useUser'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { accentTheme } from '~/utils/accentThemes'
@@ -373,6 +405,34 @@ const loading = ref(true)
 // ── Hero ──
 const { user } = useUser()
 const { current: accentKey } = useAccentTheme()
+
+// ── Email prompt ──
+// 'add' with no address, 'confirm' with an unconfirmed one, null otherwise.
+// A self-registered donor never sees it: they confirmed before signing in.
+const emailPrompt = computed(() => {
+  if (!user.value) return null
+  if (!user.value.email) return 'add'
+  return user.value.email_verified ? null : 'confirm'
+})
+const verifySending = ref(false)
+const verifySent = ref(false)
+const verifyError = ref('')
+
+async function sendVerification() {
+  if (verifySending.value) return
+  verifySending.value = true
+  verifyError.value = ''
+  try {
+    await authService.resendVerificationEmail()
+    verifySent.value = true
+  } catch (err) {
+    verifyError.value = err?.status === 429
+      ? 'Too many requests. Please wait a few minutes and try again.'
+      : (err?.message || 'Could not send the link. Please try again.')
+  } finally {
+    verifySending.value = false
+  }
+}
 // Dark or white hero text, per theme (see utils/accentThemes.ts).
 const heroTone = computed(() => accentTheme(accentKey.value).headerText)
 
@@ -997,6 +1057,23 @@ watch(() => route.path, () => {
 }
 
 .banner-link:hover { opacity: 0.8; text-decoration: underline; }
+
+.banner-link--button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.banner-link--button:disabled { opacity: 0.6; cursor: default; text-decoration: none; }
+.banner-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 4px; }
+
+.banner-error { display: block; margin-top: 2px; font-weight: 600; color: #B42318; }
+
+@media (max-width: 560px) {
+  .banner { flex-wrap: wrap; }
+  .banner-link { margin-left: 40px; }
+}
 
 /*
  * Onboarding card — deliberately neutral (same surface/border/shadow as
@@ -1775,6 +1852,7 @@ watch(() => route.path, () => {
 
 :global(.dark .scope-donor-dashboard .banner--warning) { color: #FFB74D; }
 :global(.dark .scope-donor-dashboard .banner--warning .banner-text) { color: #CBD5E1; }
+:global(.dark .scope-donor-dashboard .banner-error) { color: #F97066; }
 :global(.dark .scope-donor-dashboard .text-success) { color: #4caf50 !important; }
 
 :global(.dark .scope-donor-dashboard .stat-chip--success) {

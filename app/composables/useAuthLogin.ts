@@ -203,8 +203,10 @@ export function useAuthLogin(portalKey: PortalKey) {
     resendSent.value = false
 
     try {
+      // `login`, not `email`: the server matches an email address, a donor
+      // code (from the blood center desk's sign-in) or a username.
       const response = await authService.login({
-        email: email.value,
+        login: email.value,
         password: password.value,
         role: portal.role,
         ...(portal.requiresLicense ? { licenseNumber: licenseNumber.value } : {}),
@@ -213,6 +215,14 @@ export function useAuthLogin(portalKey: PortalKey) {
       const token = extractToken(response)
       if (token) {
         localStorage.setItem('_token', token)
+      }
+
+      // The desk's temporary password: nothing opens until the donor sets
+      // their own, so `?redirect` waits too.
+      const signedIn = response?.user ?? response?.data?.user
+      if (signedIn?.temporary_sign_in) {
+        await navigateTo('/auth/set-password')
+        return
       }
 
       await navigateTo(safeRedirect() ?? await portal.resolveHome(response))
