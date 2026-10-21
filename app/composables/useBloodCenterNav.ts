@@ -225,6 +225,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     label: 'Management',
     items: [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
+      // The Admin's alone (project owner, 2026-10-21).
+      { label: 'Audit Log', path: '/blood-center/audit-log', icon: 'history', requires: 'audit.view', keywords: 'audit log activity history trail who did what sign in login logout failed user action' },
       { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
       // These two under Management rather than Stock and Supply (project
       // owner, 2026-10-19). Their abilities are unchanged, so who sees each is

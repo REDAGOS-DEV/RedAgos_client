@@ -676,6 +676,16 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/staff/${uuid}/restore`, 'POST')
   }
 
+  // --- Audit Log (Blood Center Admin only) ---
+
+  /**
+   * Paginated, newest first. Filters: search, module, type, from, to. The
+   * response also carries the filter choices as `modules` and `types`.
+   */
+  async auditLog(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/audit-log`, 'GET', params)
+  }
+
   async list(params: Record<string, any> = {}): Promise<any> {
     return this.request(this.resource, 'GET', params)
   }
