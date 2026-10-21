@@ -1361,22 +1361,22 @@ function applyProfile(data) {
     .account-panel .account-action { flex: 1; justify-content: center; }
 }
 
-:global(.dark .scope-donor-settings .profile-strip) { background: #1E293B; border-color: #334155; }
+:global(.dark .scope-donor-settings .profile-strip) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
 :global(.dark .scope-donor-settings .profile-strip__avatar) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
-:global(.dark .scope-donor-settings .theme-preview) { background: #172033; border-color: #334155; }
+:global(.dark .scope-donor-settings .theme-preview) { background: var(--ink-inset, #172033); border-color: var(--ink-border, #334155); }
 :global(.dark .scope-donor-settings .theme-preview__hero) {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, #1E293B), color-mix(in srgb, var(--rb-primary) 18%, #1E293B));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, var(--ink-surface, #1E293B)), color-mix(in srgb, var(--rb-primary) 18%, var(--ink-surface, #1E293B)));
 }
 :global(.dark .scope-donor-settings .theme-preview__line) { background: rgba(241, 245, 249, 0.7); }
 :global(.dark .scope-donor-settings .theme-preview__line--sm) { background: rgba(241, 245, 249, 0.35); }
-:global(.dark .scope-donor-settings .theme-preview__label) { background: #1E293B; box-shadow: 0 0 0 1px #334155; color: #94A3B8; }
+:global(.dark .scope-donor-settings .theme-preview__label) { background: var(--ink-surface, #1E293B); box-shadow: 0 0 0 1px var(--ink-border, #334155); color: var(--ink-text-2, #94A3B8); }
 :global(.dark .scope-donor-settings .theme-preview__chip) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
-:global(.dark .scope-donor-settings .account-panel .account-action) { border-color: #334155; }
-:global(.dark .scope-donor-settings .account-panel .account-action:hover) { background: #263449; }
+:global(.dark .scope-donor-settings .account-panel .account-action) { border-color: var(--ink-border, #334155); }
+:global(.dark .scope-donor-settings .account-panel .account-action:hover) { background: var(--ink-hover, #263449); }
 :global(.dark .scope-donor-settings .account-panel .account-action--danger) { border-color: rgba(239, 83, 80, 0.35); }
 :global(.dark .scope-donor-settings .account-panel .account-action--danger:hover) { background: rgba(239, 83, 80, 0.12); }
 :global(.dark .scope-donor-settings .panel-sub),
-:global(.dark .scope-donor-settings .profile-strip__meta) { color: #94A3B8; }
+:global(.dark .scope-donor-settings .profile-strip__meta) { color: var(--ink-text-2, #94A3B8); }
 
 /* ============ Dark mode ============ */
 /*
@@ -1389,54 +1389,54 @@ function applyProfile(data) {
  */
 
 :global(.dark .scope-donor-settings) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .scope-donor-settings .panel),
 :global(.dark .settings-modal .panel) {
-    background: #1E293B;
-    border-color: #334155;
+    background: var(--ink-surface, #1E293B);
+    border-color: var(--ink-border, #334155);
 }
 
 :global(.dark .scope-donor-settings .panel-header--simple),
-:global(.dark .settings-modal .panel-header--simple) { border-color: #334155; }
+:global(.dark .settings-modal .panel-header--simple) { border-color: var(--ink-border, #334155); }
 
 :global(.dark .scope-donor-settings .avatar),
 :global(.dark .settings-modal .avatar) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 
 :global(.dark .scope-donor-settings .form-input),
 :global(.dark .settings-modal .form-input) {
-    background: #0F172A;
-    border-color: #334155;
-    color: #F1F5F9;
+    background: var(--ink-page, #0F172A);
+    border-color: var(--ink-border, #334155);
+    color: var(--ink-text, #F1F5F9);
 }
 
 :global(.dark .scope-donor-settings .password-toggle:hover),
-:global(.dark .settings-modal .password-toggle:hover) { color: #F1F5F9; background: #263449; }
+:global(.dark .settings-modal .password-toggle:hover) { color: var(--ink-text, #F1F5F9); background: var(--ink-hover, #263449); }
 
 :global(.dark .scope-donor-settings .toggle-row),
-:global(.dark .settings-modal .toggle-row) { border-color: #263449; }
-:global(.dark .scope-donor-settings .toggle-switch) { background: #475569; }
+:global(.dark .settings-modal .toggle-row) { border-color: var(--ink-hover, #263449); }
+:global(.dark .scope-donor-settings .toggle-switch) { background: var(--ink-border-hover, #475569); }
 :global(.dark .scope-donor-settings .toggle-switch--on) { background: var(--rb-primary); }
 
 :global(.dark .scope-donor-settings .account-action),
-:global(.dark .settings-modal .account-action) { border-color: #263449; }
+:global(.dark .settings-modal .account-action) { border-color: var(--ink-hover, #263449); }
 
 :global(.dark .scope-donor-settings .btn-outline),
 :global(.dark .settings-modal .btn-outline) {
-    background: #263449;
-    color: #E2E8F0;
+    background: var(--ink-hover, #263449);
+    color: var(--ink-text-4, #E2E8F0);
 }
 :global(.dark .scope-donor-settings .btn-outline:hover:not(:disabled)),
-:global(.dark .settings-modal .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .settings-modal .btn-outline:hover:not(:disabled)) { background: var(--ink-border, #334155); }
 
 :global(.dark .scope-donor-settings .modal-card),
 :global(.dark .settings-modal .modal-card) {
-    background: #1E293B;
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
+    background: var(--ink-surface, #1E293B);
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
 }
 :global(.dark .scope-donor-settings .modal-check),
 :global(.dark .settings-modal .modal-check) { background: rgba(102,187,106,0.16); }
@@ -1448,7 +1448,7 @@ function applyProfile(data) {
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .scope-donor-settings .skeleton),
 :global(.dark .settings-modal .skeleton) {
-    background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+    background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 
 .btn-primary:focus-visible,
@@ -1459,7 +1459,7 @@ function applyProfile(data) {
 }
 
 /* Appearance swatches on a dark card: the white rings become the card colour. */
-:global(.dark .scope-donor-settings .swatch--on .swatch__circle) { box-shadow: 0 0 0 3px #1E293B, 0 0 0 5px var(--ring); }
+:global(.dark .scope-donor-settings .swatch--on .swatch__circle) { box-shadow: 0 0 0 3px var(--ink-surface, #1E293B), 0 0 0 5px var(--ring); }
 :global(.dark .scope-donor-settings .swatch__dot),
-:global(.dark .scope-donor-settings .swatch__check) { box-shadow: 0 0 0 2px #1E293B; }
+:global(.dark .scope-donor-settings .swatch__check) { box-shadow: 0 0 0 2px var(--ink-surface, #1E293B); }
 </style>

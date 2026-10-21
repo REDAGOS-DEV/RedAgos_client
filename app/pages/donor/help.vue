@@ -674,40 +674,40 @@ a.contact-row:hover .contact-row__value { color: var(--rb-primary-text); }
 
 /* ============ Dark mode ============ */
 :global(.dark .help-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --border: #334155;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    --border: var(--ink-border, #334155);
+    background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .help-page .topic-card),
-:global(.dark .help-page .panel) { background: #1E293B; border-color: #334155; }
+:global(.dark .help-page .panel) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
 :global(.dark .help-page .help-hero) {
     background:
         radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--rb-primary-text) 12%, transparent), transparent 60%),
-        #1E293B;
-    border-color: #334155;
+        var(--ink-surface, #1E293B);
+    border-color: var(--ink-border, #334155);
 }
-:global(.dark .help-page .help-search__input) { background: #0F172A; border-color: #334155; color: #F1F5F9; }
-:global(.dark .help-page .help-search__clear) { background: #263449; color: #CBD5E1; }
+:global(.dark .help-page .help-search__input) { background: var(--ink-page, #0F172A); border-color: var(--ink-border, #334155); color: var(--ink-text, #F1F5F9); }
+:global(.dark .help-page .help-search__clear) { background: var(--ink-hover, #263449); color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .help-page .topic-card__icon--primary),
 :global(.dark .help-page .contact-row__icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 :global(.dark .help-page .topic-card__icon--success) { background: rgba(102, 187, 106, 0.16); color: #81C784; }
 :global(.dark .help-page .topic-card__icon--warning) { background: rgba(255, 167, 38, 0.16); color: #FFB74D; }
 :global(.dark .help-page .topic-card__icon--danger) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }
-:global(.dark .help-page .panel-header--simple) { border-color: #334155; }
+:global(.dark .help-page .panel-header--simple) { border-color: var(--ink-border, #334155); }
 :global(.dark .help-page .faq-item--open),
 :global(.dark .help-page .faq-question:hover),
 :global(.dark .help-page a.contact-row:hover),
-:global(.dark .help-page .legal-link:hover) { background: #263449; }
-:global(.dark .help-page .faq-question__toggle) { background: #263449; color: #CBD5E1; }
+:global(.dark .help-page .legal-link:hover) { background: var(--ink-hover, #263449); }
+:global(.dark .help-page .faq-question__toggle) { background: var(--ink-hover, #263449); color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .help-page .faq-item--open .faq-question__toggle) { background: var(--rb-primary); color: #fff; }
 :global(.dark .help-page .faq-answer p),
 :global(.dark .help-page .topic-card__desc),
-:global(.dark .help-page .page-subtitle) { color: #CBD5E1; }
+:global(.dark .help-page .page-subtitle) { color: var(--ink-text-3, #CBD5E1); }
 
 /* background-image, not the shorthand: keeps the 400% size for the shimmer. */
 :global(.dark .help-page .skeleton) {
-    background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+    background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 </style>

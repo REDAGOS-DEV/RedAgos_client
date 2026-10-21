@@ -559,24 +559,24 @@ onActivated(() => {
 
 /* ============ Dark mode ============ */
 :global(.dark .notifications-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --border: #334155;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    --border: var(--ink-border, #334155);
+    background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .notifications-page .panel),
 :global(.dark .notifications-page .filter),
-:global(.dark .notifications-page .btn-outline) { background: #1E293B; border-color: #334155; }
-:global(.dark .notifications-page .filter) { color: #CBD5E1; }
+:global(.dark .notifications-page .btn-outline) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+:global(.dark .notifications-page .filter) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .notifications-page .filter--active) { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 :global(.dark .notifications-page .filter__count) { background: color-mix(in srgb, var(--rb-primary-text) 18%, transparent); }
-:global(.dark .notifications-page .btn-outline) { color: #E2E8F0; }
-:global(.dark .notifications-page .btn-outline:hover:not(:disabled)) { background: #263449; }
-:global(.dark .notifications-page .notif-row) { border-color: #263449; }
+:global(.dark .notifications-page .btn-outline) { color: var(--ink-text-4, #E2E8F0); }
+:global(.dark .notifications-page .btn-outline:hover:not(:disabled)) { background: var(--ink-hover, #263449); }
+:global(.dark .notifications-page .notif-row) { border-color: var(--ink-hover, #263449); }
 :global(.dark .notifications-page .notif-row--unread) { background: color-mix(in srgb, var(--rb-primary-text) 6%, transparent); }
 :global(.dark .notifications-page .notif-row__desc),
-:global(.dark .notifications-page .state-sub) { color: #CBD5E1; }
+:global(.dark .notifications-page .state-sub) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .notifications-page .notif-row__icon--warning),
 :global(.dark .notifications-page .notif-tag--reminder) { background: rgba(245, 124, 0, 0.16); color: #FFB74D; }
 :global(.dark .notifications-page .notif-row__icon--success),
@@ -586,12 +586,12 @@ onActivated(() => {
 :global(.dark .notifications-page .notif-tag--screening),
 :global(.dark .notifications-page .state-icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 :global(.dark .notifications-page .notif-row__icon--danger) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }
-:global(.dark .notifications-page .notif-tag--system) { background: #263449; color: #94A3B8; }
-:global(.dark .notifications-page .notif-row__mark-read) { color: #94A3B8; }
+:global(.dark .notifications-page .notif-tag--system) { background: var(--ink-hover, #263449); color: var(--ink-text-2, #94A3B8); }
+:global(.dark .notifications-page .notif-row__mark-read) { color: var(--ink-text-2, #94A3B8); }
 
 /* background-image, not the shorthand: keeps the 400% size for the shimmer. */
 :global(.dark .notifications-page .skeleton) {
-    background-image: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
+    background-image: linear-gradient(90deg, var(--ink-hover, #263449) 25%, var(--ink-border, #334155) 37%, var(--ink-hover, #263449) 63%);
 }
 
 .btn-outline:focus-visible,

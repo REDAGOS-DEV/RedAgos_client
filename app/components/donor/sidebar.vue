@@ -276,14 +276,14 @@ watch(mobileOpen, (open) => {
 // Light/dark theme tokens — the same palette the blood-centre and admin rails
 // use, so the portals read as one product.
 // Frosted glass over the layout's themed backdrop (blur in the styles).
-const SIDEBAR_BG = computed(() => (isDark.value ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.55)'))
-const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
+const SIDEBAR_BG = computed(() => (isDark.value ? 'rgba(var(--ink-page-rgb, 15, 23, 42), 0.6)' : 'rgba(255, 255, 255, 0.55)'))
+const SIDEBAR_BORDER = computed(() => (isDark.value ? 'var(--ink-border, #334155)' : '#E5EAF0'))
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? 'var(--rb-primary-text)' : 'var(--rb-primary)'))
 // Two text levels. Primary: top-level rows and folder names (Dashboard,
 // Donate, My Records, Settings, Help). Secondary: pages inside a folder.
-const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
-const SIDEBAR_FOLDER_TEXT = computed(() => (isDark.value ? '#E2E8F0' : '#334155'))
-const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
+const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? 'var(--ink-text-2, #94A3B8)' : '#64748B'))
+const SIDEBAR_FOLDER_TEXT = computed(() => (isDark.value ? 'var(--ink-text-4, #E2E8F0)' : '#334155'))
+const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? 'var(--ink-text, #F1F5F9)' : '#1F2937'))
 const SIDEBAR_CURRENT_BG = computed(() => (isDark.value ? 'color-mix(in srgb, var(--rb-primary-text) 14%, transparent)' : 'color-mix(in srgb, var(--rb-primary) 10%, white)'))
 const SIDEBAR_HOVER_SOFT = computed(() => (isDark.value ? 'rgba(148,163,184,0.10)' : '#EEF1F5'))
 const sidebarShadow = computed(() =>
@@ -303,7 +303,7 @@ const badgeStyle = computed(() => {
   return {
     background: eligible
       ? (isDark.value ? 'rgba(76,175,80,0.18)' : 'rgba(46,125,50,0.10)')
-      : (isDark.value ? '#334155' : '#F1F5F9'),
+      : (isDark.value ? 'var(--ink-border, #334155)' : '#F1F5F9'),
     color: eligible
       ? (isDark.value ? '#81C784' : '#2E7D32')
       : SIDEBAR_IDLE_TEXT.value

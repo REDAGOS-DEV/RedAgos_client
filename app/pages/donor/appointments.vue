@@ -2799,10 +2799,10 @@ function goDashboard() {
  * .appointment-page (walay Teleport), so ok ra ang anchor.
  */
 :global(.dark .appointment-page) {
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --border: #334155;
-  background: #0F172A;
+  --text-primary: var(--ink-text, #F1F5F9);
+  --text-secondary: var(--ink-text-2, #94A3B8);
+  --border: var(--ink-border, #334155);
+  background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .appointment-page .drive-card),
@@ -2810,8 +2810,8 @@ function goDashboard() {
 :global(.dark .appointment-page .panel),
 :global(.dark .appointment-page .slot-btn),
 :global(.dark .appointment-page .modal-card) {
-  background: #1E293B;
-  border-color: #334155;
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
 }
 
 :global(.dark .appointment-page .confirm-error) {
@@ -2821,11 +2821,11 @@ function goDashboard() {
 }
 :global(.dark .appointment-page .confirm-error__icon) { color: #F97066; }
 :global(.dark .appointment-page .summary-card) {
-  background: #172033;
-  border-color: #334155;
+  background: var(--ink-inset, #172033);
+  border-color: var(--ink-border, #334155);
 }
-:global(.dark .appointment-page .summary-item) { border-bottom-color: #334155; }
-:global(.dark .appointment-page .summary-close:hover:not(:disabled)) { background: #263449; }
+:global(.dark .appointment-page .summary-item) { border-bottom-color: var(--ink-border, #334155); }
+:global(.dark .appointment-page .summary-close:hover:not(:disabled)) { background: var(--ink-hover, #263449); }
 
 :global(.dark .appointment-page .drive-card--active),
 :global(.dark .appointment-page .slot-btn--active) {
@@ -2836,49 +2836,49 @@ function goDashboard() {
 
 
 :global(.dark .appointment-page .form-input) {
-  background: #0F172A;
-  border-color: #334155;
-  color: #F1F5F9;
+  background: var(--ink-page, #0F172A);
+  border-color: var(--ink-border, #334155);
+  color: var(--ink-text, #F1F5F9);
 }
 
-:global(.dark .appointment-page .slot-btn--full) { background: #263449; }
-:global(.dark .appointment-page .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: #263449; border-color: #3f5878; }
+:global(.dark .appointment-page .slot-btn--full) { background: var(--ink-hover, #263449); }
+:global(.dark .appointment-page .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: var(--ink-hover, #263449); border-color: var(--ink-hover-border, #3F5878); }
 
 :global(.dark .appointment-page .badge--success) { background: rgba(102,187,106,0.16); }
 :global(.dark .appointment-page .badge--info) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); color: var(--rb-primary-text); }
-:global(.dark .appointment-page .badge--full) { background: #263449; }
+:global(.dark .appointment-page .badge--full) { background: var(--ink-hover, #263449); }
 
 :global(.dark .appointment-page .reschedule-banner) {
   background: color-mix(in srgb, var(--rb-primary-text) 10%, transparent);
   border-color: color-mix(in srgb, var(--rb-primary-text) 24%, transparent);
 }
 
-:global(.dark .appointment-page .reschedule-banner__text) { color: #CBD5E1; }
+:global(.dark .appointment-page .reschedule-banner__text) { color: var(--ink-text-3, #CBD5E1); }
 
 
-:global(.dark .appointment-page .progress-track) { background: #334155; }
-:global(.dark .appointment-page .progress-fill--full) { background: #475569; }
+:global(.dark .appointment-page .progress-track) { background: var(--ink-border, #334155); }
+:global(.dark .appointment-page .progress-fill--full) { background: var(--ink-border-hover, #475569); }
 
 :global(.dark .appointment-page .btn-outline) {
-  background: #263449;
-  color: #E2E8F0;
+  background: var(--ink-hover, #263449);
+  color: var(--ink-text-4, #E2E8F0);
 }
-:global(.dark .appointment-page .btn-outline:hover) { background: #334155; }
+:global(.dark .appointment-page .btn-outline:hover) { background: var(--ink-border, #334155); }
 
-:global(.dark .appointment-page .summary-row) { border-color: #263449; }
+:global(.dark .appointment-page .summary-row) { border-color: var(--ink-hover, #263449); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .appointment-page .skeleton) {
-  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+  background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 
 :global(.dark .appointment-page .date-chip) {
-  background: #1E293B;
-  border-color: #334155;
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
 }
-:global(.dark .appointment-page .date-chip:hover:not(.date-chip--active)) { border-color: #3f5878; }
+:global(.dark .appointment-page .date-chip:hover:not(.date-chip--active)) { border-color: var(--ink-hover-border, #3F5878); }
 :global(.dark .appointment-page .date-chip--active) {
   background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent);
   border-color: var(--rb-primary-text);
@@ -2893,7 +2893,7 @@ function goDashboard() {
 }
 :global(.dark .appointment-page .eligible-banner__icon),
 :global(.dark .appointment-page .appt-ticket__flag) { color: var(--rb-primary-text); }
-:global(.dark .appointment-page .eligible-banner__text) { color: #CBD5E1; }
+:global(.dark .appointment-page .eligible-banner__text) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .appointment-page .drive-card__note),
 :global(.dark .appointment-page .summary-row .summary-value--warning) { color: #FFB74D; }
 :global(.dark .appointment-page .screening-notice--info) {
@@ -2955,10 +2955,10 @@ function goDashboard() {
 :global(.dark .appointment-page .type-switch),
 :global(.dark .appointment-page .bstep),
 :global(.dark .appointment-page .ticket) {
-  background: #1E293B;
-  border-color: #334155;
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
 }
-:global(.dark .appointment-page .type-switch__opt:hover:not(.type-switch__opt--active)) { background: #263449; }
+:global(.dark .appointment-page .type-switch__opt:hover:not(.type-switch__opt--active)) { background: var(--ink-hover, #263449); }
 :global(.dark .appointment-page .type-switch__opt--active),
 :global(.dark .appointment-page .choice--active) {
   background: color-mix(in srgb, var(--rb-primary-text) 12%, transparent);
@@ -2968,30 +2968,30 @@ function goDashboard() {
 :global(.dark .appointment-page .choice__icon),
 :global(.dark .appointment-page .choice__date) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 :global(.dark .appointment-page .type-switch__opt--active .type-switch__icon) { background: var(--rb-primary); color: #fff; }
-:global(.dark .appointment-page .bstep__num) { background: #263449; }
+:global(.dark .appointment-page .bstep__num) { background: var(--ink-hover, #263449); }
 :global(.dark .appointment-page .bstep--open .bstep__num),
 :global(.dark .appointment-page .bstep--done .bstep__num) { background: var(--rb-primary); }
-:global(.dark .appointment-page .choice) { border-color: #334155; }
-:global(.dark .appointment-page .choice:hover:not(:disabled):not(.choice--active)) { background: #263449; border-color: #3f5878; }
+:global(.dark .appointment-page .choice) { border-color: var(--ink-border, #334155); }
+:global(.dark .appointment-page .choice:hover:not(:disabled):not(.choice--active)) { background: var(--ink-hover, #263449); border-color: var(--ink-hover-border, #3F5878); }
 :global(.dark .appointment-page .ticket__head) {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, #1E293B), color-mix(in srgb, var(--rb-primary) 18%, #1E293B));
-  color: #F1F5F9;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, var(--ink-surface, #1E293B)), color-mix(in srgb, var(--rb-primary) 18%, var(--ink-surface, #1E293B)));
+  color: var(--ink-text, #F1F5F9);
 }
 :global(.dark .appointment-page .ticket__tear::before),
-:global(.dark .appointment-page .ticket__tear::after) { background: #0F172A; }
-:global(.dark .appointment-page .ticket__tips li) { color: #CBD5E1; }
-:global(.dark .appointment-page .ticket__row dd.ticket__empty) { color: #64748B; }
+:global(.dark .appointment-page .ticket__tear::after) { background: var(--ink-page, #0F172A); }
+:global(.dark .appointment-page .ticket__tips li) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .appointment-page .ticket__row dd.ticket__empty) { color: var(--ink-muted, #64748B); }
 @media (max-width: 1100px) {
   :global(.dark .appointment-page .ticket) {
-    background: rgba(30, 41, 59, 0.8);
+    background: rgba(var(--ink-surface-rgb, 30, 41, 59), 0.8);
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
 
 /* Upcoming appointment ticket, dark */
-:global(.dark .appointment-page .appt-ticket) { background: #1E293B; border-color: #334155; }
+:global(.dark .appointment-page .appt-ticket) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
 :global(.dark .appointment-page .appt-ticket__stub) { background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent); }
-:global(.dark .appointment-page .appt-ticket__time) { background: rgba(15, 23, 42, 0.5); }
+:global(.dark .appointment-page .appt-ticket__time) { background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.5); }
 :global(.dark .appointment-page .appt-ticket--rescheduling) {
   border-color: var(--rb-primary-text);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--rb-primary-text) 18%, transparent);

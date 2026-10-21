@@ -416,16 +416,16 @@ onBeforeUnmount(() => {
 
 /* Dark mode. The names are unique (sf-), so the global hook is safe. */
 :global(.dark .sf) {
-  --sf-field: #0F172A;
-  --sf-border: #334155;
-  --sf-text: #F1F5F9;
-  --sf-muted: #94A3B8;
+  --sf-field: var(--ink-page, #0F172A);
+  --sf-border: var(--ink-border, #334155);
+  --sf-text: var(--ink-text, #F1F5F9);
+  --sf-muted: var(--ink-text-2, #94A3B8);
 }
 :global(.dark .sf-list) {
-  --sf-text: #F1F5F9;
-  --sf-muted: #94A3B8;
-  --sf-list: #1E293B;
-  --sf-list-border: #334155;
-  --sf-hover: #263449;
+  --sf-text: var(--ink-text, #F1F5F9);
+  --sf-muted: var(--ink-text-2, #94A3B8);
+  --sf-list: var(--ink-surface, #1E293B);
+  --sf-list-border: var(--ink-border, #334155);
+  --sf-hover: var(--ink-hover, #263449);
 }
 </style>

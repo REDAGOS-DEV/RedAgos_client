@@ -193,6 +193,51 @@ html.dark {
 }
 
 /*
+ * Donor portal dark: "ink", a near-neutral dark with only a hint of blue, so
+ * the page sits closer to the browser's own dark UI. The blue identity stays
+ * in the backdrop glow, the buttons and the Pass. The donor layout puts
+ * `portal-donor` on <html>; every other portal keeps the navy above, and the
+ * shared components read `var(--ink-*, <navy>)` so they fall back to it there.
+ */
+html.dark.portal-donor {
+  --ink-base: #0D1015;
+  --ink-base-rgb: 13, 16, 21;
+  --ink-page: #0F1217;
+  --ink-page-rgb: 15, 18, 23;
+  --ink-surface: #171B22;
+  --ink-surface-rgb: 23, 27, 34;
+  --ink-surface-alt: #13171D;
+  --ink-hover: #1F242D;
+  --ink-border: #2A2F39;
+  --ink-border-rgb: 42, 47, 57;
+  --ink-border-hover: #3B4250;
+  --ink-text: #EEF1F5;
+  --ink-text-2: #A0A8B5;
+  --ink-text-3: #C9CED6;
+  --ink-text-4: #E1E4EA;
+  --ink-muted: #6C7480;
+  --ink-inset: #12161C;
+  --ink-field-border: #323844;
+  --ink-hover-border: #4A5261;
+
+  --rb-text-primary: var(--ink-text);
+  --rb-text-secondary: var(--ink-text-2);
+  --rb-text-muted: var(--ink-muted);
+  --rb-placeholder: var(--ink-text-2);
+  --rb-border: var(--ink-border);
+  --rb-border-strong: var(--ink-border);
+  --rb-border-hover: var(--ink-border-hover);
+  --rb-surface: var(--ink-surface);
+  --rb-surface-alt: var(--ink-surface-alt);
+  --rb-surface-hover: var(--ink-hover);
+  --rb-page-bg: var(--ink-page);
+  --rb-skeleton-a: var(--ink-surface);
+  --rb-skeleton-b: var(--ink-hover);
+
+  background-color: var(--ink-base);
+}
+
+/*
  * A light form control on a dark page renders its own chrome — the calendar
  * picker, the select arrow, the spinners — in the light scheme regardless of
  * what CSS says, which is where the stray bright squares in dark mode come

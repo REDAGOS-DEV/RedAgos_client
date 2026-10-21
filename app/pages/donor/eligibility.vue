@@ -2728,15 +2728,15 @@ onActivated(() => {
  */
 
 :global(.dark .eligibility-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .eligibility-modal) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --text-muted: #94A3B8;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    --text-muted: var(--ink-text-2, #94A3B8);
 }
 
 :global(.dark .eligibility-page .panel),
@@ -2745,18 +2745,18 @@ onActivated(() => {
 :global(.dark .eligibility-modal .modal-card),
 :global(.dark .eligibility-page .modal-qr-wrap),
 :global(.dark .eligibility-modal .modal-qr-wrap) {
-    background: #1E293B;
-    border-color: #334155;
+    background: var(--ink-surface, #1E293B);
+    border-color: var(--ink-border, #334155);
 }
 :global(.dark .eligibility-page .modal-title),
 :global(.dark .eligibility-modal .modal-title) {
-    color: #F1F5F9;
+    color: var(--ink-text, #F1F5F9);
 }
 :global(.dark .eligibility-page .wizard-progress__count) {
-    color: #94A3B8;
+    color: var(--ink-text-2, #94A3B8);
 }
 :global(.dark .eligibility-page .wizard-seg::before) {
-    background: #334155;
+    background: var(--ink-border, #334155);
 }
 :global(.dark .eligibility-page .wizard-seg::after) {
     background: var(--rb-primary-text);
@@ -2774,25 +2774,25 @@ onActivated(() => {
 }
 :global(.dark .eligibility-page .wizard-nav),
 :global(.dark .eligibility-page .wizard-group__head--next) {
-    border-top-color: #334155;
+    border-top-color: var(--ink-border, #334155);
 }
 :global(.dark .eligibility-page .wizard-nav__back) {
-    background: #334155;
-    color: #F1F5F9;
+    background: var(--ink-border, #334155);
+    color: var(--ink-text, #F1F5F9);
 }
 :global(.dark .eligibility-page .wizard-nav__back:hover:not(:disabled)) {
-    background: #475569;
+    background: var(--ink-border-hover, #475569);
 }
 :global(.dark .eligibility-page .wizard-nav__count),
 :global(.dark .eligibility-page .wizard-group__part) {
-    color: #94A3B8;
+    color: var(--ink-text-2, #94A3B8);
 }
 :global(.dark .eligibility-page .consent-item) {
-    border-bottom-color: #334155;
+    border-bottom-color: var(--ink-border, #334155);
 }
 :global(.dark .eligibility-page .consent-all) {
-    background: #0F172A;
-    border-color: #334155;
+    background: var(--ink-page, #0F172A);
+    border-color: var(--ink-border, #334155);
 }
 :global(.dark .eligibility-page .consent-item__more),
 :global(.dark .eligibility-page .review-missing__link) {
@@ -2801,12 +2801,12 @@ onActivated(() => {
 
 :global(.dark .eligibility-page .modal-subtitle),
 :global(.dark .eligibility-modal .modal-subtitle) {
-    color: #94A3B8;
+    color: var(--ink-text-2, #94A3B8);
 }
 
 :global(.dark .eligibility-page .modal-validity),
 :global(.dark .eligibility-modal .modal-validity) {
-    color: #F1F5F9;
+    color: var(--ink-text, #F1F5F9);
 }
 
 :global(.dark .eligibility-page .modal-check),
@@ -2824,17 +2824,17 @@ onActivated(() => {
 :global(.dark .eligibility-modal .modal-card--review .review-head),
 :global(.dark .eligibility-page .modal-card--review .modal-actions),
 :global(.dark .eligibility-modal .modal-card--review .modal-actions) {
-    border-color: #334155;
+    border-color: var(--ink-border, #334155);
 }
 
 :global(.dark .eligibility-page .modal-card--review .modal-actions),
 :global(.dark .eligibility-modal .modal-card--review .modal-actions) {
-    background: #172033;
+    background: var(--ink-inset, #172033);
 }
 
 :global(.dark .eligibility-page .modal-card--review .review-answer),
 :global(.dark .eligibility-modal .modal-card--review .review-answer) {
-    border-bottom-color: #334155;
+    border-bottom-color: var(--ink-border, #334155);
 }
 
 :global(.dark .eligibility-page .submit-error),
@@ -2866,7 +2866,7 @@ onActivated(() => {
 }
 
 :global(.dark .eligibility-page .submit-hint) {
-    color: #94A3B8;
+    color: var(--ink-text-2, #94A3B8);
 }
 
 :global(.dark .eligibility-page .submit-hint svg) {
@@ -2883,7 +2883,7 @@ onActivated(() => {
 
 :global(.dark .eligibility-page .submit-error .submit-error__action),
 :global(.dark .eligibility-modal .submit-error .submit-error__action) {
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.6);
 }
 
 :global(.dark .eligibility-page .status-banner--success),
@@ -2911,29 +2911,29 @@ onActivated(() => {
 :global(.dark .eligibility-modal .status-banner__detail),
 :global(.dark .eligibility-page .status-banner__reasons),
 :global(.dark .eligibility-modal .status-banner__reasons) {
-    color: #CBD5E1;
+    color: var(--ink-text-3, #CBD5E1);
 }
 
 :global(.dark .eligibility-page .panel-header--simple),
-:global(.dark .eligibility-modal .panel-header--simple) { border-color: #334155; }
+:global(.dark .eligibility-modal .panel-header--simple) { border-color: var(--ink-border, #334155); }
 
 
 
 :global(.dark .eligibility-page .form-input),
 :global(.dark .eligibility-modal .form-input) {
-    background: #0F172A;
-    border-color: #334155;
-    color: #F1F5F9;
+    background: var(--ink-page, #0F172A);
+    border-color: var(--ink-border, #334155);
+    color: var(--ink-text, #F1F5F9);
 }
 
 :global(.dark .eligibility-page .form-input--locked),
 :global(.dark .eligibility-modal .form-input--locked) {
-    background: #172033;
-    color: #94A3B8;
+    background: var(--ink-inset, #172033);
+    color: var(--ink-text-2, #94A3B8);
 }
 
 :global(.dark .eligibility-page .result-box--pending),
-:global(.dark .eligibility-modal .result-box--pending) { background: #263449; }
+:global(.dark .eligibility-modal .result-box--pending) { background: var(--ink-hover, #263449); }
 :global(.dark .eligibility-page .result-box--success),
 :global(.dark .eligibility-modal .result-box--success) { background: rgba(102,187,106,0.16); }
 :global(.dark .eligibility-page .result-box--danger),
@@ -2941,21 +2941,21 @@ onActivated(() => {
 
 :global(.dark .eligibility-page .btn-outline),
 :global(.dark .eligibility-modal .btn-outline) {
-    background: #263449;
-    color: #E2E8F0;
+    background: var(--ink-hover, #263449);
+    color: var(--ink-text-4, #E2E8F0);
 }
 :global(.dark .eligibility-page .btn-outline:hover),
-:global(.dark .eligibility-modal .btn-outline:hover) { background: #334155; }
+:global(.dark .eligibility-modal .btn-outline:hover) { background: var(--ink-border, #334155); }
 
 :global(.dark .eligibility-page .modal-qr-image--placeholder),
-:global(.dark .eligibility-modal .modal-qr-image--placeholder) { background: #172033; }
+:global(.dark .eligibility-modal .modal-qr-image--placeholder) { background: var(--ink-inset, #172033); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .eligibility-page .skeleton),
 :global(.dark .eligibility-modal .skeleton) {
-    background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+    background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 
 .btn-primary:focus-visible,
@@ -3181,35 +3181,35 @@ onActivated(() => {
 
 /* Valid card, progress panel, question cards: dark */
 :global(.dark .eligibility-page .valid-card),
-:global(.dark .eligibility-page .q-rail) { background: #1E293B; border-color: #334155; }
+:global(.dark .eligibility-page .q-rail) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
 :global(.dark .eligibility-page .valid-card__main),
-:global(.dark .eligibility-page .q-rail__head) { border-color: #334155; color: #F1F5F9; }
-:global(.dark .eligibility-page .valid-gate__title) { color: #F1F5F9; }
+:global(.dark .eligibility-page .q-rail__head) { border-color: var(--ink-border, #334155); color: var(--ink-text, #F1F5F9); }
+:global(.dark .eligibility-page .valid-gate__title) { color: var(--ink-text, #F1F5F9); }
 :global(.dark .eligibility-page .valid-card__badge) { background: rgba(102, 187, 106, 0.18); color: #A5D6A7; }
-:global(.dark .eligibility-page .valid-card__dates > div) { background: #172033; border-color: #334155; }
-:global(.dark .eligibility-page .valid-card__dates dt) { color: #CBD5E1; }
+:global(.dark .eligibility-page .valid-card__dates > div) { background: var(--ink-inset, #172033); border-color: var(--ink-border, #334155); }
+:global(.dark .eligibility-page .valid-card__dates dt) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .eligibility-page .valid-card__again) {
     border-color: color-mix(in srgb, var(--rb-primary-text) 40%, transparent) !important;
     color: var(--rb-primary-text) !important;
 }
 :global(.dark .eligibility-page .valid-card__reasons li),
-:global(.dark .eligibility-page .q-step__title) { color: #CBD5E1; }
+:global(.dark .eligibility-page .q-step__title) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .eligibility-page .valid-card__reason-icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
-:global(.dark .eligibility-page .q-rail__ring) { background: conic-gradient(var(--rb-primary-text) calc(var(--pct, 0) * 1%), #334155 0); }
-:global(.dark .eligibility-page .q-rail__ring::before) { background: #1E293B; }
-:global(.dark .eligibility-page .q-step:hover:not(:disabled):not(.q-step--current)) { background: #263449; }
+:global(.dark .eligibility-page .q-rail__ring) { background: conic-gradient(var(--rb-primary-text) calc(var(--pct, 0) * 1%), var(--ink-border, #334155) 0); }
+:global(.dark .eligibility-page .q-rail__ring::before) { background: var(--ink-surface, #1E293B); }
+:global(.dark .eligibility-page .q-step:hover:not(:disabled):not(.q-step--current)) { background: var(--ink-hover, #263449); }
 :global(.dark .eligibility-page .q-step--current) { background: color-mix(in srgb, var(--rb-primary-text) 12%, transparent); }
 :global(.dark .eligibility-page .q-step--current .q-step__title) { color: var(--rb-primary-text); }
 :global(.dark .eligibility-page .q-step__num),
-:global(.dark .eligibility-page .question-card__num) { background: #263449; color: #94A3B8; }
+:global(.dark .eligibility-page .question-card__num) { background: var(--ink-hover, #263449); color: var(--ink-text-2, #94A3B8); }
 :global(.dark .eligibility-page .q-step--current .q-step__num),
 :global(.dark .eligibility-page .q-step--done .q-step__num),
 :global(.dark .eligibility-page .question-card--answered .question-card__num) { background: var(--rb-primary); color: #fff; }
-:global(.dark .eligibility-page .q-rail__note) { border-color: #334155; color: #94A3B8; }
-:global(.dark .eligibility-page .question-card) { background: #172033; border-color: #334155; }
+:global(.dark .eligibility-page .q-rail__note) { border-color: var(--ink-border, #334155); color: var(--ink-text-2, #94A3B8); }
+:global(.dark .eligibility-page .question-card) { background: var(--ink-inset, #172033); border-color: var(--ink-border, #334155); }
 :global(.dark .eligibility-page .question-card--answered) { border-color: color-mix(in srgb, var(--rb-primary-text) 35%, transparent); }
-:global(.dark .eligibility-page .answer-toggle) { background: #0F172A; }
-:global(.dark .eligibility-page .answer-btn) { color: #CBD5E1; }
-:global(.dark .eligibility-page .answer-btn:hover:not(.answer-btn--active)) { background: #263449; }
+:global(.dark .eligibility-page .answer-toggle) { background: var(--ink-page, #0F172A); }
+:global(.dark .eligibility-page .answer-btn) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .eligibility-page .answer-btn:hover:not(.answer-btn--active)) { background: var(--ink-hover, #263449); }
 :global(.dark .eligibility-page .answer-btn.answer-btn--active) { background: var(--rb-primary); color: #fff; }
 </style>

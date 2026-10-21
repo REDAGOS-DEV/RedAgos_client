@@ -534,12 +534,12 @@ const iconSize = computed(() => (props.size === 'sm' ? 15 : 17))
   font-family: var(--rb-font-sans, ui-sans-serif, system-ui, sans-serif);
 }
 html.dark .dp-panel:not(.dp-panel--light) {
-  --dpp-surface: #1E293B;
-  --dpp-text: #F1F5F9;
-  --dpp-muted: #94A3B8;
-  --dpp-faint: #64748B;
-  --dpp-border: #334155;
-  --dpp-hover: #263449;
+  --dpp-surface: var(--ink-surface, #1E293B);
+  --dpp-text: var(--ink-text, #F1F5F9);
+  --dpp-muted: var(--ink-text-2, #94A3B8);
+  --dpp-faint: var(--ink-muted, #64748B);
+  --dpp-border: var(--ink-border, #334155);
+  --dpp-hover: var(--ink-hover, #263449);
   --dpp-accent-soft: rgba(var(--rb-primary-rgb, 100, 181, 246), 0.2);
   --dpp-accent-text: var(--accent-text-dark, #64B5F6);
   --dpp-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.7);

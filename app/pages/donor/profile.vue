@@ -866,6 +866,11 @@ async function handleProfileSave() {
   backdrop-filter: blur(10px);
 }
 
+/* Below 1024px the bottom tabs sit at the foot of the screen; stick above them. */
+@media (max-width: 1023px) {
+  .profile-page .save-bar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+
 .profile-page .save-bar__state { margin: 0; font-size: var(--rb-fs-small); color: var(--text-muted); }
 .profile-page .save-bar--dirty .save-bar__state { color: var(--warning-fg); font-weight: 600; }
 .profile-page .save-bar__state--error { color: var(--danger-fg) !important; font-weight: 600; }
@@ -956,20 +961,20 @@ async function handleProfileSave() {
  * color-scheme sa native date picker ug ang chevron sa select (data URI).
  */
 :global(.dark .profile-page) {
-  --page-bg: #0F172A;
-  --surface: #1E293B;
-  --surface-subtle: #172033;
-  --surface-muted: #263449;
-  --surface-muted-hover: #334155;
+  --page-bg: var(--ink-page, #0F172A);
+  --surface: var(--ink-surface, #1E293B);
+  --surface-subtle: var(--ink-inset, #172033);
+  --surface-muted: var(--ink-hover, #263449);
+  --surface-muted-hover: var(--ink-border, #334155);
 
-  --border: #334155;
-  --border-subtle: #2A3850;
-  --border-strong: #475569;
+  --border: var(--ink-border, #334155);
+  --border-subtle: var(--ink-field-border, #2A3850);
+  --border-strong: var(--ink-border-hover, #475569);
 
-  --text-primary: #F1F5F9;
+  --text-primary: var(--ink-text, #F1F5F9);
   /* slate-200: neutral; ang slate-300 kay daw init tan-awon tapad sa asul nga muted text */
-  --text-body: #E2E8F0;
-  --text-muted: #94A3B8;
+  --text-body: var(--ink-text-4, #E2E8F0);
+  --text-muted: var(--ink-text-2, #94A3B8);
 
   --primary: var(--rb-primary);
   --primary-hover: #1976D2;
@@ -978,7 +983,7 @@ async function handleProfileSave() {
   --primary-border: color-mix(in srgb, var(--rb-primary-text) 45%, transparent);
   --focus-ring: var(--rb-primary-text);
 
-  --track: #475569;
+  --track: var(--ink-border-hover, #475569);
 
   --success-fg: #66BB6A;
   --success-bg: rgba(102, 187, 106, 0.10);
@@ -994,8 +999,8 @@ async function handleProfileSave() {
   --danger-border: rgba(240, 68, 56, 0.28);
 
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --skeleton-base: #1E293B;
-  --skeleton-shine: #263449;
+  --skeleton-base: var(--ink-surface, #1E293B);
+  --skeleton-shine: var(--ink-hover, #263449);
 }
 
 :global(.dark .profile-page .form-input) {

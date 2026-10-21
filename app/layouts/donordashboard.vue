@@ -46,17 +46,21 @@
         -->
         <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1400px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
 
-        <!-- Left Cluster: Mobile Menu Toggle + Titles -->
-        <div class="flex items-center gap-2 min-w-0">
-          <!-- Mobile menu toggle -->
-          <button @click="openMobile"
-            class="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
-            aria-label="Open menu">
-            <AssetIcon name="menu" :size="20" class="text-[#475569] dark:text-slate-300" />
-          </button>
+        <!-- Left Cluster: Logo (phones and tablets) + Titles -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <!--
+            Below 1024px the bottom tabs carry the navigation, so the menu
+            button gave way to the logo (2026-10-21), which goes Home like an
+            app's. Settings, Help and Eligibility moved into the account menu.
+          -->
+          <NuxtLink to="/donor/dashboard"
+            class="mobile-logo"
+            aria-label="RedAgos, go to Home">
+            <img :src="logo" alt="" class="mobile-logo__img">
+          </NuxtLink>
 
           <!-- Dynamic Page Title (Mobile view) -->
-          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
+          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-[color:var(--ink-text,#F1F5F9)] truncate">
             {{ pageLabels[route.path] || 'Dashboard' }}
           </span>
 
@@ -66,10 +70,10 @@
             moved to the dashboard's own header.
           -->
           <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
-            <span class="text-[12px] font-medium leading-tight text-[#64748B] dark:text-slate-400">
+            <span class="text-[12px] font-medium leading-tight text-[#64748B] dark:text-[color:var(--ink-text-2,#94A3B8)]">
               Donor Portal
             </span>
-            <span class="text-[15px] font-semibold leading-tight truncate text-[#334155] dark:text-slate-100">
+            <span class="text-[15px] font-semibold leading-tight truncate text-[#334155] dark:text-[color:var(--ink-text,#F1F5F9)]">
               {{ pageLabels[route.path] || 'Dashboard' }}
             </span>
           </div>
@@ -77,24 +81,24 @@
 
         <!-- Search Bar (Desktop) -->
         <div v-show="searchOpenMobile || true" v-click-outside="closeSearchResults"
-          class="items-center gap-2 h-10 rounded-full bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-4 focus-within:ring-[rgba(var(--rb-primary-rgb),0.1)] transition-colors px-4 relative"
+          class="items-center gap-2 h-10 rounded-full bg-white dark:bg-[color:var(--ink-surface,#1E293B)] border border-[#E2E8F0] dark:border-[color:var(--ink-border,#334155)] hover:border-[#CBD5E1] dark:hover:border-[color:var(--ink-border-hover,#475569)] focus-within:border-[rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-4 focus-within:ring-[rgba(var(--rb-primary-rgb),0.1)] transition-colors px-4 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
               : 'hidden sm:flex sm:flex-1',
             'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]">
-          <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
+          <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-[color:var(--ink-muted,#64748B)] flex-shrink-0" />
           <input ref="searchInput" v-model="searchQuery" type="text" placeholder="Search pages, records..."
-            class="text-sm flex-1 min-w-0 bg-transparent outline-none placeholder:text-[#94a3b8] dark:placeholder:text-slate-500 text-gray-800 dark:text-slate-100"
+            class="text-sm flex-1 min-w-0 bg-transparent outline-none placeholder:text-[#94a3b8] dark:placeholder:text-[color:var(--ink-muted,#64748B)] text-gray-800 dark:text-[color:var(--ink-text,#F1F5F9)]"
             @focus="showSearchResults = true" @keydown.enter="goToTopResult" @keydown.esc="handleEscSearch"
             @keydown.down.prevent="moveHighlight(1)" @keydown.up.prevent="moveHighlight(-1)" />
           <span v-if="!searchQuery"
-            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-[#F1F5F9] dark:bg-slate-700 text-[#64748b] dark:text-slate-300 border border-[#E2E8F0] dark:border-slate-600 flex-shrink-0">
+            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-[#F1F5F9] dark:bg-[color:var(--ink-border,#334155)] text-[#64748b] dark:text-[color:var(--ink-text-3,#CBD5E1)] border border-[#E2E8F0] dark:border-[color:var(--ink-border-hover,#475569)] flex-shrink-0">
             {{ searchShortcutLabel }}
           </span>
           <button v-else @click="clearSearch"
-            class="text-[#94a3b8] dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 flex-shrink-0"
+            class="text-[#94a3b8] dark:text-[color:var(--ink-muted,#64748B)] hover:text-gray-600 dark:hover:text-[color:var(--ink-text-3,#CBD5E1)] flex-shrink-0"
             aria-label="Clear search">
             <AssetIcon name="x" :size="14" />
           </button>
@@ -102,26 +106,26 @@
           <!-- Results dropdown -->
           <Transition name="popup">
             <!--
-              The borders here are bound, not a `dark:border-slate-700` class
+              The borders here are bound, not a `dark:border-[color:var(--ink-border,#334155)]` class
               beside a hard-coded inline colour: an inline `border-color`
               outranks the variant, which is what pinned every one of this
               header's popups to the light #EEF1F5 in dark mode.
             -->
             <div v-if="showSearchResults && searchQuery && filteredResults.length"
-              class="search-results-dropdown absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border shadow-lg z-40"
+              class="search-results-dropdown absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-page,#0F172A)] border shadow-lg z-40"
               :style="{ borderColor: headerBorderColor }">
               <NuxtLink v-for="(item, i) in filteredResults" :key="item.path" :to="item.path"
                 @click="closeSearchResults(); searchOpenMobile = false"
                 class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" :class="i === highlightIndex
-                  ? 'bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100'
-                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800'">
-                <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                  ? 'bg-gray-50 dark:bg-[color:var(--ink-surface,#1E293B)] text-gray-900 dark:text-[color:var(--ink-text,#F1F5F9)]'
+                  : 'text-gray-700 dark:text-[color:var(--ink-text-3,#CBD5E1)] hover:bg-gray-50 dark:hover:bg-[color:var(--ink-surface,#1E293B)]'">
+                <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-[color:var(--ink-muted,#64748B)] flex-shrink-0" />
                 <span class="truncate">{{ item.label }}</span>
               </NuxtLink>
             </div>
 
             <div v-else-if="showSearchResults && searchQuery && !filteredResults.length"
-              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
+              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-page,#0F172A)] border shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-[color:var(--ink-text-2,#94A3B8)]"
               :style="{ borderColor: headerBorderColor }">
               No matches for "{{ searchQuery }}"
             </div>
@@ -132,18 +136,18 @@
         <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <!-- Mobile Search Trigger -->
           <button @click="openMobileSearch"
-            class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
+            class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[color:var(--ink-surface,#1E293B)]"
             aria-label="Open search">
-            <AssetIcon name="search" :size="18" class="text-[#475569] dark:text-slate-300" />
+            <AssetIcon name="search" :size="18" class="text-[#475569] dark:text-[color:var(--ink-text-3,#CBD5E1)]" />
           </button>
 
           <!-- Notifications -->
           <NuxtLink to="/donor/notifications"
             :aria-label="unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'"
-            class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]">
-            <AssetIcon name="bell" :size="18" class="text-[#475569] dark:text-slate-300" />
+            class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[color:var(--ink-surface,#1E293B)]">
+            <AssetIcon name="bell" :size="18" class="text-[#475569] dark:text-[color:var(--ink-text-3,#CBD5E1)]" />
             <span v-if="unreadCount > 0"
-              class="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
+              class="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-[3px] rounded-full flex items-center justify-center text-[9px] font-semibold text-white ring-2 ring-[#F7F8FA] dark:ring-[color:var(--ink-page,#0F172A)]"
               style="background:#D32F2F">
               {{ unreadCount > 9 ? '9+' : unreadCount }}
             </span>
@@ -154,7 +158,7 @@
             no screens, so `hidden xs:block` compiled to `hidden` and this
             divider never rendered at any width. sm is the real first step up.
           -->
-          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#E2E8F0] dark:bg-[#334155]" />
+          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#E2E8F0] dark:bg-[color:var(--ink-border,#334155)]" />
 
           <!--
             Account menu. Opens on hover on devices with a mouse (closing after
@@ -164,12 +168,12 @@
           <div class="relative" @mouseenter="openMenuOnHover" @mouseleave="closeMenuOnHover">
             <button @click="showUserMenu = !showUserMenu"
               :aria-expanded="showUserMenu ? 'true' : 'false'" aria-haspopup="menu" aria-label="Account menu"
-              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]">
+              class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[color:var(--ink-surface,#1E293B)]">
 
               <!-- Outer Avatar Container -->
               <div class="relative flex-shrink-0">
                 <div
-                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-[#F7F8FA] dark:ring-[#0F172A]"
+                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white overflow-hidden ring-2 ring-[#F7F8FA] dark:ring-[color:var(--ink-page,#0F172A)]"
                   style="background:var(--rb-primary);">
                   <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                   <span v-else>{{ userInitials }}</span>
@@ -193,27 +197,27 @@
                   second notification.
                 -->
                 <span v-else-if="identityStatus === 'pending'"
-                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-[#F7F8FA] dark:ring-[#0F172A] z-10"
+                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-[#F7F8FA] dark:ring-[color:var(--ink-page,#0F172A)] z-10"
                   title="ID under review">
                   <span class="sr-only">ID under review</span>
                 </span>
 
                 <span v-else
-                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-[#F7F8FA] dark:ring-[#0F172A] z-10"
+                  class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-[#F7F8FA] dark:ring-[color:var(--ink-page,#0F172A)] z-10"
                   title="Valid ID needed">
                   <span class="sr-only">Valid ID needed</span>
                 </span>
               </div>
 
               <AssetIcon name="chevron-down" :size="14"
-                class="text-[#94a3b8] dark:text-slate-500 hidden sm:block transition-transform duration-150"
+                class="text-[#94a3b8] dark:text-[color:var(--ink-muted,#64748B)] hidden sm:block transition-transform duration-150"
                 :class="{ 'rotate-180': showUserMenu }" />
             </button>
 
             <!-- Profile Dropdown Card -->
             <Transition name="popup">
               <div v-if="showUserMenu" v-click-outside="closeUserMenu"
-                class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border z-40 shadow-lg"
+                class="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-page,#0F172A)] border z-40 shadow-lg"
                 :style="{ borderColor: headerBorderColor }">
                 <div class="flex items-center gap-3 px-4 py-4 border-b"
                   :style="{ borderColor: headerBorderColor }">
@@ -224,23 +228,23 @@
                     <span v-else>{{ userInitials }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate capitalize text-gray-900 dark:text-slate-100">
+                    <p class="text-sm font-semibold truncate capitalize text-gray-900 dark:text-[color:var(--ink-text,#F1F5F9)]">
                       {{ user?.full_name || 'Donor' }}
                     </p>
-                    <p class="text-xs truncate text-gray-500 dark:text-slate-400">{{ user?.email }}</p>
+                    <p class="text-xs truncate text-gray-500 dark:text-[color:var(--ink-text-2,#94A3B8)]">{{ user?.email }}</p>
 
                     <!-- Valid ID Status inside Dropdown (full context + CTA lives here) -->
                     <div class="flex items-center gap-1.5 mt-1.5">
                       <template v-if="identityStatus === 'verified'">
                         <AssetIcon name="badge-check" :size="16" class="text-[#0052FF] dark:text-[#3B82F6]" />
-                        <span class="text-xs font-bold text-gray-900 dark:text-slate-100">
+                        <span class="text-xs font-bold text-gray-900 dark:text-[color:var(--ink-text,#F1F5F9)]">
                           ID Verified
                         </span>
                       </template>
 
                       <template v-else-if="identityStatus === 'pending'">
                         <AssetIcon name="clock" :size="14" class="text-slate-400" />
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
+                        <span class="text-xs font-bold text-slate-500 dark:text-[color:var(--ink-text-2,#94A3B8)]">
                           ID Under Review
                         </span>
                       </template>
@@ -259,8 +263,8 @@
 
                 <div class="py-2">
                   <NuxtLink v-for="item in userMenuItems" :key="item.path" :to="item.path" @click="closeUserMenu"
-                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                    <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500" />
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[color:var(--ink-text-3,#CBD5E1)] hover:bg-gray-50 dark:hover:bg-[color:var(--ink-surface,#1E293B)] transition-colors">
+                    <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-[color:var(--ink-muted,#64748B)]" />
                     <span>{{ item.label }}</span>
                   </NuxtLink>
                 </div>
@@ -272,8 +276,8 @@
                 -->
                 <div class="border-t py-2" :style="{ borderColor: headerBorderColor }">
                   <div class="flex items-center justify-between gap-3 px-4 py-1.5">
-                    <span class="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">
-                      <AssetIcon :name="isDark ? 'moon' : 'sun'" :size="16" class="text-gray-400 dark:text-slate-500" />
+                    <span class="flex items-center gap-3 text-sm text-gray-700 dark:text-[color:var(--ink-text-3,#CBD5E1)]">
+                      <AssetIcon :name="isDark ? 'moon' : 'sun'" :size="16" class="text-gray-400 dark:text-[color:var(--ink-muted,#64748B)]" />
                       Theme
                     </span>
                     <div class="theme-seg" role="radiogroup" aria-label="Theme">
@@ -306,7 +310,7 @@
                 </div>
 
                 <div class="px-4 py-2 border-t" :style="{ borderColor: headerBorderColor }">
-                  <p class="text-[11px] text-center text-gray-400 dark:text-slate-500">v1.0.0 · Terms & Conditions</p>
+                  <p class="text-[11px] text-center text-gray-400 dark:text-[color:var(--ink-muted,#64748B)]">v1.0.0 · Terms & Conditions</p>
                 </div>
               </div>
             </Transition>
@@ -315,21 +319,24 @@
 
         <!-- Mobile search close button -->
         <button v-if="searchOpenMobile" @click="closeMobileSearch"
-          class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[#1E293B]"
+          class="sm:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#EEF1F5] dark:hover:bg-[color:var(--ink-surface,#1E293B)]"
           aria-label="Close search">
-          <AssetIcon name="x" :size="18" class="text-[#475569] dark:text-slate-300" />
+          <AssetIcon name="x" :size="18" class="text-[#475569] dark:text-[color:var(--ink-text-3,#CBD5E1)]" />
         </button>
         </div>
       </header>
 
       <!--
-        The page background is the token, not bg-white/dark:bg-slate-900. Every
+        The page background is the token, not bg-white/dark:bg-[color:var(--ink-page,#0F172A)]. Every
         donor page paints itself inside a centred max-width, so the margins on
         either side are this element and have to be the page colour.
       -->
       <main class="min-h-screen transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
+
+      <!-- Phones and tablets: the main tabs under the thumb (the sidebar is a drawer there). -->
+      <DonorBottomNav />
     </div>
   </div>
 </template>
@@ -340,12 +347,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 import { donorService } from '~/api/donor/DonorService'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 
-const { railExpanded, openMobile } = useSidebar()
+const { railExpanded } = useSidebar()
 
 // The donor's colour theme (Settings → Appearance). Applied while the donor
 // portal is open and removed on the way out, so the other portals and the
@@ -370,7 +378,33 @@ const themeHint = computed(() => (
     : `Always ${themeMode.value}`
 ))
 
-const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
+// The browser's own bar (status bar and address bar on phones) takes this
+// colour, so it runs into the glass header instead of stopping at a white
+// strip. Sampled from the header as it renders over the backdrop glow.
+// Set on the one tag by hand: useHead left the server-rendered light tag in
+// place beside the client's, and browsers read the first.
+let themeColorMeta = null
+function applyThemeColor() {
+  if (!themeColorMeta) {
+    themeColorMeta = document.querySelector('meta[name="theme-color"]') ?? document.createElement('meta')
+    themeColorMeta.setAttribute('name', 'theme-color')
+    if (!themeColorMeta.isConnected) document.head.appendChild(themeColorMeta)
+  }
+  themeColorMeta.setAttribute('content', isDark.value ? '#0E1116' : '#F6FAFF')
+}
+onMounted(applyThemeColor)
+watch(isDark, () => { if (themeColorMeta) applyThemeColor() })
+onUnmounted(() => {
+  themeColorMeta?.remove()
+  themeColorMeta = null
+})
+
+// Turns on the donor "ink" dark palette (main.css), on <html> so it also
+// reaches dialogs and dropdowns teleported to <body>.
+onMounted(() => document.documentElement.classList.add('portal-donor'))
+onUnmounted(() => document.documentElement.classList.remove('portal-donor'))
+
+const headerBorderColor = computed(() => (isDark.value ? 'var(--ink-border, #334155)' : '#E5EAF0'))
 /*
  * Bound rather than written as a `:global(.dark) header` rule. This build's
  * scoped-CSS transform drops the descendant half of `:global(.dark) .x` and
@@ -464,11 +498,14 @@ onMounted(() => {
 
 // --- Profile dropdown ---
 const showUserMenu = ref(false)
+// On phones this is the only way to Eligibility and Help (no drawer there).
 const userMenuItems = [
   { label: 'My Profile', path: '/donor/profile', icon: 'user-circle' },
   { label: 'Donation History', path: '/donor/history', icon: 'history' },
   { label: 'View My QR Code', path: '/donor/qrcode', icon: 'qr-code' },
-  { label: 'Notification Settings', path: '/donor/settings', icon: 'bell' }
+  { label: 'Eligibility Screening', path: '/donor/eligibility', icon: 'clipboard-check' },
+  { label: 'Notification Settings', path: '/donor/settings', icon: 'bell' },
+  { label: 'Help', path: '/donor/help', icon: 'help-circle' }
 ]
 const closeUserMenu = () => { showUserMenu.value = false }
 
@@ -622,7 +659,7 @@ const handleLogout = async () => {
   background:
     radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
     radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
-    #0B1220;
+    var(--ink-base, #0B1220);
 }
 
 /* Frosted glass top bar. */
@@ -632,8 +669,8 @@ const handleLogout = async () => {
   backdrop-filter: saturate(170%) blur(18px);
 }
 .topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
-:global(.dark .topbar) { background-color: rgba(15, 23, 42, 0.55); }
-:global(.dark .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.78); }
+:global(.dark .topbar) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.55); }
+:global(.dark .topbar--scrolled) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.78); }
 
 /* No blur, or the donor asked for less transparency: solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -644,7 +681,7 @@ const handleLogout = async () => {
    turns solid. */
 @media (prefers-reduced-transparency: reduce) {
   .topbar--scrolled { background-color: rgba(255, 255, 255, 0.96); }
-  :global(.dark .donor-portal .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.96); }
+  :global(.dark .donor-portal .topbar--scrolled) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.96); }
 }
 
 /*
@@ -687,6 +724,28 @@ main {
   background: transparent;
 }
 
+/* The logo in place of the menu button, on phones and tablets: the same
+   mark as the sidebar's, in the portal colour. */
+.mobile-logo {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--rb-primary);
+  box-shadow: 0 4px 12px -6px rgba(var(--rb-primary-rgb), 0.8);
+}
+.mobile-logo__img { width: 100%; height: 100%; padding: 5px; object-fit: contain; }
+.mobile-logo:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.mobile-logo:active { transform: scale(0.96); }
+/* From 1024px the sidebar shows the logo (in CSS: a lg:hidden class would lose to the display above). */
+@media (min-width: 1024px) {
+  .mobile-logo { display: none; }
+}
+
 input:focus {
   outline: none;
 }
@@ -727,6 +786,14 @@ input {
 
 a, button {
   touch-action: manipulation;
+}
+
+/* Below the sidebar breakpoint the bottom tabs cover the foot of the page,
+   so the page ends above them. */
+@media (max-width: 1023px) {
+  main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (max-width: 639px) {
@@ -775,10 +842,10 @@ a, button {
 }
 .theme-seg__btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 .theme-seg__hint { margin: 2px 16px 4px 44px; font-size: 11.5px; color: #94A3B8; }
-:global(.dark .theme-seg) { background: #1E293B; }
-:global(.dark .theme-seg__btn) { color: #94A3B8; }
-:global(.dark .theme-seg__btn:hover:not(.theme-seg__btn--on)) { color: #F1F5F9; }
-:global(.dark .theme-seg__btn--on) { background: #334155; color: var(--rb-primary-text); }
+:global(.dark .theme-seg) { background: var(--ink-surface, #1E293B); }
+:global(.dark .theme-seg__btn) { color: var(--ink-text-2, #94A3B8); }
+:global(.dark .theme-seg__btn:hover:not(.theme-seg__btn--on)) { color: var(--ink-text, #F1F5F9); }
+:global(.dark .theme-seg__btn--on) { background: var(--ink-border, #334155); color: var(--rb-primary-text); }
 @media (prefers-reduced-motion: reduce) {
   .theme-seg__btn { transition: none; }
 }

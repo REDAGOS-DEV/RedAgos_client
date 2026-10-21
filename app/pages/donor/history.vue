@@ -573,32 +573,32 @@ onActivated(() => {
 
 /* ============ Dark mode ============ */
 :global(.dark .history-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --border: #334155;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    --border: var(--ink-border, #334155);
+    background: var(--ink-page, #0F172A);
 }
 
 :global(.dark .history-page .stat-card),
 :global(.dark .history-page .panel),
-:global(.dark .history-page .record) { background: #1E293B; border-color: #334155; }
+:global(.dark .history-page .record) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
 
 :global(.dark .history-page .stat-card__label),
 :global(.dark .history-page .record__meta),
-:global(.dark .history-page .state-sub) { color: #94A3B8; }
+:global(.dark .history-page .state-sub) { color: var(--ink-text-2, #94A3B8); }
 :global(.dark .history-page .stat-card__badge--primary),
 :global(.dark .history-page .record__date) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
 :global(.dark .history-page .stat-card__badge--success) { background: rgba(102, 187, 106, 0.16); }
 :global(.dark .history-page .stat-card__badge--accent),
 :global(.dark .history-page .state-icon),
 :global(.dark .history-page .record__chip--blood) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }
-:global(.dark .history-page .record__chip) { background: #263449; color: #CBD5E1; }
-:global(.dark .history-page .record__track) { background: #172033; }
-:global(.dark .history-page .record__step + .record__step::before) { background: #334155; }
-:global(.dark .history-page .record__step-dot) { background: #1E293B; border-color: #475569; }
+:global(.dark .history-page .record__chip) { background: var(--ink-hover, #263449); color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .history-page .record__track) { background: var(--ink-inset, #172033); }
+:global(.dark .history-page .record__step + .record__step::before) { background: var(--ink-border, #334155); }
+:global(.dark .history-page .record__step-dot) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border-hover, #475569); }
 :global(.dark .history-page .record__step--done .record__step-dot) { background: var(--rb-primary); border-color: var(--rb-primary); }
 :global(.dark .history-page .record__step--current .record__step-dot) { border-color: var(--rb-primary-text); }
-:global(.dark .history-page .record__step--done .record__step-label) { color: #CBD5E1; }
+:global(.dark .history-page .record__step--done .record__step-label) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .history-page .record__step--current .record__step-label) { color: var(--rb-primary-text); }
 
 :global(.dark .history-page .history-status--completed) { background: rgba(102, 187, 106, 0.16); }
@@ -615,6 +615,6 @@ onActivated(() => {
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .history-page .skeleton) {
-    background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+    background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 </style>

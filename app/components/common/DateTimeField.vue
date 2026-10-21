@@ -91,7 +91,7 @@ function setTime(time: string) {
 .dtf-time--invalid { border-color: #D92D20; }
 .dtf-time:disabled { opacity: .6; cursor: not-allowed; }
 
-:global(.dark .dtf .dtf-time) { background: #0F172A; border-color: #334155; color: #F1F5F9; color-scheme: dark; }
+:global(.dark .dtf .dtf-time) { background: var(--ink-page, #0F172A); border-color: var(--ink-border, #334155); color: var(--ink-text, #F1F5F9); color-scheme: dark; }
 
 @media (max-width: 420px) {
   .dtf { grid-template-columns: 1fr; }
