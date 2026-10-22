@@ -38,7 +38,20 @@
           </header>
 
           <div class="pass__code">
-            <template v-if="canShowQr">
+            <!--
+              The pass could not be read. Say so, rather than fall back to
+              "book a visit first" for a donor who may well have booked.
+            -->
+            <div v-if="loadError" class="qr-empty" role="alert">
+              <span class="qr-empty__frame" aria-hidden="true">
+                <AssetIcon name="circle-alert" :size="30" />
+              </span>
+              <p class="qr-empty__title">Couldn't load your Pass</p>
+              <p class="qr-empty__sub">{{ loadError }}</p>
+              <button type="button" class="btn-primary" @click="load()">Try again</button>
+            </div>
+
+            <template v-else-if="canShowQr">
               <div class="pass__qr">
                 <img :src="qrCodeDataUrl" alt="Donor eligibility QR code" class="qr-image">
               </div>
@@ -65,6 +78,9 @@
               <NuxtLink v-else-if="qrEmptyCopy.action" :to="qrEmptyCopy.action.to" class="btn-primary">
                 {{ qrEmptyCopy.action.label }}
               </NuxtLink>
+              <NuxtLink v-if="qrEmptyCopy.alt" :to="qrEmptyCopy.alt.to" class="qr-empty__alt">
+                {{ qrEmptyCopy.alt.label }}
+              </NuxtLink>
 
               <p v-if="resendMessage" class="qr-resend-note">{{ resendMessage }}</p>
             </div>
@@ -77,11 +93,11 @@
             <div class="pass__tear" aria-hidden="true" />
             <dl class="pass__facts">
               <div>
-                <dt>Screened</dt>
+                <dt>Answered</dt>
                 <dd>{{ formatDate(profile?.screening_date) }}</dd>
               </div>
               <div>
-                <dt>Valid until</dt>
+                <dt>Answers good until</dt>
                 <dd :class="statusValueClass">{{ formatDate(profile?.screening_valid_until) }}</dd>
               </div>
               <div>
@@ -158,17 +174,13 @@
             </ol>
           </details>
 
-          <div class="privacy-note">
+          <!-- Only once there is a code to keep. -->
+          <div v-if="hasActiveToken" class="privacy-note">
             <span class="privacy-note__icon"><AssetIcon name="shield" :size="16" /></span>
             <p class="privacy-note__text">
               <strong>Keep this code to yourself.</strong>
               It is tied to your own screening answers.
-              <template v-if="hasActiveToken">
-                Your current code expires on {{ formatDate(qrValidUntil) }}. You can get a new one from this page.
-              </template>
-              <template v-else-if="profile?.screening_valid_until && !donationIntervalActive">
-                Once issued, a code stays valid for {{ qrValidDays }} days, separate from your screening, which is valid until {{ formatDate(profile.screening_valid_until) }}.
-              </template>
+              Your current code expires on {{ formatDate(qrValidUntil) }}. You can get a new one from this page.
             </p>
           </div>
         </section>
@@ -209,8 +221,15 @@ const hasActiveToken = ref(false)
 const donationIntervalActive = ref(false)
 const nextEligibleDate = ref(null) // 'YYYY-MM-DD'
 const emailVerified = ref(false)
+// The active booking and its health-question window, from GET
+// /donors/eligibility: { id, appointment_datetime, screening_window_opens_on,
+// screening_window_open }, or null with nothing booked.
+const booking = ref(null)
 const minting = ref(false)
 const qrError = ref('')
+// GET /donors/qr-code failed: nothing on the pass can be trusted, so the page
+// says that instead of guessing a state.
+const loadError = ref('')
 const resending = ref(false)
 const resendMessage = ref('')
 
@@ -270,6 +289,50 @@ const qrState = computed(() => {
   return emailVerified.value ? 'ready' : 'unverified'
 })
 
+/*
+ * No current answers: what to do depends on the booking. The questions for a
+ * booked visit open the day before it (the server refuses earlier), and a
+ * code made from answers given with nothing booked lasts its 14 days, not
+ * until the visit, so booking first is the path the portal points to.
+ */
+const answerFirstCopy = computed(() => {
+  const again = qrState.value === 'expired'
+  if (!booking.value) {
+    return {
+      title: again ? 'Book your next visit' : 'Book a visit first',
+      sub: 'Your QR code comes with your health questions, which you answer the day before your visit.',
+      action: { label: 'Book a donation', to: '/donor/appointments' },
+      alt: { label: 'Walking in instead? Answer the questions now', to: '/donor/eligibility' },
+    }
+  }
+  if (!booking.value.screening_window_open) {
+    return {
+      title: `Your health questions open on ${formatDateOnly(booking.value.screening_window_opens_on) ?? 'the day before your visit'}`,
+      sub: 'Answer them then, and your QR code is made as soon as you submit.',
+      action: { label: 'View my appointment', to: '/donor/appointments' },
+      alt: null,
+    }
+  }
+  return {
+    title: again ? 'Your answers need updating' : 'Answer your health questions',
+    sub: 'Your visit is coming up. Answer now and your QR code is made as soon as you submit.',
+    action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
+    alt: null,
+  }
+})
+
+/*
+ * How long a code made now lasts. With a visit booked the server caps it at
+ * the end of that day (the visit the answers are for); without one it runs
+ * its own qr_validity_days.
+ */
+const codeLifetimeNote = computed(() => {
+  const visit = booking.value?.appointment_datetime
+  return visit
+    ? `A code made now works until the end of your appointment day, ${formatDate(visit)}.`
+    : `A code made now stays valid for ${qrValidDays.value} days.`
+})
+
 const qrEmptyCopy = computed(() => {
   switch (qrState.value) {
     case 'waiting':
@@ -281,31 +344,26 @@ const qrEmptyCopy = computed(() => {
         action: null,
       }
     case 'ready':
-      return {
-        title: 'Your questionnaire is submitted',
-        sub: hasActiveToken.value
-          ? `You have an active check-in code, valid until ${formatDate(qrValidUntil.value)}.`
-          : 'Generate your check-in QR code to present at the blood center.',
-        action: null,
-      }
+      return hasActiveToken.value
+        ? {
+            title: 'You have a check-in code',
+            sub: `It is valid until ${formatDate(qrValidUntil.value)}. Generate it again here to see it on this device.`,
+            action: null,
+          }
+        : {
+            title: 'Get your QR code',
+            sub: `Your answers from ${formatDate(profile.value?.screening_date)} are on file. ${codeLifetimeNote.value}`,
+            action: null,
+          }
     case 'unverified':
       return {
         title: 'Verify your email address',
         sub: 'Your questionnaire is submitted. Confirm your email address to receive your check-in QR code.',
         action: null,
       }
-    case 'expired':
-      return {
-        title: 'Your questionnaire needs answering again',
-        sub: 'Complete the health questionnaire again to restore your check-in code.',
-        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
-      }
     default:
-      return {
-        title: 'No QR code yet',
-        sub: 'Complete the health questionnaire first. Your QR code is generated as soon as you submit it.',
-        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
-      }
+      // 'expired' and 'pending' (not answered): see answerFirstCopy.
+      return answerFirstCopy.value
   }
 })
 
@@ -340,7 +398,11 @@ const cycleAppointment = computed(() => {
   const confirmed = list.find(a => a.status === 'confirmed')
   if (confirmed) return confirmed
 
-  const scheduled = list.filter(a => a.status === 'scheduled').sort(byDate)[0]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const scheduled = list
+    .filter(a => a.status === 'scheduled' && new Date(a.appointment_datetime) >= today)
+    .sort(byDate)[0]
   if (scheduled) return scheduled
 
   const since = profile.value?.screening_date
@@ -354,16 +416,16 @@ const cycleAppointment = computed(() => {
 
 const STEP_COPY = [
   {
-    title: 'Complete the health questionnaire',
-    short: 'Questionnaire',
-    icon: 'clipboard-check',
-    desc: 'Answer it on the donor portal the day before your appointment. Your QR code is generated as soon as you submit it.',
-  },
-  {
     title: 'Book your appointment',
     short: 'Book',
     icon: 'calendar-check',
     desc: 'Choose a blood center or mobile drive, select your preferred date and time slot, and confirm your booking.',
+  },
+  {
+    title: 'Answer the health questions',
+    short: 'Questions',
+    icon: 'clipboard-check',
+    desc: 'They open the day before your appointment, so what the blood center reads is current. Your QR code is made as soon as you submit.',
   },
   {
     title: 'Arrive at the blood center',
@@ -389,21 +451,30 @@ const STEP_COPY = [
 // o 'upcoming'.
 const steps = computed(() => {
   const status = cycleAppointment.value?.status
+  const answered = questionnaireStatus.value === 'answered'
   const done = [
-    // Human sa donation 'expired' na ang questionnaire, pero na-answer gihapon
-    // siya para niini nga cycle.
-    questionnaireStatus.value === 'answered' || status === 'completed',
     !!cycleAppointment.value,
+    // The questions step is done once there is a code to show: answers alone
+    // still leave the donor with nothing to scan. Human sa donation 'expired'
+    // na ang questionnaire, pero nahuman gihapon kini nga step para sa cycle.
+    (answered && hasActiveToken.value) || status === 'confirmed' || status === 'completed',
     status === 'confirmed' || status === 'completed',
     status === 'completed',
     status === 'completed',
   ]
   const current = done.indexOf(false)
 
-  return STEP_COPY.map((copy, i) => ({
-    ...copy,
-    state: done[i] ? 'done' : i === current ? 'current' : 'upcoming',
-  }))
+  return STEP_COPY.map((copy, i) => {
+    // Answered, no code yet: what is left of this step is the code itself.
+    const step = i === 1 && answered && !done[1]
+      ? {
+          ...copy,
+          title: 'Get your QR code',
+          desc: 'Your answers are on file. Generate your code on this page, then show it when you arrive.',
+        }
+      : copy
+    return { ...step, state: done[i] ? 'done' : i === current ? 'current' : 'upcoming' }
+  })
 })
 
 const currentStep = computed(() => steps.value.find(step => step.state === 'current') ?? null)
@@ -417,11 +488,17 @@ function formatDate(value) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/*
+ * The minted code is kept on this device in localStorage, not sessionStorage:
+ * the server keeps only a hash, so a code lost with the browser session could
+ * never be shown again without minting a new one. It is the donor's own pass
+ * on their own device, the same as the PNG the Download button saves.
+ */
 function readStoredQr(donorId) {
   if (!import.meta.client || !donorId) return null
 
   try {
-    const raw = sessionStorage.getItem(QR_STORAGE_KEY)
+    const raw = localStorage.getItem(QR_STORAGE_KEY) ?? sessionStorage.getItem(QR_STORAGE_KEY)
     if (!raw) return null
 
     const stored = JSON.parse(raw)
@@ -438,7 +515,7 @@ function storeQr(donorId, data) {
   if (!import.meta.client || !donorId) return
 
   try {
-    sessionStorage.setItem(QR_STORAGE_KEY, JSON.stringify({
+    localStorage.setItem(QR_STORAGE_KEY, JSON.stringify({
       donorId,
       token: data?.qr_token,
       validUntil: data?.qr_valid_until,
@@ -451,13 +528,14 @@ function storeQr(donorId, data) {
 function clearStoredQr() {
   if (!import.meta.client) return
   try {
+    localStorage.removeItem(QR_STORAGE_KEY)
     sessionStorage.removeItem(QR_STORAGE_KEY)
   } catch (err) {
     console.error('Failed to clear cached QR code:', err)
   }
 }
 
-// I-drop ang daan nga QR sa memory ug sa sessionStorage para dili na makita
+// I-drop ang daan nga QR sa memory ug sa storage para dili na makita
 // o magamit.
 function dropLocalQr() {
   qrCodeDataUrl.value = ''
@@ -481,14 +559,21 @@ async function renderQr(token) {
   }
 }
 
-async function mintQrCode() {
+const { confirm: confirmDialog } = useConfirmDialog()
+
+async function mintQrCode({ silent = false } = {}) {
   if (donationIntervalActive.value) return
 
   // Ang pag-mint kay mo-revoke sa daan nga token, so pahibaw-on sa donor.
-  if (hasActiveToken.value) {
-    const confirmed = window.confirm(
-      'This replaces your current check-in code. Any copy you have saved or downloaded will stop working.'
-    )
+  if (hasActiveToken.value && !silent) {
+    const confirmed = await confirmDialog({
+      title: 'Make a new check-in code?',
+      message: 'This replaces your current code. Any copy you saved or downloaded will stop working.',
+      cancelLabel: 'Keep current one',
+      confirmLabel: 'Make new code',
+      tone: 'warning',
+      icon: 'refresh-cw',
+    })
     if (!confirmed) return
   }
 
@@ -564,6 +649,7 @@ let loadedOnce = false
 
 async function load({ silent = false } = {}) {
   if (!silent) loading.value = true
+  autoMinted = false
   try {
     // GET /api/donors/qr-code
     // Response: { profile: { full_name, donor_id, blood_type, screening_date,
@@ -571,6 +657,7 @@ async function load({ silent = false } = {}) {
     //   qr_valid_days, has_active_token, email_verified }
     // NOTE: kanunay null ang profile.qr_token — tinuyo na sa server.
     const data = await donorService.qrCode()
+    loadError.value = ''
 
     profile.value = data?.profile ?? null
     questionnaireStatus.value = data?.questionnaire_status ?? 'not_answered'
@@ -594,9 +681,11 @@ async function load({ silent = false } = {}) {
       await renderQr(stored.token)
     }
 
-    await loadAppointments()
+    await Promise.all([loadAppointments(), loadBooking()])
+    await autoMintForBooking()
   } catch (err) {
     console.error('Failed to load QR code data:', err)
+    loadError.value = 'Something went wrong on our side. Please try again in a moment.'
   } finally {
     loading.value = false
     loadedOnce = true
@@ -608,6 +697,33 @@ async function load({ silent = false } = {}) {
 // Ang request number kay para dili ma-overwrite sa mas daan nga response ang
 // mas bag-o, kay mahimong magdungan ang load() ug ang poll.
 let appointmentsRequest = 0
+
+/*
+ * A booked visit with answers on file: the Pass should simply be there. With
+ * no code yet, make one. With a live code that this device can't show (made
+ * on another device, or before codes were kept here), make a fresh one too;
+ * the server keeps only a hash, so there is no other way to show it, and the
+ * old copy stops working, as with New code. The server caps it at the end of
+ * the appointment day. Only once per page visit, so a refusal can't loop.
+ */
+let autoMinted = false
+
+async function autoMintForBooking() {
+  if (autoMinted || !booking.value || qrState.value !== 'ready' || minting.value) return
+  if (hasActiveToken.value && qrCodeDataUrl.value) return
+  autoMinted = true
+  await mintQrCode({ silent: true })
+}
+
+// Best effort: without it the empty state falls back to "book a visit first".
+async function loadBooking() {
+  try {
+    const status = await donorService.eligibilityStatus()
+    booking.value = status?.appointment ?? null
+  } catch (err) {
+    console.error('Failed to load the booking window:', err)
+  }
+}
 
 async function loadAppointments({ keepOnError = false } = {}) {
   const request = ++appointmentsRequest
@@ -818,6 +934,14 @@ onBeforeUnmount(() => {
 
 /* Empty state, framed like the QR it is waiting for */
 .qr-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.qr-empty__alt {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-primary-text);
+  text-decoration: none;
+}
+.qr-empty__alt:hover { text-decoration: underline; }
 
 .qr-empty__frame {
   display: flex;

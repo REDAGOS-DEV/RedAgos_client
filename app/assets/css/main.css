@@ -193,32 +193,51 @@ html.dark {
 }
 
 /*
- * Donor portal dark: "ink", a near-neutral dark with only a hint of blue, so
- * the page sits closer to the browser's own dark UI. The blue identity stays
+ * Donor portal light: a neutral grey canvas under solid white chrome and
+ * cards, so the portal sits with the browser's own light toolbar.
+ */
+html.portal-donor:not(.dark) {
+  /* Tinted by the colour theme (useAccentTheme); neutral fallbacks. */
+  --rb-page-bg: var(--accent-canvas-light, #F5F6F8);
+  --rb-chrome: var(--accent-chrome-light, #FFFFFF);
+  background-color: var(--rb-page-bg);
+}
+
+/*
+ * Donor portal dark: "ink", a blue slate taken from the browser's own dark
+ * chrome, so the page sits with it. The blue identity stays
  * in the backdrop glow, the buttons and the Pass. The donor layout puts
  * `portal-donor` on <html>; every other portal keeps the navy above, and the
  * shared components read `var(--ink-*, <navy>)` so they fall back to it there.
  */
 html.dark.portal-donor {
-  --ink-base: #0D1015;
-  --ink-base-rgb: 13, 16, 21;
-  --ink-page: #0F1217;
-  --ink-page-rgb: 15, 18, 23;
-  --ink-surface: #171B22;
-  --ink-surface-rgb: 23, 27, 34;
-  --ink-surface-alt: #13171D;
-  --ink-hover: #1F242D;
-  --ink-border: #2A2F39;
-  --ink-border-rgb: 42, 47, 57;
-  --ink-border-hover: #3B4250;
+  /* Blue slate, after the browser's own dark chrome: the tab strip, the
+     address bar and the toolbar. Text levels re-checked on the cards (#2B3445)
+     and the chrome (#333C4D): text-2 is 5.8:1 on the chrome. */
+  --ink-base: var(--accent-ink-base, #172030);
+  --ink-base-rgb: var(--accent-ink-base-rgb, 23, 32, 48);
+  --ink-page: var(--accent-ink-page, #1D2636);
+  --ink-page-rgb: var(--accent-ink-page-rgb, 29, 38, 54);
+  --ink-surface: var(--accent-ink-surface, #2B3445);
+  --ink-surface-rgb: var(--accent-ink-surface-rgb, 43, 52, 69);
+  --ink-chrome: var(--accent-ink-chrome, #333C4D);
+  --ink-surface-alt: var(--accent-ink-surface-alt, #252E3E);
+  --ink-hover: var(--accent-ink-hover, #364053);
+  --ink-border: var(--accent-ink-border, #3D4759);
+  --ink-border-rgb: var(--accent-ink-border-rgb, 61, 71, 89);
+  --ink-border-hover: var(--accent-ink-border-hover, #525D72);
   --ink-text: #EEF1F5;
-  --ink-text-2: #A0A8B5;
-  --ink-text-3: #C9CED6;
-  --ink-text-4: #E1E4EA;
-  --ink-muted: #6C7480;
-  --ink-inset: #12161C;
-  --ink-field-border: #323844;
-  --ink-hover-border: #4A5261;
+  --ink-text-2: #B4BCC9;
+  --ink-text-3: #D0D6E0;
+  --ink-text-4: #E3E7EE;
+  --ink-muted: #97A0AF;
+  --ink-inset: var(--accent-ink-inset, #242C3B);
+  --ink-field-border: #46506A;
+  --ink-hover-border: #5D6880;
+
+  /* Lifted to keep 4.5:1 on the lighter slate surfaces. */
+  --rb-accent-text: #FF8A8A;
+  --rb-success-text: #81C784;
 
   --rb-text-primary: var(--ink-text);
   --rb-text-secondary: var(--ink-text-2);
@@ -231,7 +250,8 @@ html.dark.portal-donor {
   --rb-surface-alt: var(--ink-surface-alt);
   --rb-surface-hover: var(--ink-hover);
   --rb-page-bg: var(--ink-page);
-  --rb-skeleton-a: var(--ink-surface);
+  --rb-chrome: var(--ink-chrome);
+  --rb-skeleton-a: var(--ink-surface-alt);
   --rb-skeleton-b: var(--ink-hover);
 
   background-color: var(--ink-base);

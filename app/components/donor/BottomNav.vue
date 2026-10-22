@@ -55,22 +55,18 @@ function isActive(tab) {
   align-items: end;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--rb-border, #E5EAF0);
-  background-color: rgba(255, 255, 255, 0.86);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: 0 -8px 24px -18px rgba(15, 23, 42, 0.35);
+  /* Solid, like the sidebar and the top bar. */
+  background-color: var(--rb-chrome, var(--rb-surface, #FFFFFF));
+  box-shadow: 0 -8px 24px -18px rgba(15, 23, 42, 0.25);
 }
 :global(.dark .bnav) {
-  background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.86);
+  background-color: var(--rb-chrome, var(--rb-surface, #1E293B));
   box-shadow: 0 -8px 24px -18px rgba(0, 0, 0, 0.7);
 }
 /* The sidebar takes over from 1024px (in CSS, not a lg:hidden class, which
    the display above would outrank). */
 @media (min-width: 1024px) {
   .bnav { display: none; }
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bnav { background-color: var(--rb-surface, #FFFFFF); }
 }
 
 .bnav__tab {

@@ -78,18 +78,95 @@
         </div>
       </section>
 
-      <div class="main-grid">
-        <!-- Personal information, in the order a form is read -->
-        <div class="panel panel--form">
-          <div class="panel-header panel-header--simple">
-            <h2 class="panel-title">Personal information</h2>
-            <p class="panel-sub">Used on your donor record and the blood center's forms.</p>
-          </div>
+      <!--
+        The valid ID gates booking, so until it is verified it sits up here,
+        where it can't be missed. Once verified it moves to the side column.
+      -->
+      <div v-if="!idVerified" class="panel id-panel">
+        <IdentityVerification :identity="identity" @submitted="handleIdentitySubmitted" />
+      </div>
 
-          <div class="form-body">
-            <fieldset class="form-section">
-              <legend class="form-section__title">Name</legend>
-              <div class="form-grid form-grid--3">
+      <div class="main-grid">
+        <div class="col-main">
+          <!--
+            What the blood center prints on its donor form and still has as
+            "Not provided". A nudge, never a block: every one of these is
+            optional to the server.
+          -->
+          <!-- Out of the way while a section is open: one thing at a time. -->
+          <section v-if="missingFields.length && !editing" class="complete-card complete-card--inline" aria-label="Missing details">
+            <div class="complete-card__top">
+              <p class="complete-card__title">
+                {{ missingFields.length }} detail{{ missingFields.length === 1 ? '' : 's' }} missing
+              </p>
+              <span class="complete-card__count">{{ COMPLETE_FIELDS.length - missingFields.length }} of {{ COMPLETE_FIELDS.length }}</span>
+            </div>
+            <span class="complete-card__meter" role="progressbar" :aria-valuenow="COMPLETE_FIELDS.length - missingFields.length"
+              aria-valuemin="0" :aria-valuemax="COMPLETE_FIELDS.length" aria-label="Profile details filled in">
+              <span class="complete-card__fill" :style="{ width: `${completePercent}%` }" />
+            </span>
+            <p class="complete-card__sub">The blood center prints these on your donor form. Add them so nothing shows as "Not provided".</p>
+            <!-- Desktop: one pill per missing field, wrapping. -->
+            <div class="complete-card__chips complete-card__chips--wide">
+              <button v-for="f in missingFields" :key="f.key" type="button" class="complete-card__pill"
+                @click="startEdit(f.section, f.key)">
+                <AssetIcon name="plus" :size="13" />
+                {{ f.label }}
+              </button>
+            </div>
+
+            <!-- Phones: a 2 x 2 grid of equal chips. -->
+            <div class="complete-card__chips complete-card__chips--grid">
+              <button v-for="c in visibleChips" :key="c.key" type="button" class="complete-card__chip"
+                :title="c.label" @click="startEdit(c.section, c.focus)">
+                <AssetIcon name="plus" :size="13" />
+                <span class="complete-card__chip-text">{{ c.label }}</span>
+              </button>
+              <button v-if="hiddenChipCount" type="button" class="complete-card__chip complete-card__chip--more"
+                @click="showAllChips = true">
+                +{{ hiddenChipCount }} more
+              </button>
+            </div>
+          </section>
+
+          <p v-if="profileMessage && !editing" class="profile-status" :class="{ 'profile-status--error': profileFailed }" role="status">
+            {{ profileMessage }}
+          </p>
+
+          <!--
+            Read first, edit one section at a time. The save still sends the
+            whole profile (one PUT), but only the open section can differ from
+            what was loaded, so nothing else changes behind the donor's back.
+          -->
+          <section v-for="section in SECTIONS" :key="section.key" class="panel info-card"
+            :class="{ 'info-card--editing': editing === section.key }" :aria-labelledby="`sec-${section.key}`">
+            <div class="info-card__head">
+              <div>
+                <h2 :id="`sec-${section.key}`" class="panel-title">{{ section.title }}</h2>
+                <p v-if="section.sub" class="panel-sub">{{ section.sub }}</p>
+              </div>
+              <button v-if="editing !== section.key" type="button" class="info-card__edit"
+                :aria-label="`Edit ${section.title}`" @click="startEdit(section.key)">
+                <AssetIcon name="pencil" :size="14" />
+                Edit
+              </button>
+            </div>
+
+            <dl v-if="editing !== section.key" class="info-card__list" :class="`info-card__list--${section.key}`">
+              <div v-for="f in section.fields" :key="f.key" :class="{ 'is-wide': f.wide }">
+                <dt>{{ f.label }}</dt>
+                <dd :class="{ 'is-empty': !shownValue(f), 'is-missing': !shownValue(f) && NEEDED_KEYS.has(f.key) }">
+                  {{ shownValue(f) || (f.optional ? 'Not given' : 'Not provided') }}
+                  <span v-if="f.key === 'email' && shownValue(f)" class="email-tag"
+                    :class="user?.email_verified ? 'email-tag--ok' : 'email-tag--warn'">
+                    {{ user?.email_verified ? 'Verified' : 'Not verified' }}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+
+            <div v-else class="form-body">
+              <div v-if="section.key === 'name'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-first">First name</label>
                   <input id="pf-first" v-model="profileForm.first_name" type="text" class="form-input" autocomplete="given-name">
@@ -103,11 +180,8 @@
                   <input id="pf-last" v-model="profileForm.last_name" type="text" class="form-input" autocomplete="family-name">
                 </div>
               </div>
-            </fieldset>
 
-            <fieldset class="form-section">
-              <legend class="form-section__title">About you</legend>
-              <div class="form-grid form-grid--3">
+              <div v-else-if="section.key === 'about'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-dob">Date of birth</label>
                   <DatePicker id="pf-dob" v-model="profileForm.date_of_birth" :max="todayIso" placeholder="Select your birth date" />
@@ -133,19 +207,16 @@
                   <input id="pf-religion" v-model="profileForm.religion" type="text" class="form-input">
                 </div>
               </div>
-            </fieldset>
 
-            <!--
-              Section I-A of the DOH questionnaire (middle name, civil status,
-              occupation, nationality, religion, telephone, office address and
-              the contact person). All optional: donors who registered before
-              these were collected cannot be back-filled, and the blood centre
-              prints what is missing as "Not provided" rather than as a blank
-              line on the form.
-            -->
-            <fieldset class="form-section">
-              <legend class="form-section__title">Contact</legend>
-              <div class="form-grid form-grid--3">
+              <!--
+                Section I-A of the DOH questionnaire (middle name, civil status,
+                occupation, nationality, religion, telephone, office address and
+                the contact person). All optional: donors who registered before
+                these were collected cannot be back-filled, and the blood centre
+                prints what is missing as "Not provided" rather than as a blank
+                line on the form.
+              -->
+              <div v-else-if="section.key === 'contact'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-mobile">Contact number</label>
                   <input id="pf-mobile" v-model="profileForm.contact_number" type="text" class="form-input" autocomplete="tel">
@@ -166,12 +237,17 @@
                   <label class="form-label" for="pf-office">Office address</label>
                   <input id="pf-office" v-model="profileForm.office_address" type="text" class="form-input">
                 </div>
+                <!--
+                  Kung mausab ang email, i-revoke sa server ang verification ug
+                  mo-send og bag-ong link. Kinahanglan makita ni sa donor, kay
+                  mo-undang ang QR ug booking hangtod dili pa siya ma-verify.
+                -->
+                <p v-if="profileForm.email !== savedValue('email')" class="form-field--full info-card__note">
+                  Changing your email sends a new confirmation link. Booking and your QR code pause until you confirm it.
+                </p>
               </div>
-            </fieldset>
 
-            <fieldset class="form-section">
-              <legend class="form-section__title">Contact person <span class="form-optional">(other relative/s)</span></legend>
-              <div class="form-grid">
+              <div v-else-if="section.key === 'emergency'" class="form-grid">
                 <div class="form-field">
                   <label class="form-label" for="pf-cp-name">Name</label>
                   <input id="pf-cp-name" v-model="profileForm.contact_person_name" type="text" class="form-input">
@@ -185,37 +261,68 @@
                   <input id="pf-cp-address" v-model="profileForm.contact_person_address" type="text" class="form-input">
                 </div>
               </div>
-            </fieldset>
-          </div>
 
-          <!-- Stays in view while scrolling the form -->
-          <div class="save-bar" :class="{ 'save-bar--dirty': isDirty }">
-            <!--
-              Kung mausab ang email, i-revoke sa server ang verification ug
-              mo-send og bag-ong link. Kinahanglan makita ni sa donor, kay
-              mo-undang ang QR ug booking hangtod dili pa siya ma-verify.
-            -->
-            <p class="save-bar__state" :class="{ 'save-bar__state--error': profileFailed }" aria-live="polite">
-              <template v-if="profileMessage && (profileFailed || !isDirty)">{{ profileMessage }}</template>
-              <template v-else-if="isDirty">You have unsaved changes</template>
-              <template v-else>Everything is saved</template>
-            </p>
-            <div class="save-bar__actions">
-              <button v-if="isDirty" type="button" class="btn-outline" :disabled="savingProfile" @click="discardChanges">
-                Discard changes
-              </button>
-              <button class="btn-primary" :disabled="savingProfile" @click="handleProfileSave">
-                {{ savingProfile ? 'Saving...' : 'Save changes' }}
-              </button>
+              <p v-if="profileMessage && profileFailed" class="profile-status profile-status--error" role="alert">{{ profileMessage }}</p>
+
+              <div class="info-card__actions">
+                <button type="button" class="btn-outline" :disabled="savingProfile" @click="cancelEdit">
+                  Cancel
+                </button>
+                <button type="button" class="btn-primary" :disabled="savingProfile || !isDirty" @click="saveSection">
+                  {{ savingProfile ? 'Saving...' : 'Save changes' }}
+                </button>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
 
-        <div class="col-side">
-          <!-- Valid ID: verification gates donating, so it sits beside the form -->
-          <div class="panel">
+        <div class="col-side" :class="{ 'col-side--sticky': !idVerified }">
+          <!-- Verified: the ID card settles here, out of the way -->
+          <div v-if="idVerified" class="panel">
             <IdentityVerification :identity="identity" @submitted="handleIdentitySubmitted" />
           </div>
+
+          <!-- Desktop: the missing details ride in this column instead, beside the cards they open. -->
+          <section v-if="missingFields.length && !editing" class="complete-card complete-card--side" aria-label="Missing details">
+            <div class="complete-card__top">
+              <p class="complete-card__title">
+                {{ missingFields.length }} detail{{ missingFields.length === 1 ? '' : 's' }} missing
+              </p>
+              <span class="complete-card__count">{{ COMPLETE_FIELDS.length - missingFields.length }} of {{ COMPLETE_FIELDS.length }}</span>
+            </div>
+            <span class="complete-card__meter" role="progressbar" :aria-valuenow="COMPLETE_FIELDS.length - missingFields.length"
+              aria-valuemin="0" :aria-valuemax="COMPLETE_FIELDS.length" aria-label="Profile details filled in">
+              <span class="complete-card__fill" :style="{ width: `${completePercent}%` }" />
+            </span>
+            <p class="complete-card__sub">The blood center prints these on your donor form. Add them so nothing shows as "Not provided".</p>
+            <div class="complete-card__chips complete-card__chips--wide">
+              <button v-for="f in missingFields" :key="f.key" type="button" class="complete-card__pill"
+                @click="startEdit(f.section, f.key)">
+                <AssetIcon name="plus" :size="13" />
+                {{ f.label }}
+              </button>
+            </div>
+          </section>
+
+          <!-- The places a donor goes from here -->
+          <nav class="panel shortcuts" aria-label="Shortcuts">
+            <p class="shortcuts__title">Shortcuts</p>
+            <NuxtLink to="/donor/qrcode" class="shortcuts__link">
+              <span class="shortcuts__icon"><AssetIcon name="qr-code" :size="16" /></span>
+              My Pass
+              <AssetIcon name="chevron-right" :size="15" class="shortcuts__chev" />
+            </NuxtLink>
+            <NuxtLink to="/donor/history" class="shortcuts__link">
+              <span class="shortcuts__icon"><AssetIcon name="history" :size="16" /></span>
+              Donation history
+              <AssetIcon name="chevron-right" :size="15" class="shortcuts__chev" />
+            </NuxtLink>
+            <NuxtLink to="/donor/help" class="shortcuts__link">
+              <span class="shortcuts__icon"><AssetIcon name="help-circle" :size="16" /></span>
+              Help
+              <AssetIcon name="chevron-right" :size="15" class="shortcuts__chev" />
+            </NuxtLink>
+          </nav>
 
           <!-- Notifications, password and log out live in Settings now -->
           <NuxtLink to="/donor/settings" class="settings-link">
@@ -360,7 +467,7 @@ async function load({ silent = false } = {}) {
   }
 }
 
-// Edits not saved yet, for the save bar.
+// Edits not saved yet, for the open section's Save button.
 const isDirty = computed(() => !!formSnapshot.value && snapshotForm() !== formSnapshot.value)
 
 // Put every field back to what was last loaded or saved.
@@ -452,6 +559,172 @@ function handleAvatarUpdated(newUrl) {
 function handleIdentitySubmitted(updatedProfile) {
   if (updatedProfile) profile.value = updatedProfile
 }
+
+// ── Read first, edit one section at a time ──
+const civilStatusLabel = Object.fromEntries(civilStatusOptions.map(o => [o.value, o.label]))
+
+// Names are stored as typed ("yana cruz"); show them capitalised, as the card above does.
+const titleCase = v => String(v).replace(/(^|[\s-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+
+const SECTIONS = [
+  {
+    key: 'name',
+    title: 'Name',
+    fields: [
+      { key: 'first_name', label: 'First name', format: titleCase },
+      { key: 'middle_name', label: 'Middle name', optional: true, format: titleCase },
+      { key: 'last_name', label: 'Last name', format: titleCase },
+    ],
+  },
+  {
+    key: 'about',
+    title: 'About you',
+    fields: [
+      { key: 'date_of_birth', label: 'Date of birth', format: v => formatDate(v) },
+      { key: 'blood_type', label: 'Blood type', format: v => v || 'Not known yet' },
+      { key: 'civil_status', label: 'Civil status', format: v => civilStatusLabel[v] || v },
+      { key: 'occupation', label: 'Occupation' },
+      { key: 'nationality', label: 'Nationality' },
+      { key: 'religion', label: 'Religion', optional: true },
+    ],
+  },
+  {
+    key: 'contact',
+    title: 'Contact',
+    fields: [
+      { key: 'contact_number', label: 'Contact number' },
+      { key: 'telephone_no', label: 'Telephone no.', optional: true },
+      { key: 'email', label: 'Email address' },
+      { key: 'address', label: 'Home address', wide: true },
+      { key: 'office_address', label: 'Office address', optional: true, wide: true },
+    ],
+  },
+  {
+    key: 'emergency',
+    title: 'Emergency contact',
+    sub: 'A relative the blood center can reach if they need to.',
+    fields: [
+      { key: 'contact_person_name', label: 'Name', format: titleCase },
+      { key: 'contact_person_number', label: 'Contact number' },
+      { key: 'contact_person_address', label: 'Address', wide: true },
+    ],
+  },
+]
+
+// The value as last loaded or saved, not as being typed.
+function savedValue(key) {
+  if (!formSnapshot.value) return profileForm[key]
+  return JSON.parse(formSnapshot.value)[key]
+}
+
+function shownValue(field) {
+  const raw = savedValue(field.key)
+  if (field.key === 'blood_type') return field.format(raw)
+  if (!raw) return ''
+  return field.format ? field.format(raw) : raw
+}
+
+// What the blood center's donor form asks for, beyond what registration took.
+const COMPLETE_FIELDS = [
+  { key: 'first_name', label: 'First name', section: 'name' },
+  { key: 'last_name', label: 'Last name', section: 'name' },
+  { key: 'date_of_birth', label: 'Date of birth', section: 'about' },
+  { key: 'civil_status', label: 'Civil status', section: 'about' },
+  { key: 'occupation', label: 'Occupation', section: 'about' },
+  { key: 'nationality', label: 'Nationality', section: 'about' },
+  { key: 'contact_number', label: 'Contact number', section: 'contact' },
+  { key: 'address', label: 'Home address', section: 'contact' },
+  { key: 'contact_person_name', label: 'Emergency contact name', section: 'emergency' },
+  { key: 'contact_person_number', label: 'Emergency contact number', section: 'emergency' },
+]
+// The fields the "missing" card counts: empty ones read amber in the cards too.
+const NEEDED_KEYS = new Set(COMPLETE_FIELDS.map(f => f.key))
+
+const missingFields = computed(() => {
+  void formSnapshot.value
+  return COMPLETE_FIELDS.filter(f => !savedValue(f.key))
+})
+/*
+ * The chips: one per thing to add, the two emergency-contact fields as one
+ * ("Emergency contact" opens that section at whichever is missing). A 2 x 2
+ * grid: with more than four, three show and the fourth says how many more.
+ */
+const missingChips = computed(() => {
+  const chips = []
+  for (const f of missingFields.value) {
+    if (f.section === 'emergency') {
+      if (!chips.some(c => c.key === 'emergency')) {
+        chips.push({ key: 'emergency', label: 'Emergency contact', section: 'emergency', focus: f.key })
+      }
+      continue
+    }
+    chips.push({ key: f.key, label: f.label, section: f.section, focus: f.key })
+  }
+  return chips
+})
+const showAllChips = ref(false)
+const visibleChips = computed(() =>
+  showAllChips.value || missingChips.value.length <= 4 ? missingChips.value : missingChips.value.slice(0, 3))
+const hiddenChipCount = computed(() => missingChips.value.length - visibleChips.value.length)
+
+const completePercent = computed(() =>
+  Math.round(((COMPLETE_FIELDS.length - missingFields.value.length) / COMPLETE_FIELDS.length) * 100))
+
+const FIELD_IDS = {
+  first_name: 'pf-first', middle_name: 'pf-middle', last_name: 'pf-last',
+  date_of_birth: 'pf-dob', blood_type: 'pf-blood', civil_status: 'pf-civil',
+  occupation: 'pf-occupation', nationality: 'pf-nationality', religion: 'pf-religion',
+  contact_number: 'pf-mobile', telephone_no: 'pf-tel', email: 'pf-email',
+  address: 'pf-home', office_address: 'pf-office',
+  contact_person_name: 'pf-cp-name', contact_person_number: 'pf-cp-number', contact_person_address: 'pf-cp-address',
+}
+
+const editing = ref(null)
+
+/*
+ * Opening another section closes the one open now. Unsaved changes there are
+ * only dropped after the donor says so; with none, it just switches.
+ */
+const { confirm: confirmDialog } = useConfirmDialog()
+
+async function startEdit(sectionKey, fieldKey = null) {
+  if (editing.value && editing.value !== sectionKey) {
+    if (isDirty.value) {
+      const open = SECTIONS.find(x => x.key === editing.value)?.title ?? 'this section'
+      const discard = await confirmDialog({
+        title: 'Discard your changes?',
+        message: `You have unsaved changes in ${open}. They will be lost if you edit another section.`,
+        cancelLabel: 'Keep editing',
+        confirmLabel: 'Discard changes',
+        tone: 'danger',
+      })
+      if (!discard) return
+    }
+    discardChanges()
+  }
+  profileMessage.value = ''
+  profileFailed.value = false
+  editing.value = sectionKey
+  nextTick(() => {
+    const id = fieldKey ? FIELD_IDS[fieldKey] : FIELD_IDS[SECTIONS.find(x => x.key === sectionKey)?.fields[0]?.key]
+    const el = id ? document.getElementById(id) : null
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el?.focus?.({ preventScroll: true })
+  })
+}
+
+function cancelEdit() {
+  discardChanges()
+  editing.value = null
+}
+
+async function saveSection() {
+  await handleProfileSave()
+  if (!profileFailed.value) editing.value = null
+}
+
+// The valid ID card sits up top until it is verified.
+const idVerified = computed(() => identity.value?.status === 'verified')
 
 async function handleProfileSave() {
   savingProfile.value = true
@@ -821,6 +1094,142 @@ async function handleProfileSave() {
 
 /* Main grid: form | side */
 .profile-page .main-grid { grid-template-columns: minmax(0, 1fr) 360px; }
+.profile-page .col-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ── Read-first section cards ── */
+.profile-page .info-card { overflow: hidden; }
+.profile-page .info-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.profile-page .info-card__edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-text);
+  font: inherit;
+  font-size: var(--rb-fs-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+.profile-page .info-card__edit:hover:not(:disabled) { background: var(--surface-muted); }
+.profile-page .info-card__edit:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.profile-page .info-card--editing { border-color: var(--primary-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rb-primary) 12%, transparent); }
+.profile-page .info-card__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin: 0;
+  padding: 16px 20px 18px;
+}
+.profile-page .info-card__list .is-wide { grid-column: span 2; }
+.profile-page .info-card__list dt { font-size: var(--rb-fs-caption); font-weight: 600; color: var(--text-muted); }
+.profile-page .info-card__list dd { margin: 2px 0 0; font-size: var(--rb-fs-body); font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+/* Anything still empty reads amber: "Not provided" (on the missing list) and
+   "Not given" (optional) alike, so every gap stands out in the cards. */
+.profile-page .info-card__list dd.is-empty { font-weight: 600; font-style: italic; color: var(--warning-fg); }
+.profile-page .info-card__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.profile-page .info-card__actions .btn-primary,
+.profile-page .info-card__actions .btn-outline { border-radius: 999px; padding: 10px 20px; }
+.profile-page .info-card__actions .btn-outline { border: 1px solid var(--border); background: transparent; }
+.profile-page .info-card__note { margin: 0; font-size: var(--rb-fs-caption); color: var(--warning-fg); }
+.profile-page .email-tag { margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; font-style: normal; }
+.profile-page .email-tag--ok { background: var(--success-bg); color: var(--success-fg); }
+.profile-page .email-tag--warn { background: var(--warning-bg); color: var(--warning-fg); }
+.profile-page .profile-status { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--success-bg); color: var(--success-fg); font-size: var(--rb-fs-small); font-weight: 600; }
+.profile-page .profile-status--error { background: var(--danger-bg); color: var(--danger-fg); }
+.profile-page .info-card .profile-status { margin-top: 14px; }
+
+/* ── Missing details ── */
+.profile-page .complete-card {
+  padding: 16px 20px;
+  border: 1px solid var(--warning-border);
+  border-radius: 20px;
+  background: var(--warning-bg);
+}
+.profile-page .complete-card__top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.profile-page .complete-card__title { margin: 0; font-weight: 700; color: var(--text-primary); }
+.profile-page .complete-card__count { font-size: var(--rb-fs-caption); font-weight: 700; color: var(--warning-fg); }
+.profile-page .complete-card__meter { display: block; height: 6px; margin-top: 10px; border-radius: 999px; background: color-mix(in srgb, var(--warning-fg) 18%, transparent); overflow: hidden; }
+.profile-page .complete-card__fill { display: block; height: 100%; border-radius: inherit; background: var(--warning-fg); }
+.profile-page .complete-card__sub { margin: 10px 0 0; font-size: var(--rb-fs-small); color: var(--text-body); }
+/* Desktop: pills that wrap. */
+.profile-page .complete-card__chips--wide { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.profile-page .complete-card__chips--grid { display: none; }
+.profile-page .complete-card__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--rb-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-page .complete-card__pill:hover { border-color: var(--warning-fg); }
+.profile-page .complete-card__pill:focus-visible { outline: 2px solid var(--warning-fg); outline-offset: 2px; }
+.profile-page .complete-card__pill :deep(.asset-icon) { color: var(--warning-fg); }
+
+/* Phones: a 2 x 2 grid of equal chips, one line each, a long label ends in "…". */
+@media (max-width: 760px) {
+  .profile-page .complete-card__chips--wide { display: none; }
+  .profile-page .complete-card__chips--grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+}
+.profile-page .complete-card__chip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--rb-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-page .complete-card__chip:hover { border-color: var(--warning-fg); }
+.profile-page .complete-card__chip :deep(.asset-icon) { flex: none; }
+.profile-page .complete-card__chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-page .complete-card__chip--more { justify-content: center; color: var(--warning-fg); }
+.profile-page .complete-card__chip:focus-visible { outline: 2px solid var(--warning-fg); outline-offset: 2px; }
+.profile-page .complete-card__chip :deep(.asset-icon) { color: var(--warning-fg); }
+
+/* Dark: an amber tint on the ink, chips quiet until hovered. */
+html.dark .profile-page .complete-card { background: var(--ink-surface, #1E293B); border-color: rgba(247, 144, 9, 0.35); box-shadow: inset 3px 0 0 #F5A524; }
+html.dark .profile-page .complete-card__meter { background: rgba(247, 144, 9, 0.16); }
+html.dark .profile-page .complete-card__fill { background: #F5A524; }
+html.dark .profile-page .complete-card__sub { color: var(--ink-text-2, #B4BCC9); }
+html.dark .profile-page .complete-card__pill,
+html.dark .profile-page .complete-card__chip {
+  background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.55);
+  border-color: rgba(247, 144, 9, 0.3);
+  color: var(--ink-text, #EEF1F5);
+}
+html.dark .profile-page .complete-card__pill:hover,
+html.dark .profile-page .complete-card__chip:hover { background: rgba(247, 144, 9, 0.12); border-color: rgba(247, 144, 9, 0.55); }
+
+/* The unverified ID card, up top: full width. */
+.profile-page .id-panel { width: 100%; }
 .profile-page .col-side { display: flex; flex-direction: column; gap: 20px; }
 .profile-page .panel { border-radius: 20px; }
 .profile-page .panel-sub { margin: 2px 0 0; font-size: var(--rb-fs-caption); color: var(--text-muted); }
@@ -845,40 +1254,6 @@ async function handleProfileSave() {
 .profile-page .form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .profile-page .form-input { min-height: 40px; border-radius: 10px; }
 
-/* Save bar, pinned to the bottom of the screen while the form is long */
-/* overflow: visible, or the card clips the sticky bar to its own box. */
-.profile-page .panel--form { overflow: visible; }
-.profile-page .panel--form > .panel-header--simple { border-radius: 20px 20px 0 0; }
-.profile-page .save-bar {
-  border-radius: 0 0 20px 20px;
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 14px 22px;
-  border-top: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-
-/* Below 1024px the bottom tabs sit at the foot of the screen; stick above them. */
-@media (max-width: 1023px) {
-  .profile-page .save-bar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-}
-
-.profile-page .save-bar__state { margin: 0; font-size: var(--rb-fs-small); color: var(--text-muted); }
-.profile-page .save-bar--dirty .save-bar__state { color: var(--warning-fg); font-weight: 600; }
-.profile-page .save-bar__state--error { color: var(--danger-fg) !important; font-weight: 600; }
-.profile-page .save-bar__actions { display: flex; flex: none; gap: 8px; }
-.profile-page .save-bar .btn-primary,
-.profile-page .save-bar .btn-outline { border-radius: 999px; padding: 10px 20px; }
-.profile-page .save-bar .btn-outline { border: 1px solid var(--border); background: transparent; }
-.profile-page .save-bar .btn-outline:hover:not(:disabled) { background: var(--surface-muted); }
 
 /* Link to Settings */
 .profile-page .settings-link {
@@ -920,9 +1295,46 @@ async function handleProfileSave() {
 .profile-page .skeleton--side { height: 420px; border-radius: 20px; }
 .profile-page .skeleton--link { height: 72px; border-radius: 20px; }
 
+/* Two columns: the missing details sit in the side column, sticky. */
+.profile-page .complete-card--side { display: none; }
+@media (min-width: 1101px) {
+  .profile-page .complete-card--inline { display: none; }
+  .profile-page .complete-card--side { display: block; }
+  /* Sticky only while short: with the verified ID card in it, it can outgrow the screen. */
+  .profile-page .col-side--sticky { position: sticky; top: 88px; }
+}
+
 @media (max-width: 1100px) {
   .profile-page .main-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Shortcuts ── */
+.profile-page .shortcuts { padding: 8px; }
+.profile-page .shortcuts__title { margin: 6px 10px 6px; font-size: var(--rb-fs-caption); font-weight: 700; color: var(--text-muted); }
+.profile-page .shortcuts__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  text-decoration: none;
+}
+.profile-page .shortcuts__link:hover { background: var(--surface-muted); }
+.profile-page .shortcuts__link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.profile-page .shortcuts__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-text);
+}
+.profile-page .shortcuts__chev { margin-left: auto; color: var(--text-muted); }
 
 @media (max-width: 760px) {
   .profile-page .identity-card { grid-template-columns: minmax(0, 1fr); padding: 18px; }
@@ -932,15 +1344,17 @@ async function handleProfileSave() {
     gap: 12px;
   }
   .profile-page .identity-card__actions { grid-row: auto; }
+  .profile-page .info-card__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-page .complete-card__chip :deep(.asset-icon) { flex: none; }
+  .profile-page .info-card__list .is-wide { grid-column: 1 / -1; }
   .profile-page .identity-card__stats > div { padding: 0; border-left: none; }
   .profile-page .identity-card__stats dd { white-space: normal; }
   .profile-page .identity-card__actions { flex-direction: row; }
   .profile-page .identity-card__actions > * { flex: 1; }
   .profile-page .form-grid--3 { grid-template-columns: minmax(0, 1fr); }
   .profile-page .form-body { padding: 18px 16px 4px; }
-  .profile-page .save-bar { flex-wrap: wrap; padding: 12px 16px; }
-  .profile-page .save-bar__actions { width: 100%; }
-  .profile-page .save-bar__actions > * { flex: 1; }
+  .profile-page .form-body { padding-bottom: 18px; }
+  .profile-page .info-card__actions > * { flex: 1; }
 }
 
 :global(.dark .profile-page .chip--blood) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }

@@ -61,11 +61,11 @@
               </div>
 
               <!-- Check in / Donate: the appointment date -->
-              <div v-else-if="upcomingAppointment && (stage === 'checkin' || stage === 'donate')"
+              <div v-else-if="currentAppointment && ['screen', 'checkin', 'donate'].includes(stage)"
                 class="cycle__visual cycle__visual--date">
-                <span class="date__month">{{ formatDate(upcomingAppointment.appointment_datetime, 'MMM') }}</span>
-                <span class="date__day">{{ formatDate(upcomingAppointment.appointment_datetime, 'D') }}</span>
-                <span class="date__time">{{ formatDate(upcomingAppointment.appointment_datetime, 'h:mm A') }}</span>
+                <span class="date__month">{{ formatDate(currentAppointment.appointment_datetime, 'MMM') }}</span>
+                <span class="date__day">{{ formatDate(currentAppointment.appointment_datetime, 'D') }}</span>
+                <span class="date__time">{{ formatDate(currentAppointment.appointment_datetime, 'h:mm A') }}</span>
               </div>
 
               <div v-else class="cycle__visual cycle__visual--icon">
@@ -95,13 +95,13 @@
                 <AssetIcon :name="nextStep.icon" :size="16" />
                 {{ nextStep.label }}
               </NuxtLink>
-              <a v-if="directionsUrl && (stage === 'checkin' || stage === 'donate')" :href="directionsUrl"
+              <a v-if="directionsUrl && ['screen', 'checkin', 'donate'].includes(stage)" :href="directionsUrl"
                 target="_blank" rel="noopener" class="btn btn--ghost">
                 <AssetIcon name="map-pin" :size="16" />
                 Directions
               </a>
               <NuxtLink to="/donor/appointments" class="cycle__link">
-                {{ upcomingAppointment ? 'Manage appointment' : 'View appointments' }}
+                {{ currentAppointment ? 'Manage appointment' : 'View appointments' }}
                 <AssetIcon name="chevron-right" :size="14" />
               </NuxtLink>
             </div>
@@ -155,7 +155,8 @@
           <section class="foryou" aria-labelledby="foryou-title">
             <div class="section-head">
               <h2 id="foryou-title" class="section-title">For you</h2>
-              <NuxtLink v-if="bloodDrives.length" to="/donor/appointments" class="section-link">
+              <!-- Straight to the drives on the booking page; not while a booking stands. -->
+              <NuxtLink v-if="bloodDrives.length && !currentAppointment" to="/donor/appointments?type=mobile" class="section-link">
                 All drives
                 <AssetIcon name="chevron-right" :size="14" />
               </NuxtLink>
@@ -168,23 +169,37 @@
                 <p class="tip__text">{{ tip.text }}</p>
               </article>
 
-              <article v-for="drive in bloodDrives.slice(0, 2)" :key="drive.id" class="drive">
+              <article v-for="drive in bloodDrives.slice(0, 2)" :key="drive.id" class="drive"
+                :class="{ 'drive--today': driveWhen(drive).today }">
                 <span class="drive__date">
                   <span>{{ formatDate(drive.date, 'MMM') }}</span>
                   <strong>{{ formatDate(drive.date, 'D') }}</strong>
                 </span>
                 <span class="drive__body">
-                  <span class="drive__kicker">Blood drive</span>
+                  <span class="drive__kicker">
+                    Blood drive
+                    <!-- When it is: today, on now, over, or tomorrow. -->
+                    <span v-if="driveWhen(drive).badge" class="drive__badge"
+                      :class="`drive__badge--${driveWhen(drive).tone}`">{{ driveWhen(drive).badge }}</span>
+                  </span>
                   <strong class="drive__name">{{ drive.name }}</strong>
                   <span class="drive__meta">
                     <AssetIcon name="map-pin" :size="12" />
                     <span>{{ drive.location }}</span>
                   </span>
+                  <span v-if="driveHours(drive)" class="drive__meta">
+                    <AssetIcon name="clock" :size="12" />
+                    <span>{{ driveHours(drive) }}</span>
+                  </span>
                   <span class="drive__foot" :class="{ 'drive__foot--muted': driveNote(drive).muted }">
                     {{ driveNote(drive).text }}
                   </span>
                   <span class="drive__actions">
-                    <NuxtLink to="/donor/appointments" class="drive__btn drive__btn--primary">Book</NuxtLink>
+                    <!-- Kept, but not a way in when there is no slot to take. -->
+                    <span v-if="driveBlocked(drive)" class="drive__btn drive__btn--primary drive__btn--off"
+                      aria-disabled="true" :title="driveBlocked(drive)">Book</span>
+                    <NuxtLink v-else :to="`/donor/appointments?type=mobile&drive=${drive.id}`"
+                      class="drive__btn drive__btn--primary">Book</NuxtLink>
                     <a :href="mapsUrl(drive.location)" target="_blank" rel="noopener" class="drive__btn"
                       :aria-label="`Directions to ${drive.location} (opens Google Maps)`">
                       <AssetIcon name="map-pin" :size="13" />
@@ -238,7 +253,7 @@
           <!-- Recent activity -->
           <section class="activity" aria-labelledby="activity-title">
             <div class="section-head">
-              <h2 id="activity-title" class="section-title">Recent donations</h2>
+              <h2 id="activity-title" class="section-title">Recent visits</h2>
               <NuxtLink to="/donor/history" class="section-link">
                 See all
                 <AssetIcon name="chevron-right" :size="14" />
@@ -247,7 +262,7 @@
 
             <ul v-if="recentDonations.length" class="activity__list">
               <li v-for="d in recentDonations.slice(0, 3)" :key="d.id" class="activity__item">
-                <span class="activity__icon" :class="`activity__icon--${donationTone(d.status)}`">
+                <span class="activity__icon" :class="`activity__icon--${donationTone(d)}`">
                   <AssetIcon name="blood-drop" :size="16" />
                 </span>
                 <span class="activity__main">
@@ -256,13 +271,13 @@
                 </span>
                 <span class="activity__side">
                   <span class="activity__date">{{ formatDate(d.donation_date, 'MMM D, YYYY') }}</span>
-                  <span class="pill" :class="`pill--${donationTone(d.status)}`">{{ donationLabel(d.status) }}</span>
+                  <span class="pill" :class="`pill--${donationTone(d)}`">{{ donationLabel(d) }}</span>
                 </span>
               </li>
             </ul>
             <div v-else class="activity__empty">
               <AssetIcon name="history" :size="22" />
-              <p>No donations yet. Your first one will show here.</p>
+              <p>No visits yet. Your first donation will show here.</p>
             </div>
           </section>
         </div>
@@ -284,17 +299,28 @@
             </NuxtLink>
 
             <dl class="pass__facts">
+              <!--
+                The health questions, not the QR itself: the code can lapse or
+                be revoked (a cancelled booking) while the answers still stand,
+                and only the Pass page asks the server about the code.
+              -->
               <div>
-                <dt>Screening</dt>
+                <dt>Health questions</dt>
                 <dd :class="`tone--${screeningTone}`">{{ QUESTIONNAIRE_LABELS[questionnaireStatus] ?? 'Not yet answered' }}</dd>
               </div>
-              <div v-if="profile?.screening_valid_until">
-                <dt>Valid until</dt>
-                <dd>{{ formatDate(profile.screening_valid_until, 'MMM D, YYYY') }}</dd>
-              </div>
               <div v-if="profile?.screening_date">
-                <dt>Screened on</dt>
+                <dt>Answered on</dt>
                 <dd>{{ formatDate(profile.screening_date, 'MMM D, YYYY') }}</dd>
+              </div>
+              <div>
+                <dt>QR code</dt>
+                <dd :class="qrActive ? 'tone--success' : ''">
+                  {{ qrActive ? `Valid until ${formatDate(qrValidUntil, 'MMM D, YYYY')}` : 'Not issued yet' }}
+                </dd>
+              </div>
+              <div v-if="screeningDone && profile?.screening_valid_until">
+                <dt>Answers good until</dt>
+                <dd>{{ formatDate(profile.screening_valid_until, 'MMM D, YYYY') }}</dd>
               </div>
             </dl>
 
@@ -392,10 +418,13 @@ const QUESTIONNAIRE_LABELS = {
   expired: 'Needs answering again',
 }
 const screeningTone = computed(() => {
-  if (eligibilityStatus.value === 'deferred') return 'danger'
   if (screeningDone.value) return 'success'
   return questionnaireStatus.value === 'expired' ? 'warning' : 'muted'
 })
+
+// From the dashboard payload: whether a check-in code is live, and until when.
+const qrActive = ref(false)
+const qrValidUntil = ref(null)
 
 const bloodType = ref('-')
 const totalDonations = ref(0)
@@ -440,32 +469,125 @@ const restPercent = computed(() => {
 
 // ── The donation cycle ──
 const CYCLE = [
-  { key: 'screen', label: 'Screen' },
   { key: 'book', label: 'Book' },
+  { key: 'screen', label: 'Screen' },
   { key: 'checkin', label: 'Check in' },
   { key: 'donate', label: 'Donate' },
   { key: 'rest', label: 'Rest' },
 ]
 
-const daysUntilAppt = computed(() =>
-  upcomingAppointment.value ? daysFromToday(upcomingAppointment.value.appointment_datetime) : null)
+/*
+ * The dashboard payload's upcoming_appointment only lists bookings whose time
+ * is still ahead, so on the day itself it drops the booking the moment its
+ * slot passes, even with the donor in the queue. The full list
+ * (GET /donors/appointments) fills that in, and shows a booking that came and
+ * went without a visit. Missed bookings are never closed automatically: they
+ * stay `scheduled` until the centre marks them `no_show`, and neither holds
+ * up a new booking.
+ */
+const myAppointments = ref([])
+const ACTIVE = ['scheduled', 'confirmed']
+
+function localDay(value) {
+  const d = parseDate(value)
+  if (!d) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Today's booking, still standing, its slot already past.
+const todaysAppointment = computed(() => {
+  const today = localDay(new Date())
+  return myAppointments.value
+    .filter(a => ACTIVE.includes(a.status) && localDay(a.appointment_datetime) === today)
+    .sort((a, b) => parseDate(b.appointment_datetime) - parseDate(a.appointment_datetime))[0] ?? null
+})
+
+// The booking the step card is about: the next one, or today's if its time passed.
+const currentAppointment = computed(() => upcomingAppointment.value ?? todaysAppointment.value)
 
 /*
- * Which step the donor is on, most urgent first. A deferral stops the cycle at
- * Screen. Resting comes before screening: recording a collection uses the
- * questionnaire up, so it reads `expired` right after a donation, but there is
- * nothing to do until the waiting period ends. `confirmed` is what the counter
- * writes when it scans the donor's QR, so a checked-in donor is on Donate.
+ * The last booking that passed without a visit: never checked in (`scheduled`)
+ * or marked `no_show` by the centre, within the past month, and after the last
+ * donation (an older miss no longer matters).
+ */
+const missedAppointment = computed(() => {
+  const today = localDay(new Date())
+  const monthAgo = localDay(new Date(Date.now() - 30 * DAY_MS))
+  const lastGiven = localDay(lastDonationDate.value)
+  return myAppointments.value
+    .filter((a) => {
+      const day = localDay(a.appointment_datetime)
+      return ['scheduled', 'no_show'].includes(a.status)
+        && day < today && day >= monthAgo && (!lastGiven || day > lastGiven)
+    })
+    .sort((a, b) => parseDate(b.appointment_datetime) - parseDate(a.appointment_datetime))[0] ?? null
+})
+
+const daysUntilAppt = computed(() =>
+  currentAppointment.value ? daysFromToday(currentAppointment.value.appointment_datetime) : null)
+
+/*
+ * The health questions for a booked visit open the day before it and close at
+ * the end of its day (AppointmentScreeningWindow on the server), so what the
+ * counter reads describes the donor as they are then. GET /donors/eligibility
+ * reports the window for the donor's active booking; for any other booking the
+ * same rule is worked out here.
+ */
+const bookingWindow = ref(null)
+
+/*
+ * GET /donors/deferral: whether a deferral stands on the donor's record, read
+ * the way the blood centre's own Donors list reads it. It blocks nothing (a
+ * deferred donor can still book); the portal just stops inviting them. The
+ * old screening result counts too, for records from before that endpoint.
+ */
+const deferral = ref(null)
+const isDeferred = computed(() => !!deferral.value?.deferred || eligibilityStatus.value === 'deferred')
+const screeningWindowOpen = computed(() => {
+  const appt = currentAppointment.value
+  if (!appt) return false
+  if (bookingWindow.value && bookingWindow.value.id === appt.id) return !!bookingWindow.value.screening_window_open
+  return daysUntilAppt.value !== null && daysUntilAppt.value <= 1
+})
+const screeningOpensOn = computed(() => {
+  const appt = currentAppointment.value
+  if (!appt) return null
+  if (bookingWindow.value && bookingWindow.value.id === appt.id && bookingWindow.value.screening_window_opens_on) {
+    return bookingWindow.value.screening_window_opens_on
+  }
+  const d = startOfDay(appt.appointment_datetime)
+  if (!d) return null
+  d.setDate(d.getDate() - 1)
+  return localDay(d)
+})
+
+// Today's slot has passed and the counter hasn't scanned the donor yet.
+const runningLate = computed(() => {
+  const appt = currentAppointment.value
+  if (!appt || appt.status === 'confirmed' || daysUntilAppt.value !== 0) return false
+  return parseDate(appt.appointment_datetime) < new Date()
+})
+
+/*
+ * Which step the donor is on, in the server's own order: book a visit, answer
+ * the health questions the day before it, check in, donate, rest. Booking
+ * needs no answers first, and answers given early can't be for a visit that
+ * isn't booked yet.
+ *
+ * Resting comes first: recording a collection uses the answers up, so they
+ * read `expired` right after a donation, but nothing can be done until the
+ * waiting period ends. `confirmed` is what the counter writes when it scans
+ * the donor's QR, so a checked-in donor is on Donate whatever else is true.
+ * `deferred` only comes from screenings recorded before RedAgos stopped ruling
+ * on answers; new ones are always `pending`.
  */
 const stage = computed(() => {
-  if (eligibilityStatus.value === 'deferred') return 'deferred'
-  if (!upcomingAppointment.value && daysUntilEligible.value > 0) return 'rest'
+  const appt = currentAppointment.value
+  if (isDeferred.value) return 'deferred'
+  if (!appt) return daysUntilEligible.value > 0 ? 'rest' : 'book'
+  if (appt.status === 'confirmed') return 'donate'
   if (!screeningDone.value) return 'screen'
-  if (upcomingAppointment.value) {
-    const today = daysUntilAppt.value !== null && daysUntilAppt.value <= 0
-    return today || upcomingAppointment.value.status === 'confirmed' ? 'donate' : 'checkin'
-  }
-  return 'book'
+  return daysUntilAppt.value !== null && daysUntilAppt.value <= 0 ? 'donate' : 'checkin'
 })
 
 const stageIndex = computed(() => {
@@ -486,16 +608,38 @@ const roundLabel = computed(() => {
 })
 
 const nextStep = computed(() => {
-  const appt = upcomingAppointment.value
+  const appt = currentAppointment.value
   switch (stage.value) {
-    case 'deferred':
-      return {
-        title: 'Screening deferred',
-        status: 'Your screening was deferred. Check the details before booking.',
-        label: 'View screening result',
-        icon: 'clipboard-check',
-        to: '/donor/eligibility',
+    case 'deferred': {
+      // The same lines the DonorDeferred email uses: a temporary deferral is
+      // usual and ends; anything else is for the centre to explain in person.
+      const d = deferral.value
+      if (d?.temporary && d.until) {
+        return {
+          title: `Deferred until ${formatDate(d.until, 'MMM D, YYYY')}`,
+          status: 'A deferral is common and is usually temporary. You can book again after that date, and the blood center can tell you more if you have questions.',
+          label: 'Get help',
+          icon: 'help-circle',
+          to: '/donor/help',
+        }
       }
+      if (d?.temporary) {
+        return {
+          title: 'Your last visit was deferred',
+          status: 'A deferral is common and is usually temporary. Please check with the blood center when it would be right to try again before you book.',
+          label: 'Get help',
+          icon: 'help-circle',
+          to: '/donor/help',
+        }
+      }
+      return {
+        title: 'Please talk to the blood center',
+        status: 'Something on your record means you should speak to the blood center before donating again. They can explain what was recorded and what it means for you.',
+        label: 'Get help',
+        icon: 'help-circle',
+        to: '/donor/help',
+      }
+    }
     case 'rest': {
       const days = daysUntilEligible.value
       return {
@@ -507,15 +651,24 @@ const nextStep = computed(() => {
       }
     }
     case 'screen': {
-      const expired = questionnaireStatus.value === 'expired'
+      const when = daysUntilAppt.value <= 0
+        ? 'today'
+        : daysUntilAppt.value === 1 ? 'tomorrow' : `on ${formatDate(appt.appointment_datetime, 'MMM D')}`
+      if (screeningWindowOpen.value) {
+        return {
+          title: 'Answer your health questions',
+          status: `Your donation is ${when} at ${appt.facility_name}, ${formatDate(appt.appointment_datetime, 'h:mm A')}. Answer now so your Pass is ready at the counter. It takes about 5 minutes.`,
+          label: 'Answer health questions',
+          icon: 'clipboard-check',
+          to: '/donor/eligibility',
+        }
+      }
       return {
-        title: expired ? 'Time to screen again' : 'Start with a quick screening',
-        status: expired
-          ? 'Your eligibility screening has expired. Retake it to donate again.'
-          : 'A few health questions so the blood center knows you can donate. It takes about 5 minutes.',
-        label: expired ? 'Retake screening' : 'Take eligibility screening',
-        icon: 'clipboard-check',
-        to: '/donor/eligibility',
+        title: `Health questions open on ${formatDate(screeningOpensOn.value, 'MMM D')}`,
+        status: `You are booked at ${appt.facility_name} on ${formatDate(appt.appointment_datetime, 'MMM D')} at ${formatDate(appt.appointment_datetime, 'h:mm A')}. Answer the health questions the day before or on the day, so they describe you as you are then.`,
+        label: 'View my booking',
+        icon: 'calendar',
+        to: '/donor/appointments',
       }
     }
     case 'checkin': {
@@ -529,16 +682,42 @@ const nextStep = computed(() => {
       }
     }
     case 'donate':
+      if (appt.status === 'confirmed') {
+        return {
+          title: 'You are checked in',
+          status: `You are checked in at ${appt.facility_name}. Thank you for giving today.`,
+          label: 'Show my Pass',
+          icon: 'qr-code',
+          to: '/donor/qrcode',
+        }
+      }
+      if (runningLate.value) {
+        return {
+          title: 'Running late?',
+          status: `Your appointment at ${appt.facility_name} was at ${formatDate(appt.appointment_datetime, 'h:mm A')}. If you are on your way, show your Pass at the counter. If you can't make it today, book a new time.`,
+          label: 'Show my Pass',
+          icon: 'qr-code',
+          to: '/donor/qrcode',
+        }
+      }
       return {
-        title: appt.status === 'confirmed' ? 'You are checked in' : 'Today is donation day',
-        status: appt.status === 'confirmed'
-          ? `You are checked in at ${appt.facility_name}. Thank you for giving today.`
-          : `See you at ${appt.facility_name} at ${formatDate(appt.appointment_datetime, 'h:mm A')}. Eat a good meal and drink water before you go.`,
+        title: 'Today is donation day',
+        status: `See you at ${appt.facility_name} at ${formatDate(appt.appointment_datetime, 'h:mm A')}. Eat a good meal and drink water before you go.`,
         label: 'Show my Pass',
         icon: 'qr-code',
         to: '/donor/qrcode',
       }
-    default:
+    default: {
+      const missed = missedAppointment.value
+      if (missed) {
+        return {
+          title: 'You missed your appointment',
+          status: `Your appointment at ${missed.facility_name} on ${formatDate(missed.appointment_datetime, 'MMM D')} has passed. No problem: book a new time when you are ready.`,
+          label: 'Book a new time',
+          icon: 'calendar',
+          to: '/donor/appointments',
+        }
+      }
       return {
         title: 'You can donate',
         status: 'You are eligible to donate. Pick a blood center and a time that suits you.',
@@ -546,6 +725,7 @@ const nextStep = computed(() => {
         icon: 'calendar',
         to: '/donor/appointments',
       }
+    }
   }
 })
 
@@ -556,7 +736,7 @@ function mapsUrl(place) {
 
 // Directions by facility name: the appointment carries no address.
 const directionsUrl = computed(() => {
-  const name = upcomingAppointment.value?.facility_name
+  const name = currentAppointment.value?.facility_name
   return name ? mapsUrl(name) : null
 })
 
@@ -598,16 +778,70 @@ const TIPS = {
   checkin: { icon: 'id-card', title: 'Before your donation', text: 'Eat a proper meal, drink extra water, and bring a valid ID along with your Pass.' },
   donate: { icon: 'heart', title: 'After you give', text: 'Rest for a few minutes, drink plenty of fluids, and skip heavy lifting for the rest of the day.' },
   rest: { icon: 'heart', title: 'While you rest', text: 'Eat iron-rich food like leafy greens, beans, eggs and fish to help your body rebuild.' },
-  deferred: { icon: 'info', title: 'About deferrals', text: 'A deferral keeps you and the patient safe. Many are temporary, and your result says what happens next.' },
+  deferred: { icon: 'info', title: 'About deferrals', text: 'A deferral keeps you and the patient safe. Many are temporary, and the blood center can tell you what happens next.' },
 }
 const tip = computed(() => TIPS[stage.value] ?? TIPS.book)
 
 // GET /api/blood-drives: upcoming mobile drives, soonest first.
 const bloodDrives = ref([])
 
+// The clock the drive badges read, moved on each minute so "On now" turns
+// to "Ended" without a reload.
+const nowTick = ref(Date.now())
+let nowTimer = null
+onMounted(() => { nowTimer = setInterval(() => { nowTick.value = Date.now() }, 60_000) })
+onBeforeUnmount(() => clearInterval(nowTimer))
+
+const minutesOf = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+const clockLabel = (hhmm) => {
+  const mins = minutesOf(hhmm)
+  if (mins === null) return ''
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+/** "8:00 AM to 4:00 PM", or from the start alone; empty without hours. */
+function driveHours(drive) {
+  const start = clockLabel(drive.start_time)
+  const end = clockLabel(drive.end_time)
+  if (start && end) return `${start} to ${end}`
+  return start ? `From ${start}` : ''
+}
+
+/** Where a drive stands against the donor's clock, and the badge it gets. */
+function driveWhen(drive) {
+  const date = String(drive.date ?? '').slice(0, 10)
+  const today = localDay(new Date(nowTick.value))
+  if (date === localDay(new Date(nowTick.value + DAY_MS))) return { badge: 'Tomorrow', tone: 'soon' }
+  if (date !== today) return {}
+
+  const now = new Date(nowTick.value)
+  const mins = now.getHours() * 60 + now.getMinutes()
+  const start = minutesOf(drive.start_time)
+  const end = minutesOf(drive.end_time)
+  if (end !== null && mins >= end) return { today: true, ended: true, badge: 'Ended', tone: 'muted' }
+  if (start !== null && mins >= start) return { today: true, badge: 'On now', tone: 'live' }
+  return { today: true, badge: 'Today', tone: 'today' }
+}
+
+const driveFull = (drive) => drive.total_slots != null && (drive.registered ?? 0) >= drive.total_slots
+// Why Book is off, or '' when it isn't. One booking at a time, so not while
+// one stands either.
+function driveBlocked(drive) {
+  if (currentAppointment.value) return 'You already have a booking'
+  if (driveWhen(drive).ended) return 'This drive has ended'
+  if (driveFull(drive)) return 'This drive is full'
+  return ''
+}
+
 function driveNote(drive) {
   const left = Math.max((drive.total_slots ?? 0) - (drive.registered ?? 0), 0)
   const date = String(drive.date ?? '').slice(0, 10)
+  if (driveWhen(drive).ended) return { text: 'This drive has ended', muted: true }
   if (nextEligibleDate.value && date < String(nextEligibleDate.value).slice(0, 10)) {
     return { text: 'Before your next eligible date', muted: true }
   }
@@ -634,15 +868,33 @@ const milestone = computed(() => {
   }
 })
 
-function donationTone(status) {
-  if (status === 'completed') return 'success'
-  return status === 'deferred' ? 'danger' : 'warning'
+// The server's visit statuses, labelled as the History page labels them:
+// registered → screening → collected → tested → completed, or rejected.
+const VISIT_LABELS = {
+  registered: 'Registered',
+  screening: 'Screening',
+  collected: 'Collected',
+  tested: 'Tested',
+  completed: 'Completed',
+  rejected: 'Rejected',
 }
 
-function donationLabel(status) {
-  if (status === 'completed') return 'Completed'
-  if (status === 'deferred') return 'Deferred'
-  return 'Pending'
+// Registered and Screening happen on the visit itself; one still there from an
+// earlier day ended without a collection (as on the History page).
+function visitEnded(d) {
+  return ['registered', 'screening'].includes(d.status) && localDay(d.donation_date) < localDay(new Date())
+}
+
+// Green when done, red when turned away, grey when it ended early, amber
+// while still moving through.
+function donationTone(d) {
+  if (d.status === 'completed') return 'success'
+  if (d.status === 'rejected') return 'danger'
+  return visitEnded(d) ? 'muted' : 'warning'
+}
+
+function donationLabel(d) {
+  return visitEnded(d) ? 'Not completed' : (VISIT_LABELS[d.status] ?? d.status)
 }
 
 // "2026-10-25 09:00:00" from the API: the space form isn't parsed everywhere.
@@ -697,6 +949,8 @@ async function load({ silent = false } = {}) {
     profile.value = data.profile ?? null
     eligibilityStatus.value = data.eligibility_status ?? 'pending'
     questionnaireStatus.value = data.questionnaire_status ?? 'not_answered'
+    qrActive.value = !!data.qr_active
+    qrValidUntil.value = data.qr_valid_until ?? null
     bloodType.value = data.blood_type ?? '-'
     totalDonations.value = data.total_donations ?? 0
     upcomingAppointment.value = data.upcoming_appointment ?? null
@@ -713,13 +967,16 @@ async function load({ silent = false } = {}) {
 
 // Best effort: the page still works without these, it just shows less.
 async function loadExtras() {
-  const [eligibility, details, drives] = await Promise.allSettled([
+  const [eligibility, details, drives, appointments, deferralStatus] = await Promise.allSettled([
     donorService.eligibilityStatus(),
     donorService.profile(),
     bookingCatalogService.bloodDrives(),
+    donorService.appointments(),
+    donorService.deferralStatus(),
   ])
   if (eligibility.status === 'fulfilled') {
     nextEligibleDate.value = eligibility.value?.next_eligible_date ?? null
+    bookingWindow.value = eligibility.value?.appointment ?? null
   } else {
     console.error('Failed to load eligibility status:', eligibility.reason)
   }
@@ -728,6 +985,16 @@ async function loadExtras() {
     lastDonationDate.value = details.value?.last_donation_date ?? null
   } else {
     console.error('Failed to load donor profile:', details.reason)
+  }
+  if (deferralStatus.status === 'fulfilled') {
+    deferral.value = deferralStatus.value ?? null
+  } else {
+    console.error('Failed to load deferral status:', deferralStatus.reason)
+  }
+  if (appointments.status === 'fulfilled') {
+    myAppointments.value = Array.isArray(appointments.value) ? appointments.value : []
+  } else {
+    console.error('Failed to load appointments:', appointments.reason)
   }
   if (drives.status === 'fulfilled') {
     bloodDrives.value = Array.isArray(drives.value) ? drives.value : []
@@ -1143,7 +1410,26 @@ watch(() => route.path, () => {
 .drive--empty { grid-column: 1 / -1; }
 .drive__date--empty { color: var(--rb-text-muted); }
 .drive__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.drive__kicker { font-size: 11px; font-weight: 700; color: var(--rb-text-muted); }
+.drive__kicker { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--rb-text-muted); }
+.drive__badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.drive__badge--today { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text); }
+.drive__badge--live { background: #E8F5E9; color: #1B5E20; }
+.drive__badge--soon { background: #FFF4E5; color: #8A4B00; }
+.drive__badge--muted { background: var(--rb-surface-hover, #F1F5F9); color: var(--rb-text-secondary); }
+html.dark .drive__badge--live { background: rgba(102, 187, 106, 0.16); color: var(--rb-success-text, #81C784); }
+html.dark .drive__badge--soon { background: rgba(245, 124, 0, 0.16); color: #FFB74D; }
+/* Today's drive: the date tile takes the portal colour. */
+.drive--today .drive__date { background: rgba(var(--rb-primary-rgb), 0.1); }
+.drive--today .drive__date span,
+.drive--today .drive__date strong { color: var(--rb-primary-text); }
+.drive__btn--off { opacity: 0.5; cursor: not-allowed; }
+.drive__btn--off:hover { background: rgba(var(--rb-primary-rgb), 0.1); }
 .drive__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .drive__btn {
   display: inline-flex;
@@ -1195,7 +1481,7 @@ watch(() => route.path, () => {
 .meter { display: block; height: 8px; border-radius: 999px; background: var(--rb-border); overflow: hidden; }
 .meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--rb-primary); transition: width 600ms var(--rb-ease-out, ease); }
 
-/* ── Recent donations ── */
+/* ── Recent visits ── */
 .activity { padding: 20px 24px; }
 .activity__list { margin: 10px 0 0; padding: 0; list-style: none; }
 .activity__item {
@@ -1226,6 +1512,8 @@ watch(() => route.path, () => {
 .pill { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .pill--success { background: rgba(var(--rb-success-rgb, 46, 125, 50), 0.12); color: var(--rb-success-text, #2E7D32); }
 .pill--warning { background: rgba(var(--rb-warning-rgb, 245, 124, 0), 0.12); color: var(--rb-warning-text, #B45309); }
+.pill--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.activity__icon--muted { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
 .pill--danger { background: rgba(var(--rb-accent-rgb, 211, 47, 47), 0.1); color: var(--danger-text); }
 .activity__empty {
   display: flex;
@@ -1287,11 +1575,12 @@ watch(() => route.path, () => {
 .pass__facts dd { margin: 0; font-weight: 700; text-align: right; }
 .pass__facts dd.tone--danger { color: #FECACA; }
 .pass__facts dd.tone--warning { color: #FDE68A; }
+.pass__facts dd.tone--success { color: #A5D6A7; }
 .pass__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .pass__actions .btn { width: 100%; }
 
 /* ── Dark ── */
-html.dark .pass { border-color: rgba(255, 255, 255, 0.1); background-color: #090B0F; box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.8); }
+html.dark .pass { border-color: rgba(255, 255, 255, 0.1); background-color: var(--ink-base, #070D1A); box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.8); }
 html.dark .tip { background: rgba(var(--rb-primary-rgb), 0.14); }
 html.dark .drive__date { background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.5); }
 html.dark .btn--light { background: var(--ink-text, #F1F5F9); }

@@ -108,6 +108,7 @@
             </div>
           </article>
         </div>
+
           <p v-if="appointmentActionError" class="my-appointment-error">{{ appointmentActionError }}</p>
           <!-- Ang Reschedule kay mogawas ra kung can_cancel (gikan sa server; naka-config ang window) -->
           <p v-if="!showBookingWizard" class="one-booking-note">
@@ -119,6 +120,77 @@
               blood center directly.
             </template>
           </p>
+
+          <!--
+            The wait between booking and the visit: what to do before it, and
+            what the day itself looks like, so a first-time donor arrives
+            knowing. Shown only with a booking standing and the wizard closed.
+          -->
+          <section v-if="nextAppointment && !showBookingWizard" class="prep" aria-label="Getting ready">
+            <div class="prep__bar">
+              <p class="prep__when">
+                <AssetIcon name="clock" :size="15" />
+                {{ countdownLabel }}
+              </p>
+              <div class="prep__actions">
+                <a :href="directionsUrl" target="_blank" rel="noopener" class="prep__action">
+                  <AssetIcon name="map-pin" :size="14" />
+                  Directions
+                </a>
+                <button type="button" class="prep__action" aria-label="Add to calendar" @click="downloadCalendar">
+                  <AssetIcon name="calendar-check" :size="14" />
+                  <span class="prep__long">Add to calendar</span>
+                  <span class="prep__short" aria-hidden="true">Calendar</span>
+                </button>
+                <NuxtLink to="/donor/qrcode" class="prep__action" aria-label="Show my Pass">
+                  <AssetIcon name="qr-code" :size="14" />
+                  <span class="prep__long">Show my Pass</span>
+                  <span class="prep__short" aria-hidden="true">My Pass</span>
+                </NuxtLink>
+              </div>
+            </div>
+
+            <div class="prep__grid">
+              <div class="prep__card">
+                <h3 class="prep__title">Before you go</h3>
+                <ul class="prep__list">
+                  <li class="prep__item" :class="{ 'is-done': questionsItem.done }">
+                    <span class="prep__check" aria-hidden="true">
+                      <AssetIcon v-if="questionsItem.done" name="check" :size="12" />
+                    </span>
+                    <span class="prep__text">
+                      Answer the health questions
+                      <small>{{ questionsItem.note }}</small>
+                    </span>
+                    <NuxtLink v-if="questionsItem.link" to="/donor/eligibility" class="prep__link">Answer now</NuxtLink>
+                  </li>
+                  <li v-for="item in PREP_ITEMS" :key="item.key" class="prep__item" :class="{ 'is-done': prepChecked[item.key] }">
+                    <label class="prep__label">
+                      <input type="checkbox" class="prep__input" :checked="!!prepChecked[item.key]" @change="togglePrep(item.key)">
+                      <span class="prep__check" aria-hidden="true">
+                        <AssetIcon v-if="prepChecked[item.key]" name="check" :size="12" />
+                      </span>
+                      <span class="prep__text">{{ item.label }}</span>
+                    </label>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="prep__card">
+                <h3 class="prep__title">On the day</h3>
+                <ol class="day">
+                  <li v-for="step in DAY_STEPS" :key="step.title" class="day__step">
+                    <span class="day__icon"><AssetIcon :name="step.icon" :size="15" /></span>
+                    <span class="day__text">
+                      <strong>{{ step.title }}</strong>
+                      <span>{{ step.text }}</span>
+                    </span>
+                  </li>
+                </ol>
+                <p class="day__note">Plan for about an hour at the blood center in all.</p>
+              </div>
+            </div>
+          </section>
       </div>
 
       <!--
@@ -141,7 +213,7 @@
         fills in as the donor picks. On small screens the ticket becomes a bar
         pinned to the bottom.
       -->
-      <div class="booking-layout">
+      <div ref="bookingEl" class="booking-layout">
         <div class="booking-steps">
           <!-- Type: always visible, so the mobile drive option is never hidden -->
           <div class="type-switch" role="radiogroup" aria-label="How do you want to donate?">
@@ -418,6 +490,21 @@
         </aside>
       </div>
       </template>
+
+      <!-- Earlier bookings: kept, done, cancelled or missed -->
+      <details v-if="pastBookings.length" class="past">
+        <summary class="past__summary">
+          Past bookings
+          <span class="past__count">{{ pastBookings.length }}</span>
+        </summary>
+        <ul class="past__list">
+          <li v-for="a in pastBookings" :key="a.id" class="past__row">
+            <span class="past__date">{{ formatDate(a.date || a.appointment_datetime) }}</span>
+            <span class="past__place">{{ a.drive_name || a.facility_name || 'Blood center' }}</span>
+            <span class="past__status" :class="`past__status--${pastTone(a)}`">{{ pastLabel(a) }}</span>
+          </li>
+        </ul>
+      </details>
     </div>
 
     <!-- Booking summary modal -->
@@ -559,12 +646,14 @@ import { donorService } from '~/api/donor/DonorService'
 
 
 const router = useRouter()
+const route = useRoute()
 
 // Page-level loading state: shows the skeleton on first mount while we
 // fetch whatever's needed before the form is interactive.
 const loading = ref(true)
 
 const appointmentType = ref('walkin')
+let drivesFetched = false
 const selectedCenterId = ref(null)
 const selectedDriveId = ref(null)
 // Ang date input kailangan og YYYY-MM-DD base sa LOCAL na oras. Dili
@@ -640,7 +729,7 @@ async function fetchBloodCenters() {
     // Ang server mo-filter na sa accepting-donations nga centers, so ang
     // status kanunay "Open today".
     const data = await bookingCatalogService.bloodCenters()
-    bloodCenters.value = data ?? []
+    bloodCenters.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load blood centers:', err)
     centersError.value = 'Could not load blood centers. Please try again.'
@@ -675,7 +764,7 @@ async function fetchTimeSlots() {
       center_id: selectedCenterId.value,
       date: selectedDate.value,
     })
-    timeSlots.value = data ?? []
+    timeSlots.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load time slots:', err)
     slotsError.value = err?.message || 'Could not load time slots. Please try again.'
@@ -721,9 +810,36 @@ async function load({ silent = false } = {}) {
   }
 }
 
-onMounted(() => load())
+/*
+ * Links from Home: `?type=mobile` opens on the drives, `&drive=ID` on that
+ * drive, picked, when it can still be booked. Applied once per link, so going
+ * back and forth doesn't undo what the donor changed since. Only while the
+ * booking form shows: with a booking already made there is nothing to pick.
+ */
+const bookingEl = ref(null)
+let appliedQuery = ''
+
+async function applyQuery() {
+  const type = route.query.type
+  const key = type === 'mobile' ? `mobile:${route.query.drive ?? ''}` : ''
+  if (key === appliedQuery) return
+  appliedQuery = key
+  if (!key || !showBookingWizard.value || reschedulingId.value) return
+
+  drivesFetched = true
+  if (appointmentType.value !== 'mobile') selectType('mobile')
+  await fetchBloodDrives()
+
+  const id = Number(route.query.drive)
+  const drive = bloodDrives.value.find(d => d.id === id)
+  if (drive && driveSlotsLeft(drive) > 0 && !driveTooEarly(drive)) pickDrive(drive.id)
+  await nextTick()
+  bookingEl.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
+onMounted(() => load().then(applyQuery))
 onActivated(() => {
-  if (loadedOnce) load({ silent: true })
+  if (loadedOnce) load({ silent: true }).then(applyQuery)
 })
 
 
@@ -743,7 +859,7 @@ async function fetchBloodDrives() {
     // GET /api/blood-drives
     // Ang `registered` kay live count sa active nga appointments.
     const data = await bookingCatalogService.bloodDrives()
-    bloodDrives.value = data ?? []
+    bloodDrives.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load blood drives:', err)
     drivesError.value = err?.message || 'Could not load blood drives. Please try again.'
@@ -787,7 +903,7 @@ function driveProgressClass(drive) {
 }
 
 // Fetch drives as soon as the donor switches to the "mobile drive" flow,
-let drivesFetched = false
+// (declared before applyQuery reads it)
 watch(appointmentType, (type) => {
   if (type === 'mobile' && !drivesFetched) {
     drivesFetched = true
@@ -865,7 +981,9 @@ async function fetchAppointments() {
     // Tanan appointment ang mo-return — bisan cancelled ug completed — newest
     // first. Walay filter param, so client na ang mo-pili.
     const data = await donorService.appointments()
-    myAppointments.value = data ?? []
+    // A list only: anything else (an error page, an unexpected shape) would
+    // crash the .filter() below and blank the whole booking page.
+    myAppointments.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load appointments:', err)
     appointmentsError.value = err?.message || 'Could not load your appointments. Please try again.'
@@ -888,6 +1006,147 @@ const activeAppointments = computed(() =>
 
 
 const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
+
+// ── Getting ready for the booked visit ──
+const nextAppointment = computed(() => activeAppointments.value[0] ?? null)
+
+function dayIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const countdownLabel = computed(() => {
+  const appt = nextAppointment.value
+  if (!appt) return ''
+  const day = String(appt.date || '').slice(0, 10) || dayIso(new Date(appt.appointment_datetime))
+  const [y, m, d] = day.split('-').map(Number)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((new Date(y, m - 1, d) - today) / 86_400_000)
+  const at = formatTime(appt.time)
+  if (days <= 0) return `Today at ${at}`
+  if (days === 1) return `Tomorrow at ${at}`
+  return `In ${days} days, ${formatDate(day)} at ${at}`
+})
+
+// Google Maps, searched by the place as written: the booking carries no address.
+const directionsUrl = computed(() => {
+  const appt = nextAppointment.value
+  const place = appt?.drive_name || appt?.facility_name || ''
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
+})
+
+// An .ics file, so the visit lands in the donor's own calendar. An hour long.
+function downloadCalendar() {
+  const appt = nextAppointment.value
+  if (!appt) return
+  const start = new Date(appt.appointment_datetime)
+  if (Number.isNaN(start.getTime())) return
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const stamp = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const place = appt.drive_name || appt.facility_name || 'Blood center'
+  const escape = text => String(text).replace(/[\\;,]/g, m => `\\${m}`)
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//RedAgos//Donor portal//EN',
+    'BEGIN:VEVENT',
+    `UID:redagos-appointment-${appt.id}@redagos`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${escape(`Blood donation at ${place}`)}`,
+    `LOCATION:${escape(place)}`,
+    `DESCRIPTION:${escape('Bring a valid ID and your RedAgos Pass. Eat a proper meal and drink water before you go.')}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'redagos-donation.ics'
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// The health questions: ticked by the server's own screening status for the
+// booking, never by hand.
+const questionsItem = computed(() => {
+  const appt = nextAppointment.value
+  switch (appt?.screening_status) {
+    case 'answered':
+      return { done: true, note: 'Done. Your Pass is ready.', link: false }
+    case 'due':
+    case 'missed':
+      return { done: false, note: 'Open now, about 5 minutes.', link: true }
+    case 'not_due':
+      return { done: false, note: `Opens on ${formatDate(appt.screening_window_opens_on)}.`, link: false }
+    default:
+      return { done: false, note: 'The day before your visit.', link: false }
+  }
+})
+
+// General advice, checked off by the donor on this device only.
+const PREP_ITEMS = [
+  { key: 'meal', label: 'Eat a proper meal before you go' },
+  { key: 'water', label: 'Drink extra water the day before and on the day' },
+  { key: 'sleep', label: 'Get a good night of sleep' },
+  { key: 'id', label: 'Bring a valid ID' },
+]
+
+const DAY_STEPS = [
+  { icon: 'qr-code', title: 'Check in', text: 'Show your Pass at the counter.' },
+  { icon: 'stethoscope', title: 'Health check', text: 'Blood pressure, hemoglobin and weight.' },
+  { icon: 'blood-drop', title: 'Donation', text: 'The draw itself usually takes about 10 minutes.' },
+  { icon: 'heart', title: 'Rest and a snack', text: 'Stay a few minutes before you head off.' },
+]
+
+const prepChecked = ref({})
+const prepKey = () => `redagos:visit-prep:${nextAppointment.value?.id ?? 'none'}`
+
+function readPrep() {
+  try {
+    prepChecked.value = JSON.parse(localStorage.getItem(prepKey()) || '{}') || {}
+  } catch {
+    prepChecked.value = {}
+  }
+}
+
+function togglePrep(key) {
+  prepChecked.value = { ...prepChecked.value, [key]: !prepChecked.value[key] }
+  try {
+    localStorage.setItem(prepKey(), JSON.stringify(prepChecked.value))
+  } catch {
+    // Storage blocked: the ticks still hold for this visit to the page.
+  }
+}
+
+watch(() => nextAppointment.value?.id, (id) => {
+  if (id && import.meta.client) readPrep()
+}, { immediate: true })
+
+// ── Past bookings ──
+const pastBookings = computed(() =>
+  myAppointments.value
+    .filter(a => !activeAppointments.value.includes(a))
+    .sort((a, b) => new Date(b.appointment_datetime) - new Date(a.appointment_datetime))
+)
+
+// A booking still `scheduled` after its time came and went is a missed one.
+function isMissed(a) {
+  return (a.status === 'scheduled' && new Date(a.appointment_datetime) < new Date()) || a.status === 'no_show'
+}
+
+function pastLabel(a) {
+  if (isMissed(a)) return 'Missed'
+  return a.status_label || a.status
+}
+
+function pastTone(a) {
+  if (isMissed(a)) return 'muted'
+  if (a.status === 'completed') return 'success'
+  if (a.status === 'cancelled') return 'muted'
+  return 'info'
+}
 
 // Sunod 14 ka adlaw gikan sa unang ma-book nga petsa. Local time, dili UTC.
 const DATE_CHIP_COUNT = 14
@@ -1439,8 +1698,9 @@ function goDashboard() {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 820px;
+  min-width: 0;
 }
+
 
 /* Upcoming appointment: a white card led by a date tile. The ticket look is
    kept for the booking summary only, so it stays special there. */
@@ -2247,6 +2507,145 @@ function goDashboard() {
   font-size: var(--rb-fs-small);
   line-height: 1.55;
   color: #334155;
+}
+
+/* ── Getting ready ── */
+.prep { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.prep__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prep__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+}
+.prep__when :deep(.asset-icon) { color: var(--rb-primary-text); }
+.prep__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prep__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.prep__action:hover { border-color: var(--rb-border-hover, #CBD5E1); }
+.prep__action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.prep__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.prep__card {
+  padding: 16px 18px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+.prep__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.prep__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.prep__item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.prep__label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
+.prep__input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.prep__check {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--rb-border-hover, #CBD5E1);
+  border-radius: 6px;
+  color: #fff;
+}
+.prep__item.is-done .prep__check { border-color: var(--rb-primary); background: var(--rb-primary); }
+.prep__input:focus-visible + .prep__check { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.prep__text { flex: 1; display: flex; flex-direction: column; font-size: 14px; color: var(--rb-text-primary); }
+.prep__text small { font-size: 12px; color: var(--rb-text-secondary); }
+.prep__item.is-done .prep__text { color: var(--rb-text-secondary); }
+.prep__link { flex: none; font-size: 13px; font-weight: 700; color: var(--rb-primary-text); text-decoration: none; }
+.prep__link:hover { text-decoration: underline; }
+.day { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.day__step { display: flex; align-items: flex-start; gap: 10px; }
+.day__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+.day__text { display: flex; flex-direction: column; font-size: 13px; color: var(--rb-text-secondary); }
+.day__text strong { font-size: 14px; color: var(--rb-text-primary); }
+.day__note { margin: 12px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* ── Past bookings ── */
+.past {
+  margin-top: 8px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+.past__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+.past__count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+}
+.past__list { margin: 0; padding: 0 18px 12px; list-style: none; }
+.past__row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--rb-border);
+  font-size: 14px;
+}
+.past__date { color: var(--rb-text-secondary); font-weight: 600; }
+.past__place { color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.past__status { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.past__status--success { background: rgba(var(--rb-success-rgb, 46, 125, 50), 0.12); color: var(--rb-success-text, #2E7D32); }
+.past__status--info { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.past__status--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+.prep__short { display: none; }
+
+@media (max-width: 760px) {
+  .prep__grid { grid-template-columns: minmax(0, 1fr); }
+  /* One row of three equal buttons, with shorter labels. */
+  .prep__actions { width: 100%; flex-wrap: nowrap; }
+  .prep__action { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 8px; font-size: 12px; white-space: nowrap; }
+  .prep__long { display: none; }
+  .prep__short { display: inline; }
+  .past__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .past__date { grid-column: 1 / -1; font-size: 12px; }
 }
 
 .one-booking-note {

@@ -95,6 +95,7 @@ import Package from '~/assets/icons/package.svg?raw'
 import packageCheck from '~/assets/icons/package-check.svg?raw'
 import packageSearch from '~/assets/icons/package-search.svg?raw'
 import palette from '~/assets/icons/palette.svg?raw'
+import pipette from '~/assets/icons/pipette.svg?raw'
 import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
 import philippinePeso from '~/assets/icons/philippine-peso.svg?raw'
@@ -226,6 +227,7 @@ const icons = {
   'package-check': packageCheck,
   'package-search': packageSearch,
   palette,
+  pipette,
   pencil,
   phone,
   'philippine-peso': philippinePeso,

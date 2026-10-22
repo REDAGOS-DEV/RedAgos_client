@@ -43,7 +43,7 @@
             </div>
 
             <!-- Current eligibility state -->
-            <div v-if="statusBanner && !hasValidScreening" class="status-banner" :class="`status-banner--${statusBanner.tone}`">
+            <div v-if="statusBanner && !hasValidScreening && !restingUntil" class="status-banner" :class="`status-banner--${statusBanner.tone}`">
                 <span class="status-banner__icon">
                     <AssetIcon :name="statusBanner.icon" :size="16" />
                 </span>
@@ -58,21 +58,102 @@
 
 
             <!--
+                A deferral on the donor's record. It blocks nothing (they can
+                still answer and book), so this informs rather than stops; the
+                reason is the blood center's to give, never shown here.
+            -->
+            <div v-if="deferral?.deferred" class="status-banner status-banner--warning" role="status">
+                <span class="status-banner__icon"><AssetIcon name="circle-alert" :size="16" /></span>
+                <div class="status-banner__body">
+                    <p class="status-banner__title">{{ deferralNotice.title }}</p>
+                    <p class="status-banner__detail">{{ deferralNotice.detail }}</p>
+                </div>
+            </div>
+
+            <!--
+                Nothing booked yet. Answering is allowed (a walk-in answers this
+                way), but the code it makes lasts its own 14 days rather than
+                running to a visit, so the usual path is to book first.
+            -->
+            <div v-if="showBookFirst" class="status-banner status-banner--info" role="note">
+                <span class="status-banner__icon"><AssetIcon name="calendar" :size="16" /></span>
+                <div class="status-banner__body">
+                    <p class="status-banner__title">No visit booked yet</p>
+                    <p class="status-banner__detail">
+                        You can answer now if you are walking in. If you plan to book, book first and answer the day before your visit, so your answers and QR code are current.
+                        <NuxtLink to="/donor/appointments" class="status-banner__link">Book a donation</NuxtLink>
+                    </p>
+                </div>
+            </div>
+
+            <!--
                 The most likely new state a donor meets: booked, but too early.
                 It has to read as a schedule, not as an error, and it must never
                 render an empty form behind it.
             -->
             <div v-if="windowClosed" class="panel window-closed">
                 <div class="panel-header panel-header--simple">
-                    <h2 class="panel-title">Your questionnaire opens on {{ formatDate(windowOpensOn) }}</h2>
+                    <div>
+                        <span v-if="opensInLabel" class="window-closed__chip">
+                            <AssetIcon name="clock" :size="13" />
+                            {{ opensInLabel }}
+                        </span>
+                        <h2 class="panel-title">Your questionnaire opens on {{ formatDate(windowOpensOn) }}</h2>
+                    </div>
                 </div>
-                <div class="form-body">
+                <div class="form-body window-closed__body">
+                    <div class="window-closed__main">
                     <p class="window-closed__text">
                         You answer this the day before your appointment, so that what the blood centre reads is current.
                         Come back on {{ formatDate(windowOpensOn) }} — we will email you a reminder.
                     </p>
+
+                    <!-- Answers already on file still work until they run out. -->
+                    <p v-if="eligibility?.questionnaire_status === 'answered'" class="window-closed__onfile">
+                        <AssetIcon name="circle-check-big" :size="14" />
+                        Your answers from {{ formatDate(eligibility.screening_date) }} are still on file. You can update them once the questionnaire opens.
+                    </p>
+                    <p v-else-if="eligibility?.screening_date" class="window-closed__onfile window-closed__onfile--muted">
+                        You last answered on {{ formatDate(eligibility.screening_date) }}.
+                    </p>
+
                     <NuxtLink to="/donor/appointments" class="btn-outline window-closed__link">
                         View my appointment
+                    </NuxtLink>
+                    </div>
+
+                    <!--
+                        What the questionnaire asks about, so the donor can have
+                        it to hand. A general list: the questions themselves stay
+                        closed until the window opens.
+                    -->
+                    <div class="window-closed__ready">
+                        <p class="window-closed__ready-title">Have these ready</p>
+                        <ul class="window-closed__ready-list">
+                            <li><AssetIcon name="pill" :size="15" />Any medicines you take now, and recent ones</li>
+                            <li><AssetIcon name="plane" :size="15" />Trips outside the country, with rough dates</li>
+                            <li><AssetIcon name="syringe" :size="15" />Recent vaccines, tattoos or piercings</li>
+                            <li><AssetIcon name="stethoscope" :size="15" />Illness, surgery or treatment since your last donation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!--
+                Resting after a donation. The server refuses a submission inside
+                the donation interval (threshold_not_met), so the form would
+                only waste 30 answers: say when it opens again instead.
+            -->
+            <div v-else-if="restingUntil" class="panel window-closed">
+                <div class="panel-header panel-header--simple">
+                    <h2 class="panel-title">You can answer again on {{ formatDate(restingUntil) }}</h2>
+                </div>
+                <div class="form-body">
+                    <p class="window-closed__text">
+                        Thank you for donating. Your body needs time to rebuild before the next one, so the questionnaire opens again when your waiting period ends.
+                    </p>
+                    <NuxtLink to="/donor/history" class="btn-outline window-closed__link">
+                        See my donations
                     </NuxtLink>
                 </div>
             </div>
@@ -749,6 +830,60 @@ const prefilled = reactive({
 // current eligibility state sa donor gikan sa server.
 const eligibility = ref(null)
 
+// GET /donors/deferral: { deferred, temporary, until, since }. Never a reason.
+const deferral = ref(null)
+
+const deferralNotice = computed(() => {
+    const d = deferral.value
+    if (d?.temporary && d.until) {
+        return {
+            title: `You are deferred until ${formatDate(d.until)}.`,
+            detail: 'A deferral is common and usually temporary. You can still answer, but please wait until after that date to book.',
+        }
+    }
+    if (d?.temporary) {
+        return {
+            title: 'Your last visit was deferred.',
+            detail: 'A deferral is common and usually temporary. Please check with the blood center when it would be right to try again.',
+        }
+    }
+    return {
+        title: 'Please speak to the blood center before donating again.',
+        detail: 'Something on your record needs their review first. They can explain what was recorded and what it means for you.',
+    }
+})
+
+// "Opens tomorrow" / "Opens in 3 days", for the closed-window panel.
+const opensInLabel = computed(() => {
+    const opens = windowOpensOn.value
+    if (!opens) return ''
+    const [y, m, d] = String(opens).slice(0, 10).split('-').map(Number)
+    if (!y) return ''
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Math.round((new Date(y, m - 1, d) - today) / 86400000)
+    if (days <= 0) return 'Opens today'
+    return days === 1 ? 'Opens tomorrow' : `Opens in ${days} days`
+})
+
+// Inside the waiting period after a donation: the date the questions open again.
+const restingUntil = computed(() => {
+    const next = eligibility.value?.next_eligible_date
+    if (!next) return null
+    const today = new Date()
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    return String(next).slice(0, 10) > iso ? next : null
+})
+
+// The form is up, nothing is booked: point to booking first (not a block).
+const showBookFirst = computed(() =>
+    !!eligibility.value
+    && !eligibility.value.appointment
+    && !restingUntil.value
+    && !windowClosed.value
+    && (!hasValidScreening.value || answeringAgain.value)
+)
+
 const submitError = ref('')
 const canForceResubmit = ref(false)
 
@@ -1308,7 +1443,14 @@ async function loadStatus() {
         //             consented_on, last_donation_date, next_eligible_date,
         //             questionnaire_version, screening_question_version,
         //             re_screen_recommended, appointment }
-        eligibility.value = await donorService.eligibilityStatus()
+        const [status, deferralStatus] = await Promise.allSettled([
+            donorService.eligibilityStatus(),
+            donorService.deferralStatus(),
+        ])
+        if (status.status === 'fulfilled') eligibility.value = status.value
+        else throw status.reason
+        // Informational too; without it the notice simply doesn't show.
+        if (deferralStatus.status === 'fulfilled') deferral.value = deferralStatus.value ?? null
     } catch (err) {
         // Informational ra ang banner, so dili ni angay mo-block sa form.
         console.error('Failed to load eligibility status:', err)
@@ -1570,6 +1712,20 @@ onActivated(() => {
     border-color: #F2D2D2;
     color: #C62828;
 }
+
+.status-banner--info {
+    background: rgba(var(--rb-primary-rgb), 0.06);
+    border-color: rgba(var(--rb-primary-rgb), 0.2);
+    color: var(--rb-primary-text);
+}
+
+.status-banner__link {
+    margin-left: 4px;
+    font-weight: 700;
+    color: var(--rb-primary-text);
+    text-decoration: none;
+}
+.status-banner__link:hover { text-decoration: underline; }
 
 /* Usa ra ka column: questions una, unya details. Full width sa container. */
 .main-grid {
@@ -2900,6 +3056,12 @@ onActivated(() => {
     color: #FFCC80;
 }
 
+:global(.dark .eligibility-page .status-banner--info) {
+    background: rgba(var(--rb-primary-rgb), 0.12);
+    border-color: rgba(var(--rb-primary-rgb), 0.3);
+    color: var(--rb-primary-text);
+}
+
 :global(.dark .eligibility-page .status-banner--danger),
 :global(.dark .eligibility-modal .status-banner--danger) {
     background: rgba(239, 83, 80, 0.10);
@@ -3085,7 +3247,17 @@ onActivated(() => {
     gap: 4px;
 }
 
-.window-closed { max-width: 640px; }
+/* Full width; on desktop the status on the left, what to have ready on the right. */
+.window-closed__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+.window-closed__main { min-width: 0; }
+@media (max-width: 900px) {
+    .window-closed__body { grid-template-columns: minmax(0, 1fr); }
+}
 
 .window-closed__text {
     margin: 0 0 14px;
@@ -3095,6 +3267,45 @@ onActivated(() => {
 }
 
 .window-closed__link { display: inline-flex; width: auto; }
+
+.window-closed__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(var(--rb-primary-rgb), 0.1);
+    color: var(--rb-primary-text);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.window-closed__onfile {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(var(--rb-success-rgb, 46, 125, 50), 0.1);
+    color: var(--rb-success-text, #2E7D32);
+    font-size: var(--rb-fs-small);
+    line-height: 1.5;
+}
+.window-closed__onfile :deep(.asset-icon) { flex: none; margin-top: 2px; }
+.window-closed__onfile--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+.window-closed__ready {
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--rb-border);
+    border-radius: 12px;
+}
+.window-closed__ready-title { margin: 0 0 8px; font-size: var(--rb-fs-small); font-weight: 700; color: var(--rb-text-primary); }
+.window-closed__ready-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.window-closed__ready-list li { display: flex; align-items: center; gap: 10px; font-size: var(--rb-fs-small); color: var(--rb-text-secondary); }
+.window-closed__ready-list :deep(.asset-icon) { flex: none; color: var(--rb-primary-text); }
 
 /* --- Review modal --- */
 

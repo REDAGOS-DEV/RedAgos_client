@@ -183,6 +183,9 @@ export function useUser() {
     if (!import.meta.client) return
 
     localStorage.removeItem('_token')
+    // The donor's check-in code is kept on the device (qrcode.vue); it goes
+    // with the session, so a shared computer doesn't keep the next user's pass.
+    localStorage.removeItem('donor-qr-code')
     inFlight = null
     clearUser()
   }

@@ -1,11 +1,10 @@
 <template>
   <div class="donor-portal">
     <!--
-      The portal's backdrop: soft washes in the donor's theme colours, the
-      same treatment as the landing page and sign-in. Fixed and at z-index -1,
+      The portal's backdrop: a plain neutral canvas. Fixed and at z-index -1,
       so it sits behind everything without creating a stacking context that
-      would trap the pages' modals. The sidebar and top bar are frosted glass
-      over it; the page cards stay solid for readability.
+      would trap the pages' modals. The sidebar, top bar and cards are solid
+      surfaces on it.
     -->
     <div class="donor-backdrop" aria-hidden="true" />
 
@@ -31,9 +30,14 @@
         has scrolled it turns translucent with a blur and a hairline shadow,
         so it still reads as sitting above the content.
       -->
+      <!--
+        Desktop: the bar runs the full width above the sidebar, with the brand
+        at its left edge on the rail's icon axis, the search in the middle and
+        the account on the right. The sidebar starts beneath it.
+      -->
       <header
-        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
-        :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'topbar--scrolled': isScrolled }]"
+        class="topbar fixed top-0 left-0 right-0 z-30 lg:z-[60] h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
+        :class="{ 'topbar--scrolled': isScrolled }"
         :style="{ borderColor: headerBorderColor, boxShadow: isScrolled ? headerShadow : 'none' }">
 
         <!--
@@ -44,7 +48,7 @@
           as the rail reflows the column. The donor pages are 1400px wide, so
           the bar is too: at 1152px the greeting sat far in from the title.
         -->
-        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1400px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[1400px] lg:max-w-none items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8 lg:px-4">
 
         <!-- Left Cluster: Logo (phones and tablets) + Titles -->
         <div class="flex items-center gap-2.5 min-w-0">
@@ -53,29 +57,48 @@
             button gave way to the logo (2026-10-21), which goes Home like an
             app's. Settings, Help and Eligibility moved into the account menu.
           -->
+          <!--
+            Desktop: the menu button opens the rail; moving the pointer off
+            the rail closes it again (components/donor/sidebar.vue). It sits
+            on the rail's 36px icon axis, so the icons line up beneath it.
+          -->
+          <button
+            type="button"
+            class="rail-toggle"
+            data-rail-toggle
+            :aria-expanded="railExpanded"
+            aria-controls="donor-sidebar"
+            :aria-label="railExpanded ? 'Close menu' : 'Open menu'"
+            @click="railExpanded ? collapseOnHover() : expandOnHover()">
+            <AssetIcon name="menu" :size="20" />
+          </button>
+
           <NuxtLink to="/donor/dashboard"
             class="mobile-logo"
             aria-label="RedAgos, go to Home">
             <img :src="logo" alt="" class="mobile-logo__img">
           </NuxtLink>
 
-          <!-- Dynamic Page Title (Mobile view) -->
-          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-[color:var(--ink-text,#F1F5F9)] truncate">
-            {{ pageLabels[route.path] || 'Dashboard' }}
-          </span>
-
           <!--
-            Where am I: "Donor Portal" as secondary text over the page title as
-            primary text, the same two levels the sidebar uses. The greeting
-            moved to the dashboard's own header.
+            The wordmark beside the logo. Phones and tablets show the brand
+            ("Donor Portal" beneath RedAgos); each page carries its own title.
+            Desktop turns the second line into a breadcrumb to the page.
+            Hidden on phones while the search takes the bar.
           -->
-          <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
-            <span class="text-[12px] font-medium leading-tight text-[#64748B] dark:text-[color:var(--ink-text-2,#94A3B8)]">
-              Donor Portal
-            </span>
-            <span class="text-[15px] font-semibold leading-tight truncate text-[#334155] dark:text-[color:var(--ink-text,#F1F5F9)]">
-              {{ pageLabels[route.path] || 'Dashboard' }}
-            </span>
+          <div class="brand-word" :class="{ 'max-sm:hidden': searchOpenMobile }">
+            <NuxtLink to="/donor/dashboard" class="brand-word__name" aria-label="RedAgos, go to Home">
+              Red<span class="brand-word__accent">Agos</span>
+            </NuxtLink>
+            <span class="brand-word__tag lg:hidden">Donor Portal</span>
+            <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb">
+              <ol>
+                <li>
+                  <NuxtLink v-if="route.path !== '/donor/dashboard'" to="/donor/dashboard">Donor Portal</NuxtLink>
+                  <span v-else>Donor Portal</span>
+                </li>
+                <li aria-current="page">{{ pageLabels[route.path] || 'Dashboard' }}</li>
+              </ol>
+            </nav>
           </div>
         </div>
 
@@ -86,7 +109,7 @@
             searchOpenMobile
               ? 'flex flex-1 z-40'
               : 'hidden sm:flex sm:flex-1',
-            'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md lg:top-1/2 lg:-translate-y-1/2'
+            'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-sm xl:max-w-md lg:top-1/2 lg:-translate-y-1/2'
           ]">
           <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-[color:var(--ink-muted,#64748B)] flex-shrink-0" />
           <input ref="searchInput" v-model="searchQuery" type="text" placeholder="Search pages, records..."
@@ -337,6 +360,9 @@
 
       <!-- Phones and tablets: the main tabs under the thumb (the sidebar is a drawer there). -->
       <DonorBottomNav />
+
+      <!-- The portal's confirm dialog (useConfirmDialog), in place of window.confirm. -->
+      <DonorConfirmDialog />
     </div>
   </div>
 </template>
@@ -352,8 +378,9 @@ import { donorService } from '~/api/donor/DonorService'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 import { useAccentTheme } from '~/composables/useAccentTheme'
+import { accentSurfaces, accentTheme } from '~/utils/accentThemes'
 
-const { railExpanded } = useSidebar()
+const { railExpanded, expandOnHover, collapseOnHover } = useSidebar()
 
 // The donor's colour theme (Settings → Appearance). Applied while the donor
 // portal is open and removed on the way out, so the other portals and the
@@ -379,8 +406,8 @@ const themeHint = computed(() => (
 ))
 
 // The browser's own bar (status bar and address bar on phones) takes this
-// colour, so it runs into the glass header instead of stopping at a white
-// strip. Sampled from the header as it renders over the backdrop glow.
+// colour, so it runs into the header instead of stopping at a white
+// strip. The header's own solid surface colour (light, and the ink dark).
 // Set on the one tag by hand: useHead left the server-rendered light tag in
 // place beside the client's, and browsers read the first.
 let themeColorMeta = null
@@ -390,10 +417,12 @@ function applyThemeColor() {
     themeColorMeta.setAttribute('name', 'theme-color')
     if (!themeColorMeta.isConnected) document.head.appendChild(themeColorMeta)
   }
-  themeColorMeta.setAttribute('content', isDark.value ? '#0E1116' : '#F6FAFF')
+  // The header's own colour, tinted by the colour theme like the rest of the chrome.
+  const { light, dark } = accentSurfaces(accentTheme(accent.current.value))
+  themeColorMeta.setAttribute('content', isDark.value ? dark.chrome : light.chrome)
 }
 onMounted(applyThemeColor)
-watch(isDark, () => { if (themeColorMeta) applyThemeColor() })
+watch([isDark, accent.current], () => { if (themeColorMeta) applyThemeColor() })
 onUnmounted(() => {
   themeColorMeta?.remove()
   themeColorMeta = null
@@ -470,7 +499,8 @@ const pageLabels = {
 
 
 // --- Notifications ---
-const unreadCount = ref(0)
+// Shared with the notifications page, which updates it as notices are read.
+const unreadCount = useState('donor-unread-count', () => 0)
 
 async function loadUnreadCount() {
   try {
@@ -483,6 +513,9 @@ async function loadUnreadCount() {
 }
 
 onMounted(loadUnreadCount)
+// A new notice can land while the donor moves around (a booking writes one),
+// so the badge is re-read on each page change.
+watch(() => route.path, () => loadUnreadCount())
 
 // --- Valid ID status ---
 // Drives the avatar badge/dot (consistent across desktop + mobile) and the
@@ -643,46 +676,23 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-/* ── Glass backdrop (see the template) ── */
+/* ── Backdrop (see the template) ── */
+/*
+ * A plain, neutral canvas. The portal's chrome (sidebar, top bar, bottom bar)
+ * is solid and the page a quiet grey, the way the browser's own toolbar is,
+ * so the two read as one in light and in dark. The brand rides on the logo,
+ * the blue actions and the red of the blood type, not on a backdrop.
+ */
 .donor-backdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 55%, transparent), transparent 72%),
-    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 85%, transparent), transparent 72%),
-    radial-gradient(30% 36% at 62% 58%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 45%, #F7F9FC) 0%, #F7F9FC 100%);
-}
-:global(.dark .donor-backdrop) {
-  background:
-    radial-gradient(48% 55% at 100% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 16%, transparent), transparent 72%),
-    radial-gradient(42% 52% at 0% 100%, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 9%, transparent), transparent 72%),
-    var(--ink-base, #0B1220);
+  background: var(--rb-page-bg, #F5F6F8);
 }
 
-/* Frosted glass top bar. */
-.topbar {
-  background-color: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: saturate(170%) blur(18px);
-  backdrop-filter: saturate(170%) blur(18px);
-}
-.topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
-:global(.dark .topbar) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.55); }
-:global(.dark .topbar--scrolled) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.78); }
-
-/* No blur, or the donor asked for less transparency: solid bar. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topbar { background-color: var(--rb-page-bg, #F7F8FA); }
-}
-/* Reduced transparency: the glass stays (it sits over a still gradient, not
-   over content), only the scrolled bar, with content sliding under it,
-   turns solid. */
-@media (prefers-reduced-transparency: reduce) {
-  .topbar--scrolled { background-color: rgba(255, 255, 255, 0.96); }
-  :global(.dark .donor-portal .topbar--scrolled) { background-color: rgba(var(--ink-page-rgb, 15, 23, 42), 0.96); }
-}
+/* Solid top bar, in the surface colour, with a hairline under it. */
+.topbar { background-color: var(--rb-chrome, var(--rb-surface, #FFFFFF)); }
 
 /*
  * badge-check is an outline glyph on a 24 viewBox. Rendered at 14px its
@@ -719,7 +729,7 @@ const handleLogout = async () => {
   will-change: left;
 }
 
-/* Transparent: the glass backdrop shows through between the cards. */
+/* Transparent: the canvas shows through between the cards. */
 main {
   background: transparent;
 }
@@ -731,19 +741,79 @@ main {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   overflow: hidden;
-  border-radius: 11px;
-  background: var(--rb-primary);
-  box-shadow: 0 4px 12px -6px rgba(var(--rb-primary-rgb), 0.8);
+  border-radius: 10px;
 }
-.mobile-logo__img { width: 100%; height: 100%; padding: 5px; object-fit: contain; }
+/* The logo stands on its own, with no tile: it carries its own red and blue,
+   which a tile in the theme colour would swallow (a blue tile the wave, a red
+   pick the drop), and it reads on every light and dark theme as it is. */
+/* The rail's menu button, desktop only (phones use the bottom tabs). */
+.rail-toggle { display: none; }
+@media (min-width: 1024px) {
+  .rail-toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--rb-text-primary, #1E293B);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+}
+.rail-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+html.dark .rail-toggle { color: var(--ink-text, #EEF1F5); }
+html.dark .rail-toggle:hover { background: rgba(255, 255, 255, 0.08); }
+.rail-toggle:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.rail-toggle:active { transform: scale(0.95); }
+.mobile-logo__img { width: 100%; height: 100%; object-fit: contain; }
 .mobile-logo:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .mobile-logo:active { transform: scale(0.96); }
-/* From 1024px the sidebar shows the logo (in CSS: a lg:hidden class would lose to the display above). */
+/* From 1024px the logo is the brand beside the menu button (which holds the
+   rail's icon axis), so it can be larger: 48px in the 64px bar. */
 @media (min-width: 1024px) {
-  .mobile-logo { display: none; }
+  .mobile-logo { width: 48px; height: 48px; }
+}
+
+/* The wordmark beside the logo: the name, and beneath it "Donor Portal"
+   (phones, tablets) or the breadcrumb to the page (desktop). */
+.brand-word { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
+.brand-word__name { text-decoration: none; }
+.brand-word__name {
+  font-family: var(--rb-font-sans);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rb-text-primary);
+}
+.brand-word__accent { color: #D32F2F; }
+/* Desktop: Donor Portal › Page. Capped so a long page name ends in an
+   ellipsis short of the centred search (narrower below 1280px). */
+.brand-crumb { margin-top: 2px; max-width: 180px; }
+@media (min-width: 1280px) {
+  .brand-crumb { max-width: 280px; }
+}
+.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
+.brand-crumb li { flex-shrink: 0; color: var(--rb-text-secondary); font-weight: 500; }
+.brand-crumb li + li { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; color: var(--rb-text-secondary); opacity: 0.7; }
+.brand-crumb li[aria-current] { color: var(--rb-text-primary); font-weight: 600; }
+.brand-crumb a { color: inherit; text-decoration: none; border-radius: 4px; }
+.brand-crumb a:hover { color: var(--rb-primary-text, var(--rb-primary)); text-decoration: underline; }
+.brand-crumb a:focus-visible, .brand-word__name:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 4px; }
+.brand-word__tag {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--rb-text-secondary);
 }
 
 input:focus {

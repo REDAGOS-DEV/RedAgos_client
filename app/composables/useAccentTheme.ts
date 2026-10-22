@@ -1,4 +1,4 @@
-import { ACCENT_THEMES, DEFAULT_ACCENT, accentTheme } from '~/utils/accentThemes'
+import { ACCENT_THEMES, DEFAULT_ACCENT, accentSurfaces, accentTheme, rgbTriple } from '~/utils/accentThemes'
 
 /**
  * The chosen colour theme (Settings → Appearance in the donor or blood center
@@ -24,6 +24,22 @@ const VARS = [
   '--accent-text-dark',
   '--rb-grad-from',
   '--rb-grad-to',
+  // Surfaces tinted by the theme (read by the donor portal's tokens in main.css).
+  '--accent-chrome-light',
+  '--accent-canvas-light',
+  '--accent-ink-base',
+  '--accent-ink-base-rgb',
+  '--accent-ink-page',
+  '--accent-ink-page-rgb',
+  '--accent-ink-surface',
+  '--accent-ink-surface-rgb',
+  '--accent-ink-surface-alt',
+  '--accent-ink-hover',
+  '--accent-ink-chrome',
+  '--accent-ink-border',
+  '--accent-ink-border-rgb',
+  '--accent-ink-border-hover',
+  '--accent-ink-inset',
 ] as const
 
 export function useAccentTheme() {
@@ -40,6 +56,23 @@ export function useAccentTheme() {
     root.setProperty('--accent-text-dark', t.textDark)
     root.setProperty('--rb-grad-from', t.gradFrom)
     root.setProperty('--rb-grad-to', t.gradTo)
+
+    const { light, dark } = accentSurfaces(t)
+    root.setProperty('--accent-chrome-light', light.chrome)
+    root.setProperty('--accent-canvas-light', light.canvas)
+    root.setProperty('--accent-ink-base', dark.base)
+    root.setProperty('--accent-ink-base-rgb', rgbTriple(dark.base))
+    root.setProperty('--accent-ink-page', dark.page)
+    root.setProperty('--accent-ink-page-rgb', rgbTriple(dark.page))
+    root.setProperty('--accent-ink-surface', dark.surface)
+    root.setProperty('--accent-ink-surface-rgb', rgbTriple(dark.surface))
+    root.setProperty('--accent-ink-surface-alt', dark.surfaceAlt)
+    root.setProperty('--accent-ink-hover', dark.hover)
+    root.setProperty('--accent-ink-chrome', dark.chrome)
+    root.setProperty('--accent-ink-border', dark.border)
+    root.setProperty('--accent-ink-border-rgb', rgbTriple(dark.border))
+    root.setProperty('--accent-ink-border-hover', dark.borderHover)
+    root.setProperty('--accent-ink-inset', dark.inset)
     document.documentElement.dataset.accent = t.key
   }
 

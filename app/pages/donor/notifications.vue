@@ -5,15 +5,21 @@
                 <h1 class="page-title">Notifications</h1>
                 <p class="page-subtitle">Updates about your screening, bookings and donations.</p>
             </div>
-            <button
-                type="button"
-                class="btn-outline"
-                :disabled="totalUnread === 0"
-                @click="markAllAsRead"
-            >
-                <AssetIcon name="check-check" :size="15" />
-                Mark all as read
-            </button>
+            <div class="header-actions">
+                <button
+                    type="button"
+                    class="btn-outline"
+                    :disabled="totalUnread === 0"
+                    @click="markAllAsRead"
+                >
+                    <AssetIcon name="check-check" :size="15" />
+                    Mark all as read
+                </button>
+                <!-- What arrives here, and by email, is chosen in Settings. -->
+                <NuxtLink to="/donor/settings#notifications" class="btn-icon" aria-label="Notification settings" title="Notification settings">
+                    <AssetIcon name="settings" :size="17" />
+                </NuxtLink>
+            </div>
         </div>
 
         <!-- Filters: pills, each with its unread count -->
@@ -68,7 +74,7 @@
                         :class="{ 'notif-row--unread': !notif.read }"
                     >
                         <div class="notif-row__icon" :class="`notif-row__icon--${notif.tone}`">
-                            <AssetIcon :name="notif.icon" :size="18" />
+                            <AssetIcon :name="notif.icon || CATEGORY_ICONS[notif.category] || 'bell'" :size="18" />
                         </div>
 
                         <div class="notif-row__body">
@@ -84,8 +90,14 @@
                         </div>
 
                         <div class="notif-row__side">
-                            <NuxtLink :to="notif.actionRoute" class="notif-row__action">
-                                {{ notif.actionLabel }}
+                            <!-- Some notices have nowhere to go (a call-us notice): no button then. -->
+                            <NuxtLink
+                                v-if="notif.actionRoute"
+                                :to="notif.actionRoute"
+                                class="notif-row__action"
+                                @click="openNotice(notif)"
+                            >
+                                {{ notif.actionLabel || 'Open' }}
                                 <AssetIcon name="arrow-right" :size="13" />
                             </NuxtLink>
                             <button
@@ -103,6 +115,14 @@
                     </article>
                 </div>
             </section>
+
+            <!-- The server pages the list, 20 at a time. -->
+            <div v-if="hasMore || loadMoreError" class="load-more">
+                <p v-if="loadMoreError" class="load-more__error" role="alert">{{ loadMoreError }}</p>
+                <button type="button" class="btn-outline" :disabled="loadingMore" @click="loadMore">
+                    {{ loadingMore ? 'Loading...' : loadMoreError ? 'Try again' : 'Show older notifications' }}
+                </button>
+            </div>
         </div>
     </div>
 </template>
@@ -136,6 +156,18 @@ const categoryLabels = {
 function categoryLabel(key) {
     return categoryLabels[key] ?? key
 }
+
+// When a notice names no icon of its own.
+const CATEGORY_ICONS = {
+    reminder: 'calendar-check',
+    donation: 'droplets',
+    screening: 'clipboard-list',
+    system: 'bell',
+}
+
+// The bell's badge in the layout reads the same count, so marking here
+// updates it at once.
+const unreadCount = useState('donor-unread-count', () => 0)
 
 const tabDefs = [
     { key: 'all', label: 'All', category: null },
@@ -200,8 +232,14 @@ const emptyStateMessage = computed(() => {
     return `No ${categoryLabel(activeTab.value).toLowerCase()} notifications yet.`
 })
 
+// Following a notice's button reads it, as opening a message would.
+function openNotice(notif) {
+    if (!notif.read) markAsRead(notif)
+}
+
 async function markAsRead(notif) {
     notif.read = true
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
     try {
         // PATCH /api/donors/notifications/{uuid}
         // Walay body ni: ang server mo-mark ra as read, dili siya mo-set og
@@ -210,12 +248,15 @@ async function markAsRead(notif) {
     } catch (err) {
         console.error('Failed to mark notification as read:', err)
         notif.read = false
+        unreadCount.value += 1
     }
 }
 
 async function markAllAsRead() {
     const previouslyUnread = notifications.value.filter(n => !n.read).map(n => n.id)
     notifications.value.forEach(n => { n.read = true })
+    const before = unreadCount.value
+    unreadCount.value = 0
     try {
         // POST /api/donors/notifications/mark-all-read
         await donorService.markAllNotificationsAsRead()
@@ -225,6 +266,54 @@ async function markAllAsRead() {
         notifications.value.forEach(n => {
             if (previouslyUnread.includes(n.id)) n.read = false
         })
+        unreadCount.value = before
+    }
+}
+
+function toNotice(n) {
+    return {
+        id: n.id,
+        category: n.category,
+        title: n.title,
+        desc: n.desc,
+        meta: n.meta,
+        icon: n.icon,
+        tone: n.tone,
+        read: n.read,
+        actionLabel: n.action_label,
+        actionRoute: n.action_route,
+        createdAt: n.created_at,
+    }
+}
+
+// Paging: the first page loads with the screen, older ones on request.
+const page = ref(1)
+const lastPage = ref(1)
+const loadingMore = ref(false)
+const loadMoreError = ref('')
+const hasMore = computed(() => page.value < lastPage.value)
+
+function applyPage(data) {
+    page.value = data?.meta?.page ?? 1
+    lastPage.value = data?.meta?.last_page ?? 1
+    loadMoreError.value = ''
+}
+
+async function loadMore() {
+    if (loadingMore.value) return
+    loadingMore.value = true
+    loadMoreError.value = ''
+    try {
+        const data = await donorService.notifications({ page: page.value + 1 })
+        const seen = new Set(notifications.value.map(n => n.id))
+        notifications.value.push(...(data?.notifications ?? []).map(toNotice).filter(n => !seen.has(n.id)))
+        page.value = data?.meta?.page ?? page.value + 1
+        lastPage.value = data?.meta?.last_page ?? lastPage.value
+    } catch (err) {
+        console.error('Failed to load older notifications:', err)
+        loadMoreError.value = 'Could not load older notifications.'
+    } finally {
+        loadingMore.value = false
     }
 }
 
@@ -242,19 +331,9 @@ async function load({ silent = false } = {}) {
         //   unread_count, meta: { page, per_page, total, last_page } }
         // Paginated (20 kada page); ang unang page ra ang gipakita karon.
         const data = await donorService.notifications()
-        notifications.value = (data?.notifications ?? []).map(n => ({
-            id: n.id,
-            category: n.category,
-            title: n.title,
-            desc: n.desc,
-            meta: n.meta,
-            icon: n.icon,
-            tone: n.tone,
-            read: n.read,
-            actionLabel: n.action_label,
-            actionRoute: n.action_route,
-            createdAt: n.created_at,
-        }))
+        notifications.value = (data?.notifications ?? []).map(toNotice)
+        applyPage(data)
+        if (typeof data?.unread_count === 'number') unreadCount.value = data.unread_count
     } catch (err) {
         console.error('Failed to load notifications:', err)
         notifications.value = []
@@ -277,12 +356,12 @@ onActivated(() => {
     --success: #2e7d32;
     --warning: #B45309;
     --text-primary: #1f2937;
-    --text-secondary: #94A3B8;
+    --text-secondary: #64748B;
     --border: #eef0f3;
-    /* Full-width background, with the list kept to a readable 960px. */
+    /* The same column and gutters as the other donor pages. */
     max-width: 1400px;
     margin: 0 auto;
-    padding: 24px max(32px, calc((100% - 960px) / 2)) 40px;
+    padding: 24px 32px 40px;
     display: flex;
     background: var(--rb-page-bg);
     flex-direction: column;
@@ -290,6 +369,23 @@ onActivated(() => {
 }
 
 .header-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    background: white;
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.btn-icon:hover { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.05); }
+.btn-icon:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.load-more { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.load-more__error { margin: 0; font-size: var(--rb-fs-caption); color: var(--accent); }
 .page-title { font-size: var(--rb-fs-title); font-weight: 700; color: var(--text-primary); margin: 0; }
 .page-subtitle { font-size: var(--rb-fs-small); color: var(--text-secondary); margin: 2px 0 0; }
 
@@ -567,7 +663,9 @@ onActivated(() => {
 
 :global(.dark .notifications-page .panel),
 :global(.dark .notifications-page .filter),
-:global(.dark .notifications-page .btn-outline) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+:global(.dark .notifications-page .btn-outline),
+:global(.dark .notifications-page .btn-icon) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+:global(.dark .notifications-page .btn-icon) { color: var(--ink-text-4, #E2E8F0); }
 :global(.dark .notifications-page .filter) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .notifications-page .filter--active) { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 :global(.dark .notifications-page .filter__count) { background: color-mix(in srgb, var(--rb-primary-text) 18%, transparent); }

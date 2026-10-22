@@ -40,36 +40,105 @@
               variables, so it changes the moment a swatch is picked.
             -->
             <section class="panel appearance-panel" aria-labelledby="appearance-title">
+                <!--
+                  Laid out like the browser's own Customize panel: a mode, then
+                  a colour, any colour, with a reset. Saved on this device.
+                -->
                 <div class="appearance-panel__pick">
                     <h2 id="appearance-title" class="panel-title">Appearance</h2>
-                    <p class="appearance__lead">Choose a colour for your portal. It applies to every RedAgos portal on this device.</p>
+                    <p class="appearance__lead">Make RedAgos yours. Saved on this device and used in every RedAgos portal.</p>
+
+                    <p class="appearance__label">Mode</p>
+                    <div class="modes" role="radiogroup" aria-label="Mode">
+                        <button
+                            v-for="m in MODES"
+                            :key="m.value"
+                            type="button"
+                            role="radio"
+                            class="mode"
+                            :class="{ 'mode--on': themeMode === m.value }"
+                            :aria-checked="themeMode === m.value"
+                            @click="setThemeMode(m.value)"
+                        >
+                            <span class="mode__art" :class="`mode__art--${m.value}`" aria-hidden="true">
+                                <span class="mode__bar" />
+                                <span class="mode__line" />
+                                <span class="mode__line mode__line--short" />
+                                <span class="mode__btn" />
+                            </span>
+                            <span class="mode__label">
+                                <AssetIcon :name="m.icon" :size="14" />
+                                {{ m.label }}
+                            </span>
+                        </button>
+                    </div>
+
+                    <p class="appearance__label">
+                        Color
+                        <span class="appearance__current">{{ hoveredColour || currentColourName }}</span>
+                    </p>
                     <div class="swatches" role="radiogroup" aria-label="Colour theme">
                         <button
-                            v-for="t in accentThemes"
+                            v-for="t in pickerSwatches"
                             :key="t.key"
                             type="button"
                             role="radio"
                             class="swatch"
                             :class="{ 'swatch--on': accentKey === t.key }"
                             :aria-checked="accentKey === t.key"
+                            :title="t.name"
                             @click="setAccent(t.key)"
+                            @mouseenter="hoveredColour = t.name"
+                            @mouseleave="hoveredColour = ''"
                         >
                             <span
                                 class="swatch__circle"
-                                :style="{ background: `linear-gradient(135deg, ${t.gradFrom}, ${t.gradTo})`, '--ring': t.primary }"
+                                :style="{ background: t.background, '--ring': t.primary }"
                             >
-                                <span class="swatch__dot" :style="{ background: t.primary }" />
-                                <span v-if="accentKey === t.key" class="swatch__check" :style="{ background: t.primary }">
+                                <span v-if="accentKey === t.key" class="swatch__check">
                                     <AssetIcon name="check" :size="12" />
                                 </span>
                             </span>
-                            <span class="swatch__name">{{ t.name }}</span>
+                            <span class="sr-only">{{ t.name }}</span>
                         </button>
+
+                        <!-- Any colour: the theme is made from it (utils/accentThemes.ts). -->
+                        <label
+                            class="swatch swatch--custom"
+                            :class="{ 'swatch--on': isCustom }"
+                            title="Custom colour"
+                            @mouseenter="hoveredColour = 'Custom'"
+                            @mouseleave="hoveredColour = ''"
+                        >
+                            <span
+                                class="swatch__circle"
+                                :style="isCustom
+                                    ? { background: swatchBackground(customTheme), '--ring': customTheme.primary }
+                                    : { '--ring': 'var(--rb-primary)' }"
+                            >
+                                <!-- Eyedropper: a colour of your own, as in the browser's picker. -->
+                                <AssetIcon v-if="!isCustom" name="pipette" :size="16" class="swatch__plus" />
+                                <span v-else class="swatch__check">
+                                    <AssetIcon name="check" :size="12" />
+                                </span>
+                            </span>
+                            <span class="sr-only">Custom colour</span>
+                            <input
+                                type="color"
+                                class="swatch__input"
+                                :value="customInputValue"
+                                aria-label="Pick a custom colour"
+                                @input="pickCustom($event.target.value)"
+                            >
+                        </label>
                     </div>
-                    <p class="appearance__note">
+
+                    <!-- A warning, not a block: red is the portal's alert and blood-type colour. -->
+                    <p v-if="customIsRed" class="appearance__warn" role="status">
                         <AssetIcon name="info" :size="13" />
-                        Saved on this device. Light, dark, or same as your browser: choose it in your account menu (top right).
+                        Red is also used for blood type and alerts, so buttons may be harder to tell apart.
                     </p>
+
                 </div>
 
                 <!-- A tiny dashboard in the picked theme -->
@@ -86,34 +155,91 @@
                     </div>
                     <p class="theme-preview__label">Preview</p>
                 </div>
+
+                <!-- Across the whole card: the note on the left, Reset in the bottom-right corner. -->
+                <div class="appearance__foot">
+                    <p class="appearance__note">
+                        <AssetIcon name="info" :size="13" />
+                        Buttons and links keep readable contrast with any colour you pick.
+                    </p>
+                    <button type="button" class="appearance__reset" :disabled="isDefaultAppearance" @click="resetAppearance">
+                        Reset to default
+                    </button>
+                </div>
             </section>
 
             <div class="main-grid">
                 <!-- Notification preferences -->
-                <section class="panel" aria-labelledby="notif-title">
+                <section id="notifications" class="panel" aria-labelledby="notif-title">
                     <div class="panel-header panel-header--simple">
                         <h2 id="notif-title" class="panel-title">Notifications</h2>
                         <p class="panel-sub">Choose what RedAgos tells you about.</p>
                     </div>
-                    <div class="toggle-list">
-                        <div v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
-                            <div class="toggle-row__text">
-                                <p :id="`pref-${pref.key}`" class="toggle-row__label">{{ pref.label }}</p>
-                                <p class="toggle-row__desc">{{ pref.desc }}</p>
+                    <!--
+                      Topics against channels. A switch is a choice the server
+                      keeps (DonorNotificationPreferences); "Always" marks a
+                      notice that can't be turned off, and a dash one that isn't
+                      sent on that channel.
+                    -->
+                    <div class="notif-grid" role="table" aria-label="Notification settings">
+                        <div class="notif-grid__head" role="row">
+                            <span role="columnheader" class="notif-grid__topic-head">Topic</span>
+                            <span role="columnheader" class="notif-grid__channel">
+                                <AssetIcon name="bell" :size="14" />
+                                In-app
+                            </span>
+                            <span role="columnheader" class="notif-grid__channel">
+                                <AssetIcon name="mail" :size="14" />
+                                Email
+                            </span>
+                        </div>
+                        <div v-for="topic in NOTIFICATION_TOPICS" :key="topic.key" class="notif-row" role="row">
+                            <div class="notif-row__text" role="rowheader">
+                                <p :id="`notif-${topic.key}`" class="notif-row__label">{{ topic.label }}</p>
+                                <p class="notif-row__desc">{{ topic.desc }}</p>
                             </div>
-                            <button
-                                type="button"
-                                class="toggle-switch"
-                                :class="{ 'toggle-switch--on': pref.enabled }"
-                                role="switch"
-                                :aria-checked="pref.enabled"
-                                :aria-labelledby="`pref-${pref.key}`"
-                                @click="pref.enabled = !pref.enabled"
+                            <div
+                                v-for="channel in ['inApp', 'email']"
+                                :key="channel"
+                                class="notif-row__cell"
+                                role="cell"
                             >
-                                <span class="toggle-switch__knob" />
-                            </button>
+                                <span
+                                    v-if="topic[channel] === 'always'"
+                                    class="notif-always"
+                                    :title="`${topic.label}: always on ${channel === 'email' ? 'by email' : 'in the app'}`"
+                                >
+                                    <AssetIcon name="lock" :size="12" />
+                                    Always
+                                </span>
+                                <span v-else-if="!topic[channel]" class="notif-none" :title="`Not sent ${channel === 'email' ? 'by email' : 'in the app'}`">
+                                    <span aria-hidden="true">&ndash;</span>
+                                    <span class="sr-only">Not sent</span>
+                                </span>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="toggle-switch"
+                                    :class="{ 'toggle-switch--on': prefs[topic[channel]] }"
+                                    role="switch"
+                                    :aria-checked="prefs[topic[channel]]"
+                                    :aria-label="`${topic.label}, ${channel === 'email' ? 'email' : 'in-app'}`"
+                                    :disabled="channel === 'email' && !profile.email"
+                                    @click="prefs[topic[channel]] = !prefs[topic[channel]]"
+                                >
+                                    <span class="toggle-switch__knob" />
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    <p class="notif-email">
+                        <AssetIcon name="mail" :size="13" />
+                        <template v-if="profile.email">
+                            Emails go to <strong>{{ profile.email }}</strong><template v-if="emailUnverified">, which isn't verified yet</template>.
+                        </template>
+                        <template v-else>No email on file, so these come to you in the app only.</template>
+                    </p>
                     <div class="panel-footer">
                         <p class="status-note" :class="{ 'status-note--error': notifsError, 'status-note--ok': notifsSaved && !notifsError }" aria-live="polite">
                             <template v-if="notifsError">{{ notifsError }}</template>
@@ -286,6 +412,8 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorService } from '~/api/donor/DonorService'
 import { useUser } from '~/composables/useUser'
 import { useAccentTheme } from '~/composables/useAccentTheme'
+import { useDarkMode } from '~/composables/useDarkMode'
+import { CUSTOM_PREFIX, DEFAULT_ACCENT, PICKER_THEMES, accentSurfaces, accentTheme, isReddish } from '~/utils/accentThemes'
 
 
 const router = useRouter()
@@ -294,7 +422,53 @@ const { clearUser, logout } = useUser()
 const loading = ref(true)
 
 // Colour theme (Appearance card). The layout has already applied the saved one.
-const { current: accentKey, themes: accentThemes, set: setAccent } = useAccentTheme()
+const { current: accentKey, set: setAccent } = useAccentTheme()
+
+// Light, dark, or as the device is set: the same choice as the account menu.
+const { isDark, themeMode, setThemeMode } = useDarkMode()
+
+/*
+ * Each swatch shows the theme as it will look in the current mode, like the
+ * browser's picker: the bar on top, the button colour bottom-left and the
+ * page bottom-right. In light mode the bar is drawn in the theme's tint, as
+ * the real one is nearly white and every swatch would look the same.
+ */
+function swatchBackground(t) {
+    const surfaces = accentSurfaces(t)
+    const top = isDark.value ? surfaces.dark.chrome : t.gradFrom
+    const page = isDark.value ? surfaces.dark.page : surfaces.light.canvas
+    return `linear-gradient(${top} 0 50%, transparent 50%), linear-gradient(90deg, ${t.primary} 0 50%, ${page} 50% 100%)`
+}
+const pickerSwatches = computed(() => PICKER_THEMES.map(t => ({ ...t, background: swatchBackground(t) })))
+const MODES = [
+    { value: 'light', label: 'Light', icon: 'sun' },
+    { value: 'dark', label: 'Dark', icon: 'moon' },
+    { value: 'system', label: 'Device', icon: 'monitor' },
+]
+
+// A custom colour lives in the same saved key, as `custom:#RRGGBB`.
+const isCustom = computed(() => String(accentKey.value).startsWith(CUSTOM_PREFIX))
+const customTheme = computed(() => accentTheme(accentKey.value))
+const currentColourName = computed(() => (isCustom.value ? 'Custom' : accentTheme(accentKey.value).name))
+// The picker opens on the colour in use (an <input type=color> wants lowercase #rrggbb).
+const customInputValue = computed(() =>
+    (isCustom.value ? accentKey.value.slice(CUSTOM_PREFIX.length) : accentTheme(accentKey.value).primary).toLowerCase())
+
+// The name above the grid follows the pointer, then falls back to the pick.
+const hoveredColour = ref('')
+
+const customIsRed = computed(() => isCustom.value && isReddish(accentKey.value.slice(CUSTOM_PREFIX.length)))
+
+function pickCustom(hex) {
+    if (/^#[0-9a-f]{6}$/i.test(hex)) setAccent(`${CUSTOM_PREFIX}${hex}`)
+}
+
+const isDefaultAppearance = computed(() => accentKey.value === DEFAULT_ACCENT && themeMode.value === 'system')
+
+function resetAppearance() {
+    setAccent(DEFAULT_ACCENT)
+    setThemeMode('system')
+}
 
 const profile = reactive({
     fullName: '',
@@ -316,12 +490,30 @@ const security = reactive({
     confirmPassword: '',
 })
 
-const notificationPrefs = reactive([
-    { key: 'appointment_reminders', label: 'Appointment reminders', desc: 'Get notified before your scheduled donation.', enabled: true },
-    { key: 'eligibility_renewal', label: 'Eligibility renewal', desc: 'Reminder when your screening is about to expire.', enabled: true },
-    { key: 'nearby_drives', label: 'Nearby donation drives', desc: 'Alerts for mobile blood drives near you.', enabled: false },
-    { key: 'email_updates', label: 'Email updates', desc: 'News and updates from the blood center.', enabled: false },
-])
+/*
+ * What the server sends a donor, by topic and channel. A string names the
+ * switch it keeps (app/Support/DonorNotificationPreferences.php on the
+ * server); 'always' can't be turned off; null isn't sent on that channel.
+ */
+const NOTIFICATION_TOPICS = [
+    { key: 'appointments', label: 'Appointments', desc: 'Booking confirmations, and a reminder the day before when your health questions open.', inApp: 'always', email: 'appointments_email' },
+    { key: 'results', label: 'Donation results', desc: 'When a donation is recorded, or if you need to wait before giving again.', inApp: 'always', email: 'results_email' },
+    { key: 'eligibility', label: 'Eligibility reminders', desc: 'An email from your blood center when you can donate again.', inApp: null, email: 'eligibility_renewal' },
+    { key: 'drives', label: 'Blood drives', desc: 'When a blood center you have visited schedules a drive.', inApp: 'drives_in_app', email: 'drives_email' },
+    { key: 'account', label: 'Account and security', desc: 'ID checks and password resets. Requests to contact your blood center come in the app only.', inApp: 'always', email: 'always' },
+]
+
+// The server's defaults, until the profile loads.
+const prefs = reactive({
+    appointments_email: true,
+    results_email: true,
+    eligibility_renewal: true,
+    drives_in_app: true,
+    drives_email: false,
+})
+
+const { user } = useUser()
+const emailUnverified = computed(() => user.value != null && !user.value.email_verified)
 const deletePassword = ref('')
 const deleteError = ref('')
 
@@ -400,7 +592,7 @@ async function saveNotifications() {
     try {
         // Backend contract: PATCH /api/donor/notification-preferences
         // Body: { appointment_reminders, eligibility_renewal, nearby_drives, email_updates }
-        await donorService.updateNotificationPreferences(Object.fromEntries(notificationPrefs.map(p => [p.key, p.enabled])))
+        await donorService.updateNotificationPreferences({ ...prefs })
         notifsSaved.value = true
         formSnapshot = snapshotForm()
     } catch (err) {
@@ -455,7 +647,7 @@ let formSnapshot = ''
 
 const snapshotForm = () => JSON.stringify({
     profile: { ...profile },
-    prefs: notificationPrefs.map(pref => pref.enabled),
+    prefs: { ...prefs },
 })
 
 async function load({ silent = false } = {}) {
@@ -471,11 +663,9 @@ async function load({ silent = false } = {}) {
         applyProfile(data)
 
         if (data?.notification_preferences) {
-            notificationPrefs.forEach(pref => {
-                if (pref.key in data.notification_preferences) {
-                    pref.enabled = !!data.notification_preferences[pref.key]
-                }
-            })
+            for (const key of Object.keys(prefs)) {
+                if (key in data.notification_preferences) prefs[key] = !!data.notification_preferences[key]
+            }
         }
 
         formSnapshot = snapshotForm()
@@ -487,9 +677,22 @@ async function load({ silent = false } = {}) {
     }
 }
 
-onMounted(() => load())
+// A link to a section (the notifications page's gear goes to #notifications)
+// lands before the skeleton gives way, so the scroll waits for the content.
+const settingsRoute = useRoute()
+async function scrollToHash() {
+    const id = settingsRoute.hash?.slice(1)
+    if (!id) return
+    await nextTick()
+    document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
+onMounted(() => load().then(scrollToHash))
 onActivated(() => {
-    if (loadedOnce) load({ silent: true })
+    if (loadedOnce) {
+        load({ silent: true })
+        scrollToHash()
+    }
 })
 
 function applyProfile(data) {
@@ -607,6 +810,9 @@ function applyProfile(data) {
     gap: 20px;
 }
 
+/* Clear of the fixed top bar when a link scrolls to a section. */
+#notifications { scroll-margin-top: 84px; }
+
 .panel {
     background: white;
     border-radius: 14px;
@@ -645,40 +851,139 @@ function applyProfile(data) {
 }
 .swatch__circle {
     position: relative;
-    width: 52px;
-    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
     transition: transform 150ms ease, box-shadow 150ms ease;
 }
 .swatch:hover .swatch__circle { transform: scale(1.06); }
 .swatch--on .swatch__circle {
     box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--ring);
 }
-/* The button colour this theme uses, as a small dot. */
-.swatch__dot {
-    position: absolute;
-    left: 50%;
-    bottom: -3px;
-    width: 14px;
-    height: 14px;
-    transform: translateX(-50%);
-    border-radius: 50%;
-    box-shadow: 0 0 0 2px #fff;
-}
 .swatch__check {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    background: rgba(15, 23, 42, 0.55);
     color: #fff;
-    box-shadow: 0 0 0 2px #fff;
 }
+
+/* ── Mode ── */
+.appearance__label {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 18px 0 10px;
+    font-size: var(--rb-fs-small);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.appearance__current { font-size: var(--rb-fs-caption); font-weight: 600; color: var(--text-secondary); }
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 460px; }
+.mode {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--rb-border);
+    border-radius: 14px;
+    background: var(--rb-surface);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.mode:hover { border-color: var(--rb-border-hover, #CBD5E1); }
+.mode--on { border-color: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.18); }
+.mode:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+/* A tiny window in each mode; Device is split down the middle. */
+.mode__art {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    height: 64px;
+    padding: 8px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: #F5F6F8;
+}
+.mode__art--dark { background: #1D2636; }
+.mode__art--system { background: linear-gradient(90deg, #F5F6F8 0 50%, #1D2636 50% 100%); }
+.mode__bar { height: 8px; border-radius: 4px; background: #FFFFFF; box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06); }
+.mode__art--dark .mode__bar { background: #333C4D; box-shadow: none; }
+.mode__art--system .mode__bar { background: linear-gradient(90deg, #FFFFFF 0 50%, #333C4D 50% 100%); }
+.mode__line { width: 70%; height: 5px; border-radius: 3px; background: rgba(15, 23, 42, 0.18); }
+.mode__line--short { width: 45%; }
+.mode__art--dark .mode__line { background: rgba(238, 241, 245, 0.25); }
+.mode__btn { width: 34%; height: 9px; margin-top: auto; border-radius: 999px; background: var(--rb-primary); }
+.mode__label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: var(--rb-fs-small);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.mode--on .mode__label { color: var(--rb-primary-text); font-weight: 700; }
+
+/* ── Custom colour ── */
+.swatch--custom .swatch__circle {
+    background: conic-gradient(#EF4444, #F59E0B, #EAB308, #22C55E, #06B6D4, #3B82F6, #8B5CF6, #EC4899, #EF4444);
+}
+.swatch__plus { padding: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); color: #0F172A; }
+.swatch--custom { position: relative; }
+/* The native picker sits invisibly over the circle, so a click opens it. */
+.swatch__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.swatch--custom:focus-within .swatch__circle { outline: 2px solid var(--rb-primary); outline-offset: 3px; }
+
+.appearance__warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 14px 0 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #FFF8E1;
+    color: #8A5A00;
+    font-size: var(--rb-fs-caption);
+    line-height: 1.4;
+}
+.appearance__warn :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+html.dark .appearance__warn { background: rgba(255, 193, 7, 0.12); color: #FFD54F; }
+.appearance__foot {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rb-border);
+}
+.appearance__foot .appearance__note { margin: 0; }
+.appearance__reset {
+    margin-left: auto; /* stays in the corner when it wraps under the note */
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--rb-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--rb-fs-small);
+    font-weight: 600;
+    cursor: pointer;
+}
+.appearance__reset:hover:not(:disabled) { background: var(--rb-surface-hover, #F1F5F9); }
+.appearance__reset:disabled { opacity: 0.5; cursor: default; }
 .swatch__name {
     font-size: var(--rb-fs-caption);
     font-weight: 600;
@@ -840,6 +1145,54 @@ function applyProfile(data) {
     font-weight: 600;
     color: var(--success);
 }
+
+/* Notifications: topics against channels */
+.notif-grid { padding: 4px 20px 0; }
+.notif-grid__head,
+.notif-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 64px 64px;
+    align-items: center;
+    gap: 8px;
+}
+.notif-grid__head {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rb-border);
+    font-size: var(--rb-fs-caption);
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+.notif-grid__topic-head { visibility: hidden; }
+.notif-grid__channel { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.notif-row { padding: 12px 0; border-bottom: 1px solid var(--rb-border); }
+.notif-row:last-child { border-bottom: 0; }
+.notif-row__label { margin: 0; font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); }
+.notif-row__desc { margin: 3px 0 0; font-size: var(--rb-fs-caption); line-height: 1.4; color: var(--text-secondary); }
+.notif-row__cell { display: flex; justify-content: center; }
+.notif-row__cell .toggle-switch { margin-top: 0; }
+.notif-row__cell .toggle-switch:disabled { opacity: 0.45; cursor: not-allowed; }
+.notif-always {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--rb-surface-hover, #F1F5F9);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.notif-none { color: var(--text-secondary); opacity: 0.7; }
+.notif-email {
+    margin: 4px 20px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--rb-surface-hover, #F1F5F9);
+    font-size: var(--rb-fs-caption);
+    color: var(--text-secondary);
+}
+.notif-email :deep(svg) { display: inline-block; margin-right: 4px; vertical-align: -2px; }
+.notif-email strong { color: var(--text-primary); font-weight: 600; word-break: break-all; }
 
 /* Notification toggles */
 .toggle-list {
@@ -1219,7 +1572,7 @@ function applyProfile(data) {
 }
 
 .appearance-panel .appearance__lead { margin: 4px 0 18px; }
-.appearance-panel .swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.appearance-panel .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
 
 .theme-preview {
     position: relative;
