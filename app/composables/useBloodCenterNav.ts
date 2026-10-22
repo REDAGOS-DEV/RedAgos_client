@@ -139,6 +139,11 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // (donations.view, held by every role there and no one else).
       { label: 'Center Dashboard', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall center overview' },
       { label: 'Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
+      // Testing's own (project owner, 2026-10-22). lab.record_serology, as on
+      // the server: it splits results by marker, which Processing never sees.
+      { label: 'Dashboard', path: '/blood-center/testing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_serology', keywords: 'home testing laboratory lab bench queue serology typing reactive verify turnaround referrals trend' },
+      // Processing's own (project owner, 2026-10-22): the department that records breakdowns.
+      { label: 'Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
       { label: 'Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
     ],
   },
@@ -165,10 +170,10 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'Testing',
     items: [
-      // One page, two views: each department's queue is its own link, gated
-      // on that department's write, so a role holding one sees only its own.
-      { label: 'Immunohematology', path: '/blood-center/testing?test=typing', icon: 'droplets', requires: 'lab.record_immunohematology', keywords: 'lab laboratory testing immunohematology typing abo rh forward reverse antibody screen barcode sticker' },
-      { label: 'Serology (TTI)', path: '/blood-center/testing?test=serology', icon: 'flask-conical', requires: 'lab.record_serology', keywords: 'lab laboratory testing tti serology hiv hbsag hcv syphilis vdrl malaria barcode sticker queue record' },
+      // Serology and Immunohematology share one link (project owner,
+      // 2026-10-22); they were a link each. The page opens on the test its
+      // holder records, and someone who records both switches views there.
+      { label: 'Blood Testing', path: '/blood-center/testing', icon: 'flask-conical', requires: TESTING_ABILITIES, keywords: 'lab laboratory testing immunohematology typing abo rh forward reverse antibody screen tti serology hiv hbsag hcv syphilis vdrl malaria barcode sticker queue record' },
       // Their own pages (project owner, 2026-10-18; they were tabs on the
       // Testing page). The badge on each counts what waits for its holder.
       { label: 'Serology Results', path: '/blood-center/serology-results', icon: 'clipboard-list', badge: 'verification', requires: 'lab.record_serology', keywords: 'tti serology results list reactive non-reactive export csv verify verification correction hiv hbsag hcv syphilis malaria' },

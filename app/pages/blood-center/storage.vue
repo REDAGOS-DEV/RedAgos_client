@@ -14,7 +14,7 @@
     <!-- ============ HEADLINE LEVELS ============ -->
     <section class="kpis" aria-label="Stock at a glance" :aria-busy="loading">
       <template v-if="loading">
-        <div v-for="n in 4" :key="n" class="kpi skeleton" />
+        <div v-for="n in 3" :key="n" class="kpi skeleton" />
       </template>
       <template v-else>
         <component
@@ -106,7 +106,7 @@
           <span class="tcard__code">{{ card.label }}</span>
           <span class="tcard__value">{{ formatCount(card.available) }}</span>
 
-          <!-- The shelf in its four parts; the counts below carry the numbers. -->
+          <!-- The shelf in its three parts; the counts below carry the numbers. -->
           <span class="tcard__bar" aria-hidden="true">
             <span
               v-for="seg in card.segments.filter((s) => s.count > 0)"
@@ -436,13 +436,8 @@ const kpis = computed(() => {
       caption: 'Allocated to requests', icon: 'package', to: canRelease.value ? '/blood-center/fulfillment' : null,
       change: stockWeekChange(trend.value, 'reserved'), spark: sparkFor('reserved'),
     },
-    {
-      // Booked in but not yet cleared by testing. Released, with their final
-      // labels, at Stock Intake.
-      key: 'quarantine', label: 'In Quarantine', value: totals?.quarantined ?? null,
-      caption: 'Awaiting testing clearance', icon: 'shield-check', to: '/blood-center/inventory-intake',
-      change: stockWeekChange(trend.value, 'quarantined'), spark: sparkFor('quarantined'),
-    },
+    // No "In Quarantine" card (project owner, 2026-10-22): bags reach
+    // Issuance cleared and labelled, so nothing waits in quarantine here.
   ]
 })
 
@@ -451,7 +446,6 @@ const SEGMENTS = [
   { key: 'fresh', label: 'Available' },
   { key: 'expiring', label: 'Expiring (≤7 days)' },
   { key: 'reserved', label: 'Reserved' },
-  { key: 'quarantined', label: 'In quarantine' },
 ]
 
 const SEGMENT_LABEL = Object.fromEntries(SEGMENTS.map((segment) => [segment.key, segment.label]))
@@ -642,7 +636,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
    the app's.
 
    Colour:
-   - The four shelf parts (available, expiring, reserved, in quarantine) are
+   - The three shelf parts (available, expiring, reserved) are
      categorical slots validated together for colour-blind separation on the
      light (#FFFFFF) and dark navy (#1E293B) surfaces. A headline card is
      neutral: its part's colour is on the sparkline's line alone, never on
@@ -668,7 +662,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   --seg-fresh: #1baf7a;
   --seg-expiring: #eda100;
   --seg-reserved: #e87ba4;
-  --seg-quarantined: #2a78d6;
 
   font-family: var(--rb-font-sans);
   max-width: var(--rb-content-max, 1600px);
@@ -694,7 +687,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   --seg-fresh: #199e70;
   --seg-expiring: #c98500;
   --seg-reserved: #d55181;
-  --seg-quarantined: #3987e5;
   color-scheme: dark;
 }
 
@@ -718,7 +710,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 .seg--fresh { --seg: var(--seg-fresh); }
 .seg--expiring { --seg: var(--seg-expiring); }
 .seg--reserved { --seg: var(--seg-reserved); }
-.seg--quarantined { --seg: var(--seg-quarantined); }
 
 /* ---------- header ---------- */
 .iss__header {
@@ -781,7 +772,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 /* ---------- headline cards ---------- */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -807,7 +798,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 .kpi--available { --kpi-mark: var(--seg-fresh); }
 .kpi--expiring { --kpi-mark: var(--seg-expiring); }
 .kpi--reserved { --kpi-mark: var(--seg-reserved); }
-.kpi--quarantine { --kpi-mark: var(--seg-quarantined); }
 
 .kpi--link:hover { border-color: var(--rb-border-hover); background: var(--rb-surface-hover); }
 .kpi--link:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
@@ -974,12 +964,11 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 
 .tcard__seg { flex-basis: 0; min-width: 3px; background: var(--seg); }
 
-/* Two by two on a narrow card, so the four never break unevenly; one row
-   once the card has room for it. */
+/* The three counts in one row, tighter on a narrow card. */
 .tcard__counts {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
-  gap: 3px 12px;
+  grid-template-columns: repeat(3, max-content);
+  gap: 3px 8px;
   font-size: 11.5px;
   color: var(--rb-text-secondary);
   font-variant-numeric: tabular-nums;
@@ -1167,8 +1156,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
    - Requests, releases and the chart share a row only where the table keeps
      its four columns without squeezing From to a stub; below that the table
      takes the full width and the other two pair up.
-   - Eight type cards stay in a row while each is wide enough for its counts
-     two by two; then four, then two. */
+   - Eight type cards stay in a row while each is wide enough for its three
+     counts; then four, then two. */
 @container issuance (max-width: 1299px) {
   .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .row > :first-child { grid-column: 1 / -1; }
@@ -1178,8 +1167,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   .types { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-@container issuance (max-width: 979px) {
+@container issuance (max-width: 819px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Three cards: the last takes the row, so none is left half-empty. */
+  .kpis > :last-child { grid-column: 1 / -1; }
 }
 
 @container issuance (max-width: 699px) {
@@ -1188,6 +1179,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 
 @container issuance (max-width: 579px) {
   .kpis { grid-template-columns: 1fr; }
+  .kpis > :last-child { grid-column: auto; }
   .types { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .panel__aside { align-items: flex-start; }
   .legend { justify-content: flex-start; }

@@ -194,7 +194,7 @@ describe('page gutters', () => {
     'appointments', 'bloodrequests', 'donation', 'dashboard', 'donors',
     'drives', 'fulfillment', 'inventory', 'reports', 'settings', 'staff',
     'laboratory', 'testing', 'stock-report', 'corrections', 'serology-results', 'counselling-referrals',
-    'processed', 'storage',
+    'processed', 'storage', 'testing-dashboard', 'processing-dashboard',
   ]
 
   for (const page of PAGES) {

@@ -266,30 +266,12 @@
             </button>
           </div>
 
-          <div v-if="selectedRows.length" class="bulk-bar" role="status">
-            <span>{{ selectedRows.length }} unit{{ selectedRows.length === 1 ? '' : 's' }} selected</span>
-            <button type="button" class="btn-outline btn-outline--sm" @click="openPrintLabels(selectedRows)">
-              <AssetIcon name="printer" :size="13" />
-              Print labels
-            </button>
-            <button type="button" class="link-btn" @click="selected = {}">Clear selection</button>
-          </div>
-
           <p v-if="unitsError" class="list-error" role="alert">{{ unitsError }}</p>
 
           <div class="table-wrap" :class="{ 'table-wrap--busy': unitsLoading }" :aria-busy="unitsLoading">
             <table v-if="unitRows.length" class="unit-table">
               <thead>
                 <tr>
-                  <th v-if="canPrintLabels" class="check-col">
-                    <input
-                      type="checkbox"
-                      :checked="allOnPageSelected"
-                      :indeterminate.prop="someOnPageSelected"
-                      aria-label="Select every unit on this page"
-                      @change="toggleAllOnPage"
-                    />
-                  </th>
                   <th>Unit ID</th>
                   <th>Blood Type</th>
                   <th>Component</th>
@@ -317,20 +299,12 @@
                   v-for="(row, index) in unitRows"
                   :key="row.id"
                   class="unit-row"
-                  :class="{ 'unit-row--selected': selected[row.id] }"
+                 
                   tabindex="0"
                   :aria-label="`${row.id}, ${row.blood_type} ${row.component}, ${row.tag.label}. Open details`"
                   @click="openDetails(row)"
                   @keydown.enter.self="openDetails(row)"
                 >
-                  <td v-if="canPrintLabels" class="check-col" @click.stop>
-                    <input
-                      type="checkbox"
-                      :checked="Boolean(selected[row.id])"
-                      :aria-label="`Select unit ${row.id}`"
-                      @change="toggleSelected(row)"
-                    />
-                  </td>
                   <td class="mono">{{ row.id }}</td>
                   <td><span class="type-text">{{ displayType(row.blood_type) }}</span></td>
                   <td class="wrap-cell">{{ row.component }}</td>
@@ -376,9 +350,6 @@
                         </button>
                         <button v-else-if="canRequestUnitCorrection && isEditable(row)" type="button" role="menuitem" class="row-menu__item" @click="rowAction('edit', row)">
                           <AssetIcon name="pencil" :size="13" /> Request correction
-                        </button>
-                        <button v-if="canPrintLabels && isPrintable(row)" type="button" role="menuitem" class="row-menu__item" @click="rowAction('print', row)">
-                          <AssetIcon name="printer" :size="13" /> Print label
                         </button>
                         <template v-if="canDiscardUnits && isDiscardable(row)">
                           <div class="row-menu__divider" />
@@ -468,11 +439,6 @@
           </ol>
         </aside>
       </div>
-
-      <!-- ============ QUARANTINE ============ -->
-      <!-- Booked in, not yet cleared. Read-only here: bags are released, and
-           given their final labels, at Stock Intake. -->
-      <BloodCenterQuarantinePanel />
     </div>
 
     <!-- ============ UNIT DETAILS DRAWER ============ -->
@@ -547,9 +513,6 @@
             <footer v-if="drawerActions" class="detail-drawer__footer">
               <button v-if="canChangeUnit && isEditable(drawerUnit)" type="button" class="btn-outline" @click="fromDrawer('edit')">
                 <AssetIcon name="pencil" :size="14" /> {{ canEditUnit ? 'Edit Unit' : 'Request Correction' }}
-              </button>
-              <button v-if="canPrintLabels && isPrintable(drawerUnit)" type="button" class="btn-outline" @click="fromDrawer('print')">
-                <AssetIcon name="printer" :size="14" /> Print Label
               </button>
               <button v-if="canDiscardUnits && isDiscardable(drawerUnit)" type="button" class="btn-outline btn-outline--danger" @click="fromDrawer('discard')">
                 <AssetIcon name="trash-2" :size="14" /> Discard
@@ -704,60 +667,6 @@
       </Transition>
     </Teleport>
 
-    <!-- ============ REPRINT LABELS MODAL ============ -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="printModalOpen" class="modal-overlay inv-tones" @click.self="closePrintLabelsModal">
-          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="print-title" v-focus-trap @dialog-escape="closePrintLabelsModal">
-            <button type="button" class="modal-close" aria-label="Close" @click="closePrintLabelsModal">
-              <AssetIcon name="x" :size="16" />
-            </button>
-
-            <h3 id="print-title" class="modal-title">Reprint Final Labels</h3>
-            <p class="modal-subtitle">
-              For released bags whose label was spoiled or lost. Bags get their first final label at Stock Intake, when
-              they leave quarantine.
-            </p>
-            <p v-if="printError" class="print-error" role="alert">{{ printError }}</p>
-            <p v-if="unprintableCount" class="print-note">
-              {{ unprintableCount }} selected unit{{ unprintableCount === 1 ? ' has' : 's have' }} no final label to reprint
-              (in quarantine, issued, expired or discarded) and {{ unprintableCount === 1 ? 'is' : 'are' }} left out.
-            </p>
-
-            <div v-if="!printableTargets.length" class="empty-state">
-              <AssetIcon name="printer" :size="32" />
-              <p>None of these units has a final label to reprint.</p>
-            </div>
-
-            <template v-else>
-              <div class="print-batch-list">
-                <label v-for="b in printableTargets" :key="b.id" class="print-batch-row">
-                  <input type="checkbox" :checked="printSelectedIds.includes(b.id)" @change="togglePrintSelection(b)" />
-                  <span class="print-batch-row__info">
-                    <span class="print-batch-row__title">{{ b.id }} &middot; {{ displayType(b.blood_type) }} {{ b.component }}</span>
-                    <span class="print-batch-row__meta">Collected {{ formatLongDate(b.collected_at) }} &middot; Expires {{ formatLongDate(b.expiry_date) }}</span>
-                  </span>
-                </label>
-              </div>
-
-              <div class="modal-actions">
-                <button
-                  type="button"
-                  class="btn-primary modal-actions__btn"
-                  :disabled="!printSelectedIds.length || printSubmitting"
-                  @click="submitPrintLabels"
-                >
-                  <AssetIcon name="printer" :size="15" />
-                  {{ printSubmitting ? 'Preparing…' : 'Print final labels' }}
-                </button>
-                <button type="button" class="btn-outline modal-actions__btn" :disabled="printSubmitting" @click="closePrintLabelsModal">Cancel</button>
-              </div>
-            </template>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
     <!-- Says what an action did, or why it did nothing. -->
     <Teleport to="body">
       <Transition name="modal-fade">
@@ -781,21 +690,16 @@
       @submitted="onUnitCorrectionSent"
     />
 
-    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
-import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, resolveComponent } from 'vue'
 import { useUser } from '~/composables/useUser'
-import { useLabelPrint } from '~/composables/useLabelPrint'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { finalLabelsFrom } from '~/utils/bagLabels'
 import { typeHealthByCode } from '~/utils/stockThreshold'
 import {
   activityKindMeta,
@@ -831,9 +735,8 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || user
 const canEditUnit = computed(() => can('inventory.update'))
 const canRequestUnitCorrection = computed(() => !canEditUnit.value && can('corrections.request') && canFile('unit_details'))
 const canChangeUnit = computed(() => canEditUnit.value || canRequestUnitCorrection.value)
-// Booking stock in and reprinting final labels are both Issuance's.
+// Booking stock in is Issuance's. Final labels are Processing's (2026-10-22).
 const canRegisterUnits = computed(() => can('inventory.create'))
-const canPrintLabels = computed(() => can('inventory.create'))
 const canDiscardUnits = computed(() => can('inventory.discard'))
 const canSeeFulfillment = computed(() => can('requests.release'))
 
@@ -1188,33 +1091,8 @@ function showStatusInList(status) {
   scrollToList()
 }
 
-// --- Selection (for reprinting labels in bulk) ---
-const selected = ref({})
-const selectedRows = computed(() => Object.values(selected.value))
-const allOnPageSelected = computed(() => units.value.length > 0 && units.value.every((row) => selected.value[row.id]))
-const someOnPageSelected = computed(() => !allOnPageSelected.value && units.value.some((row) => selected.value[row.id]))
-
-function toggleSelected(row) {
-  const next = { ...selected.value }
-  if (next[row.id]) delete next[row.id]
-  else next[row.id] = row
-  selected.value = next
-}
-
-function toggleAllOnPage() {
-  const next = { ...selected.value }
-  const selectAll = !allOnPageSelected.value
-  for (const row of units.value) {
-    if (selectAll) next[row.id] = row
-    else delete next[row.id]
-  }
-  selected.value = next
-}
-
 // --- What can be done to a unit ---
 const isEditable = (row) => !['issued', 'discarded'].includes(row?.status)
-// A final label exists only for a bag released from quarantine and still here.
-const isPrintable = (row) => Boolean(row?.donation_id) && ['available', 'reserved'].includes(row?.status)
 // A unit held for a request is given up through Request Fulfillment, not here.
 const isDiscardable = (row) => ['available', 'expired', 'quarantined'].includes(row?.status)
 
@@ -1228,7 +1106,6 @@ function rowAction(action, row) {
   openMenuId.value = null
   if (action === 'view') openDetails(row)
   else if (action === 'edit') openEditBatchModal(row)
-  else if (action === 'print') openPrintLabels([row])
   else if (action === 'discard') openDiscard(row)
 }
 
@@ -1252,7 +1129,6 @@ const drawerActions = computed(() => {
   const unit = drawerUnit.value
   if (!unit) return false
   return (canChangeUnit.value && isEditable(unit))
-    || (canPrintLabels.value && isPrintable(unit))
     || (canDiscardUnits.value && isDiscardable(unit))
 })
 
@@ -1452,76 +1328,6 @@ async function submitDiscard() {
   }
 }
 
-// --- Reprint final labels ---
-//
-// The same final label Stock Intake prints on release, from the same server
-// data, so a reprint can never say more than the original: verified blood type,
-// expiry, clearance codes, who released it. Released bags only — the server
-// refuses a bag still in quarantine — and never donor information.
-const printModalOpen = ref(false)
-const printTargets = ref([])
-const printSelectedIds = ref([])
-const printSubmitting = ref(false)
-const printError = ref(null)
-const printableTargets = computed(() => printTargets.value.filter(isPrintable))
-const unprintableCount = computed(() => printTargets.value.length - printableTargets.value.length)
-const { print: printLabels } = useLabelPrint()
-
-function openPrintLabels(rows) {
-  printTargets.value = rows
-  printSelectedIds.value = rows.filter(isPrintable).map((row) => row.id)
-  printError.value = null
-  printModalOpen.value = true
-}
-
-function closePrintLabelsModal() {
-  if (printSubmitting.value) return
-  printModalOpen.value = false
-}
-
-function togglePrintSelection(row) {
-  const idx = printSelectedIds.value.indexOf(row.id)
-  if (idx === -1) printSelectedIds.value.push(row.id)
-  else printSelectedIds.value.splice(idx, 1)
-}
-
-async function submitPrintLabels() {
-  if (!printSelectedIds.value.length) return
-  printSubmitting.value = true
-  printError.value = null
-  try {
-    // Label data is per donation, so fetch each selected bag's donation once.
-    const donationIds = [...new Set(printTargets.value
-      .filter((row) => printSelectedIds.value.includes(row.id))
-      .map((row) => row.donation_id)
-      .filter(Boolean))]
-
-    const labels = []
-
-    for (const donationId of donationIds) {
-      const data = await bloodCenterService.bloodLabels(donationId)
-      labels.push(...finalLabelsFrom(data, printSelectedIds.value))
-    }
-
-    if (!labels.length) {
-      printError.value = 'None of the selected bags has a final label to print.'
-      return
-    }
-
-    // Close the modal first, so only the label sheet is on the page to print.
-    printModalOpen.value = false
-    selected.value = {}
-    await nextTick()
-    await printLabels(labels, 'final')
-  } catch (err) {
-    printError.value = err?.status === 403 || err?.statusCode === 403
-      ? 'Only Issuance prints final labels.'
-      : err?.data?.message || err?.message || 'The labels could not be prepared.'
-  } finally {
-    printSubmitting.value = false
-  }
-}
-
 // --- Toast ---
 const notice = ref('')
 let noticeTimer = null
@@ -1611,8 +1417,8 @@ onBeforeUnmount(() => {
 
    Both modes read the app's own tokens, so dark mode has the sidebar's navy
    surfaces (project owner, 2026-10-19; the page had a charcoal palette of
-   its own), and the children it hosts (the quarantine panel, the threshold
-   banner) follow without being edited. Dark mode lifts only the page's
+   its own), and the child it hosts (the threshold banner) follows without
+   being edited. Dark mode lifts only the page's
    state colours and row dividers, on this page's root.
    Teleported dialogs carry the class too. The dark selector sits whole
    inside :global(): Vue compiles `:global(.dark) .x` to plain `.dark`, which
@@ -1909,11 +1715,6 @@ onBeforeUnmount(() => {
 .clear-btn:hover:not(:disabled) { background: var(--inv-hover); }
 .clear-btn:disabled { color: var(--inv-faint); cursor: default; }
 
-.bulk-bar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 18px 12px; padding: 8px 12px; border-radius: 8px;
-  background: var(--inv-elevated); border: 1px solid var(--inv-border);
-  font-size: 12.5px; font-weight: 500; color: var(--inv-text);
-}
 .list-error { margin: 0 18px 12px; font-size: 12.5px; color: var(--inv-crit); }
 
 .table-wrap { position: relative; overflow-x: auto; flex: 1; transition: opacity 0.15s ease; }
@@ -1926,10 +1727,8 @@ onBeforeUnmount(() => {
 .unit-table tbody td { padding: 10px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); white-space: nowrap; vertical-align: middle; }
 .unit-table .wrap-cell { white-space: normal; min-width: 120px; }
 .unit-row { cursor: pointer; transition: background 0.12s ease; }
-.unit-row:hover, .unit-row--selected { background: var(--inv-hover); }
+.unit-row:hover { background: var(--inv-hover); }
 .unit-row:focus-visible { outline-offset: -2px; }
-.check-col { width: 34px; padding-left: 14px !important; }
-.check-col input { width: 15px; height: 15px; accent-color: var(--inv-muted); cursor: pointer; }
 .actions-col { width: 44px; text-align: right; }
 .mono { font-family: var(--rb-font-mono); font-size: 11.5px; }
 .num { font-variant-numeric: tabular-nums; }
@@ -2007,14 +1806,6 @@ onBeforeUnmount(() => {
 .inv-page :deep(.low-banner__chip--more) { color: var(--inv-muted); }
 .inv-page :deep(.low-banner__chip--more::before) { display: none; }
 .inv-page :deep(.low-banner__link) { color: var(--inv-text); font-weight: 500; }
-.inv-page :deep(.quarantine) { border-color: var(--inv-border); border-radius: 12px; }
-.inv-page :deep(.quarantine__title) { font-weight: 600; }
-.inv-page :deep(.quarantine__count) { background: var(--inv-elevated); border: 1px solid var(--inv-border); color: var(--inv-text); }
-.inv-page :deep(.quarantine__row) { background: var(--inv-surface); }
-.inv-page :deep(.chip--done) { background: transparent; border-color: var(--inv-border); color: var(--inv-ok); }
-.inv-page :deep(.chip--alarm) { background: transparent; border-color: var(--inv-border); color: var(--inv-crit); }
-.inv-page :deep(.quarantine__alert) { background: var(--inv-elevated); color: var(--inv-text); }
-.inv-page :deep(.quarantine__alert--error) { color: var(--inv-crit); }
 
 /* Drawers */
 .drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.5); }
@@ -2084,15 +1875,6 @@ onBeforeUnmount(() => {
 .form-field__textarea { resize: vertical; min-height: 72px; }
 .form-error { font-size: 12px; color: var(--inv-crit); margin: -4px 0 0; }
 
-.print-error { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; border: 1px solid var(--inv-border); color: var(--inv-crit); }
-.print-note { margin: 0 0 12px; font-size: 12px; color: var(--inv-muted); }
-.print-batch-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 16px; }
-.print-batch-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--inv-border); cursor: pointer; }
-.print-batch-row:hover { background: var(--inv-hover); }
-.print-batch-row input { accent-color: var(--inv-muted); }
-.print-batch-row__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.print-batch-row__title { font-size: 12.5px; font-weight: 500; color: var(--inv-text); }
-.print-batch-row__meta { font-size: 11px; color: var(--inv-muted); }
 
 .inventory-toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1100;

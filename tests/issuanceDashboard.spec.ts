@@ -29,7 +29,7 @@ function source(relative: string): string {
 }
 
 function point(date: string, levels: Partial<StockTrendPoint> = {}): StockTrendPoint {
-  return { date, available: 0, expiring_soon: 0, reserved: 0, quarantined: 0, ...levels }
+  return { date, available: 0, expiring_soon: 0, reserved: 0, ...levels }
 }
 
 describe('stockWeekChange', () => {
@@ -45,14 +45,14 @@ describe('stockWeekChange', () => {
 
   it('reads flat when nothing moved', () => {
     const trend = [point('2026-10-12'), point('2026-10-19')]
-    expect(stockWeekChange(trend, 'quarantined')).toEqual({ direction: 'flat', text: '0%' })
+    expect(stockWeekChange(trend, 'reserved')).toEqual({ direction: 'flat', text: '0%' })
   })
 
   it('counts units instead of a percentage of nothing', () => {
-    const one = [point('2026-10-12'), point('2026-10-19', { quarantined: 1 })]
-    const many = [point('2026-10-12'), point('2026-10-19', { quarantined: 5 })]
-    expect(stockWeekChange(one, 'quarantined')).toEqual({ direction: 'up', text: '+1 unit' })
-    expect(stockWeekChange(many, 'quarantined')).toEqual({ direction: 'up', text: '+5 units' })
+    const one = [point('2026-10-12'), point('2026-10-19', { reserved: 1 })]
+    const many = [point('2026-10-12'), point('2026-10-19', { reserved: 5 })]
+    expect(stockWeekChange(one, 'reserved')).toEqual({ direction: 'up', text: '+1 unit' })
+    expect(stockWeekChange(many, 'reserved')).toEqual({ direction: 'up', text: '+5 units' })
   })
 
   it('never rounds a real change away', () => {
@@ -99,7 +99,7 @@ describe('stockSparkline', () => {
 
 describe('stockTypeCards', () => {
   it('gives every blood type a card, in the usual order, even with no stock', () => {
-    const cards = stockTypeCards([{ code: 'O-', available: 4, expiring_soon: 0, reserved: 0, quarantined: 0 }])
+    const cards = stockTypeCards([{ code: 'O-', available: 4, expiring_soon: 0, reserved: 0 }])
 
     expect(cards.map((card) => card.code)).toEqual(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
     expect(cards[0]!.available).toBe(0)
@@ -107,21 +107,20 @@ describe('stockTypeCards', () => {
   })
 
   it('splits the shelf into parts that add up, expiring units taken out of available', () => {
-    const [card] = stockTypeCards([{ code: 'A+', available: 337, expiring_soon: 10, reserved: 5, quarantined: 2 }])
+    const [card] = stockTypeCards([{ code: 'A+', available: 337, expiring_soon: 10, reserved: 5 }])
 
     expect(card!.available).toBe(337)
     expect(card!.segments).toEqual([
       { key: 'fresh', count: 327 },
       { key: 'expiring', count: 10 },
       { key: 'reserved', count: 5 },
-      { key: 'quarantined', count: 2 },
     ])
-    expect(card!.onShelf).toBe(344)
+    expect(card!.onShelf).toBe(342)
     expect(card!.segments.reduce((sum, s) => sum + s.count, 0)).toBe(card!.onShelf)
   })
 
   it('keeps a type it does not know about, after the eight', () => {
-    const cards = stockTypeCards([{ code: 'Bombay', available: 1, expiring_soon: 0, reserved: 0, quarantined: 0 }])
+    const cards = stockTypeCards([{ code: 'Bombay', available: 1, expiring_soon: 0, reserved: 0 }])
     expect(cards.at(-1)!.code).toBe('Bombay')
   })
 })
@@ -192,6 +191,12 @@ describe('the page', () => {
   it('reads the week\'s trend and the shelf by type from the summary', () => {
     expect(page).toContain('summary.value?.trend')
     expect(page).toContain('summary.value?.stock_by_blood_type')
+  })
+
+  it('shows no quarantine, since nothing reaches Issuance uncleared (project owner, 2026-10-22)', () => {
+    expect(page).not.toContain("label: 'In Quarantine'")
+    expect(page).not.toContain('quarantined')
+    expect(page).toContain('<div v-for="n in 3" :key="n" class="kpi skeleton" />')
   })
 
   it('keeps its dark palette on its own root', () => {

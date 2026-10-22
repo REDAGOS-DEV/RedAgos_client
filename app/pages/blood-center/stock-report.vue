@@ -102,22 +102,26 @@
       <!-- A print preview: white paper whatever the theme, because this is what prints. -->
       <div class="canvas">
       <article ref="sheetEl" class="sheet paper" :class="{ 'sheet--flash': flashSoon }" aria-label="Daily Blood Stock Inventory">
+        <!--
+          The seal and the logo run from the first header line down to the
+          title (project owner, 2026-10-22), so the title sits in the head's
+          middle column, under the lines.
+        -->
         <div class="sheet__head">
-          <div class="sheet__logo">
-            <img v-if="sealVisible" :src="SEAL_SRC" alt="Department of Health" @error="sealVisible = false" >
+          <div class="sheet__logo sheet__logo--seal">
+            <img v-if="sealSrc" :src="sealSrc" :alt="ownSealFailed || !report.facility.seal_url ? 'Department of Health' : report.facility.name" @error="onSealError" >
           </div>
           <div class="sheet__lines">
             <p v-for="line in report.header" :key="line">{{ line }}</p>
             <p class="sheet__facility">{{ report.facility.name }}</p>
           </div>
-          <div class="sheet__logo">
+          <div class="sheet__logo sheet__logo--own">
             <img v-if="report.facility.logo_url" :src="report.facility.logo_url" :alt="report.facility.name" >
           </div>
+          <h2 class="sheet__title">
+            Daily Blood Stock Inventory as of {{ report.as_of_date }} at {{ report.as_of_time }}
+          </h2>
         </div>
-
-        <h2 class="sheet__title">
-          Daily Blood Stock Inventory as of {{ report.as_of_date }} at {{ report.as_of_time }}
-        </h2>
         <p class="sheet__legend">
           Issuable units only (available, not past expiry). Components with a shelf life of
           {{ report.reference.shelf_life_days }} days or less are listed by expiry date.&#32;<template
@@ -315,6 +319,23 @@ const error = ref('')
 // to exist; until it is supplied, the header simply goes without it.
 const SEAL_SRC = '/images/doh-seal.png'
 const sealVisible = ref(true)
+
+// The left-hand logo: the centre's own when the Admin uploaded one in
+// Settings (project owner, 2026-10-22), else the DOH seal. One that fails to
+// load falls back to the seal, and then to nothing.
+const ownSealFailed = ref(false)
+const sealSrc = computed(() => {
+  const own = report.value?.facility?.seal_url
+
+  if (own && !ownSealFailed.value) return own
+
+  return sealVisible.value ? SEAL_SRC : null
+})
+
+function onSealError() {
+  if (report.value?.facility?.seal_url && !ownSealFailed.value) ownSealFailed.value = true
+  else sealVisible.value = false
+}
 
 async function load() {
   loading.value = true
@@ -541,21 +562,28 @@ onMounted(load)
   background: var(--rb-surface);
 }
 
+/* Two rows, the header lines and the title, with a logo either side of both. */
 .sheet__head {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  gap: 0.75rem;
+  grid-template-columns: 120px minmax(0, 1fr) 120px;
+  grid-template-rows: auto auto;
+  column-gap: 0.75rem;
+  row-gap: 0.9rem;
 }
 
-.sheet__logo { display: grid; place-items: center; height: 64px; }
-.sheet__logo img { max-width: 64px; max-height: 64px; object-fit: contain; }
+/* The box is the two rows' height; the image fills it whatever its own size. */
+.sheet__logo { position: relative; grid-row: 1 / span 2; }
+.sheet__logo--seal { grid-column: 1; }
+.sheet__logo--own { grid-column: 3; }
+.sheet__logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
-.sheet__lines { text-align: center; }
+.sheet__lines { grid-column: 2; grid-row: 1; text-align: center; }
 .sheet__lines p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--rb-text-primary); }
 .sheet__lines .sheet__facility { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 
 .sheet__title {
+  grid-column: 2;
+  grid-row: 2;
   margin: 0;
   text-align: center;
   font-size: 16px;
@@ -669,8 +697,7 @@ onMounted(load)
 @media (max-width: 640px) {
   .stock { padding: 16px 16px 32px; }
   .sheet { padding: 0.9rem; }
-  .sheet__head { grid-template-columns: 48px minmax(0, 1fr) 48px; }
-  .sheet__logo img { max-width: 44px; max-height: 44px; }
+  .sheet__head { grid-template-columns: 56px minmax(0, 1fr) 56px; column-gap: 0.5rem; }
 }
 
 /* The shared header; the "As of" stamp sits with its actions. */

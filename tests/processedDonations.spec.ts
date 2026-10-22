@@ -209,7 +209,7 @@ describe('Component Processing after the move', () => {
 
   it('still rejects a unit that cannot be separated', () => {
     expect(page).toContain("status: 'rejected',")
-    expect(page).toMatch(/v-if="!hasComponents && canUpdateStatus"[\s\S]{0,200}Cannot be processed\?/)
+    expect(page).toMatch(/v-if="!hasComponents && canUpdateStatus && !isFinal"[\s\S]{0,300}Cannot process this unit\?/)
   })
 
   it('shows a saved breakdown read-only, viewed or edited on the Processed list', () => {

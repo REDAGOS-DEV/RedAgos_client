@@ -115,7 +115,8 @@
                 <span class="person__avatar" aria-hidden="true">{{ initials(row.full_name) }}</span>
                 <div class="person__text">
                   <p class="cell-strong">
-                    {{ row.full_name }}
+                    <!-- As it prints on what they sign: "Rowena Tan, RMT". -->
+                    {{ row.signature_name || row.full_name }}
                     <span v-if="row.management_level" class="pill" :class="`pill--${row.management_level}`">
                       {{ row.management_level === 'admin' ? 'Admin' : 'Supervisor' }}
                     </span>
@@ -133,7 +134,6 @@
                 </p>
               </template>
               <p v-else class="cell-strong">{{ row.management_level ? 'Management' : 'No role yet' }}</p>
-              <p v-if="row.position" class="cell-sub">{{ row.position }}</p>
             </td>
             <td>
               <!-- A level is not capped by privileges; they cap a role, and this account has none. -->
@@ -258,17 +258,22 @@
                 </label>
               </div>
 
-              <!-- Title: pick RMT or RN, or type any other. A label only. -->
+              <!--
+                Title: credentials only (RMT, RN, MD), printed after the name on
+                everything the person signs, in every department, the stock
+                report's "BY:" line included. No job post: the role says what
+                they do (project owner, 2026-10-22).
+              -->
               <div class="form__field">
                 <label for="staff-title" class="form__label">Title <i>optional</i></label>
                 <ComboInput
                   id="staff-title"
-                  v-model="form.position"
-                  :options="titles"
-                  maxlength="100"
+                  v-model="form.credentials"
+                  :options="credentialOptions"
+                  maxlength="40"
                   placeholder="Choose or type, e.g. RMT"
                 />
-                <em v-if="errors.position">{{ errors.position[0] }}</em>
+                <em v-if="errors.credentials">{{ errors.credentials[0] }}</em>
               </div>
             </section>
 
@@ -423,7 +428,8 @@ const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
 const departments = ref([])
 const levels = ref([])
 const privileges = ref([])
-const titles = ref(['RMT', 'RN'])
+// Suggested credentials; the server's catalogue may list others.
+const credentialOptions = ref(['RMT', 'RN', 'MD'])
 const catalogueError = ref('')
 
 const departmentRoles = computed(() => departments.value.find((group) => group.department === form.department)?.roles ?? [])
@@ -466,7 +472,7 @@ async function loadCatalogue() {
     departments.value = response?.data?.departments ?? []
     levels.value = response?.data?.levels ?? []
     privileges.value = response?.data?.privileges ?? []
-    if (response?.data?.titles?.length) titles.value = response.data.titles
+    if (response?.data?.titles?.length) credentialOptions.value = response.data.titles
   } catch (error) {
     catalogueError.value = error?.message || 'Could not load the list of roles.'
   }
@@ -549,7 +555,7 @@ const bannerKind = ref('success')
 function blankForm() {
   return {
     first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
-    phone: '', employee_id: '', position: '', department: '',
+    phone: '', employee_id: '', credentials: '', department: '',
     roles: [], main_role: '', custom_role: '',
     staff_privileges: [...PRIVILEGE_ORDER], management_level: '',
     account_status: 'active',
@@ -609,7 +615,7 @@ function openEdit(row) {
   Object.assign(form, {
     phone: row.phone || '',
     employee_id: row.employee_id || '',
-    position: row.position || '',
+    credentials: row.credentials || '',
     department: row.department || '',
     roles: [...(row.staff_roles ?? (row.staff_role ? [row.staff_role] : []))],
     main_role: row.staff_role || '',
@@ -631,7 +637,7 @@ async function submit() {
       const payload = {
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position.trim() || null,
+        credentials: form.credentials.trim() || null,
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],
@@ -662,7 +668,7 @@ async function submit() {
         ...fields,
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position.trim() || null,
+        credentials: form.credentials.trim() || null,
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],

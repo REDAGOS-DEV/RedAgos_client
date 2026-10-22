@@ -9,10 +9,10 @@ import { phlebotomyProblems } from '~/utils/phlebotomy'
  * Two-phase bag labelling and the donation barcode sticker.
  *
  * Locked in: a Phase 1 (base) label never carries a blood type or a clearance;
- * the final label prints only what the server returned for released bags; a
- * bare date is never shifted a day; the barcode refuses what a bag number
- * cannot hold; and release plus final labelling live at Stock Intake, with
- * Blood Inventory showing quarantine read-only.
+ * the final label prints only what the server returned; a bare date is never
+ * shifted a day; the barcode refuses what a bag number cannot hold; and both
+ * labels are Processing's (final labels since 2026-10-22, project owner):
+ * Stock Intake and Blood Inventory print none.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -88,21 +88,22 @@ describe('Phase 1 — the base label Processing prints', () => {
   })
 })
 
-describe('Phase 2 — the final label Issuance prints on release', () => {
+describe('Phase 2 — the final label Processing prints before the hand-over', () => {
   const payload = {
     donation_barcode: '1234567',
+    collected_on: '2026-09-28',
     facility: 'Sub-National Blood Center - Mindanao',
     clearances: [
       { label: 'TTI cleared', code: 'TTI-000012', issued_at: '2026-09-28T09:00:00+08:00', issued_by: 'Ben Cruz' },
       { label: 'ABO/Rh cleared', code: 'IH-000013', issued_at: '2026-09-28T10:00:00+08:00', issued_by: 'Ben Cruz' },
     ],
     units: [
-      { unit_id: '1234567-PRBC', blood_type: 'O+', component: 'Packed RBC', volume_ml: 250, expiry_date: '2026-11-09', released_at: '2026-09-29T08:00:00+08:00', released_by: 'Ana Reyes' },
-      { unit_id: '1234567-FFP', blood_type: 'O+', component: 'Fresh Frozen Plasma', volume_ml: 220, expiry_date: '2027-09-28', released_at: '2026-09-29T08:00:00+08:00', released_by: 'Ana Reyes' },
+      { unit_id: '1234567-PRBC', blood_type: 'O+', component: 'Packed RBC', volume_ml: 250, expiry_date: '2026-11-09', labelled_at: '2026-09-29T08:00:00+08:00', labelled_by: 'Lea Navarro' },
+      { unit_id: '1234567-FFP', blood_type: 'O+', component: 'Fresh Frozen Plasma', volume_ml: 220, expiry_date: '2027-09-28', labelled_at: '2026-09-29T08:00:00+08:00', labelled_by: 'Lea Navarro' },
     ],
   }
 
-  it('carries the verified type, expiry, clearance codes and who released it', () => {
+  it('carries the verified type, expiry, clearance codes and who labelled it', () => {
     const [prbc] = finalLabelsFrom(payload)
 
     expect(prbc).toMatchObject({
@@ -110,7 +111,8 @@ describe('Phase 2 — the final label Issuance prints on release', () => {
       abo: 'O',
       rh: 'Rh POSITIVE',
       expiry: '9 Nov 2026',
-      released: 'Released 29 Sep 2026 by Ana Reyes',
+      collected: '28 Sep 2026',
+      labelled: 'Labelled 29 Sep 2026 by Lea Navarro',
       facility: 'Sub-National Blood Center - Mindanao',
     })
     expect(prbc!.clearances).toEqual([
@@ -161,19 +163,24 @@ describe('the printed label', () => {
 })
 
 describe('where labelling happens', () => {
-  it('releases and prints final labels at Stock Intake', () => {
-    const intake = source('app/pages/blood-center/inventory-intake.vue')
+  it('prints final labels in Processing, never at Issuance (project owner, 2026-10-22)', () => {
+    const processed = source('app/pages/blood-center/processed.vue')
+    const bench = source('app/pages/blood-center/laboratory.vue')
 
-    expect(intake).toContain('<BloodCenterQuarantinePanel allow-release @released="onReleased"')
-    expect(intake).toContain("print(printable, 'final')")
-    expect(intake).toContain('<BloodCenterBagLabelSheet')
+    expect(processed).toContain('bloodCenterService.printFinalLabels(row.donation_id)')
+    expect(processed).toContain("printLabelSheet(labels, 'final')")
+    expect(processed).toContain('<BloodCenterBagLabelSheet />')
+    expect(bench).toContain('service.printFinalLabels(id)')
+
+    // Stock Intake books labelled bags in; it prints nothing.
+    const intake = source('app/pages/blood-center/inventory-intake.vue')
+    expect(intake).not.toContain('<BloodCenterBagLabelSheet')
+    expect(intake).not.toContain("'final')")
+    expect(source('app/pages/blood-center/inventory.vue')).not.toContain('<BloodCenterBagLabelSheet')
   })
 
-  it('shows quarantine read-only on Blood Inventory', () => {
-    const inventory = source('app/pages/blood-center/inventory.vue')
-
-    expect(inventory).toContain('<BloodCenterQuarantinePanel />')
-    expect(inventory).not.toContain('allow-release')
+  it('books bags in with the expiry on the final label', () => {
+    expect(source('app/pages/blood-center/inventory-intake.vue')).toContain('row.expiry_date = component.expiry_date')
   })
 
   it('keeps Processing to the base label and the hand-over', () => {
@@ -187,22 +194,26 @@ describe('where labelling happens', () => {
     expect(source('app/pages/blood-center/processed.vue')).toContain('Hand over to Issuance')
   })
 
-  it('books a numbered bag without sending a unit number', () => {
+  it('books only numbered bags, and never sends a unit number', () => {
     const intake = source('app/pages/blood-center/inventory-intake.vue')
 
-    expect(intake).toContain('...(!row.bag_number && row.unit_id?.trim() ? { unit_id: row.unit_id.trim() } : {})')
+    // No bag is entered by hand (project owner, 2026-10-22): a donation that
+    // can be booked in is labelled, so its bags are numbered.
+    expect(intake).not.toContain('unit_id')
+    expect(intake).not.toContain('addUnitRow')
+    expect(intake).toContain('if (!row.into_stock || !barcoded.value) return')
   })
 })
 
 describe('endpoints', () => {
-  it('reads final label data from the inventory namespace', async () => {
+  it('prints final labels through the laboratory namespace, as a POST', async () => {
     fetchMock.mockResolvedValueOnce({ units: [] })
-    await bloodCenterService.bloodLabels(42)
+    await bloodCenterService.printFinalLabels(42)
 
     const [url, config] = fetchMock.mock.calls[0]!
 
-    expect(url).toBe('/blood-center/inventory/donations/42/labels')
-    expect(config.method).toBe('GET')
+    expect(url).toBe('/blood-center/laboratory/donations/42/labels')
+    expect(config.method).toBe('POST')
   })
 
   it('finds a donation at Stock Intake by its sticker', async () => {

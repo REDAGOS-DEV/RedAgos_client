@@ -73,9 +73,16 @@
                   <p class="wb__caption">PRODUCT</p>
                   <p class="bag-label__product">{{ label.component }}</p>
                 </div>
-                <div v-if="label.volume_ml" class="wb__fact">
-                  <p class="wb__caption">VOLUME</p>
-                  <p class="wb__value">{{ label.volume_ml }} mL</p>
+                <!-- Volume and the day it was drawn share a row, so the label keeps its size. -->
+                <div v-if="label.volume_ml || label.collected" class="wb__pair">
+                  <div v-if="label.volume_ml" class="wb__fact">
+                    <p class="wb__caption">VOLUME</p>
+                    <p class="wb__value">{{ label.volume_ml }} mL</p>
+                  </div>
+                  <div v-if="label.collected" class="wb__fact">
+                    <p class="wb__caption">COLLECTED</p>
+                    <p class="wb__value">{{ label.collected }}</p>
+                  </div>
                 </div>
                 <div class="wb__fact wb__fact--expiry">
                   <p class="wb__caption">EXPIRES</p>
@@ -92,7 +99,7 @@
             </section>
 
             <footer class="wb__foot">
-              <span>{{ label.released || 'Released for issue' }}</span>
+              <span>{{ label.labelled || 'Labelled for issue' }}</span>
               <span>Printed {{ printedOn }}</span>
             </footer>
           </div>
@@ -273,6 +280,13 @@ const printedOn = computed(() => (sheet.value.labels.length ? labelDate(new Date
 
   .wb__fact:last-child { border-bottom: 0; }
   .wb__fact--expiry { background: #000; color: #fff; }
+
+  /* Two facts side by side: the volume as wide as it needs, the date the rest. */
+  .wb__pair { display: flex; border-bottom: 0.3mm solid #000; }
+  .wb__pair .wb__fact { flex: 0 0 auto; border-bottom: 0; }
+  .wb__pair .wb__fact:last-child { flex: 1 1 auto; min-width: 0; }
+  .wb__pair .wb__fact + .wb__fact { border-left: 0.3mm solid #000; }
+  .wb__pair .wb__value { white-space: nowrap; }
 
   .bag-label__expiry { font-size: 14pt; font-weight: 800; white-space: nowrap; }
 
