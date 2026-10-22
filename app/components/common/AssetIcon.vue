@@ -21,9 +21,7 @@ import ban from '~/assets/icons/ban.svg?raw'
 import barChart from '~/assets/icons/bar-chart.svg?raw'
 import bell from '~/assets/icons/bell.svg?raw'
 import bloodDrop from '~/assets/icons/blood-drop.svg?raw'
-import bloodDropSmile from '~/assets/icons/blood-drop-smile.svg?raw'
 import bolt from '~/assets/icons/bolt.svg?raw'
-import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
 import briefcase from '~/assets/icons/briefcase.svg?raw'
 import building2 from '~/assets/icons/building-2.svg?raw'
@@ -48,9 +46,7 @@ import clipboardCheck from '~/assets/icons/clipboard-check.svg?raw'
 import clipboardList from '~/assets/icons/clipboard-list.svg?raw'
 import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
-import cloudUpload from '~/assets/icons/cloud-upload.svg?raw'
 import creditCard from '~/assets/icons/credit-card.svg?raw'
-import database from '~/assets/icons/database.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
 import drawerSlide from '~/assets/icons/drawer-slide.svg?raw'
 import dropletOff from '~/assets/icons/droplet-off.svg?raw'
@@ -65,9 +61,7 @@ import flag from '~/assets/icons/flag.svg?raw'
 import flaskConical from '~/assets/icons/flask-conical.svg?raw'
 import folder from '~/assets/icons/folder.svg?raw'
 import folderOpen from '~/assets/icons/folder-open.svg?raw'
-import chevronsLeft from '~/assets/icons/chevrons-left.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
-import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import helpCircle from '~/assets/icons/help-circle.svg?raw'
 import history from '~/assets/icons/history.svg?raw'
 import hospital from '~/assets/icons/hospital.svg?raw'
@@ -85,7 +79,6 @@ import logIn from '~/assets/icons/log-in.svg?raw'
 import logOut from '~/assets/icons/log-out.svg?raw'
 import mail from '~/assets/icons/mail.svg?raw'
 import mapPin from '~/assets/icons/map-pin.svg?raw'
-import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import menu from '~/assets/icons/menu.svg?raw'
 import monitor from '~/assets/icons/monitor.svg?raw'
 import moon from '~/assets/icons/moon.svg?raw'
@@ -102,7 +95,6 @@ import philippinePeso from '~/assets/icons/philippine-peso.svg?raw'
 import plus from '~/assets/icons/plus.svg?raw'
 import printer from '~/assets/icons/printer.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
-import quote from '~/assets/icons/quote.svg?raw'
 import receipt from '~/assets/icons/receipt.svg?raw'
 import refreshCw from '~/assets/icons/refresh-cw.svg?raw'
 import route from '~/assets/icons/route.svg?raw'
@@ -114,10 +106,8 @@ import settings from '~/assets/icons/settings.svg?raw'
 import share from '~/assets/icons/share.svg?raw'
 import shield from '~/assets/icons/shield.svg?raw'
 import shieldCheck from '~/assets/icons/shield-check.svg?raw'
-import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import slidersHorizontal from '~/assets/icons/sliders-horizontal.svg?raw'
 import smartphone from '~/assets/icons/smartphone.svg?raw'
-import smile from '~/assets/icons/smile.svg?raw'
 import triangleAlert from '~/assets/icons/triangle-alert.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
 import pill from '~/assets/icons/pill.svg?raw'
@@ -151,9 +141,7 @@ const icons = {
   'bar-chart': barChart,
   bell,
   'blood-drop': bloodDrop,
-  'blood-drop-smile': bloodDropSmile,
   bolt,
-  'bolt-fill': boltFill,
   box,
   briefcase,
   'building-2': building2,
@@ -180,9 +168,7 @@ const icons = {
   'clipboard-check': clipboardCheck,
   'clipboard-list': clipboardList,
   clock,
-  'cloud-upload': cloudUpload,
   'credit-card': creditCard,
-  database,
   'dollar-sign': dollarSign,
   'drawer-slide': drawerSlide,
   'droplet-off': dropletOff,
@@ -197,9 +183,7 @@ const icons = {
   'flask-conical': flaskConical,
   folder,
   'folder-open': folderOpen,
-  'chevrons-left': chevronsLeft,
   heart,
-  'heart-fill': heartFill,
   'help-circle': helpCircle,
   history,
   hospital,
@@ -217,7 +201,6 @@ const icons = {
   'log-out': logOut,
   mail,
   'map-pin': mapPin,
-  'map-pin-simple': mapPinSimple,
   menu,
   monitor,
   moon,
@@ -234,7 +217,6 @@ const icons = {
   plus,
   printer,
   'qr-code': qrCode,
-  quote,
   receipt,
   'refresh-cw': refreshCw,
   route,
@@ -246,10 +228,8 @@ const icons = {
   share,
   shield,
   'shield-check': shieldCheck,
-  'shield-plus': shieldPlus,
   'sliders-horizontal': slidersHorizontal,
   smartphone,
-  smile,
   pill,
   plane,
   stethoscope,
