@@ -556,6 +556,50 @@
                 <div v-if="profile.notes" class="fact fact--full"><dt>Notes</dt><dd class="fact__notes">{{ profile.notes }}</dd></div>
               </dl>
 
+              <!-- The app sign-in the desk gives a walk-in donor. On screen only, never printed. -->
+              <section v-if="!profile.restricted" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="smartphone" :size="14" />
+                  App Sign-In
+                </h3>
+
+                <div class="signin-status">
+                  <span class="badge" :class="`badge--${profile.signIn.tone}`">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ profile.signIn.label }}
+                  </span>
+                  <span class="sub-section__note">{{ profile.signIn.note }}</span>
+                </div>
+
+                <template v-if="canManage && profile.signIn.canIssue">
+                  <div v-if="signInView.confirming" class="signin-confirm">
+                    <p class="modal-hint">
+                      This replaces the old password and signs {{ profile.firstName }} out of the app.
+                    </p>
+                    <div class="signin-confirm__actions">
+                      <button type="button" class="btn-outline btn-outline--sm" :disabled="signInView.issuing" @click="signInView.confirming = false">
+                        Cancel
+                      </button>
+                      <button type="button" class="btn-outline btn-outline--sm btn-outline--accent" :disabled="signInView.issuing" @click="giveSignIn(profile)">
+                        <AssetIcon name="refresh-cw" :size="13" />
+                        {{ signInView.issuing ? 'Giving…' : 'Give New Password' }}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn-outline btn-outline--sm signin-give"
+                    :disabled="signInView.issuing"
+                    @click="profile.signIn.issued ? (signInView.confirming = true) : giveSignIn(profile)"
+                  >
+                    <AssetIcon :name="profile.signIn.issued ? 'refresh-cw' : 'log-in'" :size="13" />
+                    {{ signInView.issuing ? 'Giving…' : (profile.signIn.issued ? 'Give New Password' : 'Give Sign-In') }}
+                  </button>
+                </template>
+                <p v-if="signInView.error" class="form-error" role="alert">{{ signInView.error }}</p>
+              </section>
+
               <!-- The history carries deferral reasons and final results: the physician's alone. -->
               <section v-if="!profile.restricted" class="sub-section">
                 <h3 class="sub-section__title">
@@ -624,6 +668,66 @@
 
           <div class="modal-card__footer">
             <button type="button" class="btn-outline" @click="closeProfile">Close</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ============ APP SIGN-IN, shown once ============ -->
+    <!-- No backdrop click and no Escape: closing it is the last sight of the password. -->
+    <Transition name="modal">
+      <div v-if="credentials" class="modal-overlay modal-overlay--top">
+        <div class="modal-card modal-card--sm" role="dialog" aria-modal="true" aria-labelledby="credentials-title">
+          <div class="modal-card__header">
+            <h2 id="credentials-title" class="modal-card__title">
+              <AssetIcon name="smartphone" :size="17" />
+              App Sign-In
+            </h2>
+          </div>
+
+          <div class="modal-card__body">
+            <p class="modal-text">
+              <template v-if="credentials.registered"><strong>{{ credentials.name }}</strong> has been registered. </template>
+              Tell {{ credentials.registered ? 'them' : credentials.name }} these to sign in to the RedAgos app:
+            </p>
+
+            <dl class="credentials">
+              <div class="credential">
+                <dt>Donor code</dt>
+                <dd>
+                  <span class="credential__value">{{ credentials.donorCode }}</span>
+                  <button type="button" class="copy-btn" aria-label="Copy donor code" @click="copyCredential('code', credentials.donorCode)">
+                    <AssetIcon :name="credentials.copied === 'code' ? 'check' : 'clipboard'" :size="14" />
+                    {{ credentials.copied === 'code' ? 'Copied' : 'Copy' }}
+                  </button>
+                </dd>
+              </div>
+              <div v-if="credentials.email" class="credential">
+                <dt>Or email</dt>
+                <dd>
+                  <span class="credential__value credential__value--email">{{ credentials.email }}</span>
+                </dd>
+              </div>
+              <div class="credential credential--key">
+                <dt>Temporary password</dt>
+                <dd>
+                  <span class="credential__value credential__value--key">{{ credentials.password }}</span>
+                  <button type="button" class="copy-btn" aria-label="Copy temporary password" @click="copyCredential('password', credentials.password)">
+                    <AssetIcon :name="credentials.copied === 'password' ? 'check' : 'clipboard'" :size="14" />
+                    {{ credentials.copied === 'password' ? 'Copied' : 'Copy' }}
+                  </button>
+                </dd>
+              </div>
+            </dl>
+
+            <p class="modal-hint">
+              Shown only this once. The donor chooses their own password the first time they sign in.
+              If they lose this one, give a new one from their Donor Profile.
+            </p>
+          </div>
+
+          <div class="modal-card__footer">
+            <button type="button" class="btn-primary" @click="closeCredentials">Done</button>
           </div>
         </div>
       </div>
@@ -738,6 +842,8 @@ const canEditTemplates = computed(() => can('center.configure'))
  *  PATCH /donors/{uuid}                        -> only the changed fields
  *  POST  /donors/{uuid}/photo                  -> FormData { photo }
  *  POST  /donors/{uuid}/email                  { template }
+ *  POST  /donors/{uuid}/sign-in                -> { donor_code, email,
+ *       temporary_password, reissued }: shown once, on screen, never printed
  * -------------------------------------------------------------------------
  */
 
@@ -979,6 +1085,88 @@ function mapProfile(data) {
     restrictionNote: data?.restriction_note ?? '',
     acceptsReminders: data?.accepts_eligibility_reminders !== false,
     editable: data?.editable ?? { identity: false, contact: false, photo: false },
+    firstName: data?.first_name || base.name,
+    signIn: signInStatus(data),
+  }
+}
+
+/**
+ * The App Sign-In section: where the desk's sign-in stands for this donor.
+ * `can_issue` is the server's own rule (no confirmed email, account usable).
+ */
+function signInStatus(data) {
+  const s = data?.sign_in ?? {}
+  const issued = Boolean(s.issued_at)
+  const canIssue = Boolean(s.can_issue)
+  const base = { issued, canIssue }
+  const forgot = canIssue ? ' If they forget it, give a new one.' : ''
+
+  if (data?.account_status === 'suspended' || data?.account_status === 'deactivated') {
+    return { ...base, tone: 'neutral', label: 'Unavailable', note: 'This account is suspended or deactivated.' }
+  }
+  if (s.claimed) {
+    return { ...base, tone: 'ok', label: 'Signed in', note: `The donor has signed in and set their own password.${forgot}` }
+  }
+  if (issued) {
+    return { ...base, tone: 'warn', label: 'Not signed in yet', note: `Given ${formatShortDate(s.issued_at)}. If the donor lost the password, give a new one.` }
+  }
+  if (!canIssue && data?.email_verified) {
+    return { ...base, tone: 'info', label: 'Own email', note: 'Signs in with their own confirmed email, and resets a forgotten password from the sign-in page.' }
+  }
+  return { ...base, tone: 'neutral', label: 'No sign-in yet', note: 'Give one so the donor can use the RedAgos app without registering.' }
+}
+
+/* ---------- app sign-in ---------- */
+
+const signInView = reactive({ issuing: false, confirming: false, error: '' })
+
+// { name, donorCode, email, password, registered, copied }. Dropped on Done:
+// the server keeps only a hash, so this is the one time anyone sees it.
+const credentials = ref(null)
+let copiedTimer = null
+
+function showCredentials(data, name, registered) {
+  credentials.value = {
+    name,
+    donorCode: data?.donor_code ?? '',
+    email: data?.email ?? '',
+    password: data?.temporary_password ?? '',
+    registered,
+    copied: '',
+  }
+}
+
+function closeCredentials() {
+  clearTimeout(copiedTimer)
+  credentials.value = null
+}
+
+async function copyCredential(key, text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    credentials.value.copied = key
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { if (credentials.value) credentials.value.copied = '' }, 2000)
+  } catch {
+    // No clipboard (an insecure origin or a refused permission): the value is
+    // on screen to read out, which is the point anyway.
+  }
+}
+
+async function giveSignIn(p) {
+  if (signInView.issuing) return
+  signInView.issuing = true
+  signInView.error = ''
+
+  try {
+    const res = await bloodCenterService.issueDonorSignIn(p.uuid)
+    signInView.confirming = false
+    showCredentials(res?.data ?? res, p.name, false)
+    await loadProfile(p.uuid)
+  } catch (err) {
+    signInView.error = err?.message || 'Could not give the sign-in. Please try again.'
+  } finally {
+    signInView.issuing = false
   }
 }
 
@@ -1043,6 +1231,7 @@ const deferrals = computed(() => {
 
 async function openProfile(donor) {
   Object.assign(profileView, { open: true, uuid: donor.uuid, historyError: '' })
+  Object.assign(signInView, { issuing: false, confirming: false, error: '' })
   profile.value = null
   history.value = []
   await Promise.all([
@@ -1216,11 +1405,31 @@ async function submitForm() {
 
     const photoProblem = uuid ? await uploadPhoto(uuid) : ''
 
+    // A walk-in leaves the desk able to use the app: the sign-in is given as
+    // part of registering (project owner, 2026-10-21). If it fails, the
+    // registration still stands and the profile can give it.
+    const registeredName = `${form.data.first_name} ${form.data.last_name}`.trim()
+    let signIn = null
+    let signInProblem = ''
+    if (form.mode === 'create' && uuid) {
+      try {
+        const res = await bloodCenterService.issueDonorSignIn(uuid)
+        signIn = res?.data ?? res
+      } catch {
+        signInProblem = 'The app sign-in could not be given. Give it from their Donor Profile.'
+      }
+    }
+
     form.saving = false
     closeForm()
-    notice.value = photoProblem
-      ? { tone: 'error', text: `${message} However, ${photoProblem.charAt(0).toLowerCase()}${photoProblem.slice(1)}` }
+    const problem = [
+      photoProblem ? `${photoProblem.charAt(0).toLowerCase()}${photoProblem.slice(1)}` : '',
+      signInProblem,
+    ].filter(Boolean).join(' ')
+    notice.value = problem
+      ? { tone: 'error', text: `${message} However, ${problem}` }
       : { tone: 'success', text: message }
+    if (signIn) showCredentials(signIn, registeredName, true)
 
     await loadDonors(form.mode === 'create' ? 1 : pager.page)
     if (profileView.open && profileView.uuid === uuid) await loadProfile(uuid)
@@ -1284,6 +1493,8 @@ async function sendEmail(template) {
 // Escape closes the topmost dialog.
 function onKeydown(event) {
   if (event.key !== 'Escape') return
+  // The sign-in window closes on Done only: it is the last sight of the password.
+  if (credentials.value) return
   if (emailView.open) closeEmail()
   else if (form.open) closeForm()
   else if (remind.open) closeRemind()
@@ -1298,6 +1509,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
+  clearTimeout(copiedTimer)
   window.removeEventListener('keydown', onKeydown)
   resetPhoto()
 })
@@ -2053,6 +2265,77 @@ td.c-address {
 .deferral { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12.5px; }
 .deferral__date { font-weight: 600; color: var(--rb-text-primary); }
 .deferral__reason { color: var(--rb-text-secondary); }
+
+/* ---------- App sign-in ---------- */
+.signin-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.signin-give { align-self: flex-start; }
+
+.signin-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+}
+
+.signin-confirm__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.credentials {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.credential { padding: 10px 14px; border-bottom: 1px solid var(--rb-border); }
+.credential:last-child { border-bottom: 0; }
+.credential--key { background: var(--rb-surface-alt); }
+
+.credential dt {
+  margin: 0 0 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rb-text-secondary);
+}
+
+.credential dd { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; }
+
+.credential__value {
+  min-width: 0;
+  font-family: var(--rb-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.credential__value--email { font-family: inherit; font-size: 14px; font-weight: 600; }
+.credential__value--key { font-size: 22px; letter-spacing: 0.08em; }
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy-btn:hover { background: var(--rb-surface-hover); }
+.copy-btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 .modal-enter-active,
 .modal-leave-active { transition: opacity 0.18s ease; }

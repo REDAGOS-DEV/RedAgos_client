@@ -108,7 +108,35 @@
           </section>
 
           <!-- Setup reminders: only what is still missing, gone once done -->
-          <section v-if="setupItems.length" class="setup" aria-label="Finish setting up">
+          <section v-if="setupItems.length || emailPrompt" class="setup" aria-label="Finish setting up">
+            <!--
+              A donor the blood center desk registered has no confirmed email:
+              the desk typed it (no link is mailed then), or there is none.
+              Booking, the check-in QR and a forgotten-password link all need one.
+            -->
+            <NuxtLink v-if="emailPrompt === 'add'" to="/donor/profile" class="setup__item setup__item--warning">
+              <span class="setup__icon"><AssetIcon name="mail" :size="18" /></span>
+              <span class="setup__text">
+                <strong>Add your email address</strong>
+                <span>You need it to book online, get your check-in QR code and reset a forgotten password.</span>
+              </span>
+              <AssetIcon name="chevron-right" :size="16" class="setup__chev" />
+            </NuxtLink>
+            <div v-else-if="emailPrompt" class="setup__item" :class="verifySent ? 'setup__item--muted' : 'setup__item--warning'"
+              role="status">
+              <span class="setup__icon"><AssetIcon name="mail" :size="18" /></span>
+              <span class="setup__text">
+                <strong>{{ verifySent ? 'Check your inbox' : 'Confirm your email' }}</strong>
+                <span v-if="verifySent">Open the link we sent to {{ user?.email }} to confirm it.</span>
+                <span v-else>Confirm {{ user?.email }} to book online, get your check-in QR code and reset a forgotten password.</span>
+                <span v-if="verifyError" class="setup__error">{{ verifyError }}</span>
+              </span>
+              <button v-if="!verifySent" type="button" class="setup__action" :disabled="verifySending"
+                @click="sendVerification">
+                {{ verifySending ? 'Sending…' : 'Send link' }}
+              </button>
+            </div>
+
             <NuxtLink v-for="item in setupItems" :key="item.key" to="/donor/profile" class="setup__item"
               :class="`setup__item--${item.tone}`">
               <span class="setup__icon"><AssetIcon :name="item.icon" :size="18" /></span>
@@ -298,6 +326,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
+import { authService } from '~/api/auth/AuthService'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import { useUser } from '~/composables/useUser'
 
@@ -307,6 +336,34 @@ const loading = ref(true)
 
 // ── Greeting ──
 const { user } = useUser()
+
+// ── Email prompt ──
+// 'add' with no address, 'confirm' with an unconfirmed one, null otherwise.
+// A self-registered donor never sees it: they confirmed before signing in.
+const emailPrompt = computed(() => {
+  if (!user.value) return null
+  if (!user.value.email) return 'add'
+  return user.value.email_verified ? null : 'confirm'
+})
+const verifySending = ref(false)
+const verifySent = ref(false)
+const verifyError = ref('')
+
+async function sendVerification() {
+  if (verifySending.value) return
+  verifySending.value = true
+  verifyError.value = ''
+  try {
+    await authService.resendVerificationEmail()
+    verifySent.value = true
+  } catch (err) {
+    verifyError.value = err?.status === 429
+      ? 'Too many requests. Please wait a few minutes and try again.'
+      : (err?.message || 'Could not send the link. Please try again.')
+  } finally {
+    verifySending.value = false
+  }
+}
 
 const greeting = computed(() => {
   const h = new Date().getHours()
@@ -1000,6 +1057,25 @@ watch(() => route.path, () => {
 .setup__text strong { font-size: 14px; font-weight: 700; }
 .setup__text span { font-size: 13px; line-height: 1.4; color: var(--rb-text-secondary); }
 .setup__chev { margin-left: auto; flex: none; color: var(--rb-text-muted); }
+.setup__error { font-weight: 600; color: var(--danger-text) !important; }
+.setup__action {
+  flex: none;
+  margin-left: auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.setup__action:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.16); }
+.setup__action:disabled { opacity: 0.6; cursor: default; }
+.setup__action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 /* ── For you ── */
 .foryou { padding: 20px 24px 24px; }

@@ -69,6 +69,7 @@ export function useUser() {
       username: payload.username ?? null,
       account_status: payload.account_status ?? null,
       email_verified: Boolean(payload.email_verified),
+      temporary_sign_in: Boolean(payload.temporary_sign_in),
       activated_at: payload.activated_at ?? null,
       roles: Array.isArray(payload.roles) ? payload.roles.map((role: any) => role?.name ?? role) : [],
       // Ang facility kay gi-eager-load na sa /user, so ang portal header

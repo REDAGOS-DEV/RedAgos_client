@@ -479,7 +479,7 @@ async function loadCatalogue() {
  */
 const LEVEL_FALLBACK = {
   supervisor: { label: 'Supervisor', description: 'Sees the dashboard, the reports and the view-only monitoring pages. Cannot record, approve or manage anyone.' },
-  admin: { label: 'Blood Center Admin', description: 'Creates staff accounts, assigns roles and privileges, and sets the centre\'s logo. Sees the dashboard and reports; no department pages and no corrections.' },
+  admin: { label: 'Blood Center Admin', description: 'Creates staff accounts, assigns roles and privileges, and sets the centre\'s logo. Sees the dashboard, the reports and the audit log; no department pages and no corrections.' },
 }
 
 const levelOptions = computed(() => [

@@ -17,18 +17,23 @@
     </header>
 
     <form class="au-form" @submit.prevent="login">
+      <!-- Text, not email: the server also takes a donor code (from the blood
+           center desk's sign-in) or a username. -->
       <div class="au-field">
-        <label for="email">Email address</label>
+        <label for="email">{{ portal === 'donor' ? 'Email or donor code' : 'Email or username' }}</label>
         <div class="au-input">
           <AssetIcon name="mail" :size="18" class="au-icon" />
           <input
             id="email"
             v-model="email"
-            type="email"
+            type="text"
+            inputmode="email"
+            autocapitalize="none"
+            spellcheck="false"
             :class="{ typed: typed.email }"
-            placeholder="you@example.com"
+            :placeholder="portal === 'donor' ? 'you@example.com or DONOR-000123' : 'you@example.com'"
             required
-            autocomplete="email"
+            autocomplete="username"
           >
         </div>
       </div>

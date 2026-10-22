@@ -12,7 +12,11 @@ class AuthService extends BaseService {
  
     private resource = '/auths';
 
-    async login(payload: { email: string; password: string }): Promise<any> {
+    /**
+     * `login` takes an email address, a donor code or a username; `email` is
+     * the older field the server still accepts.
+     */
+    async login(payload: { login?: string; email?: string; password: string; role?: string }): Promise<any> {
         return await this.request('/login', 'POST', payload);
     }
 

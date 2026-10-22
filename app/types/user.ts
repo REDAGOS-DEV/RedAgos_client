@@ -90,6 +90,12 @@ export interface AppUser {
   username: string | null
   account_status: string | null
   email_verified: boolean
+  /**
+   * Signed in with the temporary password the blood center's desk gave. Every
+   * page but "set your password" waits until the donor chooses their own; the
+   * server refuses the rest with `password_change_required`.
+   */
+  temporary_sign_in: boolean
   /** ISO 8601, or null while the account is not yet activated. */
   activated_at: string | null
 

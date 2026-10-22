@@ -284,6 +284,15 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/donors/${uuid}`, 'PATCH', payload)
   }
 
+  /**
+   * Give a walk-in donor their app sign-in: { donor_code, email,
+   * temporary_password, reissued }. The password is in this answer only; the
+   * server keeps a hash. Giving it again replaces it and signs the donor out.
+   */
+  async issueDonorSignIn(uuid: string): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/sign-in`, 'POST')
+  }
+
   /** FormData with a `photo` file. */
   async uploadDonorPhoto(uuid: string, form: FormData): Promise<any> {
     return this.request(`${this.resource}/donors/${uuid}/photo`, 'POST', form)
@@ -674,6 +683,16 @@ class BloodCenterService extends BaseService {
 
   async restoreStaff(uuid: string): Promise<any> {
     return this.request(`${this.resource}/staff/${uuid}/restore`, 'POST')
+  }
+
+  // --- Audit Log (Blood Center Admin only) ---
+
+  /**
+   * Paginated, newest first. Filters: search, module, type, from, to. The
+   * response also carries the filter choices as `modules` and `types`.
+   */
+  async auditLog(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/audit-log`, 'GET', params)
   }
 
   async list(params: Record<string, any> = {}): Promise<any> {
