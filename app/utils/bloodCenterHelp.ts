@@ -136,8 +136,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       'Use the storage and expiry columns to pick the unit that expires first.',
     ],
     questions: [
-      { q: 'How do I add new units?', a: 'New units are booked in at Stock Intake, once their donation has cleared testing.' },
-      { q: 'Why can\'t I issue a unit in quarantine?', a: 'A donation\'s bags leave quarantine together, and only once TTI testing and immunohematology have both cleared it. They are then released at Stock Intake.' },
+      { q: 'How do I add new units?', a: 'New units are booked in at Stock Intake, once Processing hands over their labelled bags.' },
     ],
   },
   {
@@ -145,11 +144,11 @@ export const HELP_GUIDES: HelpGuide[] = [
     title: 'Book units into stock',
     department: 'Issuance',
     path: '/blood-center/inventory-intake',
-    summary: 'Processed bags go into quarantine first, and are released and labelled once testing clears.',
+    summary: 'Processing hands over bags that testing has cleared and that carry their final labels. They go straight into stock.',
     steps: [
-      'Pick the processed donation and book its bags into quarantine, with expiry and storage location.',
-      'Wait for TTI testing and immunohematology to clear the donation.',
-      'Release the bags and label them. They are now available in Blood Inventory.',
+      'Scan the donation barcode, or pick the donation from the list.',
+      'Set each bag\'s storage location. The expiry is the one on its label.',
+      'Book the bags in. They are available in Blood Inventory at once.',
     ],
   },
   {
@@ -302,7 +301,7 @@ export const HELP_GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'AR', meaning: 'Payment Acknowledgement Receipt: issued for each payment taken.' },
   { term: 'TTI', meaning: 'Transfusion-transmissible infections: the serology panel each unit is tested for.' },
   { term: 'Immunohematology', meaning: 'Blood typing: the unit\'s ABO group and Rh type.' },
-  { term: 'Quarantine', meaning: 'Where booked-in bags wait until testing clears their donation.' },
+  { term: 'Quarantine', meaning: 'Bags still with Processing while testing clears their donation. Their base label says "not for issue".' },
   { term: 'FEFO', meaning: 'First expiry, first out: issue the unit that expires soonest.' },
   { term: 'Walk-in', meaning: 'A request a watcher brings to the centre instead of the hospital blood bank sending it.' },
   { term: 'Weekly replenishment', meaning: 'A hospital\'s restocking order, billed to the hospital and settled outside RedAgos.' },

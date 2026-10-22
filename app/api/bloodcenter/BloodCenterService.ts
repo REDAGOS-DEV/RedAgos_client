@@ -231,6 +231,16 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/components`, 'POST', payload)
   }
 
+  /**
+   * Print, or reprint, a donation's final (Phase 2) labels — verified blood
+   * type, expiry, clearance codes — one per declared bag. Processing's, once
+   * Testing has cleared the donation (project owner, 2026-10-22). A POST: the
+   * server records who labelled the bags and when, which the hand-over needs.
+   */
+  async printFinalLabels(donationId: number): Promise<any> {
+    return this.request(`${this.resource}/laboratory/donations/${donationId}/labels`, 'POST')
+  }
+
   /** Clear for issue, or reject. The only two outcomes the laboratory may set. */
   async updateLaboratoryStatus(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/status`, 'PATCH', payload)
@@ -361,6 +371,16 @@ class BloodCenterService extends BaseService {
    */
   async collectionDashboard(): Promise<any> {
     return this.request(`${this.resource}/collection/dashboard`, 'GET')
+  }
+
+  /** The Testing department's dashboard: counts only. */
+  async testingDashboard(): Promise<any> {
+    return this.request(`${this.resource}/laboratory/testing-dashboard`, 'GET')
+  }
+
+  /** The Processing department's dashboard: counts only. */
+  async processingDashboard(): Promise<any> {
+    return this.request(`${this.resource}/laboratory/processing-dashboard`, 'GET')
   }
 
   // --- Donations list ---
@@ -569,6 +589,17 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/facility/logo`, 'DELETE')
   }
 
+  // The Daily Blood Stock Inventory's left-hand logo. Without one the report
+  // prints the DOH seal. Same file rules, so the file goes under `logo` too.
+
+  async uploadFacilitySeal(form: FormData): Promise<any> {
+    return this.request(`${this.resource}/facility/seal`, 'POST', form)
+  }
+
+  async removeFacilitySeal(): Promise<any> {
+    return this.request(`${this.resource}/facility/seal`, 'DELETE')
+  }
+
   // --- Inventory (Issuance department) ---
 
   async inventory(params: Record<string, any> = {}): Promise<any> {
@@ -628,24 +659,6 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory/${unitId}`, 'PATCH', payload)
   }
 
-  /**
-   * Release every quarantined unit of a donation to available stock.
-   *
-   * The server refuses unless TTI Testing and Immunohematology have both
-   * cleared the donation — for a supervisor too. All or nothing per donation.
-   */
-  async releaseQuarantine(donationId: number): Promise<any> {
-    return this.request(`${this.resource}/inventory/quarantine/${donationId}/release`, 'POST')
-  }
-
-  /**
-   * The final (Phase 2) label data for a donation's released bags — verified
-   * blood type, expiry, clearance codes, who released them. Refused while the
-   * bags are still in quarantine. Issuance only.
-   */
-  async bloodLabels(donationId: number): Promise<any> {
-    return this.request(`${this.resource}/inventory/donations/${donationId}/labels`, 'GET')
-  }
 
   async discardBloodUnit(unitId: string, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/inventory/${unitId}/discard`, 'POST', payload)

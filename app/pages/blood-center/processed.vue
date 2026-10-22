@@ -4,8 +4,8 @@
       <div>
         <h1 class="page-title">Processed</h1>
         <p class="page-subtitle">
-          Every unit Processing has recorded a component breakdown for, newest first. Hand each one over to Issuance
-          from here; a unit still to be separated is on Component Processing.
+          Every unit Processing has recorded a component breakdown for, newest first. Label each one and hand it over
+          to Issuance from here; a unit still to be separated is on Component Processing.
         </p>
       </div>
       <NuxtLink to="/blood-center/laboratory" class="btn-outline">
@@ -17,9 +17,9 @@
     <div class="note" role="note">
       <AssetIcon name="info" :size="15" />
       <p>
-        Handing over sends a unit's bags to Stock Intake, where Issuance books them into quarantine. You do not wait
-        for Testing: the bags are released, with their final labels, once TTI Testing and Immunohematology have both
-        cleared the donation.
+        A unit's bags stay with Processing until TTI Testing and Immunohematology have both cleared the donation.
+        Then print and affix their final labels here and hand them over: Issuance books labelled bags straight into
+        stock.
       </p>
     </div>
 
@@ -159,7 +159,7 @@
                 <span v-if="row.processed_by" class="sub">{{ row.processed_by }}</span>
               </td>
               <td class="c-status">
-                <span class="state" :class="`state--${row.status}`">{{ row.status_label }}</span>
+                <span class="state" :class="`state--${row.label_state || row.status}`">{{ row.status_label }}</span>
                 <span v-if="row.status === 'rejected' && row.rejection_reason" class="sub" :title="row.rejection_reason">{{ row.rejection_reason }}</span>
                 <span v-else-if="bookedText(row)" class="sub">{{ bookedText(row) }}</span>
                 <span v-if="row.correction_pending" class="sub sub--pending">Correction pending</span>
@@ -197,6 +197,23 @@
                     @click="openRow(row, 'edit')"
                   >
                     <AssetIcon name="pencil" :size="15" />
+                  </button>
+                  <!--
+                    Final labels (project owner, 2026-10-22): printed here once
+                    Testing has cleared the unit, before the hand-over; reprinted
+                    after it for a bag whose label was lost.
+                  -->
+                  <button
+                    v-if="row.status !== 'rejected'"
+                    type="button"
+                    class="icon-btn"
+                    :class="{ 'icon-btn--due': row.label_state === 'awaiting_labels' }"
+                    :disabled="!row.can?.print_labels || labelling !== null"
+                    :aria-label="`${row.labelled_at ? 'Reprint' : 'Print'} the final labels of ${row.code}`"
+                    :title="labelsBlockedText(row) ?? (row.labelled_at ? 'Reprint the final labels' : 'Print the final labels')"
+                    @click="printFinalLabels(row)"
+                  >
+                    <AssetIcon :name="labelling === row.donation_id ? 'loader' : 'printer'" :size="15" :class="{ spin: labelling === row.donation_id }" />
                   </button>
                   <!-- The hand-over to Issuance (it was the last card on Component Processing). -->
                   <template v-if="row.status === 'awaiting_handover'">
@@ -272,7 +289,7 @@
             <div class="facts">
               <div class="fact">
                 <span class="fact__label">Hand-over</span>
-                <span class="state" :class="`state--${open.row.status}`">{{ open.row.status_label }}</span>
+                <span class="state" :class="`state--${open.row.label_state || open.row.status}`">{{ open.row.status_label }}</span>
               </div>
               <div class="fact">
                 <span class="fact__label">Processed</span>
@@ -307,9 +324,13 @@
                   <span>{{ bagText(bag) }}</span>
                 </li>
               </ul>
-              <p v-if="open.mode === 'view' && open.row.status === 'awaiting_handover'" class="hint">
-                Bag labels are printed on
+              <p v-if="open.mode === 'view' && open.row.status !== 'rejected'" class="hint">
+                Base labels are printed on
                 <NuxtLink :to="`/blood-center/laboratory?donation=${open.row.donation_id}`" class="inline-link">Component Processing</NuxtLink>.
+                <template v-if="open.row.labelled_at">
+                  Final labels printed {{ formatDateTime(open.row.labelled_at) }}<template v-if="open.row.labelled_by"> by {{ open.row.labelled_by }}</template>.
+                </template>
+                <template v-else>Final labels print here once Testing has cleared both sections.</template>
               </p>
             </div>
 
@@ -455,8 +476,8 @@
                 Hand {{ open.row.bag_count === 1 ? 'this bag' : `these ${open.row.bag_count} bags` }} over to Issuance?
               </p>
               <p>
-                Processing for this unit is then complete. Issuance books the bags into quarantine at Stock Intake and
-                releases them once both clearances are in. A handed-over unit cannot be rejected here.
+                Processing for this unit is then complete. Issuance books the labelled bags straight into stock at
+                Stock Intake. A handed-over unit cannot be rejected here.
               </p>
             </div>
 
@@ -539,6 +560,16 @@
                 <AssetIcon name="ban" :size="14" />
                 Reject…
               </button>
+              <button
+                v-if="open.row.can?.print_labels"
+                type="button"
+                :class="open.row.can?.hand_over ? 'btn-outline' : 'btn-primary'"
+                :disabled="labelling !== null"
+                @click="printFinalLabels(open.row)"
+              >
+                <AssetIcon name="printer" :size="14" />
+                {{ open.row.labelled_at ? 'Reprint final labels' : 'Print final labels' }}
+              </button>
               <button v-if="open.row.can?.hand_over" type="button" class="btn-primary" @click="open.mode = 'handover'">
                 <AssetIcon name="send" :size="14" />
                 Hand over…
@@ -568,12 +599,17 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Hidden until final labels are printed. -->
+    <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { finalLabelsFrom } from '~/utils/bagLabels'
 import { formatShortDate } from '~/utils/donorRecords'
 import {
   STATUS_FILTERS,
@@ -588,6 +624,8 @@ import {
   handoverBlockedText,
   handoverErrorText,
   isCompleteBag,
+  labelsBlockedText,
+  labelsErrorText,
 } from '~/utils/processedDonations'
 
 /**
@@ -820,6 +858,37 @@ async function decide(kind, payload) {
 
 function handOver() {
   if (open.value?.row.can?.hand_over) decide('handover', { status: 'completed' })
+}
+
+/* ---------- final labels ---------- */
+
+// Final labelling is Processing's (project owner, 2026-10-22): printed once
+// Testing has cleared the unit, and required before the hand-over. Printing
+// records who labelled the bags and when, so the row is reloaded after.
+const { print: printLabelSheet } = useLabelPrint()
+const labelling = ref(null)
+
+async function printFinalLabels(row) {
+  if (!row?.can?.print_labels || labelling.value !== null) return
+
+  labelling.value = row.donation_id
+  notice.value = null
+  try {
+    const res = await bloodCenterService.printFinalLabels(row.donation_id)
+    const labels = finalLabelsFrom(res)
+
+    // Close the dialog first, so only the label sheet is on the page to print.
+    open.value = null
+    await nextTick()
+    if (labels.length) await printLabelSheet(labels, 'final')
+
+    notice.value = { tone: 'success', text: res?.message ?? `Final labels for ${row.code} printed.` }
+    await load(pager.page)
+  } catch (err) {
+    notice.value = { tone: 'error', text: labelsErrorText(err) }
+  } finally {
+    labelling.value = null
+  }
 }
 
 function reject() {
@@ -1202,7 +1271,7 @@ onBeforeUnmount(() => {
 .c-processed { width: 128px; }
 .c-status { width: 156px; }
 /* View, edit (or review), the labelled hand-over and reject, with the cell's padding. */
-.c-actions { width: 244px; }
+.c-actions { width: 282px; }
 
 .th-sort {
   display: inline-flex;
@@ -1297,6 +1366,11 @@ onBeforeUnmount(() => {
 }
 
 .state--awaiting_handover { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); border-color: rgba(var(--rb-warning-rgb), 0.4); }
+/* Waiting on Testing: nothing for Processing to do yet, so it stays quiet. */
+.state--awaiting_testing { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border-color: var(--rb-border-strong); }
+/* Cleared: the labels are Processing's next step. */
+.state--awaiting_labels { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); border-color: rgba(var(--rb-warning-rgb), 0.4); }
+.state--labelled { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.3); }
 .state--handed_over { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: rgba(var(--rb-success-rgb), 0.3); }
 .state--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.3); }
 
@@ -1322,6 +1396,8 @@ onBeforeUnmount(() => {
 
 /* A correction waits for this viewer's decision: the one action that stands out, as on Serology Results. */
 .icon-btn--review { background: rgba(var(--rb-warning-rgb), 0.14); border-color: rgba(var(--rb-warning-rgb), 0.45); color: var(--rb-warning-text); }
+/* The labels are what this row waits on. */
+.icon-btn--due { border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), 0.08); }
 .icon-btn--review:hover:not(:disabled) { background: rgba(var(--rb-warning-rgb), 0.22); color: var(--rb-warning-text); border-color: rgba(var(--rb-warning-rgb), 0.6); }
 
 /*
@@ -1337,7 +1413,7 @@ onBeforeUnmount(() => {
   .c-testing { width: 100px; }
   .c-testing .clearances { flex-direction: column; align-items: flex-start; }
   .c-processed { width: 108px; }
-  .processed-table { min-width: 946px; }
+  .processed-table { min-width: 984px; }
 }
 
 .skeleton {

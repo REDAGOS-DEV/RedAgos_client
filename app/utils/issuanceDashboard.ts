@@ -8,16 +8,19 @@
 /** The order the dashboard lists blood types in, as Stock Thresholds does. */
 const TYPE_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
-/** One day of the summary's `trend`: the four headline levels at its close. */
+/**
+ * One day of the summary's `trend`: the headline levels at its close. The
+ * server also sends `quarantined`, which the dashboard no longer shows (project
+ * owner, 2026-10-22): nothing reaches Issuance uncleared.
+ */
 export interface StockTrendPoint {
   date: string
   available: number
   expiring_soon: number
   reserved: number
-  quarantined: number
 }
 
-export type StockLevelKey = 'available' | 'expiring_soon' | 'reserved' | 'quarantined'
+export type StockLevelKey = 'available' | 'expiring_soon' | 'reserved'
 
 export interface StockWeekChange {
   direction: 'up' | 'down' | 'flat'
@@ -142,16 +145,15 @@ export function stockTypeAlert(
     : { tone: 'warning', short: `${shortList(low)} low`, full }
 }
 
-/** One row of the summary's `stock_by_blood_type`. */
+/** One row of the summary's `stock_by_blood_type` (its `quarantined` is not shown). */
 export interface StockTypeRow {
   code: string
   available: number
   expiring_soon: number
   reserved: number
-  quarantined: number
 }
 
-export type StockSegmentKey = 'fresh' | 'expiring' | 'reserved' | 'quarantined'
+export type StockSegmentKey = 'fresh' | 'expiring' | 'reserved'
 
 export interface StockSegment {
   key: StockSegmentKey
@@ -162,15 +164,15 @@ export interface StockTypeCard {
   code: string
   /** Units that can be issued, the card's headline (expiring ones included). */
   available: number
-  /** Everything on the shelf: available, held and not yet cleared. */
+  /** Everything on the shelf that can go out: available and held for requests. */
   onShelf: number
-  /** Always all four, in the legend's order, so the counts line up across cards. */
+  /** Always all three, in the legend's order, so the counts line up across cards. */
   segments: StockSegment[]
 }
 
 /**
  * One card per blood type, in the usual order, each with its shelf split into
- * the legend's four parts. Expiring units are part of `available`, so the
+ * the legend's three parts. Expiring units are part of `available`, so the
  * fresh part is what is left once they are taken out. A type with no stock
  * still gets a card: a zero is information.
  */
@@ -183,17 +185,15 @@ export function stockTypeCards(rows: StockTypeRow[]): StockTypeCard[] {
     const available = row?.available ?? 0
     const expiring = Math.min(row?.expiring_soon ?? 0, available)
     const reserved = row?.reserved ?? 0
-    const quarantined = row?.quarantined ?? 0
 
     return {
       code,
       available,
-      onShelf: available + reserved + quarantined,
+      onShelf: available + reserved,
       segments: [
         { key: 'fresh', count: available - expiring },
         { key: 'expiring', count: expiring },
         { key: 'reserved', count: reserved },
-        { key: 'quarantined', count: quarantined },
       ],
     }
   })

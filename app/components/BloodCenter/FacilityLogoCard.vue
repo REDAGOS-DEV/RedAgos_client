@@ -1,37 +1,39 @@
 <template>
-  <section v-if="canConfigure" class="logo-card" aria-labelledby="facility-logo-title">
+  <section v-if="canConfigure" class="logo-card" :aria-labelledby="titleId">
     <div class="logo-card__head">
       <div>
-        <h2 id="facility-logo-title" class="logo-card__title">Facility logo</h2>
-        <p class="logo-card__hint">
-          Printed on the right of this centre's reports, such as the Daily Blood Stock Inventory. PNG or JPG, 2 MB or
-          smaller. A square image prints best.
-        </p>
+        <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
+        <p class="logo-card__hint">{{ copy.hint }} PNG or JPG, 2 MB or smaller. A square image prints best.</p>
       </div>
     </div>
 
     <div class="logo-card__body">
-      <div class="logo-card__preview" :class="{ 'logo-card__preview--empty': !previewUrl }">
-        <img v-if="previewUrl" :src="previewUrl" alt="Current facility logo" @error="previewUrl = null" >
+      <div class="logo-card__preview" :class="{ 'logo-card__preview--empty': !shownUrl }">
+        <img v-if="shownUrl" :src="shownUrl" :alt="previewUrl ? copy.alt : 'Department of Health seal'" @error="onPreviewError" >
         <span v-else>No logo</span>
       </div>
 
       <div class="logo-card__actions">
-        <label class="logo-btn logo-btn--primary" :class="{ 'logo-btn--busy': busy }">
-          <input
-            ref="fileInput"
-            type="file"
-            accept="image/png,image/jpeg"
-            class="logo-card__file"
-            :disabled="busy"
-            @change="onFileChosen"
-          >
-          {{ busy ? 'Uploading…' : previewUrl ? 'Replace logo' : 'Upload logo' }}
-        </label>
+        <!-- With none uploaded, the left logo prints the DOH seal: say so beside it. -->
+        <p v-if="isSeal && !previewUrl" class="logo-card__default">Default: Department of Health seal</p>
 
-        <button v-if="previewUrl" type="button" class="logo-btn" :disabled="busy" @click="removeLogo">
-          Remove
-        </button>
+        <div class="logo-card__buttons">
+          <label class="logo-btn logo-btn--primary" :class="{ 'logo-btn--busy': busy }">
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/png,image/jpeg"
+              class="logo-card__file"
+              :disabled="busy"
+              @change="onFileChosen"
+            >
+            {{ busy ? 'Uploading…' : previewUrl ? 'Replace logo' : 'Upload logo' }}
+          </label>
+
+          <button v-if="previewUrl" type="button" class="logo-btn" :disabled="busy" @click="removeLogo">
+            {{ isSeal ? 'Use the DOH seal' : 'Remove' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -45,27 +47,78 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { logoProblem } from '~/utils/stockReport'
 
 /**
- * The Blood Center Admin's upload of their own facility's logo.
+ * The Blood Center Admin's upload of their own facility's logos.
+ *
+ * Two slots, by `kind`:
+ * - `logo`: the facility logo, on the right of its reports and on its billing
+ *   documents.
+ * - `seal`: the left-hand logo of the Daily Blood Stock Inventory (project
+ *   owner, 2026-10-22). Without one the report prints the Department of Health
+ *   seal, which the preview shows.
  *
  * Self-gating on `center.configure`, an ability only the Admin level holds.
  * The facility is never chosen here: the server takes it from the signed-in
  * account.
  */
 
+const props = defineProps({
+  kind: { type: String, default: 'logo', validator: (value) => ['logo', 'seal'].includes(value) },
+})
+
+// The same default the stock report prints (pages/blood-center/stock-report.vue).
+const DOH_SEAL_SRC = '/images/doh-seal.png'
+
+const SLOTS = {
+  logo: {
+    title: 'Facility logo',
+    hint: 'Printed on the right of this centre\'s reports, such as the Daily Blood Stock Inventory.',
+    alt: 'Current facility logo',
+    field: 'logo_url',
+    upload: (form) => bloodCenterService.uploadFacilityLogo(form),
+    remove: () => bloodCenterService.removeFacilityLogo(),
+    updated: 'Facility logo updated.',
+    removed: 'Facility logo removed.',
+  },
+  seal: {
+    title: 'Left logo',
+    hint: 'Printed on the left of the Daily Blood Stock Inventory. Without one, the Department of Health seal is printed.',
+    alt: 'Current left logo',
+    field: 'seal_url',
+    upload: (form) => bloodCenterService.uploadFacilitySeal(form),
+    remove: () => bloodCenterService.removeFacilitySeal(),
+    updated: 'Left logo updated.',
+    removed: 'Left logo removed. The report prints the Department of Health seal.',
+  },
+}
+
+const isSeal = computed(() => props.kind === 'seal')
+const copy = computed(() => SLOTS[props.kind] ?? SLOTS.logo)
+const titleId = computed(() => `facility-${props.kind}-title`)
+
 const { can } = useUser()
 const canConfigure = computed(() => can('center.configure'))
 
+// The uploaded file's link, null when there is none.
 const previewUrl = ref(null)
+const defaultSealVisible = ref(true)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 const fileInput = ref(null)
 
+// What the preview shows: the upload, else (left logo only) the DOH seal.
+const shownUrl = computed(() => previewUrl.value || (isSeal.value && defaultSealVisible.value ? DOH_SEAL_SRC : null))
+
+function onPreviewError() {
+  if (previewUrl.value) previewUrl.value = null
+  else defaultSealVisible.value = false
+}
+
 async function loadCurrent() {
   try {
     const res = await bloodCenterService.profile()
 
-    previewUrl.value = res?.facility?.logo_url ?? null
+    previewUrl.value = res?.facility?.[copy.value.field] ?? null
   } catch {
     // The card still offers an upload; only the preview is missing.
   }
@@ -95,10 +148,10 @@ async function onFileChosen(event) {
   busy.value = true
 
   try {
-    const res = await bloodCenterService.uploadFacilityLogo(form)
+    const res = await copy.value.upload(form)
 
-    previewUrl.value = res?.logo_url ?? null
-    notice.value = res?.message ?? 'Facility logo updated.'
+    previewUrl.value = res?.[copy.value.field] ?? null
+    notice.value = res?.message ?? copy.value.updated
   } catch (err) {
     error.value = err?.data?.errors?.logo?.[0] || err?.data?.message || 'The logo could not be uploaded.'
   } finally {
@@ -113,10 +166,10 @@ async function removeLogo() {
   busy.value = true
 
   try {
-    const res = await bloodCenterService.removeFacilityLogo()
+    const res = await copy.value.remove()
 
     previewUrl.value = null
-    notice.value = res?.message ?? 'Facility logo removed.'
+    notice.value = res?.message ?? copy.value.removed
   } catch (err) {
     error.value = err?.data?.message || 'The logo could not be removed.'
   } finally {
@@ -177,7 +230,9 @@ onMounted(() => {
   color: var(--rb-text-secondary);
 }
 
-.logo-card__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.logo-card__actions { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.logo-card__buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.logo-card__default { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .logo-card__file { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 

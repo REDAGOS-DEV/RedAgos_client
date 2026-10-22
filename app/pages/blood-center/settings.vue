@@ -83,14 +83,16 @@
             <p class="field-group__title">Work</p>
             <div class="form-grid">
               <!-- The role (and what it may do) is set by the Blood Center Admin in
-                   Staff Accounts; the title is the person's own label, e.g. RMT. -->
+                   Staff Accounts. The title is the person's own credentials, e.g.
+                   RMT, printed after their name on everything they sign
+                   (project owner, 2026-10-22). -->
               <div class="form-group">
                 <label class="form-label" for="bc-title">Title <span class="form-optional">optional</span></label>
                 <ComboInput
                   id="bc-title"
-                  v-model="profileForm.position"
-                  :options="TITLE_OPTIONS"
-                  maxlength="100"
+                  v-model="profileForm.credentials"
+                  :options="CREDENTIAL_OPTIONS"
+                  maxlength="40"
                   placeholder="e.g. RMT"
                   :disabled="!editingProfile"
                 />
@@ -355,6 +357,8 @@
           </div>
         </header>
         <BloodCenterFacilityLogoCard />
+        <!-- The Daily Blood Stock Inventory's left-hand logo (project owner, 2026-10-22). -->
+        <BloodCenterFacilityLogoCard kind="seal" />
         <BloodCenterDonorEmailTemplatesCard />
       </section>
     </div>
@@ -413,7 +417,7 @@ definePageMeta({
  *
  *  GET  /api/bloodcenter/settings
  *    -> {
- *         profile: { avatarUrl, fullName, employeeId, bloodCenter, position, email, contactNumber },
+ *         profile: { avatarUrl, fullName, employeeId, bloodCenter, credentials, email, contactNumber },
  *         accountInfo: { username, role, bloodCenter, createdAt, lastLogin, status },
  *         currentSession: { os, browser, loggedInLabel },
  *         notificationPrefs: [{ key, label, description, enabled }],
@@ -501,7 +505,7 @@ const profile = reactive({
   lastName: '',
   employeeId: '',
   bloodCenter: '',
-  position: '',
+  credentials: '',
   email: '',
   contactNumber: '',
 })
@@ -512,8 +516,8 @@ const savingProfile = ref(false)
 const profileError = ref('')
 const profileSuccess = ref('')
 
-// Suggestions for the title, as on the Add Staff form; any other is typed.
-const TITLE_OPTIONS = ['RMT', 'RN']
+// Suggested credentials, as on the Add Staff form; any other is typed.
+const CREDENTIAL_OPTIONS = ['RMT', 'RN', 'MD']
 
 // The person's role, as the Admin set it in Staff Accounts. Shown, not edited.
 const roleText = computed(() => {
@@ -562,7 +566,7 @@ async function saveProfile() {
       first_name: profileForm.firstName.trim(),
       last_name: profileForm.lastName.trim(),
       phone: profileForm.contactNumber.trim() || undefined,
-      position: profileForm.position.trim() || null,
+      credentials: profileForm.credentials.trim() || null,
     })
     applyServerData(updated)
     // The header shows the name from the session; refresh it so it matches.
@@ -724,7 +728,7 @@ function applyServerData(data) {
     lastName: p.last_name ?? '',
     fullName: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' '),
     employeeId: p.employee_id ?? '',
-    position: p.position ?? '',
+    credentials: p.credentials ?? '',
     email: p.email ?? '',
     contactNumber: p.phone ?? '',
     bloodCenter: data?.facility?.name ?? '',

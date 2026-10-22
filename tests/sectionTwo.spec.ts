@@ -185,10 +185,17 @@ describe('the serology panel', () => {
 describe('the Testing page', () => {
   const page = source('app/pages/blood-center/testing.vue')
 
-  it('is shared by TTI Testing and Immunohematology, each seeing only its own card', () => {
+  it('is shared by TTI Testing and Immunohematology, each seeing only its own section', () => {
     expect(page).toContain("requires: ['lab.record_serology', 'lab.record_immunohematology']")
-    expect(page).toMatch(/<section v-if="canType" class="card card--typing">[\s\S]*?Immunohematology/)
-    expect(page).toMatch(/<section v-if="canSerology" class="card card--serology">[\s\S]*?Serology/)
+    expect(page).toMatch(/<div v-if="canType" class="results__section results__section--typing">[\s\S]*?Immunohematology/)
+    expect(page).toMatch(/<div v-if="canSerology" class="results__section results__section--serology">[\s\S]*?Serology/)
+  })
+
+  it('records both sections from one card with one Save button', () => {
+    expect(page.match(/@click="submitResults"/g)).toHaveLength(1)
+    expect(page).toContain("{{ busy ? 'Saving…' : 'Save' }}")
+    // Half a section is never sent.
+    expect(page).toContain('&& !serologyUnfinished.value')
   })
 
   it('saves a panel straight away, with no run', () => {
@@ -197,28 +204,32 @@ describe('the Testing page', () => {
     expect(page).toContain('const panel = serologyPayload(readings, confirmed, markers.value)')
   })
 
-  it('sends forward and reverse grouping and the antibody screen', () => {
+  it('records ABO and Rh only, with no reverse group or antibody screen', () => {
     expect(page).toContain('forward_group: forwardGroup.value')
-    expect(page).toContain('reverse_group: typingForm.reverse_group')
-    expect(page).toContain('antibody_screen: typingForm.antibody_screen')
+    expect(page).toContain("const typingForm = reactive({ blood_type_id: null, notes: '' })")
+    expect(page).not.toContain('typingForm.reverse_group')
+    expect(page).not.toContain('typingForm.antibody_screen')
   })
 
   it('never saves over a saved result: typing becomes a correction, serology is corrected on Serology Results', () => {
-    expect(page).toMatch(/if \(selected\.value\.immunohematology\) \{[\s\S]*?subject: 'immunohematology'/)
+    expect(page).toMatch(/function requestTypingCorrection\(\) \{[\s\S]*?subject: 'immunohematology'/)
+    expect(page).toContain('if (correcting && !refused) requestTypingCorrection()')
     expect(page).toContain(':subject="correction.subject"')
     // A saved panel is only shown here, with the way to where it is changed.
-    expect(page).toContain('if (selected.value.serology) return')
-    expect(page).toContain(':disabled="isFinal || busy || Boolean(selected.serology)"')
+    expect(page).toContain('if (selected.value.serology) return null')
+    expect(page).toContain(':disabled="locked || busy || Boolean(selected?.serology)"')
+    expect(page).toContain('const locked = computed(() => !selected.value || isFinal.value)')
     expect(page).toContain('/blood-center/serology-results?donation=${selected.id}')
   })
 
   it('confirms a reactive panel before saving it', () => {
     // A reactive marker rejects the donation, defers the donor and refers
     // them. The dialog is the only way to send confirm_reactive: true.
-    expect(page).toContain('if (pendingReactive.value.length)')
-    expect(page).toContain('confirmingReactive.value = true')
-    expect(page).toContain('saveSerology(false)')
-    expect(page).toMatch(/function confirmReactive\(\)\s*\{\s*saveSerology\(true\)/)
+    expect(page).toContain('const reactiveToSave = computed(() => serologyToRecord.value && pendingReactive.value.length > 0)')
+    expect(page).toMatch(/if \(reactiveToSave\.value\) \{\s*confirmingReactive\.value = true\s*return/)
+    expect(page).toContain('saveResults(false)')
+    expect(page).toMatch(/function confirmReactive\(\)\s*\{\s*saveResults\(true\)/)
+    expect(page).toContain('const panel = serologyPayload(readings, confirmed, markers.value)')
   })
 
   it('never pre-fills the typing from the fingerprick or the donor profile', () => {
@@ -249,7 +260,16 @@ describe('the Processing page', () => {
   })
 
   it('treats a result recorded before the panel as unfinished', () => {
-    expect(page).toContain('selected.value?.test_result?.is_legacy')
+    expect(page).toContain("if (row.test_result?.is_legacy) return 'Needs serology from Testing'")
+  })
+
+  it('shows its cards before a unit is picked, locked, with the list as tall as the bench and counts on the chips (project owner, 2026-10-22)', () => {
+    expect(page).not.toContain('Pick a unit to start')
+    expect(page).toContain('<fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">')
+    expect(page).toContain("{{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}")
+    expect(page).toContain('align-items: stretch;')
+    // Each chip's count is its list's paginated total, one row asked for.
+    expect(page).toContain('per_page: 1')
   })
 })
 
@@ -300,9 +320,9 @@ describe('navigation', () => {
 
   it('gives the laboratory one testing page and Processing its own, each gated on its own write', () => {
     expect(nav).toContain("export const TESTING_ABILITIES = ['lab.record_serology', 'lab.record_immunohematology'] as const")
-    // One page, two links: each department's view, gated on that department's write.
-    expect(nav).toMatch(/label: 'Immunohematology', path: '\/blood-center\/testing\?test=typing'[^}]*requires: 'lab\.record_immunohematology'/)
-    expect(nav).toMatch(/label: 'Serology \(TTI\)', path: '\/blood-center\/testing\?test=serology'[^}]*requires: 'lab\.record_serology'/)
+    // One page, one link for both tests, gated on either department's write.
+    expect(nav).toMatch(/label: 'Blood Testing', path: '\/blood-center\/testing'[^}]*requires: TESTING_ABILITIES/)
+    expect(nav).not.toContain('/blood-center/testing?test=')
     expect(nav).not.toContain('/blood-center/immunohematology')
     expect(nav).toMatch(/label: 'Component Processing', path: '\/blood-center\/laboratory'[^}]*requires: 'lab\.record_components'/)
   })
@@ -355,7 +375,11 @@ describe('the staff roster', () => {
     expect(page).toContain('bloodCenterService.staffRoles()')
     // Title and role are pick-or-type fields (ComboInput, which replaced the
     // unstylable <datalist>): the suggestions still come from the catalogue.
-    expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.position"\s+:options="titles"/)
+    // The title holds credentials only, with no job post beside it (project
+    // owner, 2026-10-22: "ROWENA TAN, RMT").
+    expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.credentials"\s+:options="credentialOptions"/)
+    expect(page).toContain('if (response?.data?.titles?.length) credentialOptions.value = response.data.titles')
+    expect(page).not.toContain('form.position')
     expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
     // Several roles per person, all from the chosen department's catalogue
     // (project owner, 2026-10-17), plus an optional custom one.

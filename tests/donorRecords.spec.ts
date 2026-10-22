@@ -225,7 +225,8 @@ describe('the donors page', () => {
 describe('settings', () => {
   it('puts the donor email templates on the Blood Center tab', () => {
     const settings = source('app/pages/blood-center/settings.vue')
-    expect(settings).toMatch(/<BloodCenterFacilityLogoCard \/>\s*<BloodCenterDonorEmailTemplatesCard \/>/)
+    // After both logo cards: the facility logo, then the stock report's left logo.
+    expect(settings).toMatch(/<BloodCenterFacilityLogoCard \/>[\s\S]*?<BloodCenterFacilityLogoCard kind="seal" \/>\s*<BloodCenterDonorEmailTemplatesCard \/>/)
   })
 
   it('lets only the Admin edit them', () => {
