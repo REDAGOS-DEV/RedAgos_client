@@ -20,7 +20,7 @@
       </label>
       <label class="qd__field">
         <span class="qd__label">Birth date</span>
-        <input v-model="form.birth_date" type="date" class="qd__input" :max="maxBirthDate">
+        <DatePicker v-model="form.birth_date" :max="maxBirthDate" aria-label="Birth date" />
         <span v-if="fieldError('birth_date')" class="qd__error">{{ fieldError('birth_date') }}</span>
       </label>
       <label class="qd__field">
@@ -30,17 +30,12 @@
       </label>
       <label class="qd__field">
         <span class="qd__label">Sex <span class="qd__optional">optional</span></span>
-        <select v-model="form.gender" class="qd__input qd__select">
-          <option value="">Not given</option>
-          <option v-for="g in GENDER_OPTIONS" :key="g.value" :value="g.value">{{ g.label }}</option>
-        </select>
+        <SelectField v-model="form.gender" aria-label="Sex" :options="[{ value: '', label: 'Not given' }, ...GENDER_OPTIONS]" />
       </label>
       <label class="qd__field">
         <span class="qd__label">Blood group <span class="qd__optional">optional</span></span>
-        <select v-model="form.blood_type_id" class="qd__input qd__select">
-          <option value="">Not typed</option>
-          <option v-for="bt in bloodTypes" :key="bt.id" :value="String(bt.id)">{{ bt.code ?? bt.label }}</option>
-        </select>
+        <SelectField v-model="form.blood_type_id" aria-label="Blood type"
+          :options="[{ value: '', label: 'Not typed' }, ...bloodTypes.map(bt => ({ value: String(bt.id), label: bt.code ?? bt.label }))]" />
       </label>
       <label class="qd__field">
         <span class="qd__label">Mobile number <span class="qd__optional">optional</span></span>
@@ -71,6 +66,8 @@
 
 <script setup lang="ts">
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import type { BloodTypeOption } from '~/utils/bloodType'
 import { GENDER_OPTIONS, blankDonorForm, registerPayload } from '~/utils/donorRecords'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'

@@ -50,7 +50,7 @@ describe('the Testing dashboard', () => {
 
   it('is gated, in the page and the sidebar, on the ability the server checks', () => {
     expect(page).toContain("requires: 'lab.record_serology'")
-    expect(nav).toMatch(/label: 'Dashboard', path: '\/blood-center\/testing-dashboard'[^}]*requires: 'lab\.record_serology'/)
+    expect(nav).toMatch(/label: 'Testing Dashboard', path: '\/blood-center\/testing-dashboard'[^}]*requires: 'lab\.record_serology'/)
   })
 
   it('reads the dashboard endpoint and names no donor', () => {

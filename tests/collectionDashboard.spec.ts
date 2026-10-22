@@ -91,7 +91,7 @@ describe('the dashboard page and its link', () => {
 
   it('is gated on donations.view, exactly as its nav link is', () => {
     expect(page).toContain("requires: 'donations.view'")
-    expect(nav).toMatch(/label: 'Dashboard', path: '\/blood-center\/collection-dashboard'[^}]*requires: 'donations\.view'/)
+    expect(nav).toMatch(/label: 'Collection Dashboard', path: '\/blood-center\/collection-dashboard'[^}]*requires: 'donations\.view'/)
   })
 
   it('sits under Overview, with the centre-wide dashboard renamed beside it', () => {

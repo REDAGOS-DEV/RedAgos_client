@@ -138,13 +138,13 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // one is management's; the Donor/Collection one is the counter's own
       // (donations.view, held by every role there and no one else).
       { label: 'Center Dashboard', path: BLOOD_CENTER_OVERVIEW, icon: 'layout-dashboard', requires: 'reports.view_all', keywords: 'home summary overall center overview' },
-      { label: 'Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
+      { label: 'Collection Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
       // Testing's own (project owner, 2026-10-22). lab.record_serology, as on
       // the server: it splits results by marker, which Processing never sees.
-      { label: 'Dashboard', path: '/blood-center/testing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_serology', keywords: 'home testing laboratory lab bench queue serology typing reactive verify turnaround referrals trend' },
+      { label: 'Testing Dashboard', path: '/blood-center/testing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_serology', keywords: 'home testing laboratory lab bench queue serology typing reactive verify turnaround referrals trend' },
       // Processing's own (project owner, 2026-10-22): the department that records breakdowns.
-      { label: 'Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
-      { label: 'Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
+      { label: 'Processing Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
+      { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
     ],
   },
   {

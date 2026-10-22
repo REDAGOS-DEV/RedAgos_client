@@ -11,6 +11,9 @@
       </NuxtLink>
     </header>
 
+    <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
+    <TaskStrip class="needs-you" />
+
     <!-- ============ HEADLINE LEVELS ============ -->
     <section class="kpis" aria-label="Stock at a glance" :aria-busy="loading">
       <template v-if="loading">
@@ -330,6 +333,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { columnPath, niceScale } from '~/utils/collectionDashboard'

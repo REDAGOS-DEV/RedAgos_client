@@ -1173,7 +1173,7 @@ onMounted(async () => {
    inherit them correctly instead of only the .reports-page scope.
    ------------------------------------------------------------------------- */
 :global(:root) {
-    --rf-bg: #F7F8FA;
+    --rf-bg: var(--rb-page-bg, #F7F8FA);
     --rf-card: #ffffff;
     --rf-border: #e5eaf0;
     --rf-text: #1e293b;
@@ -1204,11 +1204,11 @@ onMounted(async () => {
 }
 
 :global(.dark) {
-    --rf-bg: #0f172a;
-    --rf-card: #1a2437;
-    --rf-border: #2a3650;
-    --rf-text: #e5eaf0;
-    --rf-text-secondary: #94a3b8;
+    --rf-bg: var(--ink-page, #0f172a);
+    --rf-card: var(--ink-surface, #1a2437);
+    --rf-border: var(--ink-border, #2a3650);
+    --rf-text: var(--ink-text, #e5eaf0);
+    --rf-text-secondary: var(--ink-text-2, #94a3b8);
     --rf-primary: #4f9cf9;
     --rf-primary-hover: #7ab8ff;
     --rf-primary-fill: #1565c0;

@@ -42,10 +42,8 @@
                 @input="onSearchInput"
               >
             </label>
-            <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="load()">
-              <option value="">All statuses</option>
-              <option v-for="s in DEFERRAL_STATUS_FILTERS" :key="s.value" :value="s.value">{{ s.label }}</option>
-            </select>
+            <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+              :options="[{ value: '', label: 'All statuses' }, ...DEFERRAL_STATUS_FILTERS]" @change="load()" />
           </div>
 
           <div class="toolbar__actions">
@@ -234,18 +232,13 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="d-type">Type <span class="req">*</span></label>
-                <select id="d-type" v-model="form.outcome" class="form-input form-select">
-                  <option v-for="t in DEFERRAL_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
-                </select>
+                <SelectField id="d-type" v-model="form.outcome" :options="DEFERRAL_TYPES" />
                 <p v-if="fieldError('outcome')" class="field-error">{{ fieldError('outcome') }}</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="d-reason">Reason <span class="req">*</span></label>
-                <select id="d-reason" v-model="form.reason" class="form-input form-select">
-                  <option value="" disabled>Select…</option>
-                  <option v-for="r in DEFERRAL_REASONS" :key="r" :value="r">{{ r }}</option>
-                  <option :value="OTHER_REASON">Other…</option>
-                </select>
+                <SelectField id="d-reason" v-model="form.reason" placeholder="Select…"
+                  :options="[...DEFERRAL_REASONS.map(r => ({ value: r, label: r })), { value: OTHER_REASON, label: 'Other…' }]" />
                 <p v-if="fieldError('reason') && form.reason !== OTHER_REASON" class="field-error">{{ fieldError('reason') }}</p>
               </div>
             </div>
@@ -259,19 +252,12 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="d-from">From Date</label>
-                <input id="d-from" v-model="form.from" type="date" class="form-input" :max="todayIso" @change="onFromChange">
+                <DatePicker id="d-from" v-model="form.from" :max="todayIso" @update:model-value="onFromChange" />
                 <p v-if="fieldError('deferred_on')" class="field-error">{{ fieldError('deferred_on') }}</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="d-until">Until Date <span v-if="isTemporary" class="req">*</span></label>
-                <input
-                  id="d-until"
-                  v-model="form.until"
-                  type="date"
-                  class="form-input"
-                  :min="untilMin"
-                  :disabled="!isTemporary"
-                >
+                <DatePicker id="d-until" v-model="form.until" :min="untilMin" :disabled="!isTemporary" />
                 <p v-if="fieldError('ends_on')" class="field-error">{{ fieldError('ends_on') }}</p>
                 <p v-else class="form-hint">Ignored for permanent and indefinite deferrals.</p>
               </div>
@@ -326,6 +312,8 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { isoDaysFromToday } from '~/utils/appointments'
 import {
@@ -1158,4 +1146,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

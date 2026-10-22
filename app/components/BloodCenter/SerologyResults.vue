@@ -34,9 +34,7 @@
               @input="onSearchInput"
             >
           </label>
-          <select v-model="outcome" class="select" aria-label="Filter by result" @change="load()">
-            <option v-for="option in OUTCOME_FILTERS" :key="option.value" :value="option.value">{{ option.label }}</option>
-          </select>
+          <SelectField v-model="outcome" class="sel-filter" size="sm" aria-label="Filter by result" :options="OUTCOME_FILTERS" @change="load()" />
         </div>
 
         <div class="toolbar__actions">
@@ -258,16 +256,13 @@
             <div class="form-grid">
               <label v-for="marker in markers" :key="marker.value" class="form-field">
                 <span class="form-label">{{ markerHeading(marker.label) }} <span v-if="editable" class="form-required" aria-hidden="true">*</span></span>
-                <select
+                <SelectField
                   v-model="editing.form[marker.value]"
-                  class="form-input form-select"
-                  :class="{ 'form-select--reactive': editing.form[marker.value] === 'reactive' }"
+                  :aria-label="marker.label"
+                  :invalid="editing.form[marker.value] === 'reactive'"
                   :disabled="!editable"
-                  required
-                >
-                  <option value="non_reactive">Non-reactive</option>
-                  <option value="reactive">Reactive</option>
-                </select>
+                  :options="[{ value: 'non_reactive', label: 'Non-reactive' }, { value: 'reactive', label: 'Reactive' }]"
+                />
               </label>
 
               <!-- What the panel reads as the form stands: any reactive marker makes it reactive. -->
@@ -473,6 +468,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { formatShortDate } from '~/utils/donorRecords'
 import { SEROLOGY_MARKERS, reactiveMarkers, serologyPayload } from '~/utils/serology'
@@ -1435,4 +1431,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

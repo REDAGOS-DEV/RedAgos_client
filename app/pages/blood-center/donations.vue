@@ -48,14 +48,10 @@
                 @input="onSearchInput"
               >
             </label>
-            <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="load()">
-              <option value="">All statuses</option>
-              <option v-for="s in DONATION_STATUS_FILTERS" :key="s.value" :value="s.value">{{ s.label }}</option>
-            </select>
-            <select v-model="bloodTypeId" class="select" aria-label="Filter by blood group" @change="load()">
-              <option value="">All groups</option>
-              <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
-            </select>
+            <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+              :options="[{ value: '', label: 'All statuses' }, ...DONATION_STATUS_FILTERS]" @change="load()" />
+            <SelectField v-model="bloodTypeId" class="sel-filter" size="sm" aria-label="Filter by blood group"
+              :options="[{ value: '', label: 'All groups' }, ...bloodTypeOptions.map(bt => ({ value: bt.id, label: bt.code }))]" @change="load()" />
             <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" @change="load()" />
           </div>
 
@@ -323,6 +319,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
@@ -1022,4 +1019,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

@@ -36,14 +36,10 @@
                 @input="onSearchInput"
               >
             </label>
-            <select v-model="moduleFilter" class="select" aria-label="Filter by module" @change="load()">
-              <option value="">All modules</option>
-              <option v-for="m in moduleOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-            </select>
-            <select v-model="typeFilter" class="select" aria-label="Filter by action" @change="load()">
-              <option value="">All actions</option>
-              <option v-for="t in typeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
-            </select>
+            <SelectField v-model="moduleFilter" class="sel-filter" size="sm" aria-label="Filter by module"
+              :options="[{ value: '', label: 'All modules' }, ...moduleOptions]" @change="load()" />
+            <SelectField v-model="typeFilter" class="sel-filter" size="sm" aria-label="Filter by action"
+              :options="[{ value: '', label: 'All actions' }, ...typeOptions]" @change="load()" />
             <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" @change="load()" />
           </div>
 
@@ -138,6 +134,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { auditTypeTone } from '~/utils/auditLog'
@@ -571,4 +568,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

@@ -37,6 +37,9 @@
         </template>
       </PageHeader>
 
+      <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
+      <TaskStrip class="needs-you" />
+
       <!-- ============ FIGURES ============ -->
       <!-- Each figure opens the page that owns the number, for whoever may open it. -->
       <StatStrip>
@@ -442,6 +445,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'

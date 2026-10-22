@@ -228,36 +228,27 @@
 
             <label class="filter-field">
               <span class="filter-field__label">Blood Type</span>
-              <select v-model="filters.bloodTypeId" class="filter-select">
-                <option value="">All</option>
-                <option v-for="t in bloodTypeOptions" :key="t.id" :value="t.id">{{ displayType(t.code) }}</option>
-              </select>
+              <SelectField v-model="filters.bloodTypeId" size="sm" aria-label="Blood type"
+                :options="[{ value: '', label: 'All' }, ...bloodTypeOptions.map(t => ({ value: t.id, label: displayType(t.code) }))]" />
             </label>
 
             <label class="filter-field">
               <span class="filter-field__label">Component</span>
-              <select v-model="filters.componentId" class="filter-select">
-                <option value="">All</option>
-                <option v-for="c in componentOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
+              <SelectField v-model="filters.componentId" size="sm" aria-label="Component"
+                :options="[{ value: '', label: 'All' }, ...componentOptions.map(c => ({ value: c.id, label: c.name }))]" />
             </label>
 
             <label class="filter-field">
               <span class="filter-field__label">Expiry Risk</span>
-              <select v-model="filters.expiryRisk" class="filter-select" @change="onExpiryRiskChange">
-                <option value="">All</option>
-                <option value="3">Within 3 days</option>
-                <option value="7">Within 7 days</option>
-                <option value="expired">Expired</option>
-              </select>
+              <SelectField v-model="filters.expiryRisk" size="sm" aria-label="Expiry risk"
+                :options="[{ value: '', label: 'All' }, { value: '3', label: 'Within 3 days' }, { value: '7', label: 'Within 7 days' }, { value: 'expired', label: 'Expired' }]"
+                @change="onExpiryRiskChange" />
             </label>
 
             <label class="filter-field">
               <span class="filter-field__label">Status</span>
-              <select v-model="filters.status" class="filter-select" @change="onStatusChange">
-                <option value="">All</option>
-                <option v-for="st in statusOptions" :key="st.value" :value="st.value">{{ st.label }}</option>
-              </select>
+              <SelectField v-model="filters.status" size="sm" aria-label="Status"
+                :options="[{ value: '', label: 'All' }, ...statusOptions]" @change="onStatusChange" />
             </label>
 
             <button type="button" class="clear-btn" :disabled="!hasActiveFilters" @click="clearFilters">
@@ -602,14 +593,12 @@
               <div class="form-row">
                 <label class="form-field">
                   <span class="form-field__label">Storage Location</span>
-                  <select v-model="batchForm.storageLocation" class="form-field__input form-field__select">
-                    <option value="">Not recorded</option>
-                    <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
-                  </select>
+                  <SelectField v-model="batchForm.storageLocation" aria-label="Storage location"
+                    :options="[{ value: '', label: 'Not recorded' }, ...storageLocationOptions.map(loc => ({ value: loc, label: loc }))]" />
                 </label>
                 <label class="form-field">
                   <span class="form-field__label">Expiry Date</span>
-                  <input v-model="batchForm.expiryDate" type="date" class="form-field__input" />
+                  <DatePicker v-model="batchForm.expiryDate" aria-label="Expiry date" />
                 </label>
               </div>
 
@@ -695,6 +684,8 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, resolveComponent } from 'vue'
@@ -1440,7 +1431,7 @@ onBeforeUnmount(() => {
 }
 :global(.dark .inv-tones) {
   /* Row dividers a step softer than the app's #334155 border, on #1E293B. */
-  --inv-border-soft: #263345;
+  --inv-border-soft: var(--ink-hover, #263345);
   --inv-ok: #4ADE80;
   --inv-warn: #FBBF24;
   --inv-crit: #F87171;

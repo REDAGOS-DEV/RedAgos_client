@@ -58,7 +58,7 @@
               </label>
               <label class="onsite__field">
                 <span class="onsite__label">Date of last donation <span class="onsite__optional">if any</span></span>
-                <input v-model="vitals.lastDonationDate" type="date" :max="today" class="onsite__input">
+                <DatePicker v-model="vitals.lastDonationDate" :max="today" aria-label="Last donation date" />
               </label>
               <label v-if="vitals.lastDonationDate" class="onsite__field">
                 <span class="onsite__label">Where was it? <span class="onsite__optional">optional</span></span>
@@ -122,7 +122,7 @@
 
                 <label v-if="q.code === lastMenstrualCode && answers[q.code] !== null && answers[q.code] !== undefined" class="onsite__field onsite__field--inline">
                   <span class="onsite__label">Last menstrual period</span>
-                  <input v-model="vitals.lastMenstrualPeriod" type="date" :max="today" class="onsite__input">
+                  <DatePicker v-model="vitals.lastMenstrualPeriod" :max="today" aria-label="Last menstrual period" />
                 </label>
               </li>
             </ol>
@@ -160,6 +160,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**

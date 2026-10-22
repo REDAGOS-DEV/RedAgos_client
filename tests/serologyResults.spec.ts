@@ -176,8 +176,11 @@ describe('a reactive result waits for a second person', () => {
   })
 
   it('counts what waits in the sidebar, the referrals from the unaudited summary', () => {
-    expect(sidebar).toContain("can('lab.verify_serology')")
-    expect(sidebar).toContain('counsellingReferralsSummary()')
+    // The counts live in useBloodCenterTasks, shared with the dashboards.
+    const tasks = source('app/composables/useBloodCenterTasks.ts')
+    expect(sidebar).toContain('useBloodCenterTasks()')
+    expect(tasks).toContain("can('lab.verify_serology')")
+    expect(tasks).toContain('counsellingReferralsSummary()')
     expect(sidebar).toContain('watch(badgeRefresh, () => loadCounts())')
   })
 })

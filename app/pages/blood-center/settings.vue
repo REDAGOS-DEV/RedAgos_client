@@ -191,28 +191,10 @@
       <template v-if="activeTab === 'appearance'">
         <section class="card card--split card--appearance">
           <div class="card__main">
-            <h2 class="card__title">Portal colour</h2>
-            <p class="card__sub">Pick a colour for your portal. It changes buttons, links, highlights and the sidebar in every RedAgos portal on this device.</p>
-            <div class="swatches" role="radiogroup" aria-label="Portal colour">
-              <button
-                v-for="t in accentThemes"
-                :key="t.key"
-                type="button"
-                role="radio"
-                class="swatch"
-                :class="{ 'swatch--on': accentKey === t.key }"
-                :aria-checked="accentKey === t.key"
-                @click="setAccent(t.key)"
-              >
-                <span class="swatch__circle" :style="{ background: `linear-gradient(135deg, ${t.gradFrom}, ${t.gradTo})`, '--ring': t.primary }">
-                  <span class="swatch__dot" :style="{ background: t.primary }" />
-                  <span v-if="accentKey === t.key" class="swatch__check" :style="{ background: t.primary }">
-                    <AssetIcon name="check" :size="12" />
-                  </span>
-                </span>
-                <span class="swatch__name">{{ t.name }}</span>
-              </button>
-            </div>
+            <h2 class="card__title">Appearance</h2>
+            <p class="card__sub">Make RedAgos yours. Saved on this device and used in every RedAgos portal.</p>
+            <!-- The donor portal's picker: mode, colour and custom colour. -->
+            <AppearancePicker class="card__picker" />
           </div>
 
           <!-- A tiny Blood Center screen in the picked colour -->
@@ -241,38 +223,19 @@
             </div>
             <p class="mini__label">Preview</p>
           </div>
-        </section>
 
-        <section class="card">
-          <header class="card__head">
-            <div>
-              <h2 class="card__title">Mode</h2>
-              <p class="card__sub">Light, dark, or the same as your browser. Saved on this device.</p>
-            </div>
-          </header>
-          <div class="mode-cards" role="radiogroup" aria-label="Mode">
-            <button
-              v-for="opt in themeOptions"
-              :key="opt.value"
-              type="button"
-              role="radio"
-              class="mode-card"
-              :class="{ 'mode-card--on': themeMode === opt.value }"
-              :aria-checked="themeMode === opt.value"
-              @click="selectTheme(opt.value)"
-            >
-              <span class="mode-card__preview" :class="`mode-card__preview--${opt.value}`">
-                <span class="mode-card__bar" />
-                <span class="mode-card__line mode-card__line--1" />
-                <span class="mode-card__line mode-card__line--2" />
-              </span>
-              <span class="mode-card__label">
-                <AssetIcon :name="opt.icon" :size="15" /> {{ opt.label }}
-              </span>
-              <span v-if="themeMode === opt.value" class="mode-card__check"><AssetIcon name="check" :size="12" /></span>
+          <!-- Across the whole card: the note on the left, Reset in the bottom-right corner. -->
+          <div class="appearance-foot">
+            <p class="appearance-foot__note">
+              <AssetIcon name="info" :size="13" />
+              Buttons and links keep readable contrast with any colour you pick.
+            </p>
+            <button type="button" class="appearance-foot__reset" :disabled="isDefaultAppearance" @click="resetAppearance">
+              Reset to default
             </button>
           </div>
         </section>
+
       </template>
 
       <!-- NOTIFICATIONS -->
@@ -280,21 +243,36 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Notifications</h2>
-            <p class="card__sub">Choose what you want to be told about.</p>
+            <p class="card__sub">What RedAgos tells you about, from your role. Shown in the bell at the top.</p>
           </div>
         </header>
-        <div class="toggle-list">
-          <label v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row">
+        <!--
+          From the server (StaffNotificationTopics), so this is the list the
+          senders use. A locked notice holds up a patient or a donor when
+          missed, so it stays on.
+        -->
+        <div v-if="notifLoading" class="toggle-list" aria-busy="true">
+          <div v-for="n in 2" :key="n" class="toggle-row"><span class="skeleton-line" /></div>
+        </div>
+        <div v-else-if="notificationPrefs.length" class="toggle-list">
+          <label v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row" :class="{ 'toggle-row--locked': pref.locked }">
             <span class="toggle-row__text">
               <span class="toggle-row__label">{{ pref.label }}</span>
               <span class="toggle-row__desc">{{ pref.description }}</span>
+              <span class="toggle-row__reason"><AssetIcon name="user-check" :size="12" /> {{ pref.reason }}</span>
             </span>
-            <span class="toggle-switch">
+            <span v-if="pref.locked" class="always-on" title="Always on: missing one holds up a patient or a donor">
+              <AssetIcon name="lock" :size="12" /> Always on
+            </span>
+            <span v-else class="toggle-switch">
               <input v-model="pref.enabled" type="checkbox" @change="saveNotificationPref(pref)" />
               <span class="toggle-switch__track"></span>
             </span>
           </label>
         </div>
+        <p v-else class="notif-empty">
+          Your role has no notices of its own. Messages for everyone at the centre still appear in the bell.
+        </p>
         <p v-if="notifSaveError" class="note note--error"><AssetIcon name="circle-alert" :size="14" /> {{ notifSaveError }}</p>
       </section>
 
@@ -395,6 +373,8 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import AppearancePicker from '~/components/common/AppearancePicker.vue'
+import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -459,10 +439,9 @@ const api = {
   // endpoint; ang copy sa UI kinahanglan mo-ingon niini.
   logoutOtherDevices: () => authService.logoutFromAllDevices(),
 
-  // Wala pay route ang blood center para ani. Ang notification preferences kay
-  // para ra sa donor (`/donors/notification-preferences`), ug ang tema kay
-  // lokal na pinaagi sa useDarkMode() — walay kalabotan ang server.
-  updateNotificationPref: async () => ({ success: true, local: true }),
+  // The staff member's own notices (StaffNotificationTopics on the server).
+  notificationPreferences: () => bloodCenterService.notificationPreferences(),
+  updateNotificationPref: ({ key, enabled }) => bloodCenterService.updateNotificationPreferences({ [key]: enabled }),
 }
 
 const loading = ref(true)
@@ -626,13 +605,24 @@ async function updatePassword() {
 }
 
 /* ------ NOTIFICATION PREFS ------- */
-const notificationPrefs = ref([
-  { key: 'urgent_requests', label: 'Urgent Request Alerts', description: 'Email me when a hospital submits an urgent blood request.', enabled: true },
-  { key: 'low_stock', label: 'Low Stock Alerts', description: 'Notify me when any blood type falls below safe inventory levels.', enabled: true },
-  { key: 'drive_reminders', label: 'Mobile Drive Reminders', description: 'Remind me a day before a scheduled mobile drive.', enabled: true },
-  { key: 'donor_registrations', label: 'New Donor Registrations', description: 'Notify me when a new donor registers for an appointment.', enabled: false },
-  { key: 'system_updates', label: 'System Updates', description: 'Receive occasional updates about RedAgos features.', enabled: false },
-])
+// Loaded from the server: [{ key, label, description, reason, locked, enabled }].
+const notificationPrefs = ref([])
+const notifLoading = ref(true)
+
+async function loadNotificationPrefs() {
+  notifLoading.value = true
+  try {
+    const data = await api.notificationPreferences()
+    notificationPrefs.value = Array.isArray(data?.topics) ? data.topics : []
+  } catch (err) {
+    console.error('Failed to load notification preferences:', err)
+    notifSaveError.value = 'Could not load your notifications. Please try again.'
+  } finally {
+    notifLoading.value = false
+  }
+}
+onMounted(loadNotificationPrefs)
+
 const notifSaveError = ref('')
 
 async function saveNotificationPref(pref) {
@@ -640,7 +630,7 @@ async function saveNotificationPref(pref) {
   try {
     await api.updateNotificationPref({ key: pref.key, enabled: pref.enabled })
   } catch (err) {
-    console.error('Failed to save notification preference (expected while backend is not yet wired up):', err)
+    console.error('Failed to save notification preference:', err)
     notifSaveError.value = 'Could not save this preference. Please try again.'
     pref.enabled = !pref.enabled // revert the toggle on failure
   }
@@ -682,18 +672,15 @@ const accountInfo = reactive({
 // Mode is the shared Light / Dark / System setting (same as the account menu).
 const { themeMode, setThemeMode } = useDarkMode()
 
-// Portal colour: one choice for every portal on this device.
-const { current: accentKey, themes: accentThemes, set: setAccent } = useAccentTheme()
+// Portal colour: one choice for every portal on this device. The picker
+// itself is AppearancePicker; the page keeps the reset.
+const { current: accentKey, set: setAccent } = useAccentTheme()
 
-const themeOptions = [
-  { value: 'light', label: 'Light', icon: 'sun' },
-  { value: 'dark', label: 'Dark', icon: 'moon' },
-  { value: 'system', label: 'System', icon: 'monitor' },
-]
+const isDefaultAppearance = computed(() => accentKey.value === DEFAULT_ACCENT && themeMode.value === 'system')
 
-// Used to only change this page's own state; now it switches the portal.
-function selectTheme(value) {
-  setThemeMode(value)
+function resetAppearance() {
+  setAccent(DEFAULT_ACCENT)
+  setThemeMode('system')
 }
 
 /* ------------ LOAD --------------- */
@@ -755,7 +742,6 @@ onMounted(async () => {
     if (data?.currentSession) Object.assign(currentSession, data.currentSession)
     // The server sends no device details; this browser can name itself.
     if (!currentSession.os || !currentSession.browser) Object.assign(currentSession, describeThisDevice(), { ...data?.currentSession })
-    if (data?.notificationPrefs) notificationPrefs.value = data.notificationPrefs
   } catch (err) {
     console.error('Failed to load settings:', err)
   } finally {
@@ -1103,6 +1089,33 @@ onMounted(async () => {
 .note--ok { background: rgba(46, 125, 50, 0.1); color: var(--rb-success-text, #2E7D32); }
 
 /* ── Appearance ── */
+.card__picker { margin-top: 18px; }
+.appearance-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 26px 20px;
+  border-top: 1px solid var(--rb-border);
+}
+.appearance-foot__note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--rb-fs-caption); color: var(--rb-text-secondary); }
+.appearance-foot__reset {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+.appearance-foot__reset:hover:not(:disabled) { background: var(--rb-surface-hover, #F1F5F9); }
+.appearance-foot__reset:disabled { opacity: 0.5; cursor: default; }
 .card--appearance { grid-template-columns: minmax(0, 1fr) 340px; align-items: center; }
 .card--appearance .card__main { padding: 26px; }
 
@@ -1337,6 +1350,22 @@ onMounted(async () => {
 .toggle-row__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .toggle-row__label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .toggle-row__desc { font-size: 12.5px; color: var(--text-secondary); }
+.toggle-row__reason { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text); }
+.toggle-row--locked { cursor: default; }
+.always-on {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--rb-surface-hover, #F1F5F9);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.notif-empty { margin: 0; padding: 0 24px 22px; font-size: 13px; color: var(--text-secondary); }
+.skeleton-line { display: block; width: 60%; height: 14px; border-radius: 6px; background: var(--rb-skeleton-a, #EEF1F5); }
 
 .toggle-switch { position: relative; flex-shrink: 0; width: 42px; height: 24px; }
 .toggle-switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }

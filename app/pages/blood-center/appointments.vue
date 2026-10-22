@@ -43,10 +43,8 @@
               >
             </label>
             <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" @change="load()" />
-            <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="load()">
-              <option value="">All statuses</option>
-              <option v-for="s in APPOINTMENT_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
-            </select>
+            <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+              :options="[{ value: '', label: 'All statuses' }, ...APPOINTMENT_STATUSES]" @change="load()" />
           </div>
 
           <div class="toolbar__actions">
@@ -307,26 +305,17 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="b-date">Date <span class="req">*</span></label>
-                <input
-                  id="b-date"
-                  v-model="booking.date"
-                  type="date"
-                  class="form-input"
-                  :min="todayIso"
-                  :max="horizonIso"
-                  :disabled="Boolean(booking.drive)"
-                  @change="loadSlots"
-                >
+                <DatePicker id="b-date" v-model="booking.date" :min="todayIso" :max="horizonIso"
+                  :disabled="Boolean(booking.drive)" @update:model-value="loadSlots" />
                 <p v-if="booking.drive" class="form-hint">The drive's date.</p>
                 <p v-if="fieldError('date')" class="field-error">{{ fieldError('date') }}</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="b-slot">Time Slot <span class="req">*</span></label>
-                <select id="b-slot" v-model="booking.timeSlot" class="form-input form-select" :disabled="booking.loadingSlots || !slotChoices.length">
-                  <option v-if="booking.loadingSlots" value="">Loading slots…</option>
-                  <option v-else-if="!slotChoices.length" value="">No slots this day</option>
-                  <option v-for="slot in slotChoices" :key="slot.time" :value="slot.time" :disabled="slot.disabled">{{ slot.label }}</option>
-                </select>
+                <SelectField id="b-slot" v-model="booking.timeSlot"
+                  :options="slotChoices.map(slot => ({ value: slot.time, label: slot.label, disabled: slot.disabled }))"
+                  :placeholder="booking.loadingSlots ? 'Loading slots…' : (slotChoices.length ? 'Select a time' : 'No slots this day')"
+                  :disabled="booking.loadingSlots || !slotChoices.length" />
                 <p v-if="fieldError('time_slot')" class="field-error">{{ fieldError('time_slot') }}</p>
               </div>
             </div>
@@ -389,6 +378,8 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
@@ -1343,4 +1334,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

@@ -380,7 +380,8 @@ describe('the staff roster', () => {
     expect(page).toMatch(/<ComboInput\s+id="staff-title"\s+v-model="form\.credentials"\s+:options="credentialOptions"/)
     expect(page).toContain('if (response?.data?.titles?.length) credentialOptions.value = response.data.titles')
     expect(page).not.toContain('form.position')
-    expect(page).toContain('<option v-for="group in departments" :key="group.department" :value="group.department">')
+    // The department is the system dropdown (SelectField), fed by the catalogue.
+    expect(page).toMatch(/<SelectField v-model="form\.department"[\s\S]{0,160}:options="departments\.map\(group => \(\{ value: group\.department, label: group\.label \}\)\)"/)
     // Several roles per person, all from the chosen department's catalogue
     // (project owner, 2026-10-17), plus an optional custom one.
     expect(page).toMatch(/<label v-for="role in departmentRoles"[^>]*>\s*<input v-model="form\.roles" type="checkbox" :value="role\.key"/)

@@ -1,18 +1,10 @@
 <template>
   <div class="bc-shell">
     <!--
-      Same backdrop as the donor portal: a soft gradient in the portal colour
-      behind everything. The frosted sidebar picks its tint up from here, so
-      the two rails look the same. Pages paint their own background over it.
+      As the donor portal: a plain canvas behind everything, under solid
+      chrome (the top bar and the sidebar). Pages paint their own background.
     -->
     <div class="bc-backdrop" aria-hidden="true" />
-    <!--
-      The page's glass: the same frosted layer as the top bar and the sidebar
-      (same white, opacity, blur and colour boost), filling the space beside
-      the rail and under the bar, so all three are one colour. It follows the
-      rail's width like the top bar does.
-    -->
-    <div class="bc-frost" :class="railExpanded ? 'lg:left-64' : 'lg:left-[72px]'" aria-hidden="true" />
     <BloodCenterSidebar />
 
     <!-- Sentinel sa pinakataas sa document: kung dili na makita, naka-scroll na -->
@@ -25,9 +17,14 @@
       what keeps the widened sidebar beside the page rather than over it.
     -->
     <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'">
+      <!--
+        Desktop: the bar runs the full width above the sidebar, as in the donor
+        portal: menu button and brand at its left edge on the rail's icon axis,
+        the search in the middle, the account on the right.
+      -->
       <header
-        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
-        :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'topbar--scrolled': isScrolled }]"
+        class="topbar fixed top-0 left-0 right-0 z-30 lg:z-[60] h-14 sm:h-16 border-b transition-[box-shadow,background-color] duration-200"
+        :class="{ 'topbar--scrolled': isScrolled }"
         :style="{ boxShadow: isScrolled ? headerShadow : 'none' }">
         <!--
           Same as the donor portal: the bar shares the page and sidebar canvas
@@ -44,7 +41,7 @@
           much, so the chrome and the page it framed were on two different
           grids.
         -->
-        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[var(--rb-content-max)] items-center gap-2 sm:gap-3 px-4 sm:px-6">
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[var(--rb-content-max)] lg:max-w-none items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-4">
 
         <!-- Left cluster: drawer toggle + titles -->
         <!--
@@ -54,32 +51,49 @@
           under the search box.
         -->
         <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0 lg:max-w-[calc(50%-13rem)] xl:max-w-[calc(50%-15rem)]">
+          <!--
+            The menu button: on desktop it opens the rail, which closes again
+            when the pointer leaves it (components/BloodCenter/Sidebar.vue);
+            below 1024px it opens the drawer. On the rail's 36px icon axis.
+          -->
           <button
-            class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
-            aria-label="Open menu"
-            @click="openMobile">
-            <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
+            type="button"
+            class="rail-toggle"
+            data-rail-toggle
+            :aria-expanded="railExpanded || mobileOpen"
+            aria-controls="blood-center-sidebar"
+            :aria-label="railExpanded ? 'Close menu' : 'Open menu'"
+            @click="toggleMenu">
+            <AssetIcon name="menu" :size="20" />
           </button>
 
-          <!-- Page title (small screens, where the breadcrumb does not fit) -->
-          <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
-            {{ pageLabel }}
-          </span>
+          <NuxtLink :to="homePath" class="bc-logo" :aria-label="`RedAgos, go to ${pageHomeLabel}`">
+            <img :src="logo" alt="" class="bc-logo__img">
+          </NuxtLink>
 
-          <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink" :title="breadcrumb">
-            <span class="hidden lg:block text-[11px] text-[#64748b] dark:text-slate-400 leading-tight truncate">
-              {{ breadcrumb }}
-            </span>
-            <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight truncate">
-              {{ greeting }}
-            </span>
+          <!--
+            The wordmark, and beneath it where this page sits: the centre, its
+            department and the page on desktop; the centre alone below that.
+          -->
+          <div class="brand-word">
+            <NuxtLink :to="homePath" class="brand-word__name" tabindex="-1" aria-hidden="true">
+              Red<span class="brand-word__accent">Agos</span>
+            </NuxtLink>
+            <span class="brand-word__tag lg:hidden">{{ facilityName || 'Blood Center Portal' }}</span>
+            <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="breadcrumb">
+              <ol>
+                <li v-for="(crumb, i) in crumbs" :key="i" :aria-current="i === crumbs.length - 1 ? 'page' : null">
+                  {{ crumb }}
+                </li>
+              </ol>
+            </nav>
           </div>
         </div>
 
         <div
           v-show="searchOpenMobile || true"
           v-click-outside="closeSearchResults"
-          class="items-center gap-2 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#CBD5E1] dark:hover:border-[#475569] focus-within:border-[color:rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-2 focus-within:ring-[color:rgba(var(--rb-primary-rgb),0.1)] transition-colors px-3 py-2 relative"
+          class="items-center gap-2 rounded-xl bg-white dark:bg-[color:var(--ink-surface,#1E293B)] border border-[#E2E8F0] dark:border-[color:var(--ink-border,#334155)] hover:border-[#CBD5E1] dark:hover:border-[color:var(--ink-border-hover,#475569)] focus-within:border-[color:rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-2 focus-within:ring-[color:rgba(var(--rb-primary-rgb),0.1)] transition-colors px-3 py-2 relative"
           :class="[
             searchOpenMobile
               ? 'flex flex-1 z-40'
@@ -102,7 +116,7 @@
           >
           <span
             v-if="!searchQuery"
-            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-white dark:bg-slate-700 text-[#94a3b8] dark:text-slate-300 border border-[#eef1f5] dark:border-slate-600 flex-shrink-0"
+            class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-white dark:bg-[color:var(--ink-hover,#334155)] text-[#94a3b8] dark:text-[color:var(--ink-text-3,#CBD5E1)] border border-[#eef1f5] dark:border-[color:var(--ink-border-hover,#475569)] flex-shrink-0"
           >
             {{ shortcutLabel }}
           </span>
@@ -118,7 +132,7 @@
           <Transition name="popup">
             <div
               v-if="showSearchResults && searchQuery && filteredResults.length"
-              class="search-panel absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-lg z-40"
+              class="search-panel absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-surface,#0F172A)] border dark:border-[color:var(--ink-border,#334155)] shadow-lg z-40"
               :style="{ borderColor: headerBorderColor }"
             >
               <NuxtLink
@@ -127,8 +141,8 @@
                 :to="item.path"
                 class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
                 :class="i === highlightIndex
-                  ? 'bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-slate-100'
-                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800'"
+                  ? 'bg-gray-50 dark:bg-[color:var(--ink-hover,#1E293B)] text-gray-900 dark:text-slate-100'
+                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-[color:var(--ink-hover,#1E293B)]'"
                 @click="closeSearchResults(); searchOpenMobile = false"
               >
                 <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500 flex-shrink-0" />
@@ -139,7 +153,7 @@
 
             <div
               v-else-if="showSearchResults && searchQuery && !filteredResults.length"
-              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
+              class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-surface,#0F172A)] border dark:border-[color:var(--ink-border,#334155)] shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
               :style="{ borderColor: headerBorderColor }"
             >
               No matches for "{{ searchQuery }}"
@@ -166,7 +180,7 @@
             no screens, so `hidden xs:block` compiled to `hidden` and this
             divider never rendered at any width. sm is the real first step up.
           -->
-          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
+          <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-[color:var(--ink-border,#334155)]" />
 
           <!--
             Opens on hover with a mouse (closing after a short delay, so
@@ -183,7 +197,7 @@
               @click="toggleUserMenu"
             >
               <div
-                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-900"
+                class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-[color:var(--rb-chrome,#0F172A)]"
                 style="background: var(--rb-primary)"
               >
                 <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
@@ -303,11 +317,7 @@
         </div>
       </header>
 
-      <!--
-        Transparent, like the donor layout: the backdrop behind it shows
-        through the frosted top bar and around each page, and every
-        blood-centre page still paints its own --rb-page-bg.
-      -->
+      <!-- Every blood-centre page paints its own --rb-page-bg. -->
       <main class="min-h-screen transition-colors duration-150 pt-14 sm:pt-16">
         <slot />
       </main>
@@ -326,6 +336,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterNotificationBell from '~/components/BloodCenter/NotificationBell.vue'
 import { HELP_GUIDES, guideVisible, searchGuides } from '~/utils/bloodCenterHelp'
 import { useAccentTheme } from '~/composables/useAccentTheme'
+import { accentSurfaces, accentTheme } from '~/utils/accentThemes'
+import { departmentHome } from '~/composables/useBloodCenterNav'
+import logo from '~/assets/images/RedAgosLogo.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -341,7 +354,26 @@ const THEME_OPTIONS = [
   { value: 'dark', label: 'Dark', icon: 'moon' },
   { value: 'system', label: 'System (same as your browser)', icon: 'monitor' },
 ]
-const { railExpanded, openMobile } = useSidebar('blood-center')
+const { railExpanded, mobileOpen, openMobile, expandOnHover, collapseOnHover } = useSidebar('blood-center')
+
+// One button for both: the rail on desktop, the drawer below 1024px.
+function toggleMenu() {
+  if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (railExpanded.value) collapseOnHover()
+    else expandOnHover()
+  } else {
+    openMobile()
+  }
+}
+
+// The logo goes to this user's own landing page (as the sidebar's did).
+const homePath = computed(() => departmentHome(user.value))
+const pageHomeLabel = computed(() => (homePath.value === '/blood-center/dashboard' ? 'the overview' : 'your dashboard'))
+
+// The donor portal's palette (main.css): the canvas, chrome and every
+// surface take the colour theme's tint, light and dark.
+onMounted(() => document.documentElement.classList.add('portal-bc'))
+onUnmounted(() => document.documentElement.classList.remove('portal-bc'))
 
 const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 /*
@@ -366,10 +398,30 @@ const accent = useAccentTheme()
 onMounted(() => accent.init())
 onUnmounted(() => accent.clear())
 
+// The browser's own bar (the tab strip on desktop when installed, the status
+// and address bar on phones) takes the header's colour, as in the donor
+// portal, so the browser and the portal read as one. Tinted by the colour
+// theme, light and dark. Set on the one tag by hand: useHead left the
+// server-rendered tag beside the client's, and browsers read the first.
+let themeColorMeta = null
+function applyThemeColor() {
+  if (!themeColorMeta) {
+    themeColorMeta = document.querySelector('meta[name="theme-color"]') ?? document.createElement('meta')
+    themeColorMeta.setAttribute('name', 'theme-color')
+    if (!themeColorMeta.isConnected) document.head.appendChild(themeColorMeta)
+  }
+  const { light, dark } = accentSurfaces(accentTheme(accent.current.value))
+  themeColorMeta.setAttribute('content', isDark.value ? dark.chrome : light.chrome)
+}
+onMounted(applyThemeColor)
+watch([isDark, accent.current], () => { if (themeColorMeta) applyThemeColor() })
+onUnmounted(() => {
+  themeColorMeta?.remove()
+  themeColorMeta = null
+})
+
 // The path as the nav knows it, with the one query that picks a view.
 const navPath = computed(() => (route.query.test ? `${route.path}?test=${route.query.test}` : route.path))
-
-const pageLabel = computed(() => labelForPath(navPath.value) || 'Blood Center')
 
 const facilityName = computed(() =>
   user.value?.facility?.facility_name || user.value?.facility?.name || ''
@@ -379,11 +431,13 @@ const facilityName = computed(() =>
 // page belongs to: "Davao Blood Center / Issuance / Blood Inventory".
 const sectionLabel = computed(() => sectionForPath(route.path))
 
-const breadcrumb = computed(() =>
-  [facilityName.value || 'Blood Center Portal', sectionLabel.value, labelForPath(navPath.value)]
-    .filter(Boolean)
-    .join(' / ')
+// Desktop: "Centre › Department › Page". When the bar runs short the
+// centre's name gives way first (an ellipsis, the full name in the tooltip),
+// so the department and the page always read in full.
+const crumbs = computed(() =>
+  [facilityName.value || 'Blood Center Portal', sectionLabel.value, labelForPath(navPath.value)].filter(Boolean)
 )
+const breadcrumb = computed(() => [facilityName.value, ...crumbs.value].filter(Boolean).join(' / '))
 
 const nameParts = computed(() => {
   const parts = [user.value?.first_name, user.value?.last_name].map(v => (v || '').trim()).filter(Boolean)
@@ -416,15 +470,6 @@ onMounted(() => {
   if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
     shortcutLabel.value = '⌘F'
   }
-})
-
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-  // Names are stored as typed ("maria"), so capitalise for the greeting.
-  const raw = nameParts.value[0] || ''
-  const first = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Blood Center'
-  return `${time}, ${first}`
 })
 
 // "Processing · Sub-National Blood Center": where this person works.
@@ -788,96 +833,96 @@ const handleLogout = async () => {
 }
 
 :global(.dark .bc-shell) {
-  --rb-text-secondary: #94A3B8;
-  --rb-text-muted: #8391A6;
-  --rb-placeholder: #8391A6;
-  --rb-border: #334155;
-  --rb-border-strong: #3E4C63;
+  /* The donor portal's ink levels (main.css), so text keeps its contrast on
+     the tinted surfaces. */
+  --rb-text-secondary: var(--ink-text-2, #94A3B8);
+  --rb-text-muted: var(--ink-muted, #8391A6);
+  --rb-placeholder: var(--ink-text-2, #8391A6);
+  --rb-border: var(--ink-border, #334155);
+  --rb-border-strong: var(--ink-border, #3E4C63);
 }
 
-/* ── Backdrop: the donor portal's, in the portal colour ── */
+/* ── Backdrop: a plain canvas, as in the donor portal ── */
 .bc-backdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  /*
-   * The landing hero's glow, in the portal colour (2026-10-15): a soft wash
-   * of the portal colour at the top that fades to the neutral canvas, a glow
-   * in the top-right corner and a faint brand red one on the left. The glass
-   * of the top bar and the sidebar sits on the coloured top, so it shows;
-   * the working area further down stays neutral.
-   */
-  background:
-    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 32%, transparent), transparent 70%),
-    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.06), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-from, #E5EFFC) 70%, #F6F8FB) 0%, #F6F8FB 55%);
+  /* The donor canvas (main.css); --rb-page-bg itself is transparent inside
+     .bc-shell, so the pages show this through. */
+  background: var(--accent-canvas-light, #F5F6F8);
 }
-:global(.dark .bc-shell .bc-backdrop) {
-  background:
-    radial-gradient(50% 60% at 90% 0%, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 18%, transparent), transparent 72%),
-    radial-gradient(35% 45% at 0% 15%, rgba(198, 40, 40, 0.08), transparent 72%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rb-grad-to, #ADCCEF) 8%, #0B1220) 0%, #0B1220 55%);
-}
+:global(.dark .bc-shell .bc-backdrop) { background: var(--ink-page, #0B1220); }
 
-/*
- * Frosted glass over the backdrop, exactly like the sidebar (same white at
- * the same opacity), so the two read as one frame. The landing-style gradient
- * comes through from the backdrop behind both.
- */
+/* Solid chrome, shared with the sidebar: --rb-chrome (main.css, html.portal-bc). */
 .topbar {
   /* The token, not a bound colour: a bound one keeps the server's light value after hydration. */
   border-color: var(--rb-border);
-  background-color: rgba(255, 255, 255, 0.55);
-  /* A mild colour boost, so the glow behind shows through the glass. */
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
-  transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
-  will-change: left;
-}
-.topbar--scrolled { background-color: rgba(255, 255, 255, 0.72); }
-:global(.dark .bc-shell .topbar) { background-color: rgba(15, 23, 42, 0.6); }
-:global(.dark .bc-shell .topbar--scrolled) { background-color: rgba(15, 23, 42, 0.78); }
-
-/* No blur, or less transparency requested: a solid bar. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topbar { background-color: var(--rb-surface, #FFFFFF); }
-}
-/* Reduced transparency: the glass stays (it sits over a still gradient, not
-   over content), only the scrolled bar, with content sliding under it,
-   turns solid. */
-@media (prefers-reduced-transparency: reduce) {
-  .topbar--scrolled { background-color: var(--rb-surface, #FFFFFF); }
+  background-color: var(--rb-chrome, #FFFFFF);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
 }
 
 main {
   background: transparent;
 }
 
-.bc-frost {
-  position: fixed;
-  top: 56px;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: rgba(255, 255, 255, 0.55);
-  /* A mild colour boost, so the glow behind shows through the glass. */
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
-  transition: left 200ms ease-out;
+/* ── Brand: menu button, logo, wordmark and breadcrumb ── */
+.rail-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rb-text-primary, #1E293B);
+  cursor: pointer;
+  transition: background-color 150ms ease;
 }
-@media (min-width: 640px) {
-  .bc-frost { top: 64px; }
+.rail-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+:global(.dark .bc-shell .rail-toggle:hover) { background: rgba(255, 255, 255, 0.08); }
+.rail-toggle:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.rail-toggle:active { transform: scale(0.95); }
+
+/* The logo stands on its own, as in the donor portal: no tile to swallow its
+   red and blue. */
+.bc-logo { display: flex; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; }
+.bc-logo__img { width: 100%; height: 100%; object-fit: contain; }
+.bc-logo:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+@media (min-width: 1024px) {
+  .bc-logo { width: 48px; height: 48px; }
 }
-:global(.dark .bc-shell .bc-frost) { background-color: rgba(15, 23, 42, 0.6); }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bc-frost { background-color: var(--rb-surface, #FFFFFF); }
+
+.brand-word { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
+.brand-word__name {
+  font-family: var(--rb-font-sans);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rb-text-primary);
+  text-decoration: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .bc-frost { transition: none; }
+.brand-word__accent { color: #D32F2F; }
+.brand-word__tag {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--rb-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* Centre › Department › Page; the page keeps its room, the rest give way. */
+.brand-crumb { margin-top: 2px; min-width: 0; }
+.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
+.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
+.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
+.brand-crumb li:first-child:not(:last-child) { flex-shrink: 1; }
+.brand-crumb li[aria-current] { flex-shrink: 0; max-width: 100%; color: var(--rb-text-primary); font-weight: 600; }
 
 .search-panel {
   max-height: 320px;
@@ -913,7 +958,8 @@ input:focus {
 
 @media (prefers-reduced-motion: reduce) {
   .content-shift,
-  .topbar {
+  .topbar,
+  .rail-toggle {
     transition: none;
   }
 }

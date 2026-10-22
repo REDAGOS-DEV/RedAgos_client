@@ -189,8 +189,12 @@ describe('the Processed page', () => {
   })
 
   it('counts what waits for the hand-over, for the role that hands over', () => {
-    expect(sidebar).toContain("processedDonations({ status: 'awaiting_handover', per_page: 1 })")
-    expect(sidebar).toContain("can('lab.update_status')")
+    // The counts live in useBloodCenterTasks, shared by the sidebar and the
+    // dashboards' "Needs you" strip.
+    const tasks = source('app/composables/useBloodCenterTasks.ts')
+    expect(sidebar).toContain('useBloodCenterTasks()')
+    expect(tasks).toContain("processedDonations({ status: 'awaiting_handover', per_page: 1 })")
+    expect(tasks).toContain("can('lab.update_status')")
     expect(page).toContain('badgeRefresh.value++')
   })
 })

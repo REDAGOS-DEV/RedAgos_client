@@ -67,10 +67,8 @@
             >
           </label>
           <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" aria-label="Requested between" @change="loadRequests()" />
-          <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="loadRequests()">
-            <option value="">All statuses</option>
-            <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+          <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+            :options="[{ value: '', label: 'All statuses' }, ...STATUS_OPTIONS]" @change="loadRequests()" />
         </div>
 
         <div class="toolbar__actions">
@@ -553,14 +551,8 @@
         <p class="modal-desc">{{ requestToReject?.id }} — {{ requestToReject?.hospital }}</p>
         <div class="field">
           <label class="field-label">Rejection Reason *</label>
-          <select v-model="rejectReason" class="field-select">
-            <option value="" disabled>Select a reason</option>
-            <option>Insufficient Inventory</option>
-            <option>Invalid Request</option>
-            <option>Duplicate Request</option>
-            <option>Request Cancelled by Hospital</option>
-            <option>Other</option>
-          </select>
+          <SelectField v-model="rejectReason" placeholder="Select a reason" aria-label="Reason"
+            :options="['Insufficient Inventory', 'Invalid Request', 'Duplicate Request', 'Request Cancelled by Hospital', 'Other'].map(r => ({ value: r, label: r }))" />
         </div>
         <div class="field">
           <label class="field-label">Additional Notes</label>
@@ -606,6 +598,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
@@ -1338,7 +1331,7 @@ onBeforeUnmount(() => {
   --primary: #1565c0;
   --primary-fill: #1565c0;
   --primary-fill-hover: #0d47a1;
-  --bg: #F7F8FA;
+  --bg: var(--rb-page-bg, #F7F8FA);
   --card: #ffffff;
   --border: #e5eaf0;
   --text: #1e293b;
@@ -2102,7 +2095,7 @@ onBeforeUnmount(() => {
  *    anchored on the page's scope class.
  */
 :global(.dark .scope-blood-center-bloodrequests) {
-  --bg: #0F172A; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
+  --bg: var(--ink-page, #0F172A); --card: var(--ink-surface, #171e2c); --border: var(--ink-border, #2a3447); --text: var(--ink-text, #e2e8f0); --text-secondary: var(--ink-text-2, #94a3b8);
   /* Only the text family lifts; the -fill tokens keep their deep values so
      white-on-fill buttons and toasts stay legible. */
   --primary: #64b5f6; --success: #66bb6a; --warning: #fbbf24;
@@ -2129,4 +2122,9 @@ onBeforeUnmount(() => {
 :global(.dark .scope-blood-center-bloodrequests .field-select),
 :global(.dark .scope-blood-center-bloodrequests .field-textarea) { background: #1c2536; }
 :global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

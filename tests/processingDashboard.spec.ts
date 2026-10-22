@@ -42,7 +42,7 @@ describe('the Processing dashboard', () => {
 
   it('is gated, in the page and the sidebar, on the ability the server checks', () => {
     expect(page).toContain("requires: 'lab.record_components'")
-    expect(nav).toMatch(/label: 'Dashboard', path: '\/blood-center\/processing-dashboard'[^}]*requires: 'lab\.record_components'/)
+    expect(nav).toMatch(/label: 'Processing Dashboard', path: '\/blood-center\/processing-dashboard'[^}]*requires: 'lab\.record_components'/)
     expect(source('app/api/bloodcenter/BloodCenterService.ts')).toContain('/laboratory/processing-dashboard')
   })
 

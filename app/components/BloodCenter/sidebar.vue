@@ -9,23 +9,35 @@
     </Transition>
 
     <!--
-      Same rail as the donor portal. The left edge never moves: every icon
-      (logo, pages, folders, settings) sits on the same 36px axis in both
-      states, and the labels are not removed when collapsing; the rail's right
-      edge slides over them. Only the width animates.
+      The donor portal's rail. Desktop: 72px of icons under the full-width top
+      bar, opened by the menu button in the bar and closed when the pointer
+      leaves it (or a click lands outside, or Escape). The layout moves the
+      content column over with it, so nothing is covered. Opened, each
+      department folder shows its pages on a thin "agos" line that fills up to
+      the current page. Below 1024px it is the drawer.
     -->
     <aside
+      id="blood-center-sidebar"
+      ref="asideEl"
       aria-label="Blood Center navigation"
-      class="sidebar fixed top-0 left-0 h-screen z-50 flex flex-col w-[272px] lg:translate-x-0"
+      class="sidebar fixed top-0 left-0 h-screen lg:top-16 lg:h-[calc(100vh-4rem)] z-50 flex flex-col w-[272px] lg:translate-x-0"
       :class="[
         mobileOpen ? 'translate-x-0' : '-translate-x-full',
-        railCollapsed ? 'lg:w-[72px]' : 'lg:w-64'
+        railOpen ? 'lg:w-64 is-hover-open' : 'lg:w-[72px]'
       ]"
-      :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow, '--sb-hover': SIDEBAR_HOVER_SOFT }"
-      @mouseenter="handleSidebarEnter"
-      @mouseleave="handleSidebarLeave"
-      @focusin="handleSidebarEnter"
-      @focusout="handleSidebarLeave">
+      :style="{
+        background: SIDEBAR_BG,
+        boxShadow: sidebarShadow,
+        '--sb-hover': SIDEBAR_HOVER_SOFT,
+        '--sb-current-bg': SIDEBAR_CURRENT_BG,
+        '--sb-current-text': SIDEBAR_ACTIVE_TEXT,
+        '--sb-text': SIDEBAR_FOLDER_TEXT,
+        '--sb-muted': SIDEBAR_IDLE_TEXT,
+        '--sb-border': SIDEBAR_BORDER
+      }"
+      @mouseenter="cancelClose"
+      @mouseleave="closeRailSoon"
+      @focusout="onFocusOut">
 
       <!-- Close button (mobile drawer only) -->
       <button
@@ -41,7 +53,7 @@
         px-4 + a 40px mark puts the logo's centre on the 36px axis.
       -->
       <div
-        class="brand px-4 h-14 sm:h-16 flex items-center gap-3 border-b flex-shrink-0 cursor-pointer select-none overflow-hidden"
+        class="brand px-4 h-14 sm:h-16 flex lg:hidden items-center gap-3 border-b flex-shrink-0 cursor-pointer select-none overflow-hidden"
         :style="{ borderColor: SIDEBAR_BORDER }"
         role="link"
         tabindex="0"
@@ -49,8 +61,7 @@
         @click="goHome"
         @keydown.enter.prevent="goHome"
         @keydown.space.prevent="goHome">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative"
-          style="background: var(--rb-primary)">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative">
           <img v-if="!navigatingHome" :src="logo" alt="RedAgos" class="logo-image">
           <span v-else class="logo-spinner" />
         </div>
@@ -65,13 +76,92 @@
         </div>
       </div>
 
-      <!-- Navigation: nav px-3 + item px-3 + a 24px icon box = 36px axis -->
-      <nav class="flex-1 flex flex-col overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4" :class="isDark ? 'nav-dark' : ''">
+      <!--
+        Desktop rail: icon rows whose labels show when it opens, and each
+        department's pages beneath its folder. A folder still opens and closes
+        on a click, as in the drawer.
+      -->
+      <nav v-if="!isMobile" class="rail flex-1 overflow-y-auto overflow-x-hidden" aria-label="Blood center pages">
+        <NuxtLink
+          v-for="item in topItems"
+          :key="item.path"
+          :to="item.path"
+          class="rail-row"
+          :class="{ 'is-current': isActive(item.path) }"
+          :title="railOpen ? null : item.label"
+          :aria-current="isActive(item.path) ? 'page' : null">
+          <span class="icon-box">
+            <AssetIcon :name="item.icon" :size="18" />
+            <span v-if="!railOpen && badgeFor(item)" class="status-dot" :style="dotStyle(item.badge)" />
+          </span>
+          <span class="rail-row__label">{{ item.label }}</span>
+          <span v-if="railOpen && badgeFor(item)" class="count-pill" :style="badgeStyle(item.badge)">{{ badgeFor(item) }}</span>
+        </NuxtLink>
+
+        <div v-if="topItems.length && folders.length" class="rail__divider" aria-hidden="true" />
+
+        <div v-for="folder in folders" :key="folder.key" class="rail-folder">
+          <button
+            type="button"
+            class="rail-row rail-row--folder"
+            :class="{ 'has-current': folderHasActive(folder) }"
+            :title="railOpen ? null : folder.label"
+            :aria-expanded="railOpen ? isOpen(folder.key) : null"
+            :aria-controls="`rail-folder-${folder.key}`"
+            @click="railOpen && toggleFolder(folder.key)">
+            <span class="icon-box">
+              <AssetIcon :name="folder.icon" :size="18" />
+              <span v-if="(!railOpen || !isOpen(folder.key)) && folderBadge(folder)" class="status-dot"
+                :style="dotStyle(folderBadge(folder))" />
+            </span>
+            <span class="rail-row__label">{{ folder.label }}</span>
+            <AssetIcon name="chevron-down" :size="14" class="rail-row__chevron"
+              :class="{ 'rail-row__chevron--closed': !isOpen(folder.key) }" />
+          </button>
+
+          <!--
+            The agos line: one thread from the folder down through its pages,
+            filled in the portal colour as far as the page open now.
+          -->
+          <div :id="`rail-folder-${folder.key}`" class="agos" :class="{ 'agos--closed': !isOpen(folder.key) }">
+            <ul class="agos__list">
+              <li
+                v-for="(item, i) in folder.items"
+                :key="item.path"
+                class="agos__item"
+                :class="{ 'is-filled': i <= currentIndex(folder), 'is-current': isActive(item.path) }">
+                <NuxtLink :to="item.path" class="agos__link" :aria-current="isActive(item.path) ? 'page' : null"
+                  :tabindex="railOpen && isOpen(folder.key) ? null : -1">
+                  <span class="agos__label">{{ item.label }}</span>
+                  <span v-if="badgeFor(item)" class="count-pill" :style="badgeStyle(item.badge)">{{ badgeFor(item) }}</span>
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div v-if="bottomItems.length" class="rail__bottom">
+          <NuxtLink
+            v-for="item in bottomItems"
+            :key="item.path"
+            :to="item.path"
+            class="rail-row"
+            :class="{ 'is-current': isActive(item.path) }"
+            :title="railOpen ? null : item.label"
+            :aria-current="isActive(item.path) ? 'page' : null">
+            <span class="icon-box"><AssetIcon :name="item.icon" :size="18" /></span>
+            <span class="rail-row__label">{{ item.label }}</span>
+          </NuxtLink>
+        </div>
+      </nav>
+
+      <!-- Drawer (below 1024px): nav px-3 + item px-3 + a 24px icon box = 36px axis -->
+      <nav v-else class="flex-1 flex flex-col overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4" :class="isDark ? 'nav-dark' : ''">
         <!-- Main: each department's dashboard, as top-level rows -->
         <NuxtLink v-for="item in topItems" :key="item.path" :to="item.path"
           class="nav-item"
           :class="{ 'is-current': isActive(item.path) }"
-          :title="railCollapsed && !isMobile ? item.label : null"
+          :title="null"
           :aria-current="isActive(item.path) ? 'page' : null"
           :style="navStyle(item.path)"
           @click="closeMobile"
@@ -101,7 +191,7 @@
             :class="{ 'has-current': folderHasActive(folder) }"
             :aria-expanded="isOpen(folder.key)"
             :aria-controls="`folder-${folder.key}`"
-            :title="railCollapsed && !isMobile ? folder.label : null"
+            :title="null"
             :style="folderStyle(folder)"
             @click="toggleFolder(folder.key)">
             <span class="icon-box">
@@ -143,7 +233,7 @@
           <NuxtLink v-for="item in bottomItems" :key="item.path" :to="item.path"
             class="nav-item"
             :class="{ 'is-current': isActive(item.path) }"
-            :title="railCollapsed && !isMobile ? item.label : null"
+            :title="null"
             :aria-current="isActive(item.path) ? 'page' : null"
             :style="navStyle(item.path)"
             @click="closeMobile"
@@ -167,14 +257,13 @@ import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser'
 import { useSidebar } from '~/composables/useSidebar.js'
-import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { departmentHome } from '~/composables/useBloodCenterNav'
+import { useBloodCenterTasks } from '~/composables/useBloodCenterTasks'
 
 const {
   collapsed,
   hoverExpanded,
   railExpanded,
-  expandOnHover,
   collapseOnHover,
   mobileOpen,
   closeMobile
@@ -182,7 +271,7 @@ const {
 
 const route = useRoute()
 const router = useRouter()
-const { user, ensureUser, can } = useUser()
+const { user, ensureUser } = useUser()
 
 // --- Dark mode awareness ---
 const isDark = ref(false)
@@ -195,44 +284,69 @@ let mobileMql = null
 
 const onViewportChange = (e) => {
   isMobile.value = e.matches
-  // Dropping to drawer widths with a hover still latched would leave the rail
-  // — and the content padding that tracks it — stuck open on the way back up.
-  if (isMobile.value) collapseOnHover()
+  // Dropping to drawer widths with the rail open would leave it — and the
+  // content padding that tracks it — stuck open on the way back up.
+  if (isMobile.value) closeRail()
 }
-
-/** The rail's visual state: collapsed unless hovered, or unless it is a drawer. */
-const railCollapsed = computed(() => !railExpanded.value)
-
-/** Whether labels/text should render at all. */
-const showLabels = computed(() => isMobile.value || railExpanded.value)
 
 /*
- * Leaving is deferred by a beat. Without it a pointer crossing the rail's own
- * edge — which moves out from under the cursor as the sidebar widens and the
- * content reflows — can fire leave/enter in quick succession and flicker.
+ * Opened by the menu button in the top bar (the layout), closed when the
+ * pointer leaves the rail, a click lands outside it, Escape, or the button
+ * again: the donor portal's rail. The state lives in useSidebar, which the
+ * layout reads to move its content column, so the two always agree.
  */
-let leaveTimer = null
+const railOpen = computed(() => !isMobile.value && railExpanded.value)
 
-const handleSidebarEnter = () => {
-  if (isMobile.value) return
-  clearTimeout(leaveTimer)
-  expandOnHover()
+/** Whether labels/text should render at all (the drawer always has them). */
+const showLabels = computed(() => isMobile.value || railOpen.value)
+
+const asideEl = ref(null)
+let railTimer = null
+
+// Back on the rail before the close fires: keep it open.
+function cancelClose() {
+  clearTimeout(railTimer)
 }
 
-const handleSidebarLeave = () => {
+// A beat before closing, so brushing past the edge doesn't flicker it.
+function closeRailSoon() {
   if (isMobile.value) return
-  clearTimeout(leaveTimer)
-  leaveTimer = setTimeout(collapseOnHover, 120)
+  clearTimeout(railTimer)
+  railTimer = setTimeout(closeRail, 160)
 }
+
+function closeRail() {
+  clearTimeout(railTimer)
+  collapseOnHover()
+}
+
+// Keyboard: stay open while focus is anywhere in the rail.
+function onFocusOut(e) {
+  if (isMobile.value) return
+  if (asideEl.value?.contains(e.relatedTarget) || asideEl.value?.matches(':hover')) return
+  closeRailSoon()
+}
+
+function onOutsidePointer(e) {
+  if (!hoverExpanded.value) return
+  // The menu button toggles on its own click; closing here first would reopen it.
+  if (asideEl.value?.contains(e.target) || e.target.closest?.('[data-rail-toggle]')) return
+  closeRail()
+}
+
+// Arriving on a page closes the rail, unless the pointer is still on it.
+watch(() => route.path, () => {
+  if (!asideEl.value?.matches(':hover')) closeRail()
+})
 
 const handleEscape = (e) => {
   if (e.key !== 'Escape') return
   if (mobileOpen.value) closeMobile()
-  else if (hoverExpanded.value) collapseOnHover()
+  else if (hoverExpanded.value) closeRail()
 }
 
 onMounted(() => {
-  // Hover rail: always starts collapsed, like the donor portal.
+  // Narrow until the menu button opens it, like the donor portal.
   collapsed.value = true
   restoreFolders()
 
@@ -246,10 +360,12 @@ onMounted(() => {
   isMobile.value = mobileMql.matches
   mobileMql.addEventListener('change', onViewportChange)
   window.addEventListener('keydown', handleEscape)
+  document.addEventListener('pointerdown', onOutsidePointer)
 })
 
 onUnmounted(() => {
-  clearTimeout(leaveTimer)
+  clearTimeout(railTimer)
+  document.removeEventListener('pointerdown', onOutsidePointer)
   themeObserver?.disconnect()
   mobileMql?.removeEventListener('change', onViewportChange)
   window.removeEventListener('keydown', handleEscape)
@@ -265,33 +381,32 @@ watch(mobileOpen, (open) => {
 })
 
 // Light/dark theme tokens: the donor rail's, so the portals read as one product.
-const SIDEBAR_BG = computed(() => (isDark.value ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.55)'))
-const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
+// Solid, in the chrome colour the top bar shares (main.css, html.portal-bc).
+const SIDEBAR_BG = computed(() => (isDark.value ? 'var(--rb-chrome, #1E293B)' : 'var(--rb-chrome, #FFFFFF)'))
+const SIDEBAR_BORDER = computed(() => (isDark.value ? 'var(--ink-border, #334155)' : '#E5EAF0'))
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? 'var(--rb-primary-text)' : 'var(--rb-primary)'))
 // Two text levels. Primary: top-level rows and folder names. Secondary: pages
 // inside a folder.
-const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
-const SIDEBAR_FOLDER_TEXT = computed(() => (isDark.value ? '#E2E8F0' : '#334155'))
-const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
+const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? 'var(--ink-text-2, #94A3B8)' : '#64748B'))
+const SIDEBAR_FOLDER_TEXT = computed(() => (isDark.value ? 'var(--ink-text-4, #E2E8F0)' : '#334155'))
+const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? 'var(--ink-text, #F1F5F9)' : '#1F2937'))
 const SIDEBAR_CURRENT_BG = computed(() => (isDark.value ? 'color-mix(in srgb, var(--rb-primary-text) 14%, transparent)' : 'color-mix(in srgb, var(--rb-primary) 10%, white)'))
 const SIDEBAR_HOVER_SOFT = computed(() => (isDark.value ? 'rgba(148,163,184,0.10)' : '#EEF1F5'))
-const sidebarShadow = computed(() =>
-  isDark.value
-    ? '1px 0 0 ' + SIDEBAR_BORDER.value + ', 4px 0 24px rgba(0,0,0,0.35)'
-    : '1px 0 0 ' + SIDEBAR_BORDER.value + ', 4px 0 24px rgba(15,23,42,0.04)'
-)
+const sidebarShadow = computed(() => '1px 0 0 ' + SIDEBAR_BORDER.value)
 
 const portalLabel = computed(() => user.value?.facility?.facility_name || 'Blood Center')
 
 // // Dev note: pending/urgent counts naka-fetch sa blood center dashboard summary endpoint
-const badgeCounts = ref({ pending: 0, urgent: 0, corrections: 0, verification: 0, referrals: 0, handover: 0 })
+// The counts are useBloodCenterTasks', shared with the dashboards' "Needs you".
+const { counts: taskCounts, load: loadTaskCounts } = useBloodCenterTasks()
+const badgeCounts = computed(() => taskCounts.value)
 
 const badgeStyle = (badge) => {
   const urgent = badge === 'urgent'
   return {
     background: urgent
       ? (isDark.value ? 'rgba(239,83,80,0.18)' : 'rgba(211,47,47,0.10)')
-      : (isDark.value ? '#334155' : '#F1F5F9'),
+      : (isDark.value ? 'var(--ink-border, #334155)' : '#F1F5F9'),
     color: urgent
       ? (isDark.value ? '#EF9A9A' : '#D32F2F')
       : SIDEBAR_IDLE_TEXT.value
@@ -306,9 +421,14 @@ const { navGroups } = useBloodCenterNav()
 // --- Main rows, department folders, Account at the bottom ---
 // The groups come from useBloodCenterNav (already filtered by permission and
 // ordered by department); the sidebar only decides how they are drawn.
+// One icon per department, so the narrow rail tells them apart.
 const FOLDER_ICONS = {
+  Overview: 'layout-dashboard',
+  Donor: 'users',
   'Donor / Collection': 'users',
+  Collection: 'syringe',
   Testing: 'flask-conical',
+  'Stock and Supply': 'warehouse',
   Processing: 'package',
   Issuance: 'box',
   Billing: 'receipt',
@@ -356,6 +476,8 @@ function saveFolders() {
 // Folders start open; only an explicit close is remembered.
 const isOpen = key => openFolders.value[key] !== false
 const folderHasActive = folder => folder.items.some(item => isActive(item.path))
+// How far down a folder's agos line is filled: to the current page, or not at all.
+const currentIndex = folder => folder.items.findIndex(item => isActive(item.path))
 
 function toggleFolder(key) {
   openFolders.value = { ...openFolders.value, [key]: !isOpen(key) }
@@ -390,7 +512,7 @@ const folderBadge = (folder) => {
 
 const dotStyle = badge => ({
   background: badge === 'urgent' ? '#D32F2F' : '#F57C00',
-  boxShadow: '0 0 0 2px ' + (isDark.value ? '#0F172A' : '#FFFFFF'),
+  boxShadow: '0 0 0 2px ' + (isDark.value ? 'var(--rb-chrome, #1E293B)' : 'var(--rb-chrome, #FFFFFF)'),
 })
 
 const loadUser = async () => {
@@ -406,57 +528,7 @@ const loadUser = async () => {
   await loadCounts()
 }
 
-const loadCounts = async () => {
-  // Each count is loaded on its own, and only for a user who may open the page
-  // it sits on, so one refusal or failure never hides the others.
-  const counts = []
-
-  // Incoming Requests: requests still waiting; Request Fulfillment: open emergencies.
-  if (can('requests.view')) {
-    counts.push(bloodCenterService.incomingRequestsSummary().then((summary) => {
-      badgeCounts.value.pending = summary?.totals?.pending ?? 0
-      badgeCounts.value.urgent = summary?.open_emergencies ?? 0
-    }))
-  }
-
-  // Corrections waiting on this user's decision.
-  if (can('corrections.approve')) {
-    counts.push(bloodCenterService.corrections({ scope: 'review', status: 'pending', per_page: 1 }).then((review) => {
-      badgeCounts.value.corrections = review?.total ?? 0
-    }))
-  }
-
-  // Serology Results: what waits for the Laboratory Supervisor there, reactive
-  // results to verify and corrections to decide.
-  if (can('lab.verify_serology')) {
-    counts.push(Promise.all([
-      bloodCenterService.serologyResults({ outcome: 'awaiting_verification', per_page: 1 }),
-      bloodCenterService.serologyResults({ outcome: 'correction_pending', per_page: 1 }),
-    ]).then(([waiting, corrections]) => {
-      badgeCounts.value.verification = (waiting?.total ?? 0) + (corrections?.total ?? 0)
-    }))
-  }
-
-  // Counselling Referrals: donors nobody has acted on yet. The summary route,
-  // not the list, which is audited on every read.
-  if (can('lab.referrals')) {
-    counts.push(bloodCenterService.counsellingReferralsSummary().then((summary) => {
-      badgeCounts.value.referrals = summary?.pending_count ?? 0
-    }))
-  }
-
-  // Processed: units with their breakdown recorded, waiting to be handed over
-  // to Issuance. Counted for the one role that hands them over.
-  if (can('lab.update_status') && can('lab.record_components')) {
-    counts.push(bloodCenterService.processedDonations({ status: 'awaiting_handover', per_page: 1 }).then((waiting) => {
-      badgeCounts.value.handover = waiting?.total ?? 0
-    }))
-  }
-
-  for (const result of await Promise.allSettled(counts)) {
-    if (result.status === 'rejected') console.error(result.reason)
-  }
-}
+const loadCounts = () => loadTaskCounts()
 
 onMounted(loadUser)
 
@@ -536,9 +608,6 @@ const goHome = async () => {
  * content padding that tracks it move as one.
  */
 .sidebar {
-  /* As the top bar: a mild colour boost, so the glow behind shows through. */
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
   will-change: width, transform;
   transition: width 200ms ease-out, transform 200ms ease-out;
 }
@@ -624,18 +693,145 @@ const goHome = async () => {
   border-radius: 999px;
 }
 
+/* ── Desktop rail: the donor portal's ── */
+.rail {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 14px;
+}
+/* nav px-12 + row px-12 + the 24px icon box = the 36px icon axis */
+.rail-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sb-text);
+  font: inherit;
+  font-size: var(--rb-fs-body);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+a.rail-row:hover,
+.is-hover-open .rail-row--folder:hover { background: var(--sb-hover); }
+.rail-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.rail-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.is-hover-open .rail-row__label { opacity: 1; }
+.rail-row.is-current { background: var(--sb-current-bg); color: var(--sb-current-text); font-weight: 700; }
+.rail-row--folder { cursor: default; }
+.is-hover-open .rail-row--folder { cursor: pointer; }
+.rail-row--folder.has-current { color: var(--sb-current-text); }
+.sidebar:not(.is-hover-open) .rail-row--folder.has-current { background: var(--sb-current-bg); }
+.rail-row__chevron { flex-shrink: 0; opacity: 0; transition: transform 180ms ease, opacity 150ms ease; }
+.is-hover-open .rail-row__chevron { opacity: 0.7; }
+.rail-row__chevron--closed { transform: rotate(-90deg); }
+.rail-row .count-pill { opacity: 0; }
+.is-hover-open .rail-row .count-pill { opacity: 1; }
+
+/* ── The agos line ── */
+/* Folded away while the rail is narrow or the folder closed; opens as it widens. */
+.agos {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 200ms ease-out, opacity 150ms ease;
+}
+.is-hover-open .agos:not(.agos--closed) { grid-template-rows: 1fr; opacity: 1; padding-bottom: 6px; }
+.agos__list {
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The thread runs down the folder icon's axis: 12px row padding + half the
+   24px icon box. The page names line up with the folder name. */
+.agos__item {
+  position: relative;
+  padding-left: 36px;
+}
+.agos__item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 23px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--sb-border);
+}
+.agos__item.is-filled::before { background: var(--rb-primary); }
+/* The current page: the thread ends in a drop of the portal colour. */
+.agos__item.is-current::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 19px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border: 2px solid var(--rb-chrome, #fff);
+  border-radius: 999px;
+  background: var(--rb-primary);
+  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.18);
+}
+.agos__item.is-current::before { bottom: 50%; }
+.agos__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 1px 0;
+  padding: 7px 12px;
+  border-radius: 10px;
+  color: var(--sb-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.agos__link:hover { background: var(--sb-hover); color: var(--sb-text); }
+.agos__link:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.agos__item.is-current .agos__link { color: var(--sb-current-text); font-weight: 700; }
+.agos__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.rail__divider { flex-shrink: 0; height: 1px; margin: 8px 4px; background: var(--sb-border); }
+.rail-folder { flex-shrink: 0; }
+.rail__bottom {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--sb-border);
+}
+
+/* The logo stands on its own, with no tile: it carries its own red and blue,
+   which a tile in the theme colour would swallow. */
 .logo-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
 }
 
 .logo-spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
+  border: 2px solid rgba(var(--rb-primary-rgb), 0.25);
+  border-top-color: var(--rb-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -693,14 +889,13 @@ nav::-webkit-scrollbar {
   }
 }
 
-/* No blur available: a solid rail. (Reduced transparency keeps the glass: the
-   rail sits over a still gradient, not over content.) */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .sidebar { background: var(--rb-surface, #FFFFFF) !important; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .folder-chevron,
+  .rail-row,
+  .rail-row__label,
+  .rail-row__chevron,
+  .agos,
+  .agos__link,
   .label,
   .sidebar,
   .scrim-enter-active,

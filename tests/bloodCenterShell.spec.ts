@@ -42,26 +42,42 @@ describe('rail width and the space reserved for it', () => {
 
   /*
    * The rail is 72px collapsed (the donor portal's rail) and 16rem open:
-   * w-[72px] and pl-[72px]/left-[72px] reserve exactly the first, w-64 and
-   * pl-64/left-64 the second. Asserting on the class names is asserting that
-   * the two files picked the same widths.
+   * w-[72px] and pl-[72px] reserve exactly the first, w-64 and pl-64 the
+   * second. Asserting on the class names is asserting that the two files
+   * picked the same widths.
    */
   it('gives the collapsed rail a width the content column also reserves', () => {
     expect(sidebar).toContain('lg:w-[72px]')
     expect(layout).toContain('lg:pl-[72px]')
-    expect(layout).toContain('lg:left-[72px]')
   })
 
   it('gives the expanded rail a width the content column also reserves', () => {
     expect(sidebar).toContain('lg:w-64')
     expect(layout).toContain('lg:pl-64')
-    expect(layout).toContain('lg:left-64')
   })
 
   it('drives both widths from the one railExpanded flag', () => {
-    expect(sidebar).toContain("railCollapsed ? 'lg:w-[72px]' : 'lg:w-64'")
+    // railOpen is railExpanded on desktop (the drawer below 1024px has its own width).
+    expect(sidebar).toContain('const railOpen = computed(() => !isMobile.value && railExpanded.value)')
+    expect(sidebar).toContain("railOpen ? 'lg:w-64 is-hover-open' : 'lg:w-[72px]'")
     expect(layout).toContain("railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'")
-    expect(layout).toContain("railExpanded ? 'lg:left-64' : 'lg:left-[72px]'")
+  })
+
+  /*
+   * As in the donor portal, the top bar runs the full width and the rail
+   * starts beneath it, so the bar no longer follows the rail's width.
+   */
+  it('runs the top bar the full width, with the rail beneath it', () => {
+    expect(layout).not.toContain("railExpanded ? 'lg:left-64' : 'lg:left-[72px]'")
+    expect(layout).toContain('lg:z-[60]')
+    expect(sidebar).toContain('lg:top-16 lg:h-[calc(100vh-4rem)]')
+  })
+
+  it('opens the rail from the menu button and closes it when the pointer leaves', () => {
+    expect(layout).toContain('data-rail-toggle')
+    expect(layout).toContain('function toggleMenu()')
+    expect(sidebar).toContain('@mouseleave="closeRailSoon"')
+    expect(sidebar).not.toContain('@mouseenter="handleSidebarEnter"')
   })
 
   it('reads that flag from the blood-centre bucket, not the donor one', () => {
@@ -77,7 +93,6 @@ describe('rail width and the space reserved for it', () => {
   it('moves the rail and the content column over the same duration', () => {
     expect(sidebar).toContain('transition: width 200ms ease-out')
     expect(layout).toContain('transition: padding-left 200ms ease-out')
-    expect(layout).toContain('transition: left 200ms ease-out')
   })
 
   it('reflows the content rather than floating the rail over it', () => {

@@ -49,9 +49,7 @@
               @input="onSearchInput"
             >
           </label>
-          <select v-model="status" class="select" aria-label="Filter by hand-over" @change="load()">
-            <option v-for="option in STATUS_FILTERS" :key="option.value" :value="option.value">{{ option.label }}</option>
-          </select>
+          <SelectField v-model="status" class="sel-filter" size="sm" aria-label="Filter by hand-over" :options="STATUS_FILTERS" @change="load()" />
         </div>
 
         <div class="toolbar__actions">
@@ -341,10 +339,8 @@
                 <div v-for="(bag, index) in open.form" :key="index" class="bag-row">
                   <label class="form-field">
                     <span class="form-label">Component <span class="form-required" aria-hidden="true">*</span></span>
-                    <select v-model.number="bag.component_id" class="form-input form-select">
-                      <option :value="null" disabled>Select</option>
-                      <option v-for="component in catalogue" :key="component.id" :value="component.id">{{ component.name }}</option>
-                    </select>
+                    <SelectField v-model="bag.component_id" placeholder="Select" aria-label="Component"
+                      :options="catalogue.map(component => ({ value: component.id, label: component.name }))" />
                   </label>
                   <label class="form-field form-field--volume">
                     <span class="form-label">Volume (mL) <span class="form-required" aria-hidden="true">*</span></span>
@@ -607,6 +603,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { finalLabelsFrom } from '~/utils/bagLabels'
@@ -1711,4 +1708,9 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

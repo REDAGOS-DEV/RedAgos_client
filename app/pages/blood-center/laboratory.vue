@@ -242,10 +242,8 @@
               <label class="field">
                 <span class="field__label">Component <span class="req" aria-hidden="true">*</span></span>
                 <span class="select">
-                  <select v-model.number="draft.component_id" class="field__input">
-                    <option :value="null" disabled>Select component</option>
-                    <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
-                  </select>
+                  <SelectField v-model="draft.component_id" placeholder="Select component" aria-label="Component"
+                    :options="components.map(c => ({ value: c.id, label: c.name }))" />
                   <AssetIcon name="chevron-down" :size="16" class="select__chevron" />
                 </span>
               </label>
@@ -380,6 +378,7 @@
 
 <script setup>
 import { h } from 'vue'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'

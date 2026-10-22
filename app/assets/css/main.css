@@ -194,9 +194,11 @@ html.dark {
 
 /*
  * Donor portal light: a neutral grey canvas under solid white chrome and
- * cards, so the portal sits with the browser's own light toolbar.
+ * cards, so the portal sits with the browser's own light toolbar. The blood
+ * centre (`portal-bc`, its layout) uses the same palette, light and dark.
  */
-html.portal-donor:not(.dark) {
+html.portal-donor:not(.dark),
+html.portal-bc:not(.dark) {
   /* Tinted by the colour theme (useAccentTheme); neutral fallbacks. */
   --rb-page-bg: var(--accent-canvas-light, #F5F6F8);
   --rb-chrome: var(--accent-chrome-light, #FFFFFF);
@@ -210,7 +212,8 @@ html.portal-donor:not(.dark) {
  * `portal-donor` on <html>; every other portal keeps the navy above, and the
  * shared components read `var(--ink-*, <navy>)` so they fall back to it there.
  */
-html.dark.portal-donor {
+html.dark.portal-donor,
+html.dark.portal-bc {
   /* Blue slate, after the browser's own dark chrome: the tab strip, the
      address bar and the toolbar. Text levels re-checked on the cards (#2B3445)
      and the chrome (#333C4D): text-2 is 5.8:1 on the chrome. */

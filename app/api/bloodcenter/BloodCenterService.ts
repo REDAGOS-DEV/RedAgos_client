@@ -56,6 +56,15 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/password`, 'POST', payload)
   }
 
+  /** The notices this person gets and why, and the few they may turn off. */
+  async notificationPreferences(): Promise<any> {
+    return this.request(`${this.resource}/notification-preferences`, 'GET')
+  }
+
+  async updateNotificationPreferences(payload: Record<string, boolean>): Promise<any> {
+    return this.request(`${this.resource}/notification-preferences`, 'PATCH', payload)
+  }
+
   // --- Collection department ---
 
   async collectionQueue(params: Record<string, any> = {}): Promise<any> {

@@ -44,12 +44,9 @@
         </button>
       </div>
 
-      <select v-model="departmentFilter" class="select" aria-label="Filter by department" @change="load">
-        <option value="">All departments</option>
-        <option v-for="group in departments" :key="group.department" :value="group.department">
-          {{ group.label }}
-        </option>
-      </select>
+      <SelectField v-model="departmentFilter" class="sel-filter" size="sm" aria-label="Filter by department"
+        :options="[{ value: '', label: 'All departments' }, ...departments.map(group => ({ value: group.department, label: group.label }))]"
+        @change="load" />
 
       <label class="toggle">
         <input v-model="includeDeleted" type="checkbox" @change="load" >
@@ -281,12 +278,8 @@
               <h3 class="form__section-title">Role and access</h3>
               <label class="form__field">
                 <span>Department</span>
-                <select v-model="form.department">
-                  <option value="">Select a department</option>
-                  <option v-for="group in departments" :key="group.department" :value="group.department">
-                    {{ group.label }}
-                  </option>
-                </select>
+                <SelectField v-model="form.department" placeholder="Select a department" aria-label="Department"
+                  :options="departments.map(group => ({ value: group.department, label: group.label }))" />
                 <em v-if="errors.department">{{ errors.department[0] }}</em>
                 <em v-if="catalogueError">{{ catalogueError }}</em>
               </label>
@@ -315,9 +308,7 @@
                 <!-- Only asked when there is a choice to make. -->
                 <label v-if="form.roles.length > 1" class="form__field">
                   <span>Main role</span>
-                  <select v-model="form.main_role">
-                    <option v-for="key in form.roles" :key="key" :value="key">{{ roleLabelOf(key) }}</option>
-                  </select>
+                  <SelectField v-model="form.main_role" aria-label="Main role" :options="form.roles.map(key => ({ value: key, label: roleLabelOf(key) }))" />
                   <small>Where they start after signing in.</small>
                 </label>
 
@@ -379,11 +370,8 @@
 
               <label v-if="editing" class="form__field">
                 <span>Account status</span>
-                <select v-model="form.account_status">
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
-                  <option value="deactivated">Deactivated</option>
-                </select>
+                <SelectField v-model="form.account_status" aria-label="Account status"
+                  :options="[{ value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' }, { value: 'deactivated', label: 'Deactivated' }]" />
                 <small>Suspending or deactivating an account signs it out immediately.</small>
               </label>
             </section>
@@ -405,6 +393,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
@@ -1457,4 +1446,9 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
     grid-template-columns: 1fr;
   }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

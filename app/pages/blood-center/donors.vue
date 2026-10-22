@@ -45,22 +45,12 @@
               >
             </label>
 
-            <select
-              v-if="!contactOnly"
-              v-model="bloodTypeId"
-              class="select"
-              aria-label="Filter by blood group"
-              @change="loadDonors()"
-            >
-              <option value="">All groups</option>
-              <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="bt.id">{{ bt.code }}</option>
-            </select>
+            <SelectField v-if="!contactOnly" v-model="bloodTypeId" class="sel-filter" size="sm" aria-label="Filter by blood group"
+              :options="[{ value: '', label: 'All groups' }, ...bloodTypeOptions.map(bt => ({ value: bt.id, label: bt.code }))]" @change="loadDonors()" />
 
-            <select v-model="statusFilter" class="select" aria-label="Filter by status" @change="loadDonors()">
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+              :options="[{ value: '', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]"
+              @change="loadDonors()" />
           </div>
 
           <div class="toolbar__actions">
@@ -347,14 +337,11 @@
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="d-gender">Gender</label>
-                  <select id="d-gender" v-model="form.data.gender" class="form-input form-select">
-                    <option value="">Not given</option>
-                    <option v-for="g in GENDER_OPTIONS" :key="g.value" :value="g.value">{{ g.label }}</option>
-                  </select>
+                  <SelectField id="d-gender" v-model="form.data.gender" :options="[{ value: '', label: 'Not given' }, ...GENDER_OPTIONS]" />
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="d-birth">Date of birth <span class="req">*</span></label>
-                  <input id="d-birth" v-model="form.data.birth_date" type="date" class="form-input" :max="todayIso" :disabled="!form.editable.identity" required>
+                  <DatePicker id="d-birth" v-model="form.data.birth_date" :max="todayIso" :disabled="!form.editable.identity" :invalid="!!fieldError('birth_date')" />
                   <p v-if="fieldError('birth_date')" class="field-error">{{ fieldError('birth_date') }}</p>
                 </div>
               </div>
@@ -362,10 +349,8 @@
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="d-bt">Blood group</label>
-                  <select id="d-bt" v-model="form.data.blood_type_id" class="form-input form-select">
-                    <option value="">Unknown — the laboratory will type it</option>
-                    <option v-for="bt in bloodTypeOptions" :key="bt.id" :value="String(bt.id)">{{ bt.code }}</option>
-                  </select>
+                  <SelectField id="d-bt" v-model="form.data.blood_type_id"
+                    :options="[{ value: '', label: 'Unknown — the laboratory will type it' }, ...bloodTypeOptions.map(bt => ({ value: String(bt.id), label: bt.code }))]" />
                   <p v-if="fieldError('blood_type_id')" class="field-error">{{ fieldError('blood_type_id') }}</p>
                 </div>
                 <div class="form-group">
@@ -415,7 +400,7 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="d-last-donation">Last donation date</label>
-                  <input id="d-last-donation" v-model="form.data.last_donation_date" type="date" class="form-input" :max="todayIso">
+                  <DatePicker id="d-last-donation" v-model="form.data.last_donation_date" :max="todayIso" />
                   <p v-if="fieldError('last_donation_date')" class="field-error">{{ fieldError('last_donation_date') }}</p>
                   <p v-else class="form-hint">As the donor recalls it. A donation recorded here always wins.</p>
                 </div>
@@ -424,10 +409,7 @@
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="d-status">Status</label>
-                  <select id="d-status" v-model="form.data.status" class="form-input form-select">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+                  <SelectField id="d-status" v-model="form.data.status" :options="[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]" />
                   <p class="form-hint">Inactive donors are not sent eligibility reminders.</p>
                 </div>
                 <div class="form-group">
@@ -789,6 +771,8 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import {
@@ -2361,4 +2345,9 @@ td.c-address {
   .skeleton,
   .spin { animation: none !important; }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

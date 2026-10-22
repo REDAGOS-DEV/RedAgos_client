@@ -160,12 +160,9 @@
 
             <label v-if="form.source === 'redagos'" class="field">
               <span class="form-label">Which drive</span>
-              <select v-model="form.mobile_event_id" class="form-input select" @change="onDrivePicked">
-                <option value="">Choose a drive</option>
-                <option v-for="drive in drives" :key="drive.id" :value="String(drive.id)">
-                  {{ formatShortDate(drive.event_date) }} · {{ drive.name }}
-                </option>
-              </select>
+              <SelectField v-model="form.mobile_event_id" aria-label="Drive"
+                :options="[{ value: '', label: 'Choose a drive' }, ...drives.map(drive => ({ value: String(drive.id), label: `${formatShortDate(drive.event_date)} · ${drive.name}` }))]"
+                @change="onDrivePicked" />
               <span v-if="fieldError('mobile_event_id')" class="field-error">{{ fieldError('mobile_event_id') }}</span>
             </label>
 
@@ -184,13 +181,7 @@
             <div class="field-row">
               <label class="field">
                 <span class="form-label">Date held</span>
-                <input
-                  v-model="form.held_on"
-                  type="date"
-                  class="form-input"
-                  :max="today"
-                  :disabled="form.source === 'redagos'"
-                >
+                <DatePicker v-model="form.held_on" :max="today" :disabled="form.source === 'redagos'" aria-label="Held on" />
                 <span v-if="fieldError('held_on')" class="field-error">{{ fieldError('held_on') }}</span>
               </label>
               <label class="field">
@@ -277,6 +268,8 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { formatShortDate } from '~/utils/donorRecords'
 import { daysSinceDrive, sheetSummary } from '~/utils/paperDonations'

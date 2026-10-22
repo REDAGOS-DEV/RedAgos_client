@@ -15,7 +15,7 @@
     <div v-else class="cdash-inner">
       <header class="header-row">
         <div>
-          <h1 class="page-title">Dashboard</h1>
+          <h1 class="page-title">Collection dashboard</h1>
           <p class="page-subtitle">Donor &amp; Collection{{ data ? ` · ${longDate(data.today.date)}` : '' }}</p>
         </div>
         <div class="header-actions">
@@ -29,6 +29,9 @@
           </button>
         </div>
       </header>
+
+      <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
+      <TaskStrip class="needs-you" />
 
       <div v-if="error" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -281,6 +284,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import {
   bloodGroupRows,
