@@ -1,5 +1,11 @@
 <template>
-    <div class="reports-page">
+    <!--
+      The Admin and the Supervisor (reports.view_all) read the centre's own
+      reports, counted from its records. The other roles still see the page
+      below until their department reports replace it.
+    -->
+    <BloodCenterCentreReports v-if="canViewAll" />
+    <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
             <div class="skeleton-block page-skeleton__title" />
             <div class="stats-row">
@@ -524,6 +530,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import BloodCenterCentreReports from '~/components/BloodCenter/CentreReports.vue'
 
 definePageMeta({
     middleware: ['auth', 'department'],
@@ -1160,7 +1167,12 @@ async function handleExport(report, format) {
     }
 }
 
+const { can } = useUser()
+const canViewAll = computed(() => can('reports.view_all'))
+
 onMounted(async () => {
+    // The centre reports load their own data.
+    if (canViewAll.value) return
     await loadAll()
     initialLoading.value = false
 })

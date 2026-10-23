@@ -342,7 +342,7 @@ import logo from '~/assets/images/RedAgosLogo.png'
 
 const router = useRouter()
 const route = useRoute()
-const { user, ensureUser, logout } = useUser()
+const { user, ensureUser, logout, can } = useUser()
 // Ang nav kay usa ra ka source — parehas sa sidebar, sa ⌘F search ug sa
 // profile dropdown, aron walay surface nga mo-offer og route nga i-refuse
 // ra sa server.
@@ -563,7 +563,7 @@ const filteredResults = computed(() => {
   // Then the help guides that answer it, for pages this account can open, so
   // "void" or "quarantine" finds how-to as well as where to go.
   const allowed = new Set(searchablePages.value.map(p => p.path.split('?')[0]))
-  const help = searchGuides(q, HELP_GUIDES.filter(g => guideVisible(g, allowed)))
+  const help = searchGuides(q, HELP_GUIDES.filter(g => guideVisible(g, allowed, can)))
     .slice(0, 4)
     .map(g => ({ label: g.title, path: `/blood-center/help?guide=${g.id}`, icon: 'life-buoy', isHelp: true }))
   return [...pages, ...help]

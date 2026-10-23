@@ -18,7 +18,9 @@
 
     <div v-else class="dashboard-inner">
       <!-- ============ HEADER ============ -->
-      <PageHeader title="Blood Center Dashboard" subtitle="What needs attention today, and how stock is moving.">
+      <PageHeader
+        title="Blood Center Dashboard"
+        :subtitle="dashboardSubtitle">
         <template #actions>
           <button type="button" class="ui-btn" :disabled="exporting" @click="exportReport">
             <AssetIcon name="download" :size="14" />
@@ -40,370 +42,383 @@
       <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
       <TaskStrip class="needs-you" />
 
-      <!-- ============ FIGURES ============ -->
-      <!-- Each figure opens the page that owns the number, for whoever may open it. -->
-      <StatStrip>
-        <StatItem label="Total blood units" :value="totalUnits" icon="droplets" tone="primary" :to="canViewInventory ? '/blood-center/inventory' : undefined">
-          <template #hint>
-            Across all components
-            <span v-if="weeklyChangePercent !== null" class="stat-trend" :class="weeklyChangePercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
-              <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
-              {{ Math.abs(weeklyChangePercent) }}% this week
-            </span>
-          </template>
-        </StatItem>
-        <StatItem label="Donations today" :value="donationsToday" icon="trending-up" tone="success" :to="canCollect ? '/blood-center/donation' : undefined">
-          <template #hint>
-            {{ dailyGoal !== null ? `Goal: ${dailyGoal} units/day` : 'Daily goal not set' }}
-            <span v-if="vsYesterdayPercent !== null" class="stat-trend" :class="vsYesterdayPercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
-              <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
-              {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
-            </span>
-          </template>
-        </StatItem>
-        <StatItem
-          label="Pending hospital requests"
-          :value="pendingRequestsCount"
-          :hint="pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting'"
-          icon="package"
-          tone="warning"
-          :to="canViewRequests ? '/blood-center/bloodrequests' : undefined"
-        />
-        <!-- Red only when something is actually critical. -->
-        <StatItem
-          label="Critical blood types"
-          :value="criticalTypesCount"
-          :hint="criticalTypesLabel"
-          icon="triangle-alert"
-          tone="danger"
-          :alert="criticalTypesCount > 0"
-          :to="canViewInventory ? '/blood-center/inventory' : undefined"
-        />
-      </StatStrip>
+      <!--
+        The Blood Center Admin's part: the centre's people and setup, which
+        only they can act on. The figures below stay, as the centre at a glance.
+      -->
+      <BloodCenterAdminOverview v-if="isCenterAdmin" />
 
-      <!-- ============ LOW STOCK ============ -->
-      <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" class="low-stock-banner" />
-
-      <!-- ============ NEEDS ATTENTION + STOCK BY TYPE ============ -->
-      <div class="focus-grid">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">Needs attention</h2>
-              <p class="panel-subtitle">Stock, expiry and requests that need action today.</p>
-            </div>
-          </div>
-
-          <ul v-if="attentionItems.length" class="attention-list">
-            <li v-for="item in attentionItems" :key="item.key" class="attention-item" :class="`attention-item--${item.tone}`">
-              <span class="attention-item__icon">
-                <AssetIcon :name="item.icon" :size="15" />
+      <!--
+        The centre's stock, trends and activity: the Supervisor's overview.
+        The Admin keeps the people and the setup (above); stock is not theirs
+        to manage, and Reports holds the figures.
+      -->
+      <template v-if="!isCenterAdmin">
+        <!-- ============ FIGURES ============ -->
+        <!-- Each figure opens the page that owns the number, for whoever may open it. -->
+        <StatStrip>
+          <StatItem label="Total blood units" :value="totalUnits" icon="droplets" tone="primary" :to="canViewInventory ? '/blood-center/inventory' : undefined">
+            <template #hint>
+              Across all components
+              <span v-if="weeklyChangePercent !== null" class="stat-trend" :class="weeklyChangePercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
+                <AssetIcon :name="weeklyChangePercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
+                {{ Math.abs(weeklyChangePercent) }}% this week
               </span>
-              <div class="attention-item__body">
-                <p class="attention-item__title">{{ item.title }}</p>
-                <p class="attention-item__detail">{{ item.detail }}</p>
+            </template>
+          </StatItem>
+          <StatItem label="Donations today" :value="donationsToday" icon="trending-up" tone="success" :to="canCollect ? '/blood-center/donation' : undefined">
+            <template #hint>
+              {{ dailyGoal !== null ? `Goal: ${dailyGoal} units/day` : 'Daily goal not set' }}
+              <span v-if="vsYesterdayPercent !== null" class="stat-trend" :class="vsYesterdayPercent >= 0 ? 'stat-trend--up' : 'stat-trend--down'">
+                <AssetIcon :name="vsYesterdayPercent >= 0 ? 'arrow-up-right' : 'arrow-down-right'" :size="11" />
+                {{ Math.abs(vsYesterdayPercent) }}% vs yesterday
+              </span>
+            </template>
+          </StatItem>
+          <StatItem
+            label="Pending hospital requests"
+            :value="pendingRequestsCount"
+            :hint="pendingRequestsCount ? 'Needs fulfillment' : 'Nothing waiting'"
+            icon="package"
+            tone="warning"
+            :to="canViewRequests ? '/blood-center/bloodrequests' : undefined"
+          />
+          <!-- Red only when something is actually critical. -->
+          <StatItem
+            label="Critical blood types"
+            :value="criticalTypesCount"
+            :hint="criticalTypesLabel"
+            icon="triangle-alert"
+            tone="danger"
+            :alert="criticalTypesCount > 0"
+            :to="canViewInventory ? '/blood-center/inventory' : undefined"
+          />
+        </StatStrip>
+
+        <!-- ============ LOW STOCK ============ -->
+        <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" class="low-stock-banner" />
+
+        <!-- ============ NEEDS ATTENTION + STOCK BY TYPE ============ -->
+        <div class="focus-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Needs attention</h2>
+                <p class="panel-subtitle">Stock, expiry and requests that need action today.</p>
               </div>
-              <NuxtLink v-if="canOpen(item.to)" :to="item.to" class="panel-link attention-item__link">
-                {{ item.action }}
-                <AssetIcon name="chevron-right" :size="13" />
-              </NuxtLink>
-            </li>
-          </ul>
-          <div v-else class="attention-clear">
-            <AssetIcon name="shield-check" :size="20" style="color: var(--rb-success-text)" />
-            <div>
-              <p class="attention-clear__title">All clear</p>
-              <p class="attention-clear__detail">No critical stock, expiring units or urgent requests right now.</p>
             </div>
+
+            <ul v-if="attentionItems.length" class="attention-list">
+              <li v-for="item in attentionItems" :key="item.key" class="attention-item" :class="`attention-item--${item.tone}`">
+                <span class="attention-item__icon">
+                  <AssetIcon :name="item.icon" :size="15" />
+                </span>
+                <div class="attention-item__body">
+                  <p class="attention-item__title">{{ item.title }}</p>
+                  <p class="attention-item__detail">{{ item.detail }}</p>
+                </div>
+                <NuxtLink v-if="canOpen(item.to)" :to="item.to" class="panel-link attention-item__link">
+                  {{ item.action }}
+                  <AssetIcon name="chevron-right" :size="13" />
+                </NuxtLink>
+              </li>
+            </ul>
+            <div v-else class="attention-clear">
+              <AssetIcon name="shield-check" :size="20" style="color: var(--rb-success-text)" />
+              <div>
+                <p class="attention-clear__title">All clear</p>
+                <p class="attention-clear__detail">No critical stock, expiring units or urgent requests right now.</p>
+              </div>
+            </div>
+
+            <!-- Requests stay actionable here; the full list is Incoming Requests. -->
+            <template v-if="waitingRequests.length">
+              <div class="subsection-header">
+                <p class="subsection-title">Waiting hospital requests</p>
+                <NuxtLink v-if="canViewRequests" to="/blood-center/bloodrequests" class="panel-link">
+                  View all ({{ requests.length }})
+                </NuxtLink>
+              </div>
+              <div class="request-list">
+                <div v-for="req in waitingRequests" :key="req.id" class="request-item">
+                  <div class="request-item__left">
+                    <div class="hospital-avatar" :style="{ background: urgencyIconBg(req.urgency), color: urgencyIconColor(req.urgency) }">
+                      {{ initials(req.hospital) }}
+                    </div>
+                    <div class="request-info">
+                      <div class="request-info__row">
+                        <p class="request-hospital">{{ req.hospital }}</p>
+                        <span class="urgency-pill" :class="`urgency-pill--${req.urgency}`">{{ req.urgency }}</span>
+                      </div>
+                      <p class="request-meta">
+                        {{ req.code }} &middot;
+                        <span class="type-pill type-pill--sm">{{ req.blood_type }}</span>
+                        &middot; {{ req.units }} unit{{ req.units !== 1 ? 's' : '' }} &middot; {{ req.time_ago }}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="request-item__right">
+                    <span class="status-pill status-pill--sm" :class="`status-pill--${req.status}`">
+                      <span class="status-pill__dot" />
+                      {{ req.status }}
+                    </span>
+                    <button v-if="canDecideRequests" type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="openConfirmModal(req)">
+                      {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
 
-          <!-- Requests stay actionable here; the full list is Incoming Requests. -->
-          <template v-if="waitingRequests.length">
-            <div class="subsection-header">
-              <p class="subsection-title">Waiting hospital requests</p>
-              <NuxtLink v-if="canViewRequests" to="/blood-center/bloodrequests" class="panel-link">
-                View all ({{ requests.length }})
-              </NuxtLink>
-            </div>
-            <div class="request-list">
-              <div v-for="req in waitingRequests" :key="req.id" class="request-item">
-                <div class="request-item__left">
-                  <div class="hospital-avatar" :style="{ background: urgencyIconBg(req.urgency), color: urgencyIconColor(req.urgency) }">
-                    {{ initials(req.hospital) }}
-                  </div>
-                  <div class="request-info">
-                    <div class="request-info__row">
-                      <p class="request-hospital">{{ req.hospital }}</p>
-                      <span class="urgency-pill" :class="`urgency-pill--${req.urgency}`">{{ req.urgency }}</span>
-                    </div>
-                    <p class="request-meta">
-                      {{ req.code }} &middot;
-                      <span class="type-pill type-pill--sm">{{ req.blood_type }}</span>
-                      &middot; {{ req.units }} unit{{ req.units !== 1 ? 's' : '' }} &middot; {{ req.time_ago }}
-                    </p>
-                  </div>
-                </div>
-                <div class="request-item__right">
-                  <span class="status-pill status-pill--sm" :class="`status-pill--${req.status}`">
-                    <span class="status-pill__dot" />
-                    {{ req.status }}
-                  </span>
-                  <button v-if="canDecideRequests" type="button" class="ui-btn ui-btn--primary ui-btn--sm" @click="openConfirmModal(req)">
-                    {{ req.status === 'processing' ? 'Fulfill' : 'Process' }}
-                  </button>
-                </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Stock by blood type</h2>
+                <p class="panel-subtitle">Total units across components.</p>
               </div>
+              <NuxtLink v-if="canViewInventory" to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
             </div>
-          </template>
+
+            <div v-if="stockTiles.length" class="stock-grid">
+              <component
+                :is="canViewInventory ? NuxtLink : 'div'"
+                v-for="row in stockTiles"
+                :key="row.blood_type"
+                v-bind="canViewInventory ? { to: `/blood-center/inventory?type=${encodeURIComponent(row.blood_type)}` } : {}"
+                class="stock-tile"
+                :class="`stock-tile--${row.status}`"
+                :title="`${row.blood_type}: ${row.total} units, ${statusLabel(row.status)}`"
+              >
+                <span class="stock-tile__type">{{ row.blood_type }}</span>
+                <span class="stock-tile__value">{{ row.total }}</span>
+                <span class="stock-tile__status">{{ statusLabel(row.status) }}</span>
+              </component>
+            </div>
+            <div v-else class="empty-state">
+              <AssetIcon name="droplets" :size="32" style="color: var(--rb-border-strong)" />
+              <p>No inventory recorded yet</p>
+            </div>
+          </div>
         </div>
 
+        <!-- ============ INVENTORY INSIGHTS ============ -->
+        <div class="insights-grid">
+          <!-- Inventory Trends (line chart) -->
+          <div class="panel insight-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Inventory Trends</h2>
+                <p class="panel-subtitle">Monitor inventory changes over time.</p>
+              </div>
+              <div class="segmented-control">
+                <button
+                  v-for="range in trendRanges"
+                  :key="range.value"
+                  type="button"
+                  class="segmented-control__btn"
+                  :class="{ 'segmented-control__btn--active': trendRange === range.value }"
+                  @click="trendRange = range.value"
+                >
+                  {{ range.label }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="!currentTrendData.length" class="empty-state">
+              <AssetIcon name="trending-up" :size="36" style="color: var(--rb-border-strong)" />
+              <p>No inventory trend data available yet</p>
+            </div>
+
+            <div v-else class="chart-body">
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background: var(--rb-primary)" />Available Units</span>
+                <span class="legend-item"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved Units</span>
+              </div>
+
+              <div class="line-chart-wrap" @mouseleave="hoveredPointIndex = null">
+                <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="var(--rb-primary)" stop-opacity="0.16" />
+                      <stop offset="100%" stop-color="var(--rb-primary)" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+
+                  <line
+                    v-for="(g, i) in gridLines"
+                    :key="i"
+                    :x1="chartPadding.left"
+                    :x2="chartWidth - chartPadding.right"
+                    :y1="g"
+                    :y2="g"
+                    class="chart-grid-line"
+                  />
+
+                  <path :d="areaPath" fill="url(#areaFill)" stroke="none" />
+                  <path :d="reservedPath" fill="none" stroke="var(--rb-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 4" />
+                  <path :d="availablePath" fill="none" stroke="var(--rb-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+                  <g v-for="(p, i) in availablePoints" :key="'a'+i">
+                    <circle :cx="p.x" :cy="p.y" r="3.2" fill="var(--rb-surface)" stroke="var(--rb-primary)" stroke-width="2" />
+                    <rect
+                      :x="p.x - (chartWidth / availablePoints.length) / 2"
+                      y="0"
+                      :width="chartWidth / availablePoints.length"
+                      :height="chartHeight"
+                      fill="transparent"
+                      class="hover-target"
+                      @mouseenter="hoveredPointIndex = i"
+                    />
+                  </g>
+                  <circle v-for="(p, i) in reservedPoints" :key="'r'+i" :cx="p.x" :cy="p.y" r="2.6" fill="var(--rb-surface)" stroke="var(--rb-accent)" stroke-width="2" />
+
+                  <text v-for="(p, i) in availablePoints" :key="'lbl'+i" :x="p.x" :y="chartHeight - 6" class="chart-axis-label" text-anchor="middle">{{ p.label }}</text>
+                </svg>
+
+                <div
+                  v-if="hoveredPointIndex !== null"
+                  class="chart-tooltip"
+                  :style="{
+                    left: (availablePoints[hoveredPointIndex].x / chartWidth) * 100 + '%',
+                    top: (availablePoints[hoveredPointIndex].y / chartHeight) * 100 + '%'
+                  }"
+                >
+                  <p class="chart-tooltip__label">{{ availablePoints[hoveredPointIndex].label }}</p>
+                  <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-primary)" />Available: {{ availablePoints[hoveredPointIndex].value }}</p>
+                  <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved: {{ reservedPoints[hoveredPointIndex].value }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blood Component Distribution -->
+          <div class="panel insight-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Blood Component Distribution</h2>
+                <p class="panel-subtitle">Visualize current inventory composition.</p>
+              </div>
+            </div>
+
+            <div v-if="!donutTotal" class="empty-state">
+              <AssetIcon name="package" :size="36" style="color: var(--rb-border-strong)" />
+              <p>No component distribution data available yet</p>
+            </div>
+
+            <div v-else class="donut-body">
+              <div class="donut-chart-wrap" @mouseleave="hoveredDonut = null">
+                <svg viewBox="0 0 160 160" class="donut-chart">
+                  <circle cx="80" cy="80" :r="donutRadius" fill="none" stroke="var(--rb-surface-alt)" stroke-width="22" />
+                  <circle
+                    v-for="seg in donutSegments"
+                    :key="seg.label"
+                    cx="80"
+                    cy="80"
+                    :r="donutRadius"
+                    fill="none"
+                    :stroke="seg.color"
+                    stroke-width="22"
+                    :stroke-dasharray="seg.dasharray"
+                    :stroke-dashoffset="seg.dashoffset"
+                    transform="rotate(-90 80 80)"
+                    class="donut-segment"
+                    :class="{ 'donut-segment--dim': hoveredDonut && hoveredDonut.label !== seg.label }"
+                    @mouseenter="hoveredDonut = seg"
+                  />
+                </svg>
+                <div class="donut-center">
+                  <p class="donut-center__value">{{ hoveredDonut ? hoveredDonut.pct + '%' : donutTotal }}</p>
+                  <p class="donut-center__label">{{ hoveredDonut ? hoveredDonut.label : 'Total Units' }}</p>
+                </div>
+              </div>
+
+              <div class="donut-legend">
+                <div v-for="seg in donutSegments" :key="seg.label" class="donut-legend__row" @mouseenter="hoveredDonut = seg" @mouseleave="hoveredDonut = null">
+                  <span class="legend-dot" :style="{ background: seg.color }" />
+                  <span class="donut-legend__label">{{ seg.label }}</span>
+                  <span class="donut-legend__value">{{ seg.pct }}% &middot; {{ seg.value }} units</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ RECENT ACTIVITY ============ -->
+        <div class="activity-grid">
+        <!-- ============ RECENT DONATION ACTIVITY ============ -->
         <div class="panel">
           <div class="panel-header">
             <div>
-              <h2 class="panel-title">Stock by blood type</h2>
-              <p class="panel-subtitle">Total units across components.</p>
+              <h2 class="panel-title">Recent donations</h2>
+              <p class="panel-subtitle">Latest donations recorded at this center.</p>
             </div>
-            <NuxtLink v-if="canViewInventory" to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
+            <!--
+              "View History" pointed at /blood-center/donations, which has no
+              page — the link 404'd. There is no donation-history screen to send
+              people to yet, and Donor Management is not one, so nothing is
+              offered here. Restore it with the page, not before.
+            -->
           </div>
 
-          <div v-if="stockTiles.length" class="stock-grid">
-            <component
-              :is="canViewInventory ? NuxtLink : 'div'"
-              v-for="row in stockTiles"
-              :key="row.blood_type"
-              v-bind="canViewInventory ? { to: `/blood-center/inventory?type=${encodeURIComponent(row.blood_type)}` } : {}"
-              class="stock-tile"
-              :class="`stock-tile--${row.status}`"
-              :title="`${row.blood_type}: ${row.total} units, ${statusLabel(row.status)}`"
-            >
-              <span class="stock-tile__type">{{ row.blood_type }}</span>
-              <span class="stock-tile__value">{{ row.total }}</span>
-              <span class="stock-tile__status">{{ statusLabel(row.status) }}</span>
-            </component>
+          <div v-if="donationActivity.length" class="timeline">
+            <div v-for="item in donationActivity.slice(0, 5)" :key="item.id" class="timeline-item">
+              <div class="timeline-item__marker">
+                <AssetIcon name="droplets" :size="13" style="color: var(--rb-primary-text)" />
+              </div>
+              <div class="timeline-item__body">
+                <div class="timeline-item__row">
+                  <p class="timeline-item__name">{{ item.donor_name }}</p>
+                  <span v-if="item.verified" class="verified-badge">
+                    <AssetIcon name="check-circle" :size="11" />
+                    Verified
+                  </span>
+                </div>
+                <p class="timeline-item__meta">
+                  {{ item.type }} &middot; {{ item.volume }} &middot; {{ item.time }}
+                </p>
+              </div>
+              <span class="status-pill status-pill--sm" :class="`status-pill--${item.status}`">
+                <span class="status-pill__dot" />
+                {{ item.status }}
+              </span>
+            </div>
           </div>
           <div v-else class="empty-state">
-            <AssetIcon name="droplets" :size="32" style="color: var(--rb-border-strong)" />
-            <p>No inventory recorded yet</p>
+            <AssetIcon name="droplets" :size="36" style="color: var(--rb-border-strong)" />
+            <p>No donations recorded yet today</p>
           </div>
         </div>
-      </div>
 
-      <!-- ============ INVENTORY INSIGHTS ============ -->
-      <div class="insights-grid">
-        <!-- Inventory Trends (line chart) -->
-        <div class="panel insight-card">
+        <!-- ============ RECENT SYSTEM ACTIVITY ============ -->
+        <div class="panel">
           <div class="panel-header">
             <div>
-              <h2 class="panel-title">Inventory Trends</h2>
-              <p class="panel-subtitle">Monitor inventory changes over time.</p>
-            </div>
-            <div class="segmented-control">
-              <button
-                v-for="range in trendRanges"
-                :key="range.value"
-                type="button"
-                class="segmented-control__btn"
-                :class="{ 'segmented-control__btn--active': trendRange === range.value }"
-                @click="trendRange = range.value"
-              >
-                {{ range.label }}
-              </button>
+              <h2 class="panel-title">System activity</h2>
+              <p class="panel-subtitle">Audit trail of actions across the system.</p>
             </div>
           </div>
 
-          <div v-if="!currentTrendData.length" class="empty-state">
-            <AssetIcon name="trending-up" :size="36" style="color: var(--rb-border-strong)" />
-            <p>No inventory trend data available yet</p>
-          </div>
-
-          <div v-else class="chart-body">
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background: var(--rb-primary)" />Available Units</span>
-              <span class="legend-item"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved Units</span>
-            </div>
-
-            <div class="line-chart-wrap" @mouseleave="hoveredPointIndex = null">
-              <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--rb-primary)" stop-opacity="0.16" />
-                    <stop offset="100%" stop-color="var(--rb-primary)" stop-opacity="0" />
-                  </linearGradient>
-                </defs>
-
-                <line
-                  v-for="(g, i) in gridLines"
-                  :key="i"
-                  :x1="chartPadding.left"
-                  :x2="chartWidth - chartPadding.right"
-                  :y1="g"
-                  :y2="g"
-                  class="chart-grid-line"
-                />
-
-                <path :d="areaPath" fill="url(#areaFill)" stroke="none" />
-                <path :d="reservedPath" fill="none" stroke="var(--rb-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 4" />
-                <path :d="availablePath" fill="none" stroke="var(--rb-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-
-                <g v-for="(p, i) in availablePoints" :key="'a'+i">
-                  <circle :cx="p.x" :cy="p.y" r="3.2" fill="var(--rb-surface)" stroke="var(--rb-primary)" stroke-width="2" />
-                  <rect
-                    :x="p.x - (chartWidth / availablePoints.length) / 2"
-                    y="0"
-                    :width="chartWidth / availablePoints.length"
-                    :height="chartHeight"
-                    fill="transparent"
-                    class="hover-target"
-                    @mouseenter="hoveredPointIndex = i"
-                  />
-                </g>
-                <circle v-for="(p, i) in reservedPoints" :key="'r'+i" :cx="p.x" :cy="p.y" r="2.6" fill="var(--rb-surface)" stroke="var(--rb-accent)" stroke-width="2" />
-
-                <text v-for="(p, i) in availablePoints" :key="'lbl'+i" :x="p.x" :y="chartHeight - 6" class="chart-axis-label" text-anchor="middle">{{ p.label }}</text>
-              </svg>
-
-              <div
-                v-if="hoveredPointIndex !== null"
-                class="chart-tooltip"
-                :style="{
-                  left: (availablePoints[hoveredPointIndex].x / chartWidth) * 100 + '%',
-                  top: (availablePoints[hoveredPointIndex].y / chartHeight) * 100 + '%'
-                }"
-              >
-                <p class="chart-tooltip__label">{{ availablePoints[hoveredPointIndex].label }}</p>
-                <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-primary)" />Available: {{ availablePoints[hoveredPointIndex].value }}</p>
-                <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved: {{ reservedPoints[hoveredPointIndex].value }}</p>
+          <div v-if="systemActivity.length" class="activity-feed">
+            <div v-for="item in systemActivity.slice(0, 5)" :key="item.id" class="activity-feed__item">
+              <div class="activity-feed__icon" :style="{ background: `rgba(var(--rb-${item.tone}-rgb), 0.08)` }">
+                <AssetIcon :name="item.icon" :size="14" :style="{ color: `var(--rb-${item.tone})` }" />
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Blood Component Distribution -->
-        <div class="panel insight-card">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">Blood Component Distribution</h2>
-              <p class="panel-subtitle">Visualize current inventory composition.</p>
-            </div>
-          </div>
-
-          <div v-if="!donutTotal" class="empty-state">
-            <AssetIcon name="package" :size="36" style="color: var(--rb-border-strong)" />
-            <p>No component distribution data available yet</p>
-          </div>
-
-          <div v-else class="donut-body">
-            <div class="donut-chart-wrap" @mouseleave="hoveredDonut = null">
-              <svg viewBox="0 0 160 160" class="donut-chart">
-                <circle cx="80" cy="80" :r="donutRadius" fill="none" stroke="var(--rb-surface-alt)" stroke-width="22" />
-                <circle
-                  v-for="seg in donutSegments"
-                  :key="seg.label"
-                  cx="80"
-                  cy="80"
-                  :r="donutRadius"
-                  fill="none"
-                  :stroke="seg.color"
-                  stroke-width="22"
-                  :stroke-dasharray="seg.dasharray"
-                  :stroke-dashoffset="seg.dashoffset"
-                  transform="rotate(-90 80 80)"
-                  class="donut-segment"
-                  :class="{ 'donut-segment--dim': hoveredDonut && hoveredDonut.label !== seg.label }"
-                  @mouseenter="hoveredDonut = seg"
-                />
-              </svg>
-              <div class="donut-center">
-                <p class="donut-center__value">{{ hoveredDonut ? hoveredDonut.pct + '%' : donutTotal }}</p>
-                <p class="donut-center__label">{{ hoveredDonut ? hoveredDonut.label : 'Total Units' }}</p>
+              <div class="activity-feed__body">
+                <p class="activity-feed__title">{{ item.title }}</p>
+                <p class="activity-feed__desc">{{ item.description }}</p>
               </div>
-            </div>
-
-            <div class="donut-legend">
-              <div v-for="seg in donutSegments" :key="seg.label" class="donut-legend__row" @mouseenter="hoveredDonut = seg" @mouseleave="hoveredDonut = null">
-                <span class="legend-dot" :style="{ background: seg.color }" />
-                <span class="donut-legend__label">{{ seg.label }}</span>
-                <span class="donut-legend__value">{{ seg.pct }}% &middot; {{ seg.value }} units</span>
-              </div>
+              <span class="activity-feed__time">{{ item.time }}</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ============ RECENT ACTIVITY ============ -->
-      <div class="activity-grid">
-      <!-- ============ RECENT DONATION ACTIVITY ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Recent donations</h2>
-            <p class="panel-subtitle">Latest donations recorded at this center.</p>
-          </div>
-          <!--
-            "View History" pointed at /blood-center/donations, which has no
-            page — the link 404'd. There is no donation-history screen to send
-            people to yet, and Donor Management is not one, so nothing is
-            offered here. Restore it with the page, not before.
-          -->
-        </div>
-
-        <div v-if="donationActivity.length" class="timeline">
-          <div v-for="item in donationActivity.slice(0, 5)" :key="item.id" class="timeline-item">
-            <div class="timeline-item__marker">
-              <AssetIcon name="droplets" :size="13" style="color: var(--rb-primary-text)" />
-            </div>
-            <div class="timeline-item__body">
-              <div class="timeline-item__row">
-                <p class="timeline-item__name">{{ item.donor_name }}</p>
-                <span v-if="item.verified" class="verified-badge">
-                  <AssetIcon name="check-circle" :size="11" />
-                  Verified
-                </span>
-              </div>
-              <p class="timeline-item__meta">
-                {{ item.type }} &middot; {{ item.volume }} &middot; {{ item.time }}
-              </p>
-            </div>
-            <span class="status-pill status-pill--sm" :class="`status-pill--${item.status}`">
-              <span class="status-pill__dot" />
-              {{ item.status }}
-            </span>
-          </div>
-        </div>
-        <div v-else class="empty-state">
-          <AssetIcon name="droplets" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No donations recorded yet today</p>
-        </div>
-      </div>
-
-      <!-- ============ RECENT SYSTEM ACTIVITY ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">System activity</h2>
-            <p class="panel-subtitle">Audit trail of actions across the system.</p>
+          <div v-else class="empty-state">
+            <AssetIcon name="activity" :size="36" style="color: var(--rb-border-strong)" />
+            <p>No recent activity</p>
           </div>
         </div>
 
-        <div v-if="systemActivity.length" class="activity-feed">
-          <div v-for="item in systemActivity.slice(0, 5)" :key="item.id" class="activity-feed__item">
-            <div class="activity-feed__icon" :style="{ background: `rgba(var(--rb-${item.tone}-rgb), 0.08)` }">
-              <AssetIcon :name="item.icon" :size="14" :style="{ color: `var(--rb-${item.tone})` }" />
-            </div>
-            <div class="activity-feed__body">
-              <p class="activity-feed__title">{{ item.title }}</p>
-              <p class="activity-feed__desc">{{ item.description }}</p>
-            </div>
-            <span class="activity-feed__time">{{ item.time }}</span>
-          </div>
         </div>
-        <div v-else class="empty-state">
-          <AssetIcon name="activity" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No recent activity</p>
-        </div>
-      </div>
-
-      </div>
+      </template>
     </div>
 
     <!-- Confirm process/fulfill modal -->
@@ -445,6 +460,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BloodCenterAdminOverview from '~/components/BloodCenter/AdminOverview.vue'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
@@ -462,6 +478,11 @@ definePageMeta({
 })
 
 const { user, can } = useUser()
+// The Admin keeps the staff accounts; the Supervisor, who reads this too, does not.
+const isCenterAdmin = computed(() => user.value?.management_level === 'admin' || can('staff.manage'))
+const dashboardSubtitle = computed(() => (isCenterAdmin.value
+  ? "Your team, the centre's setup and what changed."
+  : 'What needs attention today, and how stock is moving.'))
 
 // The overview is read by the Admin and the Supervisor, who record and decide
 // nothing, and the Admin sees no department page at all: its shortcuts into

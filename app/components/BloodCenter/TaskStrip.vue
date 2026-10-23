@@ -19,7 +19,8 @@
       All clear. Nothing is waiting for you right now.
     </p>
 
-    <div v-else class="tasks__grid">
+    <!-- The cards share the row; one alone becomes a banner with its verb. -->
+    <div v-else class="tasks__grid" :class="{ 'tasks__grid--single': tasks.length === 1 }">
       <NuxtLink v-for="task in tasks" :key="task.key" :to="task.to" class="task" :class="`task--${task.tone}`">
         <span class="task__icon" aria-hidden="true"><AssetIcon :name="task.icon" :size="18" /></span>
         <span class="task__body">
@@ -29,7 +30,11 @@
           </span>
           <span class="task__detail">{{ task.detail }}</span>
         </span>
-        <AssetIcon name="arrow-right" :size="15" class="task__arrow" />
+        <span v-if="tasks.length === 1" class="task__action">
+          {{ task.action }}
+          <AssetIcon name="arrow-right" :size="14" />
+        </span>
+        <AssetIcon v-else name="arrow-right" :size="15" class="task__arrow" />
       </NuxtLink>
     </div>
   </section>
@@ -61,7 +66,25 @@ onActivated(load)
   color: var(--rb-primary-text);
 }
 
-.tasks__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+/* auto-fit, not auto-fill: two or three cards stretch across the row rather
+   than leaving empty columns beside them. */
+.tasks__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.tasks__grid--single .task { min-height: 0; padding: 16px 18px; }
+.tasks__grid--single .task__detail { font-size: 13px; }
+.task__action {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--tone-fg);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rb-surface, #fff);
+  transition: transform 150ms ease;
+}
+.task:hover .task__action { transform: translateX(2px); }
 
 .task {
   --tone-bg: rgba(var(--rb-primary-rgb), 0.1);
@@ -99,8 +122,9 @@ html.dark .task--warning { --tone-bg: rgba(255, 167, 38, 0.16); --tone-fg: #FFB7
 }
 .task__body { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .task__line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.task__count { flex-shrink: 0; }
 .task__count { font-size: 20px; font-weight: 800; line-height: 1; color: var(--tone-fg); font-variant-numeric: tabular-nums; }
-.task__label { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.task__label { font-size: 14px; font-weight: 600; line-height: 1.3; }
 .task__detail { font-size: 12.5px; color: var(--rb-text-secondary); }
 .task__arrow { flex-shrink: 0; color: var(--rb-text-muted); transition: transform 150ms ease, color 150ms ease; }
 .task:hover .task__arrow { transform: translateX(2px); color: var(--tone-fg); }

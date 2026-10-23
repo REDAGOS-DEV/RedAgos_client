@@ -19,6 +19,8 @@ export interface BloodCenterTask {
   label: string
   detail: string
   to: string
+  /** The verb on the button when a task stands alone. */
+  action: string
   icon: string
   tone: 'urgent' | 'warning' | 'info'
 }
@@ -33,21 +35,27 @@ interface TaskDef {
   label: [string, string]
   detail: string
   to: string
+  action: string
   icon: string
   tone: BloodCenterTask['tone']
 }
 
 /** Most pressing first: the dashboards show them in this order. */
 const TASKS: TaskDef[] = [
-  { key: 'urgent', requires: 'requests.release', label: ['emergency requests open', 'emergency request open'], detail: 'Release blood for these first.', to: '/blood-center/fulfillment', icon: 'circle-alert', tone: 'urgent' },
-  { key: 'verification', requires: 'lab.verify_serology', label: ['results to verify', 'result to verify'], detail: 'Reactive results and corrections waiting for you.', to: '/blood-center/serology-results', icon: 'clipboard-list', tone: 'urgent' },
-  { key: 'pending', requires: 'requests.view', label: ['hospital requests waiting', 'hospital request waiting'], detail: 'Requests not yet decided.', to: '/blood-center/bloodrequests', icon: 'clipboard-check', tone: 'warning' },
-  { key: 'corrections', requires: 'corrections.approve', label: ['corrections to approve', 'correction to approve'], detail: 'Filed in your department.', to: '/blood-center/corrections', icon: 'pencil', tone: 'warning' },
-  { key: 'referrals', requires: 'lab.referrals', label: ['referrals not acted on', 'referral not acted on'], detail: 'Donors still to contact for counselling.', to: '/blood-center/counselling-referrals', icon: 'life-buoy', tone: 'warning' },
-  { key: 'handover', requires: 'lab.update_status', label: ['units to hand over', 'unit to hand over'], detail: 'Processed and waiting for Issuance.', to: '/blood-center/processed?status=awaiting_handover', icon: 'check-check', tone: 'info' },
-  { key: 'lowStock', requires: 'inventory.view', label: ['stocks below minimum', 'stock below minimum'], detail: 'Blood types or components under their minimum.', to: '/blood-center/stock-thresholds', icon: 'triangle-alert', tone: 'warning' },
-  { key: 'expiring', requires: 'inventory.view', label: ['units expire within 3 days', 'unit expires within 3 days'], detail: 'Issue these first.', to: '/blood-center/inventory', icon: 'clock', tone: 'info' },
-  { key: 'drives', requires: 'drives.manage', label: ['drives today or tomorrow', 'drive today or tomorrow'], detail: 'Check the staff and supplies.', to: '/blood-center/drives', icon: 'route', tone: 'info' },
+  { key: 'urgent', requires: 'requests.release', label: ['emergency requests open', 'emergency request open'], detail: 'Release blood for these first.', to: '/blood-center/fulfillment', action: 'Release', icon: 'circle-alert', tone: 'urgent' },
+  { key: 'verification', requires: 'lab.verify_serology', label: ['results to verify', 'result to verify'], detail: 'Reactive results and corrections waiting for you.', to: '/blood-center/serology-results', action: 'Verify', icon: 'clipboard-list', tone: 'urgent' },
+  { key: 'pending', requires: 'requests.view', label: ['hospital requests waiting', 'hospital request waiting'], detail: 'Requests not yet decided.', to: '/blood-center/bloodrequests', action: 'Review', icon: 'clipboard-check', tone: 'warning' },
+  { key: 'corrections', requires: 'corrections.approve', label: ['corrections to approve', 'correction to approve'], detail: 'Filed in your department.', to: '/blood-center/corrections', action: 'Review', icon: 'pencil', tone: 'warning' },
+  { key: 'referrals', requires: 'lab.referrals', label: ['referrals not acted on', 'referral not acted on'], detail: 'Donors still to contact for counselling.', to: '/blood-center/counselling-referrals', action: 'Contact', icon: 'life-buoy', tone: 'warning' },
+  { key: 'handover', requires: 'lab.update_status', label: ['units to hand over', 'unit to hand over'], detail: 'Processed and waiting for Issuance.', to: '/blood-center/processed?status=awaiting_handover', action: 'Hand over', icon: 'check-check', tone: 'info' },
+  { key: 'lowStock', requires: 'inventory.view', label: ['stocks below minimum', 'stock below minimum'], detail: 'Blood types or components under their minimum.', to: '/blood-center/stock-thresholds', action: 'View stock', icon: 'triangle-alert', tone: 'warning' },
+  { key: 'expiring', requires: 'inventory.view', label: ['units expire within 3 days', 'unit expires within 3 days'], detail: 'Issue these first.', to: '/blood-center/inventory', action: 'View units', icon: 'clock', tone: 'info' },
+  // The Admin's: people and setup (AdminOverviewService on the server).
+  { key: 'coverageGaps', requires: 'staff.manage', label: ['key roles have no one', 'key role has no one'], detail: 'Assign someone so the work does not stop.', to: '/blood-center/staff', action: 'Assign', icon: 'user-x', tone: 'urgent' },
+  { key: 'unassigned', requires: 'staff.manage', label: ['staff without a role', 'staff member without a role'], detail: 'They cannot do anything until assigned.', to: '/blood-center/staff', action: 'Assign roles', icon: 'users', tone: 'warning' },
+  { key: 'pendingActivation', requires: 'staff.manage', label: ['accounts not yet activated', 'account not yet activated'], detail: 'Added, but not signed in yet.', to: '/blood-center/staff', action: 'View staff', icon: 'clock', tone: 'info' },
+  { key: 'setupMissing', requires: 'staff.manage', label: ['centre setup items missing', 'centre setup item missing'], detail: 'The logo or left report logo for documents.', to: '/blood-center/settings?tab=center', action: 'Upload', icon: 'settings', tone: 'info' },
+  { key: 'drives', requires: 'drives.manage', label: ['drives today or tomorrow', 'drive today or tomorrow'], detail: 'Check the staff and supplies.', to: '/blood-center/drives', action: 'Open drives', icon: 'route', tone: 'info' },
 ]
 
 const localDay = (d: Date) =>
@@ -56,6 +64,8 @@ const localDay = (d: Date) =>
 export function useBloodCenterTasks() {
   const counts = useState<Counts>('blood-center-task-counts', () => ({}))
   const loaded = useState<boolean>('blood-center-task-loaded', () => false)
+  // The Admin's whole summary, kept for the dashboard's Admin section.
+  const adminOverview = useState<any>('blood-center-admin-overview', () => null)
   const { can } = useUser()
 
   async function load(): Promise<void> {
@@ -101,6 +111,15 @@ export function useBloodCenterTasks() {
         next.expiring = Number(summary?.near_expiry?.within_3_days ?? 0)
       }))
     }
+    if (can('staff.manage')) {
+      jobs.push(bloodCenterService.adminOverview().then((data) => {
+        adminOverview.value = data ?? null
+        next.coverageGaps = data?.needs?.coverage_gaps ?? 0
+        next.unassigned = data?.needs?.unassigned ?? 0
+        next.pendingActivation = data?.needs?.pending_activation ?? 0
+        next.setupMissing = data?.needs?.setup_missing ?? 0
+      }))
+    }
     if (can('drives.manage')) {
       jobs.push(bloodCenterService.drives().then((data) => {
         const list = Array.isArray(data) ? data : (data?.drives ?? [])
@@ -129,10 +148,11 @@ export function useBloodCenterTasks() {
         label: count === 1 ? def.label[1] : def.label[0],
         detail: def.detail,
         to: def.to,
+        action: def.action,
         icon: def.icon,
         tone: def.tone,
       }
     }))
 
-  return { counts, loaded, tasks, load }
+  return { counts, loaded, tasks, load, adminOverview }
 }

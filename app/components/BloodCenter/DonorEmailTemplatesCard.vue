@@ -44,16 +44,19 @@
 
         <div class="tpl-field">
           <span class="tpl-label">Insert a detail</span>
+          <span class="tpl-help">Click one to add it where your cursor is. Each email fills it in for its donor.</span>
+          <!-- Named in words; the {code} the email uses is in the tooltip. -->
           <div class="tpl-chips">
             <button
               v-for="p in placeholders"
               :key="p.key"
               type="button"
               class="tpl-chip"
-              :title="p.description"
+              :title="`${p.description || chipLabel(p.key)} · ${p.key}`"
               @click="insert(p.key)"
             >
-              {{ p.key }}
+              <span class="tpl-chip__plus" aria-hidden="true">+</span>
+              {{ chipLabel(p.key) }}
             </button>
           </div>
           <p v-if="unknown.length" class="tpl-card__warn">
@@ -61,10 +64,38 @@
           </p>
         </div>
 
+        <!--
+          What a donor receives: the draft with each detail filled in for a
+          sample donor, as it changes. The filled parts are marked.
+        -->
+        <div class="tpl-field">
+          <span class="tpl-label">Preview</span>
+          <div class="tpl-preview" aria-live="off">
+            <div class="tpl-preview__head">
+              <span><span class="tpl-preview__key">From</span> {{ sample['{center_name}'] }}</span>
+              <span><span class="tpl-preview__key">To</span> {{ sample['{full_name}'] }}</span>
+              <span class="tpl-preview__subject">
+                <template v-for="(part, i) in fill(draft.subject)" :key="`s${i}`">
+                  <mark v-if="part.filled" class="tpl-fill">{{ part.text }}</mark><template v-else>{{ part.text }}</template>
+                </template>
+              </span>
+            </div>
+            <p class="tpl-preview__body">
+              <template v-for="(part, i) in fill(draft.body)" :key="`b${i}`">
+                <mark v-if="part.filled" class="tpl-fill">{{ part.text }}</mark><template v-else>{{ part.text }}</template>
+              </template>
+            </p>
+          </div>
+          <span class="tpl-help">Sample donor. Each real email uses its own donor's details.</span>
+        </div>
+
         <div class="tpl-actions">
           <button type="submit" class="tpl-btn tpl-btn--primary" :disabled="saving || !dirty || !draft.subject.trim() || !draft.body.trim()">
             {{ saving ? 'Saving…' : 'Save template' }}
           </button>
+          <!-- Why Save is off, so a greyed button does not read as broken. -->
+          <span v-if="!dirty && !saving" class="tpl-actions__hint">No changes to save</span>
+          <span v-else-if="dirty && (!draft.subject.trim() || !draft.body.trim())" class="tpl-actions__hint">Add a subject and a message to save</span>
           <button v-if="dirty" type="button" class="tpl-btn" :disabled="saving" @click="select(selected)">Discard changes</button>
           <button v-if="current.customised && !dirty" type="button" class="tpl-btn" :disabled="saving" @click="reset">
             Restore default
@@ -90,11 +121,42 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
  * so Restore default simply deletes the centre's row.
  */
 
-const { can } = useUser()
+const { can, user } = useUser()
 const canConfigure = computed(() => can('center.configure'))
 
 const templates = ref([])
 const placeholders = ref([])
+
+// A sample donor for the preview; the centre's own name where it is known.
+const shortDate = (offsetDays) => {
+  const d = new Date(Date.now() + offsetDays * 86_400_000)
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+const sample = computed(() => ({
+  '{first_name}': 'Maria',
+  '{full_name}': 'Maria Santos',
+  '{donor_code}': 'DONOR-000123',
+  '{last_donation_date}': shortDate(-30),
+  '{next_eligible_date}': shortDate(26),
+  '{total_donations}': '3',
+  '{center_name}': user.value?.facility?.facility_name || 'Your blood center',
+  '{center_phone}': '(082) 123 4567',
+  '{center_email}': 'bloodcenter@example.ph',
+  '{center_address}': user.value?.facility?.address || 'Your centre address',
+}))
+
+/** The text split on {details}, each known one replaced by the sample value. */
+function fill(text) {
+  return String(text ?? '').split(/(\{[a-z_]+\})/i).filter(Boolean).map((part) => (
+    part in sample.value ? { text: sample.value[part], filled: true } : { text: part, filled: false }
+  ))
+}
+
+// "{last_donation_date}" -> "Last donation date": the words staff read.
+function chipLabel(key) {
+  const words = String(key).replace(/[{}]/g, '').replace(/_/g, ' ').trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
 const selected = ref('thank_you')
 const draft = reactive({ subject: '', body: '' })
 const loading = ref(false)
@@ -249,6 +311,27 @@ onMounted(() => {
 }
 
 .tpl-form { display: flex; flex-direction: column; gap: 0.85rem; }
+
+/* The preview: an email as the donor's inbox shows it. */
+.tpl-preview {
+  overflow: hidden;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 12px;
+  background: var(--rb-surface-alt, var(--rb-surface));
+}
+.tpl-preview__head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+.tpl-preview__key { display: inline-block; min-width: 38px; font-weight: 600; }
+.tpl-preview__subject { margin-top: 3px; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.tpl-preview__body { margin: 0; padding: 12px 14px 14px; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; color: var(--rb-text-primary); }
+.tpl-fill { padding: 0; border-radius: 3px; box-shadow: 0 0 0 1px rgba(var(--rb-primary-rgb), 0.14); background: rgba(var(--rb-primary-rgb), 0.14); color: inherit; }
 .tpl-field { display: flex; flex-direction: column; gap: 6px; }
 .tpl-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
 
@@ -269,20 +352,28 @@ onMounted(() => {
 
 .tpl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
+.tpl-help { margin-top: -2px; font-size: 12px; color: var(--rb-text-secondary); }
+
 .tpl-chip {
-  padding: 3px 9px;
-  border: 1px dashed var(--rb-border-strong);
-  border-radius: 8px;
-  background: var(--rb-surface-alt);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 999px;
+  background: var(--rb-surface);
   color: var(--rb-text-primary);
-  font-family: var(--rb-font-mono);
-  font-size: 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
 }
+.tpl-chip__plus { font-weight: 700; color: var(--rb-primary-text); }
+.tpl-chip:hover { border-color: rgba(var(--rb-primary-rgb), 0.5); background: rgba(var(--rb-primary-rgb), 0.06); color: var(--rb-primary-text); }
 
-.tpl-chip:hover { border-style: solid; }
-
-.tpl-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tpl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.tpl-actions__hint { font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .tpl-btn {
   display: inline-flex;
@@ -302,6 +393,8 @@ onMounted(() => {
 .tpl-btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
 .tpl-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .tpl-btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+/* Off: a plain grey button, not a faded blue one that reads as broken. */
+.tpl-btn--primary:disabled { opacity: 1; background: var(--rb-surface-hover); border-color: var(--rb-border-strong); color: var(--rb-text-muted); }
 .tpl-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
 
 .tpl-link {

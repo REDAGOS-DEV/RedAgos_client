@@ -56,6 +56,16 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/password`, 'POST', payload)
   }
 
+  /** The centre's reports for a period (reports.view_all): centre, staff, activity. */
+  async centreReport(params: { from: string, to: string }): Promise<any> {
+    return this.request(`${this.resource}/reports/centre`, 'GET', params)
+  }
+
+  /** The Admin's dashboard: role coverage, the team, the setup, recent changes. */
+  async adminOverview(): Promise<any> {
+    return this.request(`${this.resource}/admin-overview`, 'GET')
+  }
+
   /** The notices this person gets and why, and the few they may turn off. */
   async notificationPreferences(): Promise<any> {
     return this.request(`${this.resource}/notification-preferences`, 'GET')

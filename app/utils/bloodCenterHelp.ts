@@ -36,6 +36,11 @@ export interface HelpGuide {
    * reached from, whose access decides who sees the guide, and its name.
    */
   via?: { path: string; label: string }
+  /**
+   * An ability the guide also needs, for a page everyone opens but only some
+   * use this way (the Admin's part of the dashboard and of Settings).
+   */
+  requires?: string
   /** What the page is for, in a sentence. */
   summary: string
   steps: string[]
@@ -52,7 +57,7 @@ export const HELP_GUIDES: HelpGuide[] = [
     id: 'collection',
     title: 'Take a donor through a visit',
     department: 'Donor / Collection',
-    path: '/blood-center/collection',
+    path: '/blood-center/donation',
     summary: 'Arrival, screening and the collection itself, in one place.',
     steps: [
       'Scan the donor once on arrival.',
@@ -272,7 +277,8 @@ export const HELP_GUIDES: HelpGuide[] = [
     summary: 'Saved records are never edited directly; a mistake is fixed by an approved correction.',
     steps: [
       'Whoever entered the record requests a correction from that record\'s page.',
-      'The department\'s approver or the Center Admin approves or rejects it here. A rejection needs a note.',
+      'The head of that record\'s department approves or rejects it here. A rejection needs a note.',
+      'A head\'s own correction is applied as it is filed.',
       'An approved correction is applied under the same rules as the original.',
     ],
     questions: [
@@ -289,10 +295,207 @@ export const HELP_GUIDES: HelpGuide[] = [
     summary: 'Your profile, password and how the portal looks.',
     steps: [
       'Open Settings and choose Appearance.',
-      'Pick a portal colour, and Light, Dark or System mode.',
+      'Pick Light, Dark or Device mode.',
+      'Pick one of the colours, or the eyedropper for any colour of your own. Reset to default undoes both.',
+    ],
+    questions: [
+      { q: 'Does my colour change it for everyone?', a: 'No. It is saved on this device only, and used in every RedAgos portal on it.' },
+    ],
+  },
+  {
+    id: 'notifications',
+    title: 'Choose your notifications',
+    department: 'Account',
+    path: '/blood-center/settings',
+    summary: 'What RedAgos tells you about, from your role, in the bell at the top.',
+    steps: [
+      'Open Settings and choose Notifications.',
+      'Each notice says why you get it. The ones marked Always on hold up a patient or a donor when missed, so they stay on.',
+      'Turn the others on or off. The change is saved at once.',
+    ],
+  },
+
+  // ---- More guides, by department ----
+  {
+    id: 'appointments',
+    title: 'See and book appointments',
+    department: 'Donor / Collection',
+    path: '/blood-center/appointments',
+    summary: 'Every booked visit at this centre, and booking one for a donor.',
+    steps: [
+      'Filter by status to see today\'s visits, or the ones still to come.',
+      'To book for a donor, choose the donor, a date and a free time slot.',
+      'A donor booked here gets the same reminders as one who booked in the donor portal.',
+    ],
+  },
+  {
+    id: 'deferrals',
+    title: 'Record a deferral',
+    department: 'Donor / Collection',
+    path: '/blood-center/deferrals',
+    summary: 'Donors who may not give for now, and why.',
+    steps: [
+      'Choose the donor and whether the deferral is temporary or permanent.',
+      'Pick the reason, or Other and type it.',
+      'For a temporary one, set the date it starts and the date it ends.',
+    ],
+    questions: [
+      { q: 'Does the donor see the reason?', a: 'The donor sees that they are deferred and, for a temporary one, the date they can give again.' },
+    ],
+  },
+  {
+    id: 'serology-results',
+    title: 'Verify a reactive result',
+    department: 'Testing',
+    path: '/blood-center/serology-results',
+    summary: 'Reactive serology results wait here until a second person verifies them.',
+    steps: [
+      'Filter by Awaiting verification. The bell tells you when one arrives.',
+      'Open the result and check it against the bench record.',
+      'Verify it, or return it to the technologist with a note.',
+    ],
+    questions: [
+      { q: 'Can I verify a result I recorded myself?', a: 'No. A reactive result is always checked by a second person.' },
+    ],
+  },
+  {
+    id: 'referrals',
+    title: 'Follow up a counselling referral',
+    department: 'Testing',
+    path: '/blood-center/counselling-referrals',
+    summary: 'Donors to contact after a reactive result, until each is referred or closed.',
+    steps: [
+      'Start with the referrals still pending. The bell reminds you of any not acted on after three days.',
+      'Ask the donor to get in touch: they get an in-app notice to call the centre, which names no result.',
+      'Mark each one contacted, referred or closed as it moves on.',
+    ],
+  },
+  {
+    id: 'processed',
+    title: 'Hand processed units over to Issuance',
+    department: 'Processing',
+    path: '/blood-center/processed',
+    summary: 'Units whose components are recorded, waiting to be handed to Issuance.',
+    steps: [
+      'Filter by Awaiting hand-over.',
+      'Open a donation and check its bags.',
+      'Hand it over. The units then appear in Issuance\'s intake.',
+    ],
+  },
+  {
+    id: 'stock-thresholds',
+    title: 'Set minimum stock levels',
+    department: 'Issuance',
+    path: '/blood-center/stock-thresholds',
+    summary: 'The fewest units of each blood type and component the centre should hold.',
+    steps: [
+      'For each blood type and component, set its minimum (and its par level, if you use one).',
+      'Save. A cell that falls below its minimum shows as low, and its viewers are told.',
+    ],
+  },
+  {
+    id: 'stock-report',
+    title: 'Print the daily stock report',
+    department: 'Issuance',
+    path: '/blood-center/stock-report',
+    summary: 'Today\'s stock by blood type and component, ready to print or file.',
+    steps: [
+      'Open Daily Stock Report and check the figures.',
+      'Download the PDF. It carries the centre\'s logos and who prepared it.',
+    ],
+  },
+  {
+    id: 'admin-dashboard',
+    title: 'Keep your team and setup in order',
+    department: 'Management',
+    path: '/blood-center/dashboard',
+    requires: 'staff.manage',
+    summary: 'The Admin\'s dashboard: what waits for you, who fills each key post, and the centre\'s setup.',
+    steps: [
+      'Start with Needs you: each card opens the place to act.',
+      'Role coverage lists the posts each department needs. One shown in red has no one: Assign opens Staff Accounts.',
+      'Centre setup shows whether the logos for printed documents are uploaded.',
+    ],
+    questions: [
+      { q: 'Why does a missing Laboratory Supervisor matter?', a: 'Reactive results can only be verified by them. Without one, those results wait.' },
+    ],
+  },
+  {
+    id: 'staff',
+    title: 'Add a staff account and give it a role',
+    department: 'Management',
+    path: '/blood-center/staff',
+    summary: 'Everyone who works in this centre\'s portal, their department and what they may do.',
+    steps: [
+      'Choose Add staff and enter the name, email and title (such as RMT).',
+      'Pick the department and one or more of its roles. With several, choose the main one.',
+      'Set the privileges (read, write, update, delete) and save. They are sent a way to sign in.',
+      'To stop an account, change its status to Suspended or Deactivated rather than removing it.',
+    ],
+  },
+  {
+    id: 'audit-log',
+    title: 'See who did what',
+    department: 'Management',
+    path: '/blood-center/audit-log',
+    summary: 'Every recorded action in this centre: when, who and on what record.',
+    steps: [
+      'Filter by module (Staff, Collection, Inventory...) or by kind of action.',
+      'Each row names the person, the action and the record it touched.',
+    ],
+    questions: [
+      { q: 'Can an entry be changed or deleted?', a: 'No. The log is a record of what happened and cannot be edited.' },
+    ],
+  },
+  {
+    id: 'reports',
+    title: 'Read the centre\'s reports',
+    department: 'Management',
+    path: '/blood-center/reports',
+    summary: 'Donations, requests, units, staff changes and activity for a period, counted from the records.',
+    steps: [
+      'Pick a period: the last 7 or 30 days, this month, or a custom range.',
+      'Switch between Centre, Staff & access and Activity.',
+      'Export CSV saves the tab on screen for a spreadsheet.',
+    ],
+  },
+  {
+    id: 'centre-settings',
+    title: 'Set the centre\'s logos and donor emails',
+    department: 'Management',
+    path: '/blood-center/settings',
+    requires: 'center.configure',
+    summary: 'What the centre\'s printed documents and donor emails carry.',
+    steps: [
+      'Open Settings and choose Center.',
+      'Upload the centre logo and the left report logo. They print on receipts, statements and the stock report.',
+      'Under Donor emails, edit the Thank-You and Eligibility Reminder wording. Insert a detail adds the donor\'s name, dates and more; the preview shows what a donor receives.',
     ],
   },
 ]
+
+/**
+ * Help for each role: what the job is in RedAgos, and the guides to start
+ * with. Keyed by staff role, and by management level for the Admin and the
+ * Supervisor. Only guides the person may open are shown.
+ */
+export const ROLE_HELP: Record<string, { summary: string, start: string[] }> = {
+  screening_physician: { summary: 'You screen donors, decide whether they may give today, and approve Collection\'s corrections.', start: ['collection', 'deferrals', 'corrections'] },
+  phlebotomist: { summary: 'You collect the blood and label every bag and tube.', start: ['collection', 'donors'] },
+  apheresis_specialist: { summary: 'You collect blood components by apheresis and label them.', start: ['collection', 'donors'] },
+  medical_receptionist: { summary: 'You welcome donors, book their visits and run the mobile drives.', start: ['appointments', 'donors', 'drives'] },
+  component_technologist: { summary: 'You separate units into components, hand them to Issuance, and approve Processing\'s corrections.', start: ['processing', 'processed', 'corrections'] },
+  processing_assistant: { summary: 'You help separate units into components and hand them to Issuance.', start: ['processing', 'processed'] },
+  serology_technologist: { summary: 'You type each unit and run its serology panel.', start: ['testing', 'serology-results'] },
+  lab_supervisor: { summary: 'You verify reactive results, follow up counselling referrals and approve Testing\'s corrections.', start: ['serology-results', 'referrals', 'testing'] },
+  inventory_control_officer: { summary: 'You keep the stock, decide on hospital requests and approve Issuance\'s corrections.', start: ['requests', 'stock-thresholds', 'intake'] },
+  dispatch_coordinator: { summary: 'You release units for hospital requests.', start: ['fulfillment', 'inventory', 'requests'] },
+  it_data_clerk: { summary: 'You keep the stock records and the daily report up to date.', start: ['inventory', 'stock-report'] },
+  billing_clerk: { summary: 'You take payments at the counter and issue receipts.', start: ['counter', 'receipts', 'cash-shifts'] },
+  billing_supervisor: { summary: 'You head Billing: statements, the journal and its corrections.', start: ['statements', 'transactions', 'corrections'] },
+  admin: { summary: 'You keep the centre\'s team, its setup and its records in order. You do not do department work.', start: ['admin-dashboard', 'staff', 'centre-settings'] },
+  supervisor: { summary: 'You watch every department and the centre\'s figures, without doing their work.', start: ['reports', 'inventory', 'requests'] },
+}
 
 /** Terms staff meet across RedAgos. */
 export const HELP_GLOSSARY: { term: string; meaning: string }[] = [
@@ -308,8 +511,12 @@ export const HELP_GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'Correction', meaning: 'An approved change to a saved record. Records are never edited directly.' },
 ]
 
-/** Whether this account sees a guide: it can open the guide's page (or the page it is reached from). */
-export function guideVisible(guide: HelpGuide, allowedPaths: Set<string>): boolean {
+/**
+ * Whether this account sees a guide: it can open the guide's page (or the
+ * page it is reached from), and holds the guide's own ability if it names one.
+ */
+export function guideVisible(guide: HelpGuide, allowedPaths: Set<string>, can?: (_ability: string) => boolean): boolean {
+  if (guide.requires && !(can?.(guide.requires) ?? false)) return false
   return allowedPaths.has(guide.via?.path ?? guide.path)
 }
 

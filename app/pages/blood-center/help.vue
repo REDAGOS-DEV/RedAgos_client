@@ -6,6 +6,31 @@
         subtitle="How each part of the blood center works. To find something fast, type it in the search at the top; help guides show there too."
       />
 
+      <!--
+        FOR YOUR ROLE: what this person's job is in RedAgos, and the guides
+        to start with, before every guide their account can open.
+      -->
+      <section v-if="roleHelp" class="card role" aria-labelledby="hc-role">
+        <div class="role__intro">
+          <span class="role__icon" aria-hidden="true"><AssetIcon name="user-check" :size="20" /></span>
+          <div>
+            <p class="role__kicker">For your role</p>
+            <h2 id="hc-role" class="role__title">{{ roleName }}</h2>
+            <p class="role__summary">{{ roleHelp.summary }}</p>
+          </div>
+        </div>
+        <div v-if="startGuides.length" class="role__start">
+          <p class="role__label">Start here</p>
+          <div class="role__cards">
+            <button v-for="g in startGuides" :key="g.id" type="button" class="start" @click="openGuide(g.id)">
+              <span class="start__title">{{ g.title }}</span>
+              <span class="start__lede">{{ g.summary }}</span>
+              <span class="start__go">Read the guide <AssetIcon name="arrow-right" :size="13" /></span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- GUIDES: departments down the left, their guides on the right -->
       <section class="card guides-card" aria-labelledby="hc-guides">
         <nav class="depts" aria-labelledby="hc-guides">
@@ -124,7 +149,7 @@
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import KeyCombo from '~/components/BloodCenter/KeyCombo.vue'
-import { HELP_GLOSSARY, HELP_GUIDES, guideVisible } from '~/utils/bloodCenterHelp'
+import { HELP_GLOSSARY, HELP_GUIDES, ROLE_HELP, guideVisible } from '~/utils/bloodCenterHelp'
 import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
@@ -134,11 +159,24 @@ definePageMeta({
 
 const route = useRoute()
 const router = useRouter()
-const { navGroups, searchablePages, labelForPath } = useBloodCenterNav()
+const { navGroups, searchablePages, labelForPath, sectionForPath } = useBloodCenterNav()
+const { user, can } = useUser()
 
-// Only guides for pages this account can open; the sidebar's own rule.
+// Only guides for pages this account can open; the sidebar's own rule. Each
+// guide sits in the sidebar group of its page, so the two never disagree
+// (the guides' own department names fell behind when the sidebar was split).
 const allowedPaths = computed(() => new Set(searchablePages.value.map((item) => item.path.split('?')[0])))
-const guides = computed(() => HELP_GUIDES.filter((guide) => guideVisible(guide, allowedPaths.value)))
+const guides = computed(() => HELP_GUIDES
+  .filter((guide) => guideVisible(guide, allowedPaths.value, can))
+  .map((guide) => ({ ...guide, department: sectionForPath(guide.via?.path ?? guide.path) || guide.department })))
+
+/* FOR YOUR ROLE: the staff role, or the Admin's or Supervisor's level */
+const roleKey = computed(() => user.value?.management_level || user.value?.staff_role || '')
+const roleHelp = computed(() => ROLE_HELP[roleKey.value] ?? null)
+const roleName = computed(() => user.value?.management_level_label || user.value?.staff_role_label || user.value?.role_label || 'Your role')
+const startGuides = computed(() => (roleHelp.value?.start ?? [])
+  .map((id) => guides.value.find((g) => g.id === id))
+  .filter(Boolean))
 
 // Departments in the sidebar's order, which already puts the member's own first.
 const departments = computed(() => navGroups.value
@@ -152,8 +190,11 @@ function pageLabel(path) {
   return labelForPath(path) || 'the page'
 }
 
+// Opens on the department of the role's first guide, else the first listed.
 watch(departments, (list) => {
-  if (!list.some((d) => d.name === department.value)) department.value = list[0]?.name ?? ''
+  if (list.some((d) => d.name === department.value)) return
+  const own = startGuides.value[0]?.department
+  department.value = (own && list.some((d) => d.name === own)) ? own : (list[0]?.name ?? '')
 }, { immediate: true })
 
 /* OPEN GUIDE: one at a time; ?guide=<id> (from the top bar search) opens that one */
@@ -299,4 +340,33 @@ const topQuestions = computed(() => {
   .depts { border-right: 0; border-bottom: 1px solid var(--rb-border); }
   .stuck { flex-wrap: wrap; }
 }
+
+/* ── For your role ── */
+.role { display: flex; flex-direction: column; gap: 16px; }
+.role__intro { display: flex; align-items: flex-start; gap: 14px; }
+.role__icon { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 13px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.role__kicker { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-primary-text); }
+.role__title { margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--rb-text-primary); }
+.role__summary { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--rb-text-secondary); }
+.role__label { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); }
+.role__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.start {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.start:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); transform: translateY(-1px); }
+.start:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.start__title { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.start__lede { font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+.start__go { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12.5px; font-weight: 700; color: var(--rb-primary-text); }
+@media (prefers-reduced-motion: reduce) { .start { transition: none; } }
 </style>
