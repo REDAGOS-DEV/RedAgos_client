@@ -27,6 +27,11 @@
             <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
             Refresh
           </button>
+          <!-- The counter is where the work is done. Whoever screens has it in their queue card below. -->
+          <NuxtLink v-if="canWorkCounter && !can('donations.screen')" to="/blood-center/donation" class="btn-primary">
+            <AssetIcon name="heart" :size="14" />
+            Open counter
+          </NuxtLink>
         </div>
       </header>
 
@@ -40,6 +45,50 @@
       </div>
 
       <template v-if="data">
+        <!--
+          ============ YOUR SCREENING QUEUE ============
+          For whoever screens (donations.screen): who waits for them now and
+          how today's screening has gone, with the counter one click away.
+        -->
+        <section v-if="can('donations.screen')" class="queue" aria-labelledby="queue-title">
+          <div class="queue__main">
+            <p class="queue__kicker">Your screening queue</p>
+            <h2 id="queue-title" class="queue__title">
+              <template v-if="queueWaiting">
+                <strong>{{ queueWaiting }}</strong> {{ queueWaiting === 1 ? 'donor waits' : 'donors wait' }} for screening
+              </template>
+              <template v-else>No one is waiting for screening</template>
+            </h2>
+            <p class="queue__sub">
+              {{ data.today.donations.screening }} in screening now · {{ plural(data.today.appointments.waiting ?? 0, 'appointment') }} still to arrive
+            </p>
+          </div>
+          <dl class="queue__stats">
+            <div>
+              <dt>Screened today</dt>
+              <dd>{{ screenedToday }}</dd>
+            </div>
+            <!-- The deferrals list opens from its own figure. -->
+            <div>
+              <dt>Deferred today</dt>
+              <dd :class="{ 'queue__warn': data.today.donations.deferred }">{{ data.today.donations.deferred }}</dd>
+              <NuxtLink v-if="can('donors.view_clinical')" to="/blood-center/deferrals" class="queue__view">
+                Deferrals <AssetIcon name="arrow-right" :size="12" />
+              </NuxtLink>
+            </div>
+            <div>
+              <dt>Deferral rate</dt>
+              <dd>{{ deferralRate === null ? '—' : `${deferralRate}%` }}</dd>
+            </div>
+          </dl>
+          <div class="queue__actions">
+            <NuxtLink to="/blood-center/donation" class="btn-primary btn-primary--lg">
+              Open donation counter
+              <AssetIcon name="arrow-right" :size="14" />
+            </NuxtLink>
+          </div>
+        </section>
+
         <!-- ============ TODAY AT THE COUNTER ============ -->
         <section aria-labelledby="today-title" class="section">
           <h2 id="today-title" class="section-title">Today at the counter</h2>
@@ -55,6 +104,11 @@
                   Appointments
                   <AssetIcon name="arrow-right" :size="13" />
                 </NuxtLink>
+              </div>
+              <!-- The day's appointments in proportion, in the list's colours. -->
+              <div v-if="data.today.appointments.total" class="share" aria-hidden="true">
+                <span v-for="row in appointmentRows" :key="row.key" class="share__seg" :class="`share__seg--${row.tone}`"
+                  :style="{ flexGrow: row.value }" />
               </div>
               <ul class="stat-list">
                 <li v-for="row in appointmentRows" :key="row.key" class="stat-list__row">
@@ -78,8 +132,12 @@
                   <AssetIcon name="arrow-right" :size="13" />
                 </NuxtLink>
               </div>
-              <ol class="stages" aria-label="Where today's visits have got to">
-                <li v-for="stage in stageRows" :key="stage.key" class="stage">
+              <div v-if="data.today.donations.total" class="share" aria-hidden="true">
+                <span v-for="stage in stageRows" :key="stage.key" class="share__seg" :class="`share__seg--${stage.tone}`"
+                  :style="{ flexGrow: stage.value }" />
+              </div>
+              <ol class="stages stages--flow" aria-label="Where today's visits have got to">
+                <li v-for="stage in stageRows" :key="stage.key" class="stage" :class="`stage--${stage.tone}`">
                   <span class="stage__value">{{ stage.value }}</span>
                   <span class="stage__label">
                     <span class="dot" :class="`dot--${stage.tone}`" aria-hidden="true" />
@@ -123,12 +181,15 @@
             </div>
 
             <ul class="group-bars">
-              <li v-for="row in groupRows" :key="row.code" class="group-bar">
+              <li v-for="row in groupRows" :key="row.code" class="group-bar" :class="{ 'group-bar--low': isLowGroup(row.count) }">
                 <span class="group-bar__code">{{ row.code }}</span>
                 <span class="group-bar__track">
                   <span class="group-bar__fill" :style="{ width: groupWidth(row.count) }" />
                 </span>
-                <span class="group-bar__count">{{ row.count }}</span>
+                <span class="group-bar__count">
+                  <span v-if="isLowGroup(row.count)" class="group-bar__low">Low</span>
+                  {{ row.count }}
+                </span>
               </li>
             </ul>
             <p v-if="data.pool.eligible_untyped" class="card__note">
@@ -142,7 +203,7 @@
           <section aria-labelledby="trend-title" class="card trend">
             <div class="card__head">
               <div>
-                <h2 id="trend-title" class="card__label card__label--title">Donations, last 30 days</h2>
+                <h2 id="trend-title" class="card__label card__label--title">Donations, last 7 days</h2>
                 <p class="card__sub">
                   <strong class="figure">{{ totals.donations }}</strong> donations ·
                   <strong class="figure">{{ totals.deferrals }}</strong> deferred at screening
@@ -157,6 +218,10 @@
                   <AssetIcon :name="showTable ? 'bar-chart' : 'list'" :size="13" />
                   {{ showTable ? 'Chart' : 'Table' }}
                 </button>
+                <!-- The longer view, by period and against the one before, lives in Reports. -->
+                <NuxtLink v-if="can('donations.view')" to="/blood-center/reports" class="trend__more">
+                  See reports <AssetIcon name="arrow-right" :size="13" />
+                </NuxtLink>
               </div>
             </div>
 
@@ -168,7 +233,7 @@
                 class="chart__svg"
                 role="img"
                 tabindex="0"
-                :aria-label="`Donations per day over the last 30 days: ${totals.donations} donations and ${totals.deferrals} deferrals. Use the left and right arrow keys to read each day.`"
+                :aria-label="`Donations per day over the last 7 days: ${totals.donations} donations and ${totals.deferrals} deferrals. Use the left and right arrow keys to read each day.`"
                 @keydown="onChartKey"
                 @blur="activeIndex = null"
                 @pointerleave="activeIndex = null"
@@ -210,7 +275,7 @@
                 <p class="tooltip__row"><span class="tooltip__key tooltip__key--s2" aria-hidden="true" /><strong>{{ activeColumn.deferrals }}</strong> deferrals</p>
               </div>
 
-              <p v-if="!peak" class="chart__empty">No donations or deferrals recorded in the last 30 days.</p>
+              <p v-if="!peak" class="chart__empty">No donations or deferrals recorded in the last 7 days.</p>
             </div>
 
             <div v-if="showTable" class="trend-table-wrap">
@@ -298,6 +363,7 @@ import {
   weekday,
 } from '~/utils/collectionDashboard'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -307,6 +373,8 @@ definePageMeta({
 })
 
 const { can } = useUser()
+// Who works the counter: the roles that open, screen or collect a donation.
+const canWorkCounter = computed(() => can(COLLECTION_ABILITIES))
 
 /**
  * API SHAPE: GET /api/blood-center/collection/dashboard
@@ -387,6 +455,19 @@ const poolKpis = computed(() => {
 })
 
 const groupRows = computed(() => bloodGroupRows(data.value?.pool.eligible_by_blood_type ?? []))
+// A group with under 10 eligible donors, or under a tenth of the largest: the
+// ones to call in first.
+function isLowGroup(count) {
+  return count < Math.max(10, Math.ceil(groupMax.value * 0.1))
+}
+
+/* ---------- the physician's queue ---------- */
+// "Registered" is a visit that has arrived and not been screened yet.
+const queueWaiting = computed(() => data.value?.today.donations.registered ?? 0)
+const screenedToday = computed(() => (data.value?.today.donations.collected ?? 0) + (data.value?.today.donations.deferred ?? 0))
+const deferralRate = computed(() => (screenedToday.value
+  ? Math.round(((data.value?.today.donations.deferred ?? 0) / screenedToday.value) * 100)
+  : null))
 const groupMax = computed(() => Math.max(1, ...groupRows.value.map((r) => r.count)))
 
 function groupWidth(count) {
@@ -403,7 +484,9 @@ function dayWidth(count) {
 
 /* ---------- trend chart ---------- */
 
-const trend = computed(() => data.value?.trend ?? [])
+// The week only: this page is for the day's work. The longer trend, by any
+// period and against the one before, is in Reports.
+const trend = computed(() => (data.value?.trend ?? []).slice(-7))
 const totals = computed(() => trendTotals(trend.value))
 const peak = computed(() => trendPeak(trend.value))
 const trendNewestFirst = computed(() => [...trend.value].reverse())
@@ -460,15 +543,14 @@ const chart = computed(() => {
     }
   })
 
-  // A date label every 7 days, counted back from today so today is labelled.
+  // A label under every day of the week; today is called today.
   const xLabels = columns
     .map((col, i) => ({ col, i }))
-    .filter(({ i }) => (days.length - 1 - i) % 7 === 0)
     .map(({ col, i }) => ({
       date: col.date,
       x: col.center,
       text: i === days.length - 1 ? 'Today' : dayMonth(col.date),
-      anchor: i === days.length - 1 ? 'end' : (col.center - left < 20 ? 'start' : 'middle'),
+      anchor: 'middle',
     }))
 
   return {
@@ -795,7 +877,7 @@ onBeforeUnmount(() => {
 
 .group-bars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; margin: 0; padding: 0; list-style: none; }
 
-.group-bar { display: grid; grid-template-columns: 34px minmax(0, 1fr) 36px; align-items: center; gap: 10px; font-size: 13px; }
+.group-bar { display: grid; grid-template-columns: 34px minmax(0, 1fr) 64px; align-items: center; gap: 10px; font-size: 13px; }
 .group-bar__code { font-weight: 700; }
 .group-bar__track { height: 10px; }
 
@@ -812,6 +894,8 @@ onBeforeUnmount(() => {
 
 /* ---------- Trend ---------- */
 .trend__tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.trend__more { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--rb-primary-text, var(--rb-primary)); text-decoration: none; }
+.trend__more:hover { text-decoration: underline; }
 
 .legend { display: flex; gap: 14px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--rb-text-secondary); }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
@@ -925,5 +1009,88 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
   .chart__col { transition: none; }
+}
+
+/* ── The physician's screening queue ── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--rb-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 150ms ease;
+}
+.btn-primary:hover { background: var(--rb-primary-hover, var(--rb-primary)); }
+.btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+.queue {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 22px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 160% at 0% 0%, rgba(var(--rb-primary-rgb), 0.10), transparent 60%),
+    var(--rb-surface);
+}
+.queue__kicker { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-primary-text); }
+.queue__title { margin: 4px 0 0; font-size: 20px; font-weight: 700; color: var(--rb-text-primary); }
+.queue__title strong { font-size: 28px; font-weight: 800; color: var(--rb-primary-text); }
+.queue__sub { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.queue__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.queue__stats div { padding: 10px 12px; border-radius: 12px; background: var(--rb-surface-hover, #F6F8FB); }
+.queue__stats dt { font-size: 12px; color: var(--rb-text-secondary); }
+.queue__stats dd { margin: 2px 0 0; font-size: 20px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.queue__warn { color: var(--rb-accent-text, #C62828) !important; }
+.queue__actions { display: flex; align-items: center; }
+.btn-primary--lg { height: 44px; padding: 0 20px; font-size: 14px; }
+.queue__view { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--rb-primary-text); text-decoration: none; }
+.queue__view:hover { text-decoration: underline; }
+.queue__view:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 4px; }
+
+/* ── Shares: the day in proportion ── */
+.share { display: flex; gap: 2px; height: 8px; margin: 6px 0 4px; overflow: hidden; border-radius: 999px; background: var(--rb-surface-hover, #F1F5F9); }
+.share__seg { min-width: 0; flex-basis: 0; }
+.share__seg--ok { background: var(--rb-success); }
+.share__seg--info { background: var(--rb-primary); }
+.share__seg--warn { background: var(--rb-warning); }
+.share__seg--crit { background: var(--rb-accent); }
+.share__seg--neutral { background: var(--rb-border-strong, #CBD5E1); }
+
+/* Visits as a flow: Registered, then screening, then collected; deferred apart. */
+.stages--flow .stage { position: relative; }
+.stages--flow .stage:not(:nth-child(n+3))::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -9px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--rb-border-strong, #CBD5E1);
+  border-right: 2px solid var(--rb-border-strong, #CBD5E1);
+  transform: translateY(-50%) rotate(45deg);
+}
+.stage--ok .stage__value { color: var(--rb-success-text, #2E7D32); }
+.stage--crit .stage__value { color: var(--rb-accent-text, #C62828); }
+
+/* ── Short blood groups ── */
+.group-bar--low .group-bar__fill { background: var(--rb-warning) !important; }
+.group-bar__count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.group-bar__low { padding: 1px 6px; border-radius: 999px; background: rgba(245, 124, 0, 0.14); font-size: 10.5px; font-weight: 700; color: #B45309; }
+html.dark .group-bar__low { color: #FFB74D; }
+
+@media (max-width: 1200px) {
+  .queue { grid-template-columns: minmax(0, 1fr); }
+  .queue__actions { justify-content: flex-start; }
 }
 </style>

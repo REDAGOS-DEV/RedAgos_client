@@ -23,8 +23,8 @@ function source(relative: string): string {
 describe('the Donation page', () => {
   const page = source('app/pages/blood-center/donation.vue')
 
-  it('is called Donation', () => {
-    expect(page).toContain('<h1 class="collection__title">Donation</h1>')
+  it('is called Donation counter, as the sidebar names it', () => {
+    expect(page).toContain('<h1 class="collection__title">Donation counter</h1>')
   })
 
   it('keeps the old address as a redirect, so a bookmark still lands', () => {

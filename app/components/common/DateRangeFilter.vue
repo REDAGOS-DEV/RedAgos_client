@@ -29,27 +29,31 @@
         @focusout="onFocusOut"
       >
         <div class="drf-panel__fields">
-          <label class="drf-panel__field">
-            <span class="drf-panel__label">From</span>
-            <input
-              ref="fromEl"
-              type="date"
-              class="drf-panel__input"
-              :value="from"
+          <!-- The system's DatePicker, as on every other date field. -->
+          <div class="drf-panel__field">
+            <span :id="`${panelId}-from`" class="drf-panel__label">From</span>
+            <DatePicker
+              :model-value="from"
               :max="to || undefined"
-              @change="setFrom($event.target.value)"
-            >
-          </label>
-          <label class="drf-panel__field">
-            <span class="drf-panel__label">To</span>
-            <input
-              type="date"
-              class="drf-panel__input"
-              :value="to"
+              size="sm"
+              placeholder="Any date"
+              :describedby="`${panelId}-from`"
+              aria-label="From"
+              @update:model-value="setFrom"
+            />
+          </div>
+          <div class="drf-panel__field">
+            <span :id="`${panelId}-to`" class="drf-panel__label">To</span>
+            <DatePicker
+              :model-value="to"
               :min="from || undefined"
-              @change="setTo($event.target.value)"
-            >
-          </label>
+              size="sm"
+              placeholder="Any date"
+              :describedby="`${panelId}-to`"
+              aria-label="To"
+              @update:model-value="setTo"
+            />
+          </div>
         </div>
 
         <div class="drf-panel__foot">
@@ -63,6 +67,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 import { dateRangeLabel } from '~/utils/dateRange'
 import { ref, computed, nextTick, onBeforeUnmount, useId } from 'vue'
 
@@ -85,7 +90,8 @@ const emit = defineEmits(['change'])
 const panelId = `drf-${useId()}`
 const triggerEl = ref(null)
 const panelEl = ref(null)
-const fromEl = ref(null)
+// The From field's button, for focus on opening and after Clear.
+const focusFrom = () => panelEl.value?.querySelector('.dp-trigger')?.focus()
 const open = ref(false)
 const panelStyle = ref({})
 
@@ -105,7 +111,7 @@ function clear() {
   from.value = ''
   to.value = ''
   emit('change')
-  fromEl.value?.focus()
+  focusFrom()
 }
 
 // Under the button, kept inside the window.
@@ -117,16 +123,19 @@ function place() {
   panelStyle.value = { top: `${rect.bottom + 6}px`, left: `${left}px` }
 }
 
+// A date picker's calendar sits on <body>, outside this panel, but is part of it.
+const inCalendar = (el) => !!el?.closest?.('.dp-panel')
+
 function onPointerDown(event) {
   const target = event.target
-  if (triggerEl.value?.contains(target) || panelEl.value?.contains(target)) return
+  if (triggerEl.value?.contains(target) || panelEl.value?.contains(target) || inCalendar(target)) return
   close(false)
 }
 
 // Tabbing out of the panel closes it, like a click elsewhere.
 function onFocusOut(event) {
   const next = event.relatedTarget
-  if (!next || panelEl.value?.contains(next) || triggerEl.value?.contains(next)) return
+  if (!next || panelEl.value?.contains(next) || triggerEl.value?.contains(next) || inCalendar(next)) return
   close(false)
 }
 
@@ -142,7 +151,7 @@ async function show() {
   await nextTick()
   place()
   listen(true)
-  fromEl.value?.focus()
+  focusFrom()
 }
 
 function close(returnFocus) {
@@ -209,23 +218,11 @@ onBeforeUnmount(() => listen(false))
   font-family: var(--rb-font-sans);
 }
 
-.drf-panel__fields { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
+.drf-panel__fields { display: grid; grid-template-columns: repeat(2, 168px); gap: 10px; }
 .drf-panel__field { display: flex; flex-direction: column; gap: 6px; }
 .drf-panel__label { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
 
-.drf-panel__input {
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background-color: var(--rb-surface);
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--rb-text-primary);
-  color-scheme: light dark;
-}
 
-.drf-panel__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 .drf-panel__foot {
   display: flex;

@@ -339,6 +339,8 @@ import { useAccentTheme } from '~/composables/useAccentTheme'
 import { accentSurfaces, accentTheme } from '~/utils/accentThemes'
 import { departmentHome } from '~/composables/useBloodCenterNav'
 import logo from '~/assets/images/RedAgosLogo.png'
+// The blood centre's shared finish for its pages (scoped to html.portal-bc).
+import '~/assets/css/bc-ui.css'
 
 const router = useRouter()
 const route = useRoute()

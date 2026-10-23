@@ -5,22 +5,23 @@
     it. The same counts as the sidebar's badges (useBloodCenterTasks).
   -->
   <section class="tasks" aria-labelledby="tasks-title">
+    <!--
+      Nothing waiting is one line, not a box: the heading and an "All clear"
+      pill, so the page's own work (a screening queue, a dashboard's figures)
+      stays first instead of a second "nothing to do" message above it.
+    -->
     <div class="tasks__head">
       <h2 id="tasks-title" class="tasks__title">Needs you</h2>
-      <span v-if="loaded && tasks.length" class="tasks__count">{{ tasks.length }}</span>
+      <span v-if="!loaded" class="tasks__pill tasks__pill--loading" aria-busy="true">Checking…</span>
+      <span v-else-if="tasks.length" class="tasks__count">{{ tasks.length }}</span>
+      <span v-else class="tasks__pill" role="status" title="New tasks show here and in the bell.">
+        <AssetIcon name="check" :size="13" />
+        All clear
+      </span>
     </div>
-
-    <div v-if="!loaded" class="tasks__grid" aria-busy="true">
-      <span v-for="n in 3" :key="n" class="task task--skeleton" />
-    </div>
-
-    <p v-else-if="!tasks.length" class="tasks__clear">
-      <AssetIcon name="check" :size="15" />
-      All clear. Nothing is waiting for you right now.
-    </p>
 
     <!-- The cards share the row; one alone becomes a banner with its verb. -->
-    <div v-else class="tasks__grid" :class="{ 'tasks__grid--single': tasks.length === 1 }">
+    <div v-if="loaded && tasks.length" class="tasks__grid" :class="{ 'tasks__grid--single': tasks.length === 1 }">
       <NuxtLink v-for="task in tasks" :key="task.key" :to="task.to" class="task" :class="`task--${task.tone}`">
         <span class="task__icon" aria-hidden="true"><AssetIcon :name="task.icon" :size="18" /></span>
         <span class="task__body">
@@ -129,20 +130,19 @@ html.dark .task--warning { --tone-bg: rgba(255, 167, 38, 0.16); --tone-fg: #FFB7
 .task__arrow { flex-shrink: 0; color: var(--rb-text-muted); transition: transform 150ms ease, color 150ms ease; }
 .task:hover .task__arrow { transform: translateX(2px); color: var(--tone-fg); }
 
-.tasks__clear {
-  display: flex;
+.tasks__pill {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 12px 16px;
-  border: 1px dashed var(--rb-border);
-  border-radius: 14px;
-  font-size: 13.5px;
-  color: var(--rb-text-secondary);
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(46, 125, 50, 0.12);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rb-success-text, #2E7D32);
 }
-.tasks__clear :deep(svg) { color: var(--rb-success-text, #2E7D32); }
+.tasks__pill--loading { background: var(--rb-surface-hover, #F1F5F9); font-weight: 600; color: var(--rb-text-secondary); }
 
-.task--skeleton { min-height: 74px; border: 0; background: var(--rb-skeleton-a, #EEF1F5); }
 
 @media (prefers-reduced-motion: reduce) {
   .task, .task__arrow { transition: none; }

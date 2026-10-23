@@ -2,13 +2,23 @@
   <div class="corrections">
     <PageHeader title="Corrections">
       <template #subtitle>
-        Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
-        head decides; the head's own correction is applied as soon as it is sent. An approved correction is applied
-        under the same rules as the original.
-        A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
-        directly, and everyone else files a correction.
+        Saved records are never edited directly; a change goes through a correction.
       </template>
     </PageHeader>
+
+    <!-- The full rules, one click away instead of a four-line subtitle. -->
+    <details class="how">
+      <summary class="how__summary">How corrections work</summary>
+      <ul class="how__list">
+        <li>Whoever entered a record requests a correction, and the department's head decides.</li>
+        <li>The head's own correction is applied as soon as it is sent.</li>
+        <li>An approved correction is applied under the same rules as the original.</li>
+        <li>
+          A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
+          directly, and everyone else files a correction.
+        </li>
+      </ul>
+    </details>
 
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Corrections">
@@ -345,6 +355,47 @@ onMounted(load)
   font-size: 13px;
   line-height: 1.55;
   color: var(--rb-text-secondary);
+}
+
+/* How corrections work */
+.how {
+  margin: -6px 0 16px;
+  max-width: 76ch;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+.how__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--rb-primary);
+  list-style: none;
+}
+.how__summary::-webkit-details-marker { display: none; }
+.how__summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+.how[open] .how__summary::before { transform: rotate(45deg); }
+.how__summary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 3px; border-radius: 4px; }
+.how__list {
+  margin: 10px 0 0;
+  padding: 12px 16px 12px 30px;
+  border-left: 3px solid var(--rb-primary);
+  border-radius: 0 12px 12px 0;
+  background: rgba(var(--rb-primary-rgb), 0.05);
+  line-height: 1.6;
+}
+.how__list li + li { margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .how__summary::before { transition: none; }
 }
 
 /* Tabs + status chips */

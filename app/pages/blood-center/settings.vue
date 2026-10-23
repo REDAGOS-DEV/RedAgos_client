@@ -261,8 +261,13 @@
               <span class="toggle-row__desc">{{ pref.description }}</span>
               <span class="toggle-row__reason"><AssetIcon name="user-check" :size="12" /> {{ pref.reason }}</span>
             </span>
+            <!-- On and held there: a switch, so it reads as a preference, but one that cannot be turned off. -->
             <span v-if="pref.locked" class="always-on" title="Always on: missing one holds up a patient or a donor">
-              <AssetIcon name="lock" :size="12" /> Always on
+              <span class="always-on__text"><AssetIcon name="lock" :size="11" /> Required</span>
+              <span class="toggle-switch toggle-switch--locked">
+                <input type="checkbox" checked disabled :aria-label="`${pref.label}: always on`" />
+                <span class="toggle-switch__track"></span>
+              </span>
             </span>
             <span v-else class="toggle-switch">
               <input v-model="pref.enabled" type="checkbox" @change="saveNotificationPref(pref)" />
@@ -1352,18 +1357,18 @@ onMounted(async () => {
 .toggle-row__desc { font-size: 12.5px; color: var(--text-secondary); }
 .toggle-row__reason { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text); }
 .toggle-row--locked { cursor: default; }
-.always-on {
+.always-on { display: inline-flex; flex-shrink: 0; align-items: center; gap: 10px; }
+.always-on__text {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--rb-surface-hover, #F1F5F9);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-secondary);
 }
+/* On, but dimmed and still: it cannot be turned off. */
+.toggle-switch--locked { opacity: 0.55; }
+.toggle-switch--locked input { cursor: not-allowed; }
 .notif-empty { margin: 0; padding: 0 24px 22px; font-size: 13px; color: var(--text-secondary); }
 .skeleton-line { display: block; width: 60%; height: 14px; border-radius: 6px; background: var(--rb-skeleton-a, #EEF1F5); }
 

@@ -1,10 +1,12 @@
 <template>
     <!--
       The Admin and the Supervisor (reports.view_all) read the centre's own
-      reports, counted from its records. The other roles still see the page
+      reports, counted from its records; the Donor & Collection roles
+      (donations.view) read their department's. The other roles still see the page
       below until their department reports replace it.
     -->
-    <BloodCenterCentreReports v-if="canViewAll" />
+    <BloodCenterCentreReports v-if="canViewAll" kind="centre" />
+    <BloodCenterCentreReports v-else-if="canViewCollection" kind="collection" />
     <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
             <div class="skeleton-block page-skeleton__title" />
@@ -1169,10 +1171,11 @@ async function handleExport(report, format) {
 
 const { can } = useUser()
 const canViewAll = computed(() => can('reports.view_all'))
+const canViewCollection = computed(() => can('donations.view'))
 
 onMounted(async () => {
     // The centre reports load their own data.
-    if (canViewAll.value) return
+    if (canViewAll.value || canViewCollection.value) return
     await loadAll()
     initialLoading.value = false
 })

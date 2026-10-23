@@ -2,7 +2,7 @@
   <div class="collection">
     <header class="collection__header">
       <div>
-        <h1 class="collection__title">Donation</h1>
+        <h1 class="collection__title">Donation counter</h1>
         <p class="collection__subtitle">
           Scan a booked donor's QR, or find a walk-in by name, email or phone. The rest of the visit carries on
           from there.
@@ -1533,7 +1533,7 @@ function finishVisit() {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .checkin__panel { gap: 16px; }
