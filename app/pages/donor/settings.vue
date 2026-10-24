@@ -482,7 +482,7 @@ async function saveNotifications() {
 }
 
 async function handleLogout() {
-    await logout('/auth/donor/login')
+    await logout('/auth/login')
 }
 
 
@@ -504,7 +504,7 @@ async function handleDeleteAccount() {
         localStorage.removeItem('_token')
         clearUser()
         confirmDeleteOpen.value = false
-        router.push('/auth/donor/login')
+        router.push('/auth/login')
     } catch (err) {
         console.error('Failed to delete account:', err)
         deleteError.value = err?.errors?.password?.[0]

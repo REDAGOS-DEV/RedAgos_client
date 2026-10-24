@@ -665,9 +665,9 @@ const handleLogout = async () => {
   showUserMenu.value = false
   try {
     if (typeof logout === 'function') {
-      await logout('/auth/donor/login')
+      await logout('/auth/login')
     } else {
-      router.push('/auth/donor/login')
+      router.push('/auth/login')
     }
   } catch (error) {
     console.error('Logout error:', error)
