@@ -3,7 +3,7 @@
     The weeks ahead, in the parts the viewer's department plans with: the
     server decides which (GET /blood-center/reports/forecast). Each part is a
     weighted average of the last twelve weeks, recent weeks counting more;
-    the bars show the history and, hatched, the weeks forecast.
+    ForecastWeekChart draws the history and, dashed, the weeks forecast.
   -->
   <div class="fc">
     <div v-if="loading" class="fc__skeleton" aria-busy="true">
@@ -28,23 +28,37 @@
       <!-- ── Demand: Issuance and Inventory ── -->
       <section v-if="data.demand" class="fc__part" aria-labelledby="fc-demand">
         <h2 id="fc-demand" class="fc__title">Blood demand</h2>
+
+        <!-- The answer first: is the shelf ready for what is coming? -->
+        <div class="outlook" :class="`outlook--${demandOutlook.tone}`" role="status">
+          <span class="outlook__icon"><AssetIcon :name="demandOutlook.icon" :size="20" /></span>
+          <div class="outlook__body">
+            <p class="outlook__title">{{ demandOutlook.title }}</p>
+            <p class="outlook__text">{{ demandOutlook.text }}</p>
+          </div>
+        </div>
+
         <div class="fc__kpis">
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
             <span class="kpi__label">Units requested a week</span>
             <span class="kpi__value">{{ num(data.demand.total.per_week) }}</span>
             <span class="kpi__note">Range {{ data.demand.total.low }} to {{ data.demand.total.high }} <TrendChip :value="data.demand.total.trend" /></span>
           </div>
-          <div class="kpi" :class="{ 'kpi--bad': data.demand.short }">
+          <div class="kpi kpi--icon" :class="{ 'kpi--bad': data.demand.short }">
+            <span class="kpi__icon"><AssetIcon name="octagon-alert" :size="18" /></span>
             <span class="kpi__label">Short within a week</span>
             <span class="kpi__value">{{ data.demand.short }}</span>
             <span class="kpi__note">Blood type and component pairs</span>
           </div>
-          <div class="kpi" :class="{ 'kpi--warn': data.demand.watch }">
+          <div class="kpi kpi--icon" :class="{ 'kpi--warn': data.demand.watch }">
+            <span class="kpi__icon"><AssetIcon name="eye" :size="18" /></span>
             <span class="kpi__label">To watch</span>
             <span class="kpi__value">{{ data.demand.watch }}</span>
             <span class="kpi__note">Under two weeks of stock</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon" :class="{ 'kpi--alert': data.demand.emergency.requests }">
+            <span class="kpi__icon"><AssetIcon name="circle-alert" :size="18" /></span>
             <span class="kpi__label">Emergency requests a week</span>
             <span class="kpi__value">{{ num(data.demand.emergency.per_week) }}</span>
             <span class="kpi__note">{{ data.demand.emergency.share === null ? 'None in 12 weeks' : `${data.demand.emergency.share}% of requests` }}</span>
@@ -55,9 +69,9 @@
           <article class="card">
             <header class="card__head">
               <h3 class="card__title">Units requested, week by week</h3>
-              <span class="card__note">Hatched: forecast, with its range</span>
+              <span class="card__note">Dashed: the forecast, its range shaded</span>
             </header>
-            <WeekChart :series="data.demand.total.series" :estimate="data.demand.total" :weeks="data.weeks" :horizon="data.horizon" unit="units" />
+            <ForecastWeekChart :series="data.demand.total.series" :estimate="data.demand.total" :weeks="data.weeks" :horizon="data.horizon" unit="units" />
           </article>
           <article class="card">
             <header class="card__head">
@@ -65,13 +79,17 @@
               <span class="card__note">{{ data.demand.emergency.requests }} in 12 weeks</span>
             </header>
             <template v-if="data.demand.emergency.requests">
-              <WeekChart :series="data.demand.emergency.series" :estimate="data.demand.emergency" :weeks="data.weeks" :horizon="data.horizon" unit="requests" tone="alert" compact />
+              <ForecastWeekChart :series="data.demand.emergency.series" :estimate="data.demand.emergency" :weeks="data.weeks" :horizon="data.horizon" unit="requests" tone="alert" compact />
               <dl class="facts">
                 <div><dt>Most often for</dt><dd>{{ data.demand.emergency.by_blood_type.map(t => `${t.code} (${t.count})`).join(', ') }}</dd></div>
                 <div v-if="data.demand.emergency.busiest_weekday !== null"><dt>Busiest day</dt><dd>{{ WEEKDAYS[data.demand.emergency.busiest_weekday] }}</dd></div>
               </dl>
             </template>
-            <p v-else class="empty">No emergency requests in the last 12 weeks.</p>
+            <div v-else class="calm">
+              <span class="calm__icon"><AssetIcon name="shield-check" :size="22" /></span>
+              <p class="calm__title">No emergencies in 12 weeks</p>
+              <p class="calm__text">An emergency request from any hospital shows here, with the blood types it was for and its busiest day.</p>
+            </div>
           </article>
         </div>
 
@@ -89,21 +107,32 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in data.demand.rows" :key="`${row.blood_type}-${row.component}`">
+                <tr v-for="row in data.demand.rows" :key="`${row.blood_type}-${row.component}`" :class="`row--${row.status}`">
                   <td><span class="type">{{ row.blood_type }}</span></td>
                   <td>{{ row.component }}</td>
                   <td class="num strong">{{ num(row.per_week) }}</td>
                   <td class="num muted">{{ row.low }} to {{ row.high }}</td>
                   <td><TrendChip :value="row.trend" /></td>
                   <td class="num">{{ row.stock }}</td>
-                  <td class="num">{{ row.weeks_of_cover === null ? '—' : `${row.weeks_of_cover} wk` }}</td>
+                  <td class="num">
+                    <span class="cover" :class="`cover--${row.status}`" :title="row.weeks_of_cover === null ? 'No demand to run it down' : `${row.weeks_of_cover} weeks of stock at the forecast`">
+                      <span class="cover__track" aria-hidden="true"><span :style="{ width: `${coverWidth(row.weeks_of_cover)}%` }" /></span>
+                      {{ row.weeks_of_cover === null ? '—' : `${row.weeks_of_cover} wk` }}
+                    </span>
+                  </td>
                   <td>{{ row.runs_out_on ? shortDate(row.runs_out_on) : '—' }}</td>
                   <td><span class="pill" :class="`pill--${row.status}`">{{ STATUS[row.status] }}</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p v-else class="empty">No requests reached this centre in the last 12 weeks.</p>
+          <div v-else class="calm calm--row">
+            <span class="calm__icon"><AssetIcon name="inbox" :size="20" /></span>
+            <div>
+              <p class="calm__title">Nothing to forecast from yet</p>
+              <p class="calm__text">No requests reached this centre in the last 12 weeks. Each blood type and component appears here once hospitals request it.</p>
+            </div>
+          </div>
         </article>
       </section>
 
@@ -158,9 +187,9 @@
           <article class="card">
             <header class="card__head">
               <h3 class="card__title">Donations, week by week</h3>
-              <span class="card__note">Hatched: forecast</span>
+              <span class="card__note">Dashed: the forecast</span>
             </header>
-            <WeekChart :series="data.collection.donations.series" :estimate="data.collection.donations" :weeks="data.weeks" :horizon="data.horizon" unit="donations" />
+            <ForecastWeekChart :series="data.collection.donations.series" :estimate="data.collection.donations" :weeks="data.weeks" :horizon="data.horizon" unit="donations" />
           </article>
         </div>
       </section>
@@ -198,8 +227,8 @@
             <p v-else class="empty">No requests in the last 12 weeks.</p>
           </article>
           <article class="card">
-            <header class="card__head"><h3 class="card__title">Donations, week by week</h3><span class="card__note">Hatched: forecast</span></header>
-            <WeekChart :series="data.processing.donations.series" :estimate="data.processing.donations" :weeks="data.weeks" :horizon="data.horizon" unit="donations" />
+            <header class="card__head"><h3 class="card__title">Donations, week by week</h3><span class="card__note">Dashed: the forecast</span></header>
+            <ForecastWeekChart :series="data.processing.donations.series" :estimate="data.processing.donations" :weeks="data.weeks" :horizon="data.horizon" unit="donations" />
           </article>
         </div>
       </section>
@@ -281,8 +310,8 @@
             <p v-else class="empty">No requests in the last 12 weeks.</p>
           </article>
           <article class="card">
-            <header class="card__head"><h3 class="card__title">Requests, week by week</h3><span class="card__note">Hatched: forecast</span></header>
-            <WeekChart :series="data.billing.requests.series" :estimate="data.billing.requests" :weeks="data.weeks" :horizon="data.horizon" unit="requests" />
+            <header class="card__head"><h3 class="card__title">Requests, week by week</h3><span class="card__note">Dashed: the forecast</span></header>
+            <ForecastWeekChart :series="data.billing.requests.series" :estimate="data.billing.requests" :weeks="data.weeks" :horizon="data.horizon" unit="requests" />
           </article>
         </div>
       </section>
@@ -294,6 +323,7 @@
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import ForecastWeekChart from '~/components/BloodCenter/ForecastWeekChart.vue'
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const STATUS = { short: 'Short', watch: 'Watch', ok: 'Enough' }
@@ -348,40 +378,48 @@ const TrendChip = defineComponent({
   },
 })
 
-// Twelve weeks of history, then the forecast weeks hatched with a range mark.
-const WeekChart = defineComponent({
-  props: {
-    series: { type: Array, required: true },
-    estimate: { type: Object, required: true },
-    weeks: { type: Array, required: true },
-    horizon: { type: Array, required: true },
-    unit: { type: String, default: '' },
-    tone: { type: String, default: '' },
-    compact: { type: Boolean, default: false },
-  },
-  setup(props) {
-    return () => {
-      const top = Math.max(1, ...props.series, props.estimate.high || 0, props.estimate.per_week || 0)
-      const height = v => `${Math.max(v ? 3 : 0, (v / top) * 100)}%`
-      const label = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const cols = [
-        ...props.series.map((v, i) => h('div', { class: 'wk', title: `Week of ${label(props.weeks[i])}: ${v} ${props.unit}` }, [
-          h('span', { class: 'wk__track' }, [h('span', { class: 'wk__bar', style: { height: height(v) } })]),
-          h('span', { class: 'wk__label' }, i % 3 === 0 ? label(props.weeks[i]) : ''),
-        ])),
-        ...props.horizon.map((d, i) => h('div', { class: 'wk wk--ahead', title: `Week of ${label(d)}: about ${props.estimate.per_week} ${props.unit} (${props.estimate.low} to ${props.estimate.high})` }, [
-          h('span', { class: 'wk__track' }, [
-            h('span', { class: 'wk__range', style: { bottom: height(props.estimate.low), height: `calc(${height(props.estimate.high)} - ${height(props.estimate.low)})` } }),
-            h('span', { class: 'wk__bar wk__bar--ahead', style: { height: height(props.estimate.per_week) } }),
-          ]),
-          h('span', { class: 'wk__label' }, i === 0 ? 'Ahead' : ''),
-        ])),
-      ]
-      return h('div', { class: ['wks', props.tone ? `wks--${props.tone}` : '', props.compact ? 'wks--compact' : ''], role: 'img',
-        'aria-label': `${props.unit} a week over the last 12 weeks: ${props.series.join(', ')}. Forecast about ${props.estimate.per_week} a week.` }, cols)
+// Demand, said in one line: short, to watch, or ready.
+const demandOutlook = computed(() => {
+  const d = data.value?.demand
+  if (!d) return { tone: 'ok', icon: 'check-circle', title: '', text: '' }
+  const weeks = data.value.method.horizon_weeks
+  if (d.short) {
+    return {
+      tone: 'bad',
+      icon: 'octagon-alert',
+      title: `${d.short} ${d.short === 1 ? 'stock runs' : 'stocks run'} short within a week`,
+      text: 'At the forecast demand these blood type and component pairs run out in under a week. They are at the top of the table below.',
     }
-  },
+  }
+  if (d.watch) {
+    return {
+      tone: 'warn',
+      icon: 'eye',
+      title: `${d.watch} ${d.watch === 1 ? 'stock' : 'stocks'} to watch`,
+      text: 'Under two weeks of stock at the forecast demand. Enough for now; plan collection for them.',
+    }
+  }
+  if (!d.rows.length) {
+    return {
+      tone: 'calm',
+      icon: 'inbox',
+      title: 'No demand to forecast yet',
+      text: 'No hospital requests reached this centre in the last 12 weeks. The forecast fills in as requests come.',
+    }
+  }
+  return {
+    tone: 'ok',
+    icon: 'check-circle',
+    title: `Stock covers the next ${weeks} weeks`,
+    text: 'Every blood type and component asked for has at least two weeks of stock at the forecast demand.',
+  }
 })
+
+// Weeks of stock, against twice the horizon: four weeks fills half.
+const coverWidth = (weeks) => {
+  if (weeks === null || weeks === undefined) return 100
+  return Math.min(100, (weeks / ((data.value?.method?.horizon_weeks || 4) * 2)) * 100)
+}
 </script>
 
 <style scoped>
@@ -451,21 +489,6 @@ html.dark .pill--ok { color: #4ADE80; }
 :deep(.trend--down) { color: #1D4ED8; background: rgba(59, 130, 246, 0.12); }
 :deep(.trend--flat) { color: var(--rb-text-secondary); background: rgba(127, 127, 127, 0.12); }
 
-/* Week chart */
-:deep(.wks) { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 6px; height: 200px; }
-:deep(.wks--compact) { height: 120px; }
-:deep(.wk) { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-:deep(.wk__track) { position: relative; flex: 1; border-radius: 6px; background: rgba(var(--rb-primary-rgb), 0.04); }
-:deep(.wk__bar) { position: absolute; inset: auto 0 0; border-radius: 6px; background: rgba(var(--rb-primary-rgb), 0.55); }
-:deep(.wk--ahead .wk__track) { background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--rb-primary-rgb), 0.2); }
-:deep(.wk__bar--ahead) {
-  background: repeating-linear-gradient(135deg, rgba(var(--rb-primary-rgb), 0.9) 0 4px, rgba(var(--rb-primary-rgb), 0.45) 4px 8px);
-}
-:deep(.wk__range) { position: absolute; left: 50%; width: 2px; transform: translateX(-50%); background: var(--rb-text-secondary); opacity: 0.6; }
-:deep(.wk__label) { height: 14px; font-size: 10.5px; white-space: nowrap; color: var(--rb-text-muted); }
-:deep(.wks--alert .wk__bar) { background: rgba(220, 38, 38, 0.55); }
-:deep(.wks--alert .wk__bar--ahead) { background: repeating-linear-gradient(135deg, rgba(220, 38, 38, 0.85) 0 4px, rgba(220, 38, 38, 0.4) 4px 8px); }
-
 .facts { display: flex; flex-wrap: wrap; gap: 24px; margin: 0; padding-top: 12px; border-top: 1px solid var(--rb-border); }
 .facts dt { font-size: 12px; color: var(--rb-text-secondary); }
 .facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
@@ -484,6 +507,40 @@ html.dark .pill--ok { color: #4ADE80; }
 .day__bar { position: absolute; inset: auto 0 0; border-radius: 12px; background: var(--rb-primary); }
 .day__name { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
 .day__booked { font-size: 11.5px; color: var(--rb-text-secondary); }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+.outlook { --tone: var(--rb-success); --tone-rgb: var(--rb-success-rgb); display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid rgba(var(--tone-rgb), 0.3); border-radius: 16px; background: rgba(var(--tone-rgb), 0.06); }
+.outlook--warn { --tone: var(--rb-warning); --tone-rgb: var(--rb-warning-rgb); }
+.outlook--bad { --tone: var(--rb-accent); --tone-rgb: var(--rb-accent-rgb); }
+.outlook--calm { --tone: var(--rb-primary); --tone-rgb: var(--rb-primary-rgb); }
+.outlook__icon { display: grid; flex: none; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: rgba(var(--tone-rgb), 0.14); color: var(--tone); }
+.outlook__title { margin: 0; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); }
+.outlook__text { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+
+.kpi--icon { position: relative; padding-top: 16px; }
+.kpi__icon { --tone-rgb: var(--rb-primary-rgb); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 6px; border-radius: 10px; background: rgba(var(--tone-rgb), 0.1); color: rgb(var(--tone-rgb)); }
+.kpi--bad .kpi__icon { --tone-rgb: var(--rb-accent-rgb); }
+.kpi--warn .kpi__icon { --tone-rgb: var(--rb-warning-rgb); }
+.kpi--warn { border-color: rgba(var(--rb-warning-rgb), 0.35); }
+.kpi--alert .kpi__icon { --tone-rgb: var(--rb-accent-rgb); }
+.kpi--icon:not(.kpi--bad):not(.kpi--warn) .kpi__value { color: var(--rb-text-primary); }
+
+.calm { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; flex: 1; min-height: 160px; padding: 12px; text-align: center; }
+.calm--row { flex-direction: row; justify-content: flex-start; gap: 14px; min-height: 0; padding: 6px 0; text-align: left; }
+.calm__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.calm--row .calm__icon { flex: none; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.calm__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.calm__text { max-width: 360px; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+.calm--row .calm__text { max-width: none; }
+
+.cover { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.cover__track { width: 64px; height: 6px; border-radius: 999px; background: var(--rb-surface-alt); box-shadow: inset 0 0 0 1px var(--rb-border); overflow: hidden; }
+.cover__track > span { display: block; height: 100%; border-radius: inherit; background: var(--rb-success); }
+.cover--watch .cover__track > span { background: var(--rb-warning); }
+.cover--short .cover__track > span { background: var(--rb-accent); }
+.row--short td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.row--short td { background: rgba(var(--rb-accent-rgb), 0.04); }
+.row--watch td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
 
 .fc__skeleton { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .fc__skel-card { height: 104px; border-radius: 16px; background: var(--rb-skeleton-a, #EEF1F5); }

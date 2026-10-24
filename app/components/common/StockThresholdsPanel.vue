@@ -58,8 +58,35 @@
       <p v-if="!status.components.length" class="empty">No blood components are defined.</p>
 
       <template v-else>
+        <!--
+          One view at a time (2026-10-24): the stock now, or one of the two
+          level tables. The tables still save apart, and a draft survives a
+          switch; each tab says how many changes wait in it.
+        -->
+        <div class="views" role="tablist" aria-label="Stock thresholds">
+          <button
+            v-for="v in VIEWS"
+            :key="v.value"
+            type="button"
+            role="tab"
+            class="views__tab"
+            :class="[`views__tab--${v.value}`, { 'views__tab--on': view === v.value }]"
+            :aria-selected="view === v.value"
+            @click="view = v.value"
+          >
+            <AssetIcon :name="v.icon" :size="15" />
+            {{ v.label }}
+            <span v-if="badgeOf(v.value)" class="views__badge" :class="`views__badge--${badgeOf(v.value)!.tone}`" :title="badgeOf(v.value)!.title">
+              {{ badgeOf(v.value)!.count }}
+            </span>
+          </button>
+        </div>
+
+        <StockThresholdGrid v-show="view === 'stock'" :status="status" @set-levels="(level) => (view = level)" />
+
         <StockLevelCard
           v-for="level in LEVELS"
+          v-show="view === level"
           :key="level"
           :level="level"
           :rows="rows"
@@ -77,7 +104,6 @@
           @discard="discard(level)"
         />
 
-        <StockThresholdGrid :status="status" />
       </template>
 
       <p class="footnote">
@@ -138,6 +164,25 @@ type Feedback = { kind: 'success' | 'error'; text: string }
 
 const POLL_MS = 60_000
 const LEVELS: ThresholdLevel[] = ['par', 'critical']
+type View = 'stock' | ThresholdLevel
+const VIEWS: Array<{ value: View; label: string; icon: string }> = [
+  { value: 'stock', label: 'Current stock', icon: 'activity' },
+  { value: 'par', label: 'PAR level', icon: 'list' },
+  { value: 'critical', label: 'Critical level', icon: 'triangle-alert' },
+]
+const view = ref<View>('stock')
+
+/** What a tab carries: shortages on the stock, unsaved changes or problems on a table. */
+function badgeOf(v: View): { count: number; tone: 'crit' | 'info'; title: string } | null {
+  if (v === 'stock') {
+    const short = (status.value?.totals.low ?? 0) + (status.value?.totals.critical ?? 0)
+    return short ? { count: short, tone: 'crit', title: `${short} below the critical level` } : null
+  }
+  if (problems.value[v].length) return { count: problems.value[v].length, tone: 'crit', title: 'To fix before saving' }
+  const pending = changes.value[v].length
+  return pending ? { count: pending, tone: 'info', title: `${pending} unsaved` } : null
+}
+
 const LEVEL_NAMES: Record<ThresholdLevel, string> = { par: 'PAR levels', critical: 'critical levels' }
 
 const props = withDefaults(defineProps<{
@@ -442,6 +487,35 @@ onBeforeUnmount(() => {
 .callout :deep(.asset-icon) { flex-shrink: 0; margin-top: 2px; }
 
 .empty { margin: 0; padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
+
+/* The view switch */
+.views { display: inline-flex; flex-wrap: wrap; align-self: flex-start; gap: 4px; padding: 4px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface); }
+.views__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.views__tab:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.views__tab--on, .views__tab--on:hover { background: var(--rb-primary); color: #fff; }
+.views__tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.views__badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.views__badge--crit { background: rgba(var(--rb-accent-rgb), 0.14); color: var(--rb-accent-text); }
+.views__badge--info { background: rgba(var(--rb-primary-rgb), 0.14); color: var(--rb-primary-text); }
+.views__tab--on .views__badge { background: #fff; color: var(--rb-primary); }
+@media (prefers-reduced-motion: reduce) {
+  .views__tab { transition: none; }
+}
 
 .footnote {
   display: flex;

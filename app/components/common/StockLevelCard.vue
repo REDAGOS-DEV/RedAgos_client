@@ -76,6 +76,43 @@
           </tr>
         </thead>
         <tbody>
+          <!--
+            Fill a column at once (2026-10-24): most components take one level
+            across the types, the rare ones adjusted after. Only drafts: the
+            table's Save still sends them, and Discard takes them back.
+          -->
+          <tr v-if="editable && rows.length > 1" class="st-bulk">
+            <th scope="row" class="st-table__type st-bulk__label">
+              All types
+              <span class="st-bulk__hint">fill a column</span>
+            </th>
+            <td v-for="component in components" :key="component.id" class="st-table__cell">
+              <div class="st-bulk__field">
+                <input
+                  v-model="bulk[component.id]"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="9999"
+                  step="1"
+                  placeholder="—"
+                  :aria-label="`${title} for every blood type of ${component.name}, units`"
+                  :disabled="locked"
+                  @keydown.enter.prevent="applyBulk(component.id)"
+                >
+                <button
+                  type="button"
+                  class="st-bulk__apply"
+                  :disabled="locked || !bulkReady(component.id)"
+                  :aria-label="`Apply to every blood type of ${component.name}`"
+                  title="Apply to every blood type"
+                  @click="applyBulk(component.id)"
+                >
+                  <AssetIcon name="chevron-down" :size="13" />
+                </button>
+              </div>
+            </td>
+          </tr>
           <tr v-for="row in rows" :key="row.type.id">
             <th scope="row" class="st-table__type">{{ row.type.code }}</th>
             <td v-for="item in row.items" :key="item.key" class="st-table__cell">
@@ -98,7 +135,7 @@
                   @input="emit('input', item.key, ($event.target as HTMLInputElement).value)"
                 >
                 <button
-                  v-if="level === 'critical'"
+                  v-if="level === 'critical' && minimumOf(item.draft) !== null"
                   type="button"
                   class="st-bell"
                   :class="{ 'st-bell--muted': !item.draft.alerts_enabled }"
@@ -120,6 +157,14 @@
                   class="st-value__muted"
                   title="Notifications are off for this stock"
                 >muted</span>
+              </span>
+              <!-- The other level of this stock, so the limit is in view while typing. -->
+              <span
+                v-if="editable && pairOf(item.draft) !== null"
+                class="st-pair"
+                :class="{ 'st-pair--clash': levelConflict(item.draft) }"
+              >
+                {{ level === 'par' ? 'Critical' : 'PAR' }} {{ pairOf(item.draft) }}
               </span>
             </td>
           </tr>
@@ -146,7 +191,7 @@ import type {
   ThresholdLevel,
   ThresholdProblem,
 } from '~/types/stockThreshold'
-import { minimumOf } from '~/utils/stockThreshold'
+import { isValidLevel, levelConflict, minimumOf, parOf } from '~/utils/stockThreshold'
 
 const props = withDefaults(defineProps<{
   level: ThresholdLevel
@@ -203,6 +248,26 @@ const tableMinWidth = computed(() => 96 + props.components.length * (props.level
 
 const shownProblems = computed(() => props.problems.slice(0, SHOWN_PROBLEMS))
 const moreProblems = computed(() => Math.max(0, props.problems.length - SHOWN_PROBLEMS))
+
+/** The level the other table sets for this stock. */
+function pairOf(draft: StockThresholdDraft): number | null {
+  return props.level === 'par' ? minimumOf(draft) : parOf(draft)
+}
+
+// ---- Fill a column ----
+const bulk = reactive<Record<number, string | number>>({})
+const bulkReady = (componentId: number) => bulk[componentId] !== undefined && bulk[componentId] !== '' && isValidLevel(bulk[componentId])
+
+function applyBulk(componentId: number): void {
+  if (!bulkReady(componentId)) return
+  const value = String(bulk[componentId])
+
+  for (const row of props.rows) {
+    const item = row.items.find((i) => i.component.id === componentId)
+    if (item) emit('input', item.key, value)
+  }
+  bulk[componentId] = ''
+}
 
 function valueOf(draft: StockThresholdDraft): string | number {
   return props.level === 'par' ? draft.par : draft.minimum
@@ -448,6 +513,68 @@ function savedOf(cell: StockThresholdCell): number | null {
   font-weight: 700;
   color: var(--rb-text-secondary);
 }
+
+/* Fill a column */
+.st-bulk th, .st-bulk td { background: rgba(var(--st-level-rgb), 0.04); border-bottom: 1px dashed var(--rb-border-strong); }
+.st-bulk__label { line-height: 1.2; }
+.st-bulk__hint { display: block; font-size: 11px; font-weight: 500; color: var(--rb-text-secondary); }
+.st-bulk__field {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 132px;
+  height: 30px;
+  margin: 0 auto;
+  border: 1px dashed var(--st-input-border);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  overflow: hidden;
+}
+.st-bulk__field:focus-within { border-style: solid; border-color: var(--st-level); box-shadow: 0 0 0 3px rgba(var(--st-level-rgb), 0.16); }
+.st-bulk__field input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: var(--rb-text-sm);
+  font-weight: 600;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.st-bulk__field input::-webkit-outer-spin-button,
+.st-bulk__field input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
+.st-bulk__field input:focus { outline: none; }
+.st-bulk__field input::placeholder { color: var(--rb-text-muted); }
+.st-bulk__apply {
+  display: grid;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 0;
+  border-left: 1px dashed var(--st-input-border);
+  background: var(--st-level);
+  color: #fff;
+  cursor: pointer;
+}
+.st-bulk__apply:disabled { background: var(--rb-surface-alt); color: var(--rb-text-muted); cursor: not-allowed; }
+.st-bulk__apply:focus-visible { outline: 2px solid var(--st-level-text); outline-offset: -2px; }
+
+/* The paired level under an input */
+.st-pair { display: block; margin-top: 3px; font-size: 10.5px; font-weight: 600; color: var(--rb-text-muted); font-variant-numeric: tabular-nums; }
+.st-pair--clash { color: var(--rb-accent-text); }
+
+/* A sheet, not a wall of boxes (2026-10-24): an empty level is a faint well;
+   one with a number lifts; the edge shows on hover and focus. */
+.st-field { border-color: transparent; background: var(--rb-surface-alt); }
+.st-field:hover { border-color: var(--st-input-border); }
+.st-field:has(input:not(:placeholder-shown)) { background: rgba(var(--st-level-rgb), 0.07); border-color: rgba(var(--st-level-rgb), 0.22); }
+.st-field:has(input:not(:placeholder-shown)) input { font-weight: 700; }
+.st-field:focus-within { background: var(--rb-surface); }
+.st-table tbody tr:not(.st-bulk):hover td, .st-table tbody tr:not(.st-bulk):hover th { background: var(--rb-surface-hover); }
 
 .st-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

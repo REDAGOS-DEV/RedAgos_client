@@ -75,7 +75,7 @@
             <div>
               <h2 id="types-title" class="panel-title">Blood Type Availability</h2>
               <p class="panel-subtitle">
-                Issuable units by component. Each ring shows how much of the type's critical level is on the shelf.
+                Issuable units against the critical level: the ring for the type, the tick on each bar for a component.
               </p>
             </div>
             <ul class="legend" aria-label="Legend">
@@ -98,7 +98,7 @@
               :key="card.code"
               type="button"
               class="type-card"
-              :class="[`tone--${levelTone(card.level)}`, { 'type-card--active': filters.bloodTypeId === card.id }]"
+              :class="[`tone--${levelTone(card.level)}`, `type-card--${card.level}`, { 'type-card--active': filters.bloodTypeId === card.id }]"
               :aria-pressed="filters.bloodTypeId === card.id"
               :aria-label="typeCardLabel(card)"
               @click="toggleTypeFilter(card)"
@@ -139,8 +139,12 @@
                     :class="{ 'comp--short': comp.status === 'low' || comp.status === 'critical', [`tone--${levelTone(comp.status)}`]: true }"
                     :title="componentTitle(comp)"
                   >
-                    <span class="comp__dot" aria-hidden="true" />
                     <span class="comp__code">{{ comp.code }}</span>
+                    <!-- On the shelf against the most any type holds of it; the tick is the critical level. -->
+                    <span class="comp__meter" aria-hidden="true">
+                      <span class="comp__fill" :style="{ width: `${compWidth(comp, comp.available)}%` }" />
+                      <span v-if="comp.minimum" class="comp__min" :style="{ left: `${compWidth(comp, comp.minimum)}%` }" />
+                    </span>
                     <span class="comp__count">{{ formatCount(comp.available) }}</span>
                   </span>
                 </span>
@@ -297,12 +301,12 @@
                   @keydown.enter.self="openDetails(row)"
                 >
                   <td class="mono">{{ row.id }}</td>
-                  <td><span class="type-text">{{ displayType(row.blood_type) }}</span></td>
+                  <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type) }}</span></td>
                   <td class="wrap-cell">{{ row.component }}</td>
                   <td class="num">{{ formatDay(row.collected_at) }}</td>
                   <td class="num" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</td>
                   <td>
-                    <span class="days" :class="`tone--${row.remaining.tone}`">{{ row.remaining.label }}</span>
+                    <span class="days" :class="[`tone--${row.remaining.tone}`, { 'days--pill': row.remaining.tone === 'warning' || row.remaining.tone === 'danger' }]">{{ row.remaining.label }}</span>
                   </td>
                   <td class="wrap-cell" :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</td>
                   <td><span class="badge" :class="`tone--${row.tag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ row.tag.label }}</span></td>
@@ -918,6 +922,19 @@ const typeCards = computed(() => {
   })
 })
 
+// Each component's meter shares one scale across the types, so a short
+// shelf reads short beside the others: the most any type holds, or its
+// critical level if that is more.
+const compScale = computed(() => {
+  const scale = new Map()
+  for (const cell of stockCells.value) {
+    const top = Math.max(cell.available, cell.minimum_units ?? 0)
+    scale.set(cell.component_id, Math.max(scale.get(cell.component_id) ?? 1, top))
+  }
+  return scale
+})
+const compWidth = (comp, n) => Math.min(100, ((n || 0) / (compScale.value.get(comp.id) ?? 1)) * 100)
+
 const LEVELS = {
   ok: { label: 'Good Stock', tone: 'success' },
   low: { label: 'Low Stock', tone: 'warning' },
@@ -1427,7 +1444,14 @@ onBeforeUnmount(() => {
   --inv-ok: #15803D;
   --inv-warn: #B45309;
   --inv-crit: #B91C1C;
+  --inv-ok-fill: #1BAF7A;
+  --inv-warn-fill: #EDA100;
+  --inv-crit-fill: #DC2626;
+  --inv-action: var(--rb-primary);
+  --inv-action-hover: var(--rb-primary-hover);
+  --inv-action-text: var(--rb-primary-text);
   --tone: var(--inv-muted);
+  --tone-fill: var(--inv-faint);
 }
 :global(.dark .inv-tones) {
   /* Row dividers a step softer than the app's #334155 border, on #1E293B. */
@@ -1435,13 +1459,16 @@ onBeforeUnmount(() => {
   --inv-ok: #4ADE80;
   --inv-warn: #FBBF24;
   --inv-crit: #F87171;
+  --inv-ok-fill: #199E70;
+  --inv-warn-fill: #C98500;
+  --inv-crit-fill: #EF4444;
   color-scheme: dark;
 }
-.tone--success { --tone: var(--inv-ok); }
-.tone--warning { --tone: var(--inv-warn); }
-.tone--danger { --tone: var(--inv-crit); }
-.tone--neutral { --tone: var(--inv-muted); }
-.tone--muted { --tone: var(--inv-faint); }
+.tone--success { --tone: var(--inv-ok); --tone-fill: var(--inv-ok-fill); }
+.tone--warning { --tone: var(--inv-warn); --tone-fill: var(--inv-warn-fill); }
+.tone--danger { --tone: var(--inv-crit); --tone-fill: var(--inv-crit-fill); }
+.tone--neutral { --tone: var(--inv-muted); --tone-fill: var(--inv-muted); }
+.tone--muted { --tone: var(--inv-faint); --tone-fill: var(--inv-faint); }
 
 /* The page keeps the app's shared column. Its background is carried past it
    to the content area's edges, so a wide screen shows no strip beside it. A
@@ -1598,6 +1625,9 @@ onBeforeUnmount(() => {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .type-card:hover { border-color: var(--rb-border-hover); background: var(--inv-hover); }
+/* A short type is marked along its top edge: the exception, not the rule. */
+.type-card { position: relative; overflow: hidden; }
+.type-card--low::before, .type-card--critical::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tone); }
 .type-card--active { border-color: var(--inv-muted); box-shadow: inset 0 0 0 1px var(--inv-muted); }
 .type-card__head { display: flex; align-items: center; gap: 8px; }
 .type-card__code { font-size: 17px; font-weight: 700; color: var(--inv-text); }
@@ -1626,10 +1656,15 @@ onBeforeUnmount(() => {
 .badge__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
 
 .type-card__components { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; padding-top: 2px; }
-.comp { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 11.5px; line-height: 1.35; }
-.comp__dot { width: 4px; height: 4px; border-radius: 999px; background: var(--inv-border); }
-.comp--short .comp__dot { width: 6px; height: 6px; background: var(--tone); }
+.type-card__components { gap: 6px; }
+.comp { display: grid; grid-template-columns: 34px minmax(0, 1fr) 22px; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.35; }
 .comp__code { color: var(--inv-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A meter: grey while healthy or ungraded, the state colour only when short. */
+.comp__meter { position: relative; height: 6px; border-radius: 999px; background: var(--inv-elevated); box-shadow: inset 0 0 0 1px var(--inv-border-soft); }
+.comp__fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: color-mix(in srgb, var(--inv-muted) 55%, transparent); transition: width 0.4s ease; }
+.comp.tone--success .comp__fill { background: color-mix(in srgb, var(--inv-ok) 70%, transparent); }
+.comp--short .comp__fill { background: var(--tone); }
+.comp__min { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--inv-text); opacity: 0.55; }
 .comp__count { color: var(--inv-text); font-variant-numeric: tabular-nums; text-align: right; }
 .comp--short .comp__count { font-weight: 600; color: var(--tone); }
 
@@ -1665,6 +1700,7 @@ onBeforeUnmount(() => {
   font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--inv-text);
 }
 .type-text { font-weight: 600; color: var(--inv-text); white-space: nowrap; }
+.type-chip--cell { min-width: 32px; justify-content: center; padding: 1px 7px; border-radius: 6px; background: var(--inv-elevated); font-size: 12px; }
 
 /* Activity */
 .activity-list { list-style: none; margin: 0; padding: 0; }
@@ -1728,6 +1764,7 @@ onBeforeUnmount(() => {
 .days { font-variant-numeric: tabular-nums; color: var(--tone); }
 .days.tone--warning, .days.tone--danger { font-weight: 600; }
 .days.tone--neutral { color: var(--inv-text); }
+.days--pill { display: inline-flex; padding: 1px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
 
 .th-sort {
   display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none;
@@ -1792,11 +1829,11 @@ onBeforeUnmount(() => {
   display: inline-flex; align-items: center; gap: 6px; background: var(--inv-elevated); border: 1px solid var(--inv-border);
   color: var(--inv-text); font-weight: 500;
 }
-.inv-page :deep(.low-banner__chip::before) { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--inv-warn); }
-.inv-page :deep(.low-banner__chip--critical::before) { background: var(--inv-crit); }
+.inv-page :deep(.low-banner__chip::before) { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--inv-warn-fill); }
+.inv-page :deep(.low-banner__chip--critical::before) { background: var(--inv-crit-fill); }
 .inv-page :deep(.low-banner__chip--more) { color: var(--inv-muted); }
 .inv-page :deep(.low-banner__chip--more::before) { display: none; }
-.inv-page :deep(.low-banner__link) { color: var(--inv-text); font-weight: 500; }
+.inv-page :deep(.low-banner__link) { color: var(--inv-action-text); font-weight: 600; }
 
 /* Drawers */
 .drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.5); }
@@ -1875,13 +1912,64 @@ onBeforeUnmount(() => {
 }
 .inventory-toast__close { border: 0; background: none; color: var(--inv-muted); cursor: pointer; display: inline-flex; padding: 0.15rem; }
 
+/* ===== The system's colours (project owner, 2026-10-24) =====
+   Actions wear the app's blue, as on every other blood center page; state
+   keeps green, amber and red, now as soft tints so a badge reads at a
+   glance, and filled marks (rings, meters, edges) take the brighter fills. */
+.btn-primary { color: #fff; background: var(--inv-action); border-color: var(--inv-action); box-shadow: 0 1px 2px rgba(var(--rb-primary-rgb), 0.25); transition: background 0.15s ease, box-shadow 0.15s ease; }
+.btn-primary:hover:not(:disabled) { opacity: 1; background: var(--inv-action-hover); border-color: var(--inv-action-hover); box-shadow: 0 4px 12px rgba(var(--rb-primary-rgb), 0.28); }
+.btn-primary:active:not(:disabled), .btn-danger:active:not(:disabled) { transform: translateY(1px); }
+/* The one destructive confirm is solid; the drawer's Discard stays an outline. */
+.btn-danger { color: #fff; background: var(--inv-crit-fill); border-color: var(--inv-crit-fill); }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--inv-crit-fill) 85%, #000); border-color: transparent; }
+.btn-outline--danger { border-color: color-mix(in srgb, var(--inv-crit) 35%, var(--inv-border)); }
+.btn-outline--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--inv-crit) 8%, transparent); border-color: var(--inv-crit); }
+
+.link-btn, .clear-btn:not(:disabled) { color: var(--inv-action-text); font-weight: 600; }
+.link-btn:hover { color: var(--inv-action-text); }
+.clear-btn:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.08); }
+
+.inv-tones :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline-color: var(--inv-action-text); }
+.search-field__input:focus { border-color: var(--inv-action); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.12); }
+.th-sort--on { color: var(--inv-action-text); }
+.pager__btn--on, .pager__btn--on:hover:not(:disabled) { background: var(--inv-action); border-color: var(--inv-action); color: #fff; }
+
+/* The type picked as the list's filter: the action blue, never a state colour. */
+.type-card--active { border-color: var(--inv-action); box-shadow: 0 0 0 1px var(--inv-action), 0 4px 14px rgba(var(--rb-primary-rgb), 0.14); background: rgba(var(--rb-primary-rgb), 0.04); }
+
+/* KPI icons in a tint of their own state; plain counts in the action blue. */
+.kpi__icon { border-color: transparent; background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone); }
+.kpi.tone--neutral .kpi__icon { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
+.kpi.tone--muted .kpi__icon { background: var(--inv-elevated); color: var(--inv-faint); }
+.kpi--action:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--inv-surface); box-shadow: 0 4px 14px rgba(var(--rb-shadow-rgb, 15, 23, 42), 0.06); }
+.kpi--action:hover .kpi__chevron { color: var(--inv-action-text); }
+
+/* Badges: a tint of the state, the neutral ones left grey. */
+.badge { border-color: color-mix(in srgb, var(--tone-fill) 30%, transparent); background: color-mix(in srgb, var(--tone-fill) 10%, transparent); }
+.badge.tone--neutral, .badge.tone--muted, .badge:not([class*="tone--"]) { border-color: var(--inv-border); background: var(--inv-elevated); }
+.badge__dot, .legend__dot, .avail__dot { background: var(--tone-fill); }
+.days--pill { background: color-mix(in srgb, var(--tone-fill) 14%, transparent); }
+
+/* Filled marks */
+.gauge__fill { stroke: var(--tone-fill); }
+.type-card--low::before, .type-card--critical::before { background: var(--tone-fill); }
+.comp.tone--success .comp__fill { background: var(--inv-ok-fill); }
+.comp--short .comp__fill { background: var(--tone-fill); }
+.live-note__dot { background: var(--inv-ok-fill); box-shadow: 0 0 0 3px color-mix(in srgb, var(--inv-ok-fill) 22%, transparent); }
+.activity-item__icon { border-color: transparent; background: color-mix(in srgb, var(--tone-fill) 12%, transparent); }
+.activity-item__icon.tone--neutral { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
+
 /* Responsive: by the width the page actually has. */
 @container inv (max-width: 1240px) {
-  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi { padding-left: 14px; gap: 12px; }
   .inv-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: "types types" "list list" "expiring activity";
   }
+}
+@container inv (max-width: 1040px) {
+  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-row > :first-child { grid-column: span 2; }
 }
 @container inv (max-width: 760px) {
   .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1889,6 +1977,7 @@ onBeforeUnmount(() => {
 }
 @container inv (max-width: 440px) {
   .kpi-row { grid-template-columns: minmax(0, 1fr); }
+  .kpi-row > :first-child { grid-column: auto; }
 }
 @container types (max-width: 880px) {
   .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

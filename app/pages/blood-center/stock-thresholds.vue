@@ -52,27 +52,16 @@ const { can } = useUser()
   box-shadow: 0 0 0 100vmax var(--rb-page-bg);
 }
 
+/* Dark mode reads the app's own navy tokens (2026-10-24); the page had a
+   charcoal palette of its own that stood apart from the sidebar. Only the
+   state colours lift. */
 :global(.dark .st-quiet) {
-  --rb-page-bg: #0F1115;
-  --rb-surface: #171A1F;
-  --rb-surface-alt: #1D2128;
-  --rb-surface-hover: #1D2128;
-  --rb-border: #2B313A;
-  --rb-border-strong: #2B313A;
-  --rb-border-hover: #3A414C;
-  --rb-text-primary: #F3F4F6;
-  --rb-text-secondary: #9CA3AF;
-  --rb-text-muted: #6B7280;
-  --rb-skeleton-a: #171A1F;
-  --rb-skeleton-b: #1D2128;
   --q-ok: #4ADE80;
   --q-warn: #FBBF24;
   --q-crit: #F87171;
   color-scheme: dark;
 }
 
-/* Inputs: a neutral edge in the charcoal palette, not the slate one. */
-:global(.dark .st-quiet .st-card) { --st-input-border: #3A414C; }
 
 /* Heading and guide */
 .st-quiet :deep(.page-head__title) { font-size: 22px; font-weight: 650; letter-spacing: -0.015em; }
@@ -176,4 +165,38 @@ const { can } = useUser()
 .st-quiet :deep(.low-banner__chip--critical::before) { background: var(--q-crit); }
 .st-quiet :deep(.low-banner__chip--more) { color: var(--rb-text-secondary); }
 .st-quiet :deep(.low-banner__chip--more::before) { display: none; }
+
+/* ===== Refresh (project owner, 2026-10-24) =====
+   The stock now and the two level tables are tabs in the panel, one view at
+   a time. Each tab says what its level means, so the guide box beside the
+   title would repeat it. */
+.st-quiet :deep(.guide) { display: none; }
+
+/* With the grid's own empty state showing, the callout above it would repeat it. */
+.st-quiet:has(.setup) :deep(.callout) { display: none; }
+
+/* A healthy stock is the rule, so it says nothing: only a shortage wears a badge.
+   The meter and the legend carry the rest. */
+.st-quiet :deep(.cell--ok .cell__badge) { display: none; }
+.st-quiet :deep(.cell__fill) { background: var(--rb-text-muted); }
+.st-quiet :deep(.cell--ok .cell__fill) { background: var(--q-ok); }
+.st-quiet :deep(.cell--low .cell__fill) { background: var(--q-warn); }
+.st-quiet :deep(.cell--critical .cell__fill) { background: var(--q-crit); }
+.st-quiet :deep(.legend__swatch--ok) { background: var(--q-ok); }
+.st-quiet :deep(.cell--low), .st-quiet :deep(.cell--critical) { background: color-mix(in srgb, var(--q-warn) 5%, transparent); }
+.st-quiet :deep(.cell--critical) { background: color-mix(in srgb, var(--q-crit) 5%, transparent); }
+
+/* The counts above the grid: each a small tile, its number in its state. */
+.st-quiet :deep(.kpi) { min-width: 96px; border-radius: 12px; background: var(--rb-surface); }
+.st-quiet :deep(.kpi--low:not(.kpi--zero)) { border-color: color-mix(in srgb, var(--q-warn) 35%, var(--rb-border)); }
+.st-quiet :deep(.kpi--critical:not(.kpi--zero)) { border-color: color-mix(in srgb, var(--q-crit) 35%, var(--rb-border)); }
+/* Nothing short: the count reads plain. */
+.st-quiet :deep(.kpi--zero dd) { color: var(--rb-text-primary); }
+.st-quiet :deep(.kpi--par dd) { color: var(--rb-primary-text); }
+
+/* Headings of the level tables and the grid: icons in a tint of what they mean. */
+.st-quiet :deep(.grid-card__icon) { border: 0; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.st-quiet :deep(.st-card__icon) { border: 0; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.st-quiet :deep(.st-card--critical .st-card__icon) { background: color-mix(in srgb, var(--q-crit) 12%, transparent); }
+.st-quiet :deep(.guide__icon) { border: 0; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
 </style>

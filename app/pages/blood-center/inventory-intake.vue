@@ -82,7 +82,7 @@
             <button
               type="button"
               class="queue__item"
-              :class="{ 'queue__item--on': selected?.donation_id === row.donation_id }"
+              :class="{ 'queue__item--on': selected?.donation_id === row.donation_id, 'queue__item--held': !row.into_stock }"
               :aria-current="selected?.donation_id === row.donation_id ? 'true' : undefined"
               :disabled="busy"
               @click="openDonation(row)"
@@ -103,7 +103,7 @@
                     :class="{ 'bag-dot--in': n <= (row.recorded_units || 0) }"
                   />
                 </span>
-                <span v-if="!row.into_stock" class="queue__left queue__left--held">Not ready</span>
+                <span v-if="!row.into_stock" class="queue__left queue__left--held"><AssetIcon name="clock" :size="12" /> Not ready</span>
                 <span v-else class="queue__left">{{ row.outstanding_units }} bag{{ row.outstanding_units === 1 ? '' : 's' }} left</span>
               </span>
             </button>
@@ -142,15 +142,15 @@
             <p v-else class="bench__name bench__name--none">—</p>
           </div>
           <div v-if="selected" class="bench__progress">
-            <span class="bag-dots bag-dots--lg" aria-hidden="true">
-              <span
-                v-for="n in dotCount(selected)"
-                :key="n"
-                class="bag-dot"
-                :class="{ 'bag-dot--in': n <= (selected.recorded_units || 0) }"
-              />
+            <!-- How much of the donation is on the shelf already. -->
+            <svg class="progress-dial" viewBox="0 0 44 44" aria-hidden="true">
+              <circle class="progress-dial__track" cx="22" cy="22" r="18" />
+              <circle v-if="selected.recorded_units" class="progress-dial__fill" cx="22" cy="22" r="18" :stroke-dasharray="dialDash(selected)" />
+            </svg>
+            <span class="bench__progress-label">
+              <strong>{{ selected.recorded_units }} of {{ selected.declared_units }}</strong>
+              booked in
             </span>
-            <span class="bench__progress-label">{{ selected.recorded_units }} of {{ selected.declared_units }} booked in</span>
           </div>
           <button v-if="selected" type="button" class="icon-btn" :disabled="busy" aria-label="Close this donation" title="Close" @click="backToQueue">
             <AssetIcon name="x" :size="16" />
@@ -162,7 +162,7 @@
           <p class="section-label">Declared by the laboratory</p>
           <div class="declared">
             <template v-if="selected">
-              <div v-for="c in selected.components" :key="c.component_id" class="declared__item">
+              <div v-for="c in selected.components" :key="c.component_id" class="declared__item" :class="`declared__item--${componentTint(c.component_id)}`">
                 <span class="declared__name">{{ c.component }}</span>
                 <span class="declared__count">{{ c.recorded }}/{{ c.declared }}</span>
                 <span v-if="!c.shelf_life_configured" class="declared__flag">
@@ -203,6 +203,7 @@
 
           <div class="bags">
             <div class="bags__head" aria-hidden="true">
+              <span />
               <span>Bag</span>
               <span>Expiry</span>
               <span>Storage location</span>
@@ -216,12 +217,25 @@
               <p>Pick a donation or scan its barcode to list its bags.</p>
             </div>
 
-            <div v-for="(row, index) in unitRows" :key="index" class="bags__row">
+            <div
+              v-for="(row, index) in unitRows"
+              :key="index"
+              class="bags__row"
+              :class="[`bags__row--${componentTint(row.component_id)}`, { 'bags__row--ready': rowReady(row) }]"
+            >
+              <span class="bag-mark" :title="rowReady(row) ? 'Ready to book in' : 'Needs its shelf'">
+                <AssetIcon v-if="rowReady(row)" name="check" :size="13" />
+                <template v-else>{{ index + 1 }}</template>
+              </span>
+
               <!-- A numbered bag is booked as exactly that bag. -->
               <div class="bag-fixed">
                 <span class="bag-fixed__number mono">{{ row.bag_number }}</span>
                 <span class="bag-fixed__meta">
                   {{ componentName(row.component_id) }}<template v-if="row.volume_ml"> · {{ row.volume_ml }} mL</template>
+                </span>
+                <span v-if="expiryHint(row.expiry_date)" class="bag-fixed__expiry" :class="`bag-fixed__expiry--${expiryHint(row.expiry_date).tone}`">
+                  <AssetIcon name="clock" :size="11" /> {{ expiryHint(row.expiry_date).label }}
                 </span>
               </div>
 
@@ -299,6 +313,10 @@
         <!-- Stays in reach while a long batch scrolls. Locked until a donation is open. -->
         <div class="bench__actions">
           <p v-if="bookHint" class="bench__hint">{{ bookHint }}</p>
+          <p v-else-if="unitRows.length" class="bench__hint bench__hint--count">
+            <span class="ready-bar" aria-hidden="true"><span :style="{ width: `${(readyCount / unitRows.length) * 100}%` }" /></span>
+            {{ readyCount }} of {{ unitRows.length }} bag{{ unitRows.length === 1 ? '' : 's' }} ready
+          </p>
           <button type="button" class="ui-btn ui-btn--primary" :disabled="!canBook" @click="submit">
             {{ busy ? 'Saving…' : bookLabel }}
             <AssetIcon v-if="!busy" name="arrow-right" :size="14" />
@@ -444,6 +462,42 @@ const bookHint = computed(() => {
 
   return ''
 })
+
+// ---- Presentation ----
+const DIAL = 2 * Math.PI * 18
+function dialDash(row) {
+  const share = Math.min(1, (Number(row?.recorded_units) || 0) / Math.max(1, Number(row?.declared_units) || 0))
+  return `${(share * DIAL).toFixed(2)} ${DIAL.toFixed(2)}`
+}
+
+/** A bag is ready once it has its expiry and its shelf. */
+const rowReady = (row) => Boolean(row.expiry_date && row.storage_location)
+const readyCount = computed(() => unitRows.value.filter(rowReady).length)
+
+/** The colours bags are known by on the shelf: red cells, yellow plasma, amber platelets. */
+function componentTint(componentId) {
+  const name = componentName(componentId).toLowerCase()
+  if (name.includes('platelet')) return 'platelet'
+  if (name.includes('plasma') || name.includes('cryo')) return 'plasma'
+  if (name.includes('red') || name.includes('whole')) return 'red'
+  return 'other'
+}
+
+/** "Expires in 2 days": a short-lived bag says so before it is shelved. */
+function expiryHint(value) {
+  if (!value) return null
+  const end = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(end.getTime())) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((end - today) / 86400000)
+  if (days < 0) return { label: 'Past its expiry', tone: 'crit' }
+  if (days === 0) return { label: 'Expires today', tone: 'crit' }
+  const label = `Expires in ${days} day${days === 1 ? '' : 's'}`
+  if (days <= 3) return { label, tone: 'crit' }
+  if (days <= 7) return { label, tone: 'warn' }
+  return { label, tone: 'ok' }
+}
 
 function formatDate(value) {
   if (!value) return 'date not recorded'
@@ -1059,6 +1113,59 @@ onMounted(async () => {
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }
+}
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+.queue__item--held { opacity: 0.72; }
+.queue__item--held .queue__name { font-weight: 600; }
+.queue__left--held { display: inline-flex; align-items: center; gap: 4px; }
+
+.bench__label { font-weight: 600; letter-spacing: 0.02em; }
+.bench__progress { flex-direction: row; align-items: center; gap: 10px; }
+.bench__progress-label { display: flex; flex-direction: column; font-weight: 500; line-height: 1.3; }
+.bench__progress-label strong { font-size: 14px; color: var(--rb-text-primary); }
+.progress-dial { width: 44px; height: 44px; transform: rotate(-90deg); }
+.progress-dial__track { fill: none; stroke: var(--rb-surface-alt); stroke-width: 5; }
+.progress-dial__fill { fill: none; stroke: var(--rb-primary); stroke-width: 5; stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
+
+/* Bags: the component's colour down the edge, a mark that ticks when ready. */
+.bags__head, .bags__row { grid-template-columns: 28px minmax(0, 1.5fr) 184px minmax(0, 1.2fr) 34px; }
+.bags__row { --comp: var(--rb-text-muted); position: relative; overflow: hidden; padding-left: 14px; background: var(--rb-surface); transition: border-color 0.15s ease, background-color 0.15s ease; }
+.bags__row::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--comp); }
+.bags__row--red { --comp: #C62828; }
+.declared__item { --comp: var(--rb-text-muted); }
+.bags__row--plasma, .declared__item--plasma { --comp: #EAB308; }
+.bags__row--platelet, .declared__item--platelet { --comp: #F97316; }
+.declared__item--red { --comp: #C62828; }
+.declared__name::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--comp); vertical-align: 1px; }
+.bags__row--ready { border-color: rgba(var(--rb-success-rgb), 0.35); background: rgba(var(--rb-success-rgb), 0.04); }
+.bag-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rb-border-strong);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--rb-text-secondary);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.bags__row--ready .bag-mark { border-color: var(--rb-success); background: var(--rb-success); color: #fff; }
+.bag-fixed { gap: 1px; }
+.bag-fixed__expiry { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 11.5px; font-weight: 600; }
+.bag-fixed__expiry--ok { color: var(--rb-text-secondary); font-weight: 500; }
+.bag-fixed__expiry--warn { color: var(--rb-warning-text); }
+.bag-fixed__expiry--crit { color: var(--rb-accent-text); }
+
+.bench__hint--count { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: var(--rb-text-primary); }
+.ready-bar { position: relative; width: 120px; height: 6px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
+.ready-bar span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--rb-success); transition: width 0.3s ease; }
+.bench__actions .ui-btn--primary:not(:disabled) { box-shadow: 0 4px 12px rgba(var(--rb-primary-rgb), 0.25); }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-dial__fill, .ready-bar span, .bags__row, .bag-mark { transition: none; }
 }
 
 /* Panels in the shared SectionCard's shape (2026-10-15). */

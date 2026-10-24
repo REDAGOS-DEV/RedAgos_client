@@ -1,3 +1,5 @@
+import { smoothPath } from './smoothPath'
+
 /**
  * Shaping helpers for the Issuance dashboard (blood-center/storage.vue).
  *
@@ -54,6 +56,7 @@ export function stockWeekChange(trend: StockTrendPoint[], key: StockLevelKey): S
 }
 
 export interface StockSparkline {
+  points: Array<{ x: number, y: number }>
   line: string
   area: string
   end: { x: number, y: number }
@@ -80,14 +83,17 @@ export function stockSparkline(values: number[], width: number, height: number, 
     y: pad + (height - pad * 2) * (1 - (value - low) / span),
   }))
 
-  const line = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('')
+  // A smooth curve that never overshoots its points (smoothPath).
+  const rounded = points.map(p => ({ x: Number(p.x.toFixed(1)), y: Number(p.y.toFixed(1)) }))
+  const line = smoothPath(rounded)
   const first = points[0]!
   const end = points[points.length - 1]!
 
   return {
     line,
-    area: `${line}L${end.x.toFixed(1)},${height}L${first.x.toFixed(1)},${height}Z`,
+    area: `${line} L${end.x.toFixed(1)},${height} L${first.x.toFixed(1)},${height} Z`,
     end,
+    points: rounded,
   }
 }
 

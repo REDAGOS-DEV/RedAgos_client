@@ -2,8 +2,8 @@
   <div class="iss">
     <header class="iss__header">
       <div>
-        <h1 class="iss__title">Issuance</h1>
-        <p class="iss__subtitle">Stock on hand, what is about to expire, and hospital requests waiting on this department.</p>
+        <h1 class="iss__title">Issuance dashboard</h1>
+        <p class="iss__subtitle">Issuance · {{ todayLabel }}</p>
       </div>
       <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
         <AssetIcon name="package-check" :size="15" />
@@ -43,6 +43,7 @@
                 preserveAspectRatio="none"
                 aria-hidden="true"
               >
+                <path :d="kpi.spark.area" class="kpi__spark-area" />
                 <path :d="kpi.spark.line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
               </svg>
             </div>
@@ -98,16 +99,28 @@
         <p class="empty__body">Refresh the page to try again.</p>
       </div>
 
-      <div v-else class="types">
+      <p v-else-if="shelfEmpty" class="shelf-empty">
+        <AssetIcon name="droplets" :size="16" />
+        <span><strong>No units in stock yet.</strong> Units recorded through Stock Intake appear here by blood type.</span>
+      </p>
+
+      <div v-if="!loading && summary" class="types">
         <NuxtLink
           v-for="card in typeCards"
           :key="card.code"
           :to="`/blood-center/inventory?type=${encodeURIComponent(card.code)}`"
           class="tcard"
+          :class="shelfEmpty ? 'tcard--quiet' : `tcard--${card.status.tone}`"
           :title="card.status.title"
         >
-          <span class="tcard__code">{{ card.label }}</span>
-          <span class="tcard__value">{{ formatCount(card.available) }}</span>
+          <span class="tcard__head">
+            <span class="tcard__code">{{ card.label }}</span>
+            <!-- The type's level against the fullest shelf: a vial that empties. -->
+            <span class="tcard__vial" aria-hidden="true">
+              <span class="tcard__vial-fill" :style="{ height: `${vialLevel(card.available)}%` }" />
+            </span>
+          </span>
+          <span class="tcard__value">{{ formatCount(card.available) }}<small>units</small></span>
 
           <!-- The shelf in its three parts; the counts below carry the numbers. -->
           <span class="tcard__bar" aria-hidden="true">
@@ -135,7 +148,7 @@
 
           <!-- Only a type that needs attention says so, naming the component
                by its bag-label code; the full names are in the tooltip. -->
-          <span v-if="card.status.tone !== 'neutral'" class="tcard__status" :class="`signal--${card.status.tone}`">
+          <span v-if="!shelfEmpty && card.status.tone !== 'neutral'" class="tcard__status" :class="`signal--${card.status.tone}`">
             <AssetIcon :name="card.status.icon" :size="12" />
             <span aria-hidden="true">{{ card.status.short }}</span>
             <span class="sr-only">{{ card.status.full }}</span>
@@ -152,6 +165,15 @@
             <AssetIcon name="clipboard-check" :size="20" class="panel__icon" />
             <h2 id="requests-title" class="panel__title">Incoming Requests</h2>
           </div>
+          <!-- The whole open queue, not only the rows below. -->
+          <ul v-if="canSeeRequests && requests" class="req-chips" aria-label="Open requests">
+            <li v-if="requests.open_emergencies" class="req-chip req-chip--crit">
+              <AssetIcon name="circle-alert" :size="12" /> {{ requests.open_emergencies }} emergency
+            </li>
+            <li v-for="chip in requestChips" :key="chip.key" class="req-chip" :class="`req-chip--${chip.tone}`">
+              <strong>{{ chip.count }}</strong> {{ chip.label }}
+            </li>
+          </ul>
           <NuxtLink v-if="canSeeRequests" to="/blood-center/bloodrequests" class="panel__link">
             View all
             <AssetIcon name="arrow-right" :size="13" />
@@ -186,7 +208,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in requestRows" :key="row.id">
+              <tr v-for="row in requestRows" :key="row.id" :class="{ 'req__row--emergency': row.emergency }">
                 <td><span class="pill" :class="`pill--${row.tone}`">{{ row.status }}</span></td>
                 <td class="req__from" :title="row.reference">{{ row.from }}</td>
                 <td class="req__units">
@@ -225,10 +247,15 @@
           <p class="empty__body">Refresh the page to try again.</p>
         </div>
         <template v-else>
-          <p class="release__value">{{ awaitingRelease }}</p>
-          <p class="release__label">
-            {{ awaitingRelease === 1 ? 'request has' : 'requests have' }} units allocated and waiting to be released.
-          </p>
+          <div class="release__hero">
+            <span class="release__badge" :class="{ 'release__badge--zero': !awaitingRelease }">
+              <strong>{{ awaitingRelease }}</strong>
+              <small>to release</small>
+            </span>
+            <p class="release__label">
+              {{ awaitingRelease === 1 ? 'request has' : 'requests have' }} units allocated and waiting to be released.
+            </p>
+          </div>
           <p class="release__note">
             <AssetIcon name="info" :size="15" />
             Units go out once paid or met by the government subsidy.
@@ -240,90 +267,70 @@
         </template>
       </section>
 
-      <!-- ============ STOCK BY BLOOD GROUP ============ -->
-      <section class="panel" aria-labelledby="groups-title">
+      <!-- ============ STOCK, LAST 8 DAYS ============ -->
+      <!--
+        Each type's count is on its tile above; what the tiles cannot show is
+        how the shelf has moved. Available, expiring and reserved, day by day,
+        in the tiles' colours.
+      -->
+      <section class="panel trend-panel" aria-labelledby="trend-title">
         <header class="panel__head">
           <div class="panel__titles">
             <AssetIcon name="bar-chart" :size="20" class="panel__icon" />
             <div>
-              <h2 id="groups-title" class="panel__title">Stock by Blood Group</h2>
-              <p class="panel__sub">Available units per type. Select a column to see its units.</p>
+              <h2 id="trend-title" class="panel__title">Stock, last 8 days</h2>
+              <p class="panel__sub">How the shelf has moved: units available, expiring within 7 days, and reserved.</p>
             </div>
           </div>
-          <NuxtLink to="/blood-center/inventory" class="panel__link">
-            View inventory
-            <AssetIcon name="arrow-right" :size="13" />
-          </NuxtLink>
+          <div class="panel__aside panel__aside--row">
+            <ul class="legend" aria-label="Legend">
+              <li v-for="item in TREND_SERIES" :key="item.key">
+                <span class="legend__dot" :class="`seg--${item.seg}`" aria-hidden="true" />
+                {{ item.label }}
+              </li>
+            </ul>
+            <NuxtLink to="/blood-center/inventory" class="panel__link">
+              View inventory
+              <AssetIcon name="arrow-right" :size="13" />
+            </NuxtLink>
+          </div>
         </header>
 
         <div v-if="loading" class="panel-skeleton skeleton" />
-        <div v-else-if="!summary || !hasAvailable" class="empty">
+        <div v-else-if="trend.length < 2" class="empty">
           <AssetIcon name="bar-chart" :size="22" />
-          <p class="empty__title">{{ summary ? 'No units available' : 'Stock could not be loaded' }}</p>
-          <p class="empty__body">
-            {{ summary ? 'Columns appear once units are booked in at Stock Intake.' : 'Refresh the page to try again.' }}
-          </p>
+          <p class="empty__title">{{ summary ? 'Not enough days yet' : 'Stock could not be loaded' }}</p>
+          <p class="empty__body">{{ summary ? 'The chart fills in as the days pass.' : 'Refresh the page to try again.' }}</p>
         </div>
-
-        <!-- Available units per blood type as columns, the same counts as the
-             cards above. A column opens that type's units, as its card does. -->
-        <div v-else ref="chartBox" class="stock-chart">
-          <svg
-            v-if="chart"
-            :width="chart.width"
-            :height="chart.height"
-            class="stock-chart__svg"
-            role="img"
-            tabindex="0"
-            :aria-label="chartLabel"
-            @keydown="onChartKey"
-            @blur="activeIndex = null"
-            @pointerleave="activeIndex = null"
-          >
-            <g class="stock-chart__grid">
-              <g v-for="tick in chart.ticks" :key="tick.value">
-                <line :x1="chart.left" :x2="chart.width - chart.right" :y1="tick.y" :y2="tick.y" />
-                <text :x="chart.left - 8" :y="tick.y" text-anchor="end" dominant-baseline="middle">{{ formatCount(tick.value) }}</text>
-              </g>
-            </g>
-
-            <g
-              v-for="(col, i) in chart.columns"
-              :key="col.code"
-              class="stock-chart__col"
-              :class="{ 'stock-chart__col--dim': activeIndex !== null && activeIndex !== i }"
-            >
-              <path v-if="col.path" :d="col.path" class="stock-chart__bar" />
-              <!-- The value on the cap: the bar's light colour needs it. -->
-              <text :x="col.center" :y="col.top - 6" text-anchor="middle" class="stock-chart__cap">{{ formatCount(col.available) }}</text>
-              <rect
-                :x="col.bandX"
-                :y="chart.top"
-                :width="col.bandWidth"
-                :height="chart.height - chart.top"
-                class="stock-chart__hit"
-                @pointerenter="activeIndex = i"
-                @pointermove="activeIndex = i"
-                @click="openType(col.code)"
-              />
-            </g>
-
-            <g class="stock-chart__axis">
-              <text v-for="col in chart.columns" :key="col.code" :x="col.center" :y="chart.height - 6" text-anchor="middle">{{ col.label }}</text>
-            </g>
-          </svg>
-
-          <div v-if="activeColumn" class="stock-chart__tip" :style="tooltipStyle" role="status">
-            <p class="stock-chart__tip-title">{{ activeColumn.label }}</p>
-            <p class="stock-chart__tip-row"><strong>{{ formatCount(activeColumn.available) }}</strong> available</p>
-            <p
-              v-if="activeColumn.available > 0 && activeColumn.status.tone !== 'neutral'"
-              class="stock-chart__tip-status"
-              :class="`signal--${activeColumn.status.tone}`"
-            >
-              <AssetIcon :name="activeColumn.status.icon" :size="12" />
-              {{ activeColumn.status.full }}
-            </p>
+        <div v-else class="tchart">
+          <div class="tchart__y" aria-hidden="true">
+            <span v-for="tick in [...trendScale.ticks].reverse()" :key="tick">{{ formatCount(tick) }}</span>
+          </div>
+          <div class="tchart__area">
+            <div class="tchart__grid" aria-hidden="true">
+              <span v-for="tick in trendScale.ticks" :key="tick" />
+            </div>
+            <svg class="tchart__svg" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="iss-trend-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" class="tchart__stop tchart__stop--top" />
+                  <stop offset="100%" class="tchart__stop tchart__stop--bottom" />
+                </linearGradient>
+              </defs>
+              <path v-if="trendLines[0]" :d="trendLines[0].area" fill="url(#iss-trend-fill)" />
+              <path v-for="line in trendLines" :key="line.key" :d="line.line" class="tchart__line" :class="`seg--${line.seg}`" vector-effect="non-scaling-stroke" />
+            </svg>
+            <div class="tchart__cols" role="img" :aria-label="trendLabel">
+              <div v-for="(point, i) in trend" :key="point.date ?? i" class="tchart__col">
+                <span v-for="line in TREND_SERIES" :key="line.key" class="tchart__dot" :class="`seg--${line.seg}`"
+                  :style="{ bottom: `${trendHeight(point[line.key])}%` }" />
+                <span class="tchart__tip">
+                  <strong>{{ trendDay(point.date) }}</strong>
+                  <span v-for="line in TREND_SERIES" :key="line.key"><i :class="`seg--${line.seg}`" />{{ formatCount(point[line.key]) }} {{ line.short }}</span>
+                </span>
+                <span class="tchart__x">{{ i === trend.length - 1 ? 'Today' : trendDay(point.date) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -336,9 +343,10 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { columnPath, niceScale } from '~/utils/collectionDashboard'
+import { niceScale } from '~/utils/collectionDashboard'
 import { stockSparkline, stockTypeAlert, stockTypeCards, stockWeekChange } from '~/utils/issuanceDashboard'
 import { REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { smoothPath } from '~/utils/smoothPath'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -454,6 +462,9 @@ const SEGMENTS = [
 
 const SEGMENT_LABEL = Object.fromEntries(SEGMENTS.map((segment) => [segment.key, segment.label]))
 
+// Every type at nothing, reserved and expiring too: the whole shelf is empty, said once above the tiles.
+const shelfEmpty = computed(() => typeCards.value.length > 0 && typeCards.value.every(card => card.segments.every(seg => !seg.count)))
+
 const typeCards = computed(() => stockTypeCards(summary.value?.stock_by_blood_type ?? []).map((card) => {
   const alert = stockTypeAlert(stockCells.value, card.code, componentCodes.value)
 
@@ -484,8 +495,6 @@ function typeStatus(code, available, alert) {
   return { short: 'Available', full: 'Available', icon: 'check-circle', tone: 'neutral', title: `${code}: ${available} available` }
 }
 
-const hasAvailable = computed(() => typeCards.value.some((card) => card.available > 0))
-
 // ---- Requests ----
 const awaitingRelease = computed(() => requests.value?.awaiting_release ?? 0)
 
@@ -514,123 +523,42 @@ function formatReceived(value) {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-// ---- Stock by blood group (column chart) ----
-const chartBox = ref(null)
-const chartWidth = ref(0)
-const activeIndex = ref(null)
-let resizeObserver = null
+// ---- Header ----
+const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
-function measureChart() {
-  if (chartBox.value) chartWidth.value = chartBox.value.clientWidth
-}
+// ---- Type tiles: each type's level against the fullest shelf ----
+const vialMax = computed(() => Math.max(1, ...typeCards.value.map(card => card.available)))
+const vialLevel = available => (available ? Math.max(6, (available / vialMax.value) * 100) : 0)
 
-const CHART_HEIGHT = 230
+// ---- The request queue's counts ----
+const requestChips = computed(() => {
+  const totals = requests.value?.totals ?? {}
+  return [
+    { key: 'pending', label: 'pending', count: totals.pending ?? 0, tone: 'info' },
+    { key: 'processing', label: 'processing', count: totals.processing ?? 0, tone: 'progress' },
+    { key: 'partial', label: 'partly filled', count: totals.partial ?? 0, tone: 'warning' },
+  ].filter(chip => chip.count > 0)
+})
 
-/**
- * The chart in pixels: one column per type, in the cards' order, capped at
- * 28px wide with the rounded end on top and its value above it. The axis
- * never drops below 4, so a single unit does not fill the chart.
- */
-const chart = computed(() => {
-  const width = chartWidth.value
-  const cards = typeCards.value
-  if (!width || !cards.length) return null
-
-  const left = 34
-  const right = 4
-  const top = 22
-  const bottom = 26
-  const plotWidth = width - left - right
-  const plotHeight = CHART_HEIGHT - top - bottom
-  const scale = niceScale(Math.max(0, ...cards.map((card) => card.available)))
-  const band = plotWidth / cards.length
-  const barWidth = Math.max(6, Math.min(28, band * 0.62))
-  const y = (value) => top + plotHeight - (value / scale.max) * plotHeight
-
-  const columns = cards.map((card, i) => {
-    const bandX = left + i * band
-    const height = (card.available / scale.max) * plotHeight
-
-    return {
-      ...card,
-      bandX,
-      bandWidth: band,
-      center: bandX + band / 2,
-      top: y(card.available),
-      path: columnPath(bandX + (band - barWidth) / 2, top + plotHeight - height, barWidth, height, true),
-    }
+// ---- Stock, last 8 days: a curve a part, in the tiles' colours ----
+const TREND_SERIES = [
+  { key: 'available', label: 'Available', short: 'available', seg: 'fresh' },
+  { key: 'expiring_soon', label: 'Expiring (≤7 days)', short: 'expiring', seg: 'expiring' },
+  { key: 'reserved', label: 'Reserved', short: 'reserved', seg: 'reserved' },
+]
+const trendScale = computed(() => niceScale(Math.max(0, ...trend.value.flatMap(p => TREND_SERIES.map(sr => p[sr.key] ?? 0)))))
+const trendHeight = v => Math.min(100, ((v ?? 0) / trendScale.value.max) * 100)
+const trendLines = computed(() => {
+  const n = trend.value.length
+  if (n < 2) return []
+  return TREND_SERIES.map((sr) => {
+    const points = trend.value.map((p, i) => ({ x: ((i + 0.5) / n) * 1000, y: 200 - trendHeight(p[sr.key]) * 2 }))
+    const line = smoothPath(points)
+    return { ...sr, line, area: `${line} L${points[n - 1].x},200 L${points[0].x},200 Z` }
   })
-
-  return {
-    width,
-    height: CHART_HEIGHT,
-    left,
-    right,
-    top,
-    columns,
-    ticks: scale.ticks.map((value) => ({ value, y: y(value) })),
-  }
 })
-
-const chartLabel = computed(() => {
-  const counts = typeCards.value.map((card) => `${card.code} ${card.available}`).join(', ')
-  return `Available units per blood type: ${counts}. Use the left and right arrow keys to read each type, and Enter to open its units.`
-})
-
-const activeColumn = computed(() => (activeIndex.value === null ? null : chart.value?.columns[activeIndex.value] ?? null))
-
-const tooltipStyle = computed(() => {
-  const col = activeColumn.value
-  if (!col || !chart.value) return {}
-  const half = 60
-  const x = Math.min(Math.max(col.center, half), chart.value.width - half)
-  return { left: `${x}px`, top: `${Math.max(0, col.top - 22)}px` }
-})
-
-function openType(code) {
-  navigateTo(`/blood-center/inventory?type=${encodeURIComponent(code)}`)
-}
-
-function onChartKey(event) {
-  const last = typeCards.value.length - 1
-  if (last < 0) return
-
-  const moves = {
-    ArrowLeft: () => Math.max(0, (activeIndex.value ?? last + 1) - 1),
-    ArrowRight: () => Math.min(last, (activeIndex.value ?? -1) + 1),
-    Home: () => 0,
-    End: () => last,
-  }
-
-  if (event.key === 'Escape') {
-    activeIndex.value = null
-    return
-  }
-
-  if (event.key === 'Enter' && activeColumn.value) {
-    openType(activeColumn.value.code)
-    return
-  }
-
-  if (moves[event.key]) {
-    event.preventDefault()
-    activeIndex.value = moves[event.key]()
-  }
-}
-
-// The chart's box only exists once the summary has loaded; follow it rather
-// than looking once.
-watch(chartBox, (el, previous) => {
-  if (typeof ResizeObserver === 'undefined') return
-  resizeObserver ??= new ResizeObserver(measureChart)
-  if (previous) resizeObserver.unobserve(previous)
-  if (el) {
-    resizeObserver.observe(el)
-    measureChart()
-  }
-})
-
-onBeforeUnmount(() => resizeObserver?.disconnect())
+const trendDay = d => (d ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
+const trendLabel = computed(() => `Stock over the last ${trend.value.length} days: ${trend.value.map(p => `${trendDay(p.date)} ${p.available ?? 0} available, ${p.expiring_soon ?? 0} expiring, ${p.reserved ?? 0} reserved`).join('; ')}.`)
 </script>
 
 <style scoped>
@@ -1086,44 +1014,6 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 
 .release__note :deep(.asset-icon) { flex-shrink: 0; margin-top: 1px; }
 
-/* Stock by blood group: one series, so one colour and no legend. It counts
-   available units, so it wears the Available colour; its value sits on each
-   cap because that colour is light on white. */
-.stock-chart { position: relative; }
-
-.stock-chart__svg { display: block; overflow: visible; }
-.stock-chart__svg:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; border-radius: 8px; }
-
-.stock-chart__grid line { stroke: var(--rb-border); stroke-width: 1; shape-rendering: crispEdges; }
-.stock-chart__grid text,
-.stock-chart__axis text { fill: var(--rb-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
-
-.stock-chart__bar { fill: var(--seg-fresh); }
-.stock-chart__cap { fill: var(--rb-text-primary); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stock-chart__col { transition: opacity 0.12s ease; }
-.stock-chart__col--dim { opacity: 0.45; }
-.stock-chart__hit { fill: transparent; cursor: pointer; }
-
-.stock-chart__tip {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  min-width: 112px;
-  max-width: 230px;
-  padding: 8px 10px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface);
-  box-shadow: 0 6px 20px rgba(var(--rb-shadow-rgb), 0.18);
-  pointer-events: none;
-  font-size: 12px;
-}
-
-.stock-chart__tip-title { margin: 0 0 4px; font-weight: 600; color: var(--rb-text-secondary); }
-.stock-chart__tip-row { margin: 0; color: var(--rb-text-secondary); }
-.stock-chart__tip-row strong { color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.stock-chart__tip-status { display: flex; align-items: center; gap: 5px; margin: 4px 0 0; font-weight: 500; color: var(--rb-text-primary); }
-.stock-chart__tip-status :deep(.asset-icon) { color: var(--signal); flex-shrink: 0; }
-
 /* The threshold banner keeps its structure here, on the page's surface: its
    state moves into the icon and a dot on each chip. Anchored on its root
    class, so each rule outranks the banner's own. */
@@ -1151,34 +1041,157 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   100% { background-position: 0 50%; }
 }
 
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+.needs-you { margin-bottom: 16px; }
+
+.kpi__spark-area { fill: var(--kpi-mark); opacity: 0.14; stroke: none; }
+
+/* Type tiles: a vial of the type's level, coloured by how it stands. */
+.tcard { --tone: var(--seg-fresh); position: relative; overflow: hidden; }
+.tcard--warning { --tone: var(--seg-expiring); }
+.tcard--critical { --tone: var(--iss-crit); }
+/* Red is kept for the exception: an edge and the status line, never a filled
+   tile, so one empty type stands out among healthy ones. */
+.tcard--warning, .tcard--critical { border-color: color-mix(in srgb, var(--tone) 40%, var(--rb-border)); }
+.tcard--warning::before, .tcard--critical::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tone); }
+.tcard--quiet { --tone: var(--rb-text-secondary); }
+.tcard--quiet .tcard__code { background: var(--iss-elevated); }
+
+.shelf-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--rb-border-strong, var(--rb-border));
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+.shelf-empty strong { color: var(--rb-text-primary); }
+.tcard__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.tcard__code {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--rb-text-primary);
+}
+.tcard__vial {
+  position: relative;
+  width: 12px;
+  height: 34px;
+  border: 1.5px solid color-mix(in srgb, var(--tone) 55%, var(--rb-border));
+  border-radius: 3px 3px 7px 7px;
+  overflow: hidden;
+}
+.tcard__vial-fill { position: absolute; inset: auto 0 0; background: var(--tone); transition: height 0.5s var(--rb-ease-out, ease); }
+.tcard__value { display: flex; align-items: baseline; gap: 4px; font-size: 26px; font-weight: 800; }
+.tcard__value small { font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); }
+
+/* Requests: the queue's counts, an emergency row marked down its edge. */
+.panel__head { flex-wrap: wrap; }
+.req-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 auto 0 12px; padding: 0; list-style: none; }
+.req-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--rb-text-secondary); background: var(--iss-elevated); }
+.req-chip strong { color: var(--rb-text-primary); }
+.req-chip--crit { font-weight: 700; color: var(--iss-crit); background: color-mix(in srgb, var(--iss-crit) 10%, transparent); }
+.req__row--emergency td { background: color-mix(in srgb, var(--iss-crit) 5%, transparent); }
+.req__row--emergency td:first-child { box-shadow: inset 3px 0 0 var(--iss-crit); }
+
+/* Ready for release */
+.release__hero { display: flex; align-items: center; gap: 16px; margin: 4px 0 14px; }
+.release__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--rb-primary) 18%, transparent), color-mix(in srgb, var(--rb-primary) 8%, transparent));
+  box-shadow: inset 0 0 0 6px color-mix(in srgb, var(--rb-primary) 18%, transparent);
+}
+.release__badge strong { font-size: 32px; font-weight: 800; line-height: 1; color: var(--rb-primary-text, var(--rb-primary)); }
+.release__badge small { margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
+.release__badge--zero { background: var(--iss-elevated); box-shadow: none; }
+.release__badge--zero strong { color: var(--rb-text-secondary); }
+.release__hero .release__label { margin: 0; }
+
+/* The bottom row: requests and releases side by side, the trend under them. */
+.row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.trend-panel { grid-column: 1 / -1; }
+.panel__aside--row { flex-direction: row; align-items: center; gap: 18px; }
+
+.tchart { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; }
+.tchart__y { display: flex; flex-direction: column; justify-content: space-between; height: 220px; font-size: 11.5px; text-align: right; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.tchart__y span { transform: translateY(-50%); }
+.tchart__y span:last-child { transform: translateY(50%); }
+.tchart__area { position: relative; }
+.tchart__grid { position: absolute; inset: 0 0 auto; display: flex; flex-direction: column-reverse; justify-content: space-between; height: 220px; pointer-events: none; }
+.tchart__grid span { height: 1px; background: var(--rb-border); }
+.tchart__svg { position: absolute; inset: 0 0 auto; width: 100%; height: 220px; overflow: visible; pointer-events: none; }
+.tchart__stop--top { stop-color: var(--seg-fresh); stop-opacity: 0.24; }
+.tchart__stop--bottom { stop-color: var(--seg-fresh); stop-opacity: 0; }
+.tchart__line { fill: none; stroke: var(--seg); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.tchart__cols { position: relative; display: flex; height: 220px; padding-bottom: 26px; box-sizing: content-box; }
+.tchart__col { position: relative; flex: 1; height: 100%; }
+.tchart__col::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--rb-border-strong, var(--rb-border)); opacity: 0; transition: opacity 120ms ease; }
+.tchart__col:hover::before { opacity: 1; }
+.tchart__dot { position: absolute; left: 50%; width: 8px; height: 8px; border: 2px solid var(--rb-surface); border-radius: 50%; background: var(--seg); transform: translate(-50%, 50%); }
+.tchart__tip {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--rb-text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--rb-surface);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 120ms ease;
+}
+.tchart__tip span { display: flex; align-items: center; gap: 6px; }
+.tchart__tip i { width: 8px; height: 8px; border-radius: 50%; background: var(--seg); }
+.tchart__col:hover .tchart__tip { opacity: 1; }
+.tchart__col:first-child .tchart__tip { left: 0; transform: none; }
+.tchart__col:last-child .tchart__tip { left: auto; right: 0; transform: none; }
+.tchart__x { position: absolute; top: calc(100% + 8px); left: 50%; font-size: 11.5px; white-space: nowrap; color: var(--rb-text-secondary); transform: translateX(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tcard__vial-fill, .tchart__col::before, .tchart__tip { transition: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-  .stock-chart__col { transition: none; }
 }
 
 /* Widths are the page's content width (the container), not the window's.
-   - Requests, releases and the chart share a row only where the table keeps
-     its four columns without squeezing From to a stub; below that the table
-     takes the full width and the other two pair up.
+   - Requests and releases share a row (2 : 1) while the table keeps its
+     four columns without squeezing From to a stub; below that each takes
+     the full width. The stock trend always has a row of its own.
    - Eight type cards stay in a row while each is wide enough for its three
      counts; then four, then two. */
-@container issuance (max-width: 1299px) {
-  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .row > :first-child { grid-column: 1 / -1; }
-}
-
 @container issuance (max-width: 1059px) {
   .types { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .row { grid-template-columns: 1fr; }
 }
 
 @container issuance (max-width: 819px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Three cards: the last takes the row, so none is left half-empty. */
   .kpis > :last-child { grid-column: 1 / -1; }
-}
-
-@container issuance (max-width: 699px) {
-  .row { grid-template-columns: 1fr; }
 }
 
 @container issuance (max-width: 579px) {

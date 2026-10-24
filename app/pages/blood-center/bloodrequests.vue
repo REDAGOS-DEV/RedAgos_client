@@ -53,6 +53,30 @@
       actions on it; a pager. Built like the Donations list.
     -->
     <section class="panel">
+      <!--
+        This tab's queue at a glance, each count a filter (2026-10-24). Ready
+        to issue is not a status: it opens Request Fulfillment, where Issue goes.
+      -->
+      <div v-if="tabSummary" class="quick" role="group" aria-label="Quick filters">
+        <button
+          v-for="chip in quickChips"
+          :key="chip.key"
+          type="button"
+          class="quick__chip"
+          :class="[`quick__chip--${chip.tone}`, { 'quick__chip--on': chip.active, 'quick__chip--zero': !chip.count }]"
+          :aria-pressed="chip.active"
+          @click="toggleQuick(chip)"
+        >
+          <AssetIcon v-if="chip.icon" :name="chip.icon" :size="13" />
+          <strong>{{ chip.count }}</strong> {{ chip.label }}
+        </button>
+        <NuxtLink v-if="canRelease" to="/blood-center/fulfillment" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
+          <AssetIcon name="send" :size="13" />
+          <strong>{{ tabSummary.awaiting_release }}</strong> ready to issue
+          <AssetIcon name="arrow-right" :size="12" />
+        </NuxtLink>
+      </div>
+
       <div class="toolbar">
         <div class="toolbar__filters">
           <label class="search">
@@ -109,43 +133,25 @@
               <th v-else scope="col" class="c-patient">Blood Type</th>
               <th scope="col" class="c-component">Component</th>
               <th scope="col" class="c-units" title="Issued of requested">Units</th>
-              <th scope="col" class="c-priority">Priority</th>
               <th scope="col" class="c-status">Status</th>
               <th scope="col" class="c-actions">Actions</th>
             </tr>
           </thead>
 
-          <tbody v-if="loading && !rows.length">
-            <tr v-for="n in 6" :key="'sk-' + n">
-              <td colspan="9"><span class="skeleton skeleton--line" /></td>
-            </tr>
-          </tbody>
-
-          <tbody v-else-if="!rows.length">
-            <tr>
-              <td colspan="9" class="empty-cell">
-                <div class="empty-state">
-                  <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'inbox'" :size="20" /></span>
-                  <p class="empty-state__title">
-                    {{ hasFilters ? 'No requests match' : isPatientTab ? 'No patient requests' : 'No replenishment orders' }}
-                  </p>
-                  <p class="empty-state__text">
-                    {{ hasFilters
-                      ? 'Try another search, widen the dates, or pick another status.'
-                      : isPatientTab
-                        ? 'Requests for a patient, from hospital blood banks or recorded here as walk-ins, appear in this list.'
-                        : 'Orders from hospital blood banks restocking their own shelves, weekly ones included, appear in this list.' }}
-                  </p>
-                  <button v-if="hasFilters" type="button" class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-
-          <tbody v-else>
-            <tr v-for="r in rows" :key="r.id" class="req-row" :class="{ 'is-mutating': isMutating(r.id) }">
+          <tbody v-if="rows.length">
+            <tr
+              v-for="r in rows"
+              :key="r.id"
+              class="req-row"
+              :class="{ 'is-mutating': isMutating(r.id), 'req-row--emergency': r.emergency && r.isOpen, 'req-row--closed': !r.isOpen }"
+            >
               <td class="c-id">
                 <button type="button" class="code-link" :title="`Review ${r.code}`" @click="openReview(r)">{{ r.code }}</button>
+                <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
+                <!-- Priority: only an emergency is marked; routine is the rule. -->
+                <span v-if="r.emergency" class="chip chip--crit" :title="`${r.priority} priority`">
+                  <AssetIcon name="circle-alert" :size="11" /> {{ r.priority }}
+                </span>
                 <span v-if="r.isWalkIn" class="chip" title="Recorded at this blood center from what a watcher brought">Walk-in</span>
                 <span
                   v-else-if="r.weeklyReference"
@@ -185,19 +191,20 @@
                 </span>
               </td>
               <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested${r.held ? `, ${r.held} reserved and waiting to go out` : ''}`">
-                {{ r.issued }} / {{ r.units }}
-                <span v-if="r.held" class="sub">{{ r.held }} reserved</span>
-              </td>
-              <td class="c-priority">
-                <span class="badge" :class="r.emergency ? 'badge--crit' : 'badge--neutral'">
-                  <span class="badge__dot" aria-hidden="true" />
-                  {{ r.priority }}
+                <span class="units-bar" aria-hidden="true">
+                  <span class="units-bar__issued" :style="{ width: `${share(r.issued, r.units)}%` }" />
+                  <span class="units-bar__held" :style="{ width: `${share(r.held, r.units)}%` }" />
                 </span>
+                <span class="units-text">{{ r.issued }} / {{ r.units }}</span>
+                <span v-if="r.held" class="sub">{{ r.held }} reserved</span>
               </td>
               <td class="c-status">
                 <span class="badge" :class="`badge--${r.tone}`" :title="r.status">
                   <span class="badge__dot" aria-hidden="true" />
                   <span class="badge__text">{{ r.status }}</span>
+                </span>
+                <span v-if="r.isOpen && waitingLabel(r)" class="waiting" :class="{ 'waiting--crit': r.emergency }">
+                  <AssetIcon name="clock" :size="11" /> {{ waitingLabel(r) }}
                 </span>
               </td>
               <td class="c-actions">
@@ -211,13 +218,14 @@
                     <button
                       v-if="canAllocate"
                       type="button"
-                      class="icon-btn icon-btn--ok"
+                      class="btn-approve"
                       :disabled="isMutating(r.id)"
                       :aria-label="`${r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest of'} ${r.code}`"
                       :title="r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest'"
                       @click="requestApprove(r)"
                     >
-                      <AssetIcon name="check" :size="15" />
+                      <AssetIcon name="check" :size="14" />
+                      {{ r.statusValue === 'pending' ? 'Approve' : 'Reserve' }}
                     </button>
                   </template>
                   <!-- Only while nothing is held or sent: the server refuses
@@ -245,9 +253,8 @@
                       <AssetIcon name="send" :size="13" />
                       Issue
                     </NuxtLink>
-                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" title="Approve and reserve units first">
+                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and reserve units first" title="Issue: approve and reserve units first">
                       <AssetIcon name="send" :size="13" />
-                      Issue
                     </span>
                   </template>
                 </div>
@@ -255,6 +262,26 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Outside the table, so they span whatever columns a narrow panel keeps. -->
+        <div v-if="loading && !rows.length" class="table-skeleton" aria-busy="true">
+          <span v-for="n in 6" :key="'sk-' + n" class="skeleton skeleton--line" />
+        </div>
+
+        <div v-else-if="!rows.length" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'inbox'" :size="20" /></span>
+          <p class="empty-state__title">
+            {{ hasFilters ? 'No requests match' : isPatientTab ? 'No patient requests' : 'No replenishment orders' }}
+          </p>
+          <p class="empty-state__text">
+            {{ hasFilters
+              ? 'Try another search, widen the dates, or pick another status.'
+              : isPatientTab
+                ? 'Requests for a patient, from hospital blood banks or recorded here as walk-ins, appear in this list.'
+                : 'Orders from hospital blood banks restocking their own shelves, weekly ones included, appear in this list.' }}
+          </p>
+          <button v-if="hasFilters" type="button" class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
+        </div>
       </div>
 
       <footer class="pager">
@@ -868,10 +895,57 @@ function selectTab(purpose) {
 
 const searchQuery = ref('')
 const statusFilter = ref('')
+// Set by the Emergency quick filter; the list's other filters still apply.
+const urgencyFilter = ref('')
+
+/** This tab's own counts, for the quick filters. */
+const tabSummary = computed(() => summary.value?.by_purpose?.[purposeTab.value] ?? null)
+
+const quickChips = computed(() => {
+  const totals = tabSummary.value?.totals ?? {}
+  return [
+    { key: 'emergency', label: 'emergency', icon: 'circle-alert', tone: 'crit', count: tabSummary.value?.open_emergencies ?? 0, active: urgencyFilter.value === 'emergency' },
+    { key: 'pending', label: 'pending', tone: 'warn', count: totals.pending ?? 0, active: statusFilter.value === 'pending' && !urgencyFilter.value },
+    { key: 'processing', label: 'processing', tone: 'info', count: totals.processing ?? 0, active: statusFilter.value === 'processing' && !urgencyFilter.value },
+    { key: 'partial', label: 'partly filled', tone: 'info', count: totals.partial ?? 0, active: statusFilter.value === 'partial' && !urgencyFilter.value },
+  ]
+})
+
+/** A chip filters the list; pressed again, it clears. */
+function toggleQuick(chip) {
+  if (chip.active) {
+    urgencyFilter.value = ''
+    statusFilter.value = ''
+  } else if (chip.key === 'emergency') {
+    urgencyFilter.value = 'emergency'
+    statusFilter.value = 'open'
+  } else {
+    urgencyFilter.value = ''
+    statusFilter.value = chip.key
+  }
+  loadRequests()
+}
+
+const share = (part, whole) => (whole ? Math.min(100, (part / whole) * 100) : 0)
+
+// "Waiting 2 h": how long an open request has sat here, kept current.
+const now = ref(Date.now())
+let nowTimer = null
+function waitingLabel(r) {
+  const at = r.raw?.request_date ? new Date(r.raw.request_date).getTime() : NaN
+  if (Number.isNaN(at)) return ''
+  const minutes = Math.max(0, Math.floor((now.value - at) / 60000))
+  if (minutes < 60) return `Waiting ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `Waiting ${hours} h`
+  return `Waiting ${Math.floor(hours / 24)} days`
+}
+onMounted(() => { nowTimer = setInterval(() => { now.value = Date.now() }, 60000) })
+onBeforeUnmount(() => clearInterval(nowTimer))
 const fromDate = ref('')
 const toDate = ref('')
 
-const hasFilters = computed(() => Boolean(searchQuery.value.trim() || statusFilter.value || fromDate.value || toDate.value))
+const hasFilters = computed(() => Boolean(searchQuery.value.trim() || statusFilter.value || urgencyFilter.value || fromDate.value || toDate.value))
 
 const listSummary = computed(() => {
   if (hasFilters.value) return `${meta.value.total} request${meta.value.total === 1 ? '' : 's'} match the filters`
@@ -890,6 +964,7 @@ function filterParams() {
   if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
   if (statusFilter.value === 'open') params.open = 1
   else if (statusFilter.value) params.status = statusFilter.value
+  if (urgencyFilter.value) params.urgency_level = urgencyFilter.value
   if (fromDate.value) params.from = fromDate.value
   if (toDate.value) params.to = toDate.value
   return params
@@ -909,6 +984,7 @@ async function loadRequests(page = 1) {
   filters.search = params.search
   filters.status = params.status
   filters.open = params.open
+  filters.urgency_level = params.urgency_level
   filters.from = params.from
   filters.to = params.to
 
@@ -919,6 +995,7 @@ async function loadRequests(page = 1) {
 function resetFilters() {
   searchQuery.value = ''
   statusFilter.value = ''
+  urgencyFilter.value = ''
   fromDate.value = ''
   toDate.value = ''
   loadRequests()
@@ -1619,7 +1696,7 @@ onBeforeUnmount(() => {
 .table-wrap { position: relative; overflow-x: auto; transition: opacity 0.15s ease; }
 .table-wrap--busy { opacity: 0.55; }
 
-.req-table { width: 100%; min-width: 760px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.req-table { width: 100%; min-width: 940px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
 
 .req-table thead th {
   padding: 10px;
@@ -1652,21 +1729,37 @@ onBeforeUnmount(() => {
 .req-row:hover { background: var(--rb-surface-hover); }
 .req-row.is-mutating { opacity: 0.6; pointer-events: none; }
 
-.c-id { width: 132px; }
-.c-date { width: 106px; }
-.c-component { width: 128px; }
-.c-units { width: 86px; }
-.c-priority { width: 112px; }
-.c-status { width: 156px; }
-.c-actions { width: 226px; }
+.c-id { width: 136px; }
+.id-date { display: none; }
+/* A header never runs into the next one. */
+.req-table thead th { overflow: hidden; text-overflow: ellipsis; }
+.table-skeleton { display: flex; flex-direction: column; gap: 22px; padding: 22px 16px; }
+.c-date { width: 100px; }
+.c-component { width: 100px; }
+.c-units { width: 116px; }
+.c-status { width: 146px; }
+.c-actions { width: 272px; }
 
 /* Narrow panels keep who asked, for whom, how much and where it stands. */
 @container (max-width: 1199px) {
-  .c-component { display: none; }
-}
-
-@container (max-width: 999px) {
+  /* The component stays: what is asked for matters as much as for whom. */
   .c-date { display: none; }
+  .c-id { width: 132px; }
+  .c-component { width: 104px; }
+  .c-units { width: 90px; }
+  .c-status { width: 132px; }
+  .c-actions { width: 280px; }
+  .row-actions { gap: 4px; }
+  .btn-approve { padding: 0 9px; }
+  /* A long hospital name takes two lines rather than an ellipsis. */
+  .c-hospital .strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+  .sub.id-date { display: block; white-space: normal; }
 }
 
 /* The reference opens the review, like the eye. */
@@ -1763,6 +1856,8 @@ onBeforeUnmount(() => {
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
 .row-actions { display: flex; align-items: center; gap: 6px; }
+/* The actions a step clear of the status, aligned with their header. */
+.req-table th.c-actions, .req-table td.c-actions { padding-left: 18px; }
 
 /* Issue: the one solid action in a row, because it sends blood out. */
 .btn-issue {
@@ -1792,6 +1887,83 @@ onBeforeUnmount(() => {
 }
 
 .btn-issue--off:hover { background: var(--rb-surface-alt); }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+/* Quick filters: this tab's counts, each a filter. */
+.quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px 0; }
+.quick__chip {
+  --tone: var(--rb-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.quick__chip strong { font-size: 13px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.quick__chip:hover { border-color: color-mix(in srgb, var(--tone) 45%, var(--rb-border)); color: var(--rb-text-primary); }
+.quick__chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.quick__chip--crit { --tone: var(--rb-accent-text); }
+.quick__chip--warn { --tone: var(--rb-warning); }
+.quick__chip--info { --tone: var(--rb-primary); }
+.quick__chip--crit:not(.quick__chip--zero) { border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.07); color: var(--rb-accent-text); font-weight: 600; }
+.quick__chip--crit:not(.quick__chip--zero) strong { color: var(--rb-accent-text); }
+.quick__chip--on { border-color: var(--tone); box-shadow: inset 0 0 0 1px var(--tone); background: color-mix(in srgb, var(--tone) 10%, var(--rb-surface)); color: var(--rb-text-primary); }
+.quick__chip--zero { opacity: 0.6; }
+.quick__chip--go { margin-left: auto; border-color: rgba(var(--rb-primary-rgb), 0.35); color: var(--rb-primary-text); font-weight: 600; }
+.quick__chip--go strong { color: var(--rb-primary-text); }
+.quick__chip--go:hover { background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); }
+
+/* An open emergency is marked down its edge and on a soft tint. */
+.req-row--emergency td { background: rgba(var(--rb-accent-rgb), 0.045); }
+.req-row--emergency td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.req-row--emergency:hover td { background: rgba(var(--rb-accent-rgb), 0.08); }
+/* A finished request steps back. */
+.req-row--closed td { color: var(--rb-text-secondary); }
+.req-row--closed .patient__name, .req-row--closed .strong { font-weight: 500; }
+.req-row--closed .units-bar, .req-row--closed .blood, .req-row--closed .code-chip { opacity: 0.7; }
+
+.chip--crit { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); font-weight: 700; }
+
+/* Units: issued, then reserved, on what was asked for. */
+.units-bar { display: flex; width: 100%; max-width: 88px; height: 6px; margin-bottom: 5px; border-radius: 999px; background: var(--rb-surface-alt); box-shadow: inset 0 0 0 1px var(--rb-border); overflow: hidden; }
+.units-bar__issued { background: var(--rb-success); }
+.units-bar__held { background: var(--rb-primary); }
+.units-text { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.waiting { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
+.waiting--crit { font-weight: 700; color: var(--rb-accent-text); }
+
+/* The next step, in words. */
+.btn-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(var(--rb-success-rgb), 0.45);
+  border-radius: 8px;
+  background: rgba(var(--rb-success-rgb), 0.08);
+  color: var(--rb-success-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.btn-approve:hover:not(:disabled) { background: rgba(var(--rb-success-rgb), 0.16); border-color: var(--rb-success); }
+.btn-approve:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-approve:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.btn-issue--off { width: 30px; padding: 0; justify-content: center; }
 
 /* EMPTY AND LOADING */
 .empty-cell { padding: 0 !important; }

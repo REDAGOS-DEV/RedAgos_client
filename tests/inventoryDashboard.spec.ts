@@ -233,11 +233,15 @@ describe('the inventory page', () => {
     expect(style).not.toMatch(/^\s*:global\(\.dark\)\s+[^\s`]/m)
   })
 
-  it('keeps colour for state only, never as a container background', () => {
+  it('keeps state colours off container backgrounds; actions wear the system blue', () => {
+    // Since 2026-10-24 the actions (buttons, links, the selected type, the
+    // pager) take the app's primary blue, as on every other blood center page.
+    // Green, amber and red still never fill a container.
     const style = page.split('<style')[1] ?? ''
 
-    expect(style).not.toMatch(/background:[^;]*rgba\(var\(--rb-(success|warning|accent|primary|purple|teal)-rgb\)/)
-    expect(style).not.toMatch(/background:\s*var\(--rb-(primary|accent|purple|teal)\)/)
+    expect(style).not.toMatch(/background:[^;]*rgba\(var\(--rb-(success|warning|accent|purple|teal)-rgb\)/)
+    expect(style).not.toMatch(/background:\s*var\(--rb-(accent|purple|teal)\)/)
+    expect(style).toContain('--inv-action: var(--rb-primary)')
   })
 
   it('discards with a stated reason, through a dialog rather than a browser prompt', () => {

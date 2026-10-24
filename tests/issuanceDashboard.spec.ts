@@ -69,7 +69,7 @@ describe('stockWeekChange', () => {
 describe('stockSparkline', () => {
   it('stays inside its box and ends on the last value', () => {
     const spark = stockSparkline([3, 9, 1, 6], 96, 34)!
-    const ys = [...spark.line.matchAll(/[ML][\d.]+,([\d.]+)/g)].map((m) => Number(m[1]))
+    const ys = spark.points.map((p) => p.y)
 
     expect(ys).toHaveLength(4)
     for (const y of ys) {
@@ -82,7 +82,7 @@ describe('stockSparkline', () => {
 
   it('keeps one unit in thousands a flat line, not a cliff', () => {
     const spark = stockSparkline([2725, 2725, 2726], 96, 34)!
-    const ys = [...spark.line.matchAll(/[ML][\d.]+,([\d.]+)/g)].map((m) => Number(m[1]))
+    const ys = spark.points.map((p) => p.y)
 
     expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(1)
   })
