@@ -132,7 +132,7 @@
               <p v-else class="empty">No donations collected in this period.</p>
             </section>
 
-            <!-- Type of donor as a ring, the sexes as one split bar beneath it. -->
+            <!-- Donor status as a ring, the sexes as one split bar beneath it. -->
             <section class="card" aria-labelledby="mix-title">
               <header class="card__head">
                 <h2 id="mix-title" class="card__title">Who donated</h2>
@@ -176,17 +176,18 @@
           <section class="card" aria-labelledby="busy-title">
             <header class="card__head">
               <h2 id="busy-title" class="card__title">Busiest hours at the counter</h2>
-              <span class="card__note">Every arrival, by weekday and hour</span>
+              <span class="card__note">{{ busy.openLabel ? `Open ${busy.openLabel}` : 'Every arrival, by weekday and hour' }}</span>
             </header>
             <template v-if="busy.max">
               <div class="heat" :style="{ '--cols': busy.hours.length }">
                 <span />
-                <span v-for="h in busy.hours" :key="`h${h}`" class="heat__hour">{{ h % 2 === 0 ? hourLabel(h) : '' }}</span>
-                <template v-for="(row, d) in data.busiest" :key="`d${d}`">
+                <span v-for="h in busy.hours" :key="`h${h}`" class="heat__hour">{{ busy.hours.length <= 12 || h % 2 === 0 ? hourLabel(h) : '' }}</span>
+                <template v-for="d in busy.days" :key="`d${d}`">
                   <span class="heat__day">{{ WEEKDAYS[d] }}</span>
                   <span v-for="h in busy.hours" :key="`c${d}-${h}`" class="heat__cell"
-                    :style="{ background: row[h] ? `rgba(var(--rb-primary-rgb), ${0.14 + 0.86 * (row[h] / busy.max)})` : '' }"
-                    :title="`${WEEKDAYS[d]} ${hourLabel(h)}: ${row[h]} arrivals`" />
+                    :class="{ 'heat__cell--closed': !busy.isOpen(d, h) }"
+                    :style="{ backgroundColor: data.busiest[d][h] ? `rgba(var(--rb-primary-rgb), ${0.14 + 0.86 * (data.busiest[d][h] / busy.max)})` : '' }"
+                    :title="`${WEEKDAYS[d]} ${hourLabel(h)}: ${data.busiest[d][h]} arrivals${busy.isOpen(d, h) ? '' : ' (outside opening hours)'}`" />
                 </template>
               </div>
               <dl class="heat__facts">
@@ -336,34 +337,49 @@
         -->
         <section v-if="tab === 'profile'" class="card" aria-labelledby="profile-title">
           <header class="card__head">
-            <h2 id="profile-title" class="card__title">Collection record</h2>
-            <span class="card__note">Donations collected, by donor</span>
+            <div>
+              <h2 id="profile-title" class="card__title">Collection record</h2>
+              <span class="card__note">Donations collected, by donor</span>
+            </div>
+            <!-- The same figures, laid out as the centre's SNBC sheet, ready to submit. -->
+            <button type="button" class="snbc-download" :disabled="snbcBusy" @click="downloadSnbc">
+              <AssetIcon name="file-down" :size="15" />
+              {{ snbcBusy ? 'Preparing…' : 'Download SNBC record (.xlsx)' }}
+            </button>
           </header>
+          <p v-if="snbcError" class="cr__error" role="alert">{{ snbcError }}</p>
           <div v-if="profile.total.total" class="snbc-wrap">
             <table class="snbc">
               <thead>
                 <tr>
-                  <th rowspan="2" class="snbc__month">Month</th>
+                  <th rowspan="3" class="snbc__month">Month</th>
                   <th colspan="2" class="snbc__group">Sex</th>
                   <th :colspan="AGE_COLS.length" class="snbc__group">Age bracket</th>
-                  <th :colspan="TYPE_COLS.length" class="snbc__group">Type of donor</th>
-                  <th :colspan="ARRIVAL_COLS.length" class="snbc__group">Came as</th>
-                  <th rowspan="2" class="snbc__total">Total</th>
+                  <th :colspan="KIND_COLS.length" class="snbc__group">Type of donor</th>
+                  <th :colspan="TYPE_COLS.length" class="snbc__group">Donor status</th>
+                  <th rowspan="3" class="snbc__total">Total</th>
+                </tr>
+                <!-- WALK-IN holds its TS and NTS donors beneath it; the rest span both rows. -->
+                <tr>
+                  <th v-for="c in SEX_COLS" :key="`s${c.key}`" rowspan="2" :class="{ 'snbc__first': c === SEX_COLS[0] }">{{ c.label }}</th>
+                  <th v-for="c in AGE_COLS" :key="`a${c.key}`" rowspan="2" :class="{ 'snbc__first': c === AGE_COLS[0] }">{{ c.label }}</th>
+                  <th colspan="3" class="snbc__first snbc__sub" title="Everyone who came to the centre">Walk-in</th>
+                  <th rowspan="2" :title="KIND_COLS[3].title">{{ KIND_COLS[3].label }}</th>
+                  <th v-for="c in TYPE_COLS" :key="`t${c.key}`" rowspan="2" :class="{ 'snbc__first': c === TYPE_COLS[0] }">{{ c.label }}</th>
                 </tr>
                 <tr>
-                  <th v-for="c in SEX_COLS" :key="`s${c.key}`" :class="{ 'snbc__first': c === SEX_COLS[0] }">{{ c.label }}</th>
-                  <th v-for="c in AGE_COLS" :key="`a${c.key}`" :class="{ 'snbc__first': c === AGE_COLS[0] }">{{ c.label }}</th>
-                  <th v-for="c in TYPE_COLS" :key="`t${c.key}`" :class="{ 'snbc__first': c === TYPE_COLS[0] }">{{ c.label }}</th>
-                  <th v-for="c in ARRIVAL_COLS" :key="`c${c.key}`" :class="{ 'snbc__first': c === ARRIVAL_COLS[0] }">{{ c.label }}</th>
+                  <th v-for="c in KIND_COLS.slice(0, 3)" :key="`k${c.key}`" :class="{ 'snbc__first': c === KIND_COLS[0] }" :title="c.title">{{ c.label }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="row in profileRows" :key="row.month" :class="{ 'snbc__sum': row.month === 'total' }">
-                  <th scope="row" class="snbc__month">{{ row.month === 'total' ? 'Total' : fmtMonth(row.month) }}</th>
+                  <th scope="row" class="snbc__month">
+                    {{ row.month === 'total' ? 'Total' : fmtMonth(row.month) }}
+                  </th>
                   <td v-for="c in SEX_COLS" :key="`s${c.key}`" :class="{ 'snbc__first': c === SEX_COLS[0], 'snbc__zero': !row.sex[c.key] }">{{ row.sex[c.key] }}</td>
                   <td v-for="c in AGE_COLS" :key="`a${c.key}`" :class="{ 'snbc__first': c === AGE_COLS[0], 'snbc__zero': !row.age[c.key] }">{{ row.age[c.key] }}</td>
+                  <td v-for="c in KIND_COLS" :key="`k${c.key}`" :class="{ 'snbc__first': c === KIND_COLS[0], 'snbc__zero': !kindCount(row, c.key) }">{{ kindCount(row, c.key) }}</td>
                   <td v-for="c in TYPE_COLS" :key="`t${c.key}`" :class="{ 'snbc__first': c === TYPE_COLS[0], 'snbc__zero': !row.type[c.key] }">{{ row.type[c.key] }}</td>
-                  <td v-for="c in ARRIVAL_COLS" :key="`c${c.key}`" :class="{ 'snbc__first': c === ARRIVAL_COLS[0], 'snbc__zero': !row.arrival[c.key] }">{{ row.arrival[c.key] }}</td>
                   <td class="snbc__total">{{ row.total }}</td>
                 </tr>
               </tbody>
@@ -374,6 +390,11 @@
             <li v-if="profile.total.sex.not_stated || profile.total.age.not_stated">
               Not counted above: {{ profile.total.sex.not_stated }} with no sex recorded,
               {{ profile.total.age.not_stated }} with no birth date.
+            </li>
+            <li>
+              <strong>Walk-in</strong> counts everyone who came to the centre; among them, <strong>TS</strong> gave for a patient
+              of the same blood type and <strong>NTS</strong> for a patient of another, as picked at the counter.
+              <strong>Mobile drive</strong> counts the donors at drives.
             </li>
             <li>
               <strong>New to centre</strong> donated before, but elsewhere; this was their first time here.
@@ -542,8 +563,18 @@ const TYPE_COLS = [
   { key: 'repeat_retained', label: 'Repeat' },
   { key: 'lapsed', label: 'Lapsed' },
 ]
-const ARRIVAL_COLS = [{ key: 'walk_in', label: 'Walk-in' }, { key: 'booked', label: 'Booked' }, { key: 'drive', label: 'Drive' }]
-const profile = computed(() => data.value?.donor_profile ?? { months: [], total: { total: 0, sex: {}, age: {}, type: {}, arrival: {} }, lapsed_after_days: 365, lapsed_donors: 0 })
+// Type of donor, as the counter picks it. WALK-IN counts everyone who came to
+// the centre, its TS and NTS donors among them; a drive's donors stand apart.
+const KIND_COLS = [
+  { key: 'walk_in_total', label: 'Total', title: 'Everyone who came to the centre, TS and NTS included' },
+  { key: 'ts', label: 'TS', title: 'Type-specific: for a patient of the same blood type' },
+  { key: 'nts', label: 'NTS', title: 'Non-type-specific: for a patient of another blood type' },
+  { key: 'drive', label: 'Mobile drive', title: 'At a mobile blood drive' },
+]
+const kindCount = (row, key) => (key === 'walk_in_total'
+  ? (row.kind?.walk_in ?? 0) + (row.kind?.ts ?? 0) + (row.kind?.nts ?? 0)
+  : row.kind?.[key] ?? 0)
+const profile = computed(() => data.value?.donor_profile ?? { months: [], total: { total: 0, sex: {}, age: {}, type: {}, kind: {} }, lapsed_after_days: 365, lapsed_donors: 0 })
 const profileRows = computed(() => [...profile.value.months, { month: 'total', ...profile.value.total }])
 // Overview: age bars, the type-of-donor ring, the busiest hours.
 const ageBars = computed(() => {
@@ -581,28 +612,57 @@ const typesLabel = computed(() => ringSegments.value.map(s => `${s.label} ${s.co
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const hourLabel = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`
+// The grid covers the centre's opening days and hours (its operating hours and
+// appointment slots), widened only where someone arrived outside them.
 const busy = computed(() => {
   const grid = data.value?.busiest ?? []
+  const open = data.value?.opening_hours ?? { days: [0, 1, 2, 3, 4, 5, 6], from: 7, to: 18, label: null }
   let max = 0
   let total = 0
   let peak = null
-  let first = 7
-  let last = 17
+  let first = open.from
+  let last = open.to - 1
+  const shownDays = new Set(open.days)
   grid.forEach((row, d) => row.forEach((n, h) => {
     total += n
     if (n > max) { max = n; peak = { d, h } }
-    if (n) { first = Math.min(first, h); last = Math.max(last, h) }
+    if (n) { first = Math.min(first, h); last = Math.max(last, h); shownDays.add(d) }
   }))
   const days = grid.map(row => row.reduce((a, b) => a + b, 0))
   const dayMax = Math.max(0, ...days)
   return {
     max,
     total,
+    days: [...shownDays].sort((a, b) => a - b),
     hours: Array.from({ length: last - first + 1 }, (_, i) => first + i),
+    isOpen: (d, h) => open.days.includes(d) && h >= open.from && h < open.to,
+    openLabel: open.label,
     peak: peak ? `${WEEKDAYS[peak.d]}, ${hourLabel(peak.h)} to ${hourLabel(peak.h + 1)}` : '',
     day: dayMax ? ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'][days.indexOf(dayMax)] : '',
   }
 })
+
+// The collection record as the centre's SNBC Excel sheet, for the period on screen.
+const snbcBusy = ref(false)
+const snbcError = ref('')
+async function downloadSnbc() {
+  if (!data.value) return
+  snbcBusy.value = true
+  snbcError.value = ''
+  try {
+    const blob = await bloodCenterService.snbcRecord({ from: data.value.period.from, to: data.value.period.to })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `redagos-snbc-record-${data.value.period.from}-to-${data.value.period.to}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    snbcError.value = err?.message || 'The SNBC record could not be downloaded. Please try again.'
+  } finally {
+    snbcBusy.value = false
+  }
+}
 
 const fmtMonth = m => new Date(`${m}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 const maxModule = computed(() => Math.max(1, ...(data.value?.activity?.by_module ?? []).map(m => m.count)))
@@ -715,14 +775,16 @@ function exportCsv() {
       rows.push([], ['Age bracket', 'Donations'])
       AGE_COLS.forEach(c => rows.push([c.label, d.donor_profile.total.age[c.key]]))
       rows.push([], ['Type of donor', 'Donations'])
+      KIND_COLS.forEach(c => rows.push([c.key === 'walk_in_total' ? 'Walk-in' : c.label, kindCount(d.donor_profile.total, c.key)]))
+      rows.push([], ['Donor status', 'Donations'])
       TYPE_COLS.forEach(c => rows.push([c.label, d.donor_profile.total.type[c.key]]))
-      rows.push([], ['Hour', ...WEEKDAYS])
-      busy.value.hours.forEach(h => rows.push([hourLabel(h), ...d.busiest.map(row => row[h])]))
+      rows.push([], ['Hour', ...busy.value.days.map(day => WEEKDAYS[day])])
+      busy.value.hours.forEach(h => rows.push([hourLabel(h), ...busy.value.days.map(day => d.busiest[day][h])]))
     } else if (tab.value === 'profile') {
-      const cols = [...SEX_COLS.map(c => ['sex', c]), ...AGE_COLS.map(c => ['age', c]), ...TYPE_COLS.map(c => ['type', c]), ...ARRIVAL_COLS.map(c => ['arrival', c])]
-      rows.push([], ['Collection record'], ['', 'Sex', '', 'Age bracket', '', '', '', '', 'Type of donor', '', '', '', 'Came as', '', '', ''])
-      rows.push(['Month', ...cols.map(([, c]) => c.label), 'Total'])
-      profileRows.value.forEach(r => rows.push([r.month === 'total' ? 'Total' : fmtMonth(r.month), ...cols.map(([g, c]) => r[g][c.key]), r.total]))
+      const cols = [...SEX_COLS.map(c => ['sex', c]), ...AGE_COLS.map(c => ['age', c]), ...KIND_COLS.map(c => ['kind', c]), ...TYPE_COLS.map(c => ['type', c])]
+      rows.push([], ['Collection record'], ['', 'Sex', '', 'Age bracket', '', '', '', '', 'Type of donor', '', '', '', 'Donor status', '', '', ''])
+      rows.push(['Month', ...cols.map(([g, c]) => (g === 'kind' && c.key === 'walk_in_total' ? 'Walk-in' : c.label)), 'Total'])
+      profileRows.value.forEach(r => rows.push([r.month === 'total' ? 'Total' : fmtMonth(r.month), ...cols.map(([g, c]) => (g === 'kind' ? kindCount(r, c.key) : r[g]?.[c.key] ?? 0)), r.total]))
       rows.push([], ['No sex recorded', d.donor_profile.total.sex.not_stated], ['No birth date recorded', d.donor_profile.total.age.not_stated])
     } else {
       rows.push([], ['Reason', 'Deferrals'])
@@ -947,6 +1009,8 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
 .heat__day { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
 .heat__cell { height: 26px; border-radius: 6px; background: rgba(var(--rb-primary-rgb), 0.05); box-shadow: inset 0 0 0 1px rgba(var(--rb-primary-rgb), 0.06); transition: transform 0.12s ease; }
 .heat__cell:hover { transform: scale(1.08); }
+/* Outside opening hours: shown only because someone arrived then. */
+.heat__cell--closed { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(127, 127, 127, 0.14) 4px 5px); }
 .heat__facts { display: flex; gap: 32px; margin: 4px 0 0; padding-top: 14px; border-top: 1px solid var(--rb-border); }
 .heat__facts div { display: flex; flex-direction: column; gap: 2px; }
 .heat__facts dt { font-size: 12px; color: var(--rb-text-secondary); }
@@ -956,6 +1020,24 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
 }
 
 /* The collection record: the paper sheet's grouped header, as a table. */
+.snbc-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--rb-primary);
+  border-radius: 8px;
+  background: var(--rb-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+.snbc-download:hover:not(:disabled) { background: var(--rb-primary-hover, var(--rb-primary)); }
+.snbc-download:active:not(:disabled) { transform: translateY(1px); }
+.snbc-download:disabled { opacity: 0.6; cursor: default; }
 .snbc-wrap { overflow-x: auto; margin: 4px -4px 0; padding: 0 4px; }
 .snbc { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .snbc th, .snbc td { padding: 10px 12px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--rb-border); }
@@ -971,6 +1053,7 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
   border-left: 1px solid var(--rb-border);
 }
 .snbc__first { border-left: 1px solid var(--rb-border); }
+.snbc .snbc__sub { padding-top: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(var(--rb-primary-rgb), 0.25); font-weight: 700; color: var(--rb-text-primary); }
 .snbc .snbc__month { text-align: left; font-weight: 600; color: var(--rb-text-primary); }
 .snbc thead .snbc__month { color: var(--rb-text-secondary); }
 .snbc .snbc__total { border-left: 1px solid var(--rb-border); font-weight: 700; color: var(--rb-text-primary); }

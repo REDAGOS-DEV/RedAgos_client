@@ -37,6 +37,10 @@
           <span class="fact__label">Donation</span>
           <span class="pill" :class="donationPillClass">{{ donation?.status_label || 'Not opened' }}</span>
         </div>
+        <div v-if="donation?.donation_type" class="fact">
+          <span class="fact__label">Type</span>
+          <span class="pill pill--kind">{{ donation.donation_type_label }}</span>
+        </div>
       </div>
 
       <button type="button" class="btn" :disabled="busy" @click="finishVisit">
@@ -329,6 +333,22 @@
         </template>
       </p>
 
+      <!-- The type of donation: the TYPE OF DONOR on the collection record. -->
+      <fieldset v-if="canRegister" class="dtype">
+        <legend class="dtype__legend">Type of donation</legend>
+        <div class="dtype__choices" role="radiogroup" aria-label="Type of donation">
+          <button v-for="t in DONATION_TYPES" :key="t.value" type="button" role="radio" class="dtype__choice"
+            :class="{ 'dtype__choice--on': donationType === t.value }" :aria-checked="donationType === t.value"
+            @click="donationType = t.value">
+            <span class="dtype__radio" aria-hidden="true" />
+            <span class="dtype__text">
+              <strong>{{ t.label }}</strong>
+              <small>{{ t.hint }}</small>
+            </span>
+          </button>
+        </div>
+      </fieldset>
+
       <div class="actions">
         <button
           v-if="appointment && appointment.status === 'scheduled'"
@@ -340,7 +360,7 @@
           Check in
         </button>
 
-        <button v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="openDonation">
+        <button v-if="canRegister" type="button" class="btn btn--primary" :disabled="busy" @click="startDonation">
           {{ busy ? 'Working…' : 'Open donation' }}
         </button>
 
@@ -775,6 +795,19 @@ const {
   loadQuestionnaire, adoptQuestionnaireReference,
   verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
 } = useDonationTransaction()
+
+// The type of donation (Stage 2), a walk-in unless the counter picks otherwise.
+const DONATION_TYPES = [
+  { value: 'walk_in', label: 'Walk-in', hint: 'Voluntary, for no patient in particular' },
+  { value: 'ts', label: 'TS', hint: 'Type-specific: for a patient of the same blood type' },
+  { value: 'nts', label: 'NTS', hint: 'Non-type-specific: for a patient of another blood type' },
+]
+const donationType = ref('walk_in')
+watch(() => donor.value?.uuid, () => { donationType.value = 'walk_in' })
+
+function startDonation() {
+  openDonation({ donation_type: donationType.value })
+}
 
 const dhqOnFile = computed(() => questionnaireOnFile(questionnaireMeta.value))
 
@@ -1820,6 +1853,43 @@ function finishVisit() {
 
 /* --- actions --- */
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* The type of donation */
+.dtype { margin: 0 0 16px; padding: 0; border: 0; }
+.dtype__legend { margin-bottom: 8px; padding: 0; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+.dtype__choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dtype__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--rb-border-strong, var(--rb-border));
+  border-radius: 12px;
+  background: var(--rb-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dtype__choice:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.dtype__choice--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.06); box-shadow: inset 0 0 0 1px var(--rb-primary); }
+.dtype__choice:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.dtype__radio {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 2px solid var(--rb-border-strong, var(--rb-border));
+  border-radius: 999px;
+}
+.dtype__choice--on .dtype__radio { border-color: var(--rb-primary); box-shadow: inset 0 0 0 3px var(--rb-surface); background: var(--rb-primary); }
+.dtype__text { display: flex; flex-direction: column; gap: 2px; }
+.dtype__text strong { font-size: 14px; color: var(--rb-text-primary); }
+.dtype__text small { font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
+.pill--kind { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text, var(--rb-primary)); }
+@media (prefers-reduced-motion: reduce) {
+  .dtype__choice { transition: none; }
+}
 
 .btn {
   display: inline-flex;

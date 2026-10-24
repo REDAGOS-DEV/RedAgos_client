@@ -66,6 +66,12 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/reports/collection`, 'GET', params)
   }
 
+  /** The same period's collection record as the centre's SNBC Excel sheet (.xlsx). */
+  async snbcRecord(params: { from: string, to: string }): Promise<Blob> {
+    const query = new URLSearchParams(params).toString()
+    return this.requestBlob(`${this.resource}/reports/collection/snbc-record?${query}`)
+  }
+
   /** The Admin's dashboard: role coverage, the team, the setup, recent changes. */
   async adminOverview(): Promise<any> {
     return this.request(`${this.resource}/admin-overview`, 'GET')

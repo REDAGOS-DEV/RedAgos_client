@@ -428,12 +428,14 @@ export function useDonationTransaction() {
     return true
   }
 
-  async function openDonation() {
+  /** `extra`: what the counter adds when opening, such as the donation_type (walk_in, ts, nts). */
+  async function openDonation(extra: Record<string, unknown> = {}) {
     if (!donor.value) return false
 
     const result = await run(() => service.openDonation({
       donor_uuid: donor.value!.uuid,
       ...(appointment.value ? { appointment_id: appointment.value.id } : {}),
+      ...extra,
     }))
 
     if (!result) return false
