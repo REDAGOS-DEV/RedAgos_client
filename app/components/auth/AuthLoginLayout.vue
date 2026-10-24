@@ -1,26 +1,29 @@
 <template>
   <!--
-    Ang usa ka sign-in screen para sa upat ka portal (donor, hospital, blood
-    center, admin). Ang page kay mohatag ra sa `portal`, title, subtitle, ug
-    ang footer (slot). Ang license field ug ang "or sign in as" kay automatic
-    base sa portal. Ang frame ug ang styles kay sa AuthShell.
+    One sign-in screen for everyone (project owner, 2026-10-24): donors, blood
+    center staff and hospital blood banks sign in as a User, and the server
+    sends each to their own portal by the roles on the account (a sign-in
+    that names no role, AuthService::guardUnifiedSignIn). Administrators pick
+    Admin at the foot of the form. No DOH license is asked for any more.
+
+    Fits the window: the page never scrolls (AuthShell `fit`).
   -->
-  <AuthShell :hero="hero">
+  <AuthShell :hero="hero" fit>
     <header class="au-header">
-      <!-- Admin only: says plainly that this is the privileged portal. -->
-      <p v-if="restricted" class="au-badge">
+      <!-- Admin only: says plainly that this is the privileged sign-in. -->
+      <p v-if="mode === 'admin'" class="au-badge">
         <AssetIcon name="shield-check" :size="14" />
         Restricted access
       </p>
-      <h1>{{ title }}</h1>
-      <p>{{ subtitle }}</p>
+      <h1>{{ copy.title }}</h1>
+      <p>{{ copy.subtitle }}</p>
     </header>
 
     <form class="au-form" @submit.prevent="login">
       <!-- Text, not email: the server also takes a donor code (from the blood
            center desk's sign-in) or a username. -->
       <div class="au-field">
-        <label for="email">{{ portal === 'donor' ? 'Email or donor code' : 'Email or username' }}</label>
+        <label for="email">{{ mode === 'user' ? 'Email, username or donor code' : 'Email or username' }}</label>
         <div class="au-input">
           <AssetIcon name="mail" :size="18" class="au-icon" />
           <input
@@ -31,7 +34,7 @@
             autocapitalize="none"
             spellcheck="false"
             :class="{ typed: typed.email }"
-            :placeholder="portal === 'donor' ? 'you@example.com or DONOR-000123' : 'you@example.com'"
+            :placeholder="mode === 'user' ? 'you@example.com or DONOR-000123' : 'you@example.com'"
             required
             autocomplete="username"
           >
@@ -67,24 +70,6 @@
         </div>
       </div>
 
-      <!-- Blood center ug hospital ra: gipangayo ang DOH license sa sign-in. -->
-      <div v-if="requiresLicense" class="au-field">
-        <label for="license-number">DOH license number</label>
-        <div class="au-input">
-          <AssetIcon name="id-card" :size="18" class="au-icon" />
-          <input
-            id="license-number"
-            v-model="licenseNumber"
-            type="text"
-            :class="{ typed: typed.licenseNumber }"
-            placeholder="e.g. DOH-BC-00123"
-            required
-            :aria-describedby="licenseHint ? 'license-hint' : undefined"
-          >
-        </div>
-        <p v-if="licenseHint" id="license-hint" class="au-hint">{{ licenseHint }}</p>
-      </div>
-
       <SessionExpiredNotice />
 
       <LoginAlert
@@ -105,29 +90,42 @@
           :size="18"
           :class="{ 'au-spinner': loading }"
         />
-        {{ loading ? 'Signing in...' : 'Sign In' }}
+        {{ loading ? 'Signing in...' : (mode === 'admin' ? 'Sign In as Admin' : 'Sign In') }}
       </button>
 
-      <template v-if="otherPortals.length">
-        <div class="au-divider"><span>or sign in as</span></div>
+      <!-- Who is signing in, laid out as the old "or sign in as" row. -->
+      <div class="au-divider"><span id="login-as">Log in as</span></div>
 
-        <div class="au-roles">
-          <NuxtLink
-            v-for="other in otherPortals"
-            :key="other.key"
-            :to="other.to"
-            class="au-role"
-            :class="`au-role--${other.key}`"
-          >
-            <AssetIcon :name="other.icon" :size="18" class="au-role-icon" />
-            {{ other.label }}
-          </NuxtLink>
-        </div>
-      </template>
+      <div class="au-roles au-roles--compact" role="radiogroup" aria-labelledby="login-as">
+        <button
+          v-for="option in MODES"
+          :key="option.value"
+          type="button"
+          role="radio"
+          class="au-role"
+          :class="[`au-role--${option.value}`, { 'au-role--on': mode === option.value }]"
+          :aria-checked="mode === option.value"
+          :disabled="loading"
+          @click="setMode(option.value)"
+        >
+          <AssetIcon :name="option.icon" :size="16" class="au-role-icon" />
+          {{ option.label }}
+        </button>
+      </div>
     </form>
 
     <div class="au-footer">
-      <slot name="footer" />
+      <p v-if="mode === 'user'" class="signup-text">
+        New donor?
+        <NuxtLink to="/auth/donor/register">Register now</NuxtLink>
+        <span class="au-footer__note">Blood center and hospital accounts are set up by a RedAgos administrator.</span>
+      </p>
+      <!-- Walay self-registration ang admin: ang bag-ong admin account kay
+           gihimo ra sa naa nang admin pinaagi sa POST /users. -->
+      <p v-else class="signup-text">
+        For authorized RedAgos administrators only. New administrator accounts are created by an existing
+        administrator.
+      </p>
     </div>
   </AuthShell>
 </template>
@@ -138,73 +136,55 @@ import type { AuthHero } from '~/components/auth/AuthShell.vue'
 import SessionExpiredNotice from '~/components/auth/SessionExpiredNotice.vue'
 import LoginAlert from '~/components/auth/LoginAlert.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import type { PortalKey } from '~/composables/useAuthLogin'
 import { authPhoto } from '~/utils/authPhotos'
 
-const props = defineProps<{
-  portal: PortalKey
-  title: string
-  subtitle: string
-  /** Text below the DOH license field. Only shown on portals that ask for it. */
-  licenseHint?: string
-  /** Marks the privileged portal (admin) with a "Restricted access" badge. */
-  restricted?: boolean
-}>()
+type LoginMode = 'user' | 'admin'
 
-// Ang brand panel (headline, description, litrato) kay para sa matag portal:
-// ang copy kay naghisgot sa unsa ang naghulat sa user sulod, base sa mga
-// page nga naa gyud sa portal. Ang litrato kay parehas sa landing page.
-const HERO: Record<PortalKey, AuthHero> = {
-  'donor': {
-    // Appointments, Eligibility, QR Code ug History: tanan naa sa donor portal.
-    lead: 'Your next donation',
-    accent: 'starts here',
-    desc: "Book your next donation, check if you're eligible, and show your QR code at the blood center. Your donation history stays in one place.",
-    ...authPhoto('screening'),
+const props = withDefaults(defineProps<{
+  /** Which sign-in the screen opens on. */
+  initialMode?: LoginMode
+}>(), {
+  initialMode: 'user',
+})
+
+const MODES: Array<{ value: LoginMode; label: string; icon: string }> = [
+  { value: 'user', label: 'User', icon: 'user' },
+  { value: 'admin', label: 'Admin', icon: 'shield-check' },
+]
+
+const mode = ref<LoginMode>(props.initialMode)
+
+const COPY: Record<LoginMode, { title: string; subtitle: string; hero: AuthHero }> = {
+  user: {
+    title: 'Welcome to RedAgos',
+    subtitle: 'Sign in to your donor, blood center or hospital account',
+    hero: {
+      lead: 'Give blood,',
+      accent: 'save lives',
+      desc: "Davao City's blood bank platform, connecting donors, hospitals, and blood centers.",
+      ...authPhoto('donation'),
+    },
   },
-  'hospital': {
-    lead: 'Blood for your patients,',
-    accent: 'on request',
-    desc: 'Check availability, submit requests, and track every unit until it arrives.',
-    ...authPhoto('hospital'),
-  },
-  'blood-center': {
-    lead: 'Every unit, from',
-    accent: 'collection to dispatch',
-    desc: 'Manage testing, storage, and hospital requests in one place.',
-    ...authPhoto('microscope'),
-  },
-  'admin': {
-    lead: 'RedAgos',
-    accent: 'administration',
-    desc: 'Manage facilities, accounts, and donor identity checks.',
-    ...authPhoto('lab'),
+  admin: {
+    title: 'Administrator Sign In',
+    subtitle: 'Manage facilities, users, and the rest of the system',
+    hero: {
+      lead: 'RedAgos',
+      accent: 'administration',
+      desc: 'Manage facilities, accounts, and donor identity checks.',
+      ...authPhoto('lab'),
+    },
   },
 }
-const hero = computed(() => HERO[props.portal])
+const copy = computed(() => COPY[mode.value])
+const hero = computed(() => copy.value.hero)
 
-// Ang "or sign in as" kay para sa donor, hospital ug blood center ra.
-// Ang admin login kay wala gi-link gikan sa ubang portal, so wala pud dinhi.
-const SWITCHABLE = [
-  { key: 'donor', label: 'Donor', icon: 'blood-drop', to: '/auth/donor/login' },
-  { key: 'hospital', label: 'Hospital', icon: 'hospital', to: '/auth/hospital/login' },
-  { key: 'blood-center', label: 'Blood Center', icon: 'building-2', to: '/auth/blood-center/login' },
-] as const
-
-const otherPortals = computed(() =>
-  SWITCHABLE.some(p => p.key === props.portal)
-    ? SWITCHABLE.filter(p => p.key !== props.portal)
-    : [],
-)
-
-// Ang tibuok sign-in flow kay sa useAuthLogin na. Ang layout ra ang
-// gipaambit dinhi; ang role, redirect ug forgot-password path kay
-// gikan gihapon sa portal config.
+// The whole sign-in flow lives in useAuthLogin; it follows the mode picked
+// here (a User sign-in names no role, an Admin one names admin).
+const portal = computed(() => (mode.value === 'admin' ? 'admin' : 'user'))
 const {
   email,
   password,
-  licenseNumber,
-  requiresLicense,
   showPassword,
   loading,
   errorMessage,
@@ -219,5 +199,12 @@ const {
   login,
   resendVerification,
   goToForgotPassword,
-} = useAuthLogin(props.portal)
+  clearError,
+} = useAuthLogin(portal)
+
+function setMode(next: LoginMode) {
+  if (mode.value === next) return
+  mode.value = next
+  clearError()
+}
 </script>

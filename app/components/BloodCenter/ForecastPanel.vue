@@ -234,35 +234,112 @@
       </section>
 
       <!-- ── Testing ── -->
+      <!--
+        What comes to the bench and what it may find (2026-10-24): the samples
+        a week and the reactive panels among them, from the panels read here,
+        the week ahead day by day with who is booked.
+      -->
       <section v-if="data.testing" class="fc__part" aria-labelledby="fc-testing">
         <h2 id="fc-testing" class="fc__title">Samples to test</h2>
-        <div class="fc__kpis fc__kpis--3">
-          <div class="kpi">
+
+        <div class="outlook outlook--calm" role="status">
+          <span class="outlook__icon"><AssetIcon name="flask-conical" :size="20" /></span>
+          <div class="outlook__body">
+            <p class="outlook__title">{{ testingOutlook.title }}</p>
+            <p class="outlook__text">{{ testingOutlook.text }}</p>
+          </div>
+        </div>
+
+        <div class="fc__kpis">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+              <!-- The twelve weeks behind, as a small curve. -->
+              <svg class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.testing.samples.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.testing.samples.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Samples a week</span>
             <span class="kpi__value">{{ num(data.testing.samples.per_week) }}</span>
-            <span class="kpi__note">Range {{ data.testing.samples.low }} to {{ data.testing.samples.high }} <TrendChip :value="data.testing.samples.trend" /></span>
+            <span class="kpi__note">
+              <template v-if="data.testing.samples.high">Range {{ data.testing.samples.low }} to {{ data.testing.samples.high }} <TrendChip :value="data.testing.samples.trend" /></template>
+              <template v-else>No samples in 12 weeks</template>
+            </span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="calendar" :size="18" /></span>
+              <!-- The seven days: expected, and booked inside it. -->
+              <span class="kpi__days" aria-hidden="true">
+                <span v-for="d in data.testing.days" :key="d.date" class="kpi__day">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(d.expected, dayTop))}%` }" />
+                  <span v-if="d.booked" class="kpi__day-booked" :style="{ height: `${pct(d.booked, dayTop)}%` }" />
+                </span>
+              </span>
+            </span>
+            <span class="kpi__label">Next 7 days</span>
+            <span class="kpi__value">{{ num(weekExpected) }}</span>
+            <span class="kpi__note">{{ weekBooked }} donors booked</span>
+          </div>
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="clock" :size="18" /></span>
+              <!-- The same week, the busiest day picked out. -->
+              <span class="kpi__days" aria-hidden="true">
+                <span v-for="d in data.testing.days" :key="d.date" class="kpi__day" :class="{ 'kpi__day--top': busiestDay && d.date === busiestDay.date }">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(d.expected, dayTop))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Busiest day ahead</span>
             <span class="kpi__value kpi__value--text">{{ busiestDay ? dayName(busiestDay.date) : '—' }}</span>
             <span class="kpi__note">{{ busiestDay ? `About ${num(busiestDay.expected)} samples` : 'No samples expected' }}</span>
           </div>
-          <div class="kpi">
-            <span class="kpi__label">Next 7 days</span>
-            <span class="kpi__value">{{ num(weekExpected) }}</span>
-            <span class="kpi__note">Samples expected in all</span>
+          <div v-if="data.testing.reactive" class="kpi kpi--icon" :class="{ 'kpi--alert': data.testing.reactive.found }">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="circle-alert" :size="18" /></span>
+              <svg class="kpi__spark" :class="{ 'kpi__spark--alert': data.testing.reactive.found }" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.testing.reactive.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.testing.reactive.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
+            <span class="kpi__label">Reactive panels a week</span>
+            <span class="kpi__value">{{ num(data.testing.reactive.per_week) }}</span>
+            <span class="kpi__note">
+              {{ data.testing.reactive.rate === null ? 'No panels read in 12 weeks' : `${data.testing.reactive.rate}% of ${data.testing.reactive.panels} panels in 12 weeks` }}
+            </span>
           </div>
         </div>
-        <article class="card">
-          <header class="card__head"><h3 class="card__title">The week ahead, day by day</h3><span class="card__note">Each weekday's average, and who is booked</span></header>
-          <div class="days">
-            <div v-for="d in data.testing.days" :key="d.date" class="day">
-              <span class="day__value">{{ num(d.expected) }}</span>
-              <span class="day__track"><span class="day__bar" :style="{ height: `${pct(d.expected, maxOf(data.testing.days, 'expected'))}%` }" /></span>
-              <span class="day__name">{{ dayName(d.date) }}</span>
-              <span class="day__booked">{{ d.booked }} booked</span>
+
+        <div class="fc__grid">
+          <article class="card">
+            <header class="card__head"><h3 class="card__title">Samples, week by week</h3><span class="card__note">Dashed: the forecast</span></header>
+            <ForecastWeekChart :series="data.testing.samples.series" :estimate="data.testing.samples" :weeks="data.weeks" :horizon="data.horizon" unit="samples" />
+          </article>
+          <article class="card">
+            <header class="card__head"><h3 class="card__title">The week ahead, day by day</h3><span class="card__note">Expected, and who is booked</span></header>
+            <div class="days">
+              <div v-for="d in data.testing.days" :key="d.date" class="day" :class="{ 'day--top': busiestDay && d.date === busiestDay.date }">
+                <span class="day__value">{{ num(d.expected) }}</span>
+                <span class="day__track">
+                  <span class="day__bar" :style="{ height: `${pct(d.expected, dayTop)}%` }" />
+                  <span v-if="d.booked" class="day__booked-bar" :style="{ height: `${pct(d.booked, dayTop)}%` }" />
+                </span>
+                <span class="day__name">{{ weekdayOf(d.date) }}</span>
+                <span class="day__date">{{ shortDate(d.date) }}</span>
+                <span class="day__booked">{{ d.booked }} booked</span>
+              </div>
             </div>
-          </div>
+          </article>
+        </div>
+
+        <article v-if="data.testing.reactive" class="card">
+          <header class="card__head">
+            <h3 class="card__title">Reactive panels, week by week</h3>
+            <span class="card__note">{{ data.testing.reactive.found }} in 12 weeks · dashed: the forecast</span>
+          </header>
+          <ForecastWeekChart :series="data.testing.reactive.series" :estimate="data.testing.reactive" :weeks="data.weeks" :horizon="data.horizon" unit="reactive panels" tone="alert" compact />
         </article>
       </section>
 
@@ -324,6 +401,7 @@ import { computed, defineComponent, h, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import ForecastWeekChart from '~/components/BloodCenter/ForecastWeekChart.vue'
+import { smoothPath } from '~/utils/smoothPath'
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const STATUS = { short: 'Short', watch: 'Watch', ok: 'Enough' }
@@ -363,6 +441,37 @@ const busiestDay = computed(() => {
   return top && top.expected > 0 ? top : null
 })
 const weekExpected = computed(() => (data.value?.testing?.days ?? []).reduce((n, d) => n + d.expected, 0))
+/** A small curve of a week-by-week series, for a headline. */
+function sparkOf(series = []) {
+  const n = series.length
+  if (n < 2) return { line: '', area: '' }
+  const top = Math.max(1, ...series)
+  const points = series.map((v, i) => ({ x: (i / (n - 1)) * 120, y: 36 - ((v || 0) / top) * 32 }))
+  const line = smoothPath(points)
+  return { line, area: `${line} L120,40 L0,40 Z` }
+}
+
+const weekdayOf = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short' })
+const weekBooked = computed(() => (data.value?.testing?.days ?? []).reduce((n, d) => n + d.booked, 0))
+// One scale for the expected and the booked, so a day booked past its average shows it.
+const dayTop = computed(() => Math.max(0.0001, ...(data.value?.testing?.days ?? []).flatMap(d => [d.expected, d.booked])))
+
+// Testing, said in one line: what comes in, and what may be found.
+const testingOutlook = computed(() => {
+  const t = data.value?.testing
+  if (!t) return { title: '', text: '' }
+  const perWeek = num(t.samples.per_week)
+  const reactive = t.reactive
+  if (!t.samples.per_week && !reactive?.panels) {
+    return { title: 'Nothing to forecast from yet', text: 'No samples reached the bench in the last 12 weeks. The forecast fills in as donations are collected.' }
+  }
+  return {
+    title: `About ${perWeek} samples a week${busiestDay.value ? `, busiest on ${dayName(busiestDay.value.date)}` : ''}`,
+    text: reactive?.rate !== null && reactive?.rate !== undefined
+      ? `At the last 12 weeks' rate (${reactive.rate}%), expect about ${num(reactive.per_week)} reactive panels a week, each a referral to follow up.`
+      : 'No serology panels were read in the last 12 weeks to set a reactive rate.',
+  }
+})
 
 // The change of the last four weeks against the four before.
 const TrendChip = defineComponent({
@@ -500,13 +609,18 @@ html.dark .pill--ok { color: #4ADE80; }
 .bar__track > span { display: block; height: 100%; border-radius: 999px; background: var(--rb-primary); }
 .bar__value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
 
-.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; height: 220px; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; height: 236px; }
 .day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .day__value { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 .day__track { position: relative; flex: 1; width: 100%; max-width: 56px; border-radius: 12px; background: rgba(var(--rb-primary-rgb), 0.06); overflow: hidden; }
-.day__bar { position: absolute; inset: auto 0 0; border-radius: 12px; background: var(--rb-primary); }
+.day__bar { position: absolute; inset: auto 0 0; border-radius: 12px; background: color-mix(in srgb, var(--rb-primary) 55%, transparent); }
+/* Who is booked, a darker core inside the expected. */
+.day__booked-bar { position: absolute; inset: auto 22% 0; border-radius: 8px 8px 12px 12px; background: var(--rb-primary); }
+.day--top .day__bar { background: color-mix(in srgb, var(--rb-primary) 75%, transparent); }
+.day--top .day__name { color: var(--rb-primary-text); }
 .day__name { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
 .day__booked { font-size: 11.5px; color: var(--rb-text-secondary); }
+.day__date { margin-top: -4px; font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
 
 /* ===== Refresh (project owner, 2026-10-24) ===== */
 .outlook { --tone: var(--rb-success); --tone-rgb: var(--rb-success-rgb); display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid rgba(var(--tone-rgb), 0.3); border-radius: 16px; background: rgba(var(--tone-rgb), 0.06); }
@@ -518,6 +632,17 @@ html.dark .pill--ok { color: #4ADE80; }
 .outlook__text { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 
 .kpi--icon { position: relative; padding-top: 16px; }
+.kpi__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.kpi__top .kpi__icon { margin-bottom: 0; }
+.kpi__spark { --spark-rgb: var(--rb-primary-rgb); width: 96px; height: 34px; overflow: visible; }
+.kpi__spark--alert { --spark-rgb: var(--rb-accent-rgb); }
+.kpi__spark-area { fill: rgba(var(--spark-rgb), 0.14); }
+.kpi__spark-line { fill: none; stroke: rgb(var(--spark-rgb)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.kpi__days { display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.kpi__day { position: relative; width: 9px; height: 100%; }
+.kpi__day-exp { position: absolute; inset: auto 0 0; border-radius: 3px 3px 1px 1px; background: rgba(var(--rb-primary-rgb), 0.3); }
+.kpi__day-booked { position: absolute; inset: auto 2px 0; border-radius: 2px 2px 1px 1px; background: var(--rb-primary); }
+.kpi__day--top .kpi__day-exp { background: var(--rb-primary); }
 .kpi__icon { --tone-rgb: var(--rb-primary-rgb); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 6px; border-radius: 10px; background: rgba(var(--tone-rgb), 0.1); color: rgb(var(--tone-rgb)); }
 .kpi--bad .kpi__icon { --tone-rgb: var(--rb-accent-rgb); }
 .kpi--warn .kpi__icon { --tone-rgb: var(--rb-warning-rgb); }

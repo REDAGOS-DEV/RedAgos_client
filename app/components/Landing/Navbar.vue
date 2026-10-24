@@ -27,7 +27,7 @@
       </nav>
 
       <div class="nav-actions">
-        <NuxtLink to="/auth/donor/login" class="btn-ghost">Sign In</NuxtLink>
+        <NuxtLink to="/auth/login" class="btn-ghost">Sign In</NuxtLink>
         <NuxtLink to="/auth/donor/register" class="lp-btn lp-btn--primary lp-btn--sm">Register Now</NuxtLink>
       </div>
 
@@ -76,7 +76,7 @@
             <NuxtLink to="/auth/donor/register" class="lp-btn lp-btn--primary" @click="closeMenu">
               Register Now
             </NuxtLink>
-            <NuxtLink to="/auth/donor/login" class="lp-btn lp-btn--secondary" @click="closeMenu">
+            <NuxtLink to="/auth/login" class="lp-btn lp-btn--secondary" @click="closeMenu">
               Sign In
             </NuxtLink>
           </div>

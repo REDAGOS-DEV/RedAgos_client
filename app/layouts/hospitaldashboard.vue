@@ -444,7 +444,7 @@ const vClickOutside = {
 const handleLogout = async () => {
   try {
     showUserMenu.value = false
-    await logout('/auth/hospital/login')
+    await logout('/auth/login')
   } catch (err) {
     console.error(err)
   }

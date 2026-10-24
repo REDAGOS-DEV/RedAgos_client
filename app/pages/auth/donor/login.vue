@@ -1,20 +1,13 @@
 <template>
-  <AuthLoginLayout
-    portal="donor"
-    title="Welcome, Lifesaver!"
-    subtitle="Sign in to your RedAgos account"
-  >
-    <template #footer>
-      <p class="signup-text">
-        Need an account?
-        <NuxtLink to="/auth/donor/register">
-          Register Now
-        </NuxtLink>
-      </p>
-    </template>
-  </AuthLoginLayout>
+  <div />
 </template>
 
 <script setup>
-import AuthLoginLayout from '~/components/auth/AuthLoginLayout.vue'
+/**
+ * The old per-portal sign-in, kept so bookmarks and links still work: it
+ * opens the one sign-in screen, the page asked for (?redirect) carried along.
+ */
+definePageMeta({
+  middleware: [to => navigateTo({ path: '/auth/login', query: to.query }, { replace: true })],
+})
 </script>

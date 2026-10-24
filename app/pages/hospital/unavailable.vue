@@ -19,7 +19,7 @@
       </p>
 
       <div class="unavailable__actions">
-        <NuxtLink to="/auth/hospital/login" class="unavailable__btn unavailable__btn--primary">
+        <NuxtLink to="/auth/login" class="unavailable__btn unavailable__btn--primary">
           Back to sign in
         </NuxtLink>
         <NuxtLink to="/" class="unavailable__btn">

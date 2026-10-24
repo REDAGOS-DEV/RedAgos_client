@@ -57,10 +57,11 @@ export const FORECAST_ABILITIES = ['inventory.view', 'donations.view', 'lab.reco
 
 /**
  * The abilities that open Reports & Analytics: the centre's reports (the
- * Admin and the Supervisor) and Donor & Collection's. The other departments'
- * reports are still to come; they have the forecast meanwhile.
+ * Admin and the Supervisor), Donor & Collection's, and Testing's (either
+ * section, 2026-10-24). The other departments' reports are still to come;
+ * they have the forecast meanwhile.
  */
-export const REPORTS_ABILITIES = ['reports.view_all', 'donations.view'] as const
+export const REPORTS_ABILITIES = ['reports.view_all', 'donations.view', 'lab.record_serology', 'lab.record_immunohematology'] as const
 
 /**
  * The abilities that open the testing page, which TTI Testing and
@@ -246,7 +247,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
       // The Admin's alone (project owner, 2026-10-21).
       { label: 'Audit Log', path: '/blood-center/audit-log', icon: 'history', requires: 'audit.view', keywords: 'audit log activity history trail who did what sign in login logout failed user action' },
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: REPORTS_ABILITIES, keywords: 'report analytics past period export snbc record collection' },
+      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: REPORTS_ABILITIES, keywords: 'report analytics past period export snbc record collection testing serology reactive typing' },
       // Looking ahead, apart from the reports that look back (project owner, 2026-10-24).
       { label: 'Demand Forecast', path: '/blood-center/forecast', icon: 'trending-up', requires: FORECAST_ABILITIES, keywords: 'forecast demand projection weeks ahead shortage recruit donors workload planning emergency' },
       // These two under Management rather than Stock and Supply (project

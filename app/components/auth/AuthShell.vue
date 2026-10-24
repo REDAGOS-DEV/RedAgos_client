@@ -9,7 +9,7 @@
     unscoped nga style sa ubos, naka-prefix og .auth-shell, para magamit sa
     bisan unsang page nga mosulod sa slot.
   -->
-  <main class="auth-shell">
+  <main class="auth-shell" :class="{ 'auth-shell--fit': fit }">
     <div class="auth-card" :class="{ 'auth-card--wide': wide }">
       <!-- ── Brand panel (desktop) ── -->
       <aside class="au-brand">
@@ -82,10 +82,13 @@ withDefaults(defineProps<{
   backLabel?: string
   /** A wider form column, for long forms like donor registration. */
   wide?: boolean
+  /** Fits the window and never scrolls: the sign-in screen (2026-10-24). */
+  fit?: boolean
 }>(), {
   backTo: '/',
   backLabel: 'Back to home',
   wide: false,
+  fit: false,
 })
 </script>
 
@@ -724,4 +727,64 @@ withDefaults(defineProps<{
   .auth-shell .au-inner { padding: 24px 16px 20px; }
   .auth-shell .au-roles { grid-template-columns: 1fr; }
 }
+
+/* ════════════ Fit: the sign-in screen never scrolls (2026-10-24) ════════════
+   The page is the window's height, the card shrinks to it, and the brand
+   panel's photo gives way first. A phone too short for the form still
+   scrolls inside rather than cutting the Sign In button off. */
+html:has(.auth-shell--fit),
+body:has(.auth-shell--fit) { overflow: hidden; }
+.auth-shell--fit { height: 100dvh; min-height: 0; padding: 20px 24px; overflow: hidden; }
+.auth-shell--fit .auth-card { height: 100%; max-height: 720px; min-height: 0; }
+.auth-shell--fit .au-brand { padding: 30px 36px 0; }
+.auth-shell--fit .au-brand-copy { margin: 28px 0 20px; }
+.auth-shell--fit .au-brand-copy h2 { font-size: clamp(28px, 2.8vw, 38px); }
+.auth-shell--fit .au-brand-photo { min-height: 0; }
+/* `safe`: a form taller than the panel starts below the back link, never under it. */
+.auth-shell--fit .au-panel { align-items: safe center; padding: 64px 48px 28px; overflow-y: auto; }
+.auth-shell--fit .au-header { margin-bottom: 28px; }
+.auth-shell--fit .au-header p { margin-top: 10px; }
+.auth-shell--fit .au-form { gap: 18px; }
+.auth-shell--fit .au-footer { margin-top: 22px; line-height: 1.5; }
+
+/* A shorter window: the fields and the type a step smaller, the spacing kept,
+   so the screen still fits without anything crowding. */
+@media (max-height: 700px) and (min-width: 901px) {
+  .auth-shell--fit { padding: 14px 24px; }
+  .auth-shell--fit .au-brand-copy p { display: none; }
+  .auth-shell--fit .au-panel { padding: 58px 48px 18px; }
+  .auth-shell--fit .au-header { margin-bottom: 22px; }
+  .auth-shell--fit .au-header h1 { font-size: 27px; }
+  .auth-shell--fit .au-header p { margin-top: 8px; font-size: 14px; }
+  .auth-shell--fit .au-form { gap: 16px; }
+  .auth-shell--fit .au-input { height: 44px; }
+  .auth-shell--fit .au-btn { height: 46px; }
+  .auth-shell--fit .au-footer { margin-top: 18px; font-size: 13.5px; }
+}
+@media (max-height: 600px) and (min-width: 901px) {
+  .auth-shell--fit .au-panel { padding-top: 66px; }
+  .auth-shell--fit .au-header { margin-bottom: 18px; }
+  .auth-shell--fit .au-header h1 { font-size: 25px; }
+  .auth-shell--fit .au-form { gap: 13px; }
+  .auth-shell--fit .au-footer { margin-top: 14px; }
+  .auth-shell.auth-shell--fit .au-footer__note { display: none; }
+}
+@media (max-width: 900px) {
+  .auth-shell--fit { padding: 0; }
+  .auth-shell--fit .auth-card { max-height: none; min-height: 0; }
+  .auth-shell--fit .au-panel { height: 100%; padding: 12px 16px 16px; overflow-y: auto; }
+  .auth-shell--fit .au-inner { padding: 24px 20px 22px; }
+  .auth-shell--fit .au-header { margin-bottom: 20px; }
+}
+
+/* Log in as: User or Admin, as role buttons; the one picked in blue. */
+.auth-shell button.au-role { width: 100%; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+/* On the sign-in screen the two are small and side by side, under the divider. */
+.auth-shell .au-roles--compact { display: flex; justify-content: center; gap: 10px; margin-top: -4px; }
+.auth-shell .au-roles--compact .au-role { width: auto; min-width: 116px; height: 38px; padding: 0 16px; gap: 7px; border-radius: 999px; font-size: 13.5px; }
+.auth-shell .au-role--on,
+.auth-shell .au-role--on:hover { border-color: var(--au-accent); background: var(--au-accent-soft); color: var(--au-accent-text); box-shadow: inset 0 0 0 1px var(--au-accent); }
+.auth-shell button.au-role:disabled { cursor: not-allowed; opacity: 0.6; }
+.auth-shell button.au-role:focus-visible { outline: 2px solid var(--au-accent); outline-offset: 2px; }
+.auth-shell .au-footer__note { display: block; margin-top: 8px; font-size: 12.5px; color: var(--au-muted); }
 </style>

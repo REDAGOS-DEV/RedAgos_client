@@ -78,7 +78,7 @@
             Register Now
             <AssetIcon name="arrow-right" :size="16" />
           </NuxtLink>
-          <NuxtLink to="/auth/donor/login" class="lp-btn cta-secondary">Sign In</NuxtLink>
+          <NuxtLink to="/auth/login" class="lp-btn cta-secondary">Sign In</NuxtLink>
         </div>
       </div>
     </div>

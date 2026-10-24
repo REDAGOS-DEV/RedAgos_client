@@ -157,7 +157,7 @@ const scenarios = [
     situation: 'Finding blood for a patient',
     before: ['Phones blood centers one by one to find units', 'No clear view of when the blood will arrive'],
     with: ['Searches availability across partner blood centers', 'Requests online and tracks it until it arrives'],
-    cta: { label: 'Hospital sign in', to: '/auth/hospital/login' },
+    cta: { label: 'Hospital sign in', to: '/auth/login' },
   },
   {
     role: 'Drive Organizer',
@@ -165,7 +165,7 @@ const scenarios = [
     situation: 'Running a mobile blood drive',
     before: ['Announces drives through posters and phone calls', 'Cannot tell how many donors will come'],
     with: ['Posts the drive where donors already look', 'Sees who has registered before the day itself'],
-    cta: { label: 'Blood center sign in', to: '/auth/blood-center/login' },
+    cta: { label: 'Blood center sign in', to: '/auth/login' },
   },
   {
     role: "Patient's Family",

@@ -103,7 +103,12 @@
           </tbody>
 
           <tbody v-else>
-            <tr v-for="row in rows" :key="row.id" class="tti-row">
+            <tr
+              v-for="row in rows"
+              :key="row.id"
+              class="tti-row"
+              :class="{ 'tti-row--verify': row.awaiting_verification, 'tti-row--reactive': !row.awaiting_verification && row.outcome === 'reactive' }"
+            >
               <td class="c-id"><span class="code">{{ row.code }}</span></td>
               <td class="c-bag">
                 <span v-if="row.bag?.barcode" class="bag">{{ row.bag.barcode }}</span>
@@ -179,6 +184,7 @@
                     @click="openEdit(row, 'review')"
                   >
                     <AssetIcon name="shield-check" :size="15" />
+                    <span v-if="row.can?.verify" class="icon-btn__text">Verify</span>
                   </button>
                 </div>
               </td>
@@ -1426,6 +1432,23 @@ onBeforeUnmount(() => {
   .modal-overlay { padding: 10px; align-items: flex-end; }
   .modal-card__footer { flex-wrap: wrap; }
 }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+/* The note: one quiet line of rules, not a banner. */
+.note { padding: 8px 12px; border: 0; border-radius: 10px; background: var(--rb-surface-alt); font-size: 12.5px; color: var(--rb-text-secondary); }
+
+/* A clean marker reads quietly; a reactive one is the only thing in colour. */
+.res--clear { padding-left: 4px; padding-right: 4px; background: transparent; font-weight: 500; color: var(--rb-text-muted); }
+.res--reactive { background: var(--rb-accent); color: #fff; font-weight: 800; }
+
+/* Rows: reactive down the edge; one awaiting the supervisor tinted as well. */
+.tti-row--reactive td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.tti-row--verify td { background: rgba(var(--rb-warning-rgb), 0.06); }
+.tti-row--verify td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
+
+/* The supervisor's action, in words. */
+.c-actions { width: 168px; }
+.icon-btn--review:has(.icon-btn__text) { display: inline-flex; align-items: center; width: auto; gap: 5px; padding: 0 10px; font-size: 12px; font-weight: 700; }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton,

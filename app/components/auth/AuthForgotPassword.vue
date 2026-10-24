@@ -107,6 +107,7 @@ const props = defineProps<{
 
 // The same photo as the portal's sign-in, so the two screens read as one.
 const PHOTO: Record<PortalKey, AuthPhotoKey> = {
+  'user': 'donation',
   'donor': 'screening',
   'hospital': 'hospital',
   'blood-center': 'microscope',
