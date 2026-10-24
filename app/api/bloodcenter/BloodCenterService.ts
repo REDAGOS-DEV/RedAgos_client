@@ -66,6 +66,26 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/reports/collection`, 'GET', params)
   }
 
+  /** When the centre takes bookings: days, hours, places and closed dates (booking.configure). */
+  async bookingSchedule(): Promise<any> {
+    return this.request(`${this.resource}/booking-schedule`, 'GET')
+  }
+
+  async updateBookingSchedule(payload: Record<string, unknown>): Promise<any> {
+    return this.request(`${this.resource}/booking-schedule`, 'PUT', payload)
+  }
+
+  /** The weeks ahead, in the parts the viewer's department plans with. */
+  async forecast(): Promise<any> {
+    return this.request(`${this.resource}/reports/forecast`, 'GET')
+  }
+
+  /** A period's report as a printable PDF: the centre's ('centre') or Donor & Collection's ('collection'). */
+  async reportPdf(kind: 'centre' | 'collection', params: { from: string, to: string }): Promise<Blob> {
+    const query = new URLSearchParams(params).toString()
+    return this.requestBlob(`${this.resource}/reports/${kind}/pdf?${query}`)
+  }
+
   /** The same period's collection record as the centre's SNBC Excel sheet (.xlsx). */
   async snbcRecord(params: { from: string, to: string }): Promise<Blob> {
     const query = new URLSearchParams(params).toString()

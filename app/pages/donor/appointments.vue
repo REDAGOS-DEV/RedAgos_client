@@ -382,13 +382,15 @@
                   type="button"
                   role="radio"
                   class="date-chip"
-                  :class="{ 'date-chip--active': selectedDate === chip.value }"
+                  :class="{ 'date-chip--active': selectedDate === chip.value, 'date-chip--closed': chip.closed }"
                   :aria-checked="selectedDate === chip.value ? 'true' : 'false'"
+                  :disabled="!!chip.closed"
+                  :title="chip.closed || undefined"
                   @click="selectedDate = chip.value"
                 >
                   <span class="date-chip__dow">{{ chip.weekday }}</span>
                   <span class="date-chip__day">{{ chip.day }}</span>
-                  <span class="date-chip__month">{{ chip.month }}</span>
+                  <span class="date-chip__month">{{ chip.closed ? 'Closed' : chip.month }}</span>
                 </button>
               </div>
 
@@ -422,7 +424,8 @@
 
               <div v-else class="drive-state drive-state--flat">
                 <AssetIcon name="calendar" :size="28" class="drive-state__icon" />
-                <p>No time slots set for this date.</p>
+                <p v-if="closedReason(selectedDate)">The centre takes no bookings on this day ({{ closedReason(selectedDate) }}). Please pick another date.</p>
+                <p v-else>No time slots set for this date.</p>
                 <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet. Try another date.</p>
               </div>
             </div>
@@ -1161,11 +1164,37 @@ const dateChips = computed(() => {
       weekday: value === todayValue ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }),
       day: date.getDate(),
       month: date.toLocaleDateString('en-US', { month: 'short' }),
+      closed: closedReason(value),
     }
   })
 })
 
 const selectedIsChip = computed(() => dateChips.value.some(chip => chip.value === selectedDate.value))
+
+// The days the chosen centre takes no bookings: its closed dates, and the
+// weekdays it does not open (its booking schedule, set by the centre).
+function closedReason(value) {
+  const center = selectedCenter.value
+  if (!center || !value) return null
+  const closed = (center.closed_dates || []).find(c => c.date === value)
+  if (closed) return closed.reason || 'Closed'
+  const days = center.open_days
+  if (Array.isArray(days) && days.length) {
+    const [y, m, d] = value.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    if (!days.includes((date.getDay() + 6) % 7)) {
+      return `Closed on ${date.toLocaleDateString('en-US', { weekday: 'long' })}s`
+    }
+  }
+  return null
+}
+
+// A centre picked on a day it is shut moves to its first open day in view.
+watch(selectedCenterId, () => {
+  if (!closedReason(selectedDate.value)) return
+  const open = dateChips.value.find(chip => !chip.closed)
+  if (open) selectedDate.value = open.value
+})
 
 // Morning (una sa 12:00) ug Afternoon. Ang `time` kay H:i gikan sa server.
 const slotGroups = computed(() => {
@@ -2261,6 +2290,12 @@ function goDashboard() {
 
 .date-chip:hover:not(.date-chip--active) {
   border-color: #b9d3ef;
+}
+.date-chip--closed,
+.date-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
 }
 
 .date-chip--active {

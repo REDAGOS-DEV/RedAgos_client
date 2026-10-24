@@ -344,6 +344,20 @@
         <BloodCenterFacilityLogoCard kind="seal" />
         <BloodCenterDonorEmailTemplatesCard />
       </section>
+
+      <!-- BOOKING: when donors can book a visit -->
+      <section v-if="activeTab === 'booking'" class="card">
+        <header class="card__head">
+          <div>
+            <h2 class="card__title">Booking</h2>
+            <p class="card__sub">
+              The days and times donors can book a visit to the centre in the Donor Portal, and how many each slot takes.
+              Mobile drives keep their own hours and capacity.
+            </p>
+          </div>
+        </header>
+        <BloodCenterBookingScheduleCard embedded />
+      </section>
     </div>
 
     <!-- confirm log out -->
@@ -385,6 +399,7 @@ import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
 import BloodCenterDonorEmailTemplatesCard from '~/components/BloodCenter/DonorEmailTemplatesCard.vue'
+import BloodCenterBookingScheduleCard from '~/components/BloodCenter/BookingScheduleCard.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
@@ -463,6 +478,8 @@ const tabs = computed(() => [
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'account', label: 'Account', icon: 'monitor' },
   ...(canDo('center.configure') ? [{ id: 'center', label: 'Blood Center', icon: 'building-2' }] : []),
+  // When donors can book: the Admin's and the Medical Receptionist's (project owner, 2026-10-24).
+  ...(canDo('booking.configure') ? [{ id: 'booking', label: 'Booking', icon: 'calendar' }] : []),
 ])
 
 // ?tab=center opens a tab directly, as the Donors page's email dialog links to

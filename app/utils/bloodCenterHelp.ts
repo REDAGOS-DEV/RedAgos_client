@@ -460,6 +460,23 @@ export const HELP_GUIDES: HelpGuide[] = [
     ],
   },
   {
+    id: 'forecast',
+    title: 'Plan the weeks ahead',
+    department: 'Management',
+    path: '/blood-center/forecast',
+    summary: 'What your department should expect in the next four weeks, from the last twelve: demand, donors to recruit, donations to process, samples to test or billing ahead.',
+    steps: [
+      'Open Demand Forecast. It shows your department\'s part; the Supervisor sees every part.',
+      'Read the figure a week and its range: the range is the lowest and highest of the last four weeks.',
+      'Act on the flags: Short or Watch on stock, Recruit on a blood type that needs more donors.',
+      'The hatched bars are the weeks ahead. Recent weeks count more, so a busy month lifts the forecast.',
+    ],
+    questions: [
+      { q: 'Is the forecast a prediction?', a: 'It is a planning guide: a weighted average of this centre\'s own records, not a model. A sudden emergency will not be in it.' },
+      { q: 'Why is it empty?', a: 'It needs requests or donations in the last twelve weeks. It fills in as the centre records them.' },
+    ],
+  },
+  {
     id: 'centre-settings',
     title: 'Set the centre\'s logos and donor emails',
     department: 'Management',

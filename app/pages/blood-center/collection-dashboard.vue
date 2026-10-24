@@ -48,9 +48,20 @@
         <!--
           ============ YOUR SCREENING QUEUE ============
           For whoever screens (donations.screen): who waits for them now and
-          how today's screening has gone, with the counter one click away.
+          how today's screening has gone, with the counter one click away. The
+          ring is the day's screening done: screened, of everyone who has come.
         -->
         <section v-if="can('donations.screen')" class="queue" aria-labelledby="queue-title">
+          <div class="dial dial--hero" role="img" :aria-label="`${screenedToday} of ${queueTotal} screened today`">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="dial__base" cx="60" cy="60" r="50" />
+              <circle class="dial__arc" cx="60" cy="60" r="50" :style="ringStyle(queueDone, 50)" />
+            </svg>
+            <span class="dial__center">
+              <strong>{{ Math.round(queueDone * 100) }}%</strong>
+              <small>screened</small>
+            </span>
+          </div>
           <div class="queue__main">
             <p class="queue__kicker">Your screening queue</p>
             <h2 id="queue-title" class="queue__title">
@@ -62,25 +73,25 @@
             <p class="queue__sub">
               {{ data.today.donations.screening }} in screening now · {{ plural(data.today.appointments.waiting ?? 0, 'appointment') }} still to arrive
             </p>
+            <dl class="queue__stats">
+              <div>
+                <dt>Screened today</dt>
+                <dd>{{ screenedToday }}</dd>
+              </div>
+              <!-- The deferrals list opens from its own figure. -->
+              <div>
+                <dt>Deferred today</dt>
+                <dd :class="{ 'queue__warn': data.today.donations.deferred }">{{ data.today.donations.deferred }}</dd>
+                <NuxtLink v-if="can('donors.view_clinical')" to="/blood-center/deferrals" class="queue__view">
+                  Deferrals <AssetIcon name="arrow-right" :size="12" />
+                </NuxtLink>
+              </div>
+              <div>
+                <dt>Deferral rate</dt>
+                <dd>{{ deferralRate === null ? '—' : `${deferralRate}%` }}</dd>
+              </div>
+            </dl>
           </div>
-          <dl class="queue__stats">
-            <div>
-              <dt>Screened today</dt>
-              <dd>{{ screenedToday }}</dd>
-            </div>
-            <!-- The deferrals list opens from its own figure. -->
-            <div>
-              <dt>Deferred today</dt>
-              <dd :class="{ 'queue__warn': data.today.donations.deferred }">{{ data.today.donations.deferred }}</dd>
-              <NuxtLink v-if="can('donors.view_clinical')" to="/blood-center/deferrals" class="queue__view">
-                Deferrals <AssetIcon name="arrow-right" :size="12" />
-              </NuxtLink>
-            </div>
-            <div>
-              <dt>Deferral rate</dt>
-              <dd>{{ deferralRate === null ? '—' : `${deferralRate}%` }}</dd>
-            </div>
-          </dl>
           <div class="queue__actions">
             <NuxtLink to="/blood-center/donation" class="btn-primary btn-primary--lg">
               Open donation counter
@@ -93,35 +104,40 @@
         <section aria-labelledby="today-title" class="section">
           <h2 id="today-title" class="section-title">Today at the counter</h2>
 
-          <div class="grid-2">
-            <article class="card">
+          <div class="bento">
+            <!-- Appointments: a ring in the list's colours, the count in its middle. -->
+            <article class="card bento__appts">
               <div class="card__head">
-                <div>
-                  <p class="card__label">Appointments today</p>
-                  <p class="card__value">{{ data.today.appointments.total }}</p>
-                </div>
+                <p class="card__label">Appointments today</p>
                 <NuxtLink v-if="can('appointments.view')" to="/blood-center/appointments" class="card__link">
                   Appointments
                   <AssetIcon name="arrow-right" :size="13" />
                 </NuxtLink>
               </div>
-              <!-- The day's appointments in proportion, in the list's colours. -->
-              <div v-if="data.today.appointments.total" class="share" aria-hidden="true">
-                <span v-for="row in appointmentRows" :key="row.key" class="share__seg" :class="`share__seg--${row.tone}`"
-                  :style="{ flexGrow: row.value }" />
-              </div>
-              <ul class="stat-list">
-                <li v-for="row in appointmentRows" :key="row.key" class="stat-list__row">
-                  <span class="stat-list__label">
-                    <span class="dot" :class="`dot--${row.tone}`" aria-hidden="true" />
-                    {{ row.label }}
+              <div class="donut-row">
+                <div class="dial" role="img" :aria-label="appointmentRows.map(r => `${r.label} ${r.value}`).join(', ')">
+                  <svg viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="dial__base" cx="60" cy="60" r="48" />
+                    <circle v-for="seg in appointmentArcs" :key="seg.key" class="dial__seg" :class="`dial__seg--${seg.tone}`"
+                      cx="60" cy="60" r="48" :style="{ strokeDasharray: `${seg.length} ${RING48 - seg.length}`, strokeDashoffset: -seg.offset }" />
+                  </svg>
+                  <span class="dial__center">
+                    <strong>{{ data.today.appointments.total }}</strong>
+                    <small>booked</small>
                   </span>
-                  <span class="stat-list__value">{{ row.value }}</span>
-                </li>
-              </ul>
+                </div>
+                <ul class="legend-list">
+                  <li v-for="row in appointmentRows" :key="row.key">
+                    <span class="dot" :class="`dot--${row.tone}`" aria-hidden="true" />
+                    <span class="legend-list__label">{{ row.label }}</span>
+                    <span class="legend-list__value">{{ row.value }}</span>
+                  </li>
+                </ul>
+              </div>
             </article>
 
-            <article class="card">
+            <!-- Donor visits: a bar a stage, its count above it. -->
+            <article class="card bento__visits">
               <div class="card__head">
                 <div>
                   <p class="card__label">Donor visits today</p>
@@ -132,17 +148,11 @@
                   <AssetIcon name="arrow-right" :size="13" />
                 </NuxtLink>
               </div>
-              <div v-if="data.today.donations.total" class="share" aria-hidden="true">
-                <span v-for="stage in stageRows" :key="stage.key" class="share__seg" :class="`share__seg--${stage.tone}`"
-                  :style="{ flexGrow: stage.value }" />
-              </div>
-              <ol class="stages stages--flow" aria-label="Where today's visits have got to">
-                <li v-for="stage in stageRows" :key="stage.key" class="stage" :class="`stage--${stage.tone}`">
-                  <span class="stage__value">{{ stage.value }}</span>
-                  <span class="stage__label">
-                    <span class="dot" :class="`dot--${stage.tone}`" aria-hidden="true" />
-                    {{ stage.label }}
-                  </span>
+              <ol class="caps caps--stages" aria-label="Where today's visits have got to">
+                <li v-for="stage in stageRows" :key="stage.key" class="cap" :class="`cap--${stage.tone}`">
+                  <span class="cap__val">{{ stage.value }}</span>
+                  <span class="cap__track"><span class="cap__fill" :style="{ height: capHeight(stage.value, stageMax) }" /></span>
+                  <span class="cap__label">{{ stage.label }}</span>
                 </li>
               </ol>
               <p class="card__note">Each visit is counted once, at the furthest step it reached.</p>
@@ -157,45 +167,55 @@
             <span class="section-meta">{{ plural(data.pool.total, 'donor') }} on your list</span>
           </div>
 
-          <div class="kpi-row">
-            <div v-for="kpi in poolKpis" :key="kpi.key" class="kpi">
-              <p class="kpi__label">
-                <span class="dot" :class="`dot--${kpi.tone}`" aria-hidden="true" />
-                {{ kpi.label }}
-              </p>
-              <p class="kpi__value">{{ kpi.value }}</p>
-              <p class="kpi__hint">{{ kpi.hint }}</p>
-            </div>
-          </div>
-
-          <article class="card">
-            <div class="card__head">
-              <div>
-                <p class="card__label">Eligible donors by blood group</p>
-                <p class="card__sub">Active donors who can give today: who to call in when a group runs low.</p>
+          <div class="bento">
+            <!-- How much of the list can give today, as a gauge; the rest beside it. -->
+            <article class="card bento__pool">
+              <div class="gauge" role="img" :aria-label="`${data.pool.eligible} of ${data.pool.total} donors eligible now`">
+                <svg viewBox="0 0 200 110" aria-hidden="true">
+                  <path class="gauge__base" d="M 20 100 A 80 80 0 0 1 180 100" />
+                  <path class="gauge__arc" d="M 20 100 A 80 80 0 0 1 180 100" :style="gaugeStyle(poolShare)" />
+                </svg>
+                <span class="gauge__center">
+                  <strong>{{ data.pool.eligible }}</strong>
+                  <small>eligible now · {{ Math.round(poolShare * 100) }}%</small>
+                </span>
               </div>
-              <NuxtLink v-if="can('donors.view_contact')" to="/blood-center/donors" class="card__link">
-                {{ can('donors.manage') ? 'Remind eligible' : 'Donor Management' }}
-                <AssetIcon name="arrow-right" :size="13" />
-              </NuxtLink>
-            </div>
+              <ul class="pool-list">
+                <li v-for="kpi in poolKpis.filter(k => k.key !== 'eligible')" :key="kpi.key" :title="kpi.hint">
+                  <span class="dot" :class="`dot--${kpi.tone}`" aria-hidden="true" />
+                  <span class="pool-list__label">{{ kpi.label }}<small>{{ kpi.hint }}</small></span>
+                  <span class="pool-list__value">{{ kpi.value }}</span>
+                </li>
+              </ul>
+            </article>
 
-            <ul class="group-bars">
-              <li v-for="row in groupRows" :key="row.code" class="group-bar" :class="{ 'group-bar--low': isLowGroup(row.count) }">
-                <span class="group-bar__code">{{ row.code }}</span>
-                <span class="group-bar__track">
-                  <span class="group-bar__fill" :style="{ width: groupWidth(row.count) }" />
-                </span>
-                <span class="group-bar__count">
-                  <span v-if="isLowGroup(row.count)" class="group-bar__low">Low</span>
-                  {{ row.count }}
-                </span>
-              </li>
-            </ul>
-            <p v-if="data.pool.eligible_untyped" class="card__note">
-              {{ plural(data.pool.eligible_untyped, 'eligible donor') }} not yet typed.
-            </p>
-          </article>
+            <!-- Eligible by blood group: a capsule each, the count above, the low ones in amber. -->
+            <article class="card bento__groups">
+              <div class="card__head">
+                <div>
+                  <p class="card__label">Eligible donors by blood group</p>
+                  <p class="card__sub">Active donors who can give today: who to call in when a group runs low.</p>
+                </div>
+                <NuxtLink v-if="can('donors.view_contact')" to="/blood-center/donors" class="card__link">
+                  {{ can('donors.manage') ? 'Remind eligible' : 'Donor Management' }}
+                  <AssetIcon name="arrow-right" :size="13" />
+                </NuxtLink>
+              </div>
+              <ul class="caps caps--groups" aria-label="Eligible donors by blood group">
+                <li v-for="row in groupRows" :key="row.code" class="cap" :class="isLowGroup(row.count) ? 'cap--low' : 'cap--info'">
+                  <span class="cap__val">
+                    {{ row.count }}
+                    <span v-if="isLowGroup(row.count)" class="cap__tag">Low</span>
+                  </span>
+                  <span class="cap__track"><span class="cap__fill" :style="{ height: capHeight(row.count, groupMax) }" /></span>
+                  <span class="cap__label cap__label--type">{{ row.code }}</span>
+                </li>
+              </ul>
+              <p v-if="data.pool.eligible_untyped" class="card__note">
+                {{ plural(data.pool.eligible_untyped, 'eligible donor') }} not yet typed.
+              </p>
+            </article>
+          </div>
         </section>
 
         <div class="grid-main">
@@ -245,14 +265,24 @@
                   </g>
                 </g>
 
-                <g
-                  v-for="(col, i) in chart.columns"
-                  :key="col.date"
-                  class="chart__col"
-                  :class="{ 'chart__col--dim': activeIndex !== null && activeIndex !== i }"
-                >
-                  <path v-if="col.donationPath" :d="col.donationPath" class="chart__s1" />
-                  <path v-if="col.deferralPath" :d="col.deferralPath" class="chart__s2" />
+                <defs>
+                  <linearGradient id="cdash-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" class="chart__stop chart__stop--top" />
+                    <stop offset="100%" class="chart__stop chart__stop--bottom" />
+                  </linearGradient>
+                </defs>
+
+                <!-- The day under the pointer: a guide down to its date. -->
+                <line v-if="activeColumn" class="chart__guide" :x1="activeColumn.center" :x2="activeColumn.center" :y1="chart.top" :y2="chart.top + chart.plotHeight" />
+
+                <!-- Donations as a filled curve, deferrals as a line over it. -->
+                <path :d="chart.donationArea" class="chart__area" fill="url(#cdash-area)" />
+                <path :d="chart.deferralLine" class="chart__line chart__line--s2" />
+                <path :d="chart.donationLine" class="chart__line chart__line--s1" />
+
+                <g v-for="(col, i) in chart.columns" :key="col.date" class="chart__col">
+                  <circle v-if="col.deferrals || activeIndex === i" :cx="col.center" :cy="col.yDeferrals" :r="activeIndex === i ? 4.5 : 3" class="chart__dot chart__dot--s2" />
+                  <circle :cx="col.center" :cy="col.yDonations" :r="activeIndex === i ? 5.5 : 3.5" class="chart__dot chart__dot--s1" />
                   <rect
                     :x="col.bandX"
                     :y="chart.top"
@@ -308,14 +338,11 @@
               </div>
             </div>
 
-            <ul class="days">
-              <li v-for="day in data.upcoming.days" :key="day.date" class="day">
-                <span class="day__name">{{ weekday(day.date) }}</span>
-                <span class="day__date">{{ dayMonth(day.date) }}</span>
-                <span class="day__track">
-                  <span class="day__fill" :style="{ width: dayWidth(day.appointments) }" />
-                </span>
-                <span class="day__count">{{ day.appointments }}</span>
+            <ul class="caps caps--days" aria-label="Booked appointments, next 7 days">
+              <li v-for="day in data.upcoming.days" :key="day.date" class="cap cap--info" :title="`${weekday(day.date)}, ${dayMonth(day.date)}: ${day.appointments} booked`">
+                <span class="cap__val">{{ day.appointments }}</span>
+                <span class="cap__track"><span class="cap__fill" :style="{ height: capHeight(day.appointments, dayMax) }" /></span>
+                <span class="cap__label">{{ weekday(day.date) }}<small>{{ dayMonth(day.date) }}</small></span>
               </li>
             </ul>
 
@@ -353,7 +380,6 @@ import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import {
   bloodGroupRows,
-  columnPath,
   dayMonth,
   longDate,
   niceScale,
@@ -364,6 +390,7 @@ import {
 } from '~/utils/collectionDashboard'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
+import { smoothPath } from '~/utils/smoothPath'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -422,10 +449,10 @@ async function load() {
 const appointmentRows = computed(() => {
   const a = data.value?.today.appointments ?? {}
   return [
-    { key: 'waiting', label: 'Waiting to arrive', value: a.waiting ?? 0, tone: 'neutral' },
+    { key: 'waiting', label: 'Waiting to arrive', value: a.waiting ?? 0, tone: 'info' },
     { key: 'in_progress', label: 'In progress', value: a.in_progress ?? 0, tone: 'warn' },
     { key: 'collected', label: 'Collected', value: a.collected ?? 0, tone: 'ok' },
-    { key: 'no_show', label: 'No-show', value: a.no_show ?? 0, tone: 'neutral' },
+    { key: 'no_show', label: 'No-show', value: a.no_show ?? 0, tone: 'muted' },
     { key: 'cancelled', label: 'Cancelled', value: a.cancelled ?? 0, tone: 'neutral' },
   ]
 })
@@ -470,16 +497,49 @@ const deferralRate = computed(() => (screenedToday.value
   : null))
 const groupMax = computed(() => Math.max(1, ...groupRows.value.map((r) => r.count)))
 
-function groupWidth(count) {
-  return `${(count / groupMax.value) * 100}%`
-}
-
 /* ---------- coming up ---------- */
 
 const dayMax = computed(() => Math.max(1, ...(data.value?.upcoming.days ?? []).map((d) => d.appointments)))
 
-function dayWidth(count) {
-  return `${(count / dayMax.value) * 100}%`
+/* ---------- the graphics: rings, a gauge, capsules ---------- */
+
+// A ring of radius r filled to a fraction.
+function ringStyle(fraction, r) {
+  const length = 2 * Math.PI * r
+  return { strokeDasharray: `${length * Math.min(1, Math.max(0, fraction))} ${length}` }
+}
+
+// The day's screening done: screened, of everyone who has come in.
+const queueTotal = computed(() => screenedToday.value + queueWaiting.value + (data.value?.today.donations.screening ?? 0))
+const queueDone = computed(() => (queueTotal.value ? screenedToday.value / queueTotal.value : 0))
+
+// The appointments ring: a segment a status, in the list's order.
+const RING48 = 2 * Math.PI * 48
+const appointmentArcs = computed(() => {
+  const total = data.value?.today.appointments.total || 0
+  let offset = 0
+  return appointmentRows.value.filter(r => r.value > 0).map((row) => {
+    const length = total ? (row.value / total) * RING48 : 0
+    const arc = { key: row.key, tone: row.tone, length, offset }
+    offset += length
+    return arc
+  })
+})
+
+// The pool gauge: the share of the list that can give today.
+const poolShare = computed(() => {
+  const p = data.value?.pool
+  return p?.total ? p.eligible / p.total : 0
+})
+const GAUGE = Math.PI * 80
+function gaugeStyle(fraction) {
+  return { strokeDasharray: `${GAUGE * Math.min(1, Math.max(0, fraction))} ${GAUGE}` }
+}
+
+// Capsule bars: a sliver for anything above zero, so a one still shows.
+const stageMax = computed(() => Math.max(1, ...stageRows.value.map(s => s.value)))
+function capHeight(value, max) {
+  return value ? `${Math.max(8, (value / max) * 100)}%` : '0%'
 }
 
 /* ---------- trend chart ---------- */
@@ -502,7 +562,6 @@ function measure() {
 }
 
 const CHART_HEIGHT = 220
-const GAP = 2
 
 /**
  * The column chart in pixels: one stacked column per day, donations at the
@@ -522,26 +581,25 @@ const chart = computed(() => {
   const plotHeight = CHART_HEIGHT - top - bottom
   const scale = niceScale(peak.value)
   const band = plotWidth / days.length
-  const barWidth = Math.max(3, Math.min(24, band * 0.62))
   const y = (v) => top + plotHeight - (v / scale.max) * plotHeight
+  const base = top + plotHeight
 
   const columns = days.map((day, i) => {
     const bandX = left + i * band
-    const x = bandX + (band - barWidth) / 2
-    const donationHeight = (day.donations / scale.max) * plotHeight
-    const deferralHeight = (day.deferrals / scale.max) * plotHeight
-    const deferralBase = top + plotHeight - donationHeight - (day.donations > 0 && day.deferrals > 0 ? GAP : 0)
-
     return {
       ...day,
       bandX,
       bandWidth: band,
       center: bandX + band / 2,
-      top: y(day.donations + day.deferrals),
-      donationPath: columnPath(x, top + plotHeight - donationHeight, barWidth, donationHeight, day.deferrals === 0),
-      deferralPath: columnPath(x, deferralBase - deferralHeight, barWidth, deferralHeight, true),
+      top: y(Math.max(day.donations, day.deferrals)),
+      yDonations: y(day.donations),
+      yDeferrals: y(day.deferrals),
     }
   })
+
+  const donationLine = smoothPath(columns.map(c => ({ x: c.center, y: c.yDonations })))
+  const first = columns[0]
+  const last = columns[columns.length - 1]
 
   // A label under every day of the week; today is called today.
   const xLabels = columns
@@ -561,6 +619,9 @@ const chart = computed(() => {
     top,
     plotHeight,
     columns,
+    donationLine,
+    donationArea: `${donationLine} L${last.center},${base} L${first.center},${base} Z`,
+    deferralLine: smoothPath(columns.map(c => ({ x: c.center, y: c.yDeferrals }))),
     xLabels,
     ticks: scale.ticks.map((value) => ({ value, y: y(value) })),
   }
@@ -910,10 +971,16 @@ onBeforeUnmount(() => {
 .chart__grid text,
 .chart__axis text { fill: var(--rb-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
 
-.chart__s1 { fill: var(--series-1); }
-.chart__s2 { fill: var(--series-2); }
-.chart__col { transition: opacity 0.12s ease; }
-.chart__col--dim { opacity: 0.45; }
+.chart__area { stroke: none; }
+.chart__stop--top { stop-color: var(--series-1); stop-opacity: 0.28; }
+.chart__stop--bottom { stop-color: var(--series-1); stop-opacity: 0; }
+.chart__line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart__line--s1 { stroke: var(--series-1); }
+.chart__line--s2 { stroke: var(--series-2); stroke-width: 2; stroke-dasharray: 0; }
+.chart__dot { stroke: var(--rb-surface); stroke-width: 2; transition: r 0.12s ease; }
+.chart__dot--s1 { fill: var(--series-1); }
+.chart__dot--s2 { fill: var(--series-2); }
+.chart__guide { stroke: var(--rb-border-strong, var(--rb-border)); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
 .chart__hit { fill: transparent; cursor: default; }
 
 .chart__empty {
@@ -1092,5 +1159,80 @@ html.dark .group-bar__low { color: #FFB74D; }
 @media (max-width: 1200px) {
   .queue { grid-template-columns: minmax(0, 1fr); }
   .queue__actions { justify-content: flex-start; }
+}
+
+/* ===== Bento: the graphical dashboard (project owner, 2026-10-24) ===== */
+.bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+.bento__appts { grid-column: span 5; }
+.bento__visits { grid-column: span 7; }
+.bento__pool { grid-column: span 5; }
+.bento__groups { grid-column: span 7; }
+
+.dot--muted { background: var(--rb-text-muted, #94A3B8); }
+
+/* Rings (.dial: Tailwind's ring utility owns .ring) */
+.dial { position: relative; flex: none; width: 150px; height: 150px; }
+.dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.dial__base { fill: none; stroke: rgba(var(--rb-primary-rgb), 0.08); stroke-width: 12; }
+.dial__arc { fill: none; stroke: var(--rb-primary); stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray 0.6s var(--rb-ease-out, ease); }
+.dial__seg { fill: none; stroke-width: 12; }
+.dial__seg--info { stroke: var(--rb-primary); }
+.dial__seg--warn { stroke: var(--rb-warning); }
+.dial__seg--ok { stroke: var(--rb-success); }
+.dial__seg--muted { stroke: var(--rb-text-muted, #94A3B8); }
+.dial__seg--neutral { stroke: var(--rb-border-strong, #CBD5E1); }
+.dial__center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.dial__center strong { font-size: 26px; font-weight: 800; line-height: 1; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.dial__center small { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.dial--hero { width: 116px; height: 116px; }
+.dial--hero .dial__center strong { font-size: 24px; }
+
+.queue { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px; }
+.queue .queue__stats { margin-top: 12px; }
+
+.bento__appts { display: flex; flex-direction: column; }
+.donut-row { display: flex; flex: 1; align-items: center; gap: 28px; padding: 8px 4px; }
+.legend-list { display: flex; flex: 1; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.legend-list li { display: flex; align-items: center; gap: 8px; }
+.legend-list__label { flex: 1; color: var(--rb-text-secondary); }
+.legend-list__value { font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+
+/* Gauge */
+.bento__pool { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: center; gap: 20px; }
+.gauge { position: relative; width: 200px; height: 118px; }
+.gauge svg { width: 100%; height: 110px; }
+.gauge__base, .gauge__arc { fill: none; stroke-width: 16; stroke-linecap: round; }
+.gauge__base { stroke: rgba(var(--rb-primary-rgb), 0.08); }
+.gauge__arc { stroke: var(--rb-success); transition: stroke-dasharray 0.6s var(--rb-ease-out, ease); }
+.gauge__center { position: absolute; left: 0; right: 0; bottom: 4px; display: flex; flex-direction: column; align-items: center; }
+.gauge__center strong { font-size: 28px; font-weight: 800; line-height: 1; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.gauge__center small { margin-top: 4px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.pool-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.pool-list li { display: flex; align-items: center; gap: 8px; }
+.pool-list__label { display: flex; flex: 1; flex-direction: column; color: var(--rb-text-primary); font-weight: 600; }
+.pool-list__label small { font-size: 11.5px; font-weight: 400; color: var(--rb-text-secondary); }
+.pool-list__value { font-weight: 800; font-size: 15px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+
+/* Capsule bars, the count above each */
+.caps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 12px; height: 200px; margin: 0; padding: 0; list-style: none; }
+.caps--stages { height: 180px; }
+.caps--days { height: 170px; margin-bottom: 4px; }
+.cap { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.cap__val { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.cap__tag { padding: 0 5px; border-radius: 5px; background: rgba(245, 158, 11, 0.16); font-size: 10px; font-weight: 700; color: var(--rb-warning-text, #B45309); }
+.cap__track { position: relative; flex: 1; width: 100%; max-width: 44px; border-radius: 999px; background: rgba(var(--rb-primary-rgb), 0.06); overflow: hidden; }
+.cap__fill { position: absolute; inset: auto 0 0; border-radius: 999px; background: var(--rb-primary); transition: height 0.5s var(--rb-ease-out, ease); }
+.cap__label { display: flex; flex-direction: column; align-items: center; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); text-align: center; white-space: nowrap; }
+.cap__label small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-muted); }
+.cap__label--type { font-size: 13px; font-weight: 800; color: var(--rb-text-primary); }
+.cap--info .cap__fill { background: var(--rb-primary); }
+.cap--ok .cap__fill { background: var(--rb-success); }
+.cap--warn .cap__fill { background: var(--rb-warning); }
+.cap--crit .cap__fill { background: var(--rb-accent); }
+.cap--neutral .cap__fill { background: rgba(var(--rb-primary-rgb), 0.35); }
+.cap--low .cap__fill { background: var(--rb-warning); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dial__arc, .gauge__arc, .cap__fill { transition: none; }
 }
 </style>

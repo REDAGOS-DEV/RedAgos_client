@@ -49,6 +49,20 @@ export interface BloodCenterNavGroup {
 export const COLLECTION_ABILITIES = ['donations.register', 'donations.screen', 'donations.collect'] as const
 
 /**
+ * The abilities that open the demand forecast, one per part of it (the
+ * server's DemandForecastService): demand, collection, processing, testing,
+ * billing. The Supervisor holds inventory.view; the Admin none of them.
+ */
+export const FORECAST_ABILITIES = ['inventory.view', 'donations.view', 'lab.record_components', 'lab.record_serology', 'billing.record_payment'] as const
+
+/**
+ * The abilities that open Reports & Analytics: the centre's reports (the
+ * Admin and the Supervisor) and Donor & Collection's. The other departments'
+ * reports are still to come; they have the forecast meanwhile.
+ */
+export const REPORTS_ABILITIES = ['reports.view_all', 'donations.view'] as const
+
+/**
  * The abilities that open the testing page, which TTI Testing and
  * Immunohematology share: each works its own card on it.
  */
@@ -232,7 +246,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Staff Accounts', path: '/blood-center/staff', icon: 'user-check', requires: 'staff.manage', keywords: 'staff team department roles' },
       // The Admin's alone (project owner, 2026-10-21).
       { label: 'Audit Log', path: '/blood-center/audit-log', icon: 'history', requires: 'audit.view', keywords: 'audit log activity history trail who did what sign in login logout failed user action' },
-      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: 'reports.view_own', keywords: 'report analytics forecast' },
+      { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: REPORTS_ABILITIES, keywords: 'report analytics past period export snbc record collection' },
+      // Looking ahead, apart from the reports that look back (project owner, 2026-10-24).
+      { label: 'Demand Forecast', path: '/blood-center/forecast', icon: 'trending-up', requires: FORECAST_ABILITIES, keywords: 'forecast demand projection weeks ahead shortage recruit donors workload planning emergency' },
       // These two under Management rather than Stock and Supply (project
       // owner, 2026-10-19). Their abilities are unchanged, so who sees each is
       // too: the thresholds are read with inventory.view and set only with

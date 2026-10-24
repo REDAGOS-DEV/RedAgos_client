@@ -537,7 +537,8 @@ import BloodCenterCentreReports from '~/components/BloodCenter/CentreReports.vue
 definePageMeta({
     middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
-  requires: 'reports.view_own',
+  // The same list as the sidebar's link (REPORTS_ABILITIES).
+  requires: ['reports.view_all', 'donations.view'],
 })
 
 /**

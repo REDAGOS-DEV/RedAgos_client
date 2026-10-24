@@ -33,6 +33,11 @@
           <AssetIcon name="download" :size="15" />
           Export CSV
         </button>
+        <!-- The whole period as a printable report, with the centre's letterhead. -->
+        <button type="button" class="export" :disabled="!data || pdfBusy" @click="downloadPdf">
+          <AssetIcon name="file-down" :size="15" />
+          {{ pdfBusy ? 'Preparing…' : 'Download PDF' }}
+        </button>
       </div>
     </header>
 
@@ -42,6 +47,12 @@
         <AssetIcon :name="t.icon" :size="15" />
         {{ t.label }}
       </button>
+      <!-- Looking ahead lives on its own page. -->
+      <NuxtLink v-if="can(FORECAST_ABILITIES)" to="/blood-center/forecast" class="tabs__aside">
+        <AssetIcon name="trending-up" :size="15" />
+        Demand forecast
+        <AssetIcon name="arrow-right" :size="13" />
+      </NuxtLink>
     </nav>
 
     <p v-if="error" class="cr__error" role="alert">
@@ -77,7 +88,8 @@
         <section v-if="tab !== 'staff' && tab !== 'activity' && tab !== 'profile'" class="card" aria-labelledby="daily-title">
           <header class="card__head">
             <h2 id="daily-title" class="card__title">Day by day</h2>
-            <div class="series" role="radiogroup" aria-label="Show">
+            <div class="daily-tools">
+            <div v-if="dailyView === 'chart'" class="series" role="radiogroup" aria-label="Show">
               <button v-for="sr in SERIES" :key="sr.key" type="button" role="radio" class="series__btn"
                 :class="[`series__btn--${sr.key}`, { 'series__btn--on': series === sr.key }]"
                 :aria-checked="series === sr.key" @click="series = sr.key">
@@ -86,9 +98,44 @@
                 <strong>{{ seriesTotal(sr.key) }}</strong>
               </button>
             </div>
+            <!-- The exact counts, a day a row, for whoever needs the figures rather than the shape. -->
+            <div class="view-toggle" role="radiogroup" aria-label="View">
+              <button type="button" role="radio" class="view-toggle__btn" :class="{ 'view-toggle__btn--on': dailyView === 'chart' }"
+                :aria-checked="dailyView === 'chart'" @click="dailyView = 'chart'">
+                <AssetIcon name="bar-chart" :size="14" /> Chart
+              </button>
+              <button type="button" role="radio" class="view-toggle__btn" :class="{ 'view-toggle__btn--on': dailyView === 'table' }"
+                :aria-checked="dailyView === 'table'" @click="dailyView = 'table'">
+                <AssetIcon name="list" :size="14" /> Table
+              </button>
+            </div>
+            </div>
           </header>
 
-          <div v-if="!seriesTotal(series)" class="chart-empty">
+          <div v-if="dailyView === 'table'" class="daily-table-wrap">
+            <table class="daily-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th v-for="sr in SERIES" :key="sr.key" class="num">{{ sr.label }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="day in dailyNewestFirst" :key="day.date" :class="{ 'is-today': day.date === today }">
+                  <td>{{ fmtWeekday(day.date) }}</td>
+                  <td v-for="sr in SERIES" :key="sr.key" class="num" :class="{ 'is-zero': !day[sr.key] }">{{ day[sr.key] ?? 0 }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total</td>
+                  <td v-for="sr in SERIES" :key="sr.key" class="num">{{ seriesTotal(sr.key) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div v-else-if="!seriesTotal(series)" class="chart-empty">
             <span class="chart-empty__icon" aria-hidden="true"><AssetIcon name="bar-chart" :size="22" /></span>
             <p class="chart-empty__title">No {{ currentSeries.label.toLowerCase() }} in this period</p>
             <p class="chart-empty__text">Try a longer period, or another figure above.</p>
@@ -102,10 +149,21 @@
             </div>
             <div class="plot__area">
               <div class="plot__grid" aria-hidden="true"><span /><span /><span /></div>
-              <div class="plot__bars" role="img" :aria-label="chartLabel">
+              <!-- The series as a smooth curve over a soft fill; a point a day, drawn in the columns below. -->
+              <svg class="curve" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="cr-curve-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" class="curve__stop curve__stop--top" />
+                    <stop offset="100%" class="curve__stop curve__stop--bottom" />
+                  </linearGradient>
+                </defs>
+                <path :d="curve.area" fill="url(#cr-curve-fill)" />
+                <path :d="curve.line" class="curve__line" vector-effect="non-scaling-stroke" />
+              </svg>
+              <div class="plot__bars" :class="{ 'plot__bars--dense': daily.length > 31 }" role="img" :aria-label="chartLabel">
                 <div v-for="(day, i) in daily" :key="day.date" class="col" :class="{ 'col--today': day.date === today }">
-                  <span class="col__bar" :style="{ height: `${barHeight(day[series])}%` }" />
-                  <span class="col__tip">{{ fmtDay(day.date) }} · {{ day[series] }}</span>
+                  <span class="col__dot" :style="{ bottom: `${pointHeight(day[series])}%` }" />
+                  <span class="col__tip" :style="{ bottom: `calc(${pointHeight(day[series])}% + 12px)` }">{{ fmtDay(day.date) }} · {{ day[series] }}</span>
                   <span v-if="showTick(i)" class="col__tick" aria-hidden="true">{{ fmtDay(day.date) }}</span>
                 </div>
               </div>
@@ -436,6 +494,8 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import { FORECAST_ABILITIES } from '~/composables/useBloodCenterNav'
+import { smoothPath } from '~/utils/smoothPath'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 const props = defineProps({
@@ -443,7 +503,7 @@ const props = defineProps({
   kind: { type: String, default: 'centre' },
 })
 
-const { user } = useUser()
+const { user, can } = useUser()
 const facilityName = computed(() => user.value?.facility?.facility_name || 'Your blood center')
 
 const TABS = props.kind === 'collection'
@@ -543,7 +603,16 @@ const yMax = computed(() => {
   const step = 10 ** Math.floor(Math.log10(top))
   return [2, 4, 6, 8, 10].map(m => m * step).find(v => v >= top) ?? top
 })
-const barHeight = n => (n ? Math.max(2, (n / yMax.value) * 100) : 0)
+
+// The curve: a point at the middle of each day's column, on the same scale.
+const pointHeight = n => Math.min(100, ((n || 0) / yMax.value) * 100)
+const curve = computed(() => {
+  const n = daily.value.length
+  if (!n) return { line: '', area: '' }
+  const points = daily.value.map((d, i) => ({ x: ((i + 0.5) / n) * 1000, y: 100 - pointHeight(d[series.value]) }))
+  const line = smoothPath(points)
+  return { line, area: `${line} L${points[n - 1].x},100 L${points[0].x},100 Z` }
+})
 
 // About six dates under the chart, whatever the period's length.
 const showTick = (i) => {
@@ -661,6 +730,33 @@ async function downloadSnbc() {
     snbcError.value = err?.message || 'The SNBC record could not be downloaded. Please try again.'
   } finally {
     snbcBusy.value = false
+  }
+}
+
+// Day by day as a chart or a table; the table reads newest first.
+const dailyView = ref('chart')
+const dailyNewestFirst = computed(() => [...daily.value].reverse())
+const fmtWeekday = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+
+// The period as a printable PDF, from the server.
+const pdfBusy = ref(false)
+async function downloadPdf() {
+  if (!data.value) return
+  pdfBusy.value = true
+  error.value = ''
+  try {
+    const kind = props.kind === 'collection' ? 'collection' : 'centre'
+    const blob = await bloodCenterService.reportPdf(kind, { from: data.value.period.from, to: data.value.period.to })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `redagos-${kind}-report-${data.value.period.from}-to-${data.value.period.to}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    error.value = err?.message || 'The PDF could not be prepared. Please try again.'
+  } finally {
+    pdfBusy.value = false
   }
 }
 
@@ -830,6 +926,20 @@ function exportCsv() {
 .tool-sep { font-size: 13px; color: var(--rb-text-secondary); }
 
 .tabs { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--rb-border); }
+.tabs__aside {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rb-primary-text, var(--rb-primary));
+  text-decoration: none;
+}
+.tabs__aside:hover { background: rgba(var(--rb-primary-rgb), 0.08); }
+.tabs__aside:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .tab {
   display: inline-flex;
   align-items: center;
@@ -928,11 +1038,44 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
 .plot__grid span:last-child { background: var(--rb-border-strong, var(--rb-border)); }
 .plot__bars { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 200px; padding-bottom: 26px; box-sizing: content-box; }
 .col { position: relative; display: flex; flex: 1; align-items: flex-end; height: 100%; min-width: 0; }
-.col__bar { width: 100%; max-width: 28px; margin: 0 auto; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--series) 75%, transparent); transition: background-color 120ms ease; }
-.col:hover .col__bar, .col--today .col__bar { background: var(--series); }
+
+/* The curve over the columns: the same 200px plot, stretched to its width. */
+.curve { position: absolute; inset: 0 0 auto; width: 100%; height: 200px; overflow: visible; pointer-events: none; }
+.curve__stop--top { stop-color: var(--series); stop-opacity: 0.26; }
+.curve__stop--bottom { stop-color: var(--series); stop-opacity: 0; }
+.curve__line { fill: none; stroke: var(--series); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.col__dot {
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--rb-surface);
+  border-radius: 50%;
+  background: var(--series);
+  transform: translate(-50%, 50%);
+  transition: transform 120ms ease;
+}
+/* A guide down from the day under the pointer. */
+.col::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px dashed var(--rb-border-strong, var(--rb-border));
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.col:hover::before { opacity: 1; }
+.col:hover .col__dot, .col--today .col__dot { transform: translate(-50%, 50%) scale(1.35); }
+/* Over a long period, a point only where the pointer is, and today. */
+.plot__bars--dense .col__dot { opacity: 0; }
+.plot__bars--dense .col:hover .col__dot, .plot__bars--dense .col--today .col__dot { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .col__dot, .col::before { transition: none; }
+}
 .col__tip {
   position: absolute;
-  bottom: calc(100% + 6px);
   left: 50%;
   z-index: 2;
   padding: 4px 8px;
@@ -1020,6 +1163,33 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
 }
 
 /* The collection record: the paper sheet's grouped header, as a table. */
+.daily-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.view-toggle { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(var(--rb-primary-rgb), 0.06); }
+.view-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+.view-toggle__btn--on { background: var(--rb-surface); color: var(--rb-text-primary); box-shadow: 0 1px 3px rgba(var(--rb-shadow-rgb, 15, 23, 42), 0.12); }
+.view-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.daily-table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--rb-border); border-radius: 12px; }
+.daily-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.daily-table th { position: sticky; top: 0; z-index: 1; padding: 9px 14px; background: var(--rb-surface-alt, var(--rb-surface)); border-bottom: 1px solid var(--rb-border); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-align: left; text-transform: uppercase; color: var(--rb-text-secondary); }
+.daily-table td { padding: 8px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); }
+.daily-table .num { text-align: right; }
+.daily-table .is-zero { color: var(--rb-text-muted); }
+.daily-table .is-today td { background: rgba(var(--rb-primary-rgb), 0.05); font-weight: 600; }
+.daily-table tfoot td { position: sticky; bottom: 0; background: var(--rb-surface-alt, var(--rb-surface)); border-top: 1px solid var(--rb-border-strong, var(--rb-border)); border-bottom: 0; font-weight: 700; }
 .snbc-download {
   display: inline-flex;
   align-items: center;
