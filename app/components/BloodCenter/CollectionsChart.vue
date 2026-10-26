@@ -33,14 +33,14 @@
       </div>
 
       <div
-        v-if="hovered !== null && series[hovered]"
+        v-if="hovered !== null && hoveredPoint"
         class="cc__tip"
         :class="{ 'cc__tip--left': hovered > series.length / 2 }"
         :style="{ left: `${((hovered + 0.5) / series.length) * 100}%` }"
         role="status"
       >
-        <span class="cc__tip-label">{{ longLabel(series[hovered].key) }}</span>
-        <strong>{{ pesos(series[hovered].amount) }}</strong>
+        <span class="cc__tip-label">{{ longLabel(hoveredPoint.key) }}</span>
+        <strong>{{ pesos(hoveredPoint.amount) }}</strong>
       </div>
     </div>
 
@@ -68,6 +68,8 @@ const props = defineProps<{
 }>()
 
 const hovered = ref<number | null>(null)
+// The point under the pointer, or null: what the tooltip reads.
+const hoveredPoint = computed(() => (hovered.value === null ? null : props.series[hovered.value] ?? null))
 
 const max = computed(() => Math.max(0, ...props.series.map((p) => Number(p.amount) || 0)))
 
