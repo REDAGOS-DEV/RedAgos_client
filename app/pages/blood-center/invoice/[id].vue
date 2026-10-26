@@ -11,9 +11,9 @@
       </div>
 
       <nav class="crumbs">
-        <NuxtLink to="/blood-center/billing">Statements</NuxtLink>
+        <NuxtLink to="/blood-center/billing">Invoices</NuxtLink>
         <AssetIcon name="chevron-right" :size="14" />
-        <span aria-current="page">{{ statement?.request?.reference_number || 'Statement' }}</span>
+        <span aria-current="page">{{ statement?.request?.reference_number || 'Invoice' }}</span>
       </nav>
 
       <div v-if="loading" class="skeleton-stack">
@@ -24,10 +24,10 @@
 
       <div v-else-if="loadError" class="empty card">
         <AssetIcon name="triangle-alert" :size="30" />
-        <h2>This statement could not be opened</h2>
+        <h2>This invoice could not be opened</h2>
         <p>{{ loadError }}</p>
         <div class="empty-actions">
-          <NuxtLink to="/blood-center/billing" class="ui-btn">Back to statements</NuxtLink>
+          <NuxtLink to="/blood-center/billing" class="ui-btn">Back to invoices</NuxtLink>
           <button class="ui-btn ui-btn--primary" @click="loadAll">Try again</button>
         </div>
       </div>
@@ -36,7 +36,7 @@
         <!-- HEADER: the document, its number and where it stands -->
         <header class="doc-header">
           <div class="doc-heading">
-            <h1 class="kicker">Statement of Account</h1>
+            <h1 class="kicker">Invoice</h1>
             <p class="page-title" :class="{ mono: latestRevision }">{{ latestRevision?.document_number || 'Not issued yet' }}</p>
             <div class="doc-meta">
               <BillingBadge :tone="stamp.tone">{{ statement.status_label }}</BillingBadge>
@@ -55,7 +55,7 @@
             </button>
             <button v-if="canSeePayments" class="ui-btn" :disabled="issuing" @click="issueStatement">
               <AssetIcon name="file-text" :size="15" />
-              {{ issuing ? 'Issuing…' : latestRevision ? 'Issue updated statement' : 'Issue statement' }}
+              {{ issuing ? 'Issuing…' : latestRevision ? 'Issue updated invoice' : 'Issue invoice' }}
             </button>
             <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="credit-card" :size="15" />
@@ -68,7 +68,7 @@
           <AssetIcon name="info" :size="15" />
           <span>
             The bill has changed since {{ latestRevision.document_number }} was issued.
-            <template v-if="canSeePayments">Issue an updated statement before handing one over.</template>
+            <template v-if="canSeePayments">Issue an updated invoice before handing one over.</template>
           </span>
         </p>
         <p v-if="issueError" class="banner banner--error">
@@ -86,7 +86,7 @@
             :class="{ 'view-tab--on': view === 'printed' }"
             :aria-selected="view === 'printed'"
             :disabled="!revisions.length"
-            :title="revisions.length ? '' : 'Issue a statement to see it as it prints'"
+            :title="revisions.length ? '' : 'Issue an invoice to see it as it prints'"
             @click="view = 'printed'"
           >
             As printed
@@ -134,7 +134,7 @@
                     <dd :class="{ mono: row.mono }">{{ row.value }}</dd>
                   </div>
                 </dl>
-                <dl class="kv-list" aria-label="Statement details">
+                <dl class="kv-list" aria-label="Invoice details">
                   <div v-for="row in shown(detailRows)" :key="row.label" class="kv-row">
                     <dt>{{ row.label }}</dt>
                     <dd :class="{ mono: row.mono }">{{ row.value }}</dd>
@@ -179,7 +179,7 @@
                   <div v-if="statement.settlement.note"><dt>Note</dt><dd>{{ statement.settlement.note }}</dd></div>
                 </dl>
                 <p v-else class="quiet">
-                  Weekly orders are billed to {{ statement.request?.requesting_facility || 'the hospital' }} by statement and settled
+                  Weekly orders are billed to {{ statement.request?.requesting_facility || 'the hospital' }} by invoice and settled
                   outside RedAgos. Record the settlement here once the hospital pays.
                 </p>
               </template>
@@ -378,6 +378,31 @@
                 </div>
               </template>
 
+              <!-- A subsidy decision may be reversed only by Billing, before
+                   dispatch. The server keeps both journal events. -->
+              <template v-else-if="!weekly && statement?.is_subsidised && canApplySubsidy">
+                <div class="pay-actions">
+                  <button v-if="!removeSubsidyOpen" class="ui-btn ui-btn--ghost btn-block" @click="openRemoveSubsidy">
+                    Remove government subsidy
+                  </button>
+                </div>
+                <div v-if="removeSubsidyOpen" class="inline-form">
+                  <p class="inline-title">Remove government subsidy</p>
+                  <p class="inline-hint">This restores the invoice balance and blocks release until it is settled. The original subsidy remains in the billing journal.</p>
+                  <label class="field">
+                    <span class="field-label">Reason</span>
+                    <input v-model.trim="removeSubsidyReason" type="text" minlength="3" maxlength="255" class="input" placeholder="e.g. Applied to the wrong request" required>
+                  </label>
+                  <p v-if="removeSubsidyError" class="field-error">{{ removeSubsidyError }}</p>
+                  <div class="inline-actions">
+                    <button class="ui-btn ui-btn--sm" :disabled="saving" @click="removeSubsidyOpen = false">Cancel</button>
+                    <button class="ui-btn ui-btn--danger ui-btn--sm" :disabled="saving || removeSubsidyReason.length < 3" @click="submitRemoveSubsidy">
+                      {{ saving ? 'Removing…' : 'Remove subsidy' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+
               <!-- Weekly bill: record the hospital's settlement, once its total is final. -->
               <template v-else-if="weekly && canSeePayments && statement.status === 'statement_only'">
                 <p v-if="!statement.request?.is_closed" class="quiet">
@@ -409,12 +434,12 @@
             <!-- ISSUED STATEMENTS: each revision frozen as it was handed over, newest first -->
             <section class="card" aria-labelledby="rev-title">
               <div class="card-head">
-                <h2 id="rev-title" class="card-title">Issued statements</h2>
-                <p class="card-hint">Each statement is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.</p>
+                <h2 id="rev-title" class="card-title">Issued invoices</h2>
+                <p class="card-hint">Each invoice is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.</p>
               </div>
               <div v-if="revisionsLoading" class="skeleton skeleton--row" />
               <p v-else-if="!revisions.length" class="quiet">
-                No statement issued yet. {{ weekly ? 'Issue one to send this order to the hospital.' : 'Issue one to give the patient or their watcher the amount payable.' }}
+                No invoice issued yet. {{ weekly ? 'Issue one to send this order to the hospital.' : 'Issue one to give the patient or their watcher the amount payable.' }}
               </p>
               <ol v-else class="revisions">
                 <li v-for="(r, i) in revisions" :key="r.id" class="revision" :class="{ 'revision--latest': i === 0 }">
@@ -477,15 +502,17 @@
 
 <script setup>
 /**
- * One statement, laid out as a document: who issued it, who owes it, what it
- * bills, what has been paid, and what can still be done about it.
+ * One invoice — one billable request (project owner, 2026-10-25; this page
+ * was the request's "Statement of Account" before) — laid out as a document:
+ * who issued it, who owes it, what it bills, what has been paid, and what can
+ * still be done about it. Variable names keep the older "statement" wording.
  *
  * Laid out (2026-10-14) as the bill on the left — who owes it, the lines, the
  * payments — and, on the right, what is owed and what can be done about it,
  * with the issued revisions as a timeline beneath.
  *
- * The page reads the live statement; the issued Statements of Account are its
- * frozen revisions, shown as they print and downloaded as the server's PDF.
+ * The page reads the live bill; the issued invoices are its frozen revisions,
+ * shown as they print and downloaded as the server's PDF.
  * Taking money happens at the counter (or by GCash QR from here); everything
  * else that changes the bill — a subsidy, a weekly bill's settlement, a void
  * or a correction of a payment — is filed here and decided by the server.
@@ -516,6 +543,7 @@ const { can, canFile } = useUser()
 // record them. Filing a correction to one also needs the ability to request it
 // and the subject itself, which a custom role in the department lacks.
 const canSeePayments = computed(() => can('billing.record_payment'))
+const canApplySubsidy = computed(() => can('billing.subsidise'))
 const canCorrectPayment = computed(() => can('billing.record_payment') && can('corrections.request') && canFile('payment'))
 const canVoidPayment = computed(() => can('billing.record_payment') && can('corrections.request') && canFile('payment_void'))
 
@@ -601,14 +629,14 @@ async function issueStatement() {
   try {
     const response = await bloodCenterService.issueStatement(requestId.value)
     toast(
-      response.created ? 'Statement Issued' : 'No Changes Since Last Statement',
+      response.created ? 'Invoice Issued' : 'No Changes Since Last Invoice',
       response.created ? 'success' : 'info',
       response.revision?.document_number,
     )
     await loadRevisions()
     selectedRevisionId.value = revisions.value[0]?.id ?? null
   } catch (err) {
-    issueError.value = err?.message || 'The statement could not be issued.'
+    issueError.value = err?.message || 'The invoice could not be issued.'
   } finally {
     issuing.value = false
   }
@@ -636,7 +664,7 @@ async function downloadRevision(revision = selectedRevision.value) {
   try {
     saveBlob(await bloodCenterService.downloadStatement(revision.id), `${revision.document_number}.pdf`)
   } catch (err) {
-    toast('Download Failed', 'danger', err?.message || 'The statement could not be downloaded.')
+    toast('Download Failed', 'danger', err?.message || 'The invoice could not be downloaded.')
   } finally {
     downloading.value = false
   }
@@ -664,7 +692,7 @@ async function printRevision() {
     }
   } catch (err) {
     tab?.close()
-    toast('Print Failed', 'danger', err?.message || 'The statement could not be opened.')
+    toast('Print Failed', 'danger', err?.message || 'The invoice could not be opened.')
   } finally {
     printing.value = false
   }
@@ -689,7 +717,7 @@ const billToRows = computed(() => {
   if (weekly.value) {
     return [
       { label: 'Hospital', value: r?.requesting_facility },
-      { label: 'Payable by', value: 'The hospital, by statement' },
+      { label: 'Payable by', value: 'The hospital, by invoice' },
     ]
   }
 
@@ -937,6 +965,35 @@ async function submitSubsidy() {
   }
 }
 
+/* REMOVE A SUBSIDY: Billing corrects an accidental relief decision before dispatch. */
+const removeSubsidyOpen = ref(false)
+const removeSubsidyReason = ref('')
+const removeSubsidyError = ref('')
+
+function openRemoveSubsidy() {
+  removeSubsidyReason.value = ''
+  removeSubsidyError.value = ''
+  removeSubsidyOpen.value = true
+}
+
+async function submitRemoveSubsidy() {
+  if (removeSubsidyReason.value.length < 3) return
+
+  removeSubsidyError.value = ''
+  saving.value = true
+
+  try {
+    await bloodCenterService.removeSubsidy(requestId.value, removeSubsidyReason.value)
+    toast('Subsidy Removed', 'success', 'The invoice balance has been restored.')
+    removeSubsidyOpen.value = false
+    await loadStatement()
+  } catch (err) {
+    removeSubsidyError.value = err?.message || 'The subsidy could not be removed.'
+  } finally {
+    saving.value = false
+  }
+}
+
 /* RECORD A WEEKLY BILL'S SETTLEMENT. No money moves through RedAgos. */
 const settlement = reactive({ settlement_reference: '', settled_at: todayIso, settlement_note: '' })
 const settlementErrors = reactive({})
@@ -985,7 +1042,7 @@ async function loadAll() {
     await loadStatement()
     await Promise.all([loadRevisions(), loadPayments(), latestRevision.value ? null : loadIssuerFallback()])
   } catch (err) {
-    loadError.value = err?.status === 404 ? 'No statement was found for that request at this centre.' : (err?.message || 'Please try again.')
+    loadError.value = err?.status === 404 ? 'No invoice was found for that request at this centre.' : (err?.message || 'Please try again.')
   } finally {
     loading.value = false
   }

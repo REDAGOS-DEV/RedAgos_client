@@ -134,19 +134,8 @@
           >
             <AssetIcon :name="gateFor(request).ok ? 'check' : 'octagon-alert'" :size="15" />
             <span>{{ gateFor(request).message }}</span>
-            <!-- Issuance meets the statement from the government subsidy here,
-                 at the point of issue: a subsidised centre may have nobody at
-                 the billing desk (project owner, 2026-10-19). -->
-            <button
-              v-if="!gateFor(request).ok && request.billing && can('billing.subsidise')"
-              type="button"
-              class="gate-action"
-              @click="openSubsidy(request)"
-            >
-              Apply government subsidy
-            </button>
-            <!-- Only for whoever can take the payment: Issuance reads the
-                 statement here but does not work Billing's pages. -->
+            <!-- Issuance only sees the release gate. Billing now owns every
+                 subsidy decision and checks its centrally scheduled dates. -->
             <NuxtLink v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing" class="gate-link">
               Go to Billing
             </NuxtLink>
@@ -309,52 +298,6 @@
             <button class="ui-btn" :disabled="busyId" @click="closeDispatch">Cancel</button>
             <button class="ui-btn ui-btn--primary" :disabled="busyId" @click="confirmDispatch">
               {{ busyId ? 'Dispatching…' : 'Dispatch' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- GOVERNMENT SUBSIDY: no money is taken, and the request still goes on
-         the hospital's Statement of Account. -->
-    <Teleport to="body">
-      <div v-if="subsidyFor" class="modal-overlay" @click.self="closeSubsidy">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subsidy-title">
-          <h2 id="subsidy-title" class="modal-title">Apply Government Subsidy</h2>
-          <p class="modal-sub">{{ subsidyFor.reference_number }} · {{ subsidyFor.requesting_facility?.name }}</p>
-
-          <p class="modal-desc">
-            The government subsidy meets the {{ pesos(subsidyFor.billing?.total_amount) }} charge, so nothing is collected
-            and the units are cleared for release. The request still goes on
-            {{ subsidyFor.requesting_facility?.name || "the hospital" }}'s Statement of Account, with the charge less the
-            subsidy and nothing payable.
-          </p>
-
-          <p v-if="Number(subsidyFor.billing?.collected ?? 0) > 0" class="modal-warning" role="note">
-            <strong>{{ pesos(subsidyFor.billing.collected) }} was already received.</strong> It stays on record; any refund
-            is settled outside RedAgos.
-          </p>
-
-          <div class="field">
-            <label for="subsidy-reason" class="field-label">
-              Reason <span class="field-optional">optional</span>
-            </label>
-            <input
-              id="subsidy-reason"
-              v-model.trim="subsidyReason"
-              type="text"
-              class="input"
-              maxlength="255"
-              placeholder="e.g. DOH allocation"
-            >
-          </div>
-
-          <p v-if="subsidyError" class="field-error field-error--block">{{ subsidyError }}</p>
-
-          <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="applyingSubsidy" @click="closeSubsidy">Cancel</button>
-            <button class="btn btn-primary" :disabled="applyingSubsidy" @click="confirmSubsidy">
-              {{ applyingSubsidy ? 'Applying…' : 'Apply subsidy' }}
             </button>
           </div>
         </div>
@@ -550,16 +493,16 @@ function gateFor(request) {
   const billing = request.billing
 
   if (!billing) {
-    return { ok: false, message: 'No statement has been raised for this request yet.' }
+    return { ok: false, message: 'No invoice has been raised for this request yet.' }
   }
 
   if (billing.clears_release) {
-    let message = 'Statement settled. Cleared for release.'
+    let message = 'Invoice settled. Cleared for release.'
 
     if (billing.is_statement_only) {
-      // A weekly order is billed to the hospital by statement only and never
+      // A weekly order is billed to the hospital by invoice only and never
       // waits on a payment in RedAgos (owner decision, 2026-10-10).
-      message = 'Weekly order, billed to the hospital by statement only. Cleared for release.'
+      message = 'Weekly order, billed to the hospital by invoice only. Cleared for release.'
     } else if (billing.is_subsidised) {
       message = 'Met by the government subsidy. Cleared for release.'
     }
@@ -672,46 +615,6 @@ async function confirmDispatch() {
     actionError.value = err?.message || 'Those units could not be dispatched.'
   } finally {
     busyId.value = null
-  }
-}
-
-/* GOVERNMENT SUBSIDY */
-const subsidyFor = ref(null)
-const subsidyReason = ref('')
-const subsidyError = ref('')
-const applyingSubsidy = ref(false)
-
-function pesos(value) {
-  return `₱${Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function openSubsidy(request) {
-  subsidyReason.value = ''
-  subsidyError.value = ''
-  subsidyFor.value = request
-}
-
-function closeSubsidy() {
-  if (applyingSubsidy.value) return
-  subsidyFor.value = null
-}
-
-async function confirmSubsidy() {
-  const request = subsidyFor.value
-  if (!request) return
-
-  applyingSubsidy.value = true
-  subsidyError.value = ''
-
-  try {
-    const response = await bloodCenterService.applySubsidy(request.id, subsidyReason.value || undefined)
-    request.billing = response?.billing ?? request.billing
-    toast('Subsidy Applied', 'success', response?.message ?? "Cleared for release. It is on the hospital's Statement of Account.")
-    subsidyFor.value = null
-  } catch (err) {
-    subsidyError.value = err?.message || 'The subsidy could not be applied.'
-  } finally {
-    applyingSubsidy.value = false
   }
 }
 
@@ -928,22 +831,6 @@ onMounted(load)
 .gate--ok { background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), .2); }
 .gate--blocked { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .22); }
 .gate-link { margin-left: auto; font-weight: 700; color: inherit; text-decoration: underline; }
-.gate-action {
-  margin-left: auto;
-  padding: 5px 11px;
-  border-radius: 7px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.gate-action:hover { background: var(--rb-surface-hover); }
-.gate-action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.gate-action + .gate-link { margin-left: 12px; }
 
 .units { margin-top: 12px; }
 .units-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }

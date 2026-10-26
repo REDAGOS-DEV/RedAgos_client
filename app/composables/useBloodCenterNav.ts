@@ -238,7 +238,11 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // No Cash Shifts entry: the counter runs without shifts (one billing staff
       // member). When the server turns them on, the counter links to their history.
       { label: 'Billing Counter', path: '/blood-center/pos', icon: 'philippine-peso', requires: 'billing.record_payment', keywords: 'pos point of sale counter cashier cash change tendered gcash qr receipt print restocking settlement' },
-      { label: 'Statements', path: '/blood-center/billing', icon: 'file-text', requires: 'billing.view', keywords: 'billing bills statement of account soa invoice patient weekly hospital settlement subsidy balance' },
+      // The project owner's terms (2026-10-25): an invoice is one billable
+      // request; a Statement of Account sums up a hospital's invoices,
+      // payments and balance over a period; a receipt proves a payment.
+      { label: 'Invoices', path: '/blood-center/billing', icon: 'file-text', requires: 'billing.view', keywords: 'invoice inv bill billing request patient weekly hospital settlement subsidy balance' },
+      { label: 'Statements', path: '/blood-center/statements', icon: 'clipboard', requires: 'billing.view', keywords: 'statement of account soa hospital period invoices payments balance opening closing' },
       { label: 'Receipts', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', keywords: 'receipt acknowledgement ar reprint print 80mm pdf void' },
       { label: 'Billing Transactions', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', keywords: 'transactions journal ledger history export csv void correction' },
       // Price configuration is Billing's alone (the Billing Supervisor).
@@ -257,14 +261,20 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // The Admin's alone (project owner, 2026-10-21).
       { label: 'Audit Log', path: '/blood-center/audit-log', icon: 'history', requires: 'audit.view', keywords: 'audit log activity history trail who did what sign in login logout failed user action' },
       { label: 'Reports & Analytics', path: '/blood-center/reports', icon: 'bar-chart', requires: REPORTS_ABILITIES, keywords: 'report analytics past period export snbc record collection' },
-      // Looking ahead, apart from the reports that look back (project owner, 2026-10-24).
-      { label: 'Demand Forecast', path: '/blood-center/forecast', icon: 'trending-up', requires: FORECAST_ABILITIES, keywords: 'forecast demand projection weeks ahead shortage recruit donors workload planning emergency' },
+      // In Demand Forecast's place (project owner, 2026-10-25): the Billing
+      // Supervisor's and both management levels' (reports.financial).
+      { label: 'Financial Reports', path: '/blood-center/financial-reports', icon: 'chart', requires: 'reports.financial', keywords: 'financial report money collections collected cash card gcash bank subsidy receivables outstanding aging component hospital revenue' },
+      // Out of the sidebar since 2026-10-25; still opened from Reports & Analytics.
+      { label: 'Demand Forecast', path: '/blood-center/forecast', icon: 'trending-up', requires: FORECAST_ABILITIES, hidden: true, keywords: 'forecast demand projection weeks ahead shortage recruit donors workload planning emergency' },
       // These two under Management rather than Stock and Supply (project
       // owner, 2026-10-19). Their abilities are unchanged, so who sees each is
       // too: the thresholds are read with inventory.view and set only with
       // inventory.thresholds, the sheet is read with inventory.stock_report.
       { label: 'Stock Thresholds', path: '/blood-center/stock-thresholds', icon: 'sliders-horizontal', requires: 'inventory.view', keywords: 'threshold minimum low stock alert shortage reorder level notification' },
       { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.stock_report', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
+      // Billing's scheduled subsidies, discounts and promos. Kept in
+      // Management because date windows are policy, not a counter action.
+      { label: 'Billing Programs', path: '/blood-center/billing-programs', icon: 'tags', requires: 'billing.prices', keywords: 'subsidy discount promo effective date schedule billing relief' },
       // The codes every deferral is recorded under (project owner,
       // 2026-10-24), under Management rather than Donor (owner, same day).
       // Kept by the Screening Physician, read by the clinical record's holders.

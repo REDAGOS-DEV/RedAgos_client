@@ -122,13 +122,14 @@ describe('Fulfillment\'s payment notice', () => {
     expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
-  it('lets Issuance meet a blocked statement from the government subsidy (project owner, 2026-10-19)', () => {
-    expect(page).toContain(`v-if="!gateFor(request).ok && request.billing && can('billing.subsidise')"`)
-    expect(page).toContain('await bloodCenterService.applySubsidy(request.id, subsidyReason.value || undefined)')
-    expect(page).toContain('request.billing = response?.billing ?? request.billing')
+  it('leaves a blocked statement to Billing rather than letting Issuance apply subsidy', () => {
+    expect(page).not.toContain('applySubsidy(')
+    expect(page).not.toContain("can('billing.subsidise')")
+    expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
-  it('says the request still goes on the hospital\'s Statement of Account', () => {
-    expect(page).toMatch(/The request still goes on\s+\{\{ subsidyFor\.requesting_facility\?\.name \|\| "the hospital" \}\}'s Statement of Account/)
+  it('places scheduled subsidy, discount and promo control under Management', () => {
+    const nav = readFileSync(path.join(root, 'app/composables/useBloodCenterNav.ts'), 'utf8')
+    expect(nav).toMatch(/label: 'Billing Programs'[\s\S]*?path: '\/blood-center\/billing-programs'[\s\S]*?requires: 'billing\.prices'/)
   })
 })

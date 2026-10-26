@@ -64,8 +64,8 @@
             v-model="scanQuery"
             type="search"
             class="input search-input"
-            :placeholder="category === 'patient' ? 'Scan a reference or type a name' : 'Weekly request reference'"
-            :aria-label="category === 'patient' ? 'Scan a request reference or search a patient' : 'Find a hospital statement'"
+            :placeholder="category === 'patient' ? 'Reference or patient name' : 'Weekly request reference'"
+            :aria-label="category === 'patient' ? 'Scan a request reference or search a patient' : 'Find a hospital invoice'"
             autocomplete="off"
             @keydown.esc="scanQuery = ''"
             @input="onQuery('scan')"
@@ -91,7 +91,7 @@
             type="button"
             role="option"
             class="q-row"
-            :class="{ 'q-row--on': bill?.request_id === b.request_id, 'q-row--stat': b.is_emergency }"
+            :class="{ 'q-row--on': bill?.request_id === b.request_id }"
             :aria-selected="bill?.request_id === b.request_id"
             @click="selectBill(b.request_id)"
           >
@@ -106,27 +106,11 @@
             </span>
           </button>
         </div>
-
-        <!-- The day at a glance, from the billing summary -->
-        <dl class="today" aria-label="Today at this counter">
-          <div>
-            <dt>Collected today</dt>
-            <dd>{{ pesos(summary?.collected_today) }}</dd>
-          </div>
-          <div>
-            <dt>{{ category === 'weekly' ? 'Awaiting settlement' : 'Still owed' }}</dt>
-            <dd>
-              {{ category === 'weekly'
-                ? (summary?.weekly_awaiting_settlement?.count ?? 0)
-                : (summary?.outstanding?.count ?? 0) }}
-              <small>bills</small>
-            </dd>
-          </div>
-        </dl>
       </section>
 
-      <!-- 2. THE BILL -->
-      <section class="card billcard" aria-labelledby="bill-title">
+      <!-- 2. THE BILL, step one: the request and what is held for it. Its one
+           action opens the payment in its place (project owner, 2026-10-25). -->
+      <section v-if="!bill || !paymentReady" class="card billcard" aria-labelledby="bill-title">
         <h2 id="bill-title" class="sr-only">Bill</h2>
 
         <div v-if="billLoading" class="bill-loading" aria-busy="true">
@@ -134,31 +118,21 @@
           <div v-for="n in 3" :key="n" class="skeleton skeleton--line" />
         </div>
 
-        <div v-else-if="!bill" class="bill-empty">
-          <span class="bill-empty__icon"><AssetIcon name="scan-line" :size="28" /></span>
-          <p class="bill-empty__title">Scan a request to start</p>
-          <p class="bill-empty__sub">
-            Or pick one from the waiting list.
-            Press <kbd class="kbd">/</kbd> anytime to scan.
-          </p>
-          <button v-if="queue.length" type="button" class="btn btn-outline" @click="selectBill(queue[0].request_id)">
-            Take the next one ({{ queue[0].reference_number }})
-          </button>
-        </div>
-
+        <!-- With no request picked the panel still shows, empty and locked, as
+             Blood Testing's results card does; picking one fills it in. -->
         <template v-else>
-          <div class="bill-head">
+          <div class="bill-head" :class="{ 'bill-head--empty': !bill }">
             <span class="avatar" aria-hidden="true"><AssetIcon :name="weekly ? 'building-2' : 'user'" :size="18" /></span>
             <div class="bill-head__main">
               <p class="bill-head__name">
                 {{ recipientName }}
-                <BillingBadge v-if="bill.request?.is_emergency" tone="danger">STAT</BillingBadge>
+                <BillingBadge v-if="bill?.request?.is_emergency" tone="danger">STAT</BillingBadge>
               </p>
               <p class="bill-head__line">{{ recipientLine }}</p>
               <p v-if="recipientExtra" class="bill-head__extra">{{ recipientExtra }}</p>
             </div>
-            <div class="bill-head__actions">
-              <NuxtLink :to="`/blood-center/statement/${bill.request_id}`" class="link-btn">View details</NuxtLink>
+            <div v-if="bill" class="bill-head__actions">
+              <NuxtLink :to="`/blood-center/invoice/${bill.request_id}`" class="link-btn">View details</NuxtLink>
               <button type="button" class="icon-btn" title="Clear (Esc)" aria-label="Clear this bill" @click="nextCustomer">
                 <AssetIcon name="x" :size="15" />
               </button>
@@ -168,37 +142,38 @@
           <!-- ITEMS: the units held for the request; nothing is added or priced at the counter -->
           <div class="items">
             <table class="grid-table">
+              <!-- The figures keep fixed widths; the component name takes the rest and wraps. -->
               <colgroup>
-                <col style="width: 6%">
-                <col style="width: 34%">
-                <col style="width: 14%">
-                <col style="width: 8%">
-                <col style="width: 18%">
-                <col style="width: 20%">
+                <col class="col-idx">
+                <col>
+                <col class="col-type">
+                <col class="col-qty">
+                <col class="col-price">
+                <col class="col-total">
               </colgroup>
               <thead>
                 <tr>
-                  <th scope="col">#</th>
+                  <th scope="col" class="idx">#</th>
                   <th scope="col">Component</th>
                   <th scope="col">Type</th>
                   <th scope="col" class="num">Qty</th>
-                  <th scope="col" class="num">Unit price</th>
+                  <th scope="col" class="num price">Unit price</th>
                   <th scope="col" class="num">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
-                <template v-if="bill.lines?.length">
+                <template v-if="bill?.lines?.length">
                   <tr v-for="(line, i) in bill.lines" :key="i">
-                    <td class="muted">{{ i + 1 }}</td>
-                    <td class="ellipsis">{{ line.component_name }}</td>
+                    <td class="muted idx">{{ i + 1 }}</td>
+                    <td class="item-name">{{ line.component_name }}</td>
                     <td><span v-if="line.blood_type" class="type">{{ line.blood_type }}</span><span v-else class="muted">-</span></td>
                     <td class="num">{{ line.quantity }}</td>
-                    <td class="num">{{ pesos(line.unit_price) }}</td>
+                    <td class="num price">{{ pesos(line.unit_price) }}</td>
                     <td class="num strong">{{ pesos(line.line_total) }}</td>
                   </tr>
                 </template>
                 <tr v-else class="empty-row">
-                  <td colspan="6">No units are held for this request yet.</td>
+                  <td colspan="6">{{ bill ? 'No units are held for this request yet.' : 'No request picked.' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -208,194 +183,65 @@
           <dl class="facts">
             <div>
               <dt>Type</dt>
-              <dd>{{ bill.request?.purpose_label || (weekly ? 'Blood Bank Replenishment' : 'Patient Transfusion') }}</dd>
+              <dd>{{ !bill ? '—' : bill.request?.purpose_label || (weekly ? 'Blood Bank Replenishment' : 'Patient Transfusion') }}</dd>
             </div>
             <div>
               <dt>Priority</dt>
-              <dd :class="{ 'facts__stat': bill.request?.is_emergency }">{{ bill.request?.urgency_label || 'Routine' }}</dd>
+              <dd :class="{ 'facts__stat': bill?.request?.is_emergency }">{{ !bill ? '—' : bill.request?.urgency_label || 'Routine' }}</dd>
             </div>
             <div>
               <dt>{{ weekly ? 'Requested on' : 'Physician / hospital' }}</dt>
-              <dd>{{ weekly ? day(bill.request?.request_date) : (bill.request?.attending_physician || bill.request?.requesting_facility || '-') }}</dd>
+              <dd>{{ !bill ? '—' : weekly ? day(bill.request?.request_date) : (bill.request?.attending_physician || bill.request?.requesting_facility || '-') }}</dd>
             </div>
           </dl>
 
-          <label v-if="!weekly" class="field">
-            <span class="field-label">Received from <span class="optional">(optional)</span></span>
-            <input v-model.trim="payerName" type="text" maxlength="120" class="input" placeholder="Name printed on the receipt, e.g. the patient's watcher" autocomplete="off" :disabled="!canPay">
-          </label>
+          <div class="bill-foot">
+            <p class="bill-total" :class="{ 'bill-total--empty': !bill }">
+              <span>Total</span>
+              <strong>{{ pesos(bill?.total_amount) }}</strong>
+            </p>
+            <button ref="proceedBtn" type="button" class="btn btn-primary btn-cta bill-proceed" :disabled="!bill" @click="proceedToPayment">
+              {{ proceedLabel }}
+              <AssetIcon name="arrow-right" :size="16" />
+            </button>
+          </div>
         </template>
-
-        <p class="note">
-          <AssetIcon name="info" :size="14" />
-          <span>
-            {{ category === 'patient'
-              ? 'The government subsidy may cover an eligible patient’s whole bill. Verify eligibility before applying it.'
-              : 'Weekly bills are settled by the hospital outside RedAgos; record the settlement once the order closes.' }}
-          </span>
-        </p>
       </section>
 
-      <!-- 3. PAYMENT -->
-      <aside class="card pay" aria-labelledby="pay-title">
-        <div class="pay-hero" :class="{ 'pay-hero--empty': !bill }">
-          <div class="pay-hero__top">
-            <h2 id="pay-title" class="pay-hero__title">{{ weekly ? 'Settlement' : 'Payment' }}</h2>
-            <span class="txn">Bill <strong class="mono">{{ bill?.request?.reference_number || '-' }}</strong></span>
-          </div>
-          <p class="pay-hero__label">{{ heroLabel }}</p>
-          <p class="pay-hero__amount">{{ pesos(heroAmount) }}</p>
-        </div>
-
-        <div class="tabs" role="tablist" aria-label="Payment">
-          <button
-            v-for="t in payTabs"
-            :key="t.value"
-            role="tab"
-            class="tab"
-            :class="{ 'tab--on': payTab === t.value }"
-            :aria-selected="payTab === t.value"
-            :title="t.label"
-            @click="payTab = t.value"
-          >
-            <span class="tab__long">{{ t.label }}</span>
-            <span class="tab__short" aria-hidden="true">{{ t.short }}</span>
-          </button>
-        </div>
-
-        <div class="pay-body">
-          <!-- DONE: the receipt to hand over -->
-          <div v-if="done" class="done">
-            <div class="done-mark"><AssetIcon name="check" :size="22" /></div>
-            <h3 class="done-title">{{ done.parts > 1 ? `Payment recorded in ${done.parts} parts` : 'Payment recorded' }}</h3>
-            <div v-if="done.change !== null" class="done-change">
-              <span>Change to give back</span>
-              <strong>{{ pesos(done.change) }}</strong>
-            </div>
-            <template v-if="done.receipt">
-              <p class="done-sub">
-                Receipt <NuxtLink :to="`/blood-center/receipt/${done.receipt.id}`" class="link mono">{{ done.receipt.receipt_number }}</NuxtLink>
-                · {{ done.receipt.payment_method_label }} {{ pesos(done.receipt.amount_paid) }}
-              </p>
-              <!-- A split is one receipt; its parts are listed on it. -->
-              <p v-if="done.parts > 1" class="done-sub">
-                {{ done.receipt.tenders.map((t) => `${t.method_label} ${pesos(t.amount_paid)}`).join(' · ') }}
-              </p>
-            </template>
-            <button ref="printBtn" class="btn btn-primary btn-block btn-lg" :disabled="!done.receipt" @click="printReceipt(done.receipt)">
-              <AssetIcon name="printer" :size="16" />
-              Print receipt (80mm)
-            </button>
-            <div class="pair">
-              <button class="btn btn-outline" :disabled="downloadingReceipt || !done.receipt" @click="downloadReceipt(done.receipt)">
-                <AssetIcon name="download" :size="15" />
-                A4 PDF
-              </button>
-              <button class="btn btn-outline" @click="nextCustomer">Next customer</button>
-            </div>
-          </div>
-
-          <!-- STATEMENT PREVIEW: the live bill as the next statement would show it -->
-          <div v-else-if="payTab === 'preview'" class="preview">
-            <template v-if="bill">
-              <div class="preview-head">
-                <strong>Statement of Account</strong>
-                <span class="mono">{{ bill.request?.reference_number }}</span>
+      <!-- 3. THE PAYMENT, step two: replaces the bill. What is due on the left,
+           how it is paid on the right; stacked when the panel is narrow. -->
+      <aside v-else class="card pay" aria-labelledby="pay-title">
+        <div class="pay-layout">
+          <section class="pay-due" aria-label="Amount due">
+            <div class="pay-hero">
+              <div class="pay-hero__top">
+                <button v-if="!done" type="button" class="link-btn" @click="backToDetails">
+                  <AssetIcon name="arrow-left" :size="14" />
+                  Request details
+                </button>
+                <span class="txn">Bill <strong class="mono">{{ bill.request?.reference_number || '-' }}</strong></span>
               </div>
-              <ul class="preview-lines">
-                <li v-for="(line, i) in bill.lines" :key="i">
-                  <span>{{ line.blood_type ? `${line.blood_type} ` : '' }}{{ line.component_name }} × {{ line.quantity }}</span>
-                  <span>{{ pesos(line.line_total) }}</span>
-                </li>
-                <li v-if="!bill.lines?.length" class="muted">No units held yet.</li>
-              </ul>
+              <h2 id="pay-title" class="pay-hero__title">
+                <span class="pay-hero__name">{{ recipientName }}</span>
+                <BillingBadge v-if="bill.request?.is_emergency" tone="danger">STAT</BillingBadge>
+              </h2>
+              <p class="pay-hero__label">{{ heroLabel }}</p>
+              <p class="pay-hero__amount">{{ pesos(heroAmount) }}</p>
+            </div>
+
+            <dl v-if="weekly" class="summary">
+              <div><dt>Total billed</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
+              <div><dt>Status</dt><dd>{{ bill.status_label }}</dd></div>
+            </dl>
+            <template v-else>
               <dl class="summary">
                 <div><dt>Total amount</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
-                <div v-if="!weekly"><dt>Paid</dt><dd>{{ pesos(bill.collected) }}</dd></div>
-                <div class="summary-due"><dt>{{ weekly ? 'Billed to hospital' : 'Amount due' }}</dt><dd>{{ pesos(weekly ? bill.total_amount : bill.outstanding) }}</dd></div>
-              </dl>
-              <NuxtLink :to="`/blood-center/statement/${bill.request_id}`" class="btn btn-outline btn-block">
-                <AssetIcon name="file-text" :size="15" />
-                Open statement to print or issue
-              </NuxtLink>
-            </template>
-            <div v-else class="pay-empty">
-              <AssetIcon name="file-text" :size="24" />
-              <p>The statement preview appears once a bill is loaded.</p>
-            </div>
-          </div>
-
-          <div v-else-if="weekly && !bill" class="pay-empty">
-            <AssetIcon name="building-2" :size="24" />
-            <p>Pick a weekly statement to record the hospital's settlement.</p>
-          </div>
-
-          <!-- WEEKLY: no money moves here; the hospital's settlement is recorded -->
-          <template v-else-if="weekly">
-            <div class="summary">
-              <dl>
-                <div><dt>Total billed</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
-                <div><dt>Status</dt><dd>{{ bill.status_label }}</dd></div>
-              </dl>
-            </div>
-            <dl v-if="bill.settlement" class="settled">
-              <div><dt>Settled on</dt><dd>{{ day(bill.settlement.settled_at) }}</dd></div>
-              <div><dt>Reference</dt><dd class="mono">{{ bill.settlement.reference }}</dd></div>
-            </dl>
-            <p v-else-if="!bill.request?.is_closed" class="quiet">The order is still open, so its total can still change. Record the settlement once it closes.</p>
-            <form v-else id="settle-form" class="form" @submit.prevent="submitSettlement">
-              <label class="field">
-                <span class="field-label">Hospital's payment reference</span>
-                <input v-model.trim="settlement.settlement_reference" type="text" maxlength="100" class="input mono" placeholder="Cheque or transfer number" required>
-                <span v-if="settlementErrors.settlement_reference" class="field-error">{{ settlementErrors.settlement_reference }}</span>
-              </label>
-              <div class="pair">
-                <div class="field">
-                  <label class="field-label" for="settled-at">Date settled</label>
-                  <DatePicker id="settled-at" v-model="settlement.settled_at" :max="todayIso" size="sm" />
-                </div>
-                <label class="field">
-                  <span class="field-label">Note <span class="optional">(optional)</span></span>
-                  <input v-model.trim="settlement.settlement_note" type="text" maxlength="500" class="input">
-                </label>
-              </div>
-              <span v-if="settlementErrors.settled_at" class="field-error">{{ settlementErrors.settled_at }}</span>
-              <p v-if="settlementError" class="field-error">{{ settlementError }}</p>
-            </form>
-          </template>
-
-          <!-- PATIENT PAYMENT: the whole form shows, disabled, until a bill is loaded -->
-          <template v-else>
-            <div class="methods" role="radiogroup" aria-label="Payment method">
-              <button
-                v-for="m in METHODS"
-                :key="m.value"
-                type="button"
-                role="radio"
-                class="method"
-                :class="{ 'method--on': method === m.value }"
-                :aria-checked="method === m.value"
-                :aria-label="m.label"
-                :title="m.value === 'cash' && hasCashPart ? 'Cash is already part of this payment' : m.label"
-                :disabled="!canPay || (m.value === 'cash' && hasCashPart)"
-                @click="method = m.value"
-              >
-                <AssetIcon :name="m.icon" :size="16" />
-                <!-- A narrow panel shows the short label; the tile's name stays whole. -->
-                <span class="method-label" :class="{ 'method-label--long': m.short }">{{ m.label }}</span>
-                <span v-if="m.short" class="method-label method-label--short" aria-hidden="true">{{ m.short }}</span>
-              </button>
-            </div>
-
-            <div class="summary">
-              <dl>
-                <div><dt>Total amount</dt><dd>{{ pesos(bill?.total_amount) }}</dd></div>
                 <div class="subsidy-row">
                   <dt>
                     Government subsidy
-                    <button v-if="canPay && !subsidyOpen" type="button" class="link-btn link-btn--inline" @click="openSubsidy">Apply</button>
+                    <button v-if="canPay" type="button" class="link-btn link-btn--inline" @click="openSubsidy">Apply</button>
                   </dt>
-                  <dd>− {{ pesos(bill?.is_subsidised ? bill.total_amount : 0) }}</dd>
+                  <dd>− {{ pesos(bill.is_subsidised ? bill.total_amount : 0) }}</dd>
                 </div>
                 <div v-if="Number(bill?.collected) > 0"><dt>Already paid</dt><dd>− {{ pesos(bill.collected) }}</dd></div>
                 <div v-for="(p, i) in parts" :key="i" class="part-row">
@@ -408,235 +254,267 @@
                   <dd>− {{ pesos(p.amount) }}</dd>
                 </div>
               </dl>
-            </div>
 
-            <!-- The subsidy waives the whole bill; it is a decision, not a payment. -->
-            <div v-if="subsidyOpen" class="subsidy-form">
-              <p class="subsidy-title">Apply the government subsidy</p>
-              <p class="quiet">
-                Waives the whole {{ pesos(bill.total_amount) }} and clears the blood for release. No payment is recorded.
-                <template v-if="Number(bill.collected) > 0">The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.</template>
-              </p>
-              <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="Reason (optional), e.g. DOH allocation" aria-label="Reason for the subsidy">
-              <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
-              <div class="pair">
-                <button type="button" class="btn btn-outline" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
-                <button type="button" class="btn btn-primary" :disabled="saving" @click="submitSubsidy">{{ saving ? 'Applying…' : 'Apply subsidy' }}</button>
+              <!-- The subsidy waives the whole bill; it is a decision, not a payment. -->
+              <div v-if="subsidyOpen" class="subsidy-form">
+                <p class="subsidy-title">Apply the government subsidy</p>
+                <p class="quiet">
+                  Waives the whole {{ pesos(bill.total_amount) }} and clears the blood for release. No payment is recorded.
+                  <template v-if="Number(bill.collected) > 0">The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.</template>
+                </p>
+                <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="Reason (optional), e.g. DOH allocation" aria-label="Reason for the subsidy">
+                <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
+                <div class="pair">
+                  <button type="button" class="btn btn-outline" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
+                  <button type="button" class="btn btn-primary" :disabled="saving" @click="submitSubsidy">{{ saving ? 'Applying…' : 'Apply subsidy' }}</button>
+                </div>
               </div>
+            </template>
+          </section>
+
+          <section class="pay-take" :aria-label="weekly ? 'Settlement' : 'Payment'">
+            <div class="tabs" role="tablist" :aria-label="weekly ? 'Settlement' : 'Payment'">
+              <button
+                v-for="t in payTabs"
+                :key="t.value"
+                role="tab"
+                class="tab"
+                :class="{ 'tab--on': payTab === t.value }"
+                :aria-selected="payTab === t.value"
+                :title="t.label"
+                @click="payTab = t.value"
+              >
+                <span class="tab__long">{{ t.label }}</span>
+                <span class="tab__short" aria-hidden="true">{{ t.short }}</span>
+              </button>
             </div>
 
-            <div v-else-if="bill && !takes" class="nothing-due">
-              <AssetIcon name="check" :size="18" />
-              <div>
-                <strong>{{ bill.is_subsidised ? 'Met by the government subsidy' : 'Nothing is due on this bill' }}</strong>
-                <p>{{ bill.clears_release ? 'Its blood can be released.' : bill.status_label }}</p>
-              </div>
-            </div>
-
-            <p v-else-if="bill && shiftsEnabled && !shift" class="banner banner--warn">
-              <AssetIcon name="triangle-alert" :size="14" />
-              <span>Open a shift above before taking this payment.</span>
-            </p>
-
-            <form v-else id="pay-form" class="form" @submit.prevent="footAction === 'add' ? addPart() : takePayment()">
-              <div class="field">
-                <label for="pay-received" class="field-label">Amount received</label>
-                <div class="received">
-                  <div class="money">
-                    <span aria-hidden="true">₱</span>
-                    <input
-                      id="pay-received"
-                      ref="tenderedInput"
-                      v-model.number="tendered"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      class="input input--money"
-                      :disabled="!canPay"
-                      placeholder="0.00"
-                    >
-                  </div>
-                  <button type="button" class="btn btn-outline" :disabled="!canPay" @click="tendered = entry.remaining">Full Amount</button>
+            <div class="pay-body">
+              <!-- DONE: the receipt to hand over -->
+              <div v-if="done" class="done">
+                <div class="done-mark"><AssetIcon name="check" :size="22" /></div>
+                <h3 class="done-title">{{ done.parts > 1 ? `Payment recorded in ${done.parts} parts` : 'Payment recorded' }}</h3>
+                <div v-if="done.change !== null" class="done-change">
+                  <span>Change to give back</span>
+                  <strong>{{ pesos(done.change) }}</strong>
+                </div>
+                <template v-if="done.receipt">
+                  <p class="done-sub">
+                    Receipt <NuxtLink :to="`/blood-center/receipt/${done.receipt.id}`" class="link mono">{{ done.receipt.receipt_number }}</NuxtLink>
+                    · {{ done.receipt.payment_method_label }} {{ pesos(done.receipt.amount_paid) }}
+                  </p>
+                  <!-- A split is one receipt; its parts are listed on it. -->
+                  <p v-if="done.parts > 1" class="done-sub">
+                    {{ done.receipt.tenders.map((t) => `${t.method_label} ${pesos(t.amount_paid)}`).join(' · ') }}
+                  </p>
+                </template>
+                <button ref="printBtn" class="btn btn-primary btn-block btn-lg" :disabled="!done.receipt" @click="printReceipt(done.receipt)">
+                  <AssetIcon name="printer" :size="16" />
+                  Print receipt (80mm)
+                </button>
+                <div class="pair">
+                  <button class="btn btn-outline" :disabled="downloadingReceipt || !done.receipt" @click="downloadReceipt(done.receipt)">
+                    <AssetIcon name="download" :size="15" />
+                    A4 PDF
+                  </button>
+                  <button class="btn btn-outline" @click="nextCustomer">Next customer</button>
                 </div>
               </div>
 
-              <!-- Quick cash: the next round amounts above what is left -->
-              <div v-if="method === 'cash' && canPay && cashChips.length" class="cash-chips" aria-label="Quick amounts received">
-                <button
-                  v-for="amount in cashChips"
-                  :key="amount"
-                  type="button"
-                  class="cash-chip"
-                  :class="{ 'cash-chip--on': Number(tendered) === amount }"
-                  @click="tendered = amount"
-                >
-                  {{ pesos(amount) }}
-                </button>
+              <!-- INVOICE PREVIEW: the live bill as the next invoice would show it -->
+              <div v-else-if="payTab === 'preview'" class="preview">
+                <div class="preview-head">
+                  <strong>Invoice</strong>
+                  <span class="mono">{{ bill.request?.reference_number }}</span>
+                </div>
+                <ul class="preview-lines">
+                  <li v-for="(line, i) in bill.lines" :key="i">
+                    <span>{{ line.blood_type ? `${line.blood_type} ` : '' }}{{ line.component_name }} × {{ line.quantity }}</span>
+                    <span>{{ pesos(line.line_total) }}</span>
+                  </li>
+                  <li v-if="!bill.lines?.length" class="muted">No units held yet.</li>
+                </ul>
+                <dl class="summary">
+                  <div><dt>Total amount</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
+                  <div v-if="!weekly"><dt>Paid</dt><dd>{{ pesos(bill.collected) }}</dd></div>
+                  <div class="summary-due"><dt>{{ weekly ? 'Billed to hospital' : 'Amount due' }}</dt><dd>{{ pesos(weekly ? bill.total_amount : bill.outstanding) }}</dd></div>
+                </dl>
+                <NuxtLink :to="`/blood-center/invoice/${bill.request_id}`" class="btn btn-outline btn-block">
+                  <AssetIcon name="file-text" :size="15" />
+                  Open invoice to print or issue
+                </NuxtLink>
               </div>
 
-              <!-- A card's additional information sits beside its reference, so it costs no height. -->
-              <div class="refs" :class="{ 'refs--split': method === 'card' }">
-                <div class="field">
-                  <label for="pay-ref" class="field-label" :title="`Payment reference · ${referenceName(method) || 'card, GCash or bank transfer'} no.`">Payment reference <span class="optional">· {{ referenceName(method) || 'card, GCash or bank transfer' }} no.</span></label>
-                  <div class="ref">
-                    <input
-                      id="pay-ref"
-                      v-model.trim="reference"
-                      type="text"
-                      maxlength="100"
-                      class="input mono"
-                      :placeholder="methodInfo.placeholder"
-                      :disabled="!canPay || !needsReference(method)"
-                      :required="needsReference(method)"
+              <!-- WEEKLY: no money moves here; the hospital's settlement is recorded -->
+              <template v-else-if="weekly">
+                <dl v-if="bill.settlement" class="settled">
+                  <div><dt>Settled on</dt><dd>{{ day(bill.settlement.settled_at) }}</dd></div>
+                  <div><dt>Reference</dt><dd class="mono">{{ bill.settlement.reference }}</dd></div>
+                </dl>
+                <p v-else-if="!bill.request?.is_closed" class="quiet">The order is still open, so its total can still change. Record the settlement once it closes.</p>
+                <form v-else id="settle-form" class="form" @submit.prevent="submitSettlement">
+                  <label class="field">
+                    <span class="field-label">Hospital's payment reference</span>
+                    <input ref="settleInput" v-model.trim="settlement.settlement_reference" type="text" maxlength="100" class="input mono" placeholder="Cheque or transfer number" required>
+                    <span v-if="settlementErrors.settlement_reference" class="field-error">{{ settlementErrors.settlement_reference }}</span>
+                  </label>
+                  <div class="pair">
+                    <div class="field">
+                      <label class="field-label" for="settled-at">Date settled</label>
+                      <DatePicker id="settled-at" v-model="settlement.settled_at" :max="todayIso" size="sm" />
+                    </div>
+                    <label class="field">
+                      <span class="field-label">Note <span class="optional">(optional)</span></span>
+                      <input v-model.trim="settlement.settlement_note" type="text" maxlength="500" class="input">
+                    </label>
+                  </div>
+                  <span v-if="settlementErrors.settled_at" class="field-error">{{ settlementErrors.settled_at }}</span>
+                  <p v-if="settlementError" class="field-error">{{ settlementError }}</p>
+                </form>
+              </template>
+
+              <!-- PATIENT PAYMENT -->
+              <div v-else-if="!takes" class="nothing-due">
+                <AssetIcon name="check" :size="18" />
+                <div>
+                  <strong>{{ bill.is_subsidised ? 'Met by the government subsidy' : 'Nothing is due on this bill' }}</strong>
+                  <p>{{ bill.clears_release ? 'Its blood can be released.' : bill.status_label }}</p>
+                </div>
+              </div>
+
+              <p v-else-if="shiftsEnabled && !shift" class="banner banner--warn">
+                <AssetIcon name="triangle-alert" :size="14" />
+                <span>Open a shift above before taking this payment.</span>
+              </p>
+
+              <template v-else>
+                <div class="methods" role="radiogroup" aria-label="Payment method">
+                  <button
+                    v-for="m in METHODS"
+                    :key="m.value"
+                    type="button"
+                    role="radio"
+                    class="method"
+                    :class="{ 'method--on': method === m.value }"
+                    :aria-checked="method === m.value"
+                    :aria-label="m.label"
+                    :title="m.value === 'cash' && hasCashPart ? 'Cash is already part of this payment' : m.label"
+                    :disabled="!canPay || (m.value === 'cash' && hasCashPart)"
+                    @click="method = m.value"
+                  >
+                    <AssetIcon :name="m.icon" :size="16" />
+                    <!-- A narrow panel shows the short label; the tile's name stays whole. -->
+                    <span class="method-label" :class="{ 'method-label--long': m.short }">{{ m.label }}</span>
+                    <span v-if="m.short" class="method-label method-label--short" aria-hidden="true">{{ m.short }}</span>
+                  </button>
+                </div>
+
+                <form id="pay-form" class="form" @submit.prevent="footAction === 'add' ? addPart() : takePayment()">
+                  <div class="field">
+                    <label for="pay-received" class="field-label">Amount received</label>
+                    <div class="received">
+                      <div class="money">
+                        <span aria-hidden="true">₱</span>
+                        <input
+                          id="pay-received"
+                          ref="tenderedInput"
+                          v-model.number="tendered"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          class="input input--money"
+                          :disabled="!canPay"
+                          placeholder="0.00"
+                        >
+                      </div>
+                      <button type="button" class="btn btn-outline" :disabled="!canPay" @click="tendered = entry.remaining">Full Amount</button>
+                    </div>
+                  </div>
+
+                  <!-- Quick cash: the next round amounts above what is left -->
+                  <div v-if="method === 'cash' && canPay && cashChips.length" class="cash-chips" aria-label="Quick amounts received">
+                    <button
+                      v-for="amount in cashChips"
+                      :key="amount"
+                      type="button"
+                      class="cash-chip"
+                      :class="{ 'cash-chip--on': Number(tendered) === amount }"
+                      @click="tendered = amount"
                     >
-                    <button type="button" class="ref-copy" :disabled="!reference" aria-label="Copy the reference" title="Copy the reference" @click="copyReference">
-                      <AssetIcon name="clipboard-list" :size="15" />
+                      {{ pesos(amount) }}
                     </button>
                   </div>
-                </div>
 
-                <div v-if="method === 'card'" class="field">
-                  <label for="pay-info" class="field-label" title="Additional information (optional)">Additional information <span class="optional">(optional)</span></label>
-                  <input
-                    id="pay-info"
-                    v-model.trim="additionalInfo"
-                    type="text"
-                    maxlength="100"
-                    class="input"
-                    autocomplete="off"
-                    :disabled="!canPay"
-                  >
-                </div>
+                  <!-- A card's additional information sits beside its reference, so it costs no height. -->
+                  <div class="refs" :class="{ 'refs--split': method === 'card' }">
+                    <div class="field">
+                      <label for="pay-ref" class="field-label" :title="`Payment reference · ${referenceName(method) || 'card, GCash or bank transfer'} no.`">Payment reference <span class="optional">· {{ referenceName(method) || 'card, GCash or bank transfer' }} no.</span></label>
+                      <div class="ref">
+                        <input
+                          id="pay-ref"
+                          v-model.trim="reference"
+                          type="text"
+                          maxlength="100"
+                          class="input mono"
+                          :placeholder="methodInfo.placeholder"
+                          :disabled="!canPay || !needsReference(method)"
+                          :required="needsReference(method)"
+                        >
+                        <button type="button" class="ref-copy" :disabled="!reference" aria-label="Copy the reference" title="Copy the reference" @click="copyReference">
+                          <AssetIcon name="clipboard-list" :size="15" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div v-if="method === 'card'" class="field">
+                      <label for="pay-info" class="field-label" title="Additional information (optional)">Additional information <span class="optional">(optional)</span></label>
+                      <input
+                        id="pay-info"
+                        v-model.trim="additionalInfo"
+                        type="text"
+                        maxlength="100"
+                        class="input"
+                        autocomplete="off"
+                        :disabled="!canPay"
+                      >
+                    </div>
+                  </div>
+
+                  <label class="field">
+                    <span class="field-label">Received from <span class="optional">(optional)</span></span>
+                    <input v-model.trim="payerName" type="text" maxlength="120" class="input" placeholder="Name printed on the receipt, e.g. the patient's watcher" autocomplete="off" :disabled="!canPay">
+                  </label>
+
+                  <p v-if="payError" class="field-error">{{ payError }}</p>
+                </form>
+              </template>
+            </div>
+
+            <!-- The panel's action, outside the scrolling form so it never drops below the fold. -->
+            <div v-if="footAction" class="pay-foot">
+              <!-- The change sits by the button, so it never scrolls out of view. -->
+              <div v-if="footAction !== 'settle'" class="change" :class="{ 'change--due': entry.short > 0, 'change--short': entry.over > 0 }" aria-live="polite">
+                <span class="change__label">{{ entry.short > 0 ? 'Remaining' : 'Change' }}</span>
+                <strong class="change__value">
+                  {{ entry.over > 0 ? `${pesos(entry.over)} more than is due` : entry.short > 0 ? `${pesos(entry.short)} by another method` : pesos(entry.change) }}
+                </strong>
               </div>
-
-              <p v-if="payError" class="field-error">{{ payError }}</p>
-            </form>
-          </template>
-        </div>
-
-        <!-- The panel's action, outside the scrolling form so it never drops below the fold. -->
-        <div v-if="footAction" class="pay-foot">
-          <!-- The change sits by the button, so it never scrolls out of view. -->
-          <div v-if="footAction !== 'settle'" class="change" :class="{ 'change--due': entry.short > 0, 'change--short': entry.over > 0 }" aria-live="polite">
-            <span class="change__label">{{ entry.short > 0 ? 'Remaining' : 'Change' }}</span>
-            <strong class="change__value">
-              {{ entry.over > 0 ? `${pesos(entry.over)} more than is due` : entry.short > 0 ? `${pesos(entry.short)} by another method` : pesos(entry.change) }}
-            </strong>
-          </div>
-          <button v-if="footAction === 'add'" type="button" class="btn btn-primary btn-cta" :disabled="!canAddPart" @click="addPart">
-            <AssetIcon name="circle-plus" :size="16" />
-            Add {{ pesos(entry.paid) }} {{ methodInfo.label }} to the payment
-          </button>
-          <button v-else-if="footAction === 'settle'" type="submit" form="settle-form" class="btn btn-primary btn-cta" :disabled="saving || !settlement.settlement_reference">
-            {{ saving ? 'Recording…' : 'Record Settlement' }}
-          </button>
-          <button v-else type="submit" form="pay-form" class="btn btn-primary btn-cta" :disabled="recording || !canComplete">
-            <AssetIcon name="credit-card" :size="16" />
-            {{ recording ? 'Recording…' : 'Complete Payment' }}
-            <kbd class="kbd kbd--on-primary">Enter</kbd>
-          </button>
+              <button v-if="footAction === 'add'" type="button" class="btn btn-primary btn-cta" :disabled="!canAddPart" @click="addPart">
+                <AssetIcon name="circle-plus" :size="16" />
+                Add {{ pesos(entry.paid) }} {{ methodInfo.label }} to the payment
+              </button>
+              <button v-else-if="footAction === 'settle'" type="submit" form="settle-form" class="btn btn-primary btn-cta" :disabled="saving || !settlement.settlement_reference">
+                {{ saving ? 'Recording…' : 'Record Settlement' }}
+              </button>
+              <button v-else type="submit" form="pay-form" class="btn btn-primary btn-cta" :disabled="recording || !canComplete">
+                <AssetIcon name="credit-card" :size="16" />
+                {{ recording ? 'Recording…' : 'Complete Payment' }}
+                <kbd class="kbd kbd--on-primary">Enter</kbd>
+              </button>
+            </div>
+          </section>
         </div>
       </aside>
-    </div>
-
-    <div class="pos-bottom">
-      <!-- TODAY'S TRANSACTIONS -->
-      <section class="card recent" aria-labelledby="recent-title">
-        <div class="card-head">
-          <h2 id="recent-title" class="card-title">Recent transactions</h2>
-          <NuxtLink to="/blood-center/billing-transactions" class="link-btn">View all</NuxtLink>
-        </div>
-        <div class="recent-scroll">
-          <table class="grid-table grid-table--recent">
-            <colgroup>
-              <col style="width: 15%">
-              <col style="width: 14%">
-              <col style="width: 18%">
-              <col style="width: 10%">
-              <col style="width: 14%">
-              <col style="width: 10%">
-              <col style="width: 11%">
-              <col style="width: 8%">
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Date &amp; time</th>
-                <th scope="col">Transaction #</th>
-                <th scope="col">Patient / recipient</th>
-                <th scope="col">Type</th>
-                <th scope="col" class="num">Total amount</th>
-                <th scope="col">Method</th>
-                <th scope="col">Status</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-if="recentLoading">
-                <tr v-for="n in 3" :key="n"><td colspan="8"><div class="skeleton skeleton--line" /></td></tr>
-              </template>
-              <tr v-else-if="!recent.length" class="empty-row">
-                <td colspan="8">No recent transactions</td>
-              </tr>
-              <tr v-for="row in recent" v-else :key="row.id">
-                <td class="ellipsis">{{ when(row.occurred_at) }}</td>
-                <td class="mono ellipsis">{{ row.transaction_number }}</td>
-                <td class="ellipsis">{{ row.request?.patient_name || row.request?.requesting_facility || '-' }}</td>
-                <td class="ellipsis">{{ row.type_label }}</td>
-                <td class="num">{{ journalAmount(row) }}</td>
-                <td class="ellipsis">{{ row.payment_method_label || row.channel_label }}</td>
-                <td><BillingBadge :tone="journalStatus(row).tone">{{ journalStatus(row).label }}</BillingBadge></td>
-                <td>
-                  <NuxtLink v-if="row.receipt" :to="`/blood-center/receipt/${row.receipt.id}`" class="view-btn">View</NuxtLink>
-                  <NuxtLink v-else-if="row.request" :to="`/blood-center/statement/${row.request.id}`" class="view-btn">View</NuxtLink>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- THIS MONTH: patient bills by status, parts in a fixed order -->
-      <section class="card overview" aria-labelledby="overview-title">
-        <h2 id="overview-title" class="card-title">This month's patient bills</h2>
-        <div class="overview-body">
-          <div class="donut" role="img" :aria-label="ringLabel">
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle class="donut-track" cx="60" cy="60" :r="RING_R" />
-              <circle
-                v-for="arc in arcs"
-                :key="arc.key"
-                class="donut-arc"
-                :class="[`arc--${arc.key}`, { 'donut-arc--dim': hovered && hovered !== arc.key }]"
-                cx="60"
-                cy="60"
-                :r="RING_R"
-                :stroke-dasharray="`${arc.length} ${RING_C}`"
-                :stroke-dashoffset="-arc.offset"
-                @mouseenter="hovered = arc.key"
-                @mouseleave="hovered = null"
-              />
-            </svg>
-            <div class="donut-center">
-              <strong>{{ billsTotal }}</strong>
-              <span>bills</span>
-            </div>
-          </div>
-          <ul class="legend">
-            <li
-              v-for="s in shares"
-              :key="s.key"
-              class="legend-row"
-              :class="{ 'legend-row--on': hovered === s.key }"
-              @mouseenter="hovered = s.key"
-              @mouseleave="hovered = null"
-            >
-              <span class="swatch" :class="`arc--${s.key}`" aria-hidden="true" />
-              <span class="legend-label">{{ s.label }}</span>
-              <span class="legend-count">{{ s.count }} <small>({{ Math.round(s.share * 100) }}%)</small></span>
-            </li>
-          </ul>
-        </div>
-      </section>
     </div>
 
     <CashCountDialog
@@ -655,13 +533,14 @@
  * The billing counter: find a bill, take a patient's payment in person, and
  * hand over the receipt; or record a hospital's settlement of a weekly bill.
  *
- * Three columns, left to right, in the order a cashier works (redesigned
- * 2026-10-14): who is waiting (the queue, always in view; typing turns it into
- * search results), their bill, and the payment with the amount due and the
- * change in large type. Recent transactions sit under the first two, the
- * month's bills under the payment. It follows the portal colour. The page
- * grows with its content and scrolls; long lists scroll inside. Keys: / or F2
- * to scan, Enter to complete, Esc to clear the bill.
+ * Two panels (project owner, 2026-10-25): who is waiting (the queue, always in
+ * view; typing turns it into search results), and beside it one bill in two
+ * steps. First the request and what is held for it; "Proceed to payment" then
+ * puts the payment in its place, with the amount due and the change in large
+ * type. Recent transactions and the month's bills are the Billing
+ * Transactions and Statements pages. It follows the portal colour. The page grows with its
+ * content and scrolls; long lists scroll inside. Keys: / or F2 to scan, Enter
+ * to complete, Esc to clear the bill.
  *
  * Everything that matters is decided by the server: what is due, whether the
  * payment went in, and whether the counter works in cash shifts at all. Off —
@@ -673,10 +552,6 @@ import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import {
-  billStatusShares,
-  isCounterEvent,
-  journalAmount,
-  journalStatus,
   needsReference,
   pesos,
   referenceName,
@@ -723,10 +598,6 @@ function toast(title, variant = 'success', message = '') {
 
 function formatTime(iso) {
   return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'
-}
-
-function when(iso) {
-  return iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'
 }
 
 function day(value) {
@@ -856,7 +727,7 @@ const listHeading = computed(() => {
 })
 const listEmpty = computed(() => {
   if (typing.value) return `Nothing matches “${scanQuery.value.trim()}”.`
-  return category.value === 'patient' ? 'Nobody is waiting to pay.' : 'No weekly statement is waiting for the hospital.'
+  return category.value === 'patient' ? 'Nobody is waiting to pay.' : 'No hospital invoice is waiting for settlement.'
 })
 
 function focusScanner() {
@@ -920,6 +791,10 @@ async function loadQueue() {
 /* THE BILL */
 const bill = ref(null)
 const billLoading = ref(false)
+// The step: false shows the request and its lines, true the payment in their
+// place (project owner, 2026-10-25). A newly picked bill always starts on the request.
+const paymentReady = ref(false)
+const proceedBtn = ref(null)
 const weekly = computed(() => Boolean(bill.value?.is_statement_only) || category.value === 'weekly')
 const takes = computed(() => (bill.value ? takesPayment(bill.value) : false))
 
@@ -930,14 +805,14 @@ const recipientName = computed(() => {
 
 const recipientLine = computed(() => {
   const r = bill.value?.request
-  if (!r) return category.value === 'weekly' ? 'Enter the weekly request above' : 'Scan a request or search by name'
+  if (!r) return category.value === 'weekly' ? 'Pick a hospital invoice from the waiting list' : 'Scan a request or pick one from the waiting list'
   return weekly.value ? `Weekly order ${r.reference_number}` : `Request ${r.reference_number}`
 })
 
 const recipientExtra = computed(() => {
   const r = bill.value?.request
   if (!r) return ''
-  if (weekly.value) return r.blood_type ? `Blood types ${r.blood_type}` : 'Billed by statement'
+  if (weekly.value) return r.blood_type ? `Blood types ${r.blood_type}` : 'Billed by invoice'
 
   return [r.transfusion_reference ? `PTR ${r.transfusion_reference}` : null, r.blood_type, r.requesting_facility]
     .filter(Boolean)
@@ -950,19 +825,51 @@ async function selectBill(requestId) {
   done.value = null
   payError.value = ''
   subsidyOpen.value = false
+  paymentReady.value = false
 
   try {
     bill.value = (await bloodCenterService.billingForRequest(requestId))?.billing ?? null
     category.value = bill.value?.is_statement_only ? 'weekly' : 'patient'
     payTab.value = category.value === 'weekly' ? 'settle' : 'method'
     resetPayment()
-    await nextTick()
-    tenderedInput.value?.focus()
   } catch (err) {
     toast('Bill Not Found', 'danger', err?.message || 'That bill could not be opened.')
     bill.value = null
   } finally {
     billLoading.value = false
+  }
+
+  // Enter proceeds, as it then completes the payment.
+  await nextTick()
+  proceedBtn.value?.focus()
+}
+
+// What the request step's button leads to: a payment, a settlement, or only a look at its status.
+const proceedLabel = computed(() => {
+  if (!bill.value) return weekly.value ? 'Proceed to settlement' : 'Proceed to payment'
+  if (weekly.value) return bill.value && !bill.value.settlement && bill.value.request?.is_closed ? 'Proceed to settlement' : 'View settlement status'
+  return takes.value ? 'Proceed to payment' : 'View payment status'
+})
+
+function proceedToPayment() {
+  if (!bill.value) return
+
+  paymentReady.value = true
+  nextTick(() => (weekly.value ? settleInput.value : tenderedInput.value)?.focus())
+}
+
+function backToDetails() {
+  paymentReady.value = false
+  subsidyOpen.value = false
+  nextTick(() => proceedBtn.value?.focus())
+}
+
+// The bill again after the subsidy or a settlement, staying on the payment step.
+async function refreshBill() {
+  try {
+    bill.value = (await bloodCenterService.billingForRequest(bill.value.request_id))?.billing ?? bill.value
+  } catch {
+    // The next pick reloads it.
   }
 }
 
@@ -993,8 +900,8 @@ const hasCashPart = computed(() => parts.value.some((p) => p.method === 'cash'))
 const entry = computed(() => splitEntry(bill.value?.outstanding, partsTotal.value, method.value, tendered.value))
 
 const payTabs = computed(() => (category.value === 'weekly'
-  ? [{ value: 'settle', label: 'Settlement', short: 'Settle' }, { value: 'preview', label: 'Statement Preview', short: 'Preview' }]
-  : [{ value: 'method', label: 'Payment Method', short: 'Pay' }, { value: 'preview', label: 'Statement Preview', short: 'Preview' }]))
+  ? [{ value: 'settle', label: 'Settlement', short: 'Settle' }, { value: 'preview', label: 'Invoice Preview', short: 'Preview' }]
+  : [{ value: 'method', label: 'Payment Method', short: 'Pay' }, { value: 'preview', label: 'Invoice Preview', short: 'Preview' }]))
 
 // The payment panel's big number, and what it is.
 const heroAmount = computed(() => {
@@ -1018,8 +925,8 @@ const cashChips = computed(() => {
   return [...new Set(picks)].filter(v => v > left).slice(0, 3)
 })
 
-// Only a loaded bill with something due can be paid; the layout shows either way.
-const canPay = computed(() => Boolean(bill.value) && takes.value && !(shiftsEnabled.value && !shift.value))
+// Only a bill with something due can be paid, on the payment step, and not while the subsidy is being decided.
+const canPay = computed(() => paymentReady.value && Boolean(bill.value) && takes.value && !subsidyOpen.value && !(shiftsEnabled.value && !shift.value))
 // The amount entered meets what is left (cash may go beyond it, as change).
 const canComplete = computed(() => {
   if (!canPay.value || !(entry.value.remaining > 0) || !(entry.value.paid > 0)) return false
@@ -1033,15 +940,13 @@ const canAddPart = computed(() => canPay.value
   && parts.value.length < MAX_PARTS - 1
   && (method.value === 'cash' || Boolean(reference.value)))
 
-// Which action the panel's footer offers: the payment, a part of it, the settlement, or none.
+// Which action the payment step's footer offers: the payment, a part of it, the settlement, or none.
 const footAction = computed(() => {
-  if (done.value || payTab.value === 'preview') return null
+  if (!bill.value || !paymentReady.value || done.value || payTab.value === 'preview') return null
 
-  if (weekly.value) {
-    return bill.value && !bill.value.settlement && bill.value.request?.is_closed ? 'settle' : null
-  }
+  if (weekly.value) return !bill.value.settlement && bill.value.request?.is_closed ? 'settle' : null
 
-  if (subsidyOpen.value || (bill.value && !takes.value) || (bill.value && shiftsEnabled.value && !shift.value)) return null
+  if (subsidyOpen.value || !takes.value || (shiftsEnabled.value && !shift.value)) return null
 
   return entry.value.short > 0 ? 'add' : 'pay'
 })
@@ -1131,8 +1036,8 @@ async function takePayment() {
     parts.value = []
     nextTick(() => printBtn.value?.focus())
 
-    // The bill, the queue, the day and the drawer have all moved.
-    await Promise.all([loadShift(), loadQueue(), loadRecent(), loadSummary()])
+    // The bill, the queue and the drawer have all moved.
+    await Promise.all([loadShift(), loadQueue()])
   } catch (err) {
     const first = Object.values(err?.errors ?? {})[0]
     payError.value = (Array.isArray(first) ? first[0] : first) || err?.message || 'The payment could not be recorded.'
@@ -1147,6 +1052,7 @@ async function takePayment() {
 function nextCustomer() {
   done.value = null
   bill.value = null
+  paymentReady.value = false
   scanQuery.value = ''
   patientQuery.value = ''
   results.value = []
@@ -1176,7 +1082,7 @@ async function submitSubsidy() {
     await bloodCenterService.applySubsidy(bill.value.request_id, subsidyReason.value || undefined)
     toast('Subsidy Applied', 'success', 'The bill is met by government funding and the units can be released.')
     subsidyOpen.value = false
-    await Promise.all([selectBill(bill.value.request_id), loadQueue(), loadRecent(), loadSummary()])
+    await Promise.all([refreshBill(), loadQueue()])
   } catch (err) {
     subsidyError.value = err?.message || 'Could not apply the subsidy.'
   } finally {
@@ -1186,6 +1092,7 @@ async function submitSubsidy() {
 
 /* A WEEKLY BILL'S SETTLEMENT. No money moves through RedAgos. */
 const settlement = reactive({ settlement_reference: '', settled_at: todayIso, settlement_note: '' })
+const settleInput = ref(null)
 const settlementErrors = reactive({})
 const settlementError = ref('')
 
@@ -1201,7 +1108,7 @@ async function submitSettlement() {
       settlement_note: settlement.settlement_note || null,
     })
     toast('Settlement Recorded', 'success', response?.message)
-    await Promise.all([selectBill(bill.value.request_id), loadQueue(), loadRecent(), loadSummary()])
+    await Promise.all([refreshBill(), loadQueue()])
   } catch (err) {
     Object.entries(err?.errors ?? {}).forEach(([key, messages]) => {
       settlementErrors[key] = Array.isArray(messages) ? messages[0] : messages
@@ -1235,54 +1142,6 @@ async function downloadReceipt(receipt) {
   }
 }
 
-/* RECENT TRANSACTIONS, AND THE MONTH'S BILLS BY STATUS */
-const recent = ref([])
-const recentLoading = ref(true)
-const summary = ref(null)
-const hovered = ref(null)
-
-const RING_R = 46
-const RING_C = 2 * Math.PI * RING_R
-// A surface gap between neighbouring parts, so no two colours touch.
-const RING_GAP = 2
-
-const shares = computed(() => billStatusShares(summary.value?.patient_bills_this_month))
-const billsTotal = computed(() => shares.value.reduce((sum, s) => sum + s.count, 0))
-const ringLabel = computed(() => `${billsTotal.value} patient bills this month: ${shares.value.map((s) => `${s.label} ${s.count}`).join(', ')}`)
-
-const arcs = computed(() => {
-  const parts = shares.value.filter((s) => s.count > 0)
-  const gap = parts.length > 1 ? RING_GAP : 0
-  let offset = 0
-
-  return parts.map((s) => {
-    const span = s.share * RING_C
-    const arc = { key: s.key, length: Math.max(span - gap, 0.5), offset }
-    offset += span
-    return arc
-  })
-})
-
-// The latest money events at the counter: payments, voids, subsidies, settlements.
-async function loadRecent() {
-  try {
-    const rows = (await bloodCenterService.billingTransactions({ per_page: 30 }))?.data ?? []
-    recent.value = rows.filter(isCounterEvent).slice(0, 10)
-  } catch {
-    recent.value = []
-  } finally {
-    recentLoading.value = false
-  }
-}
-
-async function loadSummary() {
-  try {
-    summary.value = await bloodCenterService.billingSummary()
-  } catch {
-    // The overview is a convenience; the counter works without it.
-  }
-}
-
 // Cash is counted as handed over; any other method is for what is left, unless the cashier splits it.
 watch(method, (value) => {
   payError.value = ''
@@ -1290,7 +1149,7 @@ watch(method, (value) => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadShift(), loadQueue(), loadRecent(), loadSummary()])
+  await Promise.all([loadShift(), loadQueue()])
 
   // From a statement: "Take payment" opens the bill here.
   const preset = Number(route.query.request)
@@ -1317,37 +1176,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /*
- * The counter, three columns: who is waiting, their bill, the payment.
+ * The counter, two panels: who is waiting, and the bill or its payment.
  * Styled in the system tokens, so it follows the portal colour and dark mode.
  * On a desktop it fits one screen (a 1366×768 laptop included) with only the
  * lists scrolling inside themselves; below that it stacks and scrolls.
  */
 .pos {
   --pos-ctl: 36px;
-  --pos-donut: clamp(76px, 11vh, 104px);
 
   font-family: var(--rb-font-sans);
   padding: 14px 18px;
   display: flex; flex-direction: column; gap: 12px;
   color: var(--rb-text-primary);
-
-  /*
-   * Bill status as a chart fill, in this order: paid, subsidised, part paid,
-   * unpaid. Validated for colour-blind separation of neighbours on each
-   * theme's surface; always shown beside a label and a count.
-   */
-  --pos-chart-paid: #2E7D32;
-  --pos-chart-subsidised: #7C3AED;
-  --pos-chart-partial: #F57C00;
-  --pos-chart-unpaid: #D32F2F;
-}
-
-/* Their own steps on the dark surface, not a flip: amber and red pulled apart in lightness. */
-:global(.dark .pos) {
-  --pos-chart-paid: #43A047;
-  --pos-chart-subsidised: #8B5CF6;
-  --pos-chart-partial: #C4830A;
-  --pos-chart-unpaid: #B92727;
 }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -1362,15 +1202,13 @@ onBeforeUnmount(() => {
 .shift-bar .input--sm { width: 130px; height: 30px; padding: 0 10px; font-size: 12.5px; }
 
 /* ── Layout ── */
-.counter { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(320px, 380px); gap: 12px; }
-.pos-bottom { display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); gap: 12px; }
+.counter { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 12px; }
 
 .card {
   background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 18px;
   box-shadow: var(--rb-shadow-sm); padding: 14px 16px; min-width: 0; min-height: 0;
   display: flex; flex-direction: column; gap: 10px;
 }
-.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex: none; }
 .card-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
 
 .kbd {
@@ -1417,26 +1255,14 @@ onBeforeUnmount(() => {
 .q-row:hover { border-color: rgba(var(--rb-primary-rgb), .4); }
 .q-row:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .q-row--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .07); }
-.q-row--stat { box-shadow: inset 3px 0 0 var(--rb-accent, #D32F2F); }
 .q-row__top { grid-area: top; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
 .q-row__who { grid-area: who; overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
 .q-row__amount { grid-area: amount; display: flex; flex-direction: column; align-items: flex-end; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .q-row__amount small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-secondary); }
 .q-row__amount--clear { color: var(--rb-success-text); font-size: 12px; }
 
-.today { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; flex: none; }
-.today div { padding: 8px 10px; border-radius: 12px; background: var(--rb-surface-alt); }
-.today dt { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
-.today dd { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.today dd small { font-size: 11px; font-weight: 500; color: var(--rb-text-secondary); }
-
 /* ── 2. The bill ── */
 .bill-loading { display: flex; flex-direction: column; gap: 10px; }
-.bill-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
-.bill-empty__icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 4px; border-radius: 20px; background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
-.bill-empty__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
-.bill-empty__sub { margin: 0 0 6px; font-size: 13px; line-height: 1.6; color: var(--rb-text-secondary); }
-
 .bill-head { display: flex; align-items: flex-start; gap: 12px; flex: none; }
 .avatar { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .12); }
 .bill-head__main { flex: 1; min-width: 0; }
@@ -1444,6 +1270,8 @@ onBeforeUnmount(() => {
 .bill-head__line { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .bill-head__extra { margin: 1px 0 0; overflow: hidden; font-size: 12px; color: var(--rb-text-muted); text-overflow: ellipsis; white-space: nowrap; }
 .bill-head__actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.bill-head--empty .avatar { color: var(--rb-text-muted); background: var(--rb-surface-alt); }
+.bill-head--empty .bill-head__name { color: var(--rb-text-muted); }
 .icon-btn {
   display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--rb-border); border-radius: 10px;
   background: var(--rb-surface); color: var(--rb-text-secondary); cursor: pointer;
@@ -1463,36 +1291,83 @@ onBeforeUnmount(() => {
 
 /* The bill's lines take whatever height the panel has left, and scroll inside it. */
 .items { flex: 1 1 auto; min-height: 80px; overflow: auto; border: 1px solid var(--rb-border); border-radius: 14px; }
+.billcard { container-type: inline-size; }
+/* The panels that scroll inside themselves keep a thin scrollbar in the theme's colours. */
+.queue-list, .items, .pay-body { scrollbar-width: thin; scrollbar-color: var(--rb-border-strong) transparent; }
+.col-idx { width: 34px; }
+.col-type { width: 62px; }
+.col-qty { width: 50px; }
+.col-price { width: 92px; }
+.col-total { width: 98px; }
+.item-name { overflow-wrap: anywhere; }
+/* A narrow bill drops the line number, then the unit price; the subtotal stays. */
+@container (max-width: 480px) {
+  .col-idx, .idx { display: none; }
+}
+@container (max-width: 400px) {
+  .col-price, .price { display: none; }
+}
 .type { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #B71C1C; background: #FDECEC; }
 
-.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; flex: none; overflow: hidden; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-border); }
+/* Priority is always a word; the purpose and the physician get the room, and wrap rather than clip. */
+.facts { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) minmax(0, 1.3fr); gap: 1px; margin: 0; flex: none; overflow: hidden; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-border); }
 .facts div { padding: 8px 12px; background: var(--rb-surface-alt); min-width: 0; }
 .facts dt { font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
-.facts dd { margin: 2px 0 0; overflow: hidden; font-size: 13px; font-weight: 600; color: var(--rb-text-primary); text-overflow: ellipsis; white-space: nowrap; }
+.facts dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--rb-text-primary); overflow-wrap: anywhere; }
 .facts .facts__stat { color: var(--rb-accent-text); }
 
-.note { display: flex; gap: 8px; align-items: center; margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 12px; line-height: 1.4; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .06); flex: none; margin-top: auto; }
+/* The request step's close: the bill's total and the way on to the payment. */
+.bill-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; border-top: 1px solid var(--rb-border); }
+.bill-total { display: flex; flex-direction: column; gap: 1px; margin: 0; }
+.bill-total span { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.bill-total strong { font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.bill-total--empty strong { color: var(--rb-text-muted); }
+.bill-foot .bill-proceed { width: auto; min-width: 240px; padding: 0 22px; }
+@container (max-width: 480px) {
+  .bill-foot { flex-direction: column; align-items: stretch; }
+  .bill-foot .bill-proceed { width: 100%; min-width: 0; }
+}
 
 /* ── 3. Payment ── */
-.pay { padding: 0; overflow: hidden; gap: 0; }
-.pay > .tabs,
-.pay > .pay-body,
-.pay > .pay-foot { margin: 0 16px; }
+.pay { padding: 0; overflow: hidden; gap: 0; container: pay / inline-size; }
+.pay-layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
-.pay-hero {
-  padding: 14px 16px 12px; flex: none;
+/* What is due: the person, the amount in large type, and how it was arrived at. */
+.pay-due {
+  flex: none; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px;
   background:
     radial-gradient(80% 140% at 100% 0%, rgba(var(--rb-primary-rgb), .16), transparent 65%),
     var(--rb-surface-alt);
   border-bottom: 1px solid var(--rb-border);
 }
-.pay-hero__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.pay-hero__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.pay-due .summary { background: var(--rb-surface); border: 1px solid var(--rb-border); }
+
+/* How it is paid: the form scrolls inside, the action stays put. */
+.pay-take { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.pay-take > .tabs,
+.pay-take > .pay-body,
+.pay-take > .pay-foot { margin: 0 16px; }
+
+/* A wide panel puts the two side by side. */
+@container pay (min-width: 720px) {
+  .pay-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-rows: minmax(0, 1fr); }
+  .pay-due { padding: 20px 24px; overflow-y: auto; border-bottom: 0; border-right: 1px solid var(--rb-border); }
+  /* Centred, and no wider than a form reads well on a large screen. */
+  .pay-take > .tabs,
+  .pay-take > .pay-body,
+  .pay-take > .pay-foot { width: min(100% - 48px, 600px); margin: 0 auto; }
+  .pay-take > .tabs { margin-top: 20px !important; }
+  .pay-due .pay-hero__amount { font-size: 40px; }
+}
+
+.pay-hero { flex: none; }
+.pay-hero__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 20px; }
+.pay-hero__title { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 10px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.pay-hero__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .txn { font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
 .txn strong { margin-left: 4px; font-size: 12px; color: var(--rb-text-primary); }
 .pay-hero__label { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
 .pay-hero__amount { margin: 0; font-size: 32px; font-weight: 800; line-height: 1.15; letter-spacing: -.02em; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.pay-hero--empty .pay-hero__amount { color: var(--rb-text-muted); }
 
 .tabs { display: flex; gap: 4px; flex: none; margin-top: 12px !important; padding: 3px; border-radius: 12px; background: var(--rb-surface-alt); }
 .tab {
@@ -1504,16 +1379,13 @@ onBeforeUnmount(() => {
 .tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .tab__short { display: none; }
 /* A narrow panel: the tabs fall back to one word each. */
-.pay { container-type: inline-size; }
-@container (max-width: 350px) {
+@container pay (max-width: 350px) {
   .tab__long { display: none; }
   .tab__short { display: inline; }
 }
 
 .pay-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 0; }
 .pay-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 0 14px; border-top: 1px solid var(--rb-border); }
-.pay-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 8px; color: var(--rb-text-muted); text-align: center; }
-.pay-empty p { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 /* Four tiles in one row. In a narrow panel a long label gives way to its short form. */
 .methods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; flex: none; container-type: inline-size; }
@@ -1530,7 +1402,7 @@ onBeforeUnmount(() => {
 .method:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .method-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .method-label--short { display: none; }
-@container (max-width: 330px) {
+@container (max-width: 380px) {
   .method-label--long { display: none; }
   .method-label--short { display: block; }
 }
@@ -1638,37 +1510,6 @@ onBeforeUnmount(() => {
 
 .quiet { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 
-/* ── Bottom: recent transactions and the month ── */
-/* The list scrolls inside the card; the header row stays put. */
-.recent-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; border: 1px solid var(--rb-border); border-radius: 12px; }
-.view-btn {
-  display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--rb-border-strong); background: var(--rb-surface);
-  font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none;
-}
-.view-btn:hover { background: var(--rb-surface-hover); }
-.view-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
-
-.overview-body { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.donut { position: relative; width: var(--pos-donut); height: var(--pos-donut); flex: none; }
-.donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.donut-track { fill: none; stroke: var(--rb-surface-alt); stroke-width: 15; }
-.donut-arc { fill: none; stroke-width: 15; transition: opacity .15s var(--rb-ease-out); }
-.donut-arc--dim { opacity: .3; }
-.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.donut-center strong { font-size: 18px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-.donut-center span { font-size: 10px; color: var(--rb-text-secondary); margin-top: 2px; }
-.arc--paid { stroke: var(--pos-chart-paid); background: var(--pos-chart-paid); }
-.arc--subsidised { stroke: var(--pos-chart-subsidised); background: var(--pos-chart-subsidised); }
-.arc--partial { stroke: var(--pos-chart-partial); background: var(--pos-chart-partial); }
-.arc--unpaid { stroke: var(--pos-chart-unpaid); background: var(--pos-chart-unpaid); }
-.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.legend-row { display: grid; grid-template-columns: 9px 1fr auto; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 6px; font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.legend-row--on { background: var(--rb-surface-hover); }
-.swatch { width: 8px; height: 8px; border-radius: 50%; }
-.legend-label { color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.legend-count { font-weight: 600; white-space: nowrap; }
-.legend-count small { font-size: 10.5px; font-weight: 500; color: var(--rb-text-secondary); }
-
 .banner { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; margin: 0; }
 .banner--warn { background: rgba(var(--rb-warning-rgb), .1); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3); }
 
@@ -1727,61 +1568,45 @@ onBeforeUnmount(() => {
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(14px); }
 
 /*
- * Desktop: the page is as tall as its content and scrolls; the queue, the
- * items and the recent list scroll inside themselves.
+ * Desktop: the counter fills the screen under the 64px header, so the
+ * payment's action is always in view. The queue, the bill's lines and the
+ * payment form scroll inside themselves; below 560px of height the page scrolls.
  */
 @media (min-width: 1024px) {
-  /*
-   * One grid: the three counter cards on top, then recent transactions under
-   * the first two and the month's bills under the payment. The page grows to
-   * fit its content and scrolls like any other page; the cards keep their
-   * natural size (the payment form never scrolls inside itself).
-   */
   .pos {
     display: grid;
-    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(320px, 380px);
-    grid-template-rows: auto minmax(560px, auto) auto;
+    height: max(calc(100dvh - 4rem), 588px);
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(560px, 1fr);
     grid-template-areas:
-      "shift shift shift"
-      "queue bill pay"
-      "recent recent overview";
+      "shift shift"
+      "queue main";
   }
   /* No shift bar (the usual case): no empty first row. */
   .pos:not(:has(> .shift-bar)) {
-    grid-template-rows: minmax(560px, auto) auto;
-    grid-template-areas:
-      "queue bill pay"
-      "recent recent overview";
+    grid-template-rows: minmax(560px, 1fr);
+    grid-template-areas: "queue main";
   }
-  .counter, .pos-bottom { display: contents; }
+  .counter { display: contents; }
   .shift-bar { grid-area: shift; }
   .queue { grid-area: queue; }
-  .billcard { grid-area: bill; }
-  .pay { grid-area: pay; }
-  .recent { grid-area: recent; }
-  .overview { grid-area: overview; }
-  .pay-body { overflow: visible; }
-  /* The transactions list keeps a set height and scrolls inside its card. */
-  .recent-scroll { max-height: 260px; }
+  .billcard, .pay { grid-area: main; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
-  .toast-enter-active, .toast-leave-active, .btn, .method, .donut-arc, .q-row, .seg-btn { transition: none; }
+  .toast-enter-active, .toast-leave-active, .btn, .method, .q-row, .seg-btn { transition: none; }
 }
 
 /* Below desktop the page scrolls as one column, with touch-sized controls. */
 @media (max-width: 1023px) {
   .pos { --pos-ctl: 40px; }
-  .counter, .pos-bottom { grid-template-columns: 1fr; }
+  .counter { grid-template-columns: 1fr; }
   .queue-list { max-height: 320px; }
   .items { max-height: 280px; }
-  .recent-scroll { max-height: 300px; }
 }
 
 @media (max-width: 640px) {
   .pair, .refs--split, .facts { grid-template-columns: 1fr; }
-  .overview-body { flex-direction: column; align-items: stretch; }
-  .donut { align-self: center; }
 }
 </style>

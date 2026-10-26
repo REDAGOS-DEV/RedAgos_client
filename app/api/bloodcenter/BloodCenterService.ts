@@ -662,6 +662,19 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/component-prices`, 'PUT', payload)
   }
 
+  /** Billing Supervisor's dated subsidy, discount and promo register. */
+  async billingPrograms(): Promise<any> {
+    return this.request(`${this.resource}/billing-programs`, 'GET')
+  }
+
+  async createBillingProgram(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/billing-programs`, 'POST', payload)
+  }
+
+  async updateBillingProgram(programId: number, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/billing-programs/${programId}`, 'PUT', payload)
+  }
+
   // --- Facility logo (Blood Center Admin only) ---
   //
   // Ang facility kay gikan sa token sa staff, dili gikan sa request. FormData,
@@ -1004,8 +1017,8 @@ class BloodCenterService extends BaseService {
    * Zero-rates the statement and clears the request for release without
    * recording a payment, because none was taken. Money already collected is
    * left alone. The response carries the hospital's Statement of Account
-   * issued with it (`statement`). Issuance applies it at the point of issue
-   * (billing.subsidise, project owner 2026-10-19).
+   * issued with it (`statement`). Billing applies it only while the Billing
+   * Supervisor's government-subsidy programme is currently effective.
    */
   async applySubsidy(requestId: number | string, reason?: string): Promise<any> {
     return this.request(
@@ -1013,6 +1026,15 @@ class BloodCenterService extends BaseService {
       'POST',
       reason ? { reason } : {},
     )
+  }
+
+  /**
+   * Remove a subsidy applied in error before any unit has been dispatched.
+   * The server keeps the original subsidy in the journal and posts a linked
+   * reversal, then restores the statement's live balance.
+   */
+  async removeSubsidy(requestId: number | string, reason: string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/subsidy`, 'DELETE', { reason })
   }
 
   /**
@@ -1035,16 +1057,43 @@ class BloodCenterService extends BaseService {
   }
 
   /**
-   * Issue a Statement of Account. If nothing has changed since the last one,
+   * Issue an invoice for one request. If nothing has changed since the last one,
    * the server hands that one back (created: false) instead of numbering a new one.
+   * The endpoint keeps its older "statements" name; the document is an Invoice
+   * since 2026-10-25.
    */
   async issueStatement(requestId: number | string): Promise<{ message: string; created: boolean; revision: StatementRevision }> {
     return this.request(`/blood-center/billings/${requestId}/statements`, 'POST')
   }
 
-  /** One issued statement as its printed PDF. */
+  /** One issued invoice as its printed PDF. */
   async downloadStatement(revisionId: number | string): Promise<Blob> {
     return this.requestBlob(`/blood-center/statements/${revisionId}/pdf`)
+  }
+
+  /** The hospitals a Statement of Account can be drawn for: those invoiced for weekly replenishment. */
+  async accountStatementHospitals(): Promise<{ data: { id: number; name: string }[] }> {
+    return this.request('/blood-center/account-statements/hospitals', 'GET')
+  }
+
+  /**
+   * A hospital's Statement of Account for a period: its weekly invoices, its
+   * settlements and its balance, built from the billing journal on demand.
+   */
+  async accountStatement(params: { hospital_id: number | string; from: string; to: string }): Promise<any> {
+    return this.request('/blood-center/account-statements', 'GET', params)
+  }
+
+  /** The same Statement of Account as its printed PDF. */
+  async downloadAccountStatement(params: { hospital_id: number | string; from: string; to: string }): Promise<Blob> {
+    const query = new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)])).toString()
+
+    return this.requestBlob(`/blood-center/account-statements/pdf?${query}`)
+  }
+
+  /** Financial Reports for a period: collections, subsidies, receivables, and billing by component and hospital. */
+  async financialReport(params: { from: string; to: string }): Promise<any> {
+    return this.request('/blood-center/reports/financial', 'GET', params)
   }
 
   /** One Payment Acknowledgement Receipt as its printed PDF. */
