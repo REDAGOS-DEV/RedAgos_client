@@ -1,45 +1,15 @@
 <template>
   <div class="tx-page">
     <div class="tx-inner">
-      <!-- Two columns, so the actions stay on the right at every width. -->
-      <!-- The shared header keeps the actions on the right at every width. -->
-      <PageHeader title="Billing Transactions" subtitle="Every money event on this centre's bills, numbered and in order. Nothing here is edited; a mistake gets a new transaction.">
+      <!-- The transactions only (project owner, 2026-10-25). -->
+      <PageHeader title="Billing Transactions">
         <template #actions>
-          <NuxtLink to="/blood-center/billing" class="ui-btn" title="Statements" aria-label="Statements">
-            <AssetIcon name="file-text" :size="15" />
-            <span class="btn-label">Statements</span>
-          </NuxtLink>
-          <NuxtLink to="/blood-center/receipts" class="ui-btn" title="Receipts" aria-label="Receipts">
-            <AssetIcon name="receipt" :size="15" />
-            <span class="btn-label">Receipts</span>
-          </NuxtLink>
           <button class="ui-btn ui-btn--primary" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />
             {{ exporting ? 'Exporting…' : 'Export CSV' }}
           </button>
         </template>
       </PageHeader>
-
-      <!-- MONEY FLOW: the server's totals over everything the filters match, not just this page -->
-      <section v-if="totals" class="flow" aria-label="Totals">
-        <div class="flow-charged">
-          <span class="cap">Charged</span>
-          <strong>{{ pesos(totals.charged) }}</strong>
-          <small>{{ totals.count }} {{ Number(totals.count) === 1 ? 'transaction' : 'transactions' }}</small>
-        </div>
-        <AssetIcon name="arrow-right" :size="18" class="flow-arrow" aria-hidden="true" />
-        <div class="flow-split">
-          <div class="flow-bar" role="img" :aria-label="`Collected ${pesos(totals.collected)}, subsidised ${pesos(totals.subsidised)}, settled by hospitals ${pesos(totals.settled_outside)}`">
-            <span v-for="part in flowParts" :key="part.key" :class="`flow-bar--${part.key}`" :style="{ width: `${part.share}%` }" />
-          </div>
-          <dl class="flow-legend">
-            <div v-for="part in flowParts" :key="part.key" class="flow-item">
-              <dt><span class="flow-dot" :class="`flow-bar--${part.key}`" />{{ part.label }}</dt>
-              <dd>{{ pesos(part.amount) }}</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
 
       <!-- FILTERS: the common ones in reach, the rest one click away -->
       <section class="filter-bar" aria-label="Filters">
@@ -114,7 +84,7 @@
                     <span class="chip" :class="`tone--${transactionTone(row.type)}`">{{ row.type_label }}</span>
                     <span class="mono tx-no">{{ row.transaction_number }}</span>
                     <template v-if="row.request">
-                      <NuxtLink :to="`/blood-center/statement/${row.request.id}`" class="mono doc-link">{{ row.request.reference_number }}</NuxtLink>
+                      <NuxtLink :to="`/blood-center/invoice/${row.request.id}`" class="mono doc-link">{{ row.request.reference_number }}</NuxtLink>
                       <span v-if="row.request.patient_name || row.request.requesting_facility" class="tx-who">{{ row.request.patient_name || row.request.requesting_facility }}</span>
                     </template>
                     <span v-else class="mono muted">—</span>
@@ -160,12 +130,11 @@
  * The centre's billing journal, as the server keeps it.
  *
  * Read only. Every row was written in the same transaction as the change it
- * records, and the database refuses to change or delete one. The totals are
- * the server's, over everything the filters match — not added up from the page
- * on screen.
+ * records, and the database refuses to change or delete one.
  *
- * Laid out (2026-10-14) as a ledger grouped by day, two lines a row, under a
- * strip showing where the charged money went; the less-used filters fold away.
+ * Laid out (2026-10-14) as a ledger grouped by day, two lines a row; the
+ * less-used filters fold away. The money-flow strip above it was removed
+ * (project owner, 2026-10-25): the page shows the transactions only.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
@@ -212,7 +181,6 @@ const blank = () => ({ from: '', to: '', category: '', type: '', channel: '', pa
 
 const filters = reactive(blank())
 const rows = ref([])
-const totals = ref(null)
 const meta = reactive({ current_page: 1, last_page: 1 })
 const loading = ref(true)
 const error = ref('')
@@ -247,20 +215,6 @@ const activeChips = computed(() => [
   filters.payment_method && { key: 'payment_method', label: labelIn(methodOptions, filters.payment_method) },
   filters.search && { key: 'search', label: `“${filters.search}”` },
 ].filter(Boolean))
-
-/* MONEY FLOW: where the charged money went, from the server's totals */
-const flowParts = computed(() => {
-  const t = totals.value
-  if (!t) return []
-  const parts = [
-    { key: 'collected', label: 'Collected', amount: Number(t.collected) || 0 },
-    { key: 'subsidised', label: 'Subsidised', amount: Number(t.subsidised) || 0 },
-    { key: 'settled', label: 'Settled by hospitals', amount: Number(t.settled_outside) || 0 },
-  ]
-  // Shares of the charged total; the rest of the bar stays empty for what is still owed.
-  const base = Math.max(Number(t.charged) || 0, parts.reduce((sum, part) => sum + part.amount, 0))
-  return parts.map((part) => ({ ...part, share: base > 0 ? (part.amount / base) * 100 : 0 }))
-})
 
 /* THE LEDGER: the page's rows, kept in the server's order, under a heading per day */
 function dayKey(iso) {
@@ -302,7 +256,6 @@ async function load(page = 1) {
   try {
     const response = await bloodCenterService.billingTransactions({ ...params(), page, per_page: 50 })
     rows.value = response?.data ?? []
-    totals.value = response?.totals ?? null
     meta.current_page = response?.current_page ?? 1
     meta.last_page = response?.last_page ?? 1
   } catch (err) {
@@ -354,28 +307,6 @@ onMounted(() => load())
 .header-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .header-actions .btn { text-decoration: none; }
 
-.cap { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--rb-text-secondary); }
-
-/* Money flow: charged on the left, where it went on the right. */
-.flow {
-  display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 22px;
-  padding: 18px 22px; background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-}
-.flow-charged { display: flex; flex-direction: column; gap: 2px; }
-.flow-charged strong { font-size: 26px; font-weight: 800; line-height: 1.15; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.flow-charged small { font-size: 12px; color: var(--rb-text-secondary); }
-.flow-arrow { color: var(--rb-text-muted); }
-.flow-split { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.flow-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
-.flow-bar > span { height: 100%; }
-.flow-bar--collected { background: var(--rb-success, #2E7D32); }
-.flow-bar--subsidised { background: rgb(var(--rb-purple-rgb)); }
-.flow-bar--settled { background: var(--rb-primary); }
-.flow-legend { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; }
-.flow-item { display: flex; flex-direction: column; gap: 1px; }
-.flow-item dt { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
-.flow-item dd { margin: 0 0 0 14px; font-size: 16px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.flow-dot { width: 8px; height: 8px; border-radius: 50%; }
 
 /* Filter bar */
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -513,11 +444,7 @@ onMounted(() => load())
   .btn { transition: none; }
 }
 
-/* Narrow: the link labels give way to their icons; the actions stay right. */
 @media (max-width: 960px) {
-  .btn-label { display: none; }
-  .flow { grid-template-columns: 1fr; gap: 14px; }
-  .flow-arrow { display: none; }
   .more { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 }
 </style>

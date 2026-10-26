@@ -10,18 +10,8 @@
         </transition-group>
       </div>
 
-      <PageHeader title="Receipts" subtitle="Every receipt this centre has issued. A corrected payment's old receipt stays here, voided.">
-        <template #actions>
-          <NuxtLink to="/blood-center/billing" class="ui-btn">
-            <AssetIcon name="file-text" :size="15" />
-            Statements
-          </NuxtLink>
-          <NuxtLink to="/blood-center/pos" class="ui-btn ui-btn--primary">
-            <AssetIcon name="credit-card" :size="15" />
-            Billing counter
-          </NuxtLink>
-        </template>
-      </PageHeader>
+      <!-- Receipts only (project owner, 2026-10-25). -->
+      <PageHeader title="Receipts" />
 
       <section class="toolbar" aria-label="Filters">
         <div class="search">
@@ -55,7 +45,6 @@
           v-else-if="!receipts.length"
           icon="receipt"
           :title="filtered ? 'No receipt matches these filters' : 'No receipts yet'"
-          :description="filtered ? 'Clear the search or widen the dates.' : 'A receipt is issued the moment a payment is taken at the counter or confirmed by GCash.'"
         />
 
         <div v-else class="table-scroll">

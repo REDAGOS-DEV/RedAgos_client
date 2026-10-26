@@ -37,8 +37,8 @@
                 v-model="search"
                 type="search"
                 class="search__input"
-                placeholder="Search donor / reason…"
-                aria-label="Search by donor name or ID, deferral ID or reason"
+                placeholder="Search donor / code…"
+                aria-label="Search by donor name or ID, deferral ID, deferral code or reason"
                 @input="onSearchInput"
               >
             </label>
@@ -93,7 +93,7 @@
                     <p class="empty-state__text">
                       {{ hasFilters
                         ? 'Try another donor or reason, or another status.'
-                        : 'A deferral recorded here keeps the donor away until its Until date, or until it is lifted. Deferrals made at screening stay on the donor\'s history.' }}
+                        : 'Deferrals made at the counter, from a drive\'s paper records, or recorded here. Any of them can be lifted with a reason; the visit keeps its record.' }}
                     </p>
                     <button v-if="hasFilters" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
                   </div>
@@ -102,8 +102,12 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="row in rows" :key="row.id" class="def-row">
-                <td class="c-id"><span class="code">{{ row.code }}</span></td>
+              <tr v-for="row in rows" :key="row.key" class="def-row">
+                <td class="c-id">
+                  <span class="code">{{ row.code }}</span>
+                  <!-- Where it was decided (project owner, 2026-10-25): the counter's and a drive's paper screenings are listed too. -->
+                  <span class="sub">{{ DEFERRAL_SOURCES[row.source] ?? '' }}</span>
+                </td>
                 <td class="c-donor">
                   <template v-if="row.donor && !row.donor.blinded">
                     <span class="donor__name">{{ row.donor.full_name }}</span>
@@ -118,7 +122,8 @@
                   </span>
                 </td>
                 <td class="c-reason">
-                  <span class="reason" :title="row.reason">{{ row.reason }}</span>
+                  <!-- The code; the reason only when asked, as the screen may face the donor. -->
+                  <DeferralCodeTag :code="row.reason_code" :reason="row.reason" />
                 </td>
                 <td class="c-from nowrap">{{ formatShortDate(row.deferred_on) }}</td>
                 <td class="c-until nowrap">
@@ -171,109 +176,15 @@
     </div>
 
     <!-- ============ NEW DEFERRAL ============ -->
-    <Transition name="modal">
-      <div v-if="form.open" class="modal-overlay" @click.self="closeNew">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="new-deferral-title">
-          <div class="modal-card__header">
-            <h2 id="new-deferral-title" class="modal-card__title">
-              <AssetIcon name="ban" :size="17" />
-              New Deferral
-            </h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="closeNew">
-              <AssetIcon name="x" :size="18" />
-            </button>
-          </div>
-
-          <form id="deferral-form" class="modal-card__body" novalidate @submit.prevent="submitNew">
-            <p v-if="form.error" class="form-error" role="alert">{{ form.error }}</p>
-
-            <!-- Donor -->
-            <div class="form-group">
-              <label class="form-label" for="d-donor">Donor <span class="req">*</span></label>
-              <div v-if="form.donor" class="picked">
-                <div class="picked__text">
-                  <span class="picked__name">{{ form.donor.name }}</span>
-                  <span class="picked__meta">
-                    {{ form.donor.code }}<template v-if="form.donor.bloodType"> · {{ form.donor.bloodType }}</template><template v-if="form.donor.phone"> · {{ form.donor.phone }}</template>
-                  </span>
-                  <span v-if="form.donor.standing" class="badge" :class="`badge--${form.donor.standing.tone}`" :title="form.donor.standing.hint">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ form.donor.standing.key === 'deferred' ? form.donor.standing.hint : form.donor.standing.label }}
-                  </span>
-                </div>
-                <button type="button" class="btn-link" @click="form.donor = null">Change</button>
-              </div>
-              <div v-else class="combo">
-                <input
-                  id="d-donor"
-                  v-model="donorSearch.term"
-                  type="search"
-                  class="form-input"
-                  placeholder="Search donor…"
-                  autocomplete="off"
-                  @input="onDonorInput"
-                >
-                <ul v-if="donorSearch.term.trim().length >= 2" class="combo__list" role="listbox" aria-label="Matching donors">
-                  <li v-if="donorSearch.loading" class="combo__note">Searching…</li>
-                  <template v-else-if="donorSearch.results.length">
-                    <li v-for="d in donorSearch.results" :key="d.uuid">
-                      <button type="button" class="combo__option" role="option" @click="pickDonor(d)">
-                        <span class="combo__main">{{ d.name }}<span v-if="d.bloodType" class="blood">{{ d.bloodType }}</span></span>
-                        <span class="combo__sub">{{ d.code }}<template v-if="d.phone"> · {{ d.phone }}</template><template v-if="d.standing"> · {{ d.standing.label }}</template></span>
-                      </button>
-                    </li>
-                  </template>
-                  <li v-else class="combo__note">No donor on your centre's list matches. Try their name, donor ID or mobile number.</li>
-                </ul>
-              </div>
-              <p v-if="fieldError('donor_uuid')" class="field-error">{{ fieldError('donor_uuid') }}</p>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="d-type">Type <span class="req">*</span></label>
-                <SelectField id="d-type" v-model="form.outcome" :options="DEFERRAL_TYPES" />
-                <p v-if="fieldError('outcome')" class="field-error">{{ fieldError('outcome') }}</p>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="d-reason">Reason <span class="req">*</span></label>
-                <SelectField id="d-reason" v-model="form.reason" placeholder="Select…"
-                  :options="[...DEFERRAL_REASONS.map(r => ({ value: r, label: r })), { value: OTHER_REASON, label: 'Other…' }]" />
-                <p v-if="fieldError('reason') && form.reason !== OTHER_REASON" class="field-error">{{ fieldError('reason') }}</p>
-              </div>
-            </div>
-
-            <div v-if="form.reason === OTHER_REASON" class="form-group">
-              <label class="form-label" for="d-other">Describe the reason <span class="req">*</span></label>
-              <textarea id="d-other" v-model="form.otherReason" class="form-input form-textarea" rows="2" maxlength="1000" />
-              <p v-if="fieldError('reason')" class="field-error">{{ fieldError('reason') }}</p>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="d-from">From Date</label>
-                <DatePicker id="d-from" v-model="form.from" :max="todayIso" @update:model-value="onFromChange" />
-                <p v-if="fieldError('deferred_on')" class="field-error">{{ fieldError('deferred_on') }}</p>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="d-until">Until Date <span v-if="isTemporary" class="req">*</span></label>
-                <DatePicker id="d-until" v-model="form.until" :min="untilMin" :disabled="!isTemporary" />
-                <p v-if="fieldError('ends_on')" class="field-error">{{ fieldError('ends_on') }}</p>
-                <p v-else class="form-hint">Ignored for permanent and indefinite deferrals.</p>
-              </div>
-            </div>
-          </form>
-
-          <div class="modal-card__footer">
-            <button type="button" class="btn-outline" :disabled="form.saving" @click="closeNew">Cancel</button>
-            <button type="submit" form="deferral-form" class="btn-primary" :disabled="!canSave || form.saving">
-              <AssetIcon name="check" :size="15" />
-              {{ form.saving ? 'Saving…' : 'Save Deferral' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- The shared form; the counter's Defer donor opens the same one. -->
+    <DeferralFormDialog
+      v-if="form.open"
+      :saving="form.saving"
+      :error="form.error"
+      :errors="form.errors"
+      @close="closeNew"
+      @submit="submitNew"
+    />
 
     <!-- ============ LIFT ============ -->
     <Transition name="modal">
@@ -291,8 +202,8 @@
           <div class="modal-card__body">
             <p class="modal-text">
               {{ lifting.row.code }}<template v-if="lifting.row.donor && !lifting.row.donor.blinded"> for {{ lifting.row.donor.full_name }}</template>
-              ({{ deferralKindBadge(lifting.row.kind).label.toLowerCase() }}, {{ lifting.row.reason }}).
-              Lifting it lets them donate again unless a screening or laboratory deferral still stands. The record stays on this list.
+              ({{ deferralKindBadge(lifting.row.kind).label.toLowerCase() }}{{ lifting.row.reason_code ? `, ${lifting.row.reason_code}` : '' }}).
+              Lifting it lets them donate again unless another deferral still stands. The record stays on this list<template v-if="lifting.row.source !== 'manual'">, and the visit keeps its outcome</template>.
             </p>
             <label class="form-label" for="lift-reason">Reason <span class="req">*</span></label>
             <textarea id="lift-reason" v-model="lifting.reason" class="form-input form-textarea" rows="2" maxlength="1000" placeholder="e.g. Haemoglobin back in range on recheck" />
@@ -312,24 +223,17 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { isoDaysFromToday } from '~/utils/appointments'
+import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
+import DeferralFormDialog from '~/components/BloodCenter/DeferralFormDialog.vue'
 import {
-  DEFAULT_TEMPORARY_DAYS,
-  DEFERRAL_REASONS,
   DEFERRAL_STATUS_FILTERS,
-  DEFERRAL_TYPES,
-  OTHER_REASON,
-  TEMPORARY,
-  addDaysIso,
   deferralKindBadge,
   deferralPayload,
-  deferralReason,
   deferralStatusBadge,
 } from '~/utils/deferrals'
-import { eligibilityBadge, formatPhone, formatShortDate } from '~/utils/donorRecords'
+import { formatShortDate } from '~/utils/donorRecords'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 
 definePageMeta({
@@ -349,12 +253,15 @@ const canDefer = computed(() => can('donors.defer'))
  *  GET  /deferrals?search=&status=&page=   (donors.view_clinical)
  *       -> paginator; rows: { id, code, donor (blinded without
  *          donors.view_identity), outcome, outcome_label, kind
- *          ('temporary' | 'indefinite' | 'permanent'), reason, deferred_on,
- *          ends_on, status ('active' | 'expired' | 'lifted'), recorded_by,
- *          lifted_at, lifted_by, lift_reason, can: { lift } }
- *  POST /deferrals { donor_uuid, outcome, reason, deferred_on, ends_on }
+ *          ('temporary' | 'indefinite' | 'permanent'), reason_code, reason,
+ *          deferred_on, ends_on, status ('active' | 'expired' | 'lifted'),
+ *          recorded_by, lifted_at, lifted_by, lift_reason, can: { lift } }
+ *  POST /deferrals { donor_uuid, outcome, deferral_code, deferred_on, ends_on }
  *       (donors.defer; ends_on only for a temporary deferral)
  *  POST /deferrals/{id}/lift { reason }                       (donors.defer)
+ *  GET  /deferral-codes  the centre's codes for the picker (project owner,
+ *       2026-10-24): a deferral is recorded by code, and the record shows
+ *       the code; the reason stays folded in DeferralCodeTag.
  *
  * Deferrals recorded here are this centre's own. Every other screen (the
  * Donors list, the counter's notice, bookings, reminders) hears of them
@@ -363,8 +270,6 @@ const canDefer = computed(() => can('donors.defer'))
  */
 
 const PER_PAGE = 25
-
-const todayIso = isoDaysFromToday(0)
 
 const initialLoading = ref(true)
 const loading = ref(false)
@@ -381,7 +286,10 @@ const hasFilters = computed(() => Boolean(search.value.trim() || statusFilter.va
 const updatedAtLabel = computed(() => updatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
 const listSummary = computed(() => (hasFilters.value
   ? `${pager.total} deferral${pager.total === 1 ? '' : 's'} match the filters`
-  : 'Deferrals recorded on a donor outside a visit, newest first.'))
+  : 'Every deferral this centre recorded, at the counter, from paper records or here, newest first.'))
+
+/** Where a deferral on this list was decided. */
+const DEFERRAL_SOURCES = { manual: 'Recorded here', counter: 'Counter screening', paper: 'Paper record' }
 
 function filterParams() {
   const params = {}
@@ -431,49 +339,11 @@ function clearFilters() {
 
 /* ---------- new deferral ---------- */
 
-const form = reactive({
-  open: false,
-  donor: null,
-  outcome: TEMPORARY,
-  reason: '',
-  otherReason: '',
-  from: todayIso,
-  until: addDaysIso(todayIso, DEFAULT_TEMPORARY_DAYS),
-  saving: false,
-  error: '',
-  errors: {},
-})
-
-const donorSearch = reactive({ term: '', results: [], loading: false })
-
-const isTemporary = computed(() => form.outcome === TEMPORARY)
-const untilMin = computed(() => (form.from > todayIso ? form.from : todayIso))
-const canSave = computed(() => Boolean(
-  form.donor
-  && form.outcome
-  && deferralReason(form)
-  && (!isTemporary.value || form.until),
-))
-
-function fieldError(field) {
-  return form.errors?.[field]?.[0] ?? ''
-}
+// The form itself is DeferralFormDialog; the page records what it submits.
+const form = reactive({ open: false, saving: false, error: '', errors: {} })
 
 function openNew() {
-  Object.assign(form, {
-    open: true,
-    donor: null,
-    outcome: TEMPORARY,
-    reason: '',
-    otherReason: '',
-    from: todayIso,
-    until: addDaysIso(todayIso, DEFAULT_TEMPORARY_DAYS),
-    saving: false,
-    error: '',
-    errors: {},
-  })
-  donorSearch.term = ''
-  donorSearch.results = []
+  Object.assign(form, { open: true, saving: false, error: '', errors: {} })
 }
 
 function closeNew() {
@@ -481,76 +351,24 @@ function closeNew() {
   form.open = false
 }
 
-/** Keep the default length when the start moves, unless Until was already later. */
-function onFromChange() {
-  if (form.from && (!form.until || form.until < form.from)) {
-    form.until = addDaysIso(form.from, DEFAULT_TEMPORARY_DAYS)
-  }
-}
-
-function mapCandidate(row) {
-  return {
-    uuid: row.uuid,
-    name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' '),
-    code: row.donor_code,
-    bloodType: row.blood_type || '',
-    phone: formatPhone(row.phone),
-    standing: row.eligibility ? eligibilityBadge(row) : null,
-  }
-}
-
-let donorTimer = null
-
-function onDonorInput() {
-  clearTimeout(donorTimer)
-  const term = donorSearch.term.trim()
-  if (term.length < 2) {
-    donorSearch.results = []
-    return
-  }
-  donorSearch.loading = true
-  donorTimer = setTimeout(() => findDonors(term), 300)
-}
-
-/** The centre's own Donors list: only a donor it has dealt with may be deferred here. */
-async function findDonors(term) {
-  try {
-    const res = await bloodCenterService.donors({ search: term, per_page: 8 })
-    if (donorSearch.term.trim() === term) donorSearch.results = (res?.data ?? []).map(mapCandidate)
-  } catch (err) {
-    donorSearch.results = []
-    form.error = errorMessage(err, 'Could not search donors.')
-  } finally {
-    donorSearch.loading = false
-  }
-}
-
-function pickDonor(donor) {
-  form.donor = donor
-  donorSearch.term = ''
-  donorSearch.results = []
-  const { donor_uuid: _gone, ...rest } = form.errors
-  form.errors = rest
-}
-
-async function submitNew() {
-  if (!canSave.value || form.saving) return
+async function submitNew(choice) {
+  if (form.saving) return
   form.saving = true
   form.error = ''
   form.errors = {}
 
   try {
     const res = await bloodCenterService.recordDeferral(deferralPayload({
-      donorUuid: form.donor.uuid,
-      outcome: form.outcome,
-      reason: form.reason,
-      otherReason: form.otherReason,
-      from: form.from,
-      until: form.until,
+      donorUuid: choice.donor.uuid,
+      outcome: choice.outcome,
+      code: choice.code,
+      otherReason: choice.otherReason,
+      from: choice.from,
+      until: choice.until,
     }))
     form.saving = false
     form.open = false
-    notice.value = { tone: 'success', text: `${form.donor.name} is deferred (${res?.code ?? 'saved'}).` }
+    notice.value = { tone: 'success', text: `${choice.donor.name} is deferred (${res?.code ?? 'saved'}).` }
     await load(1)
   } catch (err) {
     form.errors = err?.errors ?? err?.data?.errors ?? {}
@@ -578,7 +396,8 @@ async function confirmLift() {
   lifting.busy = true
   lifting.error = ''
   try {
-    await bloodCenterService.liftDeferral(lifting.row.id, lifting.reason.trim())
+    // A counter or paper screening's deferral is lifted by its screening's id.
+    await bloodCenterService.liftDeferral(lifting.row.id, lifting.reason.trim(), lifting.row.source === 'manual' ? 'manual' : 'screening')
     notice.value = { tone: 'success', text: `${lifting.row.code} is lifted.` }
     lifting.busy = false
     lifting.row = null
@@ -594,7 +413,6 @@ async function confirmLift() {
 function onKeydown(event) {
   if (event.key !== 'Escape') return
   if (lifting.row) cancelLift()
-  else if (form.open) closeNew()
 }
 
 onMounted(() => {
@@ -604,7 +422,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
-  clearTimeout(donorTimer)
   window.removeEventListener('keydown', onKeydown)
 })
 </script>
@@ -705,7 +522,6 @@ onBeforeUnmount(() => {
 .btn-outline:focus-visible,
 .btn-link:focus-visible,
 .lift-btn:focus-visible,
-.combo__option:focus-visible,
 .modal-card__close:focus-visible {
   outline: none;
   box-shadow: var(--rb-focus-ring);
@@ -870,20 +686,6 @@ onBeforeUnmount(() => {
 /* One line, the full text on hover. */
 .reason { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.blood {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface-alt);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 /* Type and status: the colour lives on the dot, never on the badge's fill. */
 .badge {
   --tone: var(--rb-text-muted);
@@ -1025,12 +827,8 @@ onBeforeUnmount(() => {
 
 .modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; }
 .req { color: var(--rb-accent-text); }
-.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
-.field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
 .form-error {
   margin: 0;
@@ -1061,72 +859,7 @@ onBeforeUnmount(() => {
 .deferrals-page .form-input::placeholder { color: var(--rb-placeholder); }
 .deferrals-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
-.deferrals-page .form-select {
-  padding-right: 30px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 10px 6px;
-  appearance: none;
-  cursor: pointer;
-}
-
 .deferrals-page .form-textarea { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
-
-/* Search-and-pick for the donor. */
-.combo { position: relative; }
-
-.combo__list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 5;
-  max-height: 260px;
-  overflow-y: auto;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  box-shadow: 0 10px 24px rgba(var(--rb-shadow-rgb), 0.18);
-}
-
-.combo__option {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  text-align: left;
-  font-family: inherit;
-  color: var(--rb-text-primary);
-  cursor: pointer;
-}
-
-.combo__option:hover { background: var(--rb-surface-hover); }
-.combo__main { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; text-transform: capitalize; }
-.combo__sub { font-size: 11.5px; color: var(--rb-text-secondary); }
-.combo__note { padding: 10px; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
-
-.picked {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.picked__text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
-.picked__name { font-size: 13.5px; font-weight: 700; text-transform: capitalize; }
-.picked__meta { font-size: 12px; color: var(--rb-text-secondary); overflow-wrap: anywhere; }
 
 .modal-enter-active,
 .modal-leave-active { transition: opacity 0.18s ease; }
@@ -1138,7 +871,6 @@ onBeforeUnmount(() => {
   .toolbar__filters { flex-basis: 100%; }
   .search { max-width: none; flex: 1 1 100%; }
   .toolbar__actions { width: 100%; }
-  .form-row { grid-template-columns: 1fr; }
   .modal-overlay { padding: 10px; align-items: flex-end; }
 }
 

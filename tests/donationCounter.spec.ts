@@ -132,7 +132,7 @@ describe('useDonationTransaction', () => {
     expect(ok).toBe(false)
     expect(tx.donor.value).toBeNull()
     // Staff need to know what to do next, not what the server called it.
-    expect(tx.error.value).toContain('name, email or phone')
+    expect(tx.error.value).toContain('Donor Management')
   })
 
   it('names the donation already open rather than refusing blankly', async () => {
@@ -180,9 +180,9 @@ describe('useDonationTransaction', () => {
     await tx.openDonation()
 
     fetchMock.mockResolvedValueOnce({
-      data: donation('rejected', { rejection_reason: 'Haemoglobin below the accepted threshold.' }),
+      data: donation('rejected', { rejection_reason: 'R1' }),
     })
-    await tx.recordScreening({ outcome: 'deferred', deferral_reason: 'Haemoglobin below the accepted threshold.' })
+    await tx.recordScreening({ outcome: 'deferred', deferral_code: 'R1' })
 
     expect(tx.stage.value).toBe('done')
     expect(tx.isDeferred.value).toBe(true)

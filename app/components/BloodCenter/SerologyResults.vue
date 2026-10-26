@@ -311,8 +311,8 @@
               </p>
               <p>
                 Once this correction {{ isHead ? 'is applied' : 'is approved' }}, the donation is rejected and can never
-                become stock, and the donor is permanently deferred at every blood centre and added to Counselling
-                referrals. {{ isHead ? 'Yours applies as you send it.' : 'The approval counts as the verification.' }}
+                become stock, the donor is deferred pending confirmatory testing, and a confidential medical referral
+                goes to the Donor Counselling Physician. {{ isHead ? 'Yours applies as you send it.' : 'The approval counts as the verification.' }}
                 None of it can be undone here.
               </p>
               <label class="warn__confirm">
@@ -335,8 +335,8 @@
               <ul>
                 <li>
                   <strong>Verify</strong> if the bench record agrees. The donation is rejected and can never become
-                  stock, and the donor is permanently deferred at every blood centre and added to Counselling
-                  referrals, where you send them a contact request.
+                  stock, the donor is deferred pending confirmatory testing, and a confidential medical referral goes
+                  to the Donor Counselling Physician, who follows the donor up.
                 </li>
                 <li>
                   <strong>Return for re-entry</strong> if it does not. The panel is cleared and the unit goes back to
@@ -356,9 +356,9 @@
                   Approving makes it reactive for {{ proposedReactive.join(', ') }}
                 </p>
                 <p>
-                  Your approval is the verification. The donation is rejected and can never become stock, and the donor
-                  is permanently deferred at every blood centre and added to Counselling referrals. None of it can be
-                  undone here.
+                  Your approval is the verification. The donation is rejected and can never become stock, the donor is
+                  deferred pending confirmatory testing, and a confidential medical referral goes to the Screening
+                  Physician. None of it can be undone here.
                 </p>
                 <label class="warn__confirm">
                   <input v-model="editing.confirmed" type="checkbox">
@@ -471,6 +471,7 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { formatShortDate } from '~/utils/donorRecords'
+import { visibleDonor } from '~/utils/donorLabel'
 import { SEROLOGY_MARKERS, reactiveMarkers, serologyPayload } from '~/utils/serology'
 import {
   OUTCOME_FILTERS,
@@ -587,7 +588,8 @@ async function load(page = 1) {
   loadError.value = ''
   try {
     const res = await bloodCenterService.serologyResults({ ...filterParams(), page, per_page: PER_PAGE })
-    rows.value = res?.data ?? []
+    // Blind unless the viewer may know who the donor is, whatever was sent.
+    rows.value = (res?.data ?? []).map((row) => ({ ...row, donor: visibleDonor(row.donor, canViewIdentity.value) }))
     Object.assign(pager, { page: res?.current_page ?? page, lastPage: Math.max(1, res?.last_page ?? 1), total: res?.total ?? rows.value.length })
     updatedAt.value = new Date()
   } catch (err) {

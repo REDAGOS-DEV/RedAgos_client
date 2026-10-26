@@ -62,28 +62,30 @@
             <button
               v-if="canViewProfile"
               type="button"
-              class="btn-outline"
+              class="btn-outline btn-outline--squeeze"
               :disabled="exporting || !pager.total"
+              title="Export your centre's donors (CSV)"
               @click="exportList"
             >
               <AssetIcon name="download" :size="14" />
-              {{ exporting ? 'Exporting…' : 'Export' }}
+              <span class="btn-text">{{ exporting ? 'Exporting…' : 'Export' }}</span>
             </button>
 
-            <button v-if="canManage" type="button" class="btn-outline btn-outline--accent" @click="openRemind">
+            <button v-if="canManage" type="button" class="btn-outline btn-outline--accent" title="Email your centre's donors who can give again" @click="openRemind">
               <AssetIcon name="send" :size="14" />
               Remind Eligible
             </button>
 
             <button
               type="button"
-              class="btn-outline"
+              class="btn-outline btn-outline--squeeze"
               :disabled="loadingDonors"
               aria-label="Refresh the list"
+              :title="updatedAt ? `Refresh · updated ${updatedAtLabel}` : 'Refresh'"
               @click="loadDonors(pager.page)"
             >
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loadingDonors }" />
-              Refresh
+              <span class="btn-text">Refresh</span>
             </button>
 
             <button v-if="canManage" type="button" class="btn-primary" @click="openCreate">
@@ -154,6 +156,7 @@
                 <td class="c-donor">
                   <div class="donor-cell">
                     <span class="donor-cell__name">{{ donor.name }}</span>
+                    <span v-if="donor.otherCentre" class="donor-cell__other" title="Not yet booked, registered or donated at your centre">Other centre</span>
                     <span v-if="donor.subline" class="donor-cell__sub">{{ donor.subline }}</span>
                     <!-- Takes the Phone column's place when the panel is too narrow for it. -->
                     <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}</span>
@@ -189,6 +192,28 @@
                 </td>
                 <td class="c-actions">
                   <div class="row-actions">
+                    <!-- Straight to the counter with this donor, no searching there: eligible donors only. -->
+                    <template v-if="canStartDonation && donor.uuid">
+                      <NuxtLink
+                        v-if="!startDonationBlock(donor.eligibility)"
+                        :to="counterLink(donor.uuid)"
+                        class="icon-btn"
+                        :aria-label="`Start a donation for ${donor.name} at the counter`"
+                        title="Start donation"
+                      >
+                        <AssetIcon name="heart" :size="15" />
+                      </NuxtLink>
+                      <button
+                        v-else
+                        type="button"
+                        class="icon-btn"
+                        disabled
+                        :aria-label="`Cannot start a donation for ${donor.name}. ${startDonationBlock(donor.eligibility)}`"
+                        :title="startDonationBlock(donor.eligibility)"
+                      >
+                        <AssetIcon name="heart" :size="15" />
+                      </button>
+                    </template>
                     <button
                       v-if="canViewProfile && !donor.contactOnly"
                       type="button"
@@ -213,9 +238,9 @@
                       v-if="canManage"
                       type="button"
                       class="icon-btn"
-                      :disabled="!donor.email"
-                      :aria-label="donor.email ? `Email ${donor.name}` : `${donor.name} has no email address`"
-                      :title="donor.email ? 'Send email' : 'No email address on record'"
+                      :disabled="!donor.email || donor.otherCentre"
+                      :aria-label="emailBlock(donor) ? `${donor.name}: ${emailBlock(donor)}` : `Email ${donor.name}`"
+                      :title="emailBlock(donor) || 'Send email'"
                       @click="openEmail(donor)"
                     >
                       <AssetIcon name="mail" :size="15" />
@@ -499,15 +524,37 @@
                   </div>
                 </div>
 
-                <div v-if="canManage && !profile.restricted" class="hero__actions">
-                  <button type="button" class="btn-outline btn-outline--sm" :disabled="!profile.email" @click="openEmail(profile)">
-                    <AssetIcon name="mail" :size="13" />
-                    Email Donor
-                  </button>
-                  <button type="button" class="btn-outline btn-outline--sm" @click="openEdit(profile.uuid)">
-                    <AssetIcon name="pencil" :size="13" />
-                    Edit
-                  </button>
+                <div v-if="(canManage || canStartDonation) && !profile.restricted" class="hero__actions">
+                  <template v-if="canStartDonation && profile.uuid">
+                    <NuxtLink
+                      v-if="!startDonationBlock(profile.eligibility)"
+                      :to="counterLink(profile.uuid)"
+                      class="btn-outline btn-outline--sm"
+                    >
+                      <AssetIcon name="heart" :size="13" />
+                      Start Donation
+                    </NuxtLink>
+                    <button
+                      v-else
+                      type="button"
+                      class="btn-outline btn-outline--sm"
+                      disabled
+                      :title="startDonationBlock(profile.eligibility)"
+                    >
+                      <AssetIcon name="heart" :size="13" />
+                      Start Donation
+                    </button>
+                  </template>
+                  <template v-if="canManage">
+                    <button type="button" class="btn-outline btn-outline--sm" :disabled="!profile.email || profile.otherCentre" :title="emailBlock(profile) || undefined" @click="openEmail(profile)">
+                      <AssetIcon name="mail" :size="13" />
+                      Email Donor
+                    </button>
+                    <button type="button" class="btn-outline btn-outline--sm" @click="openEdit(profile.uuid)">
+                      <AssetIcon name="pencil" :size="13" />
+                      Edit
+                    </button>
+                  </template>
                 </div>
               </div>
 
@@ -538,11 +585,11 @@
                 <div v-if="profile.notes" class="fact fact--full"><dt>Notes</dt><dd class="fact__notes">{{ profile.notes }}</dd></div>
               </dl>
 
-              <!-- The app sign-in the desk gives a walk-in donor. On screen only, never printed. -->
+              <!-- The portal sign-in the desk gives a walk-in donor. On screen only, never printed. -->
               <section v-if="!profile.restricted" class="sub-section">
                 <h3 class="sub-section__title">
-                  <AssetIcon name="smartphone" :size="14" />
-                  App Sign-In
+                  <AssetIcon name="log-in" :size="14" />
+                  Portal Sign-In
                 </h3>
 
                 <div class="signin-status">
@@ -556,7 +603,7 @@
                 <template v-if="canManage && profile.signIn.canIssue">
                   <div v-if="signInView.confirming" class="signin-confirm">
                     <p class="modal-hint">
-                      This replaces the old password and signs {{ profile.firstName }} out of the app.
+                      This replaces the old password and signs {{ profile.firstName }} out of the portal.
                     </p>
                     <div class="signin-confirm__actions">
                       <button type="button" class="btn-outline btn-outline--sm" :disabled="signInView.issuing" @click="signInView.confirming = false">
@@ -595,7 +642,12 @@
                 </p>
                 <div v-else-if="profileView.historyLoading" class="skeleton skeleton--line skeleton--tall" />
                 <p v-else-if="profileView.historyError" class="sub-section__note">{{ profileView.historyError }}</p>
-                <p v-else-if="!history.length" class="sub-section__note">No donations at this centre yet.</p>
+                <p v-else-if="!history.length" class="sub-section__note">
+                  No donations at this centre yet.
+                  <template v-if="profile.totalDonations">
+                    {{ profile.totalDonations }} at other centres; their details stay with those centres.
+                  </template>
+                </p>
                 <div v-else class="history-wrap">
                   <table class="history-table">
                     <thead>
@@ -638,7 +690,9 @@
                       {{ d.label }}
                     </span>
                     <span class="deferral__date">{{ d.date }}</span>
-                    <span v-if="d.reason" class="deferral__reason">{{ d.reason }}</span>
+                    <!-- A screening's code, its reason folded: the screen may face the donor. -->
+                    <DeferralCodeTag v-if="d.coded && (d.code || d.reason)" :code="d.code" :reason="d.reason" />
+                    <span v-else-if="d.reason" class="deferral__reason">{{ d.reason }}</span>
                   </li>
                 </ul>
                 <p v-else class="sub-section__note">
@@ -655,22 +709,22 @@
       </div>
     </Transition>
 
-    <!-- ============ APP SIGN-IN, shown once ============ -->
+    <!-- ============ PORTAL SIGN-IN, shown once ============ -->
     <!-- No backdrop click and no Escape: closing it is the last sight of the password. -->
     <Transition name="modal">
       <div v-if="credentials" class="modal-overlay modal-overlay--top">
         <div class="modal-card modal-card--sm" role="dialog" aria-modal="true" aria-labelledby="credentials-title">
           <div class="modal-card__header">
             <h2 id="credentials-title" class="modal-card__title">
-              <AssetIcon name="smartphone" :size="17" />
-              App Sign-In
+              <AssetIcon name="log-in" :size="17" />
+              Portal Sign-In
             </h2>
           </div>
 
           <div class="modal-card__body">
             <p class="modal-text">
               <template v-if="credentials.registered"><strong>{{ credentials.name }}</strong> has been registered. </template>
-              Tell {{ credentials.registered ? 'them' : credentials.name }} these to sign in to the RedAgos app:
+              Tell {{ credentials.registered ? 'them' : credentials.name }} these to sign in to the RedAgos portal:
             </p>
 
             <dl class="credentials">
@@ -775,6 +829,7 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
 import {
   GENDER_OPTIONS,
   blankDonorForm,
@@ -792,7 +847,9 @@ import {
   orderBloodGroups,
   registerPayload,
   reminderSkipSummary,
+  startDonationBlock,
 } from '~/utils/donorRecords'
+import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 
 definePageMeta({
@@ -808,6 +865,19 @@ const canViewProfile = computed(() => can('donors.view'))
 const canViewHistory = computed(() => can('donors.view_clinical'))
 const canManage = computed(() => can('donors.manage'))
 const canEditTemplates = computed(() => can('center.configure'))
+
+/*
+ * Start a donation for a donor from this list (project owner, 2026-10-24):
+ * the counter opens with them already identified, with today's booking if
+ * they have one (it no longer searches for anyone itself). For those who can
+ * use the counter and bring a donor up there, and only for an eligible donor
+ * (startDonationBlock says why not otherwise).
+ */
+const canStartDonation = computed(() => can('appointments.verify') && can(COLLECTION_ABILITIES))
+
+function counterLink(donorUuid) {
+  return { path: '/blood-center/donation', query: { donor: donorUuid } }
+}
 
 /**
  * API SHAPE (tinuod nga mga ruta, /api/blood-center/donors)
@@ -882,7 +952,7 @@ const columnCount = computed(() => (contactOnly.value ? 8 : 10))
 // is sized for the buttons this role actually sees: 30px each, 6px apart,
 // plus the cell's padding. Never narrower than its "Actions" heading.
 const actionsWidth = computed(() => {
-  const buttons = (canViewProfile.value ? 1 : 0) + (canManage.value ? 2 : 0)
+  const buttons = (canStartDonation.value ? 1 : 0) + (canViewProfile.value ? 1 : 0) + (canManage.value ? 2 : 0)
   return Math.max(84, 26 + buttons * 30 + Math.max(0, buttons - 1) * 6)
 })
 const hasFilters = computed(() => Boolean(search.value.trim() || bloodTypeId.value || statusFilter.value))
@@ -891,11 +961,20 @@ const updatedAtLabel = computed(() => updatedAt.value
   ? updatedAt.value.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   : '')
 
+// Every donor in RedAgos, whichever centre they gave at (project owner,
+// 2026-10-25). Export and Remind Eligible stay with this centre's own.
 const listSummary = computed(() => {
-  if (!pager.total && !hasFilters.value) return 'Everyone who has registered, booked or donated at this centre.'
+  if (!pager.total && !hasFilters.value) return 'Every donor in RedAgos, at any blood centre.'
   if (hasFilters.value) return `${pager.total} donor${pager.total === 1 ? '' : 's'} match the filters`
-  return `${pager.total} donor${pager.total === 1 ? '' : 's'} registered, booked or donated at this centre`
+  return `${pager.total} donor${pager.total === 1 ? '' : 's'} in RedAgos, at any blood centre`
 })
+
+/** Why a donor cannot be emailed from here, or ''. */
+function emailBlock(donor) {
+  if (donor.otherCentre) return 'Emails go only to donors who have booked, registered or donated at your centre'
+  if (!donor.email) return 'No email address on record'
+  return ''
+}
 
 /** The filters as the server reads them, shared by the list, export and reminders. */
 function filterParams() {
@@ -925,6 +1004,7 @@ function mapDonor(row) {
     deferral: row.deferral ?? null,
     status: row.status || 'active',
     contactOnly: Boolean(row.contact_only),
+    otherCentre: row.scope === 'cross_facility',
   }
 }
 
@@ -1075,7 +1155,7 @@ function mapProfile(data) {
 }
 
 /**
- * The App Sign-In section: where the desk's sign-in stands for this donor.
+ * The Portal Sign-In section: where the desk's sign-in stands for this donor.
  * `can_issue` is the server's own rule (no confirmed email, account usable).
  */
 function signInStatus(data) {
@@ -1097,10 +1177,10 @@ function signInStatus(data) {
   if (!canIssue && data?.email_verified) {
     return { ...base, tone: 'info', label: 'Own email', note: 'Signs in with their own confirmed email, and resets a forgotten password from the sign-in page.' }
   }
-  return { ...base, tone: 'neutral', label: 'No sign-in yet', note: 'Give one so the donor can use the RedAgos app without registering.' }
+  return { ...base, tone: 'neutral', label: 'No sign-in yet', note: 'Give one so the donor can use the RedAgos portal without registering.' }
 }
 
-/* ---------- app sign-in ---------- */
+/* ---------- portal sign-in ---------- */
 
 const signInView = reactive({ issuing: false, confirming: false, error: '' })
 
@@ -1191,15 +1271,22 @@ const deferrals = computed(() => {
           label: d.screening.outcome_label || 'Deferred',
           tone: d.screening.is_blocking ? 'crit' : 'warn',
           date: formatShortDate(d.screening.screened_at || d.donation_date),
-          reason: d.screening.deferral_reason || '',
+          coded: true,
+          code: d.screening.deferral_code || null,
+          reason: d.screening.deferral_reason || null,
         })
       }
+      // A reactive result's confirmatory case, by its explicit status
+      // (project owner, 2026-10-25): pending confirmatory testing until the
+      // physician records the outcome. A cleared one no longer defers.
       if (d.laboratory_deferral) {
+        const lab = d.laboratory_deferral
+        const until = lab.deferred_until ? ` until ${formatShortDate(lab.deferred_until)}` : ''
         rows.push({
           key: `l-${d.id}`,
-          label: d.laboratory_deferral.outcome_label || 'Permanently Deferred',
-          tone: 'crit',
-          date: formatShortDate(d.laboratory_deferral.recorded_at),
+          label: `${lab.status_label || lab.outcome_label || 'Deferred'}${until}`,
+          tone: lab.status === 'cleared' ? 'ok' : lab.is_blocking ? 'crit' : 'warn',
+          date: formatShortDate(lab.recorded_at),
           reason: 'After laboratory testing',
         })
       }
@@ -1389,7 +1476,7 @@ async function submitForm() {
 
     const photoProblem = uuid ? await uploadPhoto(uuid) : ''
 
-    // A walk-in leaves the desk able to use the app: the sign-in is given as
+    // A walk-in leaves the desk able to use the portal: the sign-in is given as
     // part of registering (project owner, 2026-10-21). If it fails, the
     // registration still stands and the profile can give it.
     const registeredName = `${form.data.first_name} ${form.data.last_name}`.trim()
@@ -1400,7 +1487,7 @@ async function submitForm() {
         const res = await bloodCenterService.issueDonorSignIn(uuid)
         signIn = res?.data ?? res
       } catch {
-        signInProblem = 'The app sign-in could not be given. Give it from their Donor Profile.'
+        signInProblem = 'The portal sign-in could not be given. Give it from their Donor Profile.'
       }
     }
 
@@ -1672,8 +1759,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Filters stay on one line; when the buttons do not fit beside them, the
-   buttons move to their own line together, right-aligned. */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1711,9 +1796,33 @@ onBeforeUnmount(() => {
 
 .search {
   position: relative;
-  flex: 1 1 260px;
-  min-width: 170px;
+  flex: 1 1 240px;
+  min-width: 150px;
   max-width: 320px;
+}
+
+/* One row: filters on the left, actions on the right (project owner,
+   2026-10-24). As the panel narrows, the search gives way first, then the
+   "Updated" time (still on Refresh's tooltip), then Export's and Refresh's
+   words (still read out). Only a phone's width wraps (see Narrow screens). */
+.toolbar { flex-wrap: nowrap; }
+.toolbar__filters { flex-wrap: nowrap; }
+.toolbar__actions { flex: none; flex-wrap: nowrap; }
+
+@container (max-width: 1240px) {
+  .updated { display: none; }
+}
+
+@container (max-width: 1100px) {
+  .btn-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .btn-outline--squeeze { width: 36px; padding: 0; }
 }
 
 .toolbar__filters .select { flex-shrink: 0; }
@@ -1867,6 +1976,17 @@ onBeforeUnmount(() => {
 .donor-cell { display: flex; flex-direction: column; min-width: 0; }
 .donor-cell__name { font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
 .donor-cell__sub { font-size: 11.5px; color: var(--rb-text-secondary); }
+.donor-cell__other {
+  align-self: flex-start;
+  margin: 2px 0 1px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
+}
 
 /* The full address is in the cell's title and on the profile. */
 td.c-address {
@@ -2250,7 +2370,7 @@ td.c-address {
 .deferral__date { font-weight: 600; color: var(--rb-text-primary); }
 .deferral__reason { color: var(--rb-text-secondary); }
 
-/* ---------- App sign-in ---------- */
+/* ---------- Portal sign-in ---------- */
 .signin-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .signin-give { align-self: flex-start; }
 
@@ -2329,6 +2449,9 @@ td.c-address {
 
 /* ---------- Narrow screens ---------- */
 @media (max-width: 760px) {
+  .toolbar,
+  .toolbar__filters,
+  .toolbar__actions { flex-wrap: wrap; }
   .toolbar__filters { flex-basis: 100%; }
   .search { flex: 1 1 100%; }
   .toolbar__actions { width: 100%; }
@@ -2348,6 +2471,7 @@ td.c-address {
 </style>
 
 <style scoped>
-/* The system dropdown in a toolbar: a fixed width rather than the row's. */
-.sel-filter { width: 180px; flex: none; }
+/* The system dropdown in a toolbar: narrow enough for one row, and it may
+   give a little more before the row runs out. */
+.sel-filter { width: 140px; flex: 0 1 140px; min-width: 118px; }
 </style>

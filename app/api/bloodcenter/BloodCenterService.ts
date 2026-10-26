@@ -127,6 +127,15 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/collection/verify-qr`, 'POST', { token })
   }
 
+  /**
+   * A donor brought up at the counter from their record: what a QR scan
+   * answers, without the scan. { data: { donor, appointment, open_donation,
+   * health_questionnaire, prior_deferral } } (appointments.verify).
+   */
+  async counterArrival(donorUuid: string): Promise<any> {
+    return this.request(`${this.resource}/collection/arrival/${donorUuid}`, 'GET')
+  }
+
   // --- Active donation transaction (Collection) ---
 
   async donations(params: Record<string, any> = {}): Promise<any> {
@@ -178,7 +187,8 @@ class BloodCenterService extends BaseService {
 
   /**
    * The five-marker panel. A reactive marker must carry `confirm_reactive: true`:
-   * it rejects the donation, permanently defers the donor and refers them.
+   * once verified it rejects the donation, defers the donor pending
+   * confirmatory testing and opens a medical referral for the physician.
    */
   async recordSerology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/serology`, 'POST', payload)
@@ -259,22 +269,48 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/corrections/${correctionId}/reject`, 'POST', payload)
   }
 
+  /**
+   * Reactive donors' medical referrals: the Donor Counselling Physician's alone
+   * (referrals.manage, project owner, 2026-10-25). The list also carries the
+   * SOP in force, for the confirmatory step's preview.
+   */
   async counsellingReferrals(params: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/laboratory/referrals`, 'GET', params)
+    return this.request(`${this.resource}/medical-referrals`, 'GET', params)
   }
 
+  /** Any of: consent, route, provider, note, and a move forward. */
   async updateCounsellingReferral(referralId: number, payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/laboratory/referrals/${referralId}`, 'PATCH', payload)
+    return this.request(`${this.resource}/medical-referrals/${referralId}`, 'PATCH', payload)
   }
 
   /** How many referrals nobody has acted on, for the sidebar. Not audited, unlike the list. */
   async counsellingReferralsSummary(): Promise<any> {
-    return this.request(`${this.resource}/laboratory/referrals/summary`, 'GET')
+    return this.request(`${this.resource}/medical-referrals/summary`, 'GET')
   }
 
   /** The mail icon: ask the donor to contact the centre, by email (if any) and in the app. */
   async requestReferralContact(referralId: number): Promise<any> {
-    return this.request(`${this.resource}/laboratory/referrals/${referralId}/contact-request`, 'POST')
+    return this.request(`${this.resource}/medical-referrals/${referralId}/contact-request`, 'POST')
+  }
+
+  /**
+   * Documented confirmatory results, and the decision the SOP gives for them,
+   * confirmed: `{ results: [{ marker, outcome, method, laboratory,
+   * reported_on, report_reference }], decision }`. A decision that differs
+   * from the SOP's is refused (409 decision_mismatch).
+   */
+  async recordConfirmation(referralId: number, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/medical-referrals/${referralId}/confirmation`, 'POST', payload)
+  }
+
+  /** The centre's marker-specific SOP: the version in force, its history and the choices. */
+  async confirmatorySop(): Promise<any> {
+    return this.request(`${this.resource}/confirmatory-sop`, 'GET')
+  }
+
+  /** Approve a new SOP version, which takes effect at once. */
+  async approveConfirmatorySop(payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/confirmatory-sop`, 'POST', payload)
   }
 
   async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {
@@ -393,13 +429,41 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/deferrals`, 'GET', params)
   }
 
-  /** { donor_uuid, outcome, reason, deferred_on, ends_on }. ends_on counts only for temporarily_deferred. */
+  /** { donor_uuid, outcome, deferral_code, deferred_on, ends_on }. ends_on counts only for temporarily_deferred. */
   async recordDeferral(payload: Record<string, any>): Promise<any> {
     return this.request(`${this.resource}/deferrals`, 'POST', payload)
   }
 
-  async liftDeferral(id: number, reason: string): Promise<any> {
-    return this.request(`${this.resource}/deferrals/${id}/lift`, 'POST', { reason })
+  /**
+   * Lift a deferral listed on the Deferrals page. For a counter or paper
+   * screening's deferral (row.source counter | paper) the id is the
+   * screening's, sent with source "screening".
+   */
+  async liftDeferral(id: number, reason: string, source: 'manual' | 'screening' = 'manual'): Promise<any> {
+    return this.request(`${this.resource}/deferrals/${id}/lift`, 'POST', source === 'screening' ? { reason, source } : { reason })
+  }
+
+  // --- Deferral codes ---
+  // The centre's codes every deferral is recorded under, so the record (and
+  // the donor) see the code, never the reason.
+
+  /**
+   * { data: [{ id, code, reason, retired, retired_at, uses?, updated_at?, updated_by? }], can: { view_reasons, manage } }.
+   * `reason` is null for a viewer without donors.view_clinical (paper typists).
+   * include_retired: the Deferral Codes page; a picker leaves it out.
+   */
+  async deferralCodes(params: { include_retired?: boolean } = {}): Promise<any> {
+    return this.request(`${this.resource}/deferral-codes`, 'GET', params.include_retired ? { include_retired: 1 } : {})
+  }
+
+  /** { code, reason } (deferrals.configure). */
+  async addDeferralCode(payload: { code: string, reason: string }): Promise<any> {
+    return this.request(`${this.resource}/deferral-codes`, 'POST', payload)
+  }
+
+  /** Any of { code, reason, retired }. The code changes only while no record carries it. */
+  async updateDeferralCode(id: number, payload: { code?: string, reason?: string, retired?: boolean }): Promise<any> {
+    return this.request(`${this.resource}/deferral-codes/${id}`, 'PATCH', payload)
   }
 
   // The centre's donor email wording, kept in Settings (center.configure).

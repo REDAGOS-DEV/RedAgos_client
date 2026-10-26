@@ -149,7 +149,7 @@ const REFUSALS = {
   allocation_not_found: 'That dispatch record was not found.',
   payment_not_found: 'That payment was not found.',
   not_dispatched: 'Only a unit that has been dispatched has a dispatch record to correct.',
-  billing_void: 'This statement has been voided, so its payments can no longer be corrected.',
+  billing_void: 'This invoice has been voided, so its payments can no longer be corrected.',
 }
 
 /**

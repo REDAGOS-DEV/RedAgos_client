@@ -57,11 +57,12 @@ export const HELP_GUIDES: HelpGuide[] = [
     id: 'collection',
     title: 'Take a donor through a visit',
     department: 'Donor / Collection',
-    path: '/blood-center/donation',
-    summary: 'Arrival, screening and the collection itself, in one place.',
+    path: '/blood-center/donations',
+    summary: 'Arrival, screening and the collection itself, in one place: the Donation Counter.',
     steps: [
-      'Scan the donor once on arrival.',
-      'Carry on with screening; the visit continues from that scan.',
+      'A booked donor: on Donations, choose Scan QR and scan their Donor Portal QR. The counter opens with them.',
+      'A walk-in: in Donor Management, choose the heart beside an eligible donor. The counter opens with them.',
+      'A visit already under way: on Donations, choose Continue on its row.',
       'Record the collection with the donation barcode sticker that goes on the form, every bag and tube.',
     ],
     questions: [
@@ -77,7 +78,7 @@ export const HELP_GUIDES: HelpGuide[] = [
     steps: [
       'Choose Register walk-in.',
       'Enter the name, birth date and the number on a valid ID. Sex and blood type are optional.',
-      'Save. The donor can now be found by name when they arrive.',
+      'Save. When they are eligible, the heart beside their name starts their donation at the counter.',
     ],
   },
   {
@@ -206,25 +207,42 @@ export const HELP_GUIDES: HelpGuide[] = [
       { label: 'Complete the payment', keys: [['Enter']], note: 'in the amount field' },
     ],
     questions: [
-      { q: 'How do I fix a wrong payment?', a: 'Open the statement and find the payment under Payment history. Choose Correct to change the amount or method, or Void if it was recorded in error. A void is only possible on the day the payment was taken, and the Billing Supervisor approves both.' },
+      { q: 'How do I fix a wrong payment?', a: 'Open the invoice and find the payment under Payment history. Choose Correct to change the amount or method, or Void if it was recorded in error. A void is only possible on the day the payment was taken, and the Billing Supervisor approves both.' },
       { q: 'Why is a bill marked "Held"?', a: 'A patient bill holds the blood until it is paid in full or met by the government subsidy. Once it is cleared, the units can be released.' },
-      { q: 'How is a weekly hospital bill paid?', a: 'Weekly orders are settled by the hospital outside RedAgos. Once the order closes, record the hospital\'s payment reference on its statement.' },
+      { q: 'How is a weekly hospital bill paid?', a: 'Weekly orders are settled by the hospital outside RedAgos. Once the order closes, record the hospital\'s payment reference on its invoice.' },
+    ],
+  },
+  {
+    id: 'invoices',
+    title: 'Read an invoice',
+    department: 'Billing',
+    path: '/blood-center/billing',
+    summary: 'One invoice for each billable request, raised the moment stock is reserved for it.',
+    steps: [
+      'Choose Patient invoices or Hospital invoices.',
+      'Open an invoice to see its lines, payments and issued revisions.',
+      'Issue the invoice to hand over, or take payment from there.',
+    ],
+    questions: [
+      { q: 'What is the government subsidy?', a: 'It waives the whole bill and clears the blood for release. No payment is recorded; anything collected before stays on record, and any refund is settled outside RedAgos.' },
+      { q: 'Why is there more than one revision?', a: 'Each invoice is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.' },
+      { q: 'Why do older invoices start with SOA-?', a: 'They were issued before invoices were named so. An issued number never changes; new ones start with INV-.' },
     ],
   },
   {
     id: 'statements',
-    title: 'Read a statement',
+    title: 'Draw a hospital\'s Statement of Account',
     department: 'Billing',
-    path: '/blood-center/billing',
-    summary: 'A bill is raised the moment stock is reserved for a request.',
+    path: '/blood-center/statements',
+    summary: 'A hospital\'s invoices, payments and remaining balance over a period.',
     steps: [
-      'Choose Patient bills or Hospital statements.',
-      'Open a statement to see its lines, payments and issued revisions.',
-      'Issue a statement to hand over, or take payment from there.',
+      'Choose the hospital and the period.',
+      'Read the opening balance, what was invoiced and paid, and the balance left.',
+      'Print it or download the PDF to send to the hospital.',
     ],
     questions: [
-      { q: 'What is the government subsidy?', a: 'It waives the whole bill and clears the blood for release. No payment is recorded; anything collected before stays on record, and any refund is settled outside RedAgos.' },
-      { q: 'Why is there more than one revision?', a: 'Each statement is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.' },
+      { q: 'Why are patient invoices not on it?', a: 'A patient transfusion invoice is paid by the patient or watcher. A hospital\'s statement covers what the hospital owes: its weekly replenishment invoices.' },
+      { q: 'Does it have a number?', a: 'No. It is drawn from the billing journal each time, for any period, and comes out the same for the same period.' },
     ],
   },
   {
@@ -336,11 +354,12 @@ export const HELP_GUIDES: HelpGuide[] = [
     summary: 'Donors who may not give for now, and why.',
     steps: [
       'Choose the donor and whether the deferral is temporary or permanent.',
-      'Pick the reason, or Other and type it.',
+      'Pick the deferral code, or Other and type the reason. Records show the code only; click Reason beside a code to read it.',
       'For a temporary one, set the date it starts and the date it ends.',
     ],
     questions: [
-      { q: 'Does the donor see the reason?', a: 'The donor sees that they are deferred and, for a temporary one, the date they can give again.' },
+      { q: 'Does the donor see the reason?', a: 'No. The donor\'s deferral notice gives the code, such as R1, never the reason. In the portal they see that they are deferred and, for a temporary one, the date they can give again.' },
+      { q: 'A reason is not on the list. What now?', a: 'Pick Other and type it; the donor\'s notice then gives no reason at all. If it keeps coming up, the Screening Physician adds a code under Management > Deferral Codes. Codes on a donor\'s record are never renamed or reused; retire one to stop offering it.' },
     ],
   },
   {
@@ -360,14 +379,34 @@ export const HELP_GUIDES: HelpGuide[] = [
   },
   {
     id: 'referrals',
-    title: 'Follow up a counselling referral',
-    department: 'Testing',
+    title: 'Follow up a reactive donor',
+    department: 'Counselling',
     path: '/blood-center/counselling-referrals',
-    summary: 'Donors to contact after a reactive result, until each is referred or closed.',
+    summary: 'The Donor Counselling Physician\'s medical referrals: donors whose reactive result Testing verified.',
     steps: [
       'Start with the referrals still pending. The bell reminds you of any not acted on after three days.',
-      'Ask the donor to get in touch: they get an in-app notice to call the centre, which names no result.',
-      'Mark each one contacted, referred or closed as it moves on.',
+      'Ask the donor to get in touch with the mail icon: they get an email and a portal notice to call the centre, which name no result.',
+      'Record their consent, choose free (public) or private, and name the provider. Then mark them referred.',
+      'When the confirmatory report comes back, record it per marker. The centre\'s Confirmatory SOP gives the decision; you confirm it.',
+    ],
+    questions: [
+      { q: 'Is the donor permanently deferred after a reactive result?', a: 'No. A reactive screen is not a diagnosis. The donor is deferred pending confirmatory testing until you record the documented result; the SOP then decides whether they are permanently or temporarily deferred, retested, or cleared.' },
+      { q: 'Can I choose a different decision from the SOP\'s?', a: 'No. You confirm the decision the SOP gives for the results. If it looks wrong, check the results, or approve a corrected SOP version under Management > Confirmatory SOP.' },
+      { q: 'Does clearing the donor release the blood?', a: 'No. The reactive unit stays rejected whatever the donor\'s outcome.' },
+      { q: 'Does closing a referral lift the deferral?', a: 'No. The referral is the follow-up; only a confirmatory result changes the donor\'s eligibility.' },
+    ],
+  },
+  {
+    id: 'confirmatory-sop',
+    title: 'Keep the confirmatory SOP',
+    department: 'Counselling',
+    path: '/blood-center/confirmatory-sop',
+    requires: 'confirmatory_sop.configure',
+    summary: 'For each marker and confirmatory result, what becomes of the donor, from the centre\'s own SOP.',
+    steps: [
+      'Name the SOP document, then choose a decision for every marker and result.',
+      'A temporary deferral needs its number of days; an indeterminate result needs the days until the retest.',
+      'Approve. The new version takes effect at once; earlier decisions keep the version they were made under.',
     ],
   },
   {
@@ -460,10 +499,29 @@ export const HELP_GUIDES: HelpGuide[] = [
     ],
   },
   {
+    id: 'financial-reports',
+    title: 'Read the Financial Reports',
+    department: 'Management',
+    path: '/blood-center/financial-reports',
+    summary: 'The centre\'s money for a period: what was collected and how, what the subsidy met, what is still owed, and the invoices by component and hospital.',
+    steps: [
+      'Choose the period at the top.',
+      'Read collections over time and by method, net of voids.',
+      'Check receivables: what patients and hospitals still owe today, by how long ago they were invoiced.',
+      'Compare the period\'s invoices by component and by hospital.',
+    ],
+    questions: [
+      { q: 'Who sees it?', a: 'The Billing Supervisor, the Blood Center Admin and the Supervisor.' },
+      { q: 'Why does Outstanding not follow the period?', a: 'What is owed is counted as of today, whenever it was invoiced. The period sets what was invoiced, collected and settled.' },
+    ],
+  },
+  {
     id: 'forecast',
     title: 'Plan the weeks ahead',
     department: 'Management',
     path: '/blood-center/forecast',
+    // Out of the sidebar since 2026-10-25; opened from Reports & Analytics.
+    via: { path: '/blood-center/reports', label: 'Reports & Analytics' },
     summary: 'What your department should expect in the next four weeks, from the last twelve: demand, donors to recruit, donations to process, samples to test or billing ahead.',
     steps: [
       'Open Demand Forecast. It shows your department\'s part; the Supervisor sees every part.',
@@ -504,12 +562,13 @@ export const ROLE_HELP: Record<string, { summary: string, start: string[] }> = {
   component_technologist: { summary: 'You separate units into components, hand them to Issuance, and approve Processing\'s corrections.', start: ['processing', 'processed', 'corrections'] },
   processing_assistant: { summary: 'You help separate units into components and hand them to Issuance.', start: ['processing', 'processed'] },
   serology_technologist: { summary: 'You type each unit and run its serology panel.', start: ['testing', 'serology-results'] },
-  lab_supervisor: { summary: 'You verify reactive results, follow up counselling referrals and approve Testing\'s corrections.', start: ['serology-results', 'referrals', 'testing'] },
+  lab_supervisor: { summary: 'You verify reactive results and approve Testing\'s corrections. A verified reactive result goes to the Donor Counselling Physician as a medical referral.', start: ['serology-results', 'testing'] },
+  counselling_physician: { summary: 'You follow up donors whose reactive result Testing verified: contact, consent, the referral, and the confirmatory result that the centre\'s SOP decides on.', start: ['referrals', 'confirmatory-sop'] },
   inventory_control_officer: { summary: 'You keep the stock, decide on hospital requests and approve Issuance\'s corrections.', start: ['requests', 'stock-thresholds', 'intake'] },
   dispatch_coordinator: { summary: 'You release units for hospital requests.', start: ['fulfillment', 'inventory', 'requests'] },
   it_data_clerk: { summary: 'You keep the stock records and the daily report up to date.', start: ['inventory', 'stock-report'] },
   billing_clerk: { summary: 'You take payments at the counter and issue receipts.', start: ['counter', 'receipts', 'cash-shifts'] },
-  billing_supervisor: { summary: 'You head Billing: statements, the journal and its corrections.', start: ['statements', 'transactions', 'corrections'] },
+  billing_supervisor: { summary: 'You head Billing: invoices, statements, the journal, its corrections and the Financial Reports.', start: ['invoices', 'statements', 'financial-reports'] },
   admin: { summary: 'You keep the centre\'s team, its setup and its records in order. You do not do department work.', start: ['admin-dashboard', 'staff', 'centre-settings'] },
   supervisor: { summary: 'You watch every department and the centre\'s figures, without doing their work.', start: ['reports', 'inventory', 'requests'] },
 }
@@ -517,7 +576,8 @@ export const ROLE_HELP: Record<string, { summary: string, start: string[] }> = {
 /** Terms staff meet across RedAgos. */
 export const HELP_GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'PTR', meaning: 'Patient Transfusion Request: a patient\'s need for blood, which one or more centres may supply.' },
-  { term: 'SOA', meaning: 'Statement of Account: what a request is billed. Not an invoice and not an official receipt.' },
+  { term: 'Invoice', meaning: 'What one billable request is charged (INV-…). Not a BIR-registered invoice and not an official receipt.' },
+  { term: 'SOA', meaning: 'Statement of Account: a hospital\'s invoices, payments and remaining balance over a period.' },
   { term: 'AR', meaning: 'Payment Acknowledgement Receipt: issued for each payment taken.' },
   { term: 'TTI', meaning: 'Transfusion-transmissible infections: the serology panel each unit is tested for.' },
   { term: 'Immunohematology', meaning: 'Blood typing: the unit\'s ABO group and Rh type.' },

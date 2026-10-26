@@ -50,9 +50,9 @@
               <AssetIcon name="download" :size="15" />
               Download PDF
             </button>
-            <NuxtLink v-if="receipt.request_id" :to="`/blood-center/statement/${receipt.request_id}`" class="ui-btn ui-btn--primary">
+            <NuxtLink v-if="receipt.request_id" :to="`/blood-center/invoice/${receipt.request_id}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="file-text" :size="15" />
-              Open statement
+              Open invoice
             </NuxtLink>
           </div>
         </header>
@@ -132,7 +132,7 @@
           <section class="card" aria-labelledby="items-title">
             <div class="card-head">
               <h2 id="items-title" class="card-title">Items</h2>
-              <p class="card-hint">As billed on {{ receipt.statement?.document_number || 'the statement' }} when the payment was taken.</p>
+              <p class="card-hint">As billed on {{ receipt.statement?.document_number || 'the invoice' }} when the payment was taken.</p>
             </div>
             <BillingLines
               :lines="receipt.lines || []"
@@ -238,7 +238,7 @@ const detailRows = computed(() => {
   return [
     { label: 'Issued', value: when(r?.issued_at) },
     { label: 'Received by', value: r?.received_by || 'Payment provider' },
-    { label: 'Statement', value: r?.statement?.document_number, mono: true },
+    { label: 'Invoice', value: r?.statement?.document_number, mono: true },
     { label: 'Request', value: r?.request?.reference_number, mono: true },
   ]
 })

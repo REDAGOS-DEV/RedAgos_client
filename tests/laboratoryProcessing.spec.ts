@@ -75,21 +75,30 @@ describe('BloodCenterService laboratory endpoints', () => {
     expect((service as any).recordTestResult).toBeUndefined()
   })
 
-  it('reads and moves on counselling referrals in the laboratory namespace', async () => {
+  // Out of the laboratory namespace: a reactive donor's follow-up is the
+  // Screening Physician's (project owner, 2026-10-25).
+  it('reads and moves on medical referrals, and records a confirmation, outside the laboratory', async () => {
     fetchMock.mockResolvedValueOnce({ data: [] })
     await service.counsellingReferrals({ status: 'open' })
 
     let [url, config] = fetchMock.mock.calls[0]!
-    expect(url).toBe('/blood-center/laboratory/referrals')
+    expect(url).toBe('/blood-center/medical-referrals')
     expect(config.method).toBe('GET')
 
     fetchMock.mockResolvedValueOnce({})
     await service.updateCounsellingReferral(7, { status: 'contacted', note: null })
 
     ;[url, config] = fetchMock.mock.calls[1]!
-    expect(url).toBe('/blood-center/laboratory/referrals/7')
+    expect(url).toBe('/blood-center/medical-referrals/7')
     expect(config.method).toBe('PATCH')
     expect(config.body).toEqual({ status: 'contacted', note: null })
+
+    fetchMock.mockResolvedValueOnce({})
+    await service.recordConfirmation(7, { results: [], decision: 'cleared' })
+
+    ;[url, config] = fetchMock.mock.calls[2]!
+    expect(url).toBe('/blood-center/medical-referrals/7/confirmation')
+    expect(config.method).toBe('POST')
   })
 
   it('declares each bag, with its volume, on its own endpoint', async () => {

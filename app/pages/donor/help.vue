@@ -270,7 +270,7 @@ const faqs = [
     {
         id: 'when-questionnaire', category: 'screening',
         question: 'When do I answer the health questions?',
-        answer: 'The day before your appointment, when they open. You get a reminder in the app, and by email too if Appointments email is on in Settings. Your answers then stay valid for 90 days.',
+        answer: 'The day before your appointment, when they open. You get a reminder in the portal, and by email too if Appointments email is on in Settings. Your answers then stay valid for 90 days.',
         link: { to: '/donor/eligibility', label: 'Go to Eligibility Screening' },
     },
     {
@@ -281,7 +281,7 @@ const faqs = [
     {
         id: 'deferral', category: 'screening',
         question: 'What does it mean if I am deferred?',
-        answer: 'It means you should not donate for now, to keep you and the patient safe. Most deferrals are temporary: Home shows the date you can give again. If yours has no end date, the blood center can explain what it means for you.',
+        answer: 'It means you should not donate for now, to keep you and the patient safe. Most deferrals are temporary: Home shows the date you can give again. Your deferral notice gives a code, such as R1, instead of the reason, to keep it private; the blood center can tell you what it means and what to do next.',
     },
     {
         id: 'qr-when', category: 'screening',
@@ -332,7 +332,7 @@ const faqs = [
     {
         id: 'notifications', category: 'account',
         question: 'How do I choose which notifications I get?',
-        answer: 'In Settings, under Notifications, turn each topic on or off in the app and by email. Notices about your appointments, donation results and account always appear in the app.',
+        answer: 'In Settings, under Notifications, turn each topic on or off in the portal and by email. Notices about your appointments, donation results and account always appear in the portal.',
         link: { to: '/donor/settings#notifications', label: 'Notification settings' },
     },
     {

@@ -62,7 +62,7 @@
           <p v-else-if="attempt.status === 'creating'" class="modal-desc">Opening the checkout with the provider…</p>
           <p v-else-if="attempt.status === 'awaiting_verification'" class="banner banner--warn">
             <AssetIcon name="triangle-alert" :size="15" />
-            <span>The provider reports a payment and it is being confirmed. Do not take cash for this statement meanwhile.</span>
+            <span>The provider reports a payment and it is being confirmed. Do not take cash for this invoice meanwhile.</span>
           </p>
           <p v-else-if="attempt.status === 'completed'" class="banner banner--ok">
             <AssetIcon name="check" :size="15" />
@@ -206,7 +206,7 @@ async function show(next) {
     stopPolling()
 
     if (!wasSettled && next.status === 'completed') {
-      emit('notify', { title: 'GCash Payment Confirmed', variant: 'success', message: 'The statement is updated and the receipt is issued.' })
+      emit('notify', { title: 'GCash Payment Confirmed', variant: 'success', message: 'The invoice is updated and the receipt is issued.' })
       emit('changed')
     }
   }
@@ -224,7 +224,7 @@ async function load() {
       startPolling()
     }
   } catch (err) {
-    error.value = err?.message || 'Could not load this statement.'
+    error.value = err?.message || 'Could not load this invoice.'
   } finally {
     loading.value = false
   }

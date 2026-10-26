@@ -647,7 +647,7 @@ export interface StatementLine {
   line_total: string
 }
 
-/** One issued Statement of Account (SOA-…). It never changes once issued. */
+/** One issued invoice (INV-…; SOA-… if issued before 2026-10-25). It never changes once issued. */
 export interface StatementRevision {
   id: number
   document_number: string

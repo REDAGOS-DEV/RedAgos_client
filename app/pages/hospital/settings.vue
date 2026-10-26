@@ -594,7 +594,7 @@ const notificationOptions = [
   { key: 'billing_notifications', label: 'Billing Notifications', description: 'Invoices, payments, and billing reminders.' },
   { key: 'system_announcements', label: 'System Announcements', description: 'Maintenance notices and platform updates.' },
   { key: 'email_notifications', label: 'Email Notifications', description: 'Receive notifications via email.' },
-  { key: 'inapp_notifications', label: 'In-App Notifications', description: 'Receive notifications inside RedAgos.' },
+  { key: 'inapp_notifications', label: 'Portal Notifications', description: 'Receive notifications inside RedAgos.' },
   { key: 'sms_notifications', label: 'SMS Notifications', description: 'Receive urgent alerts via text message.' },
 ]
 const TOPIC_ICONS = {
@@ -606,7 +606,7 @@ const TOPIC_ICONS = {
 }
 const CHANNEL_LABELS = {
   email_notifications: { label: 'Email', icon: 'mail', description: 'To your account email' },
-  inapp_notifications: { label: 'In-app', icon: 'bell', description: 'In the bell, top right' },
+  inapp_notifications: { label: 'Portal', icon: 'bell', description: 'In the bell, top right' },
   sms_notifications: { label: 'SMS', icon: 'smartphone', description: 'Urgent alerts only' },
 }
 const notificationTopics = notificationOptions

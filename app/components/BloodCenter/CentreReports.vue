@@ -466,11 +466,12 @@
           <section class="card" aria-labelledby="reason-title">
             <header class="card__head">
               <h2 id="reason-title" class="card__title">Most common reasons</h2>
-              <span class="card__note">As the physician wrote them</span>
+              <!-- By deferral code; the server adds what each stands for only for the clinical record's holder. -->
+              <span class="card__note">By deferral code</span>
             </header>
             <ul v-if="data.deferrals.top_reasons.length" class="hbars hbars--wide">
-              <li v-for="r in data.deferrals.top_reasons" :key="r.reason" class="hbar">
-                <span class="hbar__label" :title="r.reason">{{ r.reason }}</span>
+              <li v-for="r in data.deferrals.top_reasons" :key="r.label" class="hbar">
+                <span class="hbar__label" :title="r.label">{{ r.label }}</span>
                 <span class="hbar__track"><span :style="{ width: `${pctOf(r.count, maxOf(data.deferrals.top_reasons))}%` }" /></span>
                 <span class="hbar__count">{{ r.count }}</span>
               </li>
@@ -884,7 +885,7 @@ function exportCsv() {
       rows.push([], ['No sex recorded', d.donor_profile.total.sex.not_stated], ['No birth date recorded', d.donor_profile.total.age.not_stated])
     } else {
       rows.push([], ['Reason', 'Deferrals'])
-      d.deferrals.top_reasons.forEach(r => rows.push([r.reason, r.count]))
+      d.deferrals.top_reasons.forEach(r => rows.push([r.label, r.count]))
       rows.push([], ['Type', 'Deferrals'])
       d.deferrals.by_type.forEach(t => rows.push([t.type, t.count]))
     }

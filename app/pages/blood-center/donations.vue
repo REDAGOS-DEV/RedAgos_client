@@ -14,13 +14,23 @@
           <h1 class="page-title">Donations</h1>
           <p class="page-subtitle">{{ listSummary }}</p>
         </div>
-        <!-- A remote drive's paper records, typed in after the drive. Up here
-             so the list's toolbar fits on one line. -->
-        <NuxtLink v-if="canRecordPaper" to="/blood-center/paper-records" class="btn-outline">
-          <AssetIcon name="file-text" :size="14" />
-          Paper Records
-        </NuxtLink>
+        <div v-if="canRecordPaper || canStartVisit" class="header-actions">
+          <!-- A remote drive's paper records, typed in after the drive. Up here
+               so the list's toolbar fits on one line. -->
+          <NuxtLink v-if="canRecordPaper" to="/blood-center/paper-records" class="btn-outline">
+            <AssetIcon name="file-text" :size="14" />
+            Paper Records
+          </NuxtLink>
+          <!-- A booked donor's visit starts here now: the counter has no scan of
+               its own (project owner, 2026-10-24). -->
+          <button v-if="canStartVisit" type="button" class="btn-primary" @click="scanning = true">
+            <AssetIcon name="qr-code" :size="15" />
+            Scan QR
+          </button>
+        </div>
       </header>
+
+      <DonorQrScanDialog v-if="scanning" @close="scanning = false" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -60,18 +70,20 @@
               <AssetIcon name="clock" :size="13" />
               Updated {{ updatedAtLabel }}
             </span>
-            <button type="button" class="btn-outline" :disabled="exporting || !pager.total" @click="exportList">
+            <button type="button" class="btn-outline btn-outline--squeeze" :disabled="exporting || !pager.total" title="Export" @click="exportList">
               <AssetIcon name="download" :size="14" />
-              {{ exporting ? 'Exporting…' : 'Export' }}
+              <span class="btn-text">{{ exporting ? 'Exporting…' : 'Export' }}</span>
             </button>
-            <button type="button" class="btn-outline" :disabled="loading" @click="load(pager.page)">
+            <button
+              type="button"
+              class="btn-outline btn-outline--squeeze"
+              :disabled="loading"
+              :title="updatedAt ? `Refresh · updated ${updatedAtLabel}` : 'Refresh'"
+              @click="load(pager.page)"
+            >
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
-              Refresh
+              <span class="btn-text">Refresh</span>
             </button>
-            <NuxtLink v-if="canUseCounter" to="/blood-center/donation" class="btn-primary">
-              <AssetIcon name="plus" :size="15" />
-              Donation Counter
-            </NuxtLink>
           </div>
         </div>
 
@@ -156,8 +168,8 @@
                       <AssetIcon name="eye" :size="15" />
                     </button>
                     <NuxtLink
-                      v-if="row.open && canUseCounter"
-                      to="/blood-center/donation"
+                      v-if="row.open && canStartVisit && row.donor?.uuid"
+                      :to="continueLink(row.donor.uuid)"
                       class="icon-btn"
                       :aria-label="`Continue ${row.code} at the Donation Counter`"
                       title="Continue at the Donation Counter"
@@ -234,7 +246,10 @@
                 <dd>
                   {{ detail.screening?.outcome_label ?? 'Not screened yet' }}
                   <span v-if="detail.screening?.recorded_by" class="fact__sub">by {{ detail.screening.recorded_by }}</span>
-                  <span v-if="detail.screening?.deferral_reason" class="fact__sub">{{ detail.screening.deferral_reason }}</span>
+                  <!-- The code for everyone here; the reason, folded, only for the clinical record's holder. -->
+                  <span v-if="detail.screening?.deferral_code || detail.screening?.deferral_reason" class="fact__sub">
+                    <DeferralCodeTag :code="detail.screening.deferral_code" :reason="detail.screening.deferral_reason" />
+                  </span>
                 </dd>
               </div>
               <div class="fact">
@@ -273,7 +288,7 @@
               Open the sheet
               <AssetIcon name="arrow-right" :size="14" />
             </NuxtLink>
-            <NuxtLink v-if="detail.open && canUseCounter" to="/blood-center/donation" class="btn-outline">
+            <NuxtLink v-if="detail.open && canStartVisit && detail.donor?.uuid" :to="continueLink(detail.donor.uuid)" class="btn-outline">
               Continue at the counter
               <AssetIcon name="arrow-right" :size="14" />
             </NuxtLink>
@@ -321,6 +336,8 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
+import DonorQrScanDialog from '~/components/BloodCenter/DonorQrScanDialog.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { DONATION_STATUS_FILTERS, donationTone } from '~/utils/donationRecords'
@@ -336,6 +353,16 @@ definePageMeta({
 
 const { can } = useUser()
 const canUseCounter = computed(() => can(COLLECTION_ABILITIES))
+
+// Starting a visit (Scan QR) or carrying one on (Continue) brings the donor up
+// at the counter, which is appointments.verify's (project owner, 2026-10-24).
+const canStartVisit = computed(() => canUseCounter.value && can('appointments.verify'))
+const scanning = ref(false)
+
+/** The counter, with this donor and the visit already under way. */
+function continueLink(donorUuid) {
+  return { path: '/blood-center/donation', query: { donor: donorUuid } }
+}
 const canClose = computed(() => can('donations.close'))
 const canRecordPaper = computed(() => can('donations.record_paper'))
 
@@ -564,6 +591,7 @@ onBeforeUnmount(() => {
 
 /* ---------- Header and buttons ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
@@ -680,7 +708,31 @@ onBeforeUnmount(() => {
 
 /* A small basis, so the filters and buttons share one line until the list
    is narrow; the search is what gives way. */
-.search { position: relative; flex: 1 1 180px; min-width: 160px; max-width: 280px; }
+.search { position: relative; flex: 1 1 180px; min-width: 140px; max-width: 280px; }
+
+/* One row: filters on the left, actions on the right (project owner,
+   2026-10-24). As the panel narrows, the search gives way first, then the
+   "Updated" time (still on Refresh's tooltip), then Export's and Refresh's
+   words (still read out). Only a phone's width wraps (see Narrow screens). */
+.toolbar { flex-wrap: nowrap; }
+.toolbar__filters { flex-wrap: nowrap; }
+.toolbar__actions { flex: none; flex-wrap: nowrap; }
+
+@container (max-width: 1240px) {
+  .updated { display: none; }
+}
+
+@container (max-width: 1100px) {
+  .btn-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .btn-outline--squeeze { width: 36px; padding: 0; }
+}
 
 .search__icon {
   position: absolute;
@@ -1008,6 +1060,9 @@ onBeforeUnmount(() => {
 .modal-leave-to { opacity: 0; }
 
 @media (max-width: 760px) {
+  .toolbar,
+  .toolbar__filters,
+  .toolbar__actions { flex-wrap: wrap; }
   .toolbar__filters { flex-basis: 100%; }
   .search { max-width: none; flex: 1 1 100%; }
   .toolbar__actions { width: 100%; }
@@ -1022,6 +1077,7 @@ onBeforeUnmount(() => {
 </style>
 
 <style scoped>
-/* The system dropdown in a toolbar: a fixed width rather than the row's. */
-.sel-filter { width: 180px; flex: none; }
+/* The system dropdown in a toolbar: narrow enough for one row, and it may
+   give a little more before the row runs out. */
+.sel-filter { width: 140px; flex: 0 1 140px; min-width: 118px; }
 </style>

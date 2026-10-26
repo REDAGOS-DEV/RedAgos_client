@@ -155,6 +155,20 @@ export function eligibilityBadge(row: StandingLike): { key: string, label: strin
   return { key: 'eligible', label: 'Eligible', tone: 'ok', hint: 'Can donate today' }
 }
 
+/**
+ * Why Start donation is not offered for a donor, or null when they may go to
+ * the counter: only an eligible donor proceeds (project owner, 2026-10-24).
+ */
+export function startDonationBlock(badge: { key: string, label: string, hint: string }): string | null {
+  switch (badge.key) {
+    case 'eligible': return null
+    case 'waiting': return `Not yet eligible: eligible ${badge.label.charAt(0).toLowerCase()}${badge.label.slice(1)}`
+    case 'deferred': return `Not eligible: ${badge.hint.charAt(0).toLowerCase()}${badge.hint.slice(1)}`
+    case 'in_progress': return 'A visit is already open at your centre'
+    default: return `Not eligible: ${badge.hint}`
+  }
+}
+
 /** The fields the Register / Edit donor form holds, all as strings. */
 export interface DonorForm {
   first_name: string

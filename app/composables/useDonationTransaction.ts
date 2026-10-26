@@ -118,6 +118,15 @@ export interface TransactionDonation {
   collection?: TransactionCollection | null
 }
 
+/**
+ * A QR verified on the Donations page, handed to the counter it opens
+ * (project owner, 2026-10-24: the scan lives on Donations now). Held in memory
+ * for the one navigation, never in the address, and taken by the counter.
+ */
+export function useCounterHandoff() {
+  return useState<any | null>('donation-counter-handoff', () => null)
+}
+
 export function useDonationTransaction() {
   const service = bloodCenterService
 
@@ -205,9 +214,9 @@ export function useDonationTransaction() {
 
     switch (code) {
       case 'qr_invalid':
-        return 'That QR code is not valid. Find the donor by name, email or phone instead.'
+        return 'That QR code is not valid. Start the donor from Donor Management instead.'
       case 'donor_not_found':
-        return 'No donor matches that code. Find them by name, email or phone instead.'
+        return 'That donor was not found at your centre. Start them from Donor Management.'
       case 'appointment_not_found':
         return 'That appointment is not booked at this facility.'
       case 'appointment_not_pending':
@@ -290,6 +299,30 @@ export function useDonationTransaction() {
   }
 
   /**
+   * Take up who is at the counter, as the server answers it for a scanned QR
+   * (verify-qr) and for a donor brought up from their record (arrival): the
+   * donor, today's booking, the visit under way, the questionnaire on file
+   * and any standing deferral.
+   */
+  function adoptArrival(data: any, via: TransactionArrival) {
+    donor.value = data?.donor ?? null
+    arrival.value = via
+    appointment.value = data?.appointment ?? null
+    donation.value = data?.open_donation ?? null
+    questionnaireMeta.value = data?.health_questionnaire ?? null
+    questionnaire.value = null
+    questionnaireError.value = null
+    priorDeferral.value = data?.prior_deferral ?? null
+    error.value = null
+
+    notice.value = donation.value
+      ? `Resuming donation #${donation.value.id} already in progress.`
+      : appointment.value || via !== 'qr'
+        ? null
+        : 'No appointment booked here today. You can still open a walk-in donation.'
+  }
+
+  /**
    * The one scan. Establishes donor, appointment and facility in a single call.
    */
   async function verifyQr(token: string) {
@@ -297,19 +330,21 @@ export function useDonationTransaction() {
 
     if (!result) return false
 
-    donor.value = result.data?.donor ?? null
-    arrival.value = 'qr'
-    appointment.value = result.data?.appointment ?? null
-    donation.value = result.data?.open_donation ?? null
-    questionnaireMeta.value = result.data?.health_questionnaire ?? null
-    priorDeferral.value = result.data?.prior_deferral ?? null
+    adoptArrival(result.data, 'qr')
+    return true
+  }
 
-    notice.value = donation.value
-      ? `Resuming donation #${donation.value.id} already in progress.`
-      : appointment.value
-        ? null
-        : 'No appointment booked here today. You can still open a walk-in donation.'
+  /**
+   * A donor brought up from their record (project owner, 2026-10-24): Donor
+   * Management's Start donation and Donations' Continue. The counter no longer
+   * searches for anyone itself.
+   */
+  async function bringUp(donorUuid: string) {
+    const result = await run(() => service.counterArrival(donorUuid))
 
+    if (!result) return false
+
+    adoptArrival(result.data, 'walk_in')
     return true
   }
 
@@ -525,6 +560,8 @@ export function useDonationTransaction() {
     loadQuestionnaire,
     adoptQuestionnaireReference,
     verifyQr,
+    bringUp,
+    adoptArrival,
     adoptDonor,
     checkIn,
     markNoShow,

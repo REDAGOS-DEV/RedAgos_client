@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { eligibilityBadge, startDonationBlock } from '~/utils/donorRecords'
 
 /**
  * The Donation page's two ways in, and the questionnaire each one brings.
@@ -34,24 +35,29 @@ describe('the Donation page', () => {
     expect(old).not.toContain('useDonationTransaction')
   })
 
-  it('scans booked donors and searches for walk-ins by name, email or phone', () => {
-    expect(page).toContain('Scan the Donor Portal QR')
-    expect(page).toContain('Name, email or phone number')
-    expect(page).toContain('service.searchCounterDonors(q)')
-    // The old ID-only lookup is gone from the counter.
-    expect(page).not.toContain("type: 'valid_id_number'")
+  // The counter identifies nobody itself (project owner, 2026-10-24): the QR
+  // is scanned on Donations, a walk-in starts from Donor Management.
+  it('neither scans nor searches, and says where a visit starts', () => {
+    expect(page).not.toContain('<BloodCenterQrScanner')
+    expect(page).not.toContain('searchCounterDonors')
+    expect(page).toContain('No donor at the counter')
+    expect(page).toContain('<NuxtLink to="/blood-center/donations" class="btn btn--primary">')
   })
 
-  it('adopts a chosen walk-in through the exact lookup, with its deferral and questionnaire', () => {
-    expect(page).toContain("service.lookupDonor({ type: 'donor_code', value: result.donor_code })")
-    expect(page).toContain('found.prior_deferral ?? null, found.health_questionnaire ?? null')
+  it('takes a QR verified on Donations once, from memory', () => {
+    expect(page).toContain('const handed = handoff.value')
+    expect(page).toContain("handoff.value = null\n    adoptArrival(handed.data, 'qr')")
+  })
+
+  it('goes back to Donations after a visit', () => {
+    expect(page).toMatch(/function finishVisit\(\) \{[\s\S]*?navigateTo\('\/blood-center\/donations'\)/)
   })
 
   // The onsite DHQ is optional (project owner, 2026-10-17): with none on file,
   // the physician confirms the donor answered the paper form, and the
   // screening records it.
   it('accepts a donor without a questionnaire on file only on the paper DHQ, and records it', () => {
-    expect(page).toContain(':disabled="busy || (needsQuestionnaire && !dhqOnPaper)"')
+    expect(page).toContain(':disabled="busy || !vitalsComplete || (needsQuestionnaire && !dhqOnPaper)"')
     expect(page).toContain("const needsQuestionnaire = computed(() => !dhqOnFile.value && correcting.value !== 'screening')")
     expect(page).toContain('<input v-model="dhqOnPaper" type="checkbox"')
     expect(page).toContain('if (needsQuestionnaire.value && dhqOnPaper.value) payload.dhq_on_paper = true')
@@ -112,5 +118,51 @@ describe('the onsite questionnaire', () => {
   it('clears the answers once recorded, before the device goes back to staff', () => {
     expect(onsite).toContain('recorded.value = result?.data ?? { available: true }\n    clearAnswers()')
     expect(onsite).toContain('Please hand the device back to the staff member.')
+  })
+})
+
+describe('Start donation from Donor Management', () => {
+  const page = source('app/pages/blood-center/donation.vue')
+  const donors = source('app/pages/blood-center/donors.vue')
+
+  it('links each donor to the counter, for those who can use it and bring a donor up there', () => {
+    expect(donors).toContain("const canStartDonation = computed(() => can('appointments.verify') && can(COLLECTION_ABILITIES))")
+    expect(donors).toContain("return { path: '/blood-center/donation', query: { donor: donorUuid } }")
+    expect(donors).toContain(':to="counterLink(donor.uuid)"')
+    expect(donors).toContain(':to="counterLink(profile.uuid)"')
+  })
+
+  it('offers it only for an eligible donor, saying why not otherwise', () => {
+    expect(donors).toContain('v-if="!startDonationBlock(donor.eligibility)"')
+    expect(donors).toContain('v-if="!startDonationBlock(profile.eligibility)"')
+    expect(donors).toContain(':title="startDonationBlock(donor.eligibility)"')
+
+    expect(startDonationBlock(eligibilityBadge({ eligibility: 'eligible' }))).toBeNull()
+    expect(startDonationBlock(eligibilityBadge({ eligibility: 'waiting', next_eligible_date: '2026-12-12' })))
+      .toBe('Not yet eligible: eligible from 12-Dec-2026')
+    expect(startDonationBlock(eligibilityBadge({ eligibility: 'deferred', deferral: { kind: 'temporary', recorded_on: '2026-10-18', ends_on: '2026-11-17' } })))
+      .toBe('Not eligible: temporarily deferred until 17-Nov-2026')
+    expect(startDonationBlock(eligibilityBadge({ eligibility: 'in_progress' }))).toBe('A visit is already open at your centre')
+  })
+
+  it('brings that donor up as the scan would, then drops them from the address', () => {
+    expect(page).toContain("const uuid = typeof route.query.donor === 'string' ? route.query.donor.trim() : ''")
+    expect(page).toContain('await bringUp(uuid)')
+    expect(page).toContain('router.replace({ query: rest })')
+  })
+})
+
+describe('Donor Management across the blood centres', () => {
+  const donors = source('app/pages/blood-center/donors.vue')
+
+  it('lists every donor and marks those another centre knows', () => {
+    expect(donors).toContain("otherCentre: row.scope === 'cross_facility',")
+    expect(donors).toContain('<span v-if="donor.otherCentre" class="donor-cell__other"')
+    expect(donors).toContain("'Every donor in RedAgos, at any blood centre.'")
+  })
+
+  it("keeps email, export and reminders to this centre's own donors", () => {
+    expect(donors).toContain(':disabled="!donor.email || donor.otherCentre"')
+    expect(donors).toContain(`title="Export your centre's donors (CSV)"`)
   })
 })

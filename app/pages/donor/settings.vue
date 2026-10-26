@@ -99,7 +99,7 @@
                             <span role="columnheader" class="notif-grid__topic-head">Topic</span>
                             <span role="columnheader" class="notif-grid__channel">
                                 <AssetIcon name="bell" :size="14" />
-                                In-app
+                                Portal
                             </span>
                             <span role="columnheader" class="notif-grid__channel">
                                 <AssetIcon name="mail" :size="14" />
@@ -120,12 +120,12 @@
                                 <span
                                     v-if="topic[channel] === 'always'"
                                     class="notif-always"
-                                    :title="`${topic.label}: always on ${channel === 'email' ? 'by email' : 'in the app'}`"
+                                    :title="`${topic.label}: always on ${channel === 'email' ? 'by email' : 'in the portal'}`"
                                 >
                                     <AssetIcon name="lock" :size="12" />
                                     Always
                                 </span>
-                                <span v-else-if="!topic[channel]" class="notif-none" :title="`Not sent ${channel === 'email' ? 'by email' : 'in the app'}`">
+                                <span v-else-if="!topic[channel]" class="notif-none" :title="`Not sent ${channel === 'email' ? 'by email' : 'in the portal'}`">
                                     <span aria-hidden="true">&ndash;</span>
                                     <span class="sr-only">Not sent</span>
                                 </span>
@@ -136,7 +136,7 @@
                                     :class="{ 'toggle-switch--on': prefs[topic[channel]] }"
                                     role="switch"
                                     :aria-checked="prefs[topic[channel]]"
-                                    :aria-label="`${topic.label}, ${channel === 'email' ? 'email' : 'in-app'}`"
+                                    :aria-label="`${topic.label}, ${channel === 'email' ? 'email' : 'portal'}`"
                                     :disabled="channel === 'email' && !profile.email"
                                     @click="prefs[topic[channel]] = !prefs[topic[channel]]"
                                 >
@@ -151,7 +151,7 @@
                         <template v-if="profile.email">
                             Emails go to <strong>{{ profile.email }}</strong><template v-if="emailUnverified">, which isn't verified yet</template>.
                         </template>
-                        <template v-else>No email on file, so these come to you in the app only.</template>
+                        <template v-else>No email on file, so these come to you in the portal only.</template>
                     </p>
                     <div class="panel-footer">
                         <p class="status-note" :class="{ 'status-note--error': notifsError, 'status-note--ok': notifsSaved && !notifsError }" aria-live="polite">
@@ -378,7 +378,7 @@ const NOTIFICATION_TOPICS = [
     { key: 'results', label: 'Donation results', desc: 'When a donation is recorded, or if you need to wait before giving again.', inApp: 'always', email: 'results_email' },
     { key: 'eligibility', label: 'Eligibility reminders', desc: 'An email from your blood center when you can donate again.', inApp: null, email: 'eligibility_renewal' },
     { key: 'drives', label: 'Blood drives', desc: 'When a blood center you have visited schedules a drive.', inApp: 'drives_in_app', email: 'drives_email' },
-    { key: 'account', label: 'Account and security', desc: 'ID checks and password resets. Requests to contact your blood center come in the app only.', inApp: 'always', email: 'always' },
+    { key: 'account', label: 'Account and security', desc: 'ID checks and password resets. Requests to contact your blood center come in the portal only.', inApp: 'always', email: 'always' },
 ]
 
 // The server's defaults, until the profile loads.

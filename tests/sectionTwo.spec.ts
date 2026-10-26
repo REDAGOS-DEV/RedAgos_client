@@ -238,15 +238,22 @@ describe('the Testing page', () => {
     expect(page).not.toMatch(/typingForm\.blood_type_id\s*=.*donor\?\.blood_type/)
   })
 
-  it('keeps the referral list behind its own ability, on its own page', () => {
+  // A reactive donor's follow-up is the Screening Physician's (project owner,
+  // 2026-10-25): Testing opens the referral and has no page for it.
+  it('hands the referral to the physician and keeps no referral link of its own', () => {
     const referrals = source('app/pages/blood-center/counselling-referrals.vue')
     const nav = source('app/composables/useBloodCenterNav.ts')
 
-    expect(referrals).toContain("requires: 'lab.referrals'")
-    expect(nav).toMatch(/label: 'Counselling Referrals', path: '\/blood-center\/counselling-referrals'[^}]*requires: 'lab\.referrals'/)
-    // The testing page only links to it, and only for its holder.
-    expect(page).toContain("can('lab.referrals')")
-    expect(page).toMatch(/v-if="isReactive && canSeeReferrals" to="\/blood-center\/counselling-referrals"/)
+    expect(referrals).toContain("requires: 'referrals.manage'")
+    expect(nav).toMatch(/label: 'Medical Referrals', path: '\/blood-center\/counselling-referrals'[^}]*requires: 'referrals\.manage'/)
+    // Its own department and sidebar section, apart from Collection's screening.
+    expect(nav).toMatch(/label: 'Counselling',\s*items: \[\s*\{ label: 'Medical Referrals'[\s\S]*?\{ label: 'Confirmatory SOP'/)
+    expect(nav).toContain("counselling_physician: '/blood-center/counselling-referrals'")
+    expect(nav).toContain("counselling: ['Counselling']")
+    expect(nav).not.toContain('lab.referrals')
+    expect(page).not.toContain('lab.referrals')
+    expect(page).not.toContain('/blood-center/counselling-referrals')
+    expect(page).not.toContain('permanently defer')
   })
 })
 
@@ -291,8 +298,9 @@ describe('the counter', () => {
     expect(page).toContain('@keydown.enter.prevent')
   })
 
-  it('carries the valid-ID lookup\'s deferral into the visit', () => {
-    expect(page).toContain('found.prior_deferral ?? null')
+  it('carries the standing deferral into the visit, however the donor arrived', () => {
+    const transaction = readFileSync(fileURLToPath(new URL('../app/composables/useDonationTransaction.ts', import.meta.url)), 'utf8')
+    expect(transaction).toContain('priorDeferral.value = data?.prior_deferral ?? null')
   })
 
   it('opens for any of the three counter roles', () => {
@@ -455,8 +463,8 @@ describe('corrections', () => {
     expect(fulfillment).toContain("can('corrections.request') && canFile('dispatch')")
     expect(fulfillment).toContain('subject="dispatch"')
 
-    // Payments are corrected and voided on the statement's own page.
-    const billing = source('app/pages/blood-center/statement/[id].vue')
+    // Payments are corrected and voided on the invoice's own page.
+    const billing = source('app/pages/blood-center/invoice/[id].vue')
     expect(billing).toContain("can('billing.record_payment') && can('corrections.request') && canFile('payment')")
     expect(billing).toContain('subject="payment"')
     // The payments, with their references, are behind the ability to record them.

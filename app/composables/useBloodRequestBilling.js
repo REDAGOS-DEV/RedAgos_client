@@ -57,7 +57,7 @@ export const useBloodRequestBilling = (requestId) => {
       saveBlob(await hospitalService.downloadStatement(revision.id), `${revision.document_number}.pdf`)
       return true
     } catch (err) {
-      billingError.value = err?.message || 'The statement could not be downloaded.'
+      billingError.value = err?.message || 'The invoice could not be downloaded.'
       return false
     } finally {
       downloadingId.value = null

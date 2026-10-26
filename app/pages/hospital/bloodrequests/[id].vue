@@ -298,7 +298,7 @@
 
             <div v-if="!showBillingSection" class="billing-gated">
               <AssetIcon name="clock" />
-              <p>A statement is raised once the blood centre reserves units for this request.</p>
+              <p>An invoice is raised once the blood centre reserves units for this request.</p>
             </div>
 
             <div v-else-if="isLoadingBilling" class="availability-skeleton">
@@ -309,7 +309,7 @@
 
             <div v-else-if="!billing" class="billing-gated">
               <AssetIcon name="clock" />
-              <p>No statement has been raised for this request yet.</p>
+              <p>No invoice has been raised for this request yet.</p>
             </div>
 
             <template v-else>
@@ -335,7 +335,7 @@
                   as recorded by the blood centre.
                 </template>
                 <template v-else-if="billing.is_statement_only">
-                  Weekly order, billed to your facility by statement only and settled outside RedAgos.
+                  Weekly order, billed to your facility by invoice only and settled outside RedAgos.
                   It does not hold the units back.
                 </template>
                 <template v-else-if="billing.is_subsidised">
@@ -351,12 +351,12 @@
               </p>
 
               <div v-if="statements.length" class="payment-history">
-                <span class="info-label">Statements of Account</span>
+                <span class="info-label">Invoices</span>
                 <div class="table-wrapper">
                   <table class="history-table">
                     <thead>
                       <tr>
-                        <th>Statement</th>
+                        <th>Invoice</th>
                         <th>Issued</th>
                         <th>{{ billing.is_statement_only ? 'Billed' : 'Due' }}</th>
                         <th />

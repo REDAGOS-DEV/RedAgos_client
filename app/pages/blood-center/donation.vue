@@ -4,8 +4,8 @@
       <div>
         <h1 class="collection__title">Donation counter</h1>
         <p class="collection__subtitle">
-          Scan a booked donor's QR, or find a walk-in by name, email or phone. The rest of the visit carries on
-          from there.
+          The visit carries on here once the donor is identified: a booked donor's QR is scanned on Donations, and
+          a walk-in is started from Donor Management.
         </p>
       </div>
     </header>
@@ -59,7 +59,7 @@
       <div class="visit__panel">
         <p class="visit__label">
           <AssetIcon :name="arrival === 'qr' ? 'qr-code' : 'user'" :size="14" />
-          {{ arrival !== 'qr' ? 'Walk-in donor' : appointment ? 'Booked in the Donor Portal' : 'Donor Portal QR' }}
+          {{ arrival === 'qr' ? (appointment ? 'Booked in the Donor Portal' : 'Donor Portal QR') : appointment ? 'Booked donor' : 'Walk-in donor' }}
         </p>
 
         <dl v-if="appointment" class="visit__facts">
@@ -208,114 +208,34 @@
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
     <!--
-      STAGE 1: who is at the counter. A donor who booked in the Donor Portal is
-      scanned; a walk-in is found by name, email or phone.
+      STAGE 1: nobody yet. The counter identifies no one itself (project owner,
+      2026-10-24): a booked donor's QR is scanned on Donations, a walk-in is
+      started from Donor Management, and a visit under way is carried on from
+      Donations. Each arrives here with the donor already identified.
     -->
-    <div v-if="stage === 'scan'" class="checkin">
-      <section class="card checkin__panel">
-        <div class="checkin__head">
-          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="qr-code" :size="18" /></span>
-          <div>
-            <p class="checkin__eyebrow">Booked donor</p>
-            <h2 class="card__title">Scan the Donor Portal QR</h2>
-            <p class="card__hint">
-              For donors who booked through the Donor Portal. The scan checks them in and brings up their booking
-              and the health questionnaire they completed, ready to print.
-            </p>
-          </div>
+    <section v-if="stage === 'scan'" class="card arrive">
+      <span class="arrive__icon" aria-hidden="true"><AssetIcon name="heart" :size="20" /></span>
+      <template v-if="arriving">
+        <h2 class="card__title">Bringing up the donor…</h2>
+      </template>
+      <template v-else>
+        <h2 class="card__title">No donor at the counter</h2>
+        <p class="card__hint">
+          Scan a booked donor's Donor Portal QR on Donations, start an eligible walk-in from Donor Management, or
+          carry on a visit under way from Donations.
+        </p>
+        <div class="actions">
+          <NuxtLink to="/blood-center/donations" class="btn btn--primary">
+            <AssetIcon name="qr-code" :size="14" />
+            Go to Donations
+          </NuxtLink>
+          <NuxtLink v-if="canViewDonors" to="/blood-center/donors" class="btn">
+            <AssetIcon name="users" :size="14" />
+            Donor Management
+          </NuxtLink>
         </div>
-
-        <BloodCenterQrScanner
-          ref="scannerRef"
-          :busy="busy"
-          :show-manual="false"
-          @scanned="onScanned"
-          @manual="focusLookup"
-        />
-      </section>
-
-      <section class="card checkin__panel">
-        <div class="checkin__head">
-          <span class="checkin__icon" aria-hidden="true"><AssetIcon name="search" :size="18" /></span>
-          <div>
-            <p class="checkin__eyebrow">Walk-in donor</p>
-            <h2 class="card__title">Find the donor</h2>
-            <p class="card__hint">
-              Search by name, email or phone number. Walk-in donors answer the health questionnaire here or on
-              the paper form, before screening.
-            </p>
-          </div>
-        </div>
-
-        <form class="lookup" role="search" @submit.prevent="searchDonors">
-          <label class="field">
-            <span class="field__label">Name, email or phone number</span>
-            <input
-              ref="lookupInput"
-              v-model="lookupValue"
-              type="search"
-              class="field__input"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="e.g. Ana Cruz, ana@email.com or 0917 123 4567"
-            >
-          </label>
-
-          <!-- Results come as you type; Enter searches at once. -->
-          <p class="lookup__status" aria-live="polite">
-            <template v-if="searching">Searching…</template>
-            <template v-else-if="lookupValue.trim().length === 1">Keep typing: two letters or more.</template>
-          </p>
-        </form>
-
-        <p v-if="lookupError" class="alert alert--error" role="alert">{{ lookupError }}</p>
-
-        <div v-if="searchResults" class="results" aria-live="polite">
-          <ul v-if="searchResults.length" class="results__list">
-            <li v-for="result in searchResults" :key="result.uuid">
-              <button type="button" class="result" :disabled="busy" @click="chooseDonor(result)">
-                <span class="result__avatar" aria-hidden="true">{{ initialsOf(result.full_name) }}</span>
-                <span class="result__body">
-                  <span class="result__name">
-                    {{ result.full_name }}
-                    <span v-if="result.scope === 'cross_facility'" class="result__tag">New to this centre</span>
-                  </span>
-                  <span class="result__meta">{{ resultMeta(result) }}</span>
-                  <span v-if="result.phone_hint || result.email_hint" class="result__meta">
-                    {{ [result.phone_hint, result.email_hint].filter(Boolean).join(' · ') }}
-                  </span>
-                </span>
-                <AssetIcon name="chevron-right" :size="16" class="result__go" />
-              </button>
-            </li>
-          </ul>
-
-          <p v-if="searchTruncated" class="results__note">
-            Showing the first {{ searchResults.length }} matches. Type more of the name to narrow it down.
-          </p>
-
-          <div v-if="!searchResults.length" class="results__empty">
-            <p>No donor matches “{{ searchedFor }}”.</p>
-            <p class="results__note">
-              A donor from another centre is found by their exact email or phone number.
-              <template v-if="canRegisterDonor">
-                Someone new to RedAgos is registered on the
-                <NuxtLink to="/blood-center/donors" class="results__link">Donors page</NuxtLink> first.
-              </template>
-            </p>
-          </div>
-        </div>
-
-        <div v-else class="checkin__checks">
-          <p class="checkin__checks-title">For a walk-in, the counter then</p>
-          <ol>
-            <li><span class="checkin__n">1</span> Opens the donation</li>
-            <li><span class="checkin__n">2</span> Hands the donor the device to complete the DHQ onsite</li>
-            <li><span class="checkin__n">3</span> Sends them to the physician for screening</li>
-          </ol>
-        </div>
-      </section>
-    </div>
+      </template>
+    </section>
 
     <!-- STAGE 2 — check in and open the transaction -->
     <section v-if="stage === 'verified'" class="card">
@@ -398,15 +318,6 @@
         This screening is already saved. Change what was entered wrongly; the corrected record goes to the Center
         Admin to approve.
       </p>
-      <p class="card__hint">
-        Record what the attending professional found. RedAgos stores this assessment — it does not perform or
-        judge it, and no value here decides the outcome.
-      </p>
-      <p class="card__hint">
-        This is your assessment. What the donor declared is under
-        <strong>Review questionnaire</strong> above.
-      </p>
-
       <!--
         Sleep, Meal, Meds and Allergies are not here. They are printed in the
         top margin of the donor's questionnaire sheet, so that is where staff
@@ -414,35 +325,29 @@
         the only part of that document the counter writes. They still travel to
         the server with this form, because they describe the visit it records.
       -->
-      <p class="card__hint">
-        Sleep, meal, meds and allergies are at the top of
-        <strong>Review questionnaire</strong> above, where the form prints them.
-      </p>
 
+      <!--
+        All six before accepting or deferring (project owner, 2026-10-24),
+        each against its normal range for this donor: the server sends the
+        ranges with the donation and checks them again on save. No banner and
+        no description paragraphs (owner, 2026-10-25): a reading out of range
+        is marked under its box, and the buttons say on hover what is missing.
+      -->
       <div class="vitals">
-        <label class="field">
-          <span class="field__label">Systolic BP</span>
-          <input v-model.number="screeningForm.systolic_bp" type="number" class="field__input" placeholder="mmHg" >
-        </label>
-        <label class="field">
-          <span class="field__label">Diastolic BP</span>
-          <input v-model.number="screeningForm.diastolic_bp" type="number" class="field__input" placeholder="mmHg" >
-        </label>
-        <label class="field">
-          <span class="field__label">Pulse</span>
-          <input v-model.number="screeningForm.pulse_bpm" type="number" class="field__input" placeholder="bpm" >
-        </label>
-        <label class="field">
-          <span class="field__label">Temperature</span>
-          <input v-model.number="screeningForm.temperature_c" type="number" step="0.1" class="field__input" placeholder="°C" >
-        </label>
-        <label class="field">
-          <span class="field__label">Weight</span>
-          <input v-model.number="screeningForm.weight_kg" type="number" class="field__input" placeholder="kg" >
-        </label>
-        <label class="field">
-          <span class="field__label">Haemoglobin</span>
-          <input v-model.number="screeningForm.haemoglobin_g_dl" type="number" step="0.1" class="field__input" placeholder="g/dL" >
+        <label v-for="vital in VITAL_INPUTS" :key="vital.key" class="field">
+          <span class="field__label">{{ vital.label }}</span>
+          <input
+            v-model.number="screeningForm[vital.key]"
+            type="number"
+            :step="vital.step"
+            class="field__input"
+            :class="{ 'field__input--abnormal': findingFor(vital.key) }"
+            :placeholder="vital.unit"
+            :aria-describedby="`vital-range-${vital.key}`"
+          >
+          <span v-if="rangeFor(vital.key)" :id="`vital-range-${vital.key}`" class="field__range" :class="{ 'field__range--abnormal': findingFor(vital.key) }">
+            {{ findingFor(vital.key) ? `${findingFor(vital.key).direction === 'low' ? 'Below' : 'Above'} range · ` : 'Normal ' }}{{ rangeFor(vital.key) }}
+          </span>
         </label>
       </div>
 
@@ -464,65 +369,39 @@
         </p>
       </fieldset>
 
-      <!-- Observed, in the order the form prints them. -->
-      <fieldset class="exam">
-        <legend class="exam__legend">On examination</legend>
-        <div class="vitals">
-          <label class="field">
-            <span class="field__label">General appearance</span>
-            <input v-model="screeningForm.general_appearance" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">Skin</span>
-            <input v-model="screeningForm.skin" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">HEENT</span>
-            <input v-model="screeningForm.heent" type="text" class="field__input" maxlength="255" >
-          </label>
-          <label class="field">
-            <span class="field__label">Heart and lungs</span>
-            <input v-model="screeningForm.heart_and_lungs" type="text" class="field__input" maxlength="255" >
-          </label>
-        </div>
-      </fieldset>
-
       <label class="field">
         <span class="field__label">Notes <span class="field__optional">optional</span></span>
         <textarea v-model="screeningForm.notes" class="field__input" rows="2" maxlength="500" />
       </label>
 
-      <div v-if="deferring" class="defer">
-        <!--
-          Which of the form's three deferral boxes. They behave identically in
-          the workflow; what differs is what the donor is told afterwards, so
-          the choice has to be explicit rather than inferred.
-        -->
-        <fieldset class="defer__options">
-          <legend class="field__label">Deferral</legend>
-          <label v-for="option in deferralOptions" :key="option.value" class="defer__option">
-            <input v-model="screeningForm.outcome" type="radio" :value="option.value" >
-            <span>{{ option.label }}</span>
-          </label>
-        </fieldset>
-
-        <label class="field">
-          <span class="field__label">Reason</span>
-          <input
-            v-model="screeningForm.deferral_reason"
-            type="text"
-            class="field__input"
-            maxlength="255"
-            placeholder="What the donor should be told"
-          >
-        </label>
-
-        <p class="card__hint">The donor's visit ends here and their appointment closes.</p>
-        <p v-if="isBlockingChoice" class="card__hint card__hint--warn">
-          The donor will not be invited to book again, and the next counter to scan
-          them will see this deferral.
-        </p>
-      </div>
+      <!--
+        The Deferrals page's own form (project owner, 2026-10-24), for this
+        donor and today. With every reading normal it leaves out the
+        vital-sign codes; a reading out of range offers its code and selects it.
+      -->
+      <BloodCenterDeferralFormDialog
+        v-if="deferring"
+        title="Defer donor"
+        :donor="dialogDonor"
+        :hidden-codes="lockedCodes"
+        :suggested-code="suggestedCode"
+        fixed-from
+        :saving="busy"
+        :error="error || ''"
+        :submit-label="correcting === 'screening' ? 'Request correction' : 'Defer donor'"
+        @close="deferring = false"
+        @submit="confirmDeferral"
+      >
+        <template #default="{ outcome }">
+          <p v-if="findings.length" class="card__hint">Out of range: {{ findingsText }}.</p>
+          <p v-else class="card__hint">Every reading is within range, so the vital-sign codes are not offered.</p>
+          <p class="card__hint">The donor's visit ends here and their appointment closes.</p>
+          <p v-if="BLOCKING_OUTCOMES.includes(outcome)" class="card__hint card__hint--warn">
+            The donor will not be invited to book again, and the next counter to scan
+            them will see this deferral.
+          </p>
+        </template>
+      </BloodCenterDeferralFormDialog>
 
       <!--
         The onsite DHQ is optional (project owner, 2026-10-17): the donor may
@@ -542,30 +421,18 @@
 
       <div class="actions">
         <button
-          v-if="!deferring"
           type="button"
           class="btn btn--primary"
-          :disabled="busy || (needsQuestionnaire && !dhqOnPaper)"
+          :disabled="busy || !vitalsComplete || (needsQuestionnaire && !dhqOnPaper)"
+          :title="missingVitalsHint"
           @click="submitScreening('accepted')"
         >
           {{ busy ? 'Saving…' : correcting === 'screening' ? 'Request correction — accepted' : 'Accepted — continue' }}
         </button>
 
-        <button v-if="!deferring" type="button" class="btn btn--danger" :disabled="busy" @click="deferring = true">
+        <button type="button" class="btn btn--danger" :disabled="busy || !vitalsComplete" :title="missingVitalsHint" @click="deferring = true">
           Defer donor
         </button>
-
-        <template v-else>
-          <button
-            type="button"
-            class="btn btn--danger"
-            :disabled="busy || !screeningForm.deferral_reason.trim()"
-            @click="submitScreening(screeningForm.outcome)"
-          >
-            {{ busy ? 'Saving…' : `Confirm — ${selectedDeferralLabel}` }}
-          </button>
-          <button type="button" class="btn" :disabled="busy" @click="deferring = false">Back</button>
-        </template>
 
         <button v-if="correcting === 'screening'" type="button" class="btn" :disabled="busy" @click="correcting = null">
           Cancel correction
@@ -695,9 +562,22 @@
         <div>
           <h2 class="card__title">{{ isDeferred ? 'Donor deferred' : 'Donation recorded' }}</h2>
           <p class="card__hint">
-            <!-- The reason is only served to the physician. -->
-            <template v-if="isDeferred">
+            <!-- The code, and the reason folded: it is served only to the physician. -->
+            <template v-if="isDeferred && donation?.screening?.deferral_code">
+              Deferral code
+              <BloodCenterDeferralCodeTag :code="donation.screening.deferral_code" :reason="donation.screening.deferral_reason" />.
+              The donor's notice gives the code only.
+            </template>
+            <template v-else-if="isDeferred && donation?.rejection_reason === 'Other'">
+              Deferred under
+              <BloodCenterDeferralCodeTag :reason="donation.screening?.deferral_reason" other />.
+              The donor's notice gives no reason.
+            </template>
+            <template v-else-if="isDeferred">
               {{ donation?.rejection_reason || 'The donor was not able to donate today.' }}
+            </template>
+            <template v-if="isDeferred && donation?.screening?.deferred_until">
+              Deferred until {{ formatShortDate(donation.screening.deferred_until) }}.
             </template>
             <template v-else>
               {{ donation?.volume_ml }} mL recorded. The donation is now with the Testing department, and the
@@ -743,7 +623,6 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BloodCenterQrScanner from '~/components/BloodCenter/QrScanner.vue'
 import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
 import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
 import BloodCenterPriorDeferralNotice from '~/components/BloodCenter/PriorDeferralNotice.vue'
@@ -751,8 +630,13 @@ import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import BloodCenterOnsiteQuestionnaire from '~/components/BloodCenter/OnsiteQuestionnaire.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { questionnaireOnFile } from '~/composables/useDonationTransaction'
+import { questionnaireOnFile, useCounterHandoff } from '~/composables/useDonationTransaction'
 import { atTimeOn, normalizeBarcode, phlebotomyProblems, timeNow } from '~/utils/phlebotomy'
+import { deferralChoicePayload } from '~/utils/deferralCodes'
+import { formatPhone, formatShortDate } from '~/utils/donorRecords'
+import { findingText, lockedVitalCodes, missingVitals, rangeText, suggestedDeferralCode, vitalFindings } from '~/utils/screeningVitals'
+import BloodCenterDeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
+import BloodCenterDeferralFormDialog from '~/components/BloodCenter/DeferralFormDialog.vue'
 
 /**
  * The Donation page: the counter's one continuous donation transaction.
@@ -784,7 +668,7 @@ const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))
 // it; neither is the physician's review read above.
 const canPrintQuestionnaire = computed(() => can('donors.print_questionnaire'))
 const canRecordQuestionnaire = computed(() => can('donors.record_questionnaire'))
-const canRegisterDonor = computed(() => can('donors.manage'))
+const canViewDonors = computed(() => can('donors.view_contact'))
 
 const service = bloodCenterService
 
@@ -793,7 +677,7 @@ const {
   priorDeferral, intakeForm,
   questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
   loadQuestionnaire, adoptQuestionnaireReference,
-  verifyQr, adoptDonor, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
+  bringUp, adoptArrival, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
 } = useDonationTransaction()
 
 // The type of donation (Stage 2), a walk-in unless the counter picks otherwise.
@@ -880,14 +764,6 @@ async function refreshQuestionnaire() {
   if (ok) questionnaireOpen.value = true
 }
 
-const scannerRef = ref(null)
-const lookupInput = ref(null)
-const manualOpen = ref(false)
-
-function focusLookup() {
-  lookupInput.value?.focus()
-}
-
 /**
  * Display only. A server that cannot decrypt the stored answers says
  * "The MAC is invalid", which means nothing at the counter.
@@ -899,35 +775,18 @@ const questionnaireErrorText = computed(() => {
     ? "The donor's questionnaire answers can't be read right now. Ask your administrator to check the server's encryption key."
     : message
 })
-const lookupValue = ref('')
-const lookupError = ref(null)
 const deferring = ref(false)
 
-/**
- * The form's three deferral boxes. Accepted is the primary action rather than
- * an option here, because it is the outcome that does not end the visit.
- */
-const deferralOptions = [
-  { value: 'temporarily_deferred', label: 'Temporarily Deferred' },
-  { value: 'permanently_deferred', label: 'Permanently Deferred' },
-  { value: 'indefinite_deferral', label: 'Indefinite Deferral' },
-]
-
+// What the donor is told differs for these: no invitation to book again.
 const BLOCKING_OUTCOMES = ['permanently_deferred', 'indefinite_deferral']
-
-const isBlockingChoice = computed(() => BLOCKING_OUTCOMES.includes(screeningForm.outcome))
-
-const selectedDeferralLabel = computed(() =>
-  deferralOptions.find((o) => o.value === screeningForm.outcome)?.label ?? 'deferral')
 
 const screeningForm = reactive({
   // Section I-D. The outcome lives on the form rather than being a bare
   // argument, now that there are four of them and three end the visit.
   outcome: 'temporarily_deferred',
-  general_appearance: '',
-  skin: '',
-  heent: '',
-  heart_and_lungs: '',
+  // The counter no longer asks "On examination" (general appearance, skin,
+  // HEENT, heart and lungs; project owner, 2026-10-24). The columns stay for
+  // a drive's paper record, which still types them.
   systolic_bp: null,
   diastolic_bp: null,
   pulse_bpm: null,
@@ -937,8 +796,66 @@ const screeningForm = reactive({
   // Section II's fingerprick table. Preliminary; never adopted onto the donor.
   fingerprick_blood_type_id: null,
   notes: '',
-  deferral_reason: '',
+  deferral_code: '',
+  // Typed under Other, which has no code.
+  other_reason: '',
+  // A temporary deferral's last day, from the deferral form.
+  deferred_until: '',
 })
+
+/* ---------- the six vital signs (project owner, 2026-10-24) ---------- */
+
+const VITAL_INPUTS = [
+  { key: 'systolic_bp', label: 'Systolic BP', unit: 'mmHg', step: 1 },
+  { key: 'diastolic_bp', label: 'Diastolic BP', unit: 'mmHg', step: 1 },
+  { key: 'pulse_bpm', label: 'Pulse', unit: 'bpm', step: 1 },
+  { key: 'temperature_c', label: 'Temperature', unit: '°C', step: 0.1 },
+  { key: 'weight_kg', label: 'Weight', unit: 'kg', step: 1 },
+  { key: 'haemoglobin_g_dl', label: 'Haemoglobin', unit: 'g/dL', step: 0.1 },
+]
+
+// The ranges for this donor, from the server. Without them every reading is
+// still required; the server judges the rest.
+const vitalRanges = computed(() => donation.value?.vitals?.ranges
+  ?? Object.fromEntries(VITAL_INPUTS.map((v) => [v.key, { label: v.label, unit: v.unit, min: null, max: null, low_code: null, high_code: null }])))
+
+const missingReadings = computed(() => missingVitals(vitalRanges.value, screeningForm))
+const vitalsComplete = computed(() => missingReadings.value.length === 0)
+// On the buttons in place of a banner: what still has to be recorded.
+const missingVitalsHint = computed(() => (vitalsComplete.value ? undefined : `Record ${missingReadings.value.join(', ')} first`))
+const findings = computed(() => vitalFindings(vitalRanges.value, screeningForm))
+const findingsText = computed(() => findings.value.map((f) => findingText(f, vitalRanges.value[f.field])).join('; '))
+const lockedCodes = computed(() => lockedVitalCodes(donation.value?.vitals?.vital_only_codes ?? [], findings.value))
+const suggestedCode = computed(() => suggestedDeferralCode(findings.value))
+
+function findingFor(field) {
+  return findings.value.find((f) => f.field === field) ?? null
+}
+
+function rangeFor(field) {
+  const range = donation.value?.vitals?.ranges?.[field]
+  return range ? rangeText(range) : ''
+}
+
+/* ---------- Defer donor: the shared deferral form ---------- */
+
+const dialogDonor = computed(() => (donor.value ? {
+  name: donor.value.full_name,
+  code: donor.value.donor_code,
+  bloodType: donor.value.blood_type || '',
+  phone: formatPhone(donor.value.phone),
+} : null))
+
+/** What the form chose, recorded as this visit's screening. */
+async function confirmDeferral(choice) {
+  Object.assign(screeningForm, {
+    outcome: choice.outcome,
+    deferral_code: choice.code,
+    other_reason: choice.otherReason,
+    deferred_until: choice.outcome === 'temporarily_deferred' ? choice.until : '',
+  })
+  await submitScreening(choice.outcome)
+}
 
 /**
  * Section II, "For Phlebotomist Use Only".
@@ -1033,155 +950,39 @@ const steps = computed(() => {
   return flow.map((step, i) => ({ ...step, index: i + 1 }))
 })
 
-async function onScanned(token) {
-  const ok = await verifyQr(token)
-
-  // A refused code leaves the camera running so the donor can simply try
-  // again, but the scanner must forget it or the same frame re-submits.
-  if (!ok) scannerRef.value?.reset()
-  else scannerRef.value?.stop()
-}
-
-// --- walk-ins: find the donor -----------------------------------------------
-//
-// Names reach only this centre's own donors; another centre's donor is found
-// by their exact email or phone (CounterDonorSearchService on the server).
-
-const searching = ref(false)
-const searchResults = ref(null)
-const searchTruncated = ref(false)
-const searchedFor = ref('')
-
-// Search as the staff member types (project owner, 2026-10-17): a short pause
-// after the last key, from two characters. Only the newest search may write
-// its results, so a slow answer to "an" never lands over the one for "ana cruz".
-const SEARCH_DELAY_MS = 300
-let searchTimer = null
-let searchSeq = 0
-
-async function searchDonors() {
-  clearTimeout(searchTimer)
-  const q = lookupValue.value.trim()
-
-  if (busy.value || q.length < 2 || q === searchedFor.value) return
-
-  const mine = ++searchSeq
-  lookupError.value = null
-  searching.value = true
-
-  try {
-    const result = await service.searchCounterDonors(q)
-    if (mine !== searchSeq) return
-
-    searchResults.value = result?.data ?? []
-    searchTruncated.value = Boolean(result?.truncated)
-    searchedFor.value = q
-  } catch (err) {
-    if (mine !== searchSeq) return
-
-    searchResults.value = null
-    lookupError.value = err?.status === 429
-      ? 'Too many searches just now. Wait a moment and try again.'
-      : err?.message || 'The search failed. Try again.'
-  } finally {
-    if (mine === searchSeq) searching.value = false
-  }
-}
-
-/**
- * Adopt the donor the staff member picked.
- *
- * Through the exact lookup by donor code rather than straight from the search
- * row: it is what carries the standing-deferral notice and whether a
- * questionnaire is on file, and it records which donor was chosen.
+/*
+ * How a donor reaches the counter (project owner, 2026-10-24), each already
+ * identified:
+ *  - a QR verified in the Donations page's scan, handed over in memory
+ *    (useCounterHandoff) and taken here once;
+ *  - ?donor=<uuid> from Donor Management's Start donation or Donations'
+ *    Continue, brought up as the scan would answer it: today's booking, the
+ *    visit under way. The uuid then leaves the address, so a reload does not
+ *    bring them up again.
  */
-async function chooseDonor(result) {
-  lookupError.value = null
-  busy.value = true
+const route = useRoute()
+const router = useRouter()
+const handoff = useCounterHandoff()
+const arriving = ref(false)
 
-  try {
-    const found = await service.lookupDonor({ type: 'donor_code', value: result.donor_code })
-
-    adoptDonor({
-      uuid: found.uuid,
-      donor_code: found.donor_code,
-      full_name: found.full_name,
-      blood_type: found.blood_type ?? null,
-      phone: found.phone ?? null,
-    }, null, found.prior_deferral ?? null, found.health_questionnaire ?? null)
-
-    manualOpen.value = false
-    clearSearch()
-  } catch (err) {
-    lookupError.value = err?.status === 404
-      ? 'That donor could not be found any more. Search again.'
-      : err?.message || 'The donor could not be opened. Try again.'
-  } finally {
-    busy.value = false
-  }
-}
-
-function clearSearch() {
-  clearTimeout(searchTimer)
-  searchSeq++
-  searching.value = false
-  lookupValue.value = ''
-  searchResults.value = null
-  searchTruncated.value = false
-  searchedFor.value = ''
-}
-
-// Every change to the box searches again after a short pause. The previous
-// results stay until the new ones arrive, rather than blinking out per key;
-// under two characters there is nothing to search, so they are cleared.
-watch(lookupValue, (value) => {
-  clearTimeout(searchTimer)
-
-  if (value.trim().length < 2) {
-    searchSeq++
-    searching.value = false
-    searchResults.value = null
-    searchedFor.value = ''
+onMounted(async () => {
+  const handed = handoff.value
+  if (handed) {
+    handoff.value = null
+    adoptArrival(handed.data, 'qr')
     return
   }
 
-  searchTimer = setTimeout(searchDonors, SEARCH_DELAY_MS)
+  const uuid = typeof route.query.donor === 'string' ? route.query.donor.trim() : ''
+  if (!uuid || donor.value) return
+
+  arriving.value = true
+  await bringUp(uuid)
+  arriving.value = false
+
+  const { donor: _picked, ...rest } = route.query
+  router.replace({ query: rest })
 })
-
-onBeforeUnmount(() => clearTimeout(searchTimer))
-
-function initialsOf(name) {
-  return (name || '?')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join('')
-}
-
-/** DONOR-000012 · 30 y · O+ — enough to tell two people of one name apart. */
-function resultMeta(result) {
-  const parts = [result.donor_code]
-  const age = ageFrom(result.birth_date)
-
-  if (age !== null) parts.push(`${age} y`)
-  if (result.blood_type) parts.push(result.blood_type)
-
-  return parts.join(' · ')
-}
-
-function ageFrom(birthDate) {
-  if (!birthDate) return null
-
-  const born = new Date(`${birthDate}T00:00:00`)
-  if (Number.isNaN(born.getTime())) return null
-
-  const today = new Date()
-  let age = today.getFullYear() - born.getFullYear()
-  if (today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate())) age -= 1
-
-  return age
-}
 
 function longDate(value) {
   if (!value) return '—'
@@ -1210,12 +1011,6 @@ async function submitScreening(outcome) {
     if (screeningForm[key] !== null && screeningForm[key] !== '') payload[key] = screeningForm[key]
   }
 
-  // Section I-D free text: send only what was actually written, so a field the
-  // officer tabbed past stays absent rather than becoming an empty string.
-  for (const key of ['general_appearance', 'skin', 'heent', 'heart_and_lungs']) {
-    if (screeningForm[key].trim()) payload[key] = screeningForm[key].trim()
-  }
-
   // Filled in the questionnaire drawer, where the form prints them, and
   // carried here because they belong to the screening this call records.
   for (const key of ['sleep', 'meal', 'meds', 'allergies']) {
@@ -1228,8 +1023,10 @@ async function submitScreening(outcome) {
     payload.fingerprick_blood_type_id = screeningForm.fingerprick_blood_type_id
   }
 
-  // Any of the three deferrals carries a reason; only Accepted has none.
-  if (outcome !== 'accepted') payload.deferral_reason = screeningForm.deferral_reason.trim()
+  // Any of the three deferrals carries a code, or Other's typed reason; only
+  // Accepted has neither. A temporary one carries its Until date.
+  if (outcome !== 'accepted') Object.assign(payload, deferralChoicePayload(screeningForm.deferral_code, screeningForm.other_reason))
+  if (outcome === 'temporarily_deferred') payload.deferred_until = screeningForm.deferred_until
 
   // The donor answered the printed DHQ: recorded on the screening.
   if (needsQuestionnaire.value && dhqOnPaper.value) payload.dhq_on_paper = true
@@ -1240,8 +1037,8 @@ async function submitScreening(outcome) {
     return
   }
 
-  await recordScreening(payload)
-  deferring.value = false
+  // A refused save keeps the deferral form open, with the server's message in it.
+  if (await recordScreening(payload)) deferring.value = false
 }
 
 async function submitCollection() {
@@ -1346,25 +1143,26 @@ async function abandonCollection() {
   if (result) donation.value = result.data
 }
 
+/**
+ * Next donor, or a visit given up: back to Donations, where the next visit
+ * starts (Scan QR) or is carried on (Continue).
+ */
 function finishVisit() {
   reset()
   correcting.value = null
   correction.value = null
-  manualOpen.value = false
   deferring.value = false
   onsiteOpen.value = false
-  clearSearch()
-  lookupError.value = null
   Object.assign(screeningForm, {
     outcome: 'temporarily_deferred',
-    general_appearance: '', skin: '', heent: '', heart_and_lungs: '',
     systolic_bp: null, diastolic_bp: null, pulse_bpm: null,
     temperature_c: null, weight_kg: null, haemoglobin_g_dl: null,
     fingerprick_blood_type_id: null,
-    notes: '', deferral_reason: '',
+    notes: '', deferral_code: '', other_reason: '', deferred_until: '',
   })
   Object.assign(collectionForm, blankCollection())
   collectionAttempted.value = false
+  navigateTo('/blood-center/donations')
 }
 </script>
 
@@ -1561,191 +1359,20 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-/* --- stage 1: check-in --- */
-.checkin {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
+/* --- stage 1: nobody yet --- */
+.arrive { align-items: flex-start; gap: 10px; }
+.arrive .actions { margin-top: 4px; }
+.arrive .btn { gap: 6px; text-decoration: none; }
 
-.checkin__panel { gap: 16px; }
-
-.checkin__head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.checkin__head .card__hint { margin-top: 2px; }
-
-.checkin__icon {
+.arrive__icon {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--rb-primary) 12%, transparent);
   color: var(--rb-primary-text);
 }
-
-.lookup {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-/* Holds its line even when empty, so results do not jump as it fills. */
-.lookup__status {
-  min-height: 18px;
-  margin: -4px 0 0;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
-
-.checkin__checks {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--rb-border);
-}
-
-.checkin__checks-title {
-  margin: 0 0 8px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-
-.checkin__checks ol {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.checkin__checks li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--rb-text-primary);
-}
-
-.checkin__n {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  flex: none;
-  border-radius: 50%;
-  border: 1px solid var(--rb-border-strong);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--rb-text-secondary);
-}
-
-.checkin__eyebrow {
-  margin: 0 0 2px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
-}
-
-/* --- walk-in search results --- */
-.results { display: flex; flex-direction: column; gap: 8px; }
-
-.results__list {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.results__list li + li { border-top: 1px solid var(--rb-border); }
-
-.result {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  border: none;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.result:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.result:disabled { opacity: 0.55; cursor: not-allowed; }
-.result:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
-
-.result__avatar {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  border-radius: 50%;
-  background: rgba(var(--rb-primary-rgb), 0.12);
-  color: var(--rb-primary-text);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.result__body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-
-.result__name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.result__tag {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(var(--rb-warning-rgb), 0.14);
-  color: var(--rb-warning-text);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.result__meta { font-size: 12px; color: var(--rb-text-secondary); }
-.result__go { color: var(--rb-text-secondary); flex: none; }
-
-.results__note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
-
-.results__empty {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border: 1px dashed var(--rb-border-strong);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--rb-text-primary);
-}
-
-.results__empty p { margin: 0; }
-
-.results__link { color: var(--rb-primary-text); font-weight: 600; }
 
 /* --- booking and questionnaire --- */
 .visit {
@@ -1841,15 +1468,10 @@ function finishVisit() {
   border-color: var(--rb-primary);
 }
 
-.defer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.8rem;
-  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
-  border-radius: 10px;
-  background: rgba(var(--rb-accent-rgb), 0.05);
-}
+/* A reading out of its range, and the range under every reading. */
+.field__input--abnormal { border-color: var(--rb-warning); background: rgba(var(--rb-warning-rgb), 0.06); }
+.field__range { font-size: 11.5px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.field__range--abnormal { color: var(--rb-warning-text); font-weight: 600; }
 
 /* --- actions --- */
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -1980,24 +1602,6 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-.defer__options {
-  margin: 0;
-  padding: 0;
-  border: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-}
-
-.defer__option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 13.5px;
-  color: var(--rb-text-primary);
-  cursor: pointer;
-}
-
 .card__hint--warn {
   color: var(--rb-accent-text);
   font-weight: 600;
@@ -2117,7 +1721,6 @@ function finishVisit() {
 .done-facts strong { color: var(--rb-text-primary); }
 
 @media (max-width: 900px) {
-  .checkin,
   .visit { grid-template-columns: minmax(0, 1fr); }
 }
 

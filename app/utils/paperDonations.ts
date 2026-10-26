@@ -9,6 +9,7 @@
  */
 
 import { atTimeOn, normalizeBarcode, phlebotomyProblems } from './phlebotomy'
+import { OTHER_DEFERRAL, deferralChoiceComplete, deferralChoicePayload } from './deferralCodes'
 
 export interface PaperSheet {
   id: number
@@ -58,7 +59,10 @@ export type PaperRowForm = {
   screened_time: string
   screened_by_name: string
   outcome: PaperOutcome
-  deferral_reason: string
+  /** The deferral code written on the paper, from the centre's list, or OTHER_DEFERRAL. */
+  deferral_code: string
+  /** The reason as written, under Other. */
+  other_reason: string
   fingerprick_blood_type_id: number | null
   /** Accepted only: was the bag drawn, or did the draw not go ahead? */
   draw: 'collected' | 'failed'
@@ -87,7 +91,8 @@ export function blankPaperRow(sheet: Pick<PaperSheet, 'screened_by_name' | 'phle
     screened_time: '',
     screened_by_name: sheet.screened_by_name ?? '',
     outcome: 'accepted',
-    deferral_reason: '',
+    deferral_code: '',
+    other_reason: '',
     systolic_bp: null,
     diastolic_bp: null,
     pulse_bpm: null,
@@ -146,7 +151,11 @@ export function paperRowProblems(form: PaperRowForm, heldOn: string, now: Date =
   }
 
   if (form.outcome !== 'accepted') {
-    if (!form.deferral_reason.trim()) problems.push('Give the reason the donor was deferred.')
+    if (!deferralChoiceComplete(form.deferral_code.trim(), form.other_reason)) {
+      problems.push(form.deferral_code === OTHER_DEFERRAL
+        ? 'Give the reason written on the paper.'
+        : 'Choose the deferral code written on the paper.')
+    }
 
     return problems
   }
@@ -199,7 +208,7 @@ export function paperRowPayload(
   }
 
   if (form.outcome !== 'accepted') {
-    payload.deferral_reason = form.deferral_reason.trim()
+    Object.assign(payload, deferralChoicePayload(form.deferral_code.trim(), form.other_reason))
   } else if (form.draw === 'failed') {
     payload.draw_failed = true
     payload.draw_failed_reason = form.draw_failed_reason.trim()

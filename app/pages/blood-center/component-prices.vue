@@ -1,13 +1,7 @@
 <template>
   <div class="prices-page">
     <header class="prices-page__header">
-      <div>
-        <h1 class="prices-page__title">Component Prices</h1>
-        <p class="prices-page__subtitle">
-          What this centre bills per unit of each component. On a patient's request, a priced component is held back
-          until it is paid for; one marked No charge is released without payment.
-        </p>
-      </div>
+      <h1 class="prices-page__title">Component Prices</h1>
 
       <div class="header-actions">
         <span v-if="dirtyCount" class="unsaved">{{ dirtyCount }} unsaved</span>
@@ -21,17 +15,6 @@
         </button>
       </div>
     </header>
-
-    <div class="scope">
-      <span class="scope__item">
-        <AssetIcon name="building-2" :size="14" />
-        Prices for <strong>{{ facilityName || 'this centre' }}</strong> only. Other centres set their own.
-      </span>
-      <span v-if="rows.length" class="scope__progress" :class="{ 'scope__progress--done': configuredCount === rows.length }">
-        <AssetIcon :name="configuredCount === rows.length ? 'circle-check-big' : 'circle-alert'" :size="14" />
-        {{ configuredCount }} of {{ rows.length }} components configured
-      </span>
-    </div>
 
     <div
       v-if="shownBanner"
@@ -51,7 +34,6 @@
             <th>Bag code</th>
             <th>Price per unit</th>
             <th>No charge</th>
-            <th>At release</th>
           </tr>
         </thead>
         <tbody>
@@ -61,11 +43,10 @@
               <td><span class="skeleton skeleton--code" /></td>
               <td><span class="skeleton skeleton--input" /></td>
               <td><span class="skeleton skeleton--check" /></td>
-              <td><span class="skeleton skeleton--pill" /></td>
             </tr>
           </template>
           <tr v-else-if="!rows.length">
-            <td colspan="5" class="empty">No blood components are defined.</td>
+            <td colspan="4" class="empty">No blood components are defined.</td>
           </tr>
           <tr
             v-for="row in rows"
@@ -113,25 +94,10 @@
                 <span>No charge<span class="sr-only"> for {{ row.name }}</span></span>
               </label>
             </td>
-            <td>
-              <span class="pill" :class="releaseRule(row).tone">
-                <AssetIcon :name="releaseRule(row).icon" :size="12" />
-                {{ releaseRule(row).label }}
-              </span>
-            </td>
           </tr>
         </tbody>
       </table>
     </section>
-
-    <p class="footnote">
-      <AssetIcon name="info" :size="14" />
-      <span>
-        Prices are saved together, and only once every component has a price or is marked No charge. No charge releases
-        the unit without payment and bills it at ₱0. Components and their shelf life are set by Processing, under Blood
-        Components.
-      </span>
-    </p>
   </div>
 </template>
 
@@ -168,7 +134,6 @@ const rows = ref([])
 const drafts = reactive({})
 const errors = reactive({})
 const inputs = {}
-const facilityName = ref('')
 const busy = ref(false)
 const saving = ref(false)
 const banner = ref('')
@@ -177,7 +142,6 @@ const bannerKind = ref('notice')
 // Errors show only after a save is tried; from then on each edit rechecks its row.
 const attempted = ref(false)
 
-const configuredCount = computed(() => rows.value.filter((row) => row.price !== null).length)
 const dirtyCount = computed(() => rows.value.filter(isDirty).length)
 
 /**
@@ -264,16 +228,6 @@ function setNoCharge(row, checked) {
   recheck(row)
 }
 
-/** What happens at release with the price as it stands on screen. */
-function releaseRule(row) {
-  const draft = drafts[row.id]
-
-  if (draft?.noCharge) return { label: 'Released without payment', icon: 'check', tone: 'pill--muted' }
-  if (draft && !problemWith(row)) return { label: 'Payment before release', icon: 'check', tone: 'pill--ok' }
-
-  return { label: 'Not configured', icon: 'circle-alert', tone: 'pill--warn' }
-}
-
 function clearErrors() {
   Object.keys(errors).forEach((id) => delete errors[id])
 }
@@ -321,7 +275,6 @@ async function load() {
     const res = await bloodCenterService.componentPrices()
 
     applyRows(res?.data ?? [])
-    facilityName.value = res?.meta?.facility?.name ?? ''
   } catch (err) {
     bannerKind.value = 'error'
     banner.value = firstError(err, 'The prices could not be loaded.')
@@ -431,24 +384,7 @@ onMounted(load)
 
 .prices-page__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .prices-page__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.prices-page__subtitle { margin: 4px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
 .header-actions { display: inline-flex; align-items: center; gap: 8px; }
-
-.scope { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.scope__item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--rb-text-secondary); }
-.scope__item strong { color: var(--rb-text-primary); }
-.scope__progress {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: rgba(var(--rb-warning-rgb), 0.12);
-  color: var(--rb-warning-text);
-  font-size: 12px;
-  font-weight: 700;
-}
-.scope__progress--done { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 
 .alert {
   display: flex;
@@ -571,20 +507,6 @@ onMounted(load)
 .no-charge input:disabled,
 .no-charge input:disabled + span { cursor: not-allowed; opacity: 0.6; }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.pill--ok { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.pill--warn { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
-.pill--muted { background: var(--rb-surface-hover); color: var(--rb-text-secondary); }
-
 .unsaved {
   display: inline-flex;
   align-items: center;
@@ -622,18 +544,6 @@ onMounted(load)
 .btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
 .btn--primary:hover:not(:disabled) { background: #0D47A1; border-color: #0D47A1; }
 
-.footnote {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0;
-  max-width: 90ch;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
-.footnote :deep(svg) { flex-shrink: 0; margin-top: 2px; }
-
 .skeleton {
   display: block;
   border-radius: 6px;
@@ -645,7 +555,6 @@ onMounted(load)
 .skeleton--code { width: 52px; height: 20px; }
 .skeleton--input { width: 170px; height: 36px; border-radius: 10px; }
 .skeleton--check { width: 96px; height: 16px; }
-.skeleton--pill { width: 140px; height: 20px; border-radius: 999px; }
 @keyframes price-shimmer {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }

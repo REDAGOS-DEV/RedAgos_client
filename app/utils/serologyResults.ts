@@ -120,7 +120,7 @@ export function lockText(row: Pick<SerologyResultRow, 'locked' | 'correction_pen
     case 'awaiting_verification':
       return 'Saved as reactive and waiting for the Laboratory Supervisor to verify it against the bench record. Nothing has happened yet: the donation is not rejected and the donor is not deferred. The supervisor verifies it, or returns it for re-entry.'
     case 'reactive':
-      return 'A reactive result can never be corrected. It has already rejected the donation, deferred the donor and referred them for counselling.'
+      return 'A reactive result can never be corrected. It has already rejected the donation, deferred the donor pending confirmatory testing and sent a medical referral to the Donor Counselling Physician.'
     case 'rejected':
       return 'This donation has been rejected, so its test results are locked.'
     case 'units_released':

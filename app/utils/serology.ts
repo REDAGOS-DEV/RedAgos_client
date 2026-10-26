@@ -53,8 +53,9 @@ export function reactiveMarkers(
  *
  * `confirm_reactive` is sent only once the medical technologist has confirmed
  * a reactive reading. The server refuses a reactive panel without it, because
- * a reactive marker rejects the donation, permanently defers the donor and
- * refers them — and none of it can be undone from here.
+ * a verified reactive marker rejects the donation, defers the donor pending
+ * confirmatory testing and opens a medical referral — and none of it can be
+ * undone from here.
  */
 export function serologyPayload(
   readings: Record<string, MarkerReading>,

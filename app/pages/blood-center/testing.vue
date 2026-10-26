@@ -180,8 +180,9 @@
                 <h2 class="card__title">Donation rejected</h2>
                 <p class="card__hint">
                   <template v-if="isReactive">
-                    Serology was reactive. The donation has been rejected, the donor permanently deferred and added to
-                    Counselling referrals. These results can no longer be changed.
+                    Serology was reactive. The donation has been rejected, and a confidential medical referral has gone
+                    to the Donor Counselling Physician. The donor is deferred pending confirmatory testing. These results can no
+                    longer be changed.
                   </template>
                   <template v-else>
                     {{ selected.rejection_reason || 'No reason was recorded.' }} These results can no longer be changed.
@@ -192,9 +193,6 @@
 
             <div class="actions">
               <button type="button" class="btn btn--primary" @click="backToQueue">Close this unit</button>
-              <NuxtLink v-if="isReactive && canSeeReferrals" to="/blood-center/counselling-referrals" class="btn">
-                Open Counselling Referrals
-              </NuxtLink>
             </div>
           </section>
 
@@ -394,8 +392,8 @@
             </p>
             <ul>
               <li>reject the donation, so it can never become stock;</li>
-              <li>permanently defer the donor at every blood centre;</li>
-              <li>add the donor to Counselling referrals, where you send them a contact request.</li>
+              <li>defer the donor pending confirmatory testing (never permanently on a screen alone);</li>
+              <li>send a confidential medical referral to the Donor Counselling Physician, who follows the donor up.</li>
             </ul>
             <p>It cannot be undone here. Check the readings against the bench record first.</p>
           </template>
@@ -406,8 +404,8 @@
             </p>
             <ul>
               <li>the donation is rejected, so it can never become stock;</li>
-              <li>the donor is permanently deferred at every blood centre;</li>
-              <li>the donor is added to Counselling referrals.</li>
+              <li>the donor is deferred pending confirmatory testing;</li>
+              <li>a confidential medical referral goes to the Donor Counselling Physician.</li>
             </ul>
             <p>If the reading is wrong, the supervisor returns it to be entered again.</p>
           </template>
@@ -428,7 +426,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBloodTypePicker from '~/components/BloodCenter/BloodTypePicker.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
+import { donorInitials, donorReference, donorTitle, visibleDonor } from '~/utils/donorLabel'
 import { aboOf, bloodTypeCodeFor } from '~/utils/bloodType'
 import { normalizeBarcode } from '~/utils/phlebotomy'
 import {
@@ -442,14 +440,16 @@ import {
 /**
  * The testing page: Section II's Immunohematology and Serology tables.
  *
- * The Serology Results list and the Counselling Referrals follow-up are pages
- * of their own in the sidebar (project owner, 2026-10-18).
+ * The Serology Results list is a page of its own in the sidebar (project
+ * owner, 2026-10-18). A reactive donor's follow-up is not Testing's: it is
+ * the Donor Counselling Physician's Medical Referrals (project owner, 2026-10-25).
  *
  * One page for two departments. Immunohematology records the typing and TTI
  * Testing the serology panel; each card shows only to the role that records
  * it. Saving a result that passes issues that section's clearance at once. A
- * reactive marker rejects the donation, permanently defers the donor and opens
- * a counselling referral, in one transaction, and the server refuses a
+ * verified reactive marker rejects the donation, defers the donor pending
+ * confirmatory testing and opens a confidential medical referral for the
+ * Donor Counselling Physician, in one transaction, and the server refuses a
  * reactive panel that was not explicitly confirmed here. A saved result is
  * never saved over: it goes as a correction request.
  */
@@ -463,7 +463,12 @@ definePageMeta({
 
 const route = useRoute()
 const { can } = useUser()
-const canSeeReferrals = computed(() => can('lab.referrals'))
+
+// Technologists work blind; the Laboratory Supervisor alone is told who the
+// donor is. Every donation is taken in through this, so a name the server
+// should not have sent is never shown either.
+const canViewIdentity = computed(() => can('donors.view_identity'))
+const blindFor = (donation) => (donation ? { ...donation, donor: visibleDonor(donation.donor, canViewIdentity.value) } : null)
 
 // The sidebar counts referrals and results waiting for verification; a saved
 // result can change both.
@@ -575,7 +580,7 @@ async function loadQueue({ quiet = false } = {}) {
 
     const res = await service.laboratoryQueue(params)
 
-    queue.value = res?.data ?? []
+    queue.value = (res?.data ?? []).map(blindFor)
   } catch (err) {
     error.value = messageFor(err)
   } finally {
@@ -690,7 +695,7 @@ function requestTypingCorrection() {
  * from the fingerprick at screening, and never from the donor's profile.
  */
 function adopt(payload, sections = ['typing', 'serology']) {
-  selected.value = payload ?? null
+  selected.value = blindFor(payload)
 
   // Closed: the forms stand empty, never holding the last unit's entries.
   payload ??= {}
@@ -941,13 +946,13 @@ async function run(work) {
 }
 
 onMounted(async () => {
-  // The results and referrals were tabs here. A notification sent before they
-  // moved still links to ?tab=.
+  // The results were a tab here. A notification sent before they moved still
+  // links to ?tab=. An old ?tab=referrals link stays on this page: the
+  // referrals are the Donor Counselling Physician's now (project owner, 2026-10-25).
   if (route.query.tab === 'results') {
     const outcome = typeof route.query.outcome === 'string' ? `?outcome=${encodeURIComponent(route.query.outcome)}` : ''
     return navigateTo(`/blood-center/serology-results${outcome}`, { replace: true })
   }
-  if (route.query.tab === 'referrals') return navigateTo('/blood-center/counselling-referrals', { replace: true })
 
   await loadReference()
   await loadQueue()

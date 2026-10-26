@@ -7,6 +7,8 @@
  * deferral reads and what the New Deferral form sends.
  */
 
+import { deferralChoicePayload } from '~/utils/deferralCodes'
+
 /** The three deferrals the DOH form knows, mildest first. */
 export const DEFERRAL_TYPES = [
   { value: 'temporarily_deferred', label: 'Temporary' },
@@ -21,27 +23,6 @@ export const DEFERRAL_STATUS_FILTERS = [
   { value: 'expired', label: 'Expired' },
   { value: 'lifted', label: 'Lifted' },
 ] as const
-
-/**
- * The form's reason picker. The server stores the words, so this list can
- * change freely; "Other" asks for them.
- */
-export const DEFERRAL_REASONS = [
-  'Low haemoglobin',
-  'Recent tattoo/piercing',
-  'Recent illness or fever',
-  'Recent surgery or dental work',
-  'On medication',
-  'Pregnancy or breastfeeding',
-  'Blood pressure out of range',
-  'Underweight',
-  'Recent vaccination',
-  'Recent travel to a malaria area',
-  'Chronic condition',
-  'High-risk behaviour',
-] as const
-
-export const OTHER_REASON = 'other'
 
 /** How long a temporary deferral runs unless the physician says otherwise. */
 export const DEFAULT_TEMPORARY_DAYS = 30
@@ -79,26 +60,24 @@ export function addDaysIso(iso: string, days: number): string {
 export interface DeferralForm {
   donorUuid: string
   outcome: string
-  reason: string
+  /** One of the centre's deferral codes (the server copies its reason), or OTHER_DEFERRAL. */
+  code: string
+  /** The reason typed under Other. */
   otherReason: string
   from: string
   until: string
 }
 
-/** The reason as it will be saved: the picked one, or the words typed for "Other". */
-export function deferralReason(form: Pick<DeferralForm, 'reason' | 'otherReason'>): string {
-  return form.reason === OTHER_REASON ? form.otherReason.trim() : form.reason
-}
-
 /**
- * What POST /deferrals takes. The Until date travels only with a temporary
- * deferral; the form says it is ignored otherwise.
+ * What POST /deferrals takes: the code, or the reason typed under Other. The
+ * Until date travels only with a temporary deferral; the form says it is
+ * ignored otherwise.
  */
 export function deferralPayload(form: DeferralForm): Record<string, string> {
   return {
     donor_uuid: form.donorUuid,
     outcome: form.outcome,
-    reason: deferralReason(form),
+    ...deferralChoicePayload(form.code, form.otherReason),
     deferred_on: form.from,
     ...(form.outcome === TEMPORARY ? { ends_on: form.until } : {}),
   }

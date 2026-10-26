@@ -12,6 +12,7 @@ import {
   sheetDay,
   sheetSummary,
 } from '~/utils/paperDonations'
+import { OTHER_DEFERRAL } from '~/utils/deferralCodes'
 
 /**
  * Paper records (project owner, 2026-10-17): a remote drive's screening and
@@ -99,10 +100,10 @@ describe('what a paper row is missing', () => {
       .toContain('The time ended cannot be in the future.')
   })
 
-  it('asks a deferral for its reason and nothing about a bag', () => {
+  it('asks a deferral for its code and nothing about a bag', () => {
     const row = { ...blankPaperRow(SHEET), outcome: 'permanently_deferred' as const }
 
-    expect(paperRowProblems(row, HELD_ON, NOW)).toEqual(['Give the reason the donor was deferred.'])
+    expect(paperRowProblems(row, HELD_ON, NOW)).toEqual(['Choose the deferral code written on the paper.'])
   })
 
   it('asks why a draw was not completed, or why a bag will not reach the lab', () => {
@@ -139,16 +140,25 @@ describe('what a paper row sends', () => {
     const payload = paperRowPayload(drawnRow(), HELD_ON, 'uuid-1')
 
     expect(payload).toMatchObject({ donor_uuid: 'uuid-1', screened_by_name: 'Dr. Reyes', outcome: 'accepted', systolic_bp: 120, diastolic_bp: 80, temperature_c: 36.6 })
-    for (const key of ['screened_at', 'pulse_bpm', 'weight_kg', 'haemoglobin_g_dl', 'fingerprick_blood_type_id', 'skin', 'notes', 'deferral_reason', 'draw_failed', 'not_to_lab', 'confirm_interval']) {
+    for (const key of ['screened_at', 'pulse_bpm', 'weight_kg', 'haemoglobin_g_dl', 'fingerprick_blood_type_id', 'skin', 'notes', 'deferral_code', 'draw_failed', 'not_to_lab', 'confirm_interval']) {
       expect(payload).not.toHaveProperty(key)
     }
   })
 
-  it('sends a deferral with its reason and no bag', () => {
-    const payload = paperRowPayload({ ...drawnRow(), outcome: 'temporarily_deferred', deferral_reason: ' Low Hb ' }, HELD_ON, 'u')
+  it('sends a deferral with the code written on the paper and no bag', () => {
+    const payload = paperRowPayload({ ...drawnRow(), outcome: 'temporarily_deferred', deferral_code: ' R2-Low ' }, HELD_ON, 'u')
 
-    expect(payload.deferral_reason).toBe('Low Hb')
+    expect(payload.deferral_code).toBe('R2-Low')
+    expect(payload).not.toHaveProperty('other_reason')
     expect(payload).not.toHaveProperty('collection')
+  })
+
+  it('sends Other as the reason written, with no code', () => {
+    const row = { ...drawnRow(), outcome: 'temporarily_deferred' as const, deferral_code: OTHER_DEFERRAL, other_reason: ' Low Hb ' }
+
+    expect(paperRowProblems({ ...row, other_reason: '' }, HELD_ON, NOW)).toEqual(['Give the reason written on the paper.'])
+    expect(paperRowPayload(row, HELD_ON, 'u')).toMatchObject({ other_reason: 'Low Hb' })
+    expect(paperRowPayload(row, HELD_ON, 'u')).not.toHaveProperty('deferral_code')
   })
 
   it('sends a draw not completed, a bag not reaching the lab, and a confirmed interval', () => {

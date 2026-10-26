@@ -102,8 +102,12 @@ describe('the dashboard page and its link', () => {
 
   it('splits the department into Donor and Collection', () => {
     expect(nav).toMatch(/label: 'Donor',\s*items: \[\s*\{ label: 'Donor Management'[^\n]*\n\s*\{ label: 'Appointments'/)
-    // The list of visits, the counter, then the drives (project owner, 2026-10-17).
-    expect(nav).toMatch(/label: 'Collection',\s*items: \[[\s\S]*?\{ label: 'Donations', path: '\/blood-center\/donations'[^\n]*\n\s*\{ label: 'Donation Counter'[^\n]*\n\s*\{ label: 'Blood Donation Drive'/)
+    // The list of visits, then the drives. The counter is kept out of the
+    // sidebar, reached from Donations and Donor Management (project owner,
+    // 2026-10-24), but still named for the breadcrumb.
+    expect(nav).toMatch(/label: 'Collection',\s*items: \[[\s\S]*?\{ label: 'Donations', path: '\/blood-center\/donations'[\s\S]*?\{ label: 'Blood Donation Drive'/)
+    expect(nav).toMatch(/\{ label: 'Donation Counter', path: '\/blood-center\/donation',[^}]*hidden: true \}/)
+    expect(nav).toContain('.filter((item) => !item.hidden && can(item.requires))')
     expect(nav).toContain("collection: ['Donor', 'Collection']")
   })
 

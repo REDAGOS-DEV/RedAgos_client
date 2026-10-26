@@ -150,17 +150,17 @@ export function checkoutUnavailableMessage(reason: string | null | undefined): s
     case 'merchant_not_configured':
       return 'This blood centre has no GCash merchant account set up yet. Take the payment in cash.'
     case 'billing_not_collectible':
-      return 'This is a weekly order, billed by statement only. No payment is taken in RedAgos.'
+      return 'This is a weekly order, billed by invoice only. No payment is taken in RedAgos.'
     case 'billing_settled_by_decision':
-      return 'This statement was settled by a decision (voided or subsidised). Nothing is to be paid.'
+      return 'This invoice was settled by a decision (voided or subsidised). Nothing is to be paid.'
     case 'billing_settled':
-      return 'Nothing is outstanding on this statement.'
+      return 'Nothing is outstanding on this invoice.'
     case 'payment_in_progress':
-      return 'A GCash checkout is already open for this statement.'
+      return 'A GCash checkout is already open for this invoice.'
     case 'exceeds_channel_limit':
       return 'The balance is above the GCash limit per payment. Take it in cash, or in parts.'
     default:
-      return 'GCash checkout is not available for this statement.'
+      return 'GCash checkout is not available for this invoice.'
   }
 }
 
@@ -179,7 +179,7 @@ export function reviewReasonMessage(reason: string | null | undefined): string {
     case 'statement_settled_by_decision':
     case 'nothing_outstanding':
     case 'statement_changed':
-      return 'Paid against a statement that had already changed. The money was recorded; check for an overpayment or refund.'
+      return 'Paid against an invoice that had already changed. The money was recorded; check for an overpayment or refund.'
     case 'session_unknown':
       return 'The checkout may have opened at the provider without RedAgos hearing back. Check the Xendit dashboard.'
     case 'processing_failed':

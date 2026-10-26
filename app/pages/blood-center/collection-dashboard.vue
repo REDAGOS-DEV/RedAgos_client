@@ -35,9 +35,6 @@
         </div>
       </header>
 
-      <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
-      <TaskStrip class="needs-you" />
-
       <div v-if="error" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
         <p class="banner__text">{{ error }}</p>
@@ -376,7 +373,6 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import {
   bloodGroupRows,

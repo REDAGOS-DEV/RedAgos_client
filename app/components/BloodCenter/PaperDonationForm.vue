@@ -114,9 +114,20 @@
           </label>
         </fieldset>
 
-        <label v-if="form.outcome !== 'accepted'" class="pdf__field">
+        <!-- The code the drive's physician wrote, listed bare; or Other, with the reason as written. -->
+        <div v-if="form.outcome !== 'accepted'" class="pdf__field">
+          <label class="pdf__flabel" for="paper-deferral-code">Deferral code</label>
+          <SelectField
+            id="paper-deferral-code"
+            v-model="form.deferral_code"
+            :placeholder="deferralCodes.loading ? 'Loading…' : 'As written on the paper'"
+            :options="deferralCodeChoices"
+          />
+          <span v-if="deferralCodes.error" class="pdf__flabel">{{ deferralCodes.error }}</span>
+        </div>
+        <label v-if="form.outcome !== 'accepted' && form.deferral_code === OTHER_DEFERRAL" class="pdf__field">
           <span class="pdf__flabel">Reason for deferral</span>
-          <input v-model="form.deferral_reason" type="text" class="pdf__input" maxlength="255" placeholder="As written on the paper">
+          <input v-model="form.other_reason" type="text" class="pdf__input" maxlength="255" placeholder="As written on the paper">
         </label>
 
         <div class="grid grid--6">
@@ -284,7 +295,9 @@
 <script setup lang="ts">
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import type { BloodTypeOption } from '~/utils/bloodType'
+import { OTHER_DEFERRAL, deferralCodeOptions, type DeferralCode } from '~/utils/deferralCodes'
 import { formatShortDate } from '~/utils/donorRecords'
 import {
   PAPER_OUTCOMES,
@@ -293,7 +306,7 @@ import {
   paperRowProblems,
   type PaperSheet,
 } from '~/utils/paperDonations'
-import { computed, nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 
 /**
  * One donor's paper record from a drive: who, the screening, and the bag.
@@ -339,6 +352,31 @@ const problems = computed(() => {
   const list = paperRowProblems(form, props.sheet.held_on)
   return donor.value ? list : ['Choose the donor.', ...list]
 })
+
+/* ---------- the centre's deferral codes ---------- */
+
+const deferralCodes = reactive<{ list: DeferralCode[], loading: boolean, loaded: boolean, error: string }>({
+  list: [], loading: false, loaded: false, error: '',
+})
+const deferralCodeChoices = computed(() => deferralCodeOptions(deferralCodes.list))
+
+async function loadDeferralCodes() {
+  if (deferralCodes.loaded || deferralCodes.loading) return
+  deferralCodes.loading = true
+  deferralCodes.error = ''
+  try {
+    const res = await bloodCenterService.deferralCodes()
+    deferralCodes.list = res?.data ?? []
+    deferralCodes.loaded = true
+  } catch (err: any) {
+    deferralCodes.error = err?.message || 'The deferral codes could not be loaded.'
+  } finally {
+    deferralCodes.loading = false
+  }
+}
+
+// Loaded the first time a row is marked deferred.
+watch(() => form.outcome, (outcome) => { if (outcome !== 'accepted') loadDeferralCodes() })
 
 /* ---------- donor search: the counter's own ---------- */
 
