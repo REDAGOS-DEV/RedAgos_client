@@ -4,7 +4,7 @@
       <!-- The transactions only (project owner, 2026-10-25). -->
       <PageHeader title="Billing Transactions">
         <template #actions>
-          <button class="ui-btn ui-btn--primary" :disabled="exporting" @click="exportCsv">
+          <button class="ui-btn ui-btn--download" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />
             {{ exporting ? 'Exporting…' : 'Export CSV' }}
           </button>

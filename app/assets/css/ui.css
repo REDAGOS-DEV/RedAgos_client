@@ -57,6 +57,19 @@
 .ui-btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
 .ui-btn--danger:hover:not(:disabled) { background: var(--rb-accent); filter: brightness(.94); }
 
+/* Download actions use a quiet surface at rest and a restrained blue edge on hover. */
+.ui-btn.ui-btn--download {
+  background: var(--rb-surface-alt);
+  border-color: var(--rb-border-strong);
+  color: var(--rb-text-primary);
+  transition: background-color .15s var(--rb-ease-out), border-color .15s var(--rb-ease-out), color .15s var(--rb-ease-out), box-shadow .15s var(--rb-ease-out);
+}
+.ui-btn.ui-btn--download:hover:not(:disabled) {
+  background: var(--rb-surface-alt);
+  border-color: rgba(var(--rb-primary-rgb), .58);
+  box-shadow: 0 0 0 1px rgba(var(--rb-primary-rgb), .2), 0 0 7px rgba(var(--rb-primary-rgb), .14);
+}
+
 .ui-btn--sm { height: 32px; padding: 0 11px; border-radius: 8px; font-size: var(--rb-fs-caption, 12px); }
 .ui-btn--icon { width: 38px; padding: 0; }
 .ui-btn--sm.ui-btn--icon { width: 32px; }

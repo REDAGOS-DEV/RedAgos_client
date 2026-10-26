@@ -3,14 +3,45 @@
     <div class="bl-inner">
       <!-- Invoices only (project owner, 2026-10-25): one per billable request.
            A hospital's period summary is Statements; payments are Receipts. -->
-      <PageHeader title="Invoices">
+      <PageHeader title="Billing" subtitle="Invoices, collections and balances for your blood centre.">
         <template #actions>
+          <NuxtLink v-if="canSeeReports" to="/blood-center/financial-reports" class="ui-btn">
+            <AssetIcon name="chart" :size="15" />
+            Financial reports
+          </NuxtLink>
+          <NuxtLink v-if="canSeePayments" to="/blood-center/billing-transactions" class="ui-btn">
+            <AssetIcon name="list" :size="15" />
+            Transactions
+          </NuxtLink>
           <button class="ui-btn btn-icon-only" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refreshAll">
             <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
             <span class="btn-label">Refresh</span>
           </button>
         </template>
       </PageHeader>
+
+      <dl class="overview" :aria-busy="!summary">
+        <div class="overview-card">
+          <dt><span class="overview-icon overview-icon--green"><AssetIcon name="dollar-sign" :size="17" /></span>Collected today</dt>
+          <dd>{{ summary ? pesos(summary.collected_today) : '—' }}</dd>
+          <span>{{ summary?.payments_today ?? '—' }} payments recorded</span>
+        </div>
+        <div class="overview-card">
+          <dt><span class="overview-icon overview-icon--blue"><AssetIcon name="calendar" :size="17" /></span>Collected this month</dt>
+          <dd>{{ summary ? pesos(summary.collected_this_month) : '—' }}</dd>
+          <span>Patient and counter collections</span>
+        </div>
+        <div class="overview-card">
+          <dt><span class="overview-icon overview-icon--amber"><AssetIcon name="receipt" :size="17" /></span>Patient balances</dt>
+          <dd>{{ summary ? pesos(summary.outstanding?.amount) : '—' }}</dd>
+          <span>{{ summary?.outstanding?.count ?? '—' }} outstanding invoices</span>
+        </div>
+        <div class="overview-card">
+          <dt><span class="overview-icon overview-icon--purple"><AssetIcon name="building-2" :size="17" /></span>Awaiting hospital settlement</dt>
+          <dd>{{ summary ? pesos(summary.weekly_awaiting_settlement?.amount) : '—' }}</dd>
+          <span>{{ summary?.weekly_awaiting_settlement?.count ?? '—' }} hospital invoices</span>
+        </div>
+      </dl>
 
       <section class="card list-card" aria-label="Invoices">
         <div class="list-head">
@@ -170,6 +201,7 @@ const { can } = useUser()
 // Taking money, and the counter and receipts that go with it, are the Billing
 // department's; billing.view alone reads the invoices.
 const canSeePayments = computed(() => can('billing.record_payment'))
+const canSeeReports = computed(() => can('reports.financial'))
 
 const CATEGORIES = [
   { value: 'patient', label: 'Patient invoices' },
@@ -285,6 +317,18 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .bl-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .bl-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
+.overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden; }
+.overview-card { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 16px 18px; border-left: 1px solid var(--rb-border); }
+.overview-card:first-child { border-left: 0; }
+.overview-card dt { display: flex; align-items: center; gap: 8px; color: var(--rb-text-secondary); font-size: 12px; font-weight: 600; }
+.overview-card dd { margin: 0; color: var(--rb-text-primary); font-size: 23px; line-height: 1.2; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overview-card > span:last-child { color: var(--rb-text-muted); font-size: 11.5px; }
+.overview-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.overview-icon--green { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .1); }
+.overview-icon--blue { color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .09); }
+.overview-icon--amber { color: var(--rb-warning-text); background: rgba(var(--rb-warning-rgb), .13); }
+.overview-icon--purple { color: var(--rb-purple-text); background: rgba(var(--rb-purple-rgb), .1); }
+
 /* Text | actions. The actions column never wraps under the text, so the
    buttons stay on the right at every width; only the text column shrinks. */
 .page-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
@@ -395,11 +439,16 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 
 /* Narrow: the subtitle gives way and Refresh becomes an icon, but the actions stay right. */
 @media (max-width: 900px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-card:nth-child(3) { border-left: 0; }
+  .overview-card:nth-child(n + 3) { border-top: 1px solid var(--rb-border); }
   .btn-icon-only .btn-label { display: none; }
   .btn-icon-only { width: 38px; padding: 0; }
 }
 
 @media (max-width: 640px) {
+  .overview-card { padding: 13px; }
+  .overview-card dd { font-size: 19px; }
   .search { width: 100%; }
 }
 </style>

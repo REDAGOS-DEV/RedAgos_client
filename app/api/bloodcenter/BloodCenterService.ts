@@ -1101,6 +1101,12 @@ class BloodCenterService extends BaseService {
     return this.request('/blood-center/reports/financial', 'GET', params)
   }
 
+  /** Financial Report for the selected period, as a downloadable PDF. */
+  async financialReportPdf(params: { from: string; to: string }): Promise<Blob> {
+    const query = new URLSearchParams({ from: params.from, to: params.to }).toString()
+    return this.requestBlob(`/blood-center/reports/financial/pdf?${query}`)
+  }
+
   /** One Payment Acknowledgement Receipt as its printed PDF. */
   async downloadReceipt(receiptId: number | string): Promise<Blob> {
     return this.requestBlob(`/blood-center/receipts/${receiptId}/pdf`)

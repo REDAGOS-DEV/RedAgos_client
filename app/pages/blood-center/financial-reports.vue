@@ -2,24 +2,30 @@
   <div class="fr-page">
     <div class="fr-inner">
       <!-- Financial Reports only, in Demand Forecast's place (project owner, 2026-10-25). -->
-      <PageHeader title="Financial Reports">
+      <PageHeader title="Financial Reports" subtitle="Review collections, subsidies, receivables and invoices for a selected period.">
         <template #actions>
-          <div class="period">
-            <SelectField
-              id="fr-period"
-              class="period-select"
-              :model-value="preset"
-              :options="PERIOD_OPTIONS"
-              icon="calendar"
-              size="sm"
-              aria-label="Period"
-              @update:model-value="choose"
-            />
-            <template v-if="preset === 'custom'">
-              <DatePicker id="fr-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" />
-              <span class="period-sep" aria-hidden="true">to</span>
-              <DatePicker id="fr-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" />
-            </template>
+          <div class="report-actions">
+            <div class="period">
+              <SelectField
+                id="fr-period"
+                class="period-select"
+                :model-value="preset"
+                :options="PERIOD_OPTIONS"
+                icon="calendar"
+                size="sm"
+                aria-label="Period"
+                @update:model-value="choose"
+              />
+              <template v-if="preset === 'custom'">
+                <DatePicker id="fr-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" />
+                <span class="period-sep" aria-hidden="true">to</span>
+                <DatePicker id="fr-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" />
+              </template>
+            </div>
+            <button type="button" class="ui-btn ui-btn--download" :disabled="!report || loading || exporting" @click="downloadPdf">
+              <AssetIcon name="file-down" :size="14" />
+              {{ exporting ? 'Preparing…' : 'Download PDF' }}
+            </button>
           </div>
         </template>
       </PageHeader>
@@ -172,7 +178,7 @@ import SelectField from '~/components/common/SelectField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import CollectionsChart from '~/components/BloodCenter/CollectionsChart.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { pesos } from '~/utils/billing'
+import { pesos, saveBlob } from '~/utils/billing'
 import { PERIOD_PRESETS, periodFor, periodLabel } from '~/utils/reportPeriod'
 
 definePageMeta({
@@ -200,6 +206,7 @@ function choose(value) {
 
 const report = ref(null)
 const loading = ref(false)
+const exporting = ref(false)
 const error = ref('')
 
 async function load() {
@@ -213,6 +220,21 @@ async function load() {
     error.value = err?.message || 'The report could not be loaded.'
   } finally {
     loading.value = false
+  }
+}
+
+async function downloadPdf() {
+  if (!report.value || !from.value || !to.value) return
+  exporting.value = true
+  error.value = ''
+
+  try {
+    const file = await bloodCenterService.financialReportPdf({ from: from.value, to: to.value })
+    saveBlob(file, `financial-report-${from.value}-to-${to.value}.pdf`)
+  } catch (err) {
+    error.value = err?.message || 'The PDF could not be prepared.'
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -270,6 +292,7 @@ function share(amount, max) {
 .fr-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .fr-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
+.report-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .period-select { width: 180px; }
 .period-sep { font-size: 12px; color: var(--rb-text-muted); }
@@ -351,6 +374,6 @@ function share(amount, max) {
   .figure:nth-child(n) { border-left: 0; border-top: 1px solid var(--rb-border); }
   .figure:nth-child(even) { border-left: 1px solid var(--rb-border); }
   .figure:nth-child(-n + 2) { border-top: 0; }
-  .period { justify-content: flex-start; }
+  .report-actions, .period { justify-content: flex-start; }
 }
 </style>
