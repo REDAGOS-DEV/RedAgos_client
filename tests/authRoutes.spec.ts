@@ -15,14 +15,14 @@ import { departmentHome } from '~/composables/useBloodCenterNav'
 // tests with no composable context.
 vi.stubGlobal('departmentHome', (user: any) => {
   const homes: Record<string, string> = {
-    collection: '/blood-center/collection',
+    collection: '/blood-center/donations',
     testing: '/blood-center/testing',
     processing: '/blood-center/laboratory',
     issuance: '/blood-center/storage',
     billing: '/blood-center/billing',
   }
   if (user?.department && homes[user.department]) return homes[user.department]
-  return user?.is_supervisor ? '/blood-center/dashboard' : '/blood-center/settings'
+  return user?.management_level ? '/blood-center/dashboard' : '/blood-center/settings'
 })
 
 // Mirrors the server's StaffRole enum. Every role must land on a page of its
@@ -32,15 +32,16 @@ const ROLES = [
   'component_technologist', 'processing_assistant',
   'serology_technologist', 'lab_supervisor',
   'inventory_control_officer', 'dispatch_coordinator', 'it_data_clerk',
-  'billing_clerk',
+  'billing_clerk', 'billing_supervisor',
 ]
 
 describe('loginRouteFor', () => {
   it.each([
-    ['/donor/dashboard', '/auth/donor/login'],
-    ['/donor/appointments?tab=past', '/auth/donor/login'],
-    ['/blood-center/inventory', '/auth/blood-center/login'],
-    ['/hospital/dashboard', '/auth/hospital/login'],
+    // One sign-in screen for all but the administrators (2026-10-24).
+    ['/donor/dashboard', '/auth/login'],
+    ['/donor/appointments?tab=past', '/auth/login'],
+    ['/blood-center/inventory', '/auth/login'],
+    ['/hospital/dashboard', '/auth/login'],
     ['/admin/facilities', '/auth/admin/login'],
   ])('sends %s to %s', (path, expected) => {
     expect(loginRouteFor(path)).toBe(expected)
@@ -132,8 +133,10 @@ describe('portalHomeFor', () => {
       .toBe('/blood-center/storage')
   })
 
-  it('sends a departmentless supervisor to the overview, others to settings', () => {
-    expect(portalHomeFor({ roles: ['blood_center'], is_supervisor: true } as any))
+  it('sends a departmentless Admin or Supervisor to the overview, others to settings', () => {
+    expect(portalHomeFor({ roles: ['blood_center'], management_level: 'admin' } as any))
+      .toBe('/blood-center/dashboard')
+    expect(portalHomeFor({ roles: ['blood_center'], management_level: 'supervisor' } as any))
       .toBe('/blood-center/dashboard')
     expect(portalHomeFor({ roles: ['blood_center'] } as any))
       .toBe('/blood-center/settings')
@@ -168,7 +171,8 @@ describe('portalHomeFor', () => {
 // enum declares must land somewhere, or its staff would be sent to settings.
 describe('departmentHome', () => {
   it.each([
-    ['collection', '/blood-center/collection'],
+    // Donations, where a visit starts or carries on (project owner, 2026-10-24).
+    ['collection', '/blood-center/donations'],
     // Each laboratory department has its own page now.
     ['testing', '/blood-center/testing'],
     ['processing', '/blood-center/laboratory'],
@@ -193,18 +197,23 @@ describe('departmentHome', () => {
 
   it('sends roles in one department to different places', () => {
     // A receptionist starts at the appointment list; the physician and the
-    // chair start at the counter.
+    // chair at Donations, where the counter is reached from.
     expect(departmentHome({ staff_role: 'medical_receptionist', department: 'collection' })).toBe('/blood-center/appointments')
-    expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/collection')
+    expect(departmentHome({ staff_role: 'screening_physician', department: 'collection' })).toBe('/blood-center/donations')
     expect(departmentHome({ staff_role: 'dispatch_coordinator', department: 'issuance' })).toBe('/blood-center/fulfillment')
+  })
+
+  it('sends the billing supervisor, the Billing head, to the billing page', () => {
+    expect(departmentHome({ staff_role: 'billing_supervisor', department: 'billing' })).toBe('/blood-center/billing')
   })
 
   it('lets the role win over the department', () => {
     expect(departmentHome({ staff_role: 'it_data_clerk', department: 'issuance' })).toBe('/blood-center/inventory')
   })
 
-  it('sends a supervisor who holds a role to that role\'s page', () => {
-    expect(departmentHome({ staff_role: 'lab_supervisor', is_supervisor: true })).toBe('/blood-center/testing')
-    expect(departmentHome({ is_supervisor: true })).toBe('/blood-center/dashboard')
+  it('sends an Admin or Supervisor who holds a role to that role\'s page', () => {
+    expect(departmentHome({ staff_role: 'lab_supervisor', management_level: 'supervisor' })).toBe('/blood-center/testing')
+    expect(departmentHome({ management_level: 'admin' })).toBe('/blood-center/dashboard')
+    expect(departmentHome({ management_level: 'supervisor' })).toBe('/blood-center/dashboard')
   })
 })

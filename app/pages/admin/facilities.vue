@@ -34,10 +34,14 @@
         <span v-if="activeType === tab.value && total !== null" class="tab-count">{{ total }}</span>
       </button>
 
-      <select v-model="activeStatus" class="status-filter" aria-label="Filter by status">
-        <option value="">All statuses</option>
-        <option v-for="(label, value) in STATUS_LABELS" :key="value" :value="value">{{ label }}</option>
-      </select>
+      <div class="status-filter">
+        <SelectField
+          v-model="activeStatus"
+          :options="[{ value: '', label: 'All statuses' }, ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))]"
+          aria-label="Filter by status"
+          size="sm"
+        />
+      </div>
     </nav>
 
     <p v-if="banner" class="banner" :class="`banner-${bannerKind}`">{{ banner }}</p>
@@ -398,6 +402,7 @@ import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } f
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
+import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
   middleware: 'auth',
@@ -902,23 +907,8 @@ onActivated(() => {
   font-size: 11px;
 }
 
-.status-filter {
-  margin-left: auto;
-  padding: 8px 12px;
-  border: 1px solid v-bind('BORDER_COLOR');
-  border-radius: 8px;
-  background: v-bind('BG_SECONDARY');
-  color: v-bind('TEXT_SECONDARY');
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
+.status-filter { margin-left: auto; width: 200px; }
 
-.status-filter:focus {
-  outline: none;
-  border-color: v-bind('ACCENT_PRIMARY');
-}
 
 .header-actions {
   display: inline-flex;

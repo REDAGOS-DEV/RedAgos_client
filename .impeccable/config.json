@@ -56,6 +56,34 @@
         ],
         "createdAt": "2026-10-02T03:17:56.955Z",
         "reason": "Claude: the only match is .progress-bar__fill, a progress bar whose width IS the quantity shown (house pattern, same as drives.vue/appointments.vue ignores); pre-existing since 4a7a0135, untouched by this change, which only edited the receipt toast text"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/pages/blood-center/processed.vue"
+        ],
+        "createdAt": "2026-10-18T17:57:49.268Z",
+        "reason": "Claude: the .note and .subject accents copy SerologyResults.vue (L830, L1287) unchanged; the owner asked for this page 'just like' that list, so it keeps that list's style"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/pages/blood-center/fulfillment.vue"
+        ],
+        "createdAt": "2026-10-18T20:34:49.040Z",
+        "reason": "Claude triage 2026-10-19: pre-existing 3px status edges (STAT emergency card, toast type), the project's status-colour convention (owner's quiet redesign 2026-10-16) and echoed by the owner's 2026-10-19 mock-up; not decorative"
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "app/components/BloodCenter/BagLabelSheet.vue",
+          "app/components/BloodCenter/ReferralSlipSheet.vue"
+        ],
+        "createdAt": "2026-10-19T03:30:01.615Z",
+        "reason": "Print-only stylesheet for a 100x150 mm black-and-white thermal waybill: a system font is guaranteed present at print time, with no web font that may not have loaded before window.print(). Deliberate, not a UI typeface choice."
       }
     ]
   }

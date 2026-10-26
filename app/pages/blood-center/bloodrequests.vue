@@ -11,673 +11,565 @@
     </div>
 
     <!-- HEADER -->
-    <header class="page-header">
+    <header class="header-row">
       <div>
         <h1 class="page-title">Incoming Requests</h1>
-        <p class="page-subtitle">
-          Review and process blood requests from hospital blood banks, sent through the Blood Bank Portal or brought
-          in by a watcher.
-        </p>
-      </div>
-      <div class="header-actions">
-        <!--
-          A watcher who came here instead of the hospital blood bank. Issuance
-          phones the hospital first; the request is only recorded once the
-          hospital confirms it.
-        -->
-        <button class="btn btn-outline" @click="handleExportAll">
-          <AssetIcon name="download" :size="15" />
-          Export
-        </button>
-        <button class="btn btn-outline" @click="handleRefresh" :disabled="loading">
-          <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
-          Refresh
-        </button>
-        <button v-if="canRecord" class="btn btn-primary" @click="showWalkIn = true">
-          <AssetIcon name="clipboard-plus" :size="15" />
-          New Walk-in Request
-        </button>
+        <p class="page-subtitle">{{ listSummary }}</p>
       </div>
     </header>
 
     <!-- ERROR / RETRY BANNER -->
-    <div v-if="error" class="retry-banner">
-      <AssetIcon name="triangle-alert" :size="16" />
-      <span>Couldn't load incoming requests. {{ error?.message || 'Please try again.' }}</span>
-      <button class="btn btn-outline btn-sm" @click="handleRefresh">Retry</button>
+    <div v-if="error" class="banner banner--error" role="alert">
+      <AssetIcon name="circle-alert" :size="16" />
+      <p class="banner__text">Couldn't load incoming requests. {{ error?.message || error || 'Please try again.' }}</p>
+      <button type="button" class="btn-link" @click="loadRequests(meta.current_page)">Retry</button>
     </div>
 
-    <!-- EMERGENCY ALERT -->
-    <transition name="fade">
-      <div v-if="primaryEmergency" class="emergency-banner">
-        <div class="emergency-main">
-          <div class="emergency-icon">
-            <AssetIcon name="triangle-alert" :size="20" />
-          </div>
-          <div class="emergency-body">
-            <div class="emergency-title-row">
-              <span class="emergency-title">Emergency Blood Request</span>
-              <span class="emergency-id">{{ primaryEmergency.code }}</span>
-            </div>
-            <div class="emergency-grid">
-              <div><span class="e-label">Hospital</span><span class="e-value">{{ primaryEmergency.hospital }}</span></div>
-              <div><span class="e-label">Blood Type</span><span class="e-value">{{ primaryEmergency.bloodType }}</span></div>
-              <div><span class="e-label">Component</span><span class="e-value">{{ primaryEmergency.component }}</span></div>
-              <div><span class="e-label">Units Requested</span><span class="e-value">{{ primaryEmergency.units }}</span></div>
-              <div><span class="e-label">Needed Within</span><span class="e-value">{{ primaryEmergency.neededBy }}</span></div>
-              <div>
-                <!--
-                  Coverage, not shelf stock. The queue endpoint does not carry
-                  availability, so this read `available` and rendered a bare
-                  " units" with a permanent red flag beneath it.
-                -->
-                <span class="e-label">Reserved</span>
-                <span class="e-value inv-inline" :class="'inv-' + coverageLevel(primaryEmergency)">
-                  <AssetIcon :name="inventoryIcon(coverageLevel(primaryEmergency))" :size="13" />
-                  {{ primaryEmergency.allocated }} / {{ primaryEmergency.units }} units
-                </span>
-              </div>
-            </div>
-            <p v-if="primaryEmergency.allocated === 0" class="insufficient-tag">
-              <AssetIcon name="octagon-alert" :size="14" /> No stock reserved yet. Review it to check availability.
-            </p>
-          </div>
+    <!--
+      A patient's transfusion and a hospital restocking its own shelves are
+      different work, so they are listed apart (project owner, 2026-10-19).
+      Each tab counts what is still open in it.
+    -->
+    <div class="tabs" role="tablist" aria-label="Request type">
+      <button
+        v-for="tab in PURPOSE_TABS"
+        :key="tab.value"
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ 'tab--on': purposeTab === tab.value }"
+        :aria-selected="purposeTab === tab.value"
+        @click="selectTab(tab.value)"
+      >
+        <AssetIcon :name="tab.icon" :size="14" />
+        {{ tab.label }}
+        <span v-if="openCount(tab.value)" class="tab__count" :title="`${openCount(tab.value)} open`">{{ openCount(tab.value) }}</span>
+      </button>
+    </div>
+
+    <!--
+      The list, laid out after the owner's mock-up (2026-10-19): one search,
+      the dates, the status, then the list's own actions; a table with a row's
+      actions on it; a pager. Built like the Donations list.
+    -->
+    <section class="panel">
+      <!--
+        This tab's queue at a glance, each count a filter (2026-10-24). Ready
+        to issue is not a status: it opens Request Fulfillment, where Issue goes.
+      -->
+      <div v-if="tabSummary" class="quick" role="group" aria-label="Quick filters">
+        <button
+          v-for="chip in quickChips"
+          :key="chip.key"
+          type="button"
+          class="quick__chip"
+          :class="[`quick__chip--${chip.tone}`, { 'quick__chip--on': chip.active, 'quick__chip--zero': !chip.count }]"
+          :aria-pressed="chip.active"
+          @click="toggleQuick(chip)"
+        >
+          <AssetIcon v-if="chip.icon" :name="chip.icon" :size="13" />
+          <strong>{{ chip.count }}</strong> {{ chip.label }}
+        </button>
+        <NuxtLink v-if="canRelease" to="/blood-center/fulfillment" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
+          <AssetIcon name="send" :size="13" />
+          <strong>{{ tabSummary.awaiting_release }}</strong> ready to issue
+          <AssetIcon name="arrow-right" :size="12" />
+        </NuxtLink>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar__filters">
+          <label class="search">
+            <AssetIcon name="search" :size="15" class="search__icon" />
+            <input
+              v-model="searchQuery"
+              type="search"
+              class="search__input"
+              :placeholder="isPatientTab ? 'Search patient / hospital…' : 'Search hospital / request ID…'"
+              :aria-label="isPatientTab ? 'Search by patient, hospital or request ID' : 'Search by hospital or request ID'"
+              @input="onSearchInput"
+            >
+          </label>
+          <DateRangeFilter v-model:from="fromDate" v-model:to="toDate" aria-label="Requested between" @change="loadRequests()" />
+          <SelectField v-model="statusFilter" class="sel-filter" size="sm" aria-label="Filter by status"
+            :options="[{ value: '', label: 'All statuses' }, ...STATUS_OPTIONS]" @change="loadRequests()" />
         </div>
-        <div class="emergency-actions">
-          <button class="btn btn-primary btn-sm" @click="openReview(primaryEmergency)">Review Request</button>
-          <button class="btn btn-outline btn-sm" @click="activeFilter = 'Emergency'">View Queue</button>
-          <button class="icon-btn" @click="dismissAlert(primaryEmergency.id)" aria-label="Dismiss alert">
-            <AssetIcon name="x" :size="16" />
+
+        <div class="toolbar__actions">
+          <span v-if="lastUpdatedAt" class="updated">
+            <AssetIcon name="clock" :size="13" />
+            Updated {{ lastUpdatedLabel }}
+          </span>
+          <button type="button" class="btn btn-outline" :disabled="exporting || !meta.total" @click="handleExportAll">
+            <AssetIcon name="download" :size="14" />
+            {{ exporting ? 'Exporting…' : 'Export' }}
+          </button>
+          <button type="button" class="btn btn-outline" :disabled="loading" @click="handleRefresh">
+            <AssetIcon name="refresh-cw" :size="14" :class="{ spinning: loading }" />
+            Refresh
+          </button>
+          <!--
+            A watcher who came here instead of the hospital blood bank, recorded
+            on the hospital's behalf. No phone confirmation is taken since
+            2026-10-19 (project owner).
+          -->
+          <!-- A walk-in is always for a patient, so only on that tab. -->
+          <button v-if="canRecord && isPatientTab" type="button" class="btn btn-primary" title="Record a walk-in request a watcher brought" @click="showWalkIn = true">
+            <AssetIcon name="plus" :size="15" />
+            New Request
           </button>
         </div>
       </div>
-    </transition>
 
-    <!-- SUMMARY CARDS -->
-    <section class="summary-grid">
-      <template v-if="summaryLoading">
-        <div v-for="n in 4" :key="'sk-' + n" class="summary-card skeleton-card" />
-      </template>
-      <template v-else>
-        <!-- Red only when there is an emergency to act on, not by default. -->
-        <div
-          v-for="stat in summaryStats"
-          :key="stat.key"
-          class="summary-card"
-          :class="{ 'is-danger': stat.danger && stat.value > 0 }"
-        >
-          <div class="summary-top">
-            <p class="summary-label">{{ stat.label }}</p>
-            <span class="summary-icon" :class="{ 'is-danger': stat.danger }">
-              <AssetIcon :name="stat.icon" :size="14" />
-            </span>
-          </div>
-          <p class="summary-value">{{ stat.value }}</p>
-          <p class="summary-trend" :class="{ up: stat.trendUp === true, down: stat.trendUp === false }">
-            <AssetIcon v-if="stat.trendUp === true" name="trending-up" :size="12" />
-            <AssetIcon v-else-if="stat.trendUp === false" name="trending-down" :size="12" />
-            {{ stat.trend }}
-          </p>
+      <div class="table-wrap" :class="{ 'table-wrap--busy': loading && rows.length }">
+        <table class="req-table">
+          <caption class="sr-only">Requests to this center: open ones first, emergencies at the top</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="c-id">ID</th>
+              <th scope="col" class="c-date">Date</th>
+              <th scope="col" class="c-hospital">Hospital / Requester</th>
+              <th v-if="isPatientTab" scope="col" class="c-patient">Patient</th>
+              <th v-else scope="col" class="c-patient">Blood Type</th>
+              <th scope="col" class="c-component">Component</th>
+              <th scope="col" class="c-units" title="Issued of requested">Units</th>
+              <th scope="col" class="c-status">Status</th>
+              <th scope="col" class="c-actions">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody v-if="rows.length">
+            <tr
+              v-for="r in rows"
+              :key="r.id"
+              class="req-row"
+              :class="{ 'is-mutating': isMutating(r.id), 'req-row--emergency': r.emergency && r.isOpen, 'req-row--closed': !r.isOpen }"
+            >
+              <td class="c-id">
+                <button type="button" class="code-link" :title="`Review ${r.code}`" @click="openReview(r)">{{ r.code }}</button>
+                <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
+                <!-- Priority: only an emergency is marked; routine is the rule. -->
+                <span v-if="r.emergency" class="chip chip--crit" :title="`${r.priority} priority`">
+                  <AssetIcon name="circle-alert" :size="11" /> {{ r.priority }}
+                </span>
+                <span v-if="r.isWalkIn" class="chip" title="Recorded at this blood center from what a watcher brought">Walk-in</span>
+                <span
+                  v-else-if="r.weeklyReference"
+                  class="chip"
+                  :title="`Weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
+                >Weekly</span>
+                <span v-else-if="r.ptrReference" class="chip" :title="`One facility's share of Patient Transfusion Request ${r.ptrReference}`">Share</span>
+              </td>
+              <td class="c-date nowrap">
+                {{ r.date }}
+                <span class="sub">{{ r.time }}</span>
+              </td>
+              <td class="c-hospital">
+                <span class="strong">{{ r.hospital }}</span>
+                <span v-if="!r.registered" class="chip" title="Named on a walk-in: no accounts on RedAgos, so it is not notified and cannot follow the request">Not on RedAgos</span>
+                <span v-if="r.requestedBy" class="sub">{{ r.requestedBy }}</span>
+              </td>
+              <td v-if="isPatientTab" class="c-patient">
+                <span class="patient">
+                  <span class="patient__name" :class="{ muted: !r.patient }">{{ r.patient || r.patientFallback }}</span>
+                  <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
+                </span>
+              </td>
+              <!-- A restocking order names no patient; a weekly one can ask
+                   for several blood types. -->
+              <td v-else class="c-patient">
+                <span class="patient">
+                  <span v-for="code in r.bloodTypes" :key="code" class="blood">{{ code }}</span>
+                  <span v-if="!r.bloodTypes.length" class="muted">—</span>
+                </span>
+              </td>
+              <!-- One chip per component, by its bag-label code, as the
+                   Processed list shows them; the full name is the tooltip. -->
+              <td class="c-component" :title="r.component">
+                <span class="codes">
+                  <span v-for="chip in r.componentChips" :key="chip.key" class="code-chip">{{ chip.code }}</span>
+                </span>
+              </td>
+              <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested${r.held ? `, ${r.held} reserved and waiting to go out` : ''}`">
+                <span class="units-bar" aria-hidden="true">
+                  <span class="units-bar__issued" :style="{ width: `${share(r.issued, r.units)}%` }" />
+                  <span class="units-bar__held" :style="{ width: `${share(r.held, r.units)}%` }" />
+                </span>
+                <span class="units-text">{{ r.issued }} / {{ r.units }}</span>
+                <span v-if="r.held" class="sub">{{ r.held }} reserved</span>
+              </td>
+              <td class="c-status">
+                <span class="badge" :class="`badge--${r.tone}`" :title="r.status">
+                  <span class="badge__dot" aria-hidden="true" />
+                  <span class="badge__text">{{ r.status }}</span>
+                </span>
+                <span v-if="r.isOpen && waitingLabel(r)" class="waiting" :class="{ 'waiting--crit': r.emergency }">
+                  <AssetIcon name="clock" :size="11" /> {{ waitingLabel(r) }}
+                </span>
+              </td>
+              <td class="c-actions">
+                <div class="row-actions">
+                  <button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">
+                    <AssetIcon name="eye" :size="15" />
+                  </button>
+                  <!-- Reserve stock for what it still needs: approving a new
+                       request, or topping up one part held. -->
+                  <template v-if="r.canReserve">
+                    <button
+                      v-if="canAllocate"
+                      type="button"
+                      class="btn-approve"
+                      :disabled="isMutating(r.id)"
+                      :aria-label="`${r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest of'} ${r.code}`"
+                      :title="r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest'"
+                      @click="requestApprove(r)"
+                    >
+                      <AssetIcon name="check" :size="14" />
+                      {{ r.statusValue === 'pending' ? 'Approve' : 'Reserve' }}
+                    </button>
+                  </template>
+                  <!-- Only while nothing is held or sent: the server refuses
+                       a rejection once a unit is claimed. -->
+                  <template v-if="r.canReject">
+                    <button
+                      v-if="canDecide"
+                      type="button"
+                      class="icon-btn icon-btn--danger"
+                      :disabled="isMutating(r.id)"
+                      :aria-label="`Reject ${r.code}`"
+                      title="Reject"
+                      @click="requestReject(r)"
+                    >
+                      <AssetIcon name="x" :size="15" />
+                    </button>
+                  </template>
+                  <button type="button" class="icon-btn" :aria-label="`Download the request form for ${r.code}`" title="Request form (PDF)" @click="handleExportPdf(r)">
+                    <AssetIcon name="file-down" :size="15" />
+                  </button>
+                  <!-- Issue is dispatch, on Request Fulfillment: open once units
+                       are reserved, and says why not before then. -->
+                  <template v-if="r.isOpen && canRelease">
+                    <NuxtLink v-if="r.held > 0" to="/blood-center/fulfillment" class="btn-issue" :aria-label="`Issue ${r.code}`">
+                      <AssetIcon name="send" :size="13" />
+                      Issue
+                    </NuxtLink>
+                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and reserve units first" title="Issue: approve and reserve units first">
+                      <AssetIcon name="send" :size="13" />
+                    </span>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Outside the table, so they span whatever columns a narrow panel keeps. -->
+        <div v-if="loading && !rows.length" class="table-skeleton" aria-busy="true">
+          <span v-for="n in 6" :key="'sk-' + n" class="skeleton skeleton--line" />
         </div>
-      </template>
+
+        <div v-else-if="!rows.length" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'inbox'" :size="20" /></span>
+          <p class="empty-state__title">
+            {{ hasFilters ? 'No requests match' : isPatientTab ? 'No patient requests' : 'No replenishment orders' }}
+          </p>
+          <p class="empty-state__text">
+            {{ hasFilters
+              ? 'Try another search, widen the dates, or pick another status.'
+              : isPatientTab
+                ? 'Requests for a patient, from hospital blood banks or recorded here as walk-ins, appear in this list.'
+                : 'Orders from hospital blood banks restocking their own shelves, weekly ones included, appear in this list.' }}
+          </p>
+          <button v-if="hasFilters" type="button" class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
+        </div>
+      </div>
+
+      <footer class="pager">
+        <span class="pager__info">{{ meta.total }} record(s)</span>
+        <div class="pager__btns">
+          <button type="button" class="btn btn-outline btn-sm" :disabled="meta.current_page <= 1 || loading" @click="loadRequests(meta.current_page - 1)">
+            <AssetIcon name="chevron-left" :size="14" />
+            Prev
+          </button>
+          <span class="pager__page">Page {{ meta.current_page }} / {{ meta.last_page }}</span>
+          <button type="button" class="btn btn-outline btn-sm" :disabled="meta.current_page >= meta.last_page || loading" @click="loadRequests(meta.current_page + 1)">
+            Next
+            <AssetIcon name="chevron-right" :size="14" />
+          </button>
+        </div>
+      </footer>
     </section>
 
     <!--
-      The queue: status pills, source, the filter bar and the table in one card,
-      so the controls sit with what they filter. Same refs and handlers as
-      before; Apply is still what sends the toolbar's status and priority.
+      REVIEW: a centred dialog, laid out like Donor Management's profile
+      (project owner, 2026-10-19; it was a side drawer). The approve and
+      reject confirmations open over it.
     -->
-    <section class="queue-card">
-    <div class="queue-head">
-    <!-- QUICK FILTERS -->
-    <div class="quick-filters" role="group" aria-label="Status and priority">
-      <button
-        v-for="opt in filterOptions"
-        :key="opt"
-        class="pill"
-        :class="{ active: activeFilter === opt }"
-        @click="activeFilter = opt"
-      >
-        {{ opt }}
-      </button>
-    </div>
+    <Transition name="review">
+      <div v-if="drawerOpen" class="review-overlay" @click.self="closeDrawer">
+        <div class="review-card" role="dialog" aria-modal="true" aria-labelledby="review-title">
+          <div class="review-card__header">
+            <h2 id="review-title" class="review-card__title">
+              <AssetIcon name="clipboard-check" :size="17" />
+              Review Request
+            </h2>
+            <button type="button" class="review-card__close" aria-label="Close" @click="closeDrawer">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
 
-    <!-- SOURCE: where the request was keyed in. Purpose is unchanged by it. -->
-    <div class="source-toggle" role="group" aria-label="Request source">
-      <button
-        v-for="opt in sourceOptions"
-        :key="opt.value || 'all'"
-        class="source-toggle__btn"
-        :class="{ active: sourceFilter === opt.value }"
-        :aria-pressed="sourceFilter === opt.value"
-        @click="sourceFilter = opt.value"
-      >
-        <AssetIcon v-if="opt.icon" :name="opt.icon" :size="13" />
-        {{ opt.label }}
-      </button>
-    </div>
-    </div>
+          <div class="review-card__body">
+            <div v-if="drawerLoading" class="drawer-loading">
+              <div v-for="n in 4" :key="n" class="skeleton-row" />
+            </div>
 
-    <!-- ADVANCED FILTER TOOLBAR -->
-    <div class="toolbar">
-      <!--
-        Row 1 is always shown: search and what is being asked for. Priority,
-        status and the dates sit under "More filters": the pills above already
-        cover status and priority one at a time, so these are for combining.
-      -->
-      <div class="toolbar-row">
-      <div class="toolbar-search">
-        <AssetIcon name="search" :size="15" class="search-icon" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search request ID, hospital or doctor"
-          aria-label="Search requests"
-          @input="onSearchInput"
-        />
-      </div>
-
-      <!-- The first option names the filter, so a chosen value keeps its meaning. -->
-      <select v-model="toolbarFilters.hospital" aria-label="Hospital">
-        <option value="">All hospitals</option>
-        <option v-for="h in hospitalOptions" :key="h" :value="h">{{ h }}</option>
-      </select>
-      <select v-model="toolbarFilters.bloodType" aria-label="Blood type">
-        <option value="">All blood types</option>
-        <option v-for="b in bloodTypeOptions" :key="b" :value="b">{{ b }}</option>
-      </select>
-      <select v-model="toolbarFilters.component" aria-label="Blood component">
-        <option value="">All components</option>
-        <option v-for="c in componentOptions" :key="c" :value="c">{{ c }}</option>
-      </select>
-
-      <button
-        type="button"
-        class="btn btn-outline btn-sm more-filters"
-        :class="{ 'is-on': showMoreFilters || moreFilterCount }"
-        :aria-expanded="showMoreFilters"
-        @click="showMoreFilters = !showMoreFilters"
-      >
-        <AssetIcon name="sliders-horizontal" :size="14" />
-        More filters
-        <span v-if="moreFilterCount" class="more-filters__count">{{ moreFilterCount }}</span>
-      </button>
-
-      <div class="toolbar-buttons">
-        <button class="btn btn-ghost btn-sm" @click="resetFilters">Reset</button>
-        <button class="btn btn-primary btn-sm" :disabled="loading" @click="loadRequests">Apply filters</button>
-      </div>
-      </div>
-
-      <div v-show="showMoreFilters" class="toolbar-row toolbar-row--more">
-      <select v-model="toolbarFilters.priority" aria-label="Priority">
-        <option value="">Any priority</option>
-        <option>Routine</option>
-        <option>Emergency</option>
-      </select>
-      <select v-model="toolbarFilters.status" aria-label="Status">
-        <option value="">Any status</option>
-        <option>Pending</option>
-        <option>Processing</option>
-        <option>Partial</option>
-        <option>Fulfilled</option>
-        <option>Rejected</option>
-        <option>Cancelled</option>
-      </select>
-      <label class="date-field">
-        <span>Requested</span>
-        <input v-model="toolbarFilters.date" type="date" />
-      </label>
-      <label class="date-field">
-        <span>Needed by</span>
-        <input v-model="toolbarFilters.neededBy" type="date" />
-      </label>
-      </div>
-    </div>
-
-    <div class="toolbar-meta">
-      <span><strong>{{ visibleRequests.length }}</strong> of {{ meta.total }} requests</span>
-      <template v-if="lastUpdatedAt">
-        <span class="dot">·</span>
-        <span>Updated {{ lastUpdatedLabel }}</span>
-      </template>
-      <template v-if="activeFilterCount > 0">
-        <span class="dot">·</span>
-        <span class="toolbar-meta__filters">{{ activeFilterCount }} active filter{{ activeFilterCount === 1 ? '' : 's' }}</span>
-      </template>
-    </div>
-
-    <!-- REQUEST TABLE -->
-    <div class="table-card">
-      <div v-if="loading" class="table-skeleton">
-        <div v-for="n in 5" :key="n" class="skeleton-row" />
-      </div>
-
-      <div v-else-if="!error && visibleRequests.length === 0 && activeFilterCount === 0 && !searchQuery" class="empty-state">
-        <AssetIcon name="inbox" :size="32" />
-        <h3>No incoming requests</h3>
-        <p>Hospital requests waiting for review will appear here.</p>
-        <button class="btn btn-outline btn-sm" @click="handleRefresh">Refresh</button>
-      </div>
-
-      <div v-else-if="!error && visibleRequests.length === 0" class="empty-state">
-        <AssetIcon name="search-x" :size="32" />
-        <h3>No requests match these filters</h3>
-        <p>Change a filter or clear the search to see more.</p>
-        <button class="btn btn-outline btn-sm" @click="resetFilters">Clear filters</button>
-      </div>
-
-      <table v-else-if="!error" class="request-table">
-        <thead>
-          <tr>
-            <th>Request</th>
-            <th>Hospital</th>
-            <th>Blood</th>
-            <th>Units held</th>
-            <th>Priority</th>
-            <th>Needed by</th>
-            <th>Status</th>
-            <th><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="r in visibleRequests" :key="r.id">
-            <tr
-              class="table-row"
-              :class="{ 'is-mutating': isMutating(r.id) }"
-              @click="openReview(r)"
-            >
-              <td class="mono">
-                <button
-                  class="expand-btn"
-                  @click.stop="toggleExpand(r.id)"
-                  :aria-label="expandedIds.has(r.id) ? 'Collapse row' : 'Expand row'"
-                >
-                  <AssetIcon :name="expandedIds.has(r.id) ? 'chevron-down' : 'chevron-right'" :size="14" />
-                </button>
-                {{ r.code }}
-                <span v-if="r.isWalkIn" class="source-badge" title="Recorded at this blood center after the hospital confirmed it by phone">Walk-in</span>
-                <span v-if="r.ptrReference" class="source-badge source-badge--share" :title="`One facility's share of Patient Transfusion Request ${r.ptrReference}`">Share of {{ r.ptrReference }}</span>
-                <span
-                  v-if="r.weeklyReference"
-                  class="source-badge source-badge--weekly"
-                  :title="`Part of weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
-                >Weekly · {{ r.weeklyReference }}</span>
-              </td>
-              <td>
-                <div class="hospital-cell">
-                  <span class="hospital-name">{{ r.hospital }}</span>
-                  <span class="hospital-contact">{{ r.requestedBy || r.contact || 'Requester not recorded' }}</span>
+            <template v-else-if="activeRequest">
+              <!-- Who asked, for what, and where it stands. -->
+              <div class="review-hero">
+                <div class="review-hero__text">
+                  <div class="review-hero__row">
+                    <p class="review-hero__code">{{ activeRequest.code }}</p>
+                    <span class="badge" :class="activeRequest.emergency ? 'badge--crit' : 'badge--neutral'">
+                      <span class="badge__dot" aria-hidden="true" />
+                      {{ activeRequest.priority }}
+                    </span>
+                    <span class="badge" :class="`badge--${activeRequest.tone}`">
+                      <span class="badge__dot" aria-hidden="true" />
+                      {{ activeRequest.status }}
+                    </span>
+                    <span
+                      v-if="!activeRequest.registered"
+                      class="badge badge--neutral"
+                      title="Named on a walk-in: no accounts on RedAgos, so it is not notified and cannot follow the request"
+                    >
+                      <span class="badge__dot" aria-hidden="true" />
+                      Not on RedAgos
+                    </span>
+                  </div>
+                  <p class="review-hero__name">{{ activeRequest.hospital }}</p>
+                  <p class="review-hero__meta">
+                    {{ activeRequest.requestDate }} · {{ activeRequest.sourceLabel }}<template v-if="activeRequest.purpose"> · {{ activeRequest.purpose }}</template>
+                  </p>
                 </div>
-              </td>
-              <td>
-                <div class="blood-cell">
-                  <span class="blood-pill">{{ r.bloodType }}</span>
-                  <span class="blood-component">{{ r.component }}</span>
-                </div>
-              </td>
-              <td>
-                <span class="inv-pill" :class="'inv-' + inventoryLevel(r)">
-                  <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" />
-                  {{ r.allocated }} / {{ r.units }}
-                </span>
-              </td>
-              <td>
-                <span class="priority-badge" :class="'priority-' + r.priority.toLowerCase()">
-                  <AssetIcon :name="priorityIcon(r.priority)" :size="12" />
-                  {{ r.priority }}
-                </span>
-              </td>
-              <td class="needed-by">{{ r.neededBy }}</td>
-              <td>
-                <span class="status-badge" :class="r.statusClass">{{ r.status }}</span>
-              </td>
-              <td class="actions-cell" @click.stop>
-                <button class="btn btn-primary btn-xs" :disabled="isMutating(r.id)" @click="openReview(r)">
-                  Review
-                </button>
-                <div class="menu-wrap">
-                  <button class="icon-btn" @click="toggleMenu(r.id)" :aria-label="`More actions for ${r.code}`" aria-haspopup="menu" :aria-expanded="openMenuId === r.id">
-                    <AssetIcon name="move-vertical" :size="16" />
+                <div class="review-hero__actions">
+                  <button type="button" class="btn btn-outline btn-sm" @click="handleExportPdf(activeRequest)">
+                    <AssetIcon name="file-down" :size="13" />
+                    Request form
                   </button>
-                  <div v-if="openMenuId === r.id" v-click-outside="() => (openMenuId = null)" class="context-menu">
-                    <!-- One entry per action: "View Details", "Review Request" and
-                         "View Timeline" all opened the same drawer, and "Approve"
-                         and "Reserve Inventory" called the same approval. -->
-                    <button @click="openMenuId = null; openReview(r)">
-                      <AssetIcon name="eye" :size="14" /> Review and timeline
-                    </button>
-                    <button @click="openMenuId = null; toggleExpand(r.id)">
-                      <AssetIcon name="package-search" :size="14" /> Quick look
-                    </button>
-                    <button
-                      v-if="canAllocate"
-                      :disabled="isMutating(r.id)"
-                      @click="openMenuId = null; requestApprove(r)"
-                    >
-                      <AssetIcon name="check" :size="14" /> Approve and reserve
-                    </button>
-                    <div class="context-menu__divider" />
-                    <button @click="openMenuId = null; handlePrint(r)">
-                      <AssetIcon name="printer" :size="14" /> Print request
-                    </button>
-                    <button @click="openMenuId = null; handleExportPdf(r)">
-                      <AssetIcon name="file-text" :size="14" /> Export PDF
-                    </button>
-                    <div v-if="canDecide" class="context-menu__divider" />
-                    <button v-if="canDecide" class="danger" :disabled="isMutating(r.id)" @click="openMenuId = null; requestReject(r)">
-                      <AssetIcon name="circle-x" :size="14" /> Reject request
-                    </button>
-                  </div>
                 </div>
-              </td>
-            </tr>
-
-            <!-- INLINE ROW EXPANSION (quick review, does not replace the drawer) -->
-            <tr v-if="expandedIds.has(r.id)" class="expanded-row">
-              <td colspan="8">
-                <div class="expanded-content">
-                  <div class="expanded-grid">
-                    <div><span class="e-label">Hospital</span><span class="e-value">{{ r.hospital }}</span></div>
-                    <div><span class="e-label">Requested By</span><span class="e-value">{{ r.requestedBy || r.contact || 'Not recorded' }}</span></div>
-                    <div><span class="e-label">Blood Requirement</span><span class="e-value">{{ r.bloodType }} · {{ r.component }} · {{ r.units }} units</span></div>
-                    <div>
-                      <span class="e-label">Inventory Availability</span>
-                      <span class="e-value inv-inline" :class="'inv-' + inventoryLevel(r)">
-                        <AssetIcon :name="inventoryIcon(inventoryLevel(r))" :size="12" /> {{ r.allocated }} / {{ r.units }} held
-                      </span>
-                    </div>
-                    <div>
-                      <span class="e-label">Priority</span>
-                      <span class="priority-badge" :class="'priority-' + r.priority.toLowerCase()">
-                        <AssetIcon :name="priorityIcon(r.priority)" :size="12" /> {{ r.priority }}
-                      </span>
-                    </div>
-                    <div><span class="e-label">Needed By</span><span class="e-value">{{ r.neededBy }}</span></div>
-                    <div>
-                      <span class="e-label">Status</span>
-                      <span class="status-badge" :class="r.statusClass">{{ r.status }}</span>
-                    </div>
-                  </div>
-                  <div class="expanded-actions">
-                    <button class="btn btn-outline btn-xs" @click="openReview(r)">Full Review</button>
-                    <button
-                      v-if="canDecide"
-                      class="btn btn-outline btn-xs"
-                      :disabled="isMutating(r.id)"
-                      @click="requestReject(r)"
-                    >
-                      Reject Request
-                    </button>
-                    <button
-                      v-if="canAllocate"
-                      class="btn btn-primary btn-xs"
-                      :disabled="isMutating(r.id)"
-                      @click="requestApprove(r)"
-                    >
-                      Approve &amp; Reserve
-                    </button>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
-    </section>
-
-    <!-- RECENT ACTIVITY -->
-    <section class="activity-card">
-      <h2 class="section-title">Recent Request Activity</h2>
-
-      <div v-if="activityLoading" class="activity-skeleton">
-        <div v-for="n in 4" :key="n" class="skeleton-row" />
-      </div>
-
-      <p v-else-if="activity.length === 0" class="activity-empty">No recent activity yet.</p>
-
-      <ul v-else class="activity-list">
-        <li v-for="item in activity" :key="item.id" class="activity-item">
-          <span class="activity-dot" :class="activityToneClass(item.type)">
-            <AssetIcon :name="activityIcon(item.type)" :size="14" />
-          </span>
-          <div class="activity-body">
-            <p><strong>{{ item.description }}</strong> · {{ item.hospital }}</p>
-            <span class="activity-meta">{{ item.time }} · {{ item.staff }}</span>
-          </div>
-        </li>
-      </ul>
-    </section>
-
-    <!-- REVIEW DRAWER -->
-    <transition name="drawer">
-      <aside v-if="drawerOpen" class="drawer-overlay" @click.self="closeDrawer">
-        <div class="drawer">
-          <header class="drawer-header">
-            <h2>Review Request</h2>
-            <button class="icon-btn" @click="closeDrawer" aria-label="Close"><AssetIcon name="x" :size="18" /></button>
-          </header>
-
-          <div v-if="drawerLoading" class="drawer-loading">
-            <div v-for="n in 4" :key="n" class="skeleton-row" />
-          </div>
-
-          <div v-else-if="activeRequest" class="drawer-content">
-            <section class="drawer-section">
-              <h3>Request Information</h3>
-              <dl class="detail-grid">
-                <div><dt>Request ID</dt><dd class="mono">{{ activeRequest.code }}</dd></div>
-                <div><dt>Request Date</dt><dd>{{ activeRequest.requestDate }}</dd></div>
-                <div><dt>Priority</dt><dd><span class="priority-badge" :class="'priority-' + activeRequest.priority.toLowerCase()"><AssetIcon :name="priorityIcon(activeRequest.priority)" :size="12" /> {{ activeRequest.priority }}</span></dd></div>
-                <div><dt>Status</dt><dd><span class="status-badge" :class="activeRequest.statusClass">{{ activeRequest.status }}</span></dd></div>
-                <div><dt>Needed By</dt><dd>{{ activeRequest.neededBy }}</dd></div>
-                <div><dt>Submitted By</dt><dd>{{ activeRequest.requestedBy || 'Not recorded' }}</dd></div>
-                <div><dt>Source</dt><dd>{{ activeRequest.sourceLabel }}</dd></div>
-                <div><dt>Purpose</dt><dd>{{ activeRequest.purpose || 'Not recorded' }}</dd></div>
-              </dl>
-            </section>
-
-            <section v-if="activeRequest.raw?.walk_in" class="drawer-section">
-              <h3>Walk-in &amp; Hospital Confirmation</h3>
-              <WalkInDetailsCard
-                :walk-in="activeRequest.raw.walk_in"
-                :centre-name="activeRequest.raw.target_facility?.name || ''"
-                :recorder-name="activeRequest.raw.recorder_name || ''"
-              />
-            </section>
-
-            <!--
-              The hospital may have split the patient's need across several
-              centres. This centre sees its own share against the whole — never
-              which other centres were asked.
-            -->
-            <section v-if="activeRequest.raw?.transfusion_request" class="drawer-section">
-              <h3>Patient Transfusion Request</h3>
-              <p class="share-note">
-                This request is this center's share of
-                <strong class="mono">{{ activeRequest.raw.transfusion_request.reference_number }}</strong>.
-                The patient needs {{ shareSummary(activeRequest.raw) }} in all; other facilities may be supplying the rest.
-                Approve what you can reserve, or close the rest as unavailable so the hospital can ask elsewhere.
-              </p>
-            </section>
-
-            <section class="drawer-section">
-              <h3>Hospital Information</h3>
-              <dl class="detail-grid">
-                <div><dt>Hospital Name</dt><dd>{{ activeRequest.hospital }}</dd></div>
-                <div><dt>Department</dt><dd>{{ activeRequest.department || 'Not recorded' }}</dd></div>
-                <div><dt>Doctor</dt><dd>{{ activeRequest.contact }}</dd></div>
-                <div><dt>Contact Number</dt><dd>{{ activeRequest.phone || 'Not recorded' }}</dd></div>
-                <div><dt>Email</dt><dd>{{ activeRequest.email || 'Not recorded' }}</dd></div>
-                <div><dt>Address</dt><dd>{{ activeRequest.address || 'Not recorded' }}</dd></div>
-              </dl>
-            </section>
-
-            <section class="drawer-section">
-              <h3>Blood Request</h3>
-              <dl class="detail-grid">
-                <div><dt>Blood Type</dt><dd><span class="blood-pill">{{ activeRequest.bloodType }}</span></dd></div>
-                <div v-if="activeRequest.patient"><dt>Patient</dt><dd>{{ activeRequest.patient }}</dd></div>
-                <div><dt>Component</dt><dd>{{ activeRequest.component }}</dd></div>
-                <div><dt>Units Requested</dt><dd>{{ activeRequest.units }}</dd></div>
-                <div><dt>Needed By</dt><dd>{{ activeRequest.neededBy }}</dd></div>
-              </dl>
-              <div class="notes-block">
-                <p class="notes-label">Reason for Request</p>
-                <p class="notes-text">{{ activeRequest.reason || 'Not recorded' }}</p>
-                <p class="notes-label">Clinical Notes</p>
-                <p class="notes-text">{{ activeRequest.notes || 'Not recorded' }}</p>
               </div>
-            </section>
 
-            <section class="drawer-section">
-              <h3>Inventory Availability</h3>
-              <!--
-                One row per component. A request can ask for several, each
-                answered from a different shelf, so a single "Requested /
-                Available" pair could only ever describe the first of them —
-                and printed the request's TOTAL units beside one component's
-                name, which read as a larger request than it was.
-              -->
-              <table v-if="(activeRequest.lines || []).length" class="avail-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Component</th>
-                    <th scope="col" class="num">Requested</th>
-                    <th scope="col" class="num">Outstanding</th>
-                    <th scope="col" class="num">Available</th>
-                    <th scope="col">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
-                    <td>{{ line.component?.name || 'Not recorded' }}</td>
-                    <td class="num">{{ line.requested ?? '—' }}</td>
-                    <td class="num">{{ line.outstanding }}</td>
-                    <td class="num">{{ line.available }}</td>
-                    <td>
-                      <span class="inv-inline" :class="'inv-' + lineLevel(line)">
-                        <AssetIcon :name="inventoryIcon(lineLevel(line))" :size="12" />
-                        {{ lineLevel(line) === 'ok'
-                          ? 'Can cover'
-                          : lineLevel(line) === 'low'
-                            ? `Part only (${line.can_cover_now})`
-                            : 'No stock' }}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <dl class="facts">
+                <div class="fact"><dt>Submitted by</dt><dd>{{ activeRequest.requestedBy || 'Not recorded' }}</dd></div>
+                <div class="fact"><dt>Needed by</dt><dd>{{ activeRequest.neededBy }}</dd></div>
+                <div class="fact">
+                  <dt>Units</dt>
+                  <dd>
+                    {{ activeRequest.issued }} of {{ activeRequest.units }} issued
+                    <span v-if="activeRequest.held" class="fact__sub">{{ activeRequest.held }} reserved, waiting to go out</span>
+                  </dd>
+                </div>
+                <div class="fact">
+                  <dt>Blood type</dt>
+                  <dd class="blood-pills">
+                    <span v-for="code in activeRequest.bloodTypes" :key="code" class="blood">{{ code }}</span>
+                    <span v-if="!activeRequest.bloodTypes.length">—</span>
+                  </dd>
+                </div>
+                <div class="fact fact--wide">
+                  <dt>Patient</dt>
+                  <dd>
+                    {{ activeRequest.patient || activeRequest.patientFallback }}
+                    <span v-if="activeRequest.patientDetails" class="fact__sub">{{ activeRequest.patientDetails }}</span>
+                  </dd>
+                </div>
+                <div class="fact fact--wide"><dt>Component</dt><dd>{{ activeRequest.component }}</dd></div>
+                <div class="fact fact--full"><dt>Hospital address</dt><dd>{{ activeRequest.contact || 'Not recorded' }}</dd></div>
+                <div v-if="activeRequest.reason" class="fact fact--full"><dt>Rejected because</dt><dd class="fact__notes">{{ activeRequest.reason }}</dd></div>
+              </dl>
 
-              <p v-else class="batch-empty">Availability is loading.</p>
-
-              <p class="inventory-status-line" :class="'inv-' + availabilityLevel(activeRequest)">
-                <AssetIcon :name="inventoryIcon(availabilityLevel(activeRequest))" :size="14" />
-                {{ availabilityLevel(activeRequest) === 'ok'
-                  ? 'Sufficient Inventory'
-                  : availabilityLevel(activeRequest) === 'low'
-                    ? 'Partial Inventory — some units can be reserved now'
-                    : 'Insufficient Inventory' }}
-              </p>
-
-              <p class="inventory-advisory">
-                Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held until you
-                approve, and allocation re-checks every unit under a lock before reserving.
-              </p>
-
-              <p class="health-bar-label">Inventory Health</p>
-              <div class="health-bar">
-                <div
-                  class="health-fill"
-                  :class="'inv-' + availabilityLevel(activeRequest)"
-                  :style="{ width: Math.min(100, ((activeRequest.available ?? 0) / Math.max(activeRequest.outstanding || activeRequest.units || 1, 1)) * 100) + '%' }"
+              <section v-if="activeRequest.raw?.walk_in" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="phone" :size="14" />
+                  Walk-in
+                </h3>
+                <WalkInDetailsCard
+                  :walk-in="activeRequest.raw.walk_in"
+                  :centre-name="activeRequest.raw.target_facility?.name || ''"
+                  :recorder-name="activeRequest.raw.recorder_name || ''"
                 />
-              </div>
-            </section>
+              </section>
 
-            <!--
-              Request versus fulfilment, per component. What was asked for is
-              never recomputed from what was supplied; a remainder this centre
-              cannot supply is closed here with a reason, and may still be
-              sourced from another facility by the hospital.
-            -->
-            <section v-if="activeRequest.raw" class="drawer-section">
-              <h3>Fulfilment</h3>
-              <RequestFulfilmentTable
-                :request="activeRequest.raw"
-                :closable="canDecide"
-                close-label="Close as unavailable"
-                :busy-item-id="closingLine ? lineToClose?.id ?? null : null"
-                @close-line="openCloseLine"
-              />
-            </section>
+              <!--
+                The hospital may have split the patient's need across several
+                centres. This centre sees its own share against the whole — never
+                which other centres were asked.
+              -->
+              <section v-if="activeRequest.raw?.transfusion_request" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="users" :size="14" />
+                  Patient Transfusion Request
+                </h3>
+                <p class="share-note">
+                  This request is this center's share of
+                  <strong class="mono">{{ activeRequest.raw.transfusion_request.reference_number }}</strong>.
+                  The patient needs {{ shareSummary(activeRequest.raw) }} in all; other facilities may be supplying the rest.
+                  Approve what you can reserve, or close the rest as unavailable so the hospital can ask elsewhere.
+                </p>
+                <!-- Once something here is closed as unavailable, the watcher can
+                     carry the rest to another centre (project owner, 2026-10-19). -->
+                <div v-if="activeRequest.items.some((item) => item.closed_at)" class="share-actions">
+                  <button type="button" class="btn btn-outline btn-sm" :disabled="printingSlip" @click="printReferralSlip(activeRequest)">
+                    <AssetIcon name="printer" :size="13" />
+                    {{ printingSlip ? 'Preparing…' : 'Referral slip for the watcher' }}
+                  </button>
+                  <span class="share-actions__hint">What is still needed, for the next blood center.</span>
+                </div>
+              </section>
 
-            <section class="drawer-section">
-              <h3>Request History</h3>
-              <RequestHistoryTimeline :events="history" :loading="isLoadingHistory" :error="historyError || ''" />
-            </section>
+              <section id="review-availability" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="package-search" :size="14" />
+                  Inventory Availability
+                </h3>
+                <!--
+                  One row per component. A request can ask for several, each
+                  answered from a different shelf, so a single "Requested /
+                  Available" pair could only ever describe the first of them.
+                -->
+                <div v-if="(activeRequest.lines || []).length" class="table-box">
+                  <table class="avail-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Component</th>
+                        <th scope="col" class="num">Requested</th>
+                        <th scope="col" class="num">Outstanding</th>
+                        <th scope="col" class="num">Available</th>
+                        <th scope="col">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
+                        <td>{{ line.component?.name ? requestLineLabel(activeRequest.raw, line) : 'Not recorded' }}</td>
+                        <td class="num">{{ line.requested ?? '—' }}</td>
+                        <td class="num">{{ line.outstanding }}</td>
+                        <td class="num">{{ line.available }}</td>
+                        <td>
+                          <span class="inv-inline" :class="'inv-' + lineLevel(line)">
+                            <AssetIcon :name="inventoryIcon(lineLevel(line))" :size="12" />
+                            {{ lineLevel(line) === 'ok'
+                              ? 'Can cover'
+                              : lineLevel(line) === 'low'
+                                ? `Part only (${line.can_cover_now})`
+                                : 'No stock' }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <p v-else class="sub-section__note">Availability is loading.</p>
+
+                <p class="inventory-status-line" :class="'inv-' + availabilityLevel(activeRequest)">
+                  <AssetIcon :name="inventoryIcon(availabilityLevel(activeRequest))" :size="14" />
+                  {{ availabilityLevel(activeRequest) === 'ok'
+                    ? 'Sufficient Inventory'
+                    : availabilityLevel(activeRequest) === 'low'
+                      ? 'Partial Inventory — some units can be reserved now'
+                      : 'Insufficient Inventory' }}
+                </p>
+
+                <p class="inventory-advisory">
+                  Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held until you
+                  approve, and allocation re-checks every unit under a lock before reserving.
+                </p>
+              </section>
+
+              <!--
+                Request versus fulfilment, per component. What was asked for is
+                never recomputed from what was supplied; a remainder this centre
+                cannot supply is closed here with a reason, and may still be
+                sourced from another facility by the hospital.
+              -->
+              <section v-if="activeRequest.raw" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="truck" :size="14" />
+                  Fulfilment
+                </h3>
+                <RequestFulfilmentTable
+                  :request="activeRequest.raw"
+                  :closable="canDecide"
+                  close-label="Close as unavailable"
+                  :busy-item-id="closingLine ? lineToClose?.id ?? null : null"
+                  @close-line="openCloseLine"
+                />
+              </section>
+
+              <section class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="history" :size="14" />
+                  Request History
+                </h3>
+                <RequestHistoryTimeline :events="history" :loading="isLoadingHistory" :error="historyError || ''" />
+              </section>
+            </template>
           </div>
 
-          <footer class="drawer-footer">
+          <div class="review-card__footer">
             <p v-if="activeRequest && !activeRequest.isOpen" class="drawer-closed-note">
               This request is {{ activeRequest.status }} — nothing more can be allocated to it.
             </p>
-            <template v-else>
-              <button v-if="canDecide" class="btn btn-outline" :disabled="drawerMutating" @click="requestReject(activeRequest)">
-                Reject Request
-              </button>
-              <button
-                v-if="activeRequest && availabilityLevel(activeRequest) === 'insufficient'"
-                class="btn btn-outline"
-                @click="handleReviewInventory(activeRequest)"
-              >
-                Review Inventory
-              </button>
-              <button
-                v-else-if="canAllocate"
-                class="btn btn-primary"
-                :disabled="drawerMutating"
-                @click="requestApprove(activeRequest)"
-              >
-                {{ drawerMutating ? 'Processing…' : 'Approve & Reserve' }}
-              </button>
+            <button type="button" class="btn btn-outline" @click="closeDrawer">Close</button>
+            <template v-if="activeRequest && activeRequest.isOpen">
+              <template v-if="activeRequest.canReject">
+                <button v-if="canDecide" class="btn btn-outline btn-outline--danger" :disabled="drawerMutating" @click="requestReject(activeRequest)">
+                  Reject Request
+                </button>
+              </template>
+              <!-- Reserving only while something is still needed; once all of
+                   it is held, the next step is issuing it. -->
+              <template v-if="activeRequest.canReserve">
+                <button
+                  v-if="availabilityLevel(activeRequest) === 'insufficient'"
+                  class="btn btn-outline"
+                  @click="handleReviewInventory(activeRequest)"
+                >
+                  Review Inventory
+                </button>
+                <button
+                  v-else-if="canAllocate"
+                  class="btn btn-primary"
+                  :disabled="drawerMutating"
+                  @click="requestApprove(activeRequest)"
+                >
+                  {{ drawerMutating ? 'Processing…' : 'Approve & Reserve' }}
+                </button>
+              </template>
+              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" to="/blood-center/fulfillment" class="btn btn-primary">
+                <AssetIcon name="send" :size="14" />
+                Issue
+              </NuxtLink>
             </template>
-          </footer>
-        </div>
-      </aside>
-    </transition>
-
-    <!-- APPROVAL CONFIRMATION MODAL -->
-    <div v-if="showApproveModal" class="modal-overlay" @click.self="closeApproveModal">
-      <div class="modal">
-        <h2 class="modal-title">Approve Blood Request?</h2>
-        <div class="modal-summary">
-          <div class="modal-row"><span>Request ID</span><strong class="mono">{{ requestToApprove?.id }}</strong></div>
-          <div class="modal-row"><span>Hospital</span><strong>{{ requestToApprove?.hospital }}</strong></div>
-          <div class="modal-row"><span>Blood Type / Component</span><strong>{{ requestToApprove?.bloodType }} · {{ requestToApprove?.component }}</strong></div>
-          <div class="modal-row"><span>Units Requested</span><strong>{{ requestToApprove?.units }}</strong></div>
-          <div v-if="requestToApprove?.available !== undefined" class="modal-row">
-            <span>Compatible Inventory</span>
-            <strong class="inv-inline" :class="'inv-' + availabilityLevel(requestToApprove)">
-              <AssetIcon :name="inventoryIcon(availabilityLevel(requestToApprove))" :size="13" />
-              {{ requestToApprove.available }} units available
-            </strong>
           </div>
-          <div v-else class="modal-row">
-            <span>Compatible Inventory</span>
-            <strong>Checked when the hold is taken</strong>
-          </div>
-        </div>
-        <p class="modal-desc">Approving this request will reserve the selected inventory units and move the request to Request Fulfillment.</p>
-        <div class="modal-actions">
-          <button class="btn btn-outline" :disabled="approving" @click="closeApproveModal">Cancel</button>
-          <button class="btn btn-primary" :disabled="approving" @click="confirmApprove">
-            {{ approving ? 'Approving…' : 'Approve & Reserve' }}
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
+
+    <!--
+      APPROVE AND RESERVE: staff pick the bags (project owner, 2026-10-19).
+      The server holds exactly those, or refuses the pick unit by unit.
+    -->
+    <UnitPickerDialog
+      v-if="showApproveModal && requestToApprove"
+      ref="pickerRef"
+      :request="requestToApprove"
+      :busy="approving"
+      :error="approveError"
+      :unit-errors="unitErrors"
+      @close="closeApproveModal"
+      @confirm="confirmApprove"
+    />
 
     <!-- REJECTION MODAL -->
     <div v-if="showRejectModal" class="modal-overlay" @click.self="closeRejectModal">
@@ -686,14 +578,8 @@
         <p class="modal-desc">{{ requestToReject?.id }} — {{ requestToReject?.hospital }}</p>
         <div class="field">
           <label class="field-label">Rejection Reason *</label>
-          <select v-model="rejectReason" class="field-select">
-            <option value="" disabled>Select a reason</option>
-            <option>Insufficient Inventory</option>
-            <option>Invalid Request</option>
-            <option>Duplicate Request</option>
-            <option>Request Cancelled by Hospital</option>
-            <option>Other</option>
-          </select>
+          <SelectField v-model="rejectReason" placeholder="Select a reason" aria-label="Reason"
+            :options="['Insufficient Inventory', 'Invalid Request', 'Duplicate Request', 'Request Cancelled by Hospital', 'Other'].map(r => ({ value: r, label: r }))" />
         </div>
         <div class="field">
           <label class="field-label">Additional Notes</label>
@@ -721,6 +607,9 @@
       @open-existing="onOpenExisting"
     />
 
+    <!-- WHAT THE WATCHER CARRIES TO THE NEXT CENTRE -->
+    <ReferralSlipSheet />
+
     <!-- CLOSE A LINE THIS CENTRE CANNOT SUPPLY -->
     <CloseLineDialog
       v-if="lineToClose"
@@ -736,22 +625,31 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
+import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vue'
-import { ref, computed, watch, onMounted } from 'vue'
-import { useDarkMode } from '~/composables/useDarkMode'
+import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
+import ReferralSlipSheet from '~/components/BloodCenter/ReferralSlipSheet.vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
-import { componentSummary, requestStatusLabel } from '~/types/bloodRequest'
+import {
+  bloodTypeCodes,
+  bloodTypeSummary,
+  componentSummary,
+  hasMixedBloodTypes,
+  requestLineLabel,
+  requestStatusLabel,
+} from '~/types/bloodRequest'
+import { formatShortDate } from '~/utils/donorRecords'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
   requires: 'requests.view',
 })
-
-const { isDark } = useDarkMode()
 
 // Two abilities split this queue. Reserving units against a request
 // (requests.process) is the Inventory Control Officer's; declining or handing
@@ -760,23 +658,17 @@ const { isDark } = useDarkMode()
 const { can } = useUser()
 const canAllocate = computed(() => can('requests.process'))
 const canDecide = computed(() => can('requests.approve'))
-// Recording a walk-in is Issuance's: the counter a watcher reaches.
-const canRecord = computed(() => can('requests.record'))
+// Recording a walk-in is Issuance's: the counter a watcher reaches. The
+// toolbar renders on the server, which has no signed-in user, so this waits
+// for the browser rather than have the server's markup and the client's differ.
+const hydrated = ref(false)
+const canRecord = computed(() => hydrated.value && can('requests.record'))
+// Issuing is dispatch, done on Request Fulfillment.
+const canRelease = computed(() => can('requests.release'))
 
-/*
- * This page destructured eleven names from useIncomingRequests(), seven of
- * which it has never returned — `activity`, `loading`, `isMutating`,
- * `fetchRequestDetail`, `approveAndReserve`, `rejectRequest` and
- * `fetchActivity` were all undefined. Calling one threw, and the table then
- * read `r.priority.toLowerCase()` on rows that carry no `priority`, which
- * throws during render and takes the whole page down with it.
- *
- * The composable's real surface is below. Everything the template expects but
- * the API does not send is built in mapRequest(), with a defined fallback for
- * every field so a render can no longer throw.
- */
 const {
   requests: apiRequests,
+  // Read for the tabs' open counts; the composable refreshes it after every action.
   summary,
   selected,
   inventory,
@@ -809,15 +701,6 @@ function formatDateTime(value) {
 }
 
 /**
- * Flatten one request for the table.
- *
- * `id` stays the numeric key every API call needs; `code` is the reference
- * number staff actually read. Fields the schema has no answer for — the
- * requesting doctor, their phone, the department — resolve to an em dash
- * rather than being invented, which is the rule this feature has followed
- * throughout.
- */
-/**
  * What the patient needs in all, beside this centre's share of it.
  *
  * "Packed RBC 5 (you are asked for 1)" — so a reviewer reading a share of one
@@ -836,15 +719,67 @@ function shareSummary(raw) {
     .join(', ') || 'more than this request'
 }
 
+/**
+ * Each component a request asks for once, by its bag-label code, the full
+ * name as the fallback. A weekly request repeats a component across blood
+ * types, hence the distinct.
+ */
+function componentChips(items) {
+  const seen = new Map()
+
+  for (const item of items) {
+    const key = item.component?.id ?? item.component?.name
+    if (key === undefined || key === null || seen.has(key)) continue
+    seen.set(key, { key, code: item.component?.code || item.component?.name || '—' })
+  }
+
+  return seen.size ? [...seen.values()] : [{ key: 'none', code: '—' }]
+}
+
+/**
+ * Status tones on the list's dot badges. Waiting on a decision is amber,
+ * being worked is blue, done is green, refused red, withdrawn grey.
+ */
+const STATUS_TONES = {
+  pending: 'warn',
+  processing: 'info',
+  partial: 'info',
+  fulfilled: 'ok',
+  rejected: 'crit',
+  cancelled: 'neutral',
+}
+
+/**
+ * Flatten one request for the table and the drawer.
+ *
+ * `id` stays the numeric key every API call needs; `code` is the reference
+ * number staff actually read. Fields the schema has no answer for — the
+ * requesting doctor, their phone, the department — resolve to an em dash
+ * rather than being invented, which is the rule this feature has followed
+ * throughout.
+ */
 function mapRequest(r) {
+  // allocated_count counts every claiming hold, dispatched ones included;
+  // fulfilled_quantity is what has gone out. The difference is what is
+  // reserved and waiting to be issued.
   const allocated = r.allocated_count ?? 0
+  const issued = r.fulfilled_quantity ?? 0
   const units = r.quantity ?? 0
+  const outstanding = r.outstanding_quantity ?? Math.max(0, units - allocated)
+  const isOpen = r.is_open !== false
 
   return {
     id: r.id,
     code: r.reference_number ?? `#${r.id}`,
+    date: formatShortDate(r.request_date) || '—',
+    time: r.request_date
+      ? new Date(r.request_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : '',
     hospital: r.requesting_facility?.name ?? '—',
     contact: r.requesting_facility?.address ?? '',
+    // False for a hospital a centre named on a walk-in (project owner,
+    // 2026-10-19): nobody there is notified.
+    registered: r.requesting_facility?.is_registered !== false,
     // The hospital user who submitted it, or — for a walk-in, which nobody at
     // the hospital submitted — who recorded it here.
     requestedBy: r.requester_name
@@ -853,27 +788,46 @@ function mapRequest(r) {
     ptrReference: r.transfusion_request?.reference_number ?? null,
     weeklyReference: r.weekly_request?.reference_number ?? null,
     sourceLabel: r.source_label ?? 'Blood Bank Portal',
-    bloodType: r.blood_type?.code ?? '—',
+    // A weekly request is one request whose lines can each restock a
+    // different blood type, so a row may carry several.
+    bloodType: bloodTypeSummary(r),
+    bloodTypes: bloodTypeCodes(r),
+    mixedTypes: hasMixedBloodTypes(r),
+    lineSummary: (r.items ?? []).map((item) => `${requestLineLabel(r, item)} ×${item.quantity}`).join(', '),
     component: componentSummary(r),
+    componentChips: componentChips(r.items ?? []),
     units,
     items: r.items ?? [],
-    // Coverage, not shelf stock: the queue endpoint does not carry
-    // availability, and printing "0 available" beside a request nobody has
-    // checked would read as "we have none" rather than "we have not looked".
     allocated,
-    outstanding: r.outstanding_quantity ?? Math.max(0, units - allocated),
+    issued,
+    held: Math.max(0, allocated - issued),
+    outstanding,
     priority: r.is_emergency ? 'Emergency' : 'Routine',
+    emergency: Boolean(r.is_emergency),
     status: requestStatusLabel(r),
+    tone: STATUS_TONES[r.status] ?? 'neutral',
     // Keyed on the stored value, not the label: "Partially Fulfilled (Closed)"
     // is not a class name.
     statusClass: `status-${r.status ?? 'pending'}`,
     statusValue: r.status,
-    isOpen: r.is_open !== false,
+    isOpen,
+    // What the row offers, before the abilities are asked. Reserving needs
+    // something still to find; rejecting needs nothing held or sent, which
+    // is what the server checks.
+    canReserve: isOpen && outstanding > 0,
+    canReject: isOpen && allocated === 0,
     // The API shape, for the shared fulfilment and walk-in components.
     raw: r,
     urgency: r.urgency_level,
     purpose: r.purpose_label ?? '',
     patient: r.patient?.full_name ?? '',
+    // Age and sex as the form records them, for the review.
+    patientDetails: [
+      r.patient?.age ? `${r.patient.age} years` : null,
+      r.patient?.sex ? r.patient.sex.charAt(0).toUpperCase() + r.patient.sex.slice(1) : null,
+    ].filter(Boolean).join(' · '),
+    // A restocking order names no patient.
+    patientFallback: r.request_purpose === 'replenishment' ? 'Replenishment' : '—',
     requestDate: formatDateTime(r.request_date),
     neededBy: r.is_emergency ? 'Immediate' : 'Routine',
     reason: r.rejection_reason ?? '',
@@ -881,7 +835,7 @@ function mapRequest(r) {
   }
 }
 
-const requests = computed(() => (apiRequests.value ?? []).map(mapRequest))
+const rows = computed(() => (apiRequests.value ?? []).map(mapRequest))
 
 /* TOASTS */
 const toasts = ref([])
@@ -894,124 +848,161 @@ function toast(title, variant = 'success', message = '') {
   }, 3600)
 }
 
-/* FILTER STATE */
-const activeFilter = ref('All')
-const searchQuery = ref('')
-const dismissedAlertIds = ref([])
-
-// The statuses the schema actually accepts, plus the two urgency levels.
-// "Urgent", "Under Review", "Approved" and "Ready for Fulfillment" were never
-// values this API could return, so filtering by them matched nothing.
-const filterOptions = ['All', 'Emergency', 'Routine', 'Pending', 'Processing', 'Partial', 'Fulfilled', 'Rejected', 'Cancelled']
-
-const STATUS_FILTERS = {
-  Pending: 'pending',
-  Processing: 'processing',
-  Partial: 'partial',
-  Fulfilled: 'fulfilled',
-  Rejected: 'rejected',
-  Cancelled: 'cancelled',
-}
-const URGENCY_FILTERS = { Emergency: 'emergency', Routine: 'routine' }
-
-// Where the request was keyed in. Filtered by the API, so the page count and
-// pagination stay honest.
-const sourceOptions = [
-  { value: '', label: 'All sources', icon: null },
-  { value: 'blood_bank_portal', label: 'Blood Bank Portal', icon: 'send' },
-  { value: 'blood_center_walk_in', label: 'Walk-in', icon: 'phone' },
+/* FILTERS */
+// "Open" is every request still being worked; the rest are the statuses the
+// API stores.
+const STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'partial', label: 'Partially Fulfilled' },
+  { value: 'fulfilled', label: 'Fulfilled' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
-const sourceFilter = ref('')
 
-const toolbarFilters = ref({
-  hospital: '',
-  bloodType: '',
-  component: '',
-  priority: '',
-  status: '',
-  date: '',
-  neededBy: '',
-})
-
-const activeFilterCount = computed(() => Object.values(toolbarFilters.value).filter(Boolean).length)
-
-// UI only: whether the second filter row is open, and how many of its
-// filters are set (shown on the button so a hidden filter is never forgotten).
-const showMoreFilters = ref(false)
-const moreFilterCount = computed(() => {
-  const f = toolbarFilters.value
-  return [f.priority, f.status, f.date, f.neededBy].filter(Boolean).length
-})
-
-const hospitalOptions = computed(() => [...new Set(requests.value.map((r) => r.hospital))])
-const bloodTypeOptions = computed(() => [...new Set(requests.value.map((r) => r.bloodType))])
-const componentOptions = computed(() =>
-  [...new Set(requests.value.flatMap((r) => r.items.map((i) => i.component?.name).filter(Boolean)))],
-)
-
-/**
- * The rows actually shown.
- *
- * Status, urgency and the free-text search are applied by the API. Hospital,
- * blood type and component are narrowed here, because the queue endpoint takes
- * ids for those and this toolbar collects names.
+/*
+ * What a request is for, one tab each (project owner, 2026-10-19): a named
+ * patient's transfusion, walk-ins and shares of a Patient Transfusion Request
+ * among them, or a hospital blood bank restocking its own shelves, weekly
+ * orders among them. The tab is kept in the address as ?type=, so a refresh
+ * or a shared link opens the same one.
  */
-const visibleRequests = computed(() =>
-  requests.value.filter((r) => {
-    const f = toolbarFilters.value
-    if (f.hospital && r.hospital !== f.hospital) return false
-    if (f.bloodType && r.bloodType !== f.bloodType) return false
-    if (f.component && !r.items.some((i) => i.component?.name === f.component)) return false
-    if (f.priority && r.priority !== f.priority) return false
-    return true
-  }),
-)
+const PURPOSE_TABS = [
+  { value: 'patient_transfusion', label: 'Patient Requests', icon: 'users', query: 'patient' },
+  { value: 'replenishment', label: 'Inventory Replenishment', icon: 'package', query: 'replenishment' },
+]
+
+const route = useRoute()
+const router = useRouter()
+
+const purposeTab = ref(route.query.type === 'replenishment' ? 'replenishment' : 'patient_transfusion')
+const isPatientTab = computed(() => purposeTab.value === 'patient_transfusion')
+
+/** What is still open on a tab, from the queue summary. */
+function openCount(purpose) {
+  return summary.value?.open_by_purpose?.[purpose] ?? 0
+}
+
+function selectTab(purpose) {
+  if (purposeTab.value === purpose) return
+  purposeTab.value = purpose
+
+  const query = PURPOSE_TABS.find((tab) => tab.value === purpose)?.query
+  router.replace({ query: { ...route.query, type: query } })
+  loadRequests()
+}
+
+const searchQuery = ref('')
+const statusFilter = ref('')
+// Set by the Emergency quick filter; the list's other filters still apply.
+const urgencyFilter = ref('')
+
+/** This tab's own counts, for the quick filters. */
+const tabSummary = computed(() => summary.value?.by_purpose?.[purposeTab.value] ?? null)
+
+const quickChips = computed(() => {
+  const totals = tabSummary.value?.totals ?? {}
+  return [
+    { key: 'emergency', label: 'emergency', icon: 'circle-alert', tone: 'crit', count: tabSummary.value?.open_emergencies ?? 0, active: urgencyFilter.value === 'emergency' },
+    { key: 'pending', label: 'pending', tone: 'warn', count: totals.pending ?? 0, active: statusFilter.value === 'pending' && !urgencyFilter.value },
+    { key: 'processing', label: 'processing', tone: 'info', count: totals.processing ?? 0, active: statusFilter.value === 'processing' && !urgencyFilter.value },
+    { key: 'partial', label: 'partly filled', tone: 'info', count: totals.partial ?? 0, active: statusFilter.value === 'partial' && !urgencyFilter.value },
+  ]
+})
+
+/** A chip filters the list; pressed again, it clears. */
+function toggleQuick(chip) {
+  if (chip.active) {
+    urgencyFilter.value = ''
+    statusFilter.value = ''
+  } else if (chip.key === 'emergency') {
+    urgencyFilter.value = 'emergency'
+    statusFilter.value = 'open'
+  } else {
+    urgencyFilter.value = ''
+    statusFilter.value = chip.key
+  }
+  loadRequests()
+}
+
+const share = (part, whole) => (whole ? Math.min(100, (part / whole) * 100) : 0)
+
+// "Waiting 2 h": how long an open request has sat here, kept current.
+const now = ref(Date.now())
+let nowTimer = null
+function waitingLabel(r) {
+  const at = r.raw?.request_date ? new Date(r.raw.request_date).getTime() : NaN
+  if (Number.isNaN(at)) return ''
+  const minutes = Math.max(0, Math.floor((now.value - at) / 60000))
+  if (minutes < 60) return `Waiting ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `Waiting ${hours} h`
+  return `Waiting ${Math.floor(hours / 24)} days`
+}
+onMounted(() => { nowTimer = setInterval(() => { now.value = Date.now() }, 60000) })
+onBeforeUnmount(() => clearInterval(nowTimer))
+const fromDate = ref('')
+const toDate = ref('')
+
+const hasFilters = computed(() => Boolean(searchQuery.value.trim() || statusFilter.value || urgencyFilter.value || fromDate.value || toDate.value))
+
+const listSummary = computed(() => {
+  if (hasFilters.value) return `${meta.value.total} request${meta.value.total === 1 ? '' : 's'} match the filters`
+
+  return isPatientTab.value
+    ? 'Blood for a named patient, walk-ins included: open ones first, emergencies at the top.'
+    : 'Hospital blood banks restocking their own shelves, weekly orders included: open ones first.'
+})
 
 const lastUpdatedAt = ref(null)
-const lastUpdatedLabel = computed(() => {
-  if (!lastUpdatedAt.value) return '—'
-  const seconds = Math.round((Date.now() - lastUpdatedAt.value) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.round(seconds / 60)
-  return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
-})
+const lastUpdatedLabel = computed(() => lastUpdatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
+
+/** The filters as the API takes them, for the list and its export alike. */
+function filterParams() {
+  const params = { request_purpose: purposeTab.value }
+  if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+  if (statusFilter.value === 'open') params.open = 1
+  else if (statusFilter.value) params.status = statusFilter.value
+  if (urgencyFilter.value) params.urgency_level = urgencyFilter.value
+  if (fromDate.value) params.from = fromDate.value
+  if (toDate.value) params.to = toDate.value
+  return params
+}
 
 let searchDebounce = null
 function onSearchInput() {
   clearTimeout(searchDebounce)
-  searchDebounce = setTimeout(() => loadRequests(), 400)
+  searchDebounce = setTimeout(() => loadRequests(), 300)
 }
 
-/**
- * Push the toolbar into the composable's filter bag, then load page one.
- *
- * fetchRequests() takes a page number. This used to hand it the whole filter
- * object, which went out as page[status]=… and came back 422 — the queue then
- * rendered empty no matter what was in it.
- */
-async function loadRequests() {
-  const quick = activeFilter.value
-  const toolbar = toolbarFilters.value
+/** Push the toolbar into the composable's filter bag, then load a page. */
+async function loadRequests(page = 1) {
+  const params = filterParams()
 
-  filters.status = STATUS_FILTERS[toolbar.status] ?? STATUS_FILTERS[quick] ?? undefined
-  filters.urgency_level = URGENCY_FILTERS[quick] ?? URGENCY_FILTERS[toolbar.priority] ?? undefined
-  filters.request_source = sourceFilter.value || undefined
-  filters.search = searchQuery.value.trim() || undefined
+  filters.request_purpose = params.request_purpose
+  filters.search = params.search
+  filters.status = params.status
+  filters.open = params.open
+  filters.urgency_level = params.urgency_level
+  filters.from = params.from
+  filters.to = params.to
 
-  await fetchRequests(1)
-  lastUpdatedAt.value = Date.now()
+  await fetchRequests(page)
+  lastUpdatedAt.value = new Date()
 }
 
 function resetFilters() {
-  toolbarFilters.value = { hospital: '', bloodType: '', component: '', priority: '', status: '', date: '', neededBy: '' }
   searchQuery.value = ''
-  activeFilter.value = 'All'
-  sourceFilter.value = ''
+  statusFilter.value = ''
+  urgencyFilter.value = ''
+  fromDate.value = ''
+  toDate.value = ''
   loadRequests()
 }
 
 async function handleRefresh() {
-  await Promise.all([loadRequests(), fetchSummary()])
+  await Promise.all([loadRequests(meta.value.current_page), fetchSummary()])
 }
 
 /**
@@ -1025,134 +1016,26 @@ function isMutating(id) {
   return isActing.value && mutatingId.value === id
 }
 
-/* re-fetch whenever a quick filter pill changes */
-watch([activeFilter, sourceFilter], () => loadRequests())
+/* EXPORT — the list as CSV, with its filters, every page */
+const exporting = ref(false)
 
-/* SUMMARY CARDS */
-const summaryLoading = computed(() => loading.value && !summary.value)
-
-/**
- * Recent activity, derived from the requests already loaded.
- *
- * There is no activity endpoint, and the page previously called a
- * `fetchActivity` the composable does not have. Every event below is a
- * timestamp the queue already carries, so the card shows real history instead
- * of throwing.
- */
-const activity = computed(() => {
-  const events = []
-
-  for (const r of apiRequests.value ?? []) {
-    const hospital = r.requesting_facility?.name ?? '—'
-
-    if (r.request_date) {
-      events.push({
-        id: `${r.id}-received`,
-        type: r.is_emergency ? 'emergency' : 'received',
-        description: `${r.reference_number} ${r.is_emergency ? 'raised as an emergency' : 'received'}`,
-        hospital,
-        at: r.request_date,
-        staff: 'Requesting facility',
-      })
-    }
-
-    if (r.reviewed_at) {
-      events.push({
-        id: `${r.id}-reviewed`,
-        type: r.status === 'rejected' ? 'rejected' : 'approved',
-        description: `${r.reference_number} ${r.status === 'rejected' ? 'rejected' : 'reviewed'}`,
-        hospital,
-        at: r.reviewed_at,
-        staff: 'Blood centre',
-      })
-    }
-
-    if (r.fulfilled_at) {
-      events.push({
-        id: `${r.id}-fulfilled`,
-        type: 'reserved',
-        description: `${r.reference_number} fulfilled`,
-        hospital,
-        at: r.fulfilled_at,
-        staff: 'Blood centre',
-      })
-    }
+async function handleExportAll() {
+  exporting.value = true
+  try {
+    const blob = await bloodCenterService.exportIncomingRequests(filterParams())
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${isPatientTab.value ? 'patient-requests' : 'replenishment-requests'}-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (err) {
+    toast('Export Failed', 'danger', err?.message || 'Could not export the requests. Please try again.')
+  } finally {
+    exporting.value = false
   }
-
-  return events
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 8)
-    .map((event) => ({ ...event, time: formatDateTime(event.at) }))
-})
-
-const summaryStats = computed(() => {
-  // The endpoint returns { totals: {…per status}, open_emergencies,
-  // awaiting_release }, not the flat camelCase keys this block assumed.
-  const payload = summary.value || {}
-  const totals = payload.totals || {}
-  const s = {
-    pending: totals.pending ?? 0,
-    emergency: payload.open_emergencies ?? 0,
-    underReview: totals.processing ?? 0,
-    readyForFulfillment: payload.awaiting_release ?? 0,
-  }
-  const openWalkIns = payload.open_by_source?.blood_center_walk_in ?? 0
-
-  return [
-    {
-      key: 'pending',
-      label: 'Pending Requests',
-      value: s.pending ?? 0,
-      icon: 'clock',
-      trend: openWalkIns
-        ? `Awaiting staff review · ${openWalkIns} open walk-in${openWalkIns === 1 ? '' : 's'}`
-        : 'Awaiting staff review',
-      trendUp: s.pendingTrendUp ?? null,
-    },
-    {
-      key: 'emergency',
-      label: 'Emergency Requests',
-      value: s.emergency ?? 0,
-      icon: 'triangle-alert',
-      trend: s.emergencyTrend ?? 'Requires immediate action',
-      trendUp: null,
-      danger: true,
-    },
-    {
-      key: 'review',
-      label: 'Under Review',
-      value: s.underReview ?? 0,
-      icon: 'search',
-      trend: s.underReviewTrend ?? 'Currently being assessed',
-      trendUp: s.underReviewTrendUp ?? null,
-    },
-    {
-      key: 'ready',
-      label: 'Ready for Fulfillment',
-      value: s.readyForFulfillment ?? 0,
-      icon: 'circle-check-big',
-      trend: s.readyTrend ?? 'Approved and inventory available',
-      trendUp: s.readyTrendUp ?? null,
-    },
-  ]
-})
-
-/* EMERGENCY BANNER */
-const emergencyRequests = computed(() =>
-  requests.value.filter((r) => r.priority === 'Emergency' && !dismissedAlertIds.value.includes(r.id))
-)
-const primaryEmergency = computed(() => emergencyRequests.value[0] || null)
-
-function dismissAlert(id) {
-  dismissedAlertIds.value.push(id)
-}
-
-/* ROW EXPANSION */
-const expandedIds = ref(new Set())
-function toggleExpand(id) {
-  const next = new Set(expandedIds.value)
-  next.has(id) ? next.delete(id) : next.add(id)
-  expandedIds.value = next
 }
 
 /* REVIEW DRAWER */
@@ -1234,15 +1117,44 @@ async function confirmCloseLine(note) {
     toast(
       'Remaining quantity closed',
       'success',
-      result?.is_open === false
+      // The hospital is notified by the server; a watcher can carry the rest.
+      (result?.is_open === false
         ? `${activeRequest.value.code} is now ${result.status_label} and closed.`
-        : `The rest of ${lineToClose.value.component} is recorded as unavailable here.`,
+        : `The rest of ${lineToClose.value.component} is recorded as unavailable here.`)
+        + (activeRequest.value.registered
+          ? ' The hospital has been told.'
+          : ' The hospital is not on RedAgos, so let the watcher know.')
+        + (activeRequest.value.raw?.transfusion_request ? ' Hand the watcher a referral slip from the review.' : ''),
     )
     lineToClose.value = null
   } catch (err) {
     closeLineError.value = err?.message || 'The remaining quantity could not be closed.'
   } finally {
     closingLine.value = false
+  }
+}
+
+/* REFERRAL SLIP — what the watcher carries when this centre cannot supply it all */
+const { printSlip } = useReferralSlip()
+const printingSlip = ref(false)
+
+async function printReferralSlip(request) {
+  if (!request) return
+  printingSlip.value = true
+
+  try {
+    const data = await bloodCenterService.referralSlip(request.id)
+
+    if (!data?.still_needed) {
+      toast('Nothing still needed elsewhere', 'info', "Every unit of the patient's request is already asked of a facility, so there is nothing for the watcher to carry on.")
+      return
+    }
+
+    await printSlip(data)
+  } catch (err) {
+    toast('Could not prepare the slip', 'danger', err?.message || 'Please try again in a moment.')
+  } finally {
+    printingSlip.value = false
   }
 }
 
@@ -1259,14 +1171,14 @@ async function onWalkInCreated(response) {
     created ? `${created.reference_number} is in the queue for ${created.requesting_facility?.name ?? 'the hospital'}.` : '',
   )
 
-  await Promise.all([loadRequests(), fetchSummary()])
+  await loadRequests()
 
   if (created) openReview(mapRequest(created))
 }
 
 function onOpenExisting(id) {
   showWalkIn.value = false
-  const existing = requests.value.find((r) => r.id === id)
+  const existing = rows.value.find((r) => r.id === id)
 
   openReview(existing ?? { id, code: `#${id}`, status: '', statusClass: '', priority: 'Routine' })
 }
@@ -1276,28 +1188,41 @@ function closeDrawer() {
   setTimeout(() => (activeRequest.value = null), 250)
 }
 
-/** Scroll the drawer back to the availability table. */
+/** Bring the review's availability table into view. */
 function handleReviewInventory() {
-  document.querySelector('.drawer-content')?.scrollTo({ top: 0, behavior: 'smooth' })
+  document.getElementById('review-availability')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-/* APPROVAL — confirmation modal */
+/**
+ * Escape closes the review, unless a dialog over it is open: those close
+ * themselves first, so one press never shuts two.
+ */
+function onKeydown(event) {
+  if (event.key !== 'Escape' || !drawerOpen.value) return
+  if (showApproveModal.value || showRejectModal.value || lineToClose.value || showWalkIn.value) return
+  closeDrawer()
+}
+
+/* APPROVAL — staff pick the units to reserve (project owner, 2026-10-19) */
 const showApproveModal = ref(false)
 const requestToApprove = ref(null)
 const approving = ref(false)
+const approveError = ref('')
+// Unit id → why the server would not hold it, shown against its row.
+const unitErrors = ref({})
+const pickerRef = ref(null)
 
 /**
- * Open the approval confirmation.
+ * Open the unit picker for a request.
  *
- * No longer refuses up front. The guard here asked coverage whether there was
- * stock, so a request with nothing reserved yet — which is every new request —
- * was turned away before the server was ever asked. Allocation re-checks every
- * unit under a lock anyway, and a partial hold is a normal outcome it reports
- * rather than an error, so the decision belongs there.
+ * The picker asks the server which units each line may take; nothing is
+ * refused up front here. Allocation re-checks every pick under a lock.
  */
 function requestApprove(request) {
   if (!request) return
   requestToApprove.value = request
+  approveError.value = ''
+  unitErrors.value = {}
   showApproveModal.value = true
 }
 
@@ -1307,23 +1232,40 @@ function closeApproveModal() {
   requestToApprove.value = null
 }
 
-async function confirmApprove() {
-  if (!requestToApprove.value) return
+/** Hold exactly the units picked; on a refusal, say which unit and why. */
+async function confirmApprove(unitIds) {
+  if (!requestToApprove.value || !unitIds?.length) return
   approving.value = true
+  approveError.value = ''
+  unitErrors.value = {}
   mutatingId.value = requestToApprove.value.id
 
   try {
-    // Holds stock FEFO across the request's lines and moves it to Processing.
-    await allocate(requestToApprove.value.id)
-    toast('Request Approved', 'success', `${requestToApprove.value.code} was approved and stock has been reserved.`)
+    // The composable refreshes the list, the counts and an open review.
+    const result = await allocate(requestToApprove.value.id, unitIds)
+    toast(
+      `${unitIds.length} unit${unitIds.length === 1 ? '' : 's'} reserved`,
+      'success',
+      `${requestToApprove.value.code}: ${result?.message || 'stock has been reserved.'}`,
+    )
     showApproveModal.value = false
     requestToApprove.value = null
-    closeDrawer()
-    await Promise.all([loadRequests(), fetchSummary()])
   } catch (err) {
-    // The API refuses with a message written for staff; show it rather than
-    // replacing it with something vaguer.
-    toast('Unable to Approve Request', 'danger', err?.message || 'Please try again in a moment.')
+    // A refusal names each unit it could not take as unit_ids.N; map those
+    // back onto the units, and reload the list so a taken unit drops off.
+    const errors = err?.data?.errors ?? {}
+    const byUnit = {}
+
+    for (const [key, messages] of Object.entries(errors)) {
+      const index = Number(key.split('.')[1])
+      if (key.startsWith('unit_ids.') && unitIds[index]) byUnit[unitIds[index]] = [messages].flat()[0]
+    }
+
+    unitErrors.value = byUnit
+    approveError.value = Object.keys(byUnit).length
+      ? 'Some of the units picked could not be reserved; nothing was held. Change the pick and try again.'
+      : err?.message || 'The units could not be reserved. Please try again in a moment.'
+    pickerRef.value?.reload()
   } finally {
     approving.value = false
     mutatingId.value = null
@@ -1366,37 +1308,13 @@ async function confirmReject() {
     showRejectModal.value = false
     requestToReject.value = null
     closeDrawer()
-    await Promise.all([loadRequests(), fetchSummary()])
+    await loadRequests(meta.value.current_page)
   } catch (err) {
     toast('Unable to Reject Request', 'danger', err?.message || 'Please try again in a moment.')
   } finally {
     rejecting.value = false
     mutatingId.value = null
   }
-}
-
-/* ROW MENU */
-const openMenuId = ref(null)
-function toggleMenu(id) {
-  openMenuId.value = openMenuId.value === id ? null : id
-}
-
-// Minimal outside-click directive so the context menu closes without a global click listener leak.
-const vClickOutside = {
-  mounted(el, binding) {
-    el._clickOutside = (event) => {
-      if (!el.contains(event.target)) binding.value(event)
-    }
-    document.addEventListener('click', el._clickOutside, true)
-  },
-  unmounted(el) {
-    document.removeEventListener('click', el._clickOutside, true)
-  },
-}
-
-function handlePrint(request) {
-  toast('Preparing Print View', 'info', `${request.id} is ready to print.`)
-  window.print()
 }
 
 /**
@@ -1420,30 +1338,17 @@ async function handleExportPdf(request) {
   }
 }
 
-function handleExportAll() {
-  // connect to actual bulk export endpoint (e.g. GET /api/center/requests/export)
-  toast('Export Started', 'info', 'Preparing an export of the current request list.')
-}
-
 /* INVENTORY HELPERS */
 /*
- * Coverage and availability are two different questions and this page needs
- * both. Coverage is how much stock is already held FOR the request; the queue
- * endpoint carries it for every row. Availability is how much issuable stock
- * is on the shelf, which only the review endpoint knows, per component.
+ * Coverage and availability are two different questions. Coverage is how much
+ * stock is already held FOR the request; the list's Units column shows it.
+ * Availability is how much issuable stock is on the shelf, which only the
+ * review endpoint knows, per component; the drawer reads it here.
  *
  * They were briefly the same function, which is why a request for one unit
  * with one unit available still read "Insufficient Inventory": nothing had
  * been reserved yet, and coverage was being asked an availability question.
  */
-
-/** How much of the request is already reserved. Used by the queue and banner. */
-function coverageLevel(request) {
-  if (!request || !request.units) return 'insufficient'
-  if (request.allocated >= request.units) return 'ok'
-  if (request.allocated > 0) return 'low'
-  return 'insufficient'
-}
 
 /**
  * Whether the shelf can answer what is still outstanding.
@@ -1472,37 +1377,20 @@ function lineLevel(line) {
   return 'insufficient'
 }
 
-// The queue column and the emergency banner both speak coverage.
-const inventoryLevel = coverageLevel
 function inventoryIcon(level) {
   return { ok: 'check', low: 'triangle-alert', insufficient: 'x' }[level] || 'check'
-}
-function priorityIcon(priority) {
-  return { Routine: 'info', Urgent: 'triangle-alert', Emergency: 'octagon-alert' }[priority] || 'info'
-}
-
-/* ACTIVITY FEED HELPERS */
-const activityLoading = computed(() => loading.value && activity.value.length === 0)
-
-function activityToneClass(type) {
-  if (type === 'emergency' || type === 'rejected') return 'danger'
-  if (type === 'approved' || type === 'reserved') return 'success'
-  return 'info'
-}
-function activityIcon(type) {
-  const map = {
-    received: 'inbox',
-    emergency: 'triangle-alert',
-    reserved: 'archive',
-    approved: 'circle-check-big',
-    rejected: 'circle-x',
-  }
-  return map[type] || 'activity'
 }
 
 /* INITIAL LOAD */
 onMounted(() => {
+  hydrated.value = true
+  window.addEventListener('keydown', onKeydown)
   handleRefresh()
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(searchDebounce)
+  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -1510,16 +1398,17 @@ onMounted(() => {
 /* TOKENS */
 .page {
   /*
-   * Two families. The `-fill` tokens are the surfaces that carry white text,
-   * so they stay deep in both themes; the plain names are the colours used AS
-   * text and icons, and those lift in the dark block below. Left as one set,
-   * every status pill, trend arrow and stage badge sat between 2.2:1 and 3:1
-   * on a dark card.
+   * The list itself is drawn with the app's --rb-* tokens, like the other
+   * list pages, so it follows the theme on its own. These page tokens serve
+   * the review drawer and the dialogs. The `-fill` tokens are the surfaces
+   * that carry white text, so they stay deep in both themes; the plain names
+   * are the colours used AS text and icons, and those lift in the dark block
+   * below.
    */
   --primary: #1565c0;
   --primary-fill: #1565c0;
   --primary-fill-hover: #0d47a1;
-  --bg: #F7F8FA;
+  --bg: var(--rb-page-bg, #F7F8FA);
   --card: #ffffff;
   --border: #e5eaf0;
   --text: #1e293b;
@@ -1536,11 +1425,9 @@ onMounted(() => {
   --info-fill: #2563eb;
   --purple: #7c3aed;
   --radius: 14px;
-  --card-padding: 24px;
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 
-  background: var(--bg);
-  color: var(--text);
+  background: var(--rb-page-bg);
+  color: var(--rb-text-primary);
   font-family: var(--rb-font-sans);
   /* Same column as every other blood-centre page, so a user moving between
      them does not see the content jump width and the gutters change. */
@@ -1549,7 +1436,19 @@ onMounted(() => {
   padding: 24px var(--rb-gutter, 24px) 40px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* TOASTS */
@@ -1571,185 +1470,549 @@ onMounted(() => {
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(20px); }
 
 /* HEADER */
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
-.page-title { font-size: 20px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
-.page-subtitle { font-size: 13px; color: var(--text-secondary); margin: 0; max-width: 72ch; }
-.header-actions { display: flex; align-items: center; gap: 8px; }
-.btn-ghost { background: transparent; color: var(--text-secondary); border-color: transparent; }
-.btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--bg); }
+.header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; max-width: 80ch; }
 
+/* BUTTONS: the list pages' set, shared by the toolbar, the drawer and the dialogs. */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px; border-radius: 10px;
-  font-size: 13px; font-weight: 700; padding: 10px 16px; cursor: pointer;
-  border: 1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.btn-sm { padding: 8px 14px; font-size: 12px; }
-.btn-xs { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
-.btn-primary { background: var(--primary-fill); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--primary-fill-hover); }
-.btn-outline { background: var(--card); color: var(--text); border-color: var(--border); }
-.btn-outline:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
-.btn-danger { background: var(--danger-fill); color: #fff; }
-.btn-danger:hover:not(:disabled) { background: #a82424; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 8px; gap: 4px; }
+.btn-primary { color: #fff; background: var(--rb-primary); border-color: var(--rb-primary); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+.btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border-color: var(--rb-border-strong); }
+.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+.btn-danger { color: #fff; background: var(--rb-accent); border-color: var(--rb-accent); }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--rb-primary-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-link:hover { text-decoration: underline; }
+
+.btn:focus-visible,
+.btn-link:focus-visible,
+.icon-btn:focus-visible,
+.code-link:focus-visible,
+.btn-issue:focus-visible {
+  outline: none;
+  box-shadow: var(--rb-focus-ring);
+}
 
 .icon-btn {
-  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
-  border-radius: 8px; border: 1px solid var(--border); background: var(--card);
-  color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.icon-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.icon-btn:hover:not(:disabled) { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.icon-btn--ok:hover:not(:disabled) { color: var(--rb-success-text); border-color: rgba(var(--rb-success-rgb), 0.45); }
+.icon-btn--danger:hover:not(:disabled) { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.45); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .spinning { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* RETRY BANNER */
-.retry-banner {
-  display: flex; align-items: center; gap: 10px; background: #FDF1F1;
-  border: 1px solid #F2D2D2; color: #C62828; border-radius: 12px;
-  padding: 12px 16px; font-size: 13px; font-weight: 500;
+/* BANNER */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
+  font-size: 13px;
 }
-.retry-banner .btn { margin-left: auto; }
 
-/* EMERGENCY BANNER */
-.emergency-banner {
-  background: #FDF1F1; border: 1px solid #F2D2D2; border-left: 4px solid var(--danger);
-  border-radius: var(--radius); padding: 20px 24px; display: flex;
-  justify-content: space-between; gap: 20px; align-items: flex-start;
-}
-.emergency-main { display: flex; gap: 14px; }
-.emergency-icon {
-  width: 36px; height: 36px; border-radius: 10px; background: var(--danger-fill); color: #fff;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.emergency-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.emergency-title { font-weight: 600; font-size: 15px; color: #C62828; }
-.emergency-id { font-size: 12px; color: var(--text-secondary); font-family: var(--rb-font-mono); }
-/* auto-fit, not a fixed count: the content column now changes width
-   when the rail expands, so the grid has to answer to its container
-   rather than to a viewport breakpoint that no longer describes it. */
-.emergency-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 24px; }
-.e-label { display: block; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
-.e-value { display: block; font-size: 14px; font-weight: 600; }
-.insufficient-tag { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #C62828; }
-.emergency-actions { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
+.banner > :deep(.asset-icon) { flex-shrink: 0; }
+.banner__text { flex: 1; margin: 0; line-height: 1.45; }
+.banner--error { border-color: rgba(var(--rb-accent-rgb), 0.35); }
+.banner--error > :deep(.asset-icon) { color: var(--rb-accent-text); }
 
-/* SUMMARY CARDS */
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.summary-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; display: flex; flex-direction: column; box-shadow: var(--shadow);
+/* TABS: Fulfillment's segmented bar, one tab per kind of request. */
+.tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
+  background: var(--rb-surface);
 }
-.skeleton-card { min-height: 88px; background: linear-gradient(90deg, #eef2f7 25%, #f7f9fc 37%, #eef2f7 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; }
-.summary-icon {
-  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; background: #e8f0fc; color: var(--primary);
-  display: flex; align-items: center; justify-content: center;
-}
-.summary-icon.is-danger { background: #fdecea; color: var(--danger); }
-.summary-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.summary-value { font-size: 24px; font-weight: 800; margin: 6px 0 4px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.summary-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin: 0; }
-.summary-card.is-danger { border-color: rgba(211, 47, 47, 0.35); box-shadow: inset 3px 0 0 var(--danger-fill); }
-.summary-card.is-danger .summary-value { color: var(--danger); }
-.summary-trend { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin: 0; }
-.summary-trend.up { color: var(--success); }
-.summary-trend.down { color: var(--danger); }
 
-/* QUICK FILTERS */
-.quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
-/* QUEUE CARD: pills, source, toolbar and table together */
-.queue-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); overflow: hidden;
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.queue-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 14px 18px; border-bottom: 1px solid var(--border);
-}
-.source-toggle { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
-.source-toggle__btn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 8px;
-  background: transparent; color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
-}
-.source-toggle__btn:hover { color: var(--text); }
-.source-toggle__btn.active { background: var(--card); color: var(--primary); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
-.source-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
-.pill {
-  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-  border: 1px solid var(--border); background: var(--card); color: var(--text-secondary);
-  cursor: pointer; transition: all 0.15s ease;
-}
-.pill:hover { border-color: var(--primary); color: var(--primary); }
-.pill.active { background: var(--primary-fill); border-color: var(--primary-fill); color: #fff; }
+.tab:hover { color: var(--rb-text-primary); }
+.tab--on { background: var(--rb-primary); color: #fff; }
+.tab--on:hover { color: #fff; }
+.tab:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
-/* TOOLBAR */
+.tab__count {
+  min-width: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab--on .tab__count { background: #fff; color: var(--rb-primary); }
+
+/* PANEL AND TOOLBAR */
+.panel {
+  container-type: inline-size;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+  overflow: hidden;
+}
+
 .toolbar {
-  padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;
-  border-bottom: 1px solid var(--border); background: var(--card);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rb-border);
 }
-.toolbar-row { display: flex; align-items: center; gap: 8px; }
-.toolbar .toolbar-row > select { flex: 1 1 0; min-width: 0; max-width: 220px; }
-.toolbar-row > .date-field { flex: 0 0 auto; }
-.toolbar-row--more { padding-top: 8px; border-top: 1px dashed var(--border); }
-.toolbar-row--more > select { flex: 0 1 180px !important; }
 
-.more-filters { flex-shrink: 0; }
-.more-filters.is-on { border-color: var(--primary); color: var(--primary); }
-.more-filters__count {
-  min-width: 18px; padding: 0 6px; border-radius: 999px;
-  background: var(--primary-fill); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+.toolbar__filters,
+.toolbar__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar__filters { flex: 1 1 auto; min-width: 0; }
+.toolbar__actions { justify-content: flex-end; margin-left: auto; }
+
+.updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.toolbar-search { position: relative; flex: 2 1 0; min-width: 220px; }
-.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
-.toolbar-search input { width: 100%; height: 36px; padding: 0 12px 0 32px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); }
-.toolbar select { height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); font: inherit; font-size: 13px; background: var(--card); color: var(--text); max-width: 180px; }
-.toolbar-search input:focus, .toolbar select:focus, .date-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12); }
-.date-field { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
-.date-field span { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
-.date-field input { height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
-.toolbar-buttons { display: flex; gap: 6px; margin-left: auto; }
-.toolbar-meta { padding: 10px 18px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
-.toolbar-meta strong { color: var(--text); }
-.toolbar-meta__filters { color: var(--primary); font-weight: 600; }
-.dot { opacity: 0.5; }
+
+/* A small basis, so the filters and buttons share one line until the list
+   is narrow; the search is what gives way. */
+.search { position: relative; flex: 1 1 200px; min-width: 170px; max-width: 300px; }
+
+.search__icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rb-text-secondary);
+  pointer-events: none;
+}
+
+.search__input,
+.select {
+  height: 36px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background-color: var(--rb-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--rb-text-primary);
+}
+
+.search__input { width: 100%; padding: 0 12px 0 34px; }
+
+/* As wide as the chosen option, not the longest one (where supported). */
+.select {
+  field-sizing: content;
+  padding: 0 30px 0 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px 6px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.search__input::placeholder { color: var(--rb-placeholder); }
+
+.search__input:focus,
+.select:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 /* TABLE */
-.table-card { background: var(--card); overflow: auto; }
-.request-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
-.request-table thead th {
-  position: sticky; top: 0; background: var(--card); text-align: left; padding: 14px 16px;
-  font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
-  border-bottom: 1px solid var(--border); z-index: 2;
+.table-wrap { position: relative; overflow-x: auto; transition: opacity 0.15s ease; }
+.table-wrap--busy { opacity: 0.55; }
+
+.req-table { width: 100%; min-width: 940px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+
+.req-table thead th {
+  padding: 10px;
+  background: var(--rb-surface-alt);
+  border-bottom: 1px solid var(--rb-border);
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
 }
-.table-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease, border-left 0.15s ease; border-left: 3px solid transparent; }
-.table-row:hover { background: #f4f8fd; border-left-color: var(--primary); }
-.table-row.is-mutating { opacity: 0.6; pointer-events: none; }
-.request-table td { padding: 14px 16px; vertical-align: middle; }
+
+.req-table tbody td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--rb-border);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.req-table th:first-child,
+.req-table td:first-child { padding-left: 16px; }
+
+.req-table th:last-child,
+.req-table td:last-child { padding-right: 16px; }
+
+.req-table tbody tr:last-child td { border-bottom: 0; }
+.req-row { transition: background 0.12s ease, opacity 0.12s ease; }
+.req-row:hover { background: var(--rb-surface-hover); }
+.req-row.is-mutating { opacity: 0.6; pointer-events: none; }
+
+.c-id { width: 136px; }
+.id-date { display: none; }
+/* A header never runs into the next one. */
+.req-table thead th { overflow: hidden; text-overflow: ellipsis; }
+.table-skeleton { display: flex; flex-direction: column; gap: 22px; padding: 22px 16px; }
+.c-date { width: 100px; }
+.c-component { width: 100px; }
+.c-units { width: 116px; }
+.c-status { width: 146px; }
+.c-actions { width: 272px; }
+
+/* Narrow panels keep who asked, for whom, how much and where it stands. */
+@container (max-width: 1199px) {
+  /* The component stays: what is asked for matters as much as for whom. */
+  .c-date { display: none; }
+  .c-id { width: 132px; }
+  .c-component { width: 104px; }
+  .c-units { width: 90px; }
+  .c-status { width: 132px; }
+  .c-actions { width: 280px; }
+  .row-actions { gap: 4px; }
+  .btn-approve { padding: 0 9px; }
+  /* A long hospital name takes two lines rather than an ellipsis. */
+  .c-hospital .strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+  .sub.id-date { display: block; white-space: normal; }
+}
+
+/* The reference opens the review, like the eye. */
+.code-link {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-family: var(--rb-font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rb-primary-text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.code-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Where a request came from, when it is not the portal. */
+.chip {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border-strong);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--rb-text-secondary);
+  white-space: nowrap;
+}
+
+.strong { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: var(--rb-text-secondary); }
+.nowrap { white-space: nowrap; }
+
+.codes { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.code-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  font-family: var(--rb-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rb-text-primary);
+  white-space: nowrap;
+}
+
+.patient { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
+.patient__name { font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.patient__name.muted { font-weight: 500; text-transform: none; }
+
+.blood {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface-alt);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Priority and status: the colour lives on the dot, never on the badge's fill. */
+.badge {
+  --tone: var(--rb-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.badge__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
+.badge__text { overflow: hidden; text-overflow: ellipsis; }
+.badge--info { --tone: var(--rb-primary); }
+.badge--ok { --tone: var(--rb-success); }
+.badge--warn { --tone: var(--rb-warning); }
+.badge--crit { --tone: var(--rb-accent); }
+.badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
+
+.row-actions { display: flex; align-items: center; gap: 6px; }
+/* The actions a step clear of the status, aligned with their header. */
+.req-table th.c-actions, .req-table td.c-actions { padding-left: 18px; }
+
+/* Issue: the one solid action in a row, because it sends blood out. */
+.btn-issue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--rb-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.btn-issue:hover { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+
+/* Shown, so the column reads the same on every open row, but not offered. */
+.btn-issue--off {
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-muted);
+  cursor: not-allowed;
+}
+
+.btn-issue--off:hover { background: var(--rb-surface-alt); }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+/* Quick filters: this tab's counts, each a filter. */
+.quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px 0; }
+.quick__chip {
+  --tone: var(--rb-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.quick__chip strong { font-size: 13px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.quick__chip:hover { border-color: color-mix(in srgb, var(--tone) 45%, var(--rb-border)); color: var(--rb-text-primary); }
+.quick__chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.quick__chip--crit { --tone: var(--rb-accent-text); }
+.quick__chip--warn { --tone: var(--rb-warning); }
+.quick__chip--info { --tone: var(--rb-primary); }
+.quick__chip--crit:not(.quick__chip--zero) { border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.07); color: var(--rb-accent-text); font-weight: 600; }
+.quick__chip--crit:not(.quick__chip--zero) strong { color: var(--rb-accent-text); }
+.quick__chip--on { border-color: var(--tone); box-shadow: inset 0 0 0 1px var(--tone); background: color-mix(in srgb, var(--tone) 10%, var(--rb-surface)); color: var(--rb-text-primary); }
+.quick__chip--zero { opacity: 0.6; }
+.quick__chip--go { margin-left: auto; border-color: rgba(var(--rb-primary-rgb), 0.35); color: var(--rb-primary-text); font-weight: 600; }
+.quick__chip--go strong { color: var(--rb-primary-text); }
+.quick__chip--go:hover { background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); }
+
+/* An open emergency is marked down its edge and on a soft tint. */
+.req-row--emergency td { background: rgba(var(--rb-accent-rgb), 0.045); }
+.req-row--emergency td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.req-row--emergency:hover td { background: rgba(var(--rb-accent-rgb), 0.08); }
+/* A finished request steps back. */
+.req-row--closed td { color: var(--rb-text-secondary); }
+.req-row--closed .patient__name, .req-row--closed .strong { font-weight: 500; }
+.req-row--closed .units-bar, .req-row--closed .blood, .req-row--closed .code-chip { opacity: 0.7; }
+
+.chip--crit { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); font-weight: 700; }
+
+/* Units: issued, then reserved, on what was asked for. */
+.units-bar { display: flex; width: 100%; max-width: 88px; height: 6px; margin-bottom: 5px; border-radius: 999px; background: var(--rb-surface-alt); box-shadow: inset 0 0 0 1px var(--rb-border); overflow: hidden; }
+.units-bar__issued { background: var(--rb-success); }
+.units-bar__held { background: var(--rb-primary); }
+.units-text { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.waiting { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
+.waiting--crit { font-weight: 700; color: var(--rb-accent-text); }
+
+/* The next step, in words. */
+.btn-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(var(--rb-success-rgb), 0.45);
+  border-radius: 8px;
+  background: rgba(var(--rb-success-rgb), 0.08);
+  color: var(--rb-success-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.btn-approve:hover:not(:disabled) { background: rgba(var(--rb-success-rgb), 0.16); border-color: var(--rb-success); }
+.btn-approve:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-approve:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.btn-issue--off { width: 30px; padding: 0; justify-content: center; }
+
+/* EMPTY AND LOADING */
+.empty-cell { padding: 0 !important; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 24px; text-align: center; }
+
+.empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  color: var(--rb-text-secondary);
+}
+
+.empty-state__title { margin: 0; font-size: 14px; font-weight: 700; }
+.empty-state__text { margin: 0 0 8px; max-width: 46ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.skeleton--line { height: 16px; width: 100%; border-radius: 6px; }
+
+/* PAGER */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+
+.pager__btns { display: flex; align-items: center; gap: 8px; }
+.pager__page { font-variant-numeric: tabular-nums; }
+
+/* REVIEW DRAWER: request details, availability, fulfilment, history */
 .mono { font-family: var(--rb-font-mono); font-size: 12px; color: var(--text-secondary); }
-
-.expand-btn {
-  display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
-  border: none; background: transparent; color: var(--text-secondary); cursor: pointer; border-radius: 6px;
-  margin-right: 2px; vertical-align: middle;
-}
-.expand-btn:hover { background: var(--bg); color: var(--primary); }
-
-.hospital-cell { display: flex; flex-direction: column; }
-.hospital-name { font-weight: 600; }
-.hospital-contact { font-size: 12px; color: var(--text-secondary); }
-.blood-cell { display: flex; align-items: center; gap: 8px; }
-.blood-component { font-size: 12.5px; color: var(--text); }
-
-.context-menu__divider { height: 1px; margin: 4px 0; background: var(--border); }
-
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
+.blood-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .blood-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding: 3px 8px; border-radius: 8px; background: #fdecea; color: var(--danger); font-weight: 700; font-size: 12px; }
 
-.inv-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; }
 .inv-inline { display: inline-flex; align-items: center; gap: 4px; }
 .inv-ok { color: var(--success); background: #e8f5e9; }
 .inv-low { color: var(--warning); background: #fef3e0; }
@@ -1765,36 +2028,18 @@ onMounted(() => {
 .priority-emergency { background: #fdecea; color: var(--danger); }
 
 .status-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+/* The statuses the API sends, keyed on the stored value. */
 .status-pending { background: #eef2f7; color: var(--text-secondary); }
-.status-under-review { background: #e8f0fc; color: var(--info); }
-.status-approved { background: #e8f5e9; color: var(--success); }
-.status-rejected { background: #fdecea; color: var(--danger); }
-.status-ready-for-fulfillment { background: #ede7fb; color: var(--purple); }
-/* The statuses the API actually sends, keyed on the stored value. */
 .status-processing { background: #e8f0fc; color: var(--info); }
 .status-partial { background: #fef3c7; color: var(--warning); }
 .status-fulfilled { background: #e8f5e9; color: var(--success); }
+.status-rejected { background: #fdecea; color: var(--danger); }
 .status-cancelled { background: #eef2f7; color: var(--text-secondary); }
 
-.source-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: #ede7fb;
-  color: var(--purple);
-  font-family: var(--rb-font-sans);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  vertical-align: middle;
-}
-.source-badge--share { background: #e8f0fc; color: var(--info); }
-.source-badge--weekly { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
 .share-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
-.share-note .mono { font-size: 12.5px; color: var(--text-primary); }
-
-.pill--source { display: inline-flex; align-items: center; gap: 6px; }
+.share-note .mono { font-size: 12.5px; color: var(--text); }
+.share-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.share-actions__hint { font-size: 12px; color: var(--rb-text-secondary); }
 
 .drawer-closed-note {
   margin: 0;
@@ -1803,189 +2048,141 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
-.needed-by { color: var(--text-secondary); font-size: 12.5px; }
-
-.actions-cell { display: flex; align-items: center; gap: 8px; }
-.menu-wrap { position: relative; }
-.context-menu {
-  position: absolute; right: 0; top: 36px; background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; box-shadow: 0 8px 24px rgba(15,23,42,0.12); display: flex; flex-direction: column;
-  min-width: 190px; padding: 6px; z-index: 10;
-}
-.context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; font-size: 13px; text-align: left; cursor: pointer; color: var(--text); width: 100%; }
-.context-menu button:hover:not(:disabled) { background: var(--bg); }
-.context-menu button.danger { color: var(--danger); }
-.context-menu button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* EXPANDED ROW */
-.expanded-row td { padding: 0; }
-.expanded-content { background: var(--bg); padding: 18px 20px; border-bottom: 1px solid var(--border); }
-.expanded-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 20px; margin-bottom: 14px; }
-.expanded-actions { display: flex; gap: 8px; justify-content: flex-end; }
-
-/* skeleton / empty */
-.table-skeleton, .activity-skeleton, .drawer-loading { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.drawer-loading { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 .skeleton-row { height: 44px; border-radius: 10px; background: linear-gradient(90deg, #eef2f7 25%, #f7f9fc 37%, #eef2f7 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; }
 @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-.empty-state { padding: 60px 24px; text-align: center; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.empty-state h3 { margin: 8px 0 0; color: var(--text); font-size: 16px; }
-.empty-state p { margin: 0 0 8px; font-size: 13px; }
 
-/* ACTIVITY */
-.activity-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--card-padding); box-shadow: var(--shadow); }
-.section-title { font-size: 15px; font-weight: 700; margin: 0 0 16px; }
-.activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
-.activity-empty { font-size: 13px; color: var(--text-secondary); margin: 0; }
-.activity-item { display: flex; gap: 12px; align-items: flex-start; }
-.activity-dot { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.activity-dot.info { background: #e8f0fc; color: var(--info); }
-.activity-dot.danger { background: #fdecea; color: var(--danger); }
-.activity-dot.success { background: #e8f5e9; color: var(--success); }
-.activity-body p { margin: 0; font-size: 13.5px; }
-.activity-meta { font-size: 12px; color: var(--text-secondary); }
-
-/* DRAWER */
-.drawer-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); display: flex; justify-content: flex-end; z-index: 50; }
-.drawer { width: 500px; max-width: 100%; height: 100%; background: var(--card); display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(15,23,42,0.15); }
-.drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
-.drawer-header h2 { margin: 0; font-size: 17px; }
-.drawer-content { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 24px; }
-.drawer-section h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-secondary); }
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
-.detail-grid dt { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
-.detail-grid dd { margin: 0; font-size: 13.5px; font-weight: 600; }
-
-.notes-block { margin-top: 12px; background: var(--bg); border-radius: 10px; padding: 12px 14px; }
-.notes-label { font-size: 11px; color: var(--text-secondary); margin: 0 0 2px; text-transform: uppercase; }
-.notes-text { font-size: 13px; margin: 0 0 10px; }
-.notes-text:last-child { margin-bottom: 0; }
-
-.batches-label, .health-bar-label { font-size: 12px; color: var(--text-secondary); margin: 14px 0 6px; }
-.batch-list { display: flex; flex-direction: column; gap: 6px; }
-.batch-empty { font-size: 12.5px; color: var(--text-secondary); }
-.batch-row { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
-.batch-main { display: flex; justify-content: space-between; font-weight: 700; }
-.batch-expiry { color: var(--text-secondary); font-weight: 500; }
-.batch-meta { display: flex; justify-content: space-between; color: var(--text-secondary); }
-.health-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
-.health-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
-.health-fill.inv-ok { background: var(--success); }
-.health-fill.inv-low { background: var(--warning-fill); }
-.health-fill.inv-insufficient { background: var(--danger); }
-
-.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.timeline li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); }
-.timeline li.done { color: var(--text); font-weight: 600; }
-.timeline li.current { color: var(--primary); font-weight: 700; }
-.timeline-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
-.timeline li.done .timeline-dot { background: var(--primary); border-color: var(--primary); }
-.timeline li.current .timeline-dot { border-color: var(--primary); }
-
-.drawer-footer { display: flex; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--border); }
-.drawer-footer .btn { flex: 1; justify-content: center; }
-
-/* MODALS */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-.modal { background: var(--card); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18); }
-.modal-title { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
-.modal-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
-.modal-summary { background: var(--bg); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
-.modal-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; gap: 12px; }
-.modal-row span { color: var(--text-secondary); }
-.modal-row strong { text-align: right; }
-.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-.modal-actions .btn { flex: 1; justify-content: center; }
-
-.field { margin-bottom: 14px; }
-.field-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; }
-.field-select, .field-textarea {
-  width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit;
+/* The review dialog, built like Donor Management's profile. Under the
+   approve and reject confirmations (z-index 100), which open over it. */
+.review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--rb-overlay);
 }
-.field-textarea { resize: vertical; }
 
-/* TRANSITIONS */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.drawer-enter-active, .drawer-leave-active { transition: opacity 0.25s ease; }
-.drawer-enter-active .drawer, .drawer-leave-active .drawer { transition: transform 0.25s ease; }
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-from .drawer, .drawer-leave-to .drawer { transform: translateX(100%); }
+.review-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 860px;
+  max-height: calc(100vh - 40px);
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
+  color: var(--rb-text-primary);
+}
 
-/* RESPONSIVE */
-@media (max-width: 640px) {
-  .page { padding: 16px 16px 32px; }
-  .summary-grid { grid-template-columns: 1fr; }
-  .emergency-banner { flex-direction: column; }
-  .emergency-actions { flex-wrap: wrap; }
-  .drawer { width: 100%; }
-  .expanded-grid { grid-template-columns: 1fr; }
+.review-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rb-border);
+  flex-shrink: 0;
 }
-@media (prefers-reduced-motion: reduce) {
-  .summary-card, .pill, .table-row, .drawer, .health-fill, .spinning { transition: none !important; animation: none !important; }
-}
-/*
- * DARK MODE. Two rules about the selectors here, both learned the hard way:
- *
- *  - `:global(.dark) .selector` does NOT work — this toolchain drops the
- *    descendant half and emits a bare `.dark { … }`, putting the declaration
- *    on <html>.
- *  - `:global(.dark .selector)` works but is fully global, so it must be
- *    anchored on `.page`. Unanchored, these rules matched .summary-card,
- *    .table-row and friends on every other page in the app the moment this
- *    route's stylesheet was fetched.
- */
-:global(.dark .scope-blood-center-bloodrequests) {
-  --bg: #0F172A; --card: #171e2c; --border: #2a3447; --text: #e2e8f0; --text-secondary: #94a3b8;
-  /* Only the text family lifts; the -fill tokens keep their deep values so
-     white-on-fill buttons and toasts stay legible. */
-  --primary: #64b5f6; --success: #66bb6a; --warning: #fbbf24;
-  --danger: #f87171; --info: #60a5fa; --purple: #a78bfa;
-  --primary-fill-hover: #1976d2;
-}
-:global(.dark .scope-blood-center-bloodrequests .summary-icon) { background: #1c2a42; }
-:global(.dark .scope-blood-center-bloodrequests .summary-icon.is-danger) { background: #3a1f22; }
-:global(.dark .scope-blood-center-bloodrequests .emergency-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); }
-:global(.dark .scope-blood-center-bloodrequests .retry-banner) { background: rgba(239, 83, 80, 0.10); border-color: rgba(239, 83, 80, 0.24); color: #EF9A9A; }
-:global(.dark .scope-blood-center-bloodrequests .blood-pill) { background: #3a1f22; }
-:global(.dark .scope-blood-center-bloodrequests .inv-ok) { background: #16301c; }
-:global(.dark .scope-blood-center-bloodrequests .inv-low) { background: #3a2c10; }
-:global(.dark .scope-blood-center-bloodrequests .inv-insufficient) { background: #3a1f22; }
-:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-ok) { background: #16301c; }
-:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-low) { background: #3a2c10; }
-:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-insufficient) { background: #3a1f22; }
-:global(.dark .scope-blood-center-bloodrequests .status-pending) { background: #1e2635; }
-:global(.dark .scope-blood-center-bloodrequests .status-under-review) { background: #16223a; }
-:global(.dark .scope-blood-center-bloodrequests .status-approved) { background: #16301c; }
-:global(.dark .scope-blood-center-bloodrequests .status-rejected) { background: #3a1f22; }
-:global(.dark .scope-blood-center-bloodrequests .status-ready-for-fulfillment) { background: #2a1f42; }
-:global(.dark .scope-blood-center-bloodrequests .status-processing) { background: #16223a; }
-:global(.dark .scope-blood-center-bloodrequests .status-partial) { background: #3a2e12; }
-:global(.dark .scope-blood-center-bloodrequests .status-fulfilled) { background: #16301c; }
-:global(.dark .scope-blood-center-bloodrequests .status-cancelled) { background: #1e2635; }
-:global(.dark .scope-blood-center-bloodrequests .source-badge) { background: #2a1f42; }
-:global(.dark .scope-blood-center-bloodrequests .source-badge--share) { background: #16223a; }
-:global(.dark .scope-blood-center-bloodrequests .table-row:hover) { background: #1c2536; }
-:global(.dark .scope-blood-center-bloodrequests .expanded-content) { background: #141b29; }
-:global(.dark .scope-blood-center-bloodrequests .skeleton-row),
-:global(.dark .scope-blood-center-bloodrequests .skeleton-card) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
-:global(.dark .scope-blood-center-bloodrequests .notes-block),
-:global(.dark .scope-blood-center-bloodrequests .batch-row),
-:global(.dark .scope-blood-center-bloodrequests .modal-summary),
-:global(.dark .scope-blood-center-bloodrequests .field-select),
-:global(.dark .scope-blood-center-bloodrequests .field-textarea),
-:global(.dark .scope-blood-center-bloodrequests .toolbar-search input),
-:global(.dark .scope-blood-center-bloodrequests .toolbar select),
-:global(.dark .scope-blood-center-bloodrequests .toolbar input[type="date"]) { background: #1c2536; }
-:global(.dark .scope-blood-center-bloodrequests .context-menu),
-:global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 
-.btn:focus-visible,
-.icon-btn:focus-visible,
-.expand-btn:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+.review-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; }
+.review-card__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
+
+.review-card__close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rb-border);
+  border-radius: 8px;
+  background: none;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
 }
+
+.review-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.review-card__close:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.review-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.review-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--rb-border);
+  flex-shrink: 0;
+}
+
+.review-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.review-hero__text { min-width: 0; }
+.review-hero__row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.review-hero__code { margin: 0; font-family: var(--rb-font-mono); font-size: 13px; font-weight: 700; color: var(--rb-text-secondary); }
+.review-hero__name { margin: 6px 0 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.review-hero__meta { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.review-hero__actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+}
+
+.fact { min-width: 0; }
+.fact--wide { grid-column: span 2; }
+.fact--full { grid-column: 1 / -1; }
+
+.fact dt {
+  margin: 0 0 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rb-text-secondary);
+}
+
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.fact__sub { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.fact__notes { font-weight: 500; white-space: pre-line; }
+
+.sub-section { display: flex; flex-direction: column; gap: 8px; }
+
+.sub-section__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sub-section__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
+.sub-section__note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.table-box { position: relative; overflow-x: auto; padding: 8px 4px 2px; border: 1px solid var(--rb-border); border-radius: 10px; }
+
+/* Rejecting, a decision: outlined, red only on hover. */
+.btn-outline--danger:hover:not(:disabled) { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.45); }
 
 /* Per-component availability in the review drawer. */
 .avail-table {
@@ -2017,4 +2214,89 @@ onMounted(() => {
   color: var(--rb-text-secondary);
   margin: 6px 0 12px;
 }
+
+/* MODALS */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { background: var(--card); color: var(--text); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18); }
+.modal-title { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+.modal-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+.modal-summary { background: var(--bg); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.modal-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; gap: 12px; }
+.modal-row span { color: var(--text-secondary); }
+.modal-row strong { text-align: right; }
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.modal-actions .btn { flex: 1; }
+
+.field { margin-bottom: 14px; }
+.field-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; }
+.field-select, .field-textarea {
+  width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit;
+}
+.field-textarea { resize: vertical; }
+
+/* TRANSITIONS */
+.review-enter-active, .review-leave-active { transition: opacity 0.18s ease; }
+.review-enter-from, .review-leave-to { opacity: 0; }
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  .page { padding: 20px 16px 32px; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-hero { flex-direction: column; }
+  .review-overlay { padding: 10px; align-items: flex-end; }
+  .review-card { max-height: calc(100vh - 20px); }
+  .review-card__footer { flex-wrap: wrap; }
+  .toolbar__actions { margin-left: 0; justify-content: flex-start; }
+  .search { max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .req-row, .spinning, .skeleton, .skeleton-row { transition: none !important; animation: none !important; }
+}
+
+/*
+ * DARK MODE, for the drawer and the dialogs; the list follows the app's
+ * --rb-* tokens by itself. Two rules about the selectors here, both learned
+ * the hard way:
+ *
+ *  - `:global(.dark) .selector` does NOT work — this toolchain drops the
+ *    descendant half and emits a bare `.dark { … }`, putting the declaration
+ *    on <html>.
+ *  - `:global(.dark .selector)` works but is fully global, so it must be
+ *    anchored on the page's scope class.
+ */
+:global(.dark .scope-blood-center-bloodrequests) {
+  --bg: var(--ink-page, #0F172A); --card: var(--ink-surface, #171e2c); --border: var(--ink-border, #2a3447); --text: var(--ink-text, #e2e8f0); --text-secondary: var(--ink-text-2, #94a3b8);
+  /* Only the text family lifts; the -fill tokens keep their deep values so
+     white-on-fill buttons and toasts stay legible. */
+  --primary: #64b5f6; --success: #66bb6a; --warning: #fbbf24;
+  --danger: #f87171; --info: #60a5fa; --purple: #a78bfa;
+  --primary-fill-hover: #1976d2;
+}
+:global(.dark .scope-blood-center-bloodrequests .blood-pill) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .inv-ok) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .inv-low) { background: #3a2c10; }
+:global(.dark .scope-blood-center-bloodrequests .inv-insufficient) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-ok) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-low) { background: #3a2c10; }
+:global(.dark .scope-blood-center-bloodrequests .inventory-status-line.inv-insufficient) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .priority-routine) { background: #1e2635; }
+:global(.dark .scope-blood-center-bloodrequests .priority-emergency) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .status-pending) { background: #1e2635; }
+:global(.dark .scope-blood-center-bloodrequests .status-processing) { background: #16223a; }
+:global(.dark .scope-blood-center-bloodrequests .status-partial) { background: #3a2e12; }
+:global(.dark .scope-blood-center-bloodrequests .status-fulfilled) { background: #16301c; }
+:global(.dark .scope-blood-center-bloodrequests .status-rejected) { background: #3a1f22; }
+:global(.dark .scope-blood-center-bloodrequests .status-cancelled) { background: #1e2635; }
+:global(.dark .scope-blood-center-bloodrequests .skeleton-row) { background: linear-gradient(90deg, #1c2536 25%, #212b3f 37%, #1c2536 63%); background-size: 400% 100%; }
+:global(.dark .scope-blood-center-bloodrequests .modal-summary),
+:global(.dark .scope-blood-center-bloodrequests .field-select),
+:global(.dark .scope-blood-center-bloodrequests .field-textarea) { background: #1c2536; }
+:global(.dark .scope-blood-center-bloodrequests .modal) { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

@@ -84,12 +84,12 @@ describe('BloodCenterService laboratory endpoints', () => {
     expect(config.method).toBe('GET')
 
     fetchMock.mockResolvedValueOnce({})
-    await service.updateCounsellingReferral(7, { status: 'contacted', note: null })
+    await service.updateCounsellingReferral(7, { status: 'referred', note: null })
 
     ;[url, config] = fetchMock.mock.calls[1]!
     expect(url).toBe('/blood-center/laboratory/referrals/7')
     expect(config.method).toBe('PATCH')
-    expect(config.body).toEqual({ status: 'contacted', note: null })
+    expect(config.body).toEqual({ status: 'referred', note: null })
   })
 
   it('declares each bag, with its volume, on its own endpoint', async () => {

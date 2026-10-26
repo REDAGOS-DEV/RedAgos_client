@@ -1,916 +1,516 @@
 <template>
-  <div class="inv-page">
+  <div class="inv-page inv-tones">
     <!-- Skeleton loading state -->
-    <div v-if="loading" class="inv-inner">
+    <div v-if="loading" class="inv-inner" aria-busy="true">
       <div class="skeleton skeleton--header" />
-      <div class="skeleton skeleton--panel" style="height:300px" />
-      <div class="skeleton skeleton--toolbar" />
-      <div class="stats-grid">
-        <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
+      <div class="kpi-row">
+        <div v-for="n in 5" :key="n" class="skeleton skeleton--kpi" />
       </div>
-      <div class="skeleton skeleton--panel" style="height:360px" />
-      <div class="insights-grid">
-        <div class="skeleton skeleton--panel" style="height:280px" />
-        <div class="skeleton skeleton--panel" style="height:280px" />
+      <div class="inv-grid">
+        <div class="skeleton skeleton--panel" style="grid-area: types; height: 380px" />
+        <div class="skeleton skeleton--panel" style="grid-area: expiring; height: 380px" />
+        <div class="skeleton skeleton--panel" style="grid-area: list; height: 520px" />
+        <div class="skeleton skeleton--panel" style="grid-area: activity; height: 520px" />
       </div>
     </div>
-    <!-- ============ HEADER ============ -->
+
     <div v-else class="inv-inner">
-      <div class="">
-        <div class="header-row">
-          <div>
-            <h1 class="page-title">Blood Inventory</h1>
-            <p class="page-subtitle">Manage and monitor all blood units across all blood components and blood types.</p>
-          </div>
-          <div class="header-actions">
-            <button type="button" class="btn-outline" @click="syncInventory" :disabled="syncing">
-              <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': syncing }" />
-              {{ syncing ? 'Syncing…' : 'Sync Inventory' }}
-            </button>
-
-            <!-- The page-level actions that used to sit in a Quick Actions
-                 panel at the bottom of the page. -->
-            <div class="more-menu" @focusout="onMoreMenuFocusOut">
-              <button
-                type="button"
-                class="btn-outline"
-                aria-haspopup="menu"
-                :aria-expanded="moreMenuOpen"
-                @click="moreMenuOpen = !moreMenuOpen"
-              >
-                More
-                <AssetIcon name="chevron-down" :size="14" />
-              </button>
-              <div v-if="moreMenuOpen" class="more-menu__list" role="menu">
-                <button
-                  v-for="action in secondaryQuickActions"
-                  :key="action.label"
-                  type="button"
-                  role="menuitem"
-                  class="more-menu__item"
-                  @click="moreMenuOpen = false; handleQuickAction(action)"
-                >
-                  <AssetIcon :name="action.icon" :size="15" />
-                  <span>
-                    <strong>{{ action.label }}</strong>
-                    <small>{{ action.description }}</small>
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
-              <AssetIcon name="plus" :size="15" />
-              Stock Intake
-            </NuxtLink>
-          </div>
+      <!-- ============ HEADER ============ -->
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Blood Inventory</h1>
+          <p class="page-subtitle">Monitor and manage {{ facilityLabel }}'s blood units in real time.</p>
         </div>
-      </div>
-
-      <!-- ============ KPI CARDS (first, as on every other page) ============ -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Total Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-primary-rgb), 0.08)' }">
-              <AssetIcon name="database" :size="14" style="color: var(--rb-primary-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalInventoryUnits === null }">{{ totalInventoryUnits ?? 'No data' }}</p>
-          <span class="stat-chip stat-chip--neutral">Units on hand</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Healthy Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-success-rgb), 0.08)' }">
-              <AssetIcon name="shield-check" :size="14" style="color: var(--rb-success-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value">{{ healthyBatchCount }}</p>
-          <span class="stat-chip stat-chip--neutral">Batches at safe levels</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Reserved Inventory</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-purple-rgb), 0.08)' }">
-              <AssetIcon name="lock" :size="14" style="color: var(--rb-purple-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :class="{ 'stat-card__value--empty': totalReservedUnits === null }">{{ totalReservedUnits ?? 'No data' }}</p>
-          <span class="stat-chip stat-chip--neutral">Units held for hospitals</span>
-        </div>
-
-        <div class="stat-card" :class="{ 'stat-card--emphasized': expiringSoonCount > 0 }">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Expiring Soon</p>
-            <div class="stat-card__badge" :style="{ background: 'rgba(var(--rb-warning-rgb), 0.08)' }">
-              <AssetIcon name="clock" :size="14" style="color: var(--rb-warning-text)" />
-            </div>
-          </div>
-          <p class="stat-card__value" :style="expiringSoonCount ? { color: 'var(--rb-warning)' } : {}">{{ expiringSoonCount }}</p>
-          <span class="stat-chip stat-chip--neutral">Within 7 days</span>
-        </div>
-      </div>
-
-      <!-- ============ EXPIRY ALERT ============ -->
-      <div v-if="expiryAlert.visible && expiringBatches.length" class="alert-banner">
-        <div class="alert-banner__icon">
-          <AssetIcon name="alert-triangle" :size="18" style="color: var(--rb-warning-text)" />
-        </div>
-        <div class="alert-banner__body">
-          <p class="alert-banner__title">Attention Required</p>
-          <p class="alert-banner__desc">
-            {{ expiringBatches.length }} blood inventory batch{{ expiringBatches.length !== 1 ? 'es' : '' }} will expire within the next 3 days.
-          </p>
-          <div class="alert-banner__list">
-            <span v-for="b in expiringBatches.slice(0, 4)" :key="b.id" class="alert-banner__chip">
-              {{ b.blood_type }} {{ b.component }}
-            </span>
-            <span v-if="expiringBatches.length > 4" class="alert-banner__chip alert-banner__chip--muted">
-              +{{ expiringBatches.length - 4 }} more
-            </span>
-          </div>
-        </div>
-        <div class="alert-banner__actions">
-          <button type="button" class="btn-primary btn-primary--sm" @click="showExpiringInRecords">Show these units</button>
-          <button type="button" class="alert-banner__dismiss" @click="expiryAlert.visible = false">
-            <AssetIcon name="x" :size="15" />
+        <div class="page-head__meta">
+          <span v-if="lastUpdatedLabel" class="live-note">
+            <span class="live-note__dot" aria-hidden="true" />
+            Updated {{ lastUpdatedLabel }}
+          </span>
+          <button type="button" class="btn-outline btn-outline--sm" :disabled="refreshing" @click="refreshAll()">
+            <AssetIcon name="refresh-cw" :size="13" :class="{ 'spin-icon': refreshing }" />
+            Refresh
           </button>
         </div>
-      </div>
+      </header>
 
-      <!-- ============ AVAILABLE UNITS BY BLOOD TYPE ============ -->
-      <!-- One series, so one colour and no legend: the title names it. Every
-           column carries its value on the cap, so the axis needs no ticks. -->
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Available Units by Blood Type</h2>
-            <p class="panel-subtitle">
-              {{ bloodTypeTotal }} unit{{ bloodTypeTotal !== 1 ? 's' : '' }} available. Click a column to filter the records below.
-            </p>
-          </div>
-          <div class="segmented-control" role="group" aria-label="Show blood types as">
+      <p v-if="loadError" class="load-error" role="alert">
+        <AssetIcon name="circle-alert" :size="15" />
+        <span>{{ loadError }}</span>
+        <button type="button" class="link-btn" @click="refreshAll()">Try again</button>
+      </p>
+
+      <!-- ============ KPI ROW ============ -->
+      <section class="kpi-row" aria-label="Inventory at a glance">
+        <component
+          :is="kpi.to ? NuxtLinkComponent : kpi.onClick ? 'button' : 'div'"
+          v-for="kpi in kpis"
+          :key="kpi.key"
+          v-bind="kpi.to ? { to: kpi.to } : kpi.onClick ? { type: 'button' } : {}"
+          class="kpi"
+          :class="[`tone--${kpi.tone}`, { 'kpi--action': kpi.to || kpi.onClick }]"
+          @click="kpi.onClick ? kpi.onClick() : undefined"
+        >
+          <span class="kpi__icon" aria-hidden="true">
+            <AssetIcon :name="kpi.icon" :size="20" />
+          </span>
+          <span class="kpi__body">
+            <span class="kpi__label">{{ kpi.label }}</span>
+            <span class="kpi__value">{{ kpi.value }}</span>
+            <span class="kpi__sub" :class="{ 'kpi__sub--up': kpi.rising }">
+              <AssetIcon v-if="kpi.rising" name="trending-up" :size="13" />
+              {{ kpi.sub }}
+            </span>
+          </span>
+          <AssetIcon v-if="kpi.to || kpi.onClick" name="chevron-right" :size="16" class="kpi__chevron" />
+        </component>
+      </section>
+
+      <!-- Every shelf under its critical level, by name; hidden when none is. -->
+      <LowStockBanner :cells="lowStock" to="/blood-center/stock-thresholds" />
+
+      <div class="inv-grid">
+        <!-- ============ BLOOD TYPE AVAILABILITY ============ -->
+        <section class="panel types-panel" aria-labelledby="types-title">
+          <header class="panel-head">
+            <div>
+              <h2 id="types-title" class="panel-title">Blood Type Availability</h2>
+              <p class="panel-subtitle">
+                Issuable units against the critical level: the ring for the type, the tick on each bar for a component.
+              </p>
+            </div>
+            <ul class="legend" aria-label="Legend">
+              <li class="tone--success"><span class="legend__dot" />Healthy</li>
+              <li class="tone--warning"><span class="legend__dot" />Low Stock</li>
+              <li class="tone--danger"><span class="legend__dot" />Critical</li>
+              <li><span class="rare-chip">Rare</span>Rh-negative</li>
+            </ul>
+          </header>
+
+          <p v-if="!anyMinimumSet" class="types-hint">
+            <AssetIcon name="info" :size="14" />
+            <span>No critical level is set yet, so no type is graded.</span>
+            <NuxtLink to="/blood-center/stock-thresholds" class="link-btn">Set levels</NuxtLink>
+          </p>
+
+          <div class="type-grid">
             <button
-              v-for="view in bloodTypeViews"
-              :key="view.value"
+              v-for="card in typeCards"
+              :key="card.code"
               type="button"
-              class="segmented-control__btn"
-              :class="{ 'segmented-control__btn--active': bloodTypeView === view.value }"
-              :aria-pressed="bloodTypeView === view.value"
-              @click="bloodTypeView = view.value"
+              class="type-card"
+              :class="[`tone--${levelTone(card.level)}`, `type-card--${card.level}`, { 'type-card--active': filters.bloodTypeId === card.id }]"
+              :aria-pressed="filters.bloodTypeId === card.id"
+              :aria-label="typeCardLabel(card)"
+              @click="toggleTypeFilter(card)"
             >
-              {{ view.label }}
-            </button>
-          </div>
-        </div>
+              <span class="type-card__head">
+                <span class="type-card__code">{{ displayType(card.code) }}</span>
+                <span v-if="card.rare" class="rare-chip">Rare</span>
+              </span>
 
-        <div v-if="!bloodTypeSummary.length" class="empty-state">
-          <AssetIcon name="droplets" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No blood types to show yet</p>
-        </div>
+              <span class="type-card__body">
+                <span class="type-card__summary">
+                  <span class="gauge" :title="ringTitle(card)">
+                    <svg viewBox="0 0 64 64" class="gauge__svg" aria-hidden="true">
+                      <circle class="gauge__track" :class="{ 'gauge__track--none': card.coverage === null }" cx="32" cy="32" r="26" />
+                      <circle
+                        v-if="card.coverage"
+                        class="gauge__fill"
+                        cx="32"
+                        cy="32"
+                        r="26"
+                        :stroke-dasharray="ringDash(card.coverage)"
+                      />
+                    </svg>
+                    <span class="gauge__value">{{ card.coverage === null ? '—' : `${card.coverage}%` }}</span>
+                  </span>
+                  <span class="type-card__units"><strong>{{ formatCount(card.total) }}</strong> unit{{ card.total === 1 ? '' : 's' }}</span>
+                  <span class="badge">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ levelLabel(card.level) }}
+                  </span>
+                </span>
 
-        <div v-else-if="bloodTypeView === 'chart'" class="bt-chart">
-          <div class="bt-chart__plot">
-            <button
-              v-for="(bt, i) in bloodTypeSummary"
-              :key="bt.blood_type"
-              type="button"
-              class="bt-col"
-              :class="{
-                'bt-col--active': activeBloodType === bt.blood_type,
-                'bt-col--dim': activeBloodType && activeBloodType !== bt.blood_type,
-              }"
-              :style="{ '--h': bt.height / 100 }"
-              :aria-pressed="activeBloodType === bt.blood_type"
-              :aria-label="`${bt.blood_type}: ${bt.total_units} available unit${bt.total_units !== 1 ? 's' : ''}, ${healthLabel(bt.health)}`"
-              @click="toggleBloodTypeFilter(bt.blood_type)"
-              @pointerenter="hoveredBloodType = bt.blood_type"
-              @pointerleave="hoveredBloodType = null"
-              @focus="hoveredBloodType = bt.blood_type"
-              @blur="hoveredBloodType = null"
-            >
-              <span class="bt-col__track">
-                <span v-if="bt.total_units > 0" class="bt-col__clip"><span class="bt-col__bar" /></span>
-                <span class="bt-col__value">{{ bt.total_units }}</span>
-                <span
-                  v-if="hoveredBloodType === bt.blood_type"
-                  class="bt-tooltip"
-                  :class="{ 'bt-tooltip--start': i < 2, 'bt-tooltip--end': i >= bloodTypeSummary.length - 2 }"
-                  aria-hidden="true"
-                >
-                  <span class="bt-tooltip__value">{{ bt.total_units }} unit{{ bt.total_units !== 1 ? 's' : '' }}</span>
-                  <span class="bt-tooltip__label">{{ bt.blood_type }} &middot; {{ healthLabel(bt.health) }}</span>
-                  <span class="bt-tooltip__hint">{{ activeBloodType === bt.blood_type ? 'Click to clear the filter' : 'Click to filter records' }}</span>
+                <span class="type-card__components">
+                  <span
+                    v-for="comp in card.components"
+                    :key="comp.id"
+                    class="comp"
+                    :class="{ 'comp--short': comp.status === 'low' || comp.status === 'critical', [`tone--${levelTone(comp.status)}`]: true }"
+                    :title="componentTitle(comp)"
+                  >
+                    <span class="comp__code">{{ comp.code }}</span>
+                    <!-- On the shelf against the most any type holds of it; the tick is the critical level. -->
+                    <span class="comp__meter" aria-hidden="true">
+                      <span class="comp__fill" :style="{ width: `${compWidth(comp, comp.available)}%` }" />
+                      <span v-if="comp.minimum" class="comp__min" :style="{ left: `${compWidth(comp, comp.minimum)}%` }" />
+                    </span>
+                    <span class="comp__count">{{ formatCount(comp.available) }}</span>
+                  </span>
                 </span>
               </span>
-              <span class="bt-col__label">{{ bt.blood_type }}</span>
-              <!-- Status never rides on colour alone: icon and word. Healthy
-                   is the quiet default, so only the exception is marked. -->
-              <span v-if="bt.health !== 'healthy'" class="bt-col__status" :class="`bt-col__status--${bt.health}`">
-                <AssetIcon name="alert-triangle" :size="11" />
-                {{ healthLabel(bt.health) }}
-              </span>
             </button>
           </div>
-        </div>
+        </section>
 
-        <!-- The same numbers without the chart, for screen readers and exact reading. -->
-        <div v-else class="inventory-table-wrap">
-          <table class="inventory-table">
-            <thead>
-              <tr>
-                <th>Blood Type</th>
-                <th>Available Units</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="bt in bloodTypeSummary" :key="bt.blood_type">
-                <td><span class="type-pill">{{ bt.blood_type }}</span></td>
-                <td>{{ bt.total_units }}</td>
-                <td><span class="health-badge" :class="`health-badge--${bt.health}`">{{ healthLabel(bt.health) }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <!-- ============ EXPIRING SOON ============ -->
+        <aside class="panel side-panel expiring-panel" aria-labelledby="expiring-title">
+          <header class="side-head">
+            <h2 id="expiring-title" class="side-title">
+              <span class="side-title__icon"><AssetIcon name="clock" :size="15" /></span>
+              Expiring Soon
+            </h2>
+            <button type="button" class="link-btn" @click="showExpiringInList">View All</button>
+          </header>
 
-      <!-- ============ MAIN INVENTORY TABLE ============ -->
-      <div ref="inventoryTableSection" class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Inventory Records</h2>
-            <p class="panel-subtitle">
-              {{ filteredBatches.length }} record{{ filteredBatches.length !== 1 ? 's' : '' }}
-              <span v-if="lastSyncedLabel"> &middot; Updated {{ lastSyncedLabel }}</span>
-            </p>
-          </div>
-          <label class="sort-select">
-            <span class="sort-select__label">Sort by</span>
-            <select v-model="filters.sortBy" class="filter-select" @change="applyFilters">
-              <option value="last_updated">Last updated</option>
-              <option value="expiry_date">Expiry date</option>
-              <option value="blood_type">Blood type</option>
-              <option value="available_units">Available units</option>
-            </select>
-          </label>
-        </div>
-
-        <!--
-          Filters sit with the table they filter. Each select's first option
-          names the filter ("All blood types"), so a chosen value never loses
-          its label, and the chips below say what is applied. Filtering was
-          already live; changing one just returns to page 1, as Apply did.
-        -->
-        <div class="records-filters">
-          <div class="records-filters__row">
-            <div class="search-box search-box--lg">
-              <AssetIcon name="search" :size="14" class="search-box__icon" />
-              <input
-                v-model="filters.search"
-                type="text"
-                placeholder="Search batch, type, component or location"
-                aria-label="Search inventory"
-                class="search-box__input"
-                @input="applyFilters"
-              />
-            </div>
-
-            <select v-model="filters.bloodType" class="filter-select" aria-label="Blood type" @change="onBloodTypeSelect">
-              <option value="">All blood types</option>
-              <option v-for="t in bloodTypeOptions" :key="t" :value="t">{{ t }}</option>
-            </select>
-
-            <select v-model="filters.component" class="filter-select" aria-label="Component" @change="applyFilters">
-              <option value="">All components</option>
-              <option v-for="c in componentOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
-            </select>
-
-            <select v-model="filters.status" class="filter-select" aria-label="Status" @change="applyFilters">
-              <option value="">All statuses</option>
-              <option v-for="st in statusOptions" :key="st.value" :value="st.value">{{ st.label }}</option>
-            </select>
-
-            <button
-              type="button"
-              class="btn-outline btn-outline--sm"
-              :aria-expanded="showMoreFilters"
-              @click="showMoreFilters = !showMoreFilters"
-            >
-              <AssetIcon name="sliders-horizontal" :size="13" />
-              {{ showMoreFilters ? 'Fewer filters' : 'More filters' }}
-            </button>
-          </div>
-
-          <div v-if="showMoreFilters" class="records-filters__row">
-            <select v-model="filters.storageLocation" class="filter-select" aria-label="Storage location" @change="applyFilters">
-              <option value="">All storage locations</option>
-              <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
-            </select>
-
-            <select v-model="filters.expiryStatus" class="filter-select" aria-label="Expiry" @change="applyFilters">
-              <option value="">Any expiry</option>
-              <option value="expired">Expired</option>
-              <option value="today">Expiring today</option>
-              <option value="3days">Within 3 days</option>
-              <option value="7days">Within 7 days</option>
-              <option value="ok">Not near expiry</option>
-            </select>
-          </div>
-
-          <div v-if="activeFilterChips.length" class="filter-chips">
-            <button
-              v-for="chip in activeFilterChips"
-              :key="chip.key"
-              type="button"
-              class="filter-chip"
-              :aria-label="`Remove filter ${chip.label}`"
-              @click="clearFilter(chip.key)"
-            >
-              {{ chip.label }}
-              <AssetIcon name="x" :size="12" />
-            </button>
-            <button type="button" class="filter-chips__clear" @click="resetFilters">Clear all</button>
-          </div>
-        </div>
-
-        <div v-if="!paginatedBatches.length" class="empty-state">
-          <AssetIcon name="inbox" :size="40" style="color: var(--rb-border-strong)" />
-          <p class="empty-state__title">{{ activeFilterCount ? 'No units match these filters' : 'No units in stock yet' }}</p>
-          <p class="empty-state__desc">
-            {{ activeFilterCount ? 'Remove a filter to see more.' : 'Units appear here once they are booked in at Stock Intake.' }}
+          <p v-if="expiringError" class="side-empty">{{ expiringError }}</p>
+          <p v-else-if="!expiringUnits.length" class="side-empty">
+            <AssetIcon name="check-circle" :size="22" />
+            Nothing expires in the next 7 days.
           </p>
-          <button v-if="activeFilterCount" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
-          <NuxtLink v-else to="/blood-center/inventory-intake" class="btn-primary">
-            <AssetIcon name="plus" :size="14" />
-            Stock Intake
-          </NuxtLink>
-        </div>
-
-        <!--
-          Seven columns instead of twelve. Batch and component share a cell,
-          available and reserved share a cell, and the expiry date carries how
-          close it is. Last updated, collection date and the rest are in the
-          details drawer, which a row click now opens (the inline expansion
-          showed the same information a second way).
-        -->
-        <div v-else class="inventory-table-wrap">
-          <table class="inventory-table records-table">
+          <table v-else class="mini-table">
             <thead>
               <tr>
-                <th>Batch</th>
-                <th>
-                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'blood_type' }" @click="sortBy('blood_type')">
-                    Blood type
-                    <AssetIcon v-if="filters.sortBy === 'blood_type'" name="chevron-up" :size="12" />
-                  </button>
-                </th>
-                <th>
-                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'available_units' }" @click="sortBy('available_units')">
-                    Units
-                    <AssetIcon v-if="filters.sortBy === 'available_units'" name="chevron-down" :size="12" />
-                  </button>
-                </th>
-                <th>
-                  <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sortBy === 'expiry_date' }" @click="sortBy('expiry_date')">
-                    Expires
-                    <AssetIcon v-if="filters.sortBy === 'expiry_date'" name="chevron-up" :size="12" />
-                  </button>
-                </th>
-                <th>Location</th>
-                <th>Status</th>
-                <th class="actions-col"><span class="sr-only">Actions</span></th>
+                <th>Unit ID / Blood Type</th>
+                <th>Expiry Date</th>
+                <th>Remaining</th>
+                <th><span class="sr-only">Open</span></th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="row in paginatedBatches"
+                v-for="row in expiringUnits"
                 :key="row.id"
-                class="inventory-row"
+                class="mini-row"
                 tabindex="0"
-                :aria-label="`${row.blood_type} ${row.component}, batch ${row.batch_id}. Open details`"
-                @click="openDetailsDrawer(row)"
-                @keydown.enter.self="openDetailsDrawer(row)"
+                :aria-label="`${row.id}, ${row.blood_type} ${row.component}, ${daysLeftLabel(row.days_remaining)}. Open details`"
+                @click="openDetails(row)"
+                @keydown.enter.self="openDetails(row)"
               >
-                <td data-label="Batch">
-                  <p class="cell-main mono-cell">{{ row.batch_id }}</p>
-                  <p class="cell-sub">{{ row.component }}</p>
+                <td>
+                  <span class="mini-row__id mono">{{ row.id }}</span>
+                  <span class="type-chip">{{ displayType(row.blood_type) }}</span>
                 </td>
-                <td data-label="Blood type"><span class="type-pill">{{ row.blood_type }}</span></td>
-                <td data-label="Units">
-                  <p class="cell-main">{{ row.available_units }}</p>
-                  <p v-if="row.reserved_units" class="cell-sub">{{ row.reserved_units }} reserved</p>
-                </td>
-                <td data-label="Expires">
-                  <p class="cell-main">{{ formatDate(row.expiry_date) }}</p>
-                  <span class="expiry-badge" :class="`expiry-badge--${expiryBadge(row).tone}`">{{ expiryBadge(row).label }}</span>
-                </td>
-                <td data-label="Location">
-                  <span :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</span>
-                </td>
-                <td data-label="Status">
-                  <span class="status-pill" :class="`status-pill--${row.status}`">
-                    <span class="status-pill__dot" />
-                    {{ statusLabel(row.status) }}
+                <td class="num">{{ row.expiry_date }}</td>
+                <td>
+                  <span class="badge" :class="row.days_remaining <= 3 ? 'tone--danger' : 'tone--warning'">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ daysLeftLabel(row.days_remaining) }}
                   </span>
                 </td>
-                <td class="actions-col" @click.stop>
-                  <div class="row-menu">
-                    <button
-                      type="button"
-                      class="row-menu__trigger"
-                      :aria-label="`Actions for batch ${row.batch_id}`"
-                      aria-haspopup="menu"
-                      :aria-expanded="openMenuId === row.id"
-                      @click="toggleRowMenu(row.id)"
-                    >
-                      <AssetIcon name="move-vertical" :size="16" />
-                    </button>
-                    <!-- Grouped by what the action touches; the destructive ones last, apart. -->
-                    <div v-if="openMenuId === row.id" class="row-menu__dropdown" role="menu" @click.stop>
-                      <p class="row-menu__group">This unit</p>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('view', row)">
-                        <AssetIcon name="eye" :size="13" /> View details
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('edit', row)">
-                        <AssetIcon name="pencil" :size="13" /> Edit unit
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('print', row)">
-                        <AssetIcon name="printer" :size="13" /> Print label
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('history', row)">
-                        <AssetIcon name="history" :size="13" /> Movement history
-                      </button>
-                      <!-- Opens the edit form: expiry comes from the unit's date, there is no flag to set. -->
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('mark-expiring', row)">
-                        <AssetIcon name="clock" :size="13" /> Change expiry date
-                      </button>
-
-                      <p class="row-menu__group">Stock</p>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('reserve', row)">
-                        <AssetIcon name="lock" :size="13" /> Reserve units
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('release', row)">
-                        <AssetIcon name="unlock" :size="13" /> Release units
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item" @click="handleRowAction('transfer', row)">
-                        <AssetIcon name="send" :size="13" /> Transfer units
-                      </button>
-
-                      <div class="row-menu__divider" />
-                      <button type="button" role="menuitem" class="row-menu__item row-menu__item--danger" @click="handleRowAction('archive', row)">
-                        <AssetIcon name="archive" :size="13" /> Archive
-                      </button>
-                      <button type="button" role="menuitem" class="row-menu__item row-menu__item--danger" @click="handleRowAction('discard', row)">
-                        <AssetIcon name="trash-2" :size="13" /> Discard
-                      </button>
-                    </div>
-                  </div>
-                </td>
+                <td class="mini-row__chevron"><AssetIcon name="chevron-right" :size="15" /></td>
               </tr>
             </tbody>
           </table>
-        </div>
+        </aside>
 
-        <div v-if="paginatedBatches.length" class="pagination">
-          <p class="pagination__summary">Page {{ page }} of {{ totalPages }}</p>
-          <div class="pagination__controls">
-            <button type="button" class="btn-outline btn-outline--sm" :disabled="page <= 1" @click="page--">Previous</button>
-            <button type="button" class="btn-outline btn-outline--sm" :disabled="page >= totalPages" @click="page++">Next</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ QUARANTINE + RECENT ACTIVITY ============ -->
-      <div class="side-grid">
-      <!-- ============ QUARANTINE ============ -->
-      <!-- Booked in, not yet cleared. Read-only here: bags are released, and
-           given their final labels, at Stock Intake. -->
-        <BloodCenterQuarantinePanel />
-
-
-      <!-- ============ RECENT INVENTORY ACTIVITY ============ -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2 class="panel-title">Recent Inventory Activity</h2>
-        </div>
-
-        <div v-if="!activityLog.length" class="empty-state">
-          <AssetIcon name="activity" :size="36" style="color: var(--rb-border-strong)" />
-          <p>No recent activity</p>
-        </div>
-
-        <div v-else class="timeline">
-          <div v-for="item in activityLog" :key="item.id" class="timeline-item">
-            <div class="timeline-item__marker" :style="{ background: `rgba(var(--rb-${item.tone || 'primary'}-rgb), 0.08)` }">
-              <AssetIcon :name="item.icon" :size="13" :style="{ color: `var(--rb-${item.tone || 'primary'})` }" />
-            </div>
-            <div class="timeline-item__body">
-              <p class="timeline-item__name">{{ item.title }}</p>
-              <p class="timeline-item__meta">{{ item.description }}</p>
-            </div>
-            <div class="timeline-item__right">
-              <p class="activity-feed__time">{{ item.time }}</p>
-              <p class="timeline-item__user">{{ item.user || 'System' }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-
-      <!-- ============ INVENTORY INSIGHTS ============ -->
-      <div class="insights-grid">
-        <div class="panel insight-card">
-          <div class="panel-header">
+        <!-- ============ INVENTORY LIST ============ -->
+        <section ref="listSection" class="panel list-panel" aria-labelledby="list-title">
+          <header class="panel-head">
             <div>
-              <h2 class="panel-title">Inventory Trend</h2>
-              <p class="panel-subtitle">Movement of available vs. reserved units over time.</p>
+              <h2 id="list-title" class="panel-title">Inventory List</h2>
+              <p class="panel-subtitle">Scan and manage blood units.</p>
             </div>
-            <div class="segmented-control">
-              <button
-                v-for="range in trendRanges"
-                :key="range.value"
-                type="button"
-                class="segmented-control__btn"
-                :class="{ 'segmented-control__btn--active': trendRange === range.value }"
-                @click="trendRange = range.value"
-              >
-                {{ range.label }}
+            <NuxtLink v-if="canRegisterUnits" to="/blood-center/inventory-intake" class="btn-primary">
+              <AssetIcon name="plus" :size="15" />
+              Register Blood Unit
+            </NuxtLink>
+          </header>
+
+          <div class="list-filters">
+            <label class="search-field">
+              <AssetIcon name="search" :size="15" class="search-field__icon" />
+              <input
+                v-model="filters.search"
+                type="search"
+                class="search-field__input"
+                placeholder="Search by unit ID or location…"
+                aria-label="Search by unit ID or storage location"
+                @keydown.enter.prevent="loadUnits(1)"
+              />
+            </label>
+
+            <label class="filter-field">
+              <span class="filter-field__label">Blood Type</span>
+              <SelectField v-model="filters.bloodTypeId" size="sm" aria-label="Blood type"
+                :options="[{ value: '', label: 'All' }, ...bloodTypeOptions.map(t => ({ value: t.id, label: displayType(t.code) }))]" />
+            </label>
+
+            <label class="filter-field">
+              <span class="filter-field__label">Component</span>
+              <SelectField v-model="filters.componentId" size="sm" aria-label="Component"
+                :options="[{ value: '', label: 'All' }, ...componentOptions.map(c => ({ value: c.id, label: c.name }))]" />
+            </label>
+
+            <label class="filter-field">
+              <span class="filter-field__label">Expiry Risk</span>
+              <SelectField v-model="filters.expiryRisk" size="sm" aria-label="Expiry risk"
+                :options="[{ value: '', label: 'All' }, { value: '3', label: 'Within 3 days' }, { value: '7', label: 'Within 7 days' }, { value: 'expired', label: 'Expired' }]"
+                @change="onExpiryRiskChange" />
+            </label>
+
+            <label class="filter-field">
+              <span class="filter-field__label">Status</span>
+              <SelectField v-model="filters.status" size="sm" aria-label="Status"
+                :options="[{ value: '', label: 'All' }, ...statusOptions]" @change="onStatusChange" />
+            </label>
+
+            <button type="button" class="clear-btn" :disabled="!hasActiveFilters" @click="clearFilters">
+              <AssetIcon name="refresh-cw" :size="13" />
+              Clear Filters
+            </button>
+          </div>
+
+          <p v-if="unitsError" class="list-error" role="alert">{{ unitsError }}</p>
+
+          <div class="table-wrap" :class="{ 'table-wrap--busy': unitsLoading }" :aria-busy="unitsLoading">
+            <table v-if="unitRows.length" class="unit-table">
+              <thead>
+                <tr>
+                  <th>Unit ID</th>
+                  <th>Blood Type</th>
+                  <th>Component</th>
+                  <th :aria-sort="filters.sort === 'recent' ? 'descending' : 'none'">
+                    <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sort === 'recent' }" @click="filters.sort = 'recent'">
+                      Collection Date
+                      <AssetIcon v-if="filters.sort === 'recent'" name="chevron-down" :size="12" />
+                    </button>
+                  </th>
+                  <th :aria-sort="filters.sort === 'fefo' ? 'ascending' : 'none'">
+                    <button type="button" class="th-sort" :class="{ 'th-sort--on': filters.sort === 'fefo' }" @click="filters.sort = 'fefo'">
+                      Expiry Date
+                      <AssetIcon v-if="filters.sort === 'fefo'" name="chevron-up" :size="12" />
+                    </button>
+                  </th>
+                  <th>Remaining Days</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Availability</th>
+                  <th class="actions-col"><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(row, index) in unitRows"
+                  :key="row.id"
+                  class="unit-row"
+                 
+                  tabindex="0"
+                  :aria-label="`${row.id}, ${row.blood_type} ${row.component}, ${row.tag.label}. Open details`"
+                  @click="openDetails(row)"
+                  @keydown.enter.self="openDetails(row)"
+                >
+                  <td class="mono">{{ row.id }}</td>
+                  <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type) }}</span></td>
+                  <td class="wrap-cell">{{ row.component }}</td>
+                  <td class="num">{{ formatDay(row.collected_at) }}</td>
+                  <td class="num" :class="{ 'ink-danger': row.remaining.label === 'Expired' }">{{ row.expiry_date || '—' }}</td>
+                  <td>
+                    <span class="days" :class="[`tone--${row.remaining.tone}`, { 'days--pill': row.remaining.tone === 'warning' || row.remaining.tone === 'danger' }]">{{ row.remaining.label }}</span>
+                  </td>
+                  <td class="wrap-cell" :class="{ 'cell-muted': !row.storage_location }">{{ row.storage_location || 'Not set' }}</td>
+                  <td><span class="badge" :class="`tone--${row.tag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ row.tag.label }}</span></td>
+                  <td>
+                    <span class="avail" :class="`tone--${row.availability.tone}`">
+                      <span class="avail__dot" aria-hidden="true" />
+                      {{ row.availability.label }}
+                    </span>
+                  </td>
+                  <td class="actions-col" @click.stop>
+                    <div class="row-menu" @focusout="onRowMenuFocusOut">
+                      <button
+                        type="button"
+                        class="row-menu__trigger"
+                        :aria-label="`Actions for unit ${row.id}`"
+                        aria-haspopup="menu"
+                        :aria-expanded="openMenuId === row.id"
+                        @click="openMenuId = openMenuId === row.id ? null : row.id"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+                          <circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" />
+                        </svg>
+                      </button>
+                      <div
+                        v-if="openMenuId === row.id"
+                        class="row-menu__dropdown"
+                        :class="{ 'row-menu__dropdown--up': index >= unitRows.length - 3 && unitRows.length > 4 }"
+                        role="menu"
+                      >
+                        <button type="button" role="menuitem" class="row-menu__item" @click="rowAction('view', row)">
+                          <AssetIcon name="eye" :size="13" /> View details
+                        </button>
+                        <!-- The head edits a unit directly. Everyone else files a correction, and only the roles the server admits are offered it. -->
+                        <button v-if="canEditUnit && isEditable(row)" type="button" role="menuitem" class="row-menu__item" @click="rowAction('edit', row)">
+                          <AssetIcon name="pencil" :size="13" /> Edit unit
+                        </button>
+                        <button v-else-if="canRequestUnitCorrection && isEditable(row)" type="button" role="menuitem" class="row-menu__item" @click="rowAction('edit', row)">
+                          <AssetIcon name="pencil" :size="13" /> Request correction
+                        </button>
+                        <template v-if="canDiscardUnits && isDiscardable(row)">
+                          <div class="row-menu__divider" />
+                          <button type="button" role="menuitem" class="row-menu__item row-menu__item--danger" @click="rowAction('discard', row)">
+                            <AssetIcon name="trash-2" :size="13" /> Discard
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-else-if="!unitsLoading" class="empty-state">
+              <AssetIcon name="inbox" :size="36" />
+              <p class="empty-state__title">{{ hasActiveFilters ? 'No units match these filters' : 'No units in stock yet' }}</p>
+              <p class="empty-state__desc">
+                {{ hasActiveFilters ? 'Clear a filter to see more.' : 'Units appear here once they are booked in at Stock Intake.' }}
+              </p>
+              <button v-if="hasActiveFilters" type="button" class="btn-outline btn-outline--sm" @click="clearFilters">Clear filters</button>
+            </div>
+          </div>
+
+          <footer v-if="unitsMeta.total" class="list-foot">
+            <p class="list-foot__summary">
+              Showing {{ formatCount(unitsMeta.from) }}–{{ formatCount(unitsMeta.to) }} of {{ formatCount(unitsMeta.total) }} unit{{ unitsMeta.total === 1 ? '' : 's' }}
+            </p>
+            <nav v-if="unitsMeta.lastPage > 1" class="pager" aria-label="Inventory pages">
+              <button type="button" class="pager__btn" :disabled="unitsMeta.page <= 1" aria-label="Previous page" @click="loadUnits(unitsMeta.page - 1)">
+                <AssetIcon name="chevron-left" :size="14" />
               </button>
-            </div>
-          </div>
+              <template v-for="(p, i) in pages" :key="`${p}-${i}`">
+                <span v-if="p === '…'" class="pager__gap" aria-hidden="true">…</span>
+                <button
+                  v-else
+                  type="button"
+                  class="pager__btn"
+                  :class="{ 'pager__btn--on': p === unitsMeta.page }"
+                  :aria-current="p === unitsMeta.page ? 'page' : undefined"
+                  :aria-label="`Page ${p}`"
+                  @click="loadUnits(p)"
+                >
+                  {{ p }}
+                </button>
+              </template>
+              <button type="button" class="pager__btn" :disabled="unitsMeta.page >= unitsMeta.lastPage" aria-label="Next page" @click="loadUnits(unitsMeta.page + 1)">
+                <AssetIcon name="chevron-right" :size="14" />
+              </button>
+            </nav>
+          </footer>
+        </section>
 
-          <div v-if="!currentTrendData.length" class="empty-state">
-            <AssetIcon name="trending-up" :size="36" style="color: var(--rb-border-strong)" />
-            <p>No trend data available yet</p>
-          </div>
+        <!-- ============ RECENT ACTIVITY ============ -->
+        <aside class="panel side-panel activity-panel" aria-labelledby="activity-title">
+          <header class="side-head">
+            <h2 id="activity-title" class="side-title">
+              <span class="side-title__icon"><AssetIcon name="activity" :size="15" /></span>
+              Recent Activity
+            </h2>
+            <button type="button" class="link-btn" @click="openActivityDrawer">View All</button>
+          </header>
 
-          <div v-else class="chart-body">
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background: var(--rb-primary)" />Available Units</span>
-              <span class="legend-item"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved Units</span>
-            </div>
-
-            <div class="line-chart-wrap" @mouseleave="hoveredPointIndex = null">
-              <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="invAreaFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--rb-primary)" stop-opacity="0.16" />
-                    <stop offset="100%" stop-color="var(--rb-primary)" stop-opacity="0" />
-                  </linearGradient>
-                </defs>
-
-                <line v-for="(g, i) in gridLines" :key="i" :x1="chartPadding.left" :x2="chartWidth - chartPadding.right" :y1="g" :y2="g" class="chart-grid-line" />
-
-                <path :d="areaPath" fill="url(#invAreaFill)" stroke="none" />
-                <path :d="reservedPath" fill="none" stroke="var(--rb-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 4" />
-                <path :d="availablePath" fill="none" stroke="var(--rb-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-
-                <g v-for="(p, i) in availablePoints" :key="'a'+i">
-                  <circle :cx="p.x" :cy="p.y" r="3.2" fill="var(--rb-surface)" stroke="var(--rb-primary)" stroke-width="2" />
-                  <rect
-                    :x="p.x - (chartWidth / availablePoints.length) / 2"
-                    y="0"
-                    :width="chartWidth / availablePoints.length"
-                    :height="chartHeight"
-                    fill="transparent"
-                    class="hover-target"
-                    @mouseenter="hoveredPointIndex = i"
-                  />
-                </g>
-                <circle v-for="(p, i) in reservedPoints" :key="'r'+i" :cx="p.x" :cy="p.y" r="2.6" fill="var(--rb-surface)" stroke="var(--rb-accent)" stroke-width="2" />
-
-                <text v-for="(p, i) in availablePoints" :key="'lbl'+i" :x="p.x" :y="chartHeight - 6" class="chart-axis-label" text-anchor="middle">{{ p.label }}</text>
-              </svg>
-
-              <div
-                v-if="hoveredPointIndex !== null"
-                class="chart-tooltip"
-                :style="{
-                  left: (availablePoints[hoveredPointIndex].x / chartWidth) * 100 + '%',
-                  top: (availablePoints[hoveredPointIndex].y / chartHeight) * 100 + '%'
-                }"
-              >
-                <p class="chart-tooltip__label">{{ availablePoints[hoveredPointIndex].label }}</p>
-                <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-primary)" />Available: {{ availablePoints[hoveredPointIndex].value }}</p>
-                <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved: {{ reservedPoints[hoveredPointIndex].value }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel insight-card">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">Blood Component Distribution</h2>
-              <p class="panel-subtitle">Percentage and total units by component.</p>
-            </div>
-          </div>
-
-          <div v-if="!donutTotal" class="empty-state">
-            <AssetIcon name="package" :size="36" style="color: var(--rb-border-strong)" />
-            <p>No component distribution data available yet</p>
-          </div>
-
-          <div v-else class="donut-body">
-            <div class="donut-chart-wrap" @mouseleave="hoveredDonut = null">
-              <svg viewBox="0 0 160 160" class="donut-chart">
-                <circle cx="80" cy="80" :r="donutRadius" fill="none" stroke="var(--rb-surface-alt)" stroke-width="22" />
-                <circle
-                  v-for="seg in donutSegments"
-                  :key="seg.label"
-                  cx="80"
-                  cy="80"
-                  :r="donutRadius"
-                  fill="none"
-                  :stroke="seg.color"
-                  stroke-width="22"
-                  :stroke-dasharray="seg.dasharray"
-                  :stroke-dashoffset="seg.dashoffset"
-                  transform="rotate(-90 80 80)"
-                  class="donut-segment"
-                  :class="{ 'donut-segment--dim': hoveredDonut && hoveredDonut.label !== seg.label }"
-                  @mouseenter="hoveredDonut = seg"
-                />
-              </svg>
-              <div class="donut-center">
-                <p class="donut-center__value">{{ hoveredDonut ? hoveredDonut.pct + '%' : donutTotal }}</p>
-                <p class="donut-center__label">{{ hoveredDonut ? hoveredDonut.label : 'Total Units' }}</p>
-              </div>
-            </div>
-
-            <div class="donut-legend">
-              <div v-for="seg in donutSegments" :key="seg.label" class="donut-legend__row" @mouseenter="hoveredDonut = seg" @mouseleave="hoveredDonut = null">
-                <span class="legend-dot" :style="{ background: seg.color }" />
-                <span class="donut-legend__label">{{ seg.label }}</span>
-                <span class="donut-legend__value">{{ seg.pct }}% &middot; {{ seg.value }} units</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          <p v-if="activityError" class="side-empty">{{ activityError }}</p>
+          <p v-else-if="!activity.length" class="side-empty">
+            <AssetIcon name="activity" :size="22" />
+            No stock has moved yet.
+          </p>
+          <ol v-else class="activity-list">
+            <li v-for="item in activity" :key="item.id" class="activity-item">
+              <span class="activity-item__icon" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
+                <AssetIcon :name="activityKindMeta(item.kind).icon" :size="16" />
+              </span>
+              <span class="activity-item__body">
+                <span class="activity-item__title">{{ activityKindMeta(item.kind).label }}</span>
+                <span class="activity-item__meta">
+                  <span class="mono">{{ item.unit_id }}</span>
+                  <span class="type-text">{{ displayType(item.blood_type) }}</span>
+                  <span>{{ item.component }}</span>
+                </span>
+              </span>
+              <span class="activity-item__when">
+                <time :datetime="item.at" :title="formatDateTime(item.at)">{{ timeAgo(item.at, now) }}</time>
+                <span>{{ item.actor || 'System' }}</span>
+              </span>
+            </li>
+          </ol>
+        </aside>
       </div>
     </div>
 
-
-    <!-- ============ ADD / EDIT INVENTORY BATCH MODAL ============ -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="batchModalOpen" class="modal-overlay" @click.self="closeBatchModal">
-          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
-            <button type="button" class="modal-close" @click="closeBatchModal">
-              <AssetIcon name="x" :size="16" />
-            </button>
-
-            <h3 class="modal-title modal-title--left">Edit unit {{ editingBatchId }}</h3>
-            <p class="modal-subtitle modal-subtitle--left">
-              Only where a unit is kept and when it expires can be changed. Its blood type, component and
-              donation are facts about the donation it came from, so they are fixed here.
-            </p>
-
-            <form class="batch-form" @submit.prevent="submitBatchForm">
-              <p class="batch-form__section">Unit</p>
-              <div class="form-row">
-                <label class="form-field">
-                  <span class="form-field__label">Storage Location</span>
-                  <select v-model="batchForm.storageLocation" class="form-field__input form-field__select">
-                    <option value="">Not recorded</option>
-                    <option v-for="loc in storageLocationOptions" :key="loc" :value="loc">{{ loc }}</option>
-                  </select>
-                </label>
-                <label class="form-field">
-                  <span class="form-field__label">Expiry Date</span>
-                  <input v-model="batchForm.expiryDate" type="date" class="form-field__input" >
-                </label>
-              </div>
-
-              <p v-if="batchFormError" class="form-error">{{ batchFormError }}</p>
-
-              <div class="modal-actions">
-                <button type="submit" class="btn-primary modal-actions__btn" :disabled="batchSubmitting">
-                  <AssetIcon name="circle-check" :size="15" />
-                  {{ batchSubmitting ? 'Saving…' : 'Save Changes' }}
-                </button>
-                <button type="button" class="btn-outline modal-actions__btn" @click="closeBatchModal" :disabled="batchSubmitting">Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- Says why an action did nothing, rather than closing a modal in silence. -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="manageActionNote" class="inventory-toast" role="status">
-          <AssetIcon name="circle-alert" :size="15" />
-          <span>{{ manageActionNote }}</span>
-          <button type="button" class="inventory-toast__close" aria-label="Dismiss" @click="manageActionNote = ''">
-            <AssetIcon name="x" :size="13" />
-          </button>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- ============ MANAGE INVENTORY MODAL ============ -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="manageModalOpen" class="modal-overlay" @click.self="closeManageModal">
-          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
-            <button type="button" class="modal-close" @click="closeManageModal">
-              <AssetIcon name="x" :size="16" />
-            </button>
-
-            <h3 class="modal-title modal-title--left">Manage Inventory</h3>
-            <p class="modal-subtitle modal-subtitle--left" v-if="manageTargetBatch">
-              {{ manageTargetBatch.batch_id }} &middot; {{ manageTargetBatch.blood_type }} {{ manageTargetBatch.component }}
-            </p>
-
-            <div class="manage-actions-grid">
-              <button type="button" class="manage-action-card" @click="runManageAction('reserve')">
-                <AssetIcon name="lock" :size="18" style="color: var(--rb-primary-text)" />
-                <span>Reserve Inventory</span>
-              </button>
-              <button type="button" class="manage-action-card" @click="runManageAction('release')">
-                <AssetIcon name="unlock" :size="18" style="color: var(--rb-primary-text)" />
-                <span>Release Inventory</span>
-              </button>
-              <button type="button" class="manage-action-card" @click="runManageAction('transfer')">
-                <AssetIcon name="send" :size="18" style="color: var(--rb-primary-text)" />
-                <span>Transfer Inventory</span>
-              </button>
-              <button type="button" class="manage-action-card" @click="runManageAction('print')">
-                <AssetIcon name="printer" :size="18" style="color: var(--rb-primary-text)" />
-                <span>Print Label</span>
-              </button>
-              <button type="button" class="manage-action-card manage-action-card--danger" @click="runManageAction('archive')">
-                <AssetIcon name="archive" :size="18" style="color: var(--rb-accent-text)" />
-                <span>Archive Inventory</span>
-              </button>
-              <button type="button" class="manage-action-card manage-action-card--danger" @click="runManageAction('discard')">
-                <AssetIcon name="trash-2" :size="18" style="color: var(--rb-accent-text)" />
-                <span>Discard Inventory</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- ============ PRINT LABELS MODAL ============ -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="printModalOpen" class="modal-overlay" @click.self="closePrintLabelsModal">
-          <div class="modal-card modal-card--wide" role="dialog" v-focus-trap aria-modal="true">
-            <button type="button" class="modal-close" @click="closePrintLabelsModal">
-              <AssetIcon name="x" :size="16" />
-            </button>
-
-            <h3 class="modal-title modal-title--left">Reprint Final Labels</h3>
-            <p class="modal-subtitle modal-subtitle--left">
-              For released bags whose label was spoiled or lost. Bags get their first final label at Stock Intake, when
-              they leave quarantine.
-            </p>
-            <p v-if="printError" class="print-error" role="alert">{{ printError }}</p>
-
-            <div v-if="!printableBatches.length" class="empty-state">
-              <AssetIcon name="printer" :size="32" style="color: var(--rb-border-strong)" />
-              <p>No available batches to print labels for.</p>
-            </div>
-
-            <template v-else>
-              <div class="print-batch-list">
-                <label v-for="b in printableBatches" :key="b.id" class="print-batch-row">
-                  <input type="checkbox" :checked="printSelectedIds.includes(b.id)" @change="togglePrintSelection(b)" />
-                  <div class="print-batch-row__info">
-                    <p class="print-batch-row__title">{{ b.batch_id }} &middot; {{ b.blood_type }} {{ b.component }}</p>
-                    <p class="print-batch-row__meta">Collected {{ formatDate(b.collection_date) }} &middot; Expires {{ formatDate(b.expiry_date) }}</p>
-                  </div>
-                </label>
-              </div>
-
-              <div v-if="printSelectedIds.length" class="print-preview">
-                <p class="expanded-col__title">Label Preview</p>
-                <div class="print-preview__grid">
-                  <div v-for="id in printSelectedIds" :key="id" class="print-label-card">
-                    <p class="print-label-card__type">{{ inventoryBatches.find(b => b.id === id)?.blood_type }}</p>
-                    <p class="print-label-card__meta">
-                      {{ inventoryBatches.find(b => b.id === id)?.component }}
-                      <template v-if="inventoryBatches.find(b => b.id === id)?.volume_ml">
-                        &middot; {{ inventoryBatches.find(b => b.id === id)?.volume_ml }} mL
-                      </template>
-                    </p>
-                    <p class="print-label-card__meta">{{ inventoryBatches.find(b => b.id === id)?.batch_id }}</p>
-                    <p class="print-label-card__meta">Exp {{ formatDate(inventoryBatches.find(b => b.id === id)?.expiry_date) }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="modal-actions">
-                <button
-                  type="button"
-                  class="btn-primary modal-actions__btn"
-                  :disabled="!printSelectedIds.length || printSubmitting"
-                  @click="submitPrintLabels"
-                >
-                  <AssetIcon name="printer" :size="15" />
-                  {{ printSubmitting ? 'Preparing…' : 'Print final labels' }}
-                </button>
-                <button type="button" class="btn-outline modal-actions__btn" @click="closePrintLabelsModal" :disabled="printSubmitting">Cancel</button>
-              </div>
-            </template>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- ============ INVENTORY DETAIL DRAWER (View Details) ============ -->
+    <!-- ============ UNIT DETAILS DRAWER ============ -->
     <Teleport to="body">
       <Transition name="drawer-fade">
-        <div v-if="drawerOpen" class="drawer-overlay" @click.self="closeDetailsDrawer">
-          <aside class="detail-drawer" role="dialog" v-focus-trap aria-modal="true" aria-label="Inventory batch details">
+        <div v-if="drawerUnit" class="drawer-overlay inv-tones" @click.self="closeDetails">
+          <aside
+            class="detail-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unit-drawer-title"
+            v-focus-trap
+            @dialog-escape="closeDetails"
+          >
             <header class="detail-drawer__header">
               <div>
-                <p class="detail-drawer__eyebrow">{{ drawerBatch?.batch_id }}</p>
-                <h2 class="detail-drawer__title">{{ drawerBatch?.blood_type }} &middot; {{ drawerBatch?.component }}</h2>
+                <p class="detail-drawer__eyebrow">{{ drawerUnit.id }}</p>
+                <h2 id="unit-drawer-title" class="detail-drawer__title">
+                  {{ displayType(drawerUnit.blood_type) }} &middot; {{ drawerUnit.component }}
+                </h2>
               </div>
-              <button type="button" class="modal-close" @click="closeDetailsDrawer">
+              <button type="button" class="modal-close" aria-label="Close" @click="closeDetails">
                 <AssetIcon name="x" :size="16" />
               </button>
             </header>
 
-            <div v-if="drawerBatch" class="detail-drawer__body">
-              <section class="detail-drawer__section">
-                <p class="expanded-col__title">Inventory Overview</p>
+            <div class="detail-drawer__body">
+              <section>
+                <p class="drawer-section-title">Unit</p>
                 <dl class="drawer-info-grid">
-                  <div><dt>Blood Type</dt><dd>{{ drawerBatch.blood_type }}</dd></div>
-                  <div><dt>Component</dt><dd>{{ drawerBatch.component }}</dd></div>
-                  <div><dt>Volume</dt><dd>{{ drawerBatch.volume_ml ? `${drawerBatch.volume_ml} mL` : '—' }}</dd></div>
-                  <div><dt>Available Units</dt><dd>{{ drawerBatch.available_units }}</dd></div>
-                  <div><dt>Reserved Units</dt><dd>{{ drawerBatch.reserved_units }}</dd></div>
-                  <div><dt>Batch Number</dt><dd>{{ drawerBatch.batch_number || drawerBatch.batch_id }}</dd></div>
-                  <div><dt>Collection Source</dt><dd>{{ drawerBatch.donation_source || '—' }}</dd></div>
-                  <div><dt>Storage Location</dt><dd>{{ drawerBatch.storage_location || '—' }}</dd></div>
-                  <div><dt>Collection Date</dt><dd>{{ formatDate(drawerBatch.collection_date) }}</dd></div>
-                  <div><dt>Expiry Date</dt><dd>{{ formatDate(drawerBatch.expiry_date) }} <span class="drawer-note">{{ daysRemainingLabel(drawerBatch.expiry_date) }}</span></dd></div>
-                  <div><dt>Last Updated</dt><dd>{{ drawerBatch.last_updated || 'Not recorded' }}</dd></div>
-                  <div class="drawer-info-grid__wide"><dt>Notes</dt><dd>{{ drawerBatch.notes || 'No notes' }}</dd></div>
+                  <div><dt>Blood Type</dt><dd>{{ displayType(drawerUnit.blood_type) }}</dd></div>
+                  <div><dt>Component</dt><dd>{{ drawerUnit.component }}</dd></div>
+                  <div><dt>Volume</dt><dd>{{ drawerUnit.volume_ml ? `${drawerUnit.volume_ml} mL` : '—' }}</dd></div>
                   <div>
-                    <dt>Inventory Status</dt>
+                    <dt>Status</dt>
+                    <dd><span class="badge" :class="`tone--${drawerTag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ drawerTag.label }}</span></dd>
+                  </div>
+                  <div><dt>Collection Date</dt><dd>{{ formatLongDate(drawerUnit.collected_at) }}</dd></div>
+                  <div>
+                    <dt>Expiry Date</dt>
                     <dd>
-                      <span class="status-pill" :class="`status-pill--${drawerBatch.status}`">
-                        <span class="status-pill__dot" />{{ statusLabel(drawerBatch.status) }}
-                      </span>
+                      {{ formatLongDate(drawerUnit.expiry_date) }}
+                      <span class="drawer-note">{{ drawerRemaining }}</span>
                     </dd>
                   </div>
+                  <div><dt>Storage Location</dt><dd>{{ drawerUnit.storage_location || 'Not set' }}</dd></div>
+                  <div><dt>Donation</dt><dd>{{ drawerUnit.donation_id ? `#${drawerUnit.donation_id}` : '—' }}</dd></div>
+                  <div><dt>Booked In</dt><dd>{{ formatDateTime(drawerUnit.recorded_at) || '—' }}</dd></div>
+                  <div v-if="drawerUnit.discard_reason" class="drawer-info-grid__wide"><dt>Discard Reason</dt><dd>{{ drawerUnit.discard_reason }}</dd></div>
                 </dl>
               </section>
 
-              <section class="detail-drawer__section">
-                <p class="expanded-col__title">Reserved History</p>
-                <div v-if="drawerBatch.reserved_history?.length" class="expanded-list">
-                  <p v-for="(h, i) in drawerBatch.reserved_history" :key="i" class="expanded-list__row">
-                    {{ h.hospital }} &middot; {{ h.units }} units &middot; {{ h.date }}
-                  </p>
-                </div>
-                <p v-else class="expanded-col__note">No reservation history</p>
-              </section>
-
-              <section class="detail-drawer__section">
-                <p class="expanded-col__title">Hospital Allocation</p>
-                <div v-if="drawerBatch.hospital_allocation?.length" class="expanded-list">
-                  <p v-for="(a, i) in drawerBatch.hospital_allocation" :key="i" class="expanded-list__row">
-                    {{ a.hospital }} &middot; {{ a.units }} units
-                  </p>
-                </div>
-                <p v-else class="expanded-col__note">No current allocations</p>
-              </section>
-
-              <section class="detail-drawer__section">
-                <p class="expanded-col__title">Movement Timeline</p>
-                <div v-if="drawerBatch.movement_history?.length" class="expanded-list">
-                  <p v-for="(m, i) in drawerBatch.movement_history" :key="i" class="expanded-list__row">
-                    {{ m.action }} &middot; {{ m.date }}
-                  </p>
-                </div>
-                <p v-else class="expanded-col__note">No recorded movement yet</p>
+              <section>
+                <p class="drawer-section-title">Movement History</p>
+                <p v-if="drawerHistoryLoading" class="drawer-muted">Loading…</p>
+                <p v-else-if="drawerHistoryError" class="drawer-muted">{{ drawerHistoryError }}</p>
+                <p v-else-if="!drawerHistory.length" class="drawer-muted">No recorded movement yet.</p>
+                <ol v-else class="history-list">
+                  <li v-for="item in drawerHistory" :key="item.id" class="history-list__item">
+                    <span class="activity-item__icon activity-item__icon--sm" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
+                      <AssetIcon :name="activityKindMeta(item.kind).icon" :size="13" />
+                    </span>
+                    <span class="history-list__body">
+                      <strong>{{ activityKindMeta(item.kind).label }}</strong>
+                      <span>{{ formatDateTime(item.at) }} &middot; {{ item.actor || 'System' }}</span>
+                    </span>
+                  </li>
+                </ol>
               </section>
             </div>
 
-            <footer v-if="drawerBatch" class="detail-drawer__footer">
-              <button type="button" class="btn-outline" @click="editFromDrawer">
-                <AssetIcon name="pencil" :size="14" /> Edit Inventory
+            <footer v-if="drawerActions" class="detail-drawer__footer">
+              <button v-if="canChangeUnit && isEditable(drawerUnit)" type="button" class="btn-outline" @click="fromDrawer('edit')">
+                <AssetIcon name="pencil" :size="14" /> {{ canEditUnit ? 'Edit Unit' : 'Request Correction' }}
               </button>
-              <button type="button" class="btn-outline" @click="reserveFromDrawer">
-                <AssetIcon name="lock" :size="14" /> Reserve Units
-              </button>
-              <button type="button" class="btn-outline" @click="transferFromDrawer">
-                <AssetIcon name="send" :size="14" /> Transfer Units
-              </button>
-              <button type="button" class="btn-primary" @click="printFromDrawer">
-                <AssetIcon name="printer" :size="14" /> Print Label
+              <button v-if="canDiscardUnits && isDiscardable(drawerUnit)" type="button" class="btn-outline btn-outline--danger" @click="fromDrawer('discard')">
+                <AssetIcon name="trash-2" :size="14" /> Discard
               </button>
             </footer>
           </aside>
@@ -918,19 +518,196 @@
       </Transition>
     </Teleport>
 
-    <BloodCenterBagLabelSheet />
+    <!-- ============ ALL ACTIVITY DRAWER ============ -->
+    <Teleport to="body">
+      <Transition name="drawer-fade">
+        <div v-if="activityDrawerOpen" class="drawer-overlay inv-tones" @click.self="activityDrawerOpen = false">
+          <aside
+            class="detail-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-drawer-title"
+            v-focus-trap
+            @dialog-escape="activityDrawerOpen = false"
+          >
+            <header class="detail-drawer__header">
+              <div>
+                <p class="detail-drawer__eyebrow">{{ facilityLabel }}</p>
+                <h2 id="activity-drawer-title" class="detail-drawer__title">Inventory Activity</h2>
+              </div>
+              <button type="button" class="modal-close" aria-label="Close" @click="activityDrawerOpen = false">
+                <AssetIcon name="x" :size="16" />
+              </button>
+            </header>
+
+            <div class="detail-drawer__body detail-drawer__body--flush">
+              <p v-if="allActivityError" class="drawer-muted drawer-muted--pad">{{ allActivityError }}</p>
+              <p v-else-if="!allActivity.length && !allActivityLoading" class="drawer-muted drawer-muted--pad">No stock has moved yet.</p>
+              <ol class="activity-list">
+                <li v-for="item in allActivity" :key="item.id" class="activity-item">
+                  <span class="activity-item__icon" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
+                    <AssetIcon :name="activityKindMeta(item.kind).icon" :size="16" />
+                  </span>
+                  <span class="activity-item__body">
+                    <span class="activity-item__title">{{ activityKindMeta(item.kind).label }}</span>
+                    <span class="activity-item__meta">
+                      <span class="mono">{{ item.unit_id }}</span>
+                      <span class="type-text">{{ displayType(item.blood_type) }}</span>
+                      <span>{{ item.component }}</span>
+                    </span>
+                  </span>
+                  <span class="activity-item__when">
+                    <time :datetime="item.at">{{ formatDateTime(item.at) }}</time>
+                    <span>{{ item.actor || 'System' }}</span>
+                  </span>
+                </li>
+              </ol>
+              <div v-if="allActivityPage < allActivityLastPage || allActivityLoading" class="drawer-more">
+                <button type="button" class="btn-outline btn-outline--sm" :disabled="allActivityLoading" @click="loadAllActivity(allActivityPage + 1)">
+                  {{ allActivityLoading ? 'Loading…' : 'Load more' }}
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ============ EDIT UNIT MODAL ============ -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="batchModalOpen" class="modal-overlay inv-tones" @click.self="closeBatchModal">
+          <div class="modal-card modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="edit-unit-title" v-focus-trap @dialog-escape="closeBatchModal">
+            <button type="button" class="modal-close" aria-label="Close" @click="closeBatchModal">
+              <AssetIcon name="x" :size="16" />
+            </button>
+
+            <h3 id="edit-unit-title" class="modal-title">
+              {{ canEditUnit ? 'Edit unit' : 'Request a correction to unit' }} {{ editingBatchId }}
+            </h3>
+            <p class="modal-subtitle">
+              Only where a unit is kept and when it expires can be changed. Its blood type, component and
+              donation are facts about the donation it came from, so they are fixed here.
+              <template v-if="!canEditUnit">
+                Your change goes to the Inventory Control Officer to approve.
+              </template>
+            </p>
+
+            <form class="batch-form" @submit.prevent="submitBatchForm">
+              <div class="form-row">
+                <label class="form-field">
+                  <span class="form-field__label">Storage Location</span>
+                  <SelectField v-model="batchForm.storageLocation" aria-label="Storage location"
+                    :options="[{ value: '', label: 'Not recorded' }, ...storageLocationOptions.map(loc => ({ value: loc, label: loc }))]" />
+                </label>
+                <label class="form-field">
+                  <span class="form-field__label">Expiry Date</span>
+                  <DatePicker v-model="batchForm.expiryDate" aria-label="Expiry date" />
+                </label>
+              </div>
+
+              <p v-if="batchFormError" class="form-error">{{ batchFormError }}</p>
+
+              <div class="modal-actions">
+                <button type="submit" class="btn-primary modal-actions__btn" :disabled="batchSubmitting">
+                  <AssetIcon name="circle-check-big" :size="15" />
+                  {{ batchSubmitting ? 'Saving…' : (canEditUnit ? 'Save Changes' : 'Review correction') }}
+                </button>
+                <button type="button" class="btn-outline modal-actions__btn" :disabled="batchSubmitting" @click="closeBatchModal">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ============ DISCARD MODAL ============ -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="discardTarget" class="modal-overlay inv-tones" @click.self="closeDiscard">
+          <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="discard-title" v-focus-trap @dialog-escape="closeDiscard">
+            <button type="button" class="modal-close" aria-label="Close" @click="closeDiscard">
+              <AssetIcon name="x" :size="16" />
+            </button>
+            <h3 id="discard-title" class="modal-title">Discard unit {{ discardTarget.id }}</h3>
+            <p class="modal-subtitle">
+              {{ displayType(discardTarget.blood_type) }} {{ discardTarget.component }}. A discarded unit leaves stock for good;
+              the reason is kept in the audit trail.
+            </p>
+            <form class="batch-form" @submit.prevent="submitDiscard">
+              <label class="form-field">
+                <span class="form-field__label">Reason</span>
+                <textarea
+                  v-model="discardReason"
+                  class="form-field__input form-field__textarea"
+                  maxlength="255"
+                  rows="3"
+                  placeholder="For example: bag leaking, haemolysed, past expiry"
+                  required
+                />
+              </label>
+              <p v-if="discardError" class="form-error">{{ discardError }}</p>
+              <div class="modal-actions">
+                <button type="submit" class="btn-danger modal-actions__btn" :disabled="discardSubmitting || !discardReason.trim()">
+                  <AssetIcon name="trash-2" :size="15" />
+                  {{ discardSubmitting ? 'Discarding…' : 'Discard unit' }}
+                </button>
+                <button type="button" class="btn-outline modal-actions__btn" :disabled="discardSubmitting" @click="closeDiscard">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Says what an action did, or why it did nothing. -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="notice" class="inventory-toast" role="status">
+          <AssetIcon name="circle-alert" :size="15" />
+          <span>{{ notice }}</span>
+          <button type="button" class="inventory-toast__close" aria-label="Dismiss" @click="notice = ''">
+            <AssetIcon name="x" :size="13" />
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <BloodCenterCorrectionRequestDialog
+      v-if="unitCorrection"
+      subject="unit_details"
+      :target-id="unitCorrection.unitId"
+      :changes="unitCorrection.changes"
+      :previous="unitCorrection.previous"
+      @close="closeUnitCorrection"
+      @submitted="onUnitCorrectionSent"
+    />
+
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BloodCenterQuarantinePanel from '~/components/BloodCenter/QuarantinePanel.vue'
-import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import SelectField from '~/components/common/SelectField.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, resolveComponent } from 'vue'
 import { useUser } from '~/composables/useUser'
-import { useLabelPrint } from '~/composables/useLabelPrint'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { finalLabelsFrom } from '~/utils/bagLabels'
+import { typeHealthByCode } from '~/utils/stockThreshold'
+import {
+  activityKindMeta,
+  daysLeftLabel,
+  isRareBloodType,
+  orderDashboardTypes,
+  pageWindow,
+  remainingDaysTag,
+  timeAgo,
+  typeCoverage,
+  unitAvailability,
+  unitStatusTag,
+} from '~/utils/inventoryDashboard'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -938,534 +715,495 @@ definePageMeta({
   requires: 'inventory.view',
 })
 
-const { user } = useUser()
-const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'Blood Center')
+const NuxtLinkComponent = resolveComponent('NuxtLink')
+
+const { user, can, canFile } = useUser()
+
+// Every number on this page is the signed-in account's own centre: the server
+// resolves the facility from the session, never from anything sent from here.
+const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'your blood center')
+
+// A unit is edited directly only by whoever holds inventory.update (the
+// Inventory Control Officer). The IT Data Entry Clerk files a correction
+// instead, and a custom role in the same department is offered neither: it
+// holds the ability but not the post, and the server refuses it.
+const canEditUnit = computed(() => can('inventory.update'))
+const canRequestUnitCorrection = computed(() => !canEditUnit.value && can('corrections.request') && canFile('unit_details'))
+const canChangeUnit = computed(() => canEditUnit.value || canRequestUnitCorrection.value)
+// Booking stock in is Issuance's. Final labels are Processing's (2026-10-22).
+const canRegisterUnits = computed(() => can('inventory.create'))
+const canDiscardUnits = computed(() => can('inventory.discard'))
+const canSeeFulfillment = computed(() => can('requests.release'))
 
 const loading = ref(true)
-const syncing = ref(false)
-const lastSyncedLabel = ref('')
-const inventorySummaryData = ref(null)
+const loadError = ref('')
+const refreshing = ref(false)
+const lastUpdated = ref(null)
+const now = ref(Date.now())
 
-// --- Reference/dropdown data — (/blood-center/reference-data) endpoint ---
+// --- Reference data ---
 const bloodTypeOptions = ref([])
 const componentOptions = ref([])
 const statusOptions = ref([])
 const storageLocationOptions = ref([])
 
-// --- Inventory batches (main dataset) ---
-const inventoryBatches = ref([])
+// --- Overview: summary, minimums, expiring units, activity ---
+const summary = ref(null)
+const thresholds = ref(null)
+// The facility's minimums against its stock. Supplementary: the page works
+// without them, so a failed load just leaves the cards ungraded.
+const stockCells = ref([])
+const lowStock = ref([])
+const expiringUnits = ref([])
+const expiringError = ref('')
+const activity = ref([])
+const activityError = ref('')
 
-// --- Filters ---
-const activeBloodType = ref('')
+function toRow(unit) {
+  return {
+    id: unit.id,
+    blood_type: unit.blood_type?.code ?? null,
+    component: unit.component?.name ?? null,
+    volume_ml: unit.volume_ml ?? null,
+    status: unit.status,
+    expiry_date: unit.expiry_date,
+    days_remaining: unit.days_remaining,
+    storage_location: unit.storage_location,
+    donation_id: unit.donation_id,
+    collected_at: unit.collected_at ?? null,
+    recorded_at: unit.recorded_at ?? null,
+    discard_reason: unit.discard_reason ?? null,
+  }
+}
+
+async function loadReference() {
+  try {
+    const reference = await bloodCenterService.referenceData()
+    // Blood types arrive as {id, code, label} and components as {id, name, …};
+    // the selects filter by id, which is what the server listing takes.
+    bloodTypeOptions.value = orderDashboardTypes(reference?.blood_types ?? [])
+    componentOptions.value = reference?.components ?? []
+    statusOptions.value = reference?.statuses ?? []
+    storageLocationOptions.value = reference?.storage_locations ?? []
+  } catch (err) {
+    console.error('Failed to load inventory reference data:', err)
+  }
+}
+
+async function loadOverview() {
+  const [summaryData, thresholdData, expiring, recent] = await Promise.all([
+    bloodCenterService.inventorySummary().catch((err) => {
+      console.error('Failed to load the inventory summary:', err)
+      return null
+    }),
+    bloodCenterService.stockThresholds().catch(() => null),
+    bloodCenterService.inventory({ expiring_within_days: 7, per_page: 6 }).catch(() => null),
+    bloodCenterService.inventoryActivity({ per_page: 6 }).catch(() => null),
+  ])
+
+  loadError.value = summaryData ? '' : 'The inventory summary could not be loaded. The figures below may be out of date.'
+  if (summaryData) {
+    summary.value = summaryData
+    if (summaryData.storage_locations?.length) storageLocationOptions.value = summaryData.storage_locations
+  }
+
+  thresholds.value = thresholdData
+  stockCells.value = thresholdData?.cells ?? []
+  lowStock.value = thresholdData?.low ?? []
+
+  expiringError.value = expiring ? '' : 'Units close to expiry could not be loaded.'
+  if (expiring) expiringUnits.value = (expiring.data ?? []).map(toRow)
+
+  activityError.value = recent ? '' : 'Recent activity could not be loaded.'
+  if (recent) activity.value = recent.data ?? []
+
+  lastUpdated.value = new Date()
+}
+
+// --- KPI row ---
+const availableTotal = computed(() => {
+  // Counted from the same issuable cells as the cards below, so the headline
+  // and the cards always add up. The summary's count is the fallback.
+  if (stockCells.value.length) return stockCells.value.reduce((sum, cell) => sum + cell.available, 0)
+  return summary.value?.totals?.available ?? null
+})
+
+const anyMinimumSet = computed(() => stockCells.value.some((cell) => cell.minimum_units !== null))
+const typesBelowMinimum = computed(() => typeCards.value.filter((card) => card.level === 'low' || card.level === 'critical').length)
+
+const kpis = computed(() => {
+  const added = summary.value?.released_last_7_days ?? 0
+
+  return [
+    {
+      key: 'available',
+      label: 'Total Available Units',
+      value: formatCount(availableTotal.value),
+      sub: added > 0 ? `+${formatCount(added)} added in 7 days` : 'None added in 7 days',
+      rising: added > 0,
+      icon: 'blood-drop',
+      tone: 'neutral',
+    },
+    {
+      key: 'critical',
+      label: 'Critical Low Stock',
+      value: anyMinimumSet.value ? formatCount(typesBelowMinimum.value) : '—',
+      sub: anyMinimumSet.value
+        ? `type${typesBelowMinimum.value === 1 ? '' : 's'} below critical level`
+        : 'No critical levels set',
+      icon: 'triangle-alert',
+      // State rides on the icon alone: every card shares one surface.
+      tone: !anyMinimumSet.value ? 'muted' : typesBelowMinimum.value > 0 ? 'danger' : 'success',
+      to: '/blood-center/stock-thresholds',
+    },
+    {
+      key: 'expiring',
+      label: 'Expiring Soon',
+      value: formatCount(summary.value?.near_expiry?.within_7_days),
+      sub: 'units (≤ 7 days)',
+      icon: 'clock',
+      tone: Number(summary.value?.near_expiry?.within_7_days) > 0 ? 'warning' : 'neutral',
+      onClick: showExpiringInList,
+    },
+    {
+      key: 'reserved',
+      label: 'Reserved for Requests',
+      value: formatCount(summary.value?.totals?.reserved),
+      sub: 'units',
+      icon: 'clipboard-list',
+      tone: 'neutral',
+      onClick: () => showStatusInList('reserved'),
+    },
+    {
+      key: 'issued',
+      label: 'Issued Today',
+      value: formatCount(summary.value?.issued_today),
+      sub: 'units',
+      icon: 'send',
+      tone: 'neutral',
+      ...(canSeeFulfillment.value ? { to: '/blood-center/fulfillment' } : {}),
+    },
+  ]
+})
+
+// --- Blood type availability ---
+const typeCards = computed(() => {
+  const types = orderDashboardTypes(thresholds.value?.blood_types ?? bloodTypeOptions.value)
+  // Catalogue order, Whole Blood first, rather than the server's by-name order.
+  const components = [...(thresholds.value?.components ?? [])].sort((a, b) => a.id - b.id)
+  const summaryByCode = new Map((summary.value?.by_blood_type ?? []).map((row) => [row.code, row.available]))
+
+  return types.map(({ id, code }) => {
+    const own = stockCells.value.filter((cell) => cell.blood_type_id === id)
+    // "Low" is the facility's own judgement: a type is graded against the
+    // minimums staff set on the Stock Thresholds page, and the worst monitored
+    // component decides. A type with no minimum set is not graded.
+    const level = typeHealthByCode(stockCells.value, code)
+
+    return {
+      id,
+      code,
+      rare: isRareBloodType(code),
+      level,
+      coverage: typeCoverage(stockCells.value, id),
+      total: own.length ? own.reduce((sum, cell) => sum + cell.available, 0) : Number(summaryByCode.get(code)) || 0,
+      components: components.map((component) => {
+        const cell = own.find((c) => c.component_id === component.id)
+        return {
+          id: component.id,
+          code: component.code,
+          name: component.name,
+          available: cell?.available ?? 0,
+          minimum: cell?.minimum_units ?? null,
+          status: cell?.status ?? 'unmonitored',
+        }
+      }),
+    }
+  })
+})
+
+// Each component's meter shares one scale across the types, so a short
+// shelf reads short beside the others: the most any type holds, or its
+// critical level if that is more.
+const compScale = computed(() => {
+  const scale = new Map()
+  for (const cell of stockCells.value) {
+    const top = Math.max(cell.available, cell.minimum_units ?? 0)
+    scale.set(cell.component_id, Math.max(scale.get(cell.component_id) ?? 1, top))
+  }
+  return scale
+})
+const compWidth = (comp, n) => Math.min(100, ((n || 0) / (compScale.value.get(comp.id) ?? 1)) * 100)
+
+const LEVELS = {
+  ok: { label: 'Good Stock', tone: 'success' },
+  low: { label: 'Low Stock', tone: 'warning' },
+  critical: { label: 'Critical Low', tone: 'danger' },
+  unmonitored: { label: 'No level set', tone: 'muted' },
+}
+const levelLabel = (level) => LEVELS[level]?.label ?? level
+const levelTone = (level) => LEVELS[level]?.tone ?? 'muted'
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 26
+function ringDash(coverage) {
+  const filled = (Math.min(100, Math.max(0, coverage)) / 100) * RING_CIRCUMFERENCE
+  return `${filled.toFixed(2)} ${RING_CIRCUMFERENCE.toFixed(2)}`
+}
+
+function ringTitle(card) {
+  return card.coverage === null
+    ? `No critical level is set for ${card.code}.`
+    : `${card.coverage}% of ${card.code}'s critical level is on the shelf.`
+}
+
+function componentTitle(comp) {
+  return comp.minimum === null
+    ? `${comp.name}: ${comp.available} issuable, no critical level set`
+    : `${comp.name}: ${comp.available} issuable, critical level ${comp.minimum}`
+}
+
+function typeCardLabel(card) {
+  const coverage = card.coverage === null ? 'no critical level set' : `${card.coverage}% of critical level on the shelf`
+  const filtered = filters.bloodTypeId === card.id
+  return `${card.code}${card.rare ? ', rare' : ''}: ${card.total} issuable unit${card.total === 1 ? '' : 's'}, ${levelLabel(card.level)}, ${coverage}. ${filtered ? 'Showing only this type below; press to show all.' : 'Press to show only this type below.'}`
+}
+
+function toggleTypeFilter(card) {
+  filters.bloodTypeId = filters.bloodTypeId === card.id ? '' : card.id
+}
+
+// --- Inventory list (server-paginated) ---
+const PAGE_SIZE = 8
+const listSection = ref(null)
+const units = ref([])
+const unitsLoading = ref(false)
+const unitsError = ref('')
+const unitsMeta = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
+
 const filters = reactive({
   search: '',
-  bloodType: '',
-  component: '',
+  bloodTypeId: '',
+  componentId: '',
+  expiryRisk: '',
   status: '',
-  storageLocation: '',
-  expiryStatus: '',
-  sortBy: 'last_updated',
+  // Newest bags first: every status is listed, and in FEFO order the list
+  // would open on units that left long ago.
+  sort: 'recent',
 })
 
-const activeFilterCount = computed(() => {
-  let count = 0
-  if (filters.search.trim()) count++
-  if (filters.bloodType) count++
-  if (filters.component) count++
-  if (filters.status) count++
-  if (filters.storageLocation) count++
-  if (filters.expiryStatus) count++
-  return count
-})
+const hasActiveFilters = computed(() =>
+  Boolean(filters.search.trim() || filters.bloodTypeId || filters.componentId || filters.expiryRisk || filters.status),
+)
 
-function toggleBloodTypeFilter(bt) {
-  if (activeBloodType.value === bt) {
-    activeBloodType.value = ''
-    filters.bloodType = ''
-  } else {
-    activeBloodType.value = bt
-    filters.bloodType = bt
-  }
-  page.value = 1
+function unitParams(page) {
+  const params = { page, per_page: PAGE_SIZE, sort: filters.sort }
+  const search = filters.search.trim()
+
+  if (search) params.search = search
+  if (filters.bloodTypeId) params.blood_type_id = filters.bloodTypeId
+  if (filters.componentId) params.component_id = filters.componentId
+
+  // Expiry risk and status are one choice at a time (see the change handlers):
+  // "expiring within" lists available units only, and "expired" is a status.
+  if (filters.expiryRisk === 'expired') params.status = 'expired'
+  else if (filters.expiryRisk) params.expiring_within_days = Number(filters.expiryRisk)
+  else if (filters.status) params.status = filters.status
+
+  return params
 }
 
-function resetFilters() {
-  filters.search = ''
-  filters.bloodType = ''
-  filters.component = ''
-  filters.status = ''
-  filters.storageLocation = ''
-  filters.expiryStatus = ''
-  filters.sortBy = 'last_updated'
-  activeBloodType.value = ''
-  page.value = 1
-}
-function applyFilters() {
-  page.value = 1
-}
+let unitsTicket = 0
+async function loadUnits(page = unitsMeta.page, { quiet = false } = {}) {
+  const ticket = ++unitsTicket
+  if (!quiet) unitsLoading.value = true
 
-// The column chart and the select drive the same filter; keep them in step.
-function onBloodTypeSelect() {
-  activeBloodType.value = filters.bloodType
-  applyFilters()
-}
+  try {
+    const response = await bloodCenterService.inventory(unitParams(page))
+    if (ticket !== unitsTicket) return
 
-const showMoreFilters = ref(false)
+    const lastPage = response?.last_page ?? 1
 
-const EXPIRY_LABELS = {
-  expired: 'Expired', today: 'Expiring today', '3days': 'Within 3 days', '7days': 'Within 7 days', ok: 'Not near expiry',
-}
-
-/** What is applied, worded so each chip reads on its own. */
-const activeFilterChips = computed(() => {
-  const chips = []
-  if (filters.search.trim()) chips.push({ key: 'search', label: `"${filters.search.trim()}"` })
-  if (filters.bloodType) chips.push({ key: 'bloodType', label: filters.bloodType })
-  if (filters.component) {
-    const label = componentOptions.value.find((c) => c.value === filters.component)?.label || filters.component
-    chips.push({ key: 'component', label })
-  }
-  if (filters.status) {
-    const label = statusOptions.value.find((st) => st.value === filters.status)?.label || filters.status
-    chips.push({ key: 'status', label })
-  }
-  if (filters.storageLocation) chips.push({ key: 'storageLocation', label: filters.storageLocation })
-  if (filters.expiryStatus) chips.push({ key: 'expiryStatus', label: EXPIRY_LABELS[filters.expiryStatus] || filters.expiryStatus })
-  return chips
-})
-
-function clearFilter(key) {
-  filters[key] = ''
-  if (key === 'bloodType') activeBloodType.value = ''
-  applyFilters()
-}
-
-// --- Header "More" menu ---
-const moreMenuOpen = ref(false)
-function onMoreMenuFocusOut(event) {
-  if (!event.currentTarget.contains(event.relatedTarget)) moreMenuOpen.value = false
-}
-
-function daysRemaining(expiryDate) {
-  if (!expiryDate) return null
-  const expiry = new Date(expiryDate)
-  if (Number.isNaN(expiry.getTime())) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  expiry.setHours(0, 0, 0, 0)
-  return Math.round((expiry - today) / 86400000)
-}
-
-function matchesExpiryFilter(row, filterValue) {
-  const d = daysRemaining(row.expiry_date)
-  if (d === null) return false
-  switch (filterValue) {
-    case 'expired': return d < 0
-    case 'today': return d === 0
-    case '3days': return d >= 0 && d <= 3
-    case '7days': return d >= 0 && d <= 7
-    case 'ok': return d > 7
-    default: return true
-  }
-}
-
-const filteredBatches = computed(() => {
-  const q = filters.search.trim().toLowerCase()
-  let list = inventoryBatches.value.filter(row => {
-    if (q) {
-      const haystack = `${row.batch_id} ${row.blood_type} ${row.component} ${row.storage_location || ''}`.toLowerCase()
-      if (!haystack.includes(q)) return false
+    // A refresh can find the page gone (units discarded, a filter narrowed).
+    if (!response?.data?.length && page > 1 && lastPage < page) {
+      await loadUnits(lastPage, { quiet })
+      return
     }
-    if (filters.bloodType && row.blood_type !== filters.bloodType) return false
-    if (filters.component && row.component !== filters.component) return false
-    if (filters.status && row.status !== filters.status) return false
-    if (filters.storageLocation && row.storage_location !== filters.storageLocation) return false
-    if (filters.expiryStatus && !matchesExpiryFilter(row, filters.expiryStatus)) return false
-    return true
-  })
 
-  list = [...list].sort((a, b) => {
-    const col = filters.sortBy
-    if (col === 'expiry_date') return new Date(a.expiry_date) - new Date(b.expiry_date)
-    if (col === 'blood_type') return a.blood_type.localeCompare(b.blood_type)
-    if (col === 'available_units') return b.available_units - a.available_units
-    return new Date(b.last_updated_at || 0) - new Date(a.last_updated_at || 0)
-  })
-
-  return list
-})
-
-// --- Pagination ---
-const page = ref(1)
-const pageSize = 10
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredBatches.value.length / pageSize)))
-const paginatedBatches = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return filteredBatches.value.slice(start, start + pageSize)
-})
-
-// --- Available units by blood type (column chart) ---
-const bloodTypeViews = [
-  { label: 'Chart', value: 'chart' },
-  { label: 'Table', value: 'table' },
-]
-const bloodTypeView = ref('chart')
-const hoveredBloodType = ref(null)
-
-const bloodTypeSummary = computed(() => {
-  // Counted by the server rather than re-derived from the rows on this page:
-  // those rows are one page of units, so summing them would report a page
-  // total as though it were the facility's whole stock.
-  const available = new Map(
-    (inventorySummaryData.value?.by_blood_type ?? []).map(row => [row.code, row.available])
-  )
-
-  const totals = bloodTypeOptions.value.map(code => [code, Number(available.get(code)) || 0])
-
-  // Scaled to the tallest column rather than a fixed ceiling: there is no
-  // configured capacity per type to measure against, so the chart compares
-  // the types with each other and nothing else.
-  const max = Math.max(0, ...totals.map(([, total]) => total))
-
-  return totals.map(([code, total]) => {
-    // Only the two ends are claimed. Grading "low" needs a per-type minimum
-    // that nothing in this system configures, and inventing a threshold here
-    // would put a stock-level judgement on screen that nobody has made. The
-    // old code read r.status === 'critical' | 'low', which are not unit
-    // statuses at all, so every card reported "Healthy" regardless.
-    const health = total === 0 ? 'critical' : 'healthy'
-
-    return { blood_type: code, total_units: total, health, height: max ? (total / max) * 100 : 0 }
-  })
-})
-
-const bloodTypeTotal = computed(() => bloodTypeSummary.value.reduce((sum, bt) => sum + bt.total_units, 0))
-
-function healthLabel(h) {
-  const map = { healthy: 'Healthy', low: 'Low', critical: 'Critical' }
-  return map[h] || h
+    units.value = (response?.data ?? []).map(toRow)
+    unitsMeta.page = response?.current_page ?? page
+    unitsMeta.lastPage = lastPage
+    unitsMeta.total = response?.total ?? units.value.length
+    unitsMeta.from = response?.from ?? 0
+    unitsMeta.to = response?.to ?? 0
+    unitsError.value = ''
+  } catch (err) {
+    if (ticket !== unitsTicket) return
+    console.error('Failed to load blood units:', err)
+    unitsError.value = err?.data?.message || 'The units could not be loaded.'
+  } finally {
+    if (ticket === unitsTicket) unitsLoading.value = false
+  }
 }
 
-// --- Inventory health summary stats ---
-const totalInventoryUnits = computed(() =>
-  inventoryBatches.value.length ? inventoryBatches.value.reduce((s, r) => s + (r.available_units || 0), 0) : null
+const unitRows = computed(() =>
+  units.value.map((row) => ({
+    ...row,
+    tag: unitStatusTag(row.status, row.days_remaining),
+    availability: unitAvailability(row.status),
+    remaining: remainingDaysTag(row.status, row.days_remaining),
+  })),
 )
-const totalReservedUnits = computed(() =>
-  inventoryBatches.value.length ? inventoryBatches.value.reduce((s, r) => s + (r.reserved_units || 0), 0) : null
+
+const pages = computed(() => pageWindow(unitsMeta.page, unitsMeta.lastPage))
+
+watch(
+  () => [filters.bloodTypeId, filters.componentId, filters.expiryRisk, filters.status, filters.sort],
+  () => loadUnits(1),
 )
-const healthyBatchCount = computed(() => inventoryBatches.value.filter(r => r.status === 'available').length)
-const expiringSoonCount = computed(() => inventoryBatches.value.filter(r => {
-  const d = daysRemaining(r.expiry_date)
-  return d !== null && d >= 0 && d <= 7
-}).length)
 
-function statusLabel(status) {
-  const map = { available: 'Available', reserved: 'Reserved', low: 'Low', critical: 'Critical', expired: 'Expired' }
-  return map[status] || status
-}
-
-function formatDate(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-}
-
-function daysRemainingLabel(expiryDate) {
-  const d = daysRemaining(expiryDate)
-  if (d === null) return 'Expiry date not set'
-  if (d < 0) return `Expired ${Math.abs(d)} day${Math.abs(d) !== 1 ? 's' : ''} ago`
-  if (d === 0) return 'Expires today'
-  return `${d} day${d !== 1 ? 's' : ''} remaining`
-}
-
-function expiryTier(days) {
-  if (days <= 0) return 'critical'
-  if (days <= 3) return 'critical'
-  if (days <= 7) return 'low'
-  return 'available'
-}
-
-// --- Expiry alert banner ---
-const expiryAlert = reactive({ visible: true })
-const expiringBatches = computed(() =>
-  inventoryBatches.value.filter(r => {
-    const d = daysRemaining(r.expiry_date)
-    return d !== null && d >= 0 && d <= 3
-  })
+let searchTimer = null
+watch(
+  () => filters.search,
+  () => {
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => loadUnits(1), 300)
+  },
 )
-function showExpiringInRecords() {
-  filters.expiryStatus = '3days'
-  filters.sortBy = 'expiry_date'
-  showMoreFilters.value = true
-  applyFilters()
-  inventoryTableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+function onExpiryRiskChange() {
+  if (!filters.expiryRisk) return
+  filters.status = ''
+  // The soonest to go first, once the list is about expiry.
+  filters.sort = 'fefo'
 }
 
-// --- Records table helpers ---
-function sortBy(key) {
-  filters.sortBy = key
-  applyFilters()
+function onStatusChange() {
+  if (filters.status) filters.expiryRisk = ''
 }
 
-/** "Expired", "Today", "In 3 days"... with a tone for the badge. */
-function expiryBadge(row) {
-  const d = daysRemaining(row.expiry_date)
-  if (d === null) return { label: 'No date', tone: 'muted' }
-  if (d < 0) return { label: 'Expired', tone: 'critical' }
-  if (d === 0) return { label: 'Today', tone: 'critical' }
-  if (d <= 3) return { label: `In ${d} day${d !== 1 ? 's' : ''}`, tone: 'critical' }
-  if (d <= 7) return { label: `In ${d} days`, tone: 'low' }
-  return { label: `In ${d} days`, tone: 'ok' }
+function clearFilters() {
+  Object.assign(filters, { search: '', bloodTypeId: '', componentId: '', expiryRisk: '', status: '', sort: 'recent' })
 }
+
+function scrollToList() {
+  nextTick(() => listSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+
+function showExpiringInList() {
+  Object.assign(filters, { expiryRisk: '7', status: '', sort: 'fefo' })
+  scrollToList()
+}
+
+function showStatusInList(status) {
+  Object.assign(filters, { status, expiryRisk: '' })
+  scrollToList()
+}
+
+// --- What can be done to a unit ---
+const isEditable = (row) => !['issued', 'discarded'].includes(row?.status)
+// A unit held for a request is given up through Request Fulfillment, not here.
+const isDiscardable = (row) => ['available', 'expired', 'quarantined'].includes(row?.status)
 
 // --- Row action menu ---
 const openMenuId = ref(null)
-function toggleRowMenu(id) {
-  openMenuId.value = openMenuId.value === id ? null : id
+function onRowMenuFocusOut(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) openMenuId.value = null
 }
 
-function handleRowAction(action, row) {
+function rowAction(action, row) {
   openMenuId.value = null
-  if (action === 'view' || action === 'history') { openDetailsDrawer(row); return }
-  if (action === 'edit') { openEditBatchModal(row); return }
-  if (action === 'print') { openPrintLabelsModal(row); return }
-  if (['reserve', 'release', 'transfer', 'archive', 'discard'].includes(action)) {
-    openManageModal(row, action)
-    return
-  }
-  if (action === 'mark-expiring') {
-    // Nothing to call. A unit expires from the expiry_date it already carries,
-    // swept server-side, so there is no flag to set by hand. This previously
-    // called markAsExpiring?.(), which does not exist and did nothing. Editing
-    // the date is the only real action, so offer that.
-    openEditBatchModal(row)
-  }
+  if (action === 'view') openDetails(row)
+  else if (action === 'edit') openEditBatchModal(row)
+  else if (action === 'discard') openDiscard(row)
 }
 
-const inventoryTableSection = ref(null)
-function openBatchDetail(row) {
-  if (row.days_remaining <= 0) filters.expiryStatus = 'today'
-  else if (row.days_remaining <= 3) filters.expiryStatus = '3days'
-  else filters.expiryStatus = '7days'
-  page.value = 1
-  inventoryTableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
+// --- Unit details drawer ---
+const drawerUnit = ref(null)
+const drawerHistory = ref([])
+const drawerHistoryLoading = ref(false)
+const drawerHistoryError = ref('')
 
-// --- Inventory detail drawer (View Details) ---
-const drawerOpen = ref(false)
-const drawerBatch = ref(null)
-function openDetailsDrawer(row) {
-  drawerBatch.value = row
-  drawerOpen.value = true
+const drawerTag = computed(() => (drawerUnit.value ? unitStatusTag(drawerUnit.value.status, drawerUnit.value.days_remaining) : null))
+const drawerRemaining = computed(() => {
+  const unit = drawerUnit.value
+  if (!unit || unit.days_remaining === null || unit.days_remaining === undefined) return ''
+  if (['issued', 'discarded'].includes(unit.status)) return ''
+  const d = unit.days_remaining
+  if (d < 0) return `Expired ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} ago`
+  if (d === 0) return 'Expires today'
+  return `${d} day${d === 1 ? '' : 's'} remaining`
+})
+const drawerActions = computed(() => {
+  const unit = drawerUnit.value
+  if (!unit) return false
+  return (canChangeUnit.value && isEditable(unit))
+    || (canDiscardUnits.value && isDiscardable(unit))
+})
+
+async function openDetails(row) {
   openMenuId.value = null
-}
-function closeDetailsDrawer() {
-  drawerOpen.value = false
-  drawerBatch.value = null
-}
-function editFromDrawer() {
-  const row = drawerBatch.value
-  closeDetailsDrawer()
-  if (row) openEditBatchModal(row)
-}
-function reserveFromDrawer() {
-  const row = drawerBatch.value
-  closeDetailsDrawer()
-  if (row) openManageModal(row, 'reserve')
-}
-function transferFromDrawer() {
-  const row = drawerBatch.value
-  closeDetailsDrawer()
-  if (row) openManageModal(row, 'transfer')
-}
-function printFromDrawer() {
-  const row = drawerBatch.value
-  closeDetailsDrawer()
-  if (row) openPrintLabelsModal(row)
-}
+  drawerUnit.value = row
+  drawerHistory.value = []
+  drawerHistoryError.value = ''
+  drawerHistoryLoading.value = true
 
-// --- Inventory trend chart ---
-const chartWidth = 560
-const chartHeight = 200
-const chartPadding = { top: 16, right: 14, bottom: 26, left: 14 }
-const gridLines = [chartPadding.top, (chartHeight - chartPadding.bottom + chartPadding.top) / 2, chartHeight - chartPadding.bottom]
-
-const trendRanges = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-]
-const trendRange = ref('weekly')
-const inventoryTrends = reactive({ weekly: [], monthly: [], quarterly: [] })
-const currentTrendData = computed(() => inventoryTrends[trendRange.value] || [])
-
-const trendScale = computed(() => {
-  const data = currentTrendData.value
-  if (!data.length) return { max: 1, min: 0 }
-  const values = data.flatMap(d => [d.available, d.reserved])
-  return { max: Math.max(...values), min: 0 }
-})
-function xForIndex(i, len) {
-  const innerWidth = chartWidth - chartPadding.left - chartPadding.right
-  if (len <= 1) return chartPadding.left
-  return chartPadding.left + (innerWidth * i) / (len - 1)
-}
-function yForValue(v) {
-  const innerHeight = chartHeight - chartPadding.top - chartPadding.bottom
-  const { max, min } = trendScale.value
-  if (max === min) return chartHeight - chartPadding.bottom
-  const ratio = (v - min) / (max - min)
-  return chartHeight - chartPadding.bottom - ratio * innerHeight
-}
-function pointsToPath(points) {
-  return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
-}
-const availablePoints = computed(() =>
-  currentTrendData.value.map((d, i) => ({ x: xForIndex(i, currentTrendData.value.length), y: yForValue(d.available), value: d.available, label: d.label }))
-)
-const reservedPoints = computed(() =>
-  currentTrendData.value.map((d, i) => ({ x: xForIndex(i, currentTrendData.value.length), y: yForValue(d.reserved), value: d.reserved, label: d.label }))
-)
-const availablePath = computed(() => pointsToPath(availablePoints.value))
-const reservedPath = computed(() => pointsToPath(reservedPoints.value))
-const areaPath = computed(() => {
-  if (!availablePoints.value.length) return ''
-  const baseline = chartHeight - chartPadding.bottom
-  const pts = availablePoints.value
-  return `${pointsToPath(pts)} L ${pts[pts.length - 1].x.toFixed(1)} ${baseline} L ${pts[0].x.toFixed(1)} ${baseline} Z`
-})
-const hoveredPointIndex = ref(null)
-
-// --- Component distribution donut chart ---
-const donutRadius = 58
-const donutCircumference = 2 * Math.PI * donutRadius
-const componentDistributionOverride = ref([])
-const hoveredDonut = ref(null)
-
-const componentColorMap = {
-  'Packed RBC': 'var(--rb-primary)',
-  'Whole Blood': 'var(--rb-accent)',
-  'Fresh Frozen Plasma': 'var(--rb-purple)',
-  'Platelet Concentrate': 'var(--rb-teal)',
-  Cryoprecipitate: 'var(--rb-warning)',
-  Cryosupernate: 'var(--rb-success)',
-}
-
-const computedDistribution = computed(() => {
-  if (componentDistributionOverride.value.length) return componentDistributionOverride.value
-  const sums = {}
-  inventoryBatches.value.forEach(row => {
-    const label = componentOptions.value.find(c => c.value === row.component)?.label || row.component
-    sums[label] = (sums[label] || 0) + (row.available_units || 0)
-  })
-  return Object.entries(sums).map(([label, value]) => ({ label, value, color: componentColorMap[label] || 'var(--rb-text-secondary)' }))
-})
-
-const donutTotal = computed(() => computedDistribution.value.reduce((s, d) => s + d.value, 0))
-const donutSegments = computed(() => {
-  let cumulative = 0
-  const total = donutTotal.value || 1
-  return computedDistribution.value.map(seg => {
-    const pct = seg.value / total
-    const dash = pct * donutCircumference
-    const geo = {
-      ...seg,
-      pct: Math.round(pct * 100),
-      dasharray: `${dash.toFixed(2)} ${(donutCircumference - dash).toFixed(2)}`,
-      dashoffset: (-cumulative).toFixed(2),
-    }
-    cumulative += dash
-    return geo
-  })
-})
-
-// --- Recent inventory activity ---
-const activityLog = ref([])
-
-// --- Quick actions ---
-const quickActions = [
-  {
-    label: 'Record Donation',
-    description: 'Register newly collected blood.',
-    icon: 'droplets',
-    kind: 'link',
-    to: '/blood-center/dashboard',
-    tier: 'primary',
-  },
-  {
-    label: 'Record Stock',
-    description: 'Book a cleared donation onto the shelf.',
-    icon: 'plus',
-    kind: 'link',
-    to: '/blood-center/inventory-intake',
-    tier: 'primary',
-  },
-  {
-    label: 'Transfer Units',
-    description: 'Move units between supported facilities.',
-    icon: 'send',
-    kind: 'manage',
-    tier: 'secondary',
-  },
-  {
-    label: 'Print Labels',
-    description: 'Generate and print blood unit labels.',
-    icon: 'printer',
-    kind: 'print',
-    tier: 'secondary',
-  },
-  {
-    label: 'Inventory Report',
-    description: 'View or export inventory reports.',
-    icon: 'file-text',
-    kind: 'report',
-    tier: 'secondary',
-  },
-]
-const secondaryQuickActions = computed(() => quickActions.filter(a => a.tier === 'secondary'))
-
-function handleQuickAction(action) {
-  if (action.kind === 'manage') return openManageModal(null, 'transfer')
-  if (action.kind === 'print') return openPrintLabelsModal()
-  if (action.kind === 'report') {
-    return navigateTo('/blood-center/reports')
-  }
-  if (action.kind === 'link' && action.to) return navigateTo(action.to)
-}
-
-async function syncInventory() {
-  syncing.value = true
   try {
-    // There is no /inventory/sync endpoint and never was. Re-reading the
-    // facility's stock is all "sync" ever meant here.
-    await loadDashboard()
+    const response = await bloodCenterService.inventoryActivity({ unit_id: row.id, per_page: 50 })
+    if (drawerUnit.value?.id === row.id) drawerHistory.value = response?.data ?? []
   } catch (err) {
-    console.error('Failed to sync inventory:', err)
+    console.error('Failed to load unit history:', err)
+    if (drawerUnit.value?.id === row.id) drawerHistoryError.value = 'This unit\'s history could not be loaded.'
   } finally {
-    syncing.value = false
+    if (drawerUnit.value?.id === row.id) drawerHistoryLoading.value = false
   }
 }
 
-// --- Add / Edit batch modal ---
+function closeDetails() {
+  drawerUnit.value = null
+}
+
+function fromDrawer(action) {
+  const row = drawerUnit.value
+  closeDetails()
+  if (row) rowAction(action, row)
+}
+
+// --- All activity drawer ---
+const activityDrawerOpen = ref(false)
+const allActivity = ref([])
+const allActivityPage = ref(0)
+const allActivityLastPage = ref(1)
+const allActivityLoading = ref(false)
+const allActivityError = ref('')
+
+async function loadAllActivity(page) {
+  allActivityLoading.value = true
+  allActivityError.value = ''
+  try {
+    const response = await bloodCenterService.inventoryActivity({ page, per_page: 20 })
+    allActivity.value = page === 1 ? (response?.data ?? []) : [...allActivity.value, ...(response?.data ?? [])]
+    allActivityPage.value = response?.current_page ?? page
+    allActivityLastPage.value = response?.last_page ?? page
+  } catch (err) {
+    console.error('Failed to load inventory activity:', err)
+    allActivityError.value = 'Activity could not be loaded.'
+  } finally {
+    allActivityLoading.value = false
+  }
+}
+
+function openActivityDrawer() {
+  activityDrawerOpen.value = true
+  loadAllActivity(1)
+}
+
+// --- Edit unit modal ---
 const batchModalOpen = ref(false)
-const batchModalMode = ref('add')
 const batchSubmitting = ref(false)
 const batchFormError = ref('')
 const editingBatchId = ref(null)
-
-const emptyBatchForm = () => ({
-  bloodType: '',
-  component: '',
-  availableUnits: null,
-  collectionDate: '',
-  expiryDate: '',
-  donationSource: '',
-  storageLocation: '',
-  batchNumber: '',
-  notes: '',
-})
-const batchForm = reactive(emptyBatchForm())
+const editingUnit = ref(null)
+const batchForm = reactive({ storageLocation: '', expiryDate: '' })
 
 // There is deliberately no "add" counterpart. Stock is created by booking a
 // cleared donation in at /blood-center/inventory-intake, because every unit has
@@ -1475,27 +1213,83 @@ function openEditBatchModal(row) {
     expiryDate: row.expiry_date || '',
     storageLocation: row.storage_location || '',
   })
-  batchModalMode.value = 'edit'
   editingBatchId.value = row.id
+  editingUnit.value = row
   batchFormError.value = ''
   batchModalOpen.value = true
 }
+
 function closeBatchModal() {
   if (batchSubmitting.value) return
   batchModalOpen.value = false
 }
+
+const unitCorrection = ref(null)
+
+function onUnitCorrectionSent(response) {
+  unitCorrection.value = null
+  notice.value = response?.message ?? 'Correction requested.'
+}
+
+// The edit modal sits above the dialog, so it steps aside while the dialog is
+// open and comes back, with what was typed, if the request is cancelled.
+function closeUnitCorrection() {
+  unitCorrection.value = null
+  batchModalOpen.value = true
+}
+
+/**
+ * What the form changes on the unit, and nothing else.
+ *
+ * An expired unit takes a new expiry date and nothing more — the server refuses
+ * a storage location on it — so sending the untouched location along with a
+ * date change used to make every edit of an expired unit fail.
+ */
+function changedUnitFields(row) {
+  const changes = {}
+
+  if (batchForm.expiryDate && batchForm.expiryDate !== (row.expiry_date || '')) {
+    changes.expiry_date = batchForm.expiryDate
+  }
+
+  if (row.status !== 'expired' && (batchForm.storageLocation || null) !== (row.storage_location || null)) {
+    changes.storage_location = batchForm.storageLocation || null
+  }
+
+  return changes
+}
+
 async function submitBatchForm() {
   if (!editingBatchId.value) return
+
+  const row = editingUnit.value
+  const changes = row ? changedUnitFields(row) : {}
+
+  if (!Object.keys(changes).length) {
+    batchFormError.value = 'Nothing has changed yet.'
+    return
+  }
+
+  // Anyone but the head files a correction: the change is reviewed in the
+  // dialog and applied only once it is approved.
+  if (!canEditUnit.value) {
+    batchFormError.value = ''
+    unitCorrection.value = {
+      unitId: editingBatchId.value,
+      changes,
+      previous: { storage_location: row.storage_location || null, expiry_date: row.expiry_date || null },
+    }
+    batchModalOpen.value = false
+    return
+  }
 
   batchSubmitting.value = true
   batchFormError.value = ''
   try {
-    await bloodCenterService.updateBloodUnit(editingBatchId.value, {
-      storage_location: batchForm.storageLocation || null,
-      ...(batchForm.expiryDate ? { expiry_date: batchForm.expiryDate } : {}),
-    })
+    await bloodCenterService.updateBloodUnit(editingBatchId.value, changes)
     batchModalOpen.value = false
-    await loadDashboard()
+    notice.value = `Unit ${editingBatchId.value} updated.`
+    await refreshAll({ quiet: true })
   } catch (err) {
     console.error('Failed to update blood unit:', err)
     batchFormError.value = err?.data?.message || 'Something went wrong while saving. Please try again.'
@@ -1504,761 +1298,699 @@ async function submitBatchForm() {
   }
 }
 
-// --- Manage inventory modal (reserve/release/transfer/archive/discard) ---
-const manageModalOpen = ref(false)
-const manageTargetBatch = ref(null)
-const manageActionNote = ref('')
-function openManageModal(row, presetAction) {
-  manageTargetBatch.value = row
-  manageModalOpen.value = true
-  if (presetAction && row) runManageAction(presetAction)
+// --- Discard ---
+const discardTarget = ref(null)
+const discardReason = ref('')
+const discardSubmitting = ref(false)
+const discardError = ref('')
+
+function openDiscard(row) {
+  discardTarget.value = row
+  discardReason.value = ''
+  discardError.value = ''
 }
-function closeManageModal() {
-  manageModalOpen.value = false
-  manageTargetBatch.value = null
+
+function closeDiscard() {
+  if (discardSubmitting.value) return
+  discardTarget.value = null
 }
-/**
- * Only discard is a direct action on a unit.
- *
- * Reserving and releasing happen by allocating a unit to a hospital request,
- * not by editing the unit here, and there is no transfer or archive endpoint at
- * all. Those used to call `manageInventoryAction?.()`, which does not exist —
- * the modal closed and nothing happened. They now say so instead.
- */
-async function runManageAction(action) {
-  const row = manageTargetBatch.value
 
-  if (action === 'print') {
-    manageModalOpen.value = false
-    openPrintLabelsModal(row)
-    return
-  }
+async function submitDiscard() {
+  const row = discardTarget.value
+  const reason = discardReason.value.trim()
+  if (!row || !reason) return
 
-  if (action !== 'discard') {
-    manageModalOpen.value = false
-    manageActionNote.value = action === 'reserve' || action === 'release'
-      ? 'Units are reserved and released by allocating them to a hospital request, under Request Fulfillment.'
-      : `There is no "${action}" action for a blood unit. Discard it if it can no longer be issued.`
-    return
-  }
-
-  const reason = window.prompt('Why is this unit being discarded?')
-
-  if (!reason?.trim()) return
-
+  discardSubmitting.value = true
+  discardError.value = ''
   try {
-    await bloodCenterService.discardBloodUnit(row?.id, { reason: reason.trim() })
-    await loadDashboard()
+    await bloodCenterService.discardBloodUnit(row.id, { reason })
+    discardSubmitting.value = false
+    discardTarget.value = null
+    notice.value = `Unit ${row.id} discarded.`
+    await refreshAll({ quiet: true })
   } catch (err) {
     console.error('Failed to discard blood unit:', err)
-    manageActionNote.value = err?.data?.message || 'The unit could not be discarded.'
+    discardError.value = err?.data?.message || 'The unit could not be discarded.'
   } finally {
-    manageModalOpen.value = false
+    discardSubmitting.value = false
   }
 }
 
-// --- Reprint final labels modal ---
-//
-// The same final label Stock Intake prints on release, from the same server
-// data, so a reprint can never say more than the original: verified blood type,
-// expiry, clearance codes, who released it. Released bags only — the server
-// refuses a bag still in quarantine — and never donor information.
-const printModalOpen = ref(false)
-const printSelectedIds = ref([])
-const printSubmitting = ref(false)
-const printError = ref(null)
-const printableBatches = computed(() => inventoryBatches.value.filter(b => (b.available_units || 0) > 0))
-const { print: printLabels } = useLabelPrint()
+// --- Toast ---
+const notice = ref('')
+let noticeTimer = null
+watch(notice, (message) => {
+  clearTimeout(noticeTimer)
+  if (message) noticeTimer = setTimeout(() => { notice.value = '' }, 6000)
+})
 
-function openPrintLabelsModal(presetBatch = null) {
-  printSelectedIds.value = presetBatch ? [presetBatch.id] : []
-  printError.value = null
-  printModalOpen.value = true
+// --- Formatting ---
+function displayType(code) {
+  // A true minus sign, which reads as "minus" aloud and lines up with the plus.
+  return code ? String(code).replace('-', '−') : '—'
 }
-function closePrintLabelsModal() {
-  if (printSubmitting.value) return
-  printModalOpen.value = false
+
+function formatCount(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—'
+  return Number(value).toLocaleString('en-US')
 }
-function togglePrintSelection(row) {
-  const idx = printSelectedIds.value.indexOf(row.id)
-  if (idx === -1) printSelectedIds.value.push(row.id)
-  else printSelectedIds.value.splice(idx, 1)
+
+// Dates as the centre keeps them: its own calendar day, year first.
+function formatDay(value) {
+  if (!value) return '—'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 }
-async function submitPrintLabels() {
-  if (!printSelectedIds.value.length) return
-  printSubmitting.value = true
-  printError.value = null
+
+function formatLongDate(value) {
+  if (!value) return '—'
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00+08:00`) : new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
+  })
+}
+
+const lastUpdatedLabel = computed(() => (lastUpdated.value
+  ? lastUpdated.value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  : ''))
+
+// --- Refresh ---
+async function refreshAll({ quiet = false } = {}) {
+  if (refreshing.value) return
+  refreshing.value = true
   try {
-    // Label data is per donation, so fetch each selected bag's donation once.
-    const donationIds = [...new Set(printSelectedIds.value
-      .map(id => inventoryBatches.value.find(b => b.id === id)?.donation_id)
-      .filter(Boolean))]
-
-    const labels = []
-
-    for (const donationId of donationIds) {
-      const data = await bloodCenterService.bloodLabels(donationId)
-      labels.push(...finalLabelsFrom(data, printSelectedIds.value))
-    }
-
-    if (!labels.length) {
-      printError.value = 'None of the selected bags has a final label to print.'
-      return
-    }
-
-    // Close the modal first, so only the label sheet is on the page to print.
-    printModalOpen.value = false
-    await nextTick()
-    await printLabels(labels, 'final')
-  } catch (err) {
-    printError.value = err?.status === 403 || err?.statusCode === 403
-      ? 'Only Issuance prints final labels.'
-      : err?.data?.message || err?.message || 'The labels could not be prepared.'
+    await Promise.all([loadOverview(), loadUnits(unitsMeta.page, { quiet })])
   } finally {
-    printSubmitting.value = false
+    refreshing.value = false
   }
 }
 
-async function loadDashboard() {
-  loading.value = true
-  try {
-    // Three endpoints that exist. This page used to call a single
-    // `inventoryOverview()` that was never implemented; because it was invoked
-    // as `?.()`, the missing method returned undefined instead of throwing and
-    // the page rendered zeros with no error anywhere. Optional-call on a
-    // service method is banned in this file for that reason.
-    const [units, summary, reference] = await Promise.all([
-      bloodCenterService.inventory({ per_page: 100 }),
-      bloodCenterService.inventorySummary(),
-      bloodCenterService.referenceData(),
-    ])
+// Kept current without a reload, as the thresholds grid is: once a minute, and
+// only while the tab is in view.
+const POLL_MS = 60_000
+let pollTimer = null
 
-    // One row per physical bag. The server records individual units rather than
-    // batches, because a unit has to be traceable back to the donation it came
-    // from — so the counts here are 1 or 0, not a batch quantity.
-    inventoryBatches.value = (units?.data ?? []).map(unit => ({
-      id: unit.id,
-      batch_id: unit.id,
-      blood_type: unit.blood_type?.code ?? null,
-      component: unit.component?.name ?? null,
-      // The bag's volume as Processing recorded it; null for units booked in
-      // before volumes were kept.
-      volume_ml: unit.volume_ml ?? null,
-      status: unit.status,
-      available_units: unit.status === 'available' ? 1 : 0,
-      reserved_units: unit.status === 'reserved' ? 1 : 0,
-      expiry_date: unit.expiry_date,
-      days_remaining: unit.days_remaining,
-      storage_location: unit.storage_location,
-      donation_id: unit.donation_id,
-      last_updated: unit.recorded_at,
-      last_updated_at: unit.recorded_at,
-    }))
+onMounted(async () => {
+  await loadReference()
+  await Promise.all([loadOverview(), loadUnits(1)])
+  loading.value = false
 
-    inventorySummaryData.value = summary ?? null
-    lastSyncedLabel.value = summary?.as_of ? formatDate(summary.as_of) : ''
+  pollTimer = setInterval(() => {
+    now.value = Date.now()
+    if (!document.hidden) refreshAll({ quiet: true })
+  }, POLL_MS)
+})
 
-    // No endpoint serves these three. They stay empty rather than invented —
-    // the panels already explain themselves when there is nothing to show.
-    activityLog.value = []
-    inventoryTrends.weekly = []
-    inventoryTrends.monthly = []
-    inventoryTrends.quarterly = []
-    componentDistributionOverride.value = []
-
-    // Blood types arrive as {id, code, label} but are rendered and compared as
-    // bare codes; components arrive as {id, name, …} but these selects expect
-    // {value, label}. Rendering either one raw puts a JSON object on screen.
-    bloodTypeOptions.value = (reference?.blood_types ?? []).map(t => t.code)
-    componentOptions.value = (reference?.components ?? []).map(c => ({ value: c.name, label: c.name }))
-    statusOptions.value = reference?.statuses ?? []
-    storageLocationOptions.value = summary?.storage_locations ?? reference?.storage_locations ?? []
-  } catch (err) {
-    console.error('Failed to load blood inventory:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(loadDashboard)
+onBeforeUnmount(() => {
+  clearInterval(pollTimer)
+  clearTimeout(searchTimer)
+  clearTimeout(noticeTimer)
+})
 </script>
 
 <style scoped>
+/* A quiet, neutral page. Every container shares one surface and is set apart
+   by a hairline border; hierarchy comes from three steps of grey ink. Colour
+   is kept for state alone (green healthy, amber low, red critical), and only
+   on dots, icons, badges and text, never on a card or a panel.
+
+   Both modes read the app's own tokens, so dark mode has the sidebar's navy
+   surfaces (project owner, 2026-10-19; the page had a charcoal palette of
+   its own), and the child it hosts (the threshold banner) follows without
+   being edited. Dark mode lifts only the page's
+   state colours and row dividers, on this page's root.
+   Teleported dialogs carry the class too. The dark selector sits whole
+   inside :global(): Vue compiles `:global(.dark) .x` to plain `.dark`, which
+   would declare these tokens on <html> and repaint the whole app. */
+.inv-tones {
+  --inv-page: var(--rb-page-bg);
+  --inv-surface: var(--rb-surface);
+  --inv-elevated: var(--rb-surface-alt);
+  --inv-hover: var(--rb-surface-hover);
+  --inv-border: var(--rb-border-strong);
+  --inv-border-soft: var(--rb-border);
+  --inv-text: var(--rb-text-primary);
+  --inv-muted: var(--rb-text-secondary);
+  --inv-faint: var(--rb-text-muted);
+  --inv-ok: #15803D;
+  --inv-warn: #B45309;
+  --inv-crit: #B91C1C;
+  --inv-ok-fill: #1BAF7A;
+  --inv-warn-fill: #EDA100;
+  --inv-crit-fill: #DC2626;
+  --inv-action: var(--rb-primary);
+  --inv-action-hover: var(--rb-primary-hover);
+  --inv-action-text: var(--rb-primary-text);
+  --tone: var(--inv-muted);
+  --tone-fill: var(--inv-faint);
+}
+:global(.dark .inv-tones) {
+  /* Row dividers a step softer than the app's #334155 border, on #1E293B. */
+  --inv-border-soft: var(--ink-hover, #263345);
+  --inv-ok: #4ADE80;
+  --inv-warn: #FBBF24;
+  --inv-crit: #F87171;
+  --inv-ok-fill: #199E70;
+  --inv-warn-fill: #C98500;
+  --inv-crit-fill: #EF4444;
+  color-scheme: dark;
+}
+.tone--success { --tone: var(--inv-ok); --tone-fill: var(--inv-ok-fill); }
+.tone--warning { --tone: var(--inv-warn); --tone-fill: var(--inv-warn-fill); }
+.tone--danger { --tone: var(--inv-crit); --tone-fill: var(--inv-crit-fill); }
+.tone--neutral { --tone: var(--inv-muted); --tone-fill: var(--inv-muted); }
+.tone--muted { --tone: var(--inv-faint); --tone-fill: var(--inv-faint); }
+
+/* The page keeps the app's shared column. Its background is carried past it
+   to the content area's edges, so a wide screen shows no strip beside it. A
+   shadow, not clip-path: a clip would also clip the correction dialog, which
+   is fixed in place rather than teleported, and stack it under the header. */
 .inv-page {
   font-family: var(--rb-font-sans);
   max-width: var(--rb-content-max, 1600px);
-  background: var(--rb-page-bg);
   margin: 0 auto;
+  background: var(--inv-page);
+  box-shadow: 0 0 0 100vmax var(--inv-page);
+  color: var(--inv-text);
   padding: 24px var(--rb-gutter, 24px) 40px;
   transition: background-color 0.2s ease;
 }
 
-.inv-inner { display: flex; flex-direction: column; gap: 20px; }
+/* The layout answers to the width the page is given, not the window's: the
+   sidebar rail changes that width on its own. */
+.inv-inner {
+  display: flex; flex-direction: column; gap: 16px;
+  container-type: inline-size; container-name: inv;
+}
 
 /* Skeleton */
 .skeleton {
   background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
-  border-radius: 14px;
+  border-radius: 12px;
   animation: shimmer 1.4s ease infinite;
 }
-.skeleton--crumb { height: 16px; max-width: 180px; }
-.skeleton--header { height: 44px; max-width: 340px; margin-top: 8px; }
-.skeleton--toolbar { height: 96px; }
-.skeleton--card { height: 108px; }
-.skeleton--panel { border-radius: 14px; }
+.skeleton--header { height: 44px; max-width: 340px; }
+.skeleton--kpi { height: 88px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .stat-card, .quick-action-card, .bt-col, .bt-col__bar, .bt-col__value, .health-card, .spin-icon, .detail-drawer { animation: none !important; transition: none !important; }
+  .skeleton, .spin-icon, .detail-drawer, .gauge__fill, .kpi, .type-card { animation: none !important; transition: none !important; }
 }
 
-.header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
-.header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+/* Focus: the strongest ink, on any surface. */
+.inv-tones :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--inv-text); outline-offset: 2px;
+}
+
+/* Header */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--inv-text); margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--inv-muted); margin: 4px 0 0; }
+.page-head__meta { display: flex; align-items: center; gap: 12px; }
+.live-note { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--inv-muted); }
+.live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok); }
 
 .spin-icon { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.load-error {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 10px;
+  background: var(--inv-surface); border: 1px solid var(--inv-border); color: var(--inv-text); font-size: 13px;
+}
+.load-error :deep(svg) { color: var(--inv-crit); }
+.load-error span { flex: 1; }
+
+/* Buttons: one inverted primary, the rest outlined. */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
-  color: #ffffff; background: var(--rb-primary); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.06);
-  transition: opacity 0.15s ease; border: none; cursor: pointer;
-  text-decoration: none; line-height: 1.2; font-family: inherit;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2;
+  color: var(--inv-surface); background: var(--inv-text); border: 1px solid var(--inv-text);
+  cursor: pointer; text-decoration: none; font-family: inherit; transition: opacity 0.15s ease;
 }
-.btn-primary:hover:not(:disabled) { background: #0D47A1; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.btn-primary--sm { padding: 7px 13px; font-size: 12px; }
+.btn-primary:hover:not(:disabled) { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-outline {
+.btn-outline, .btn-danger {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
-  color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong);
-  cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; line-height: 1.2; font-family: inherit;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2;
+  color: var(--inv-text); background: var(--inv-surface); border: 1px solid var(--inv-border);
+  cursor: pointer; font-family: inherit; transition: background 0.15s ease, border-color 0.15s ease;
 }
-.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
-.btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-outline:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
-.btn-outline--sm { padding: 7px 13px; font-size: 12px; }
-
-/* Alert banner */
-.alert-banner {
-  display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border-radius: 14px;
-  background: rgba(var(--rb-warning-rgb), 0.07); border: 1px solid rgba(var(--rb-warning-rgb), 0.22);
-}
-.alert-banner__icon {
-  width: 36px; height: 36px; border-radius: 10px; background: rgba(var(--rb-warning-rgb), 0.12);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.alert-banner__body { flex: 1; min-width: 0; }
-.alert-banner__title { font-size: 13px; font-weight: 600; color: var(--rb-warning-text); margin: 0; }
-.alert-banner__desc { font-size: 12.5px; font-weight: 400; line-height: 1.55; color: var(--rb-text-secondary); margin: 3px 0 8px; }
-.alert-banner__list { display: flex; flex-wrap: wrap; gap: 6px; }
-.alert-banner__chip {
-  font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
-  background: var(--rb-surface); border: 1px solid var(--rb-border-strong); color: var(--rb-text-primary);
-}
-.alert-banner__chip--muted { color: var(--rb-text-secondary); }
-.alert-banner__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.alert-banner__dismiss {
-  width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent;
-  color: var(--rb-text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.alert-banner__dismiss:hover { background: rgba(var(--rb-warning-rgb), 0.12); }
-
-/* Available units by blood type — column chart */
-/* One series colour. Dark mode takes a lighter step of the same blue so the
-   columns keep 3:1 against the dark card; #1565C0 alone falls short there. */
-.bt-chart { --bt-bar: var(--rb-primary); padding: 16px 18px 14px; }
-:global(.dark) .bt-chart { --bt-bar: #1E88E5; }
-/* Columns share the width equally and touch, so each one's hit target is its
-   whole band — the bar itself stays thin. */
-.bt-chart__plot { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-.bt-col {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  min-width: 0; padding: 0 0 4px; border: none; border-radius: 10px; background: transparent;
-  font-family: inherit; cursor: pointer; transition: background 0.15s ease;
-}
-.bt-col:hover { background: var(--rb-surface-hover); }
-.bt-col:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
-/* The plot: room above the tallest column for its value, a hairline baseline
-   under all of them (each band draws its own piece, and the bands touch). */
-/* --h is the column's share of the tallest, 0 to 1; --rise is that share in
-   pixels, which every piece riding the column moves by. */
-.bt-col__track {
-  --track: 150px; --rise: calc(var(--h) * var(--track));
-  position: relative; align-self: stretch; height: var(--track); margin-top: 22px;
-  border-bottom: 1px solid var(--rb-border-strong);
-}
-/* The bar is always full height and slides up out of a clipping box, so a
-   change animates as a transform: no relayout per frame, and the rounded top
-   is never squashed the way a scaleY would squash it. */
-.bt-col__clip { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.bt-col__bar {
-  position: absolute; top: 0; left: 50%; width: 24px; max-width: calc(100% - 8px); height: 100%;
-  transform: translate(-50%, calc(var(--track) - max(2px, var(--rise))));
-  background: var(--bt-bar); border-radius: 4px 4px 0 0;
-  transition: transform 0.35s ease, opacity 0.15s ease, filter 0.15s ease;
-}
-.bt-col:hover .bt-col__bar, .bt-col:focus-visible .bt-col__bar { filter: brightness(1.15); }
-.bt-col__value {
-  position: absolute; left: 0; right: 0; bottom: 4px; text-align: center;
-  transform: translateY(calc(-1 * var(--rise)));
-  font-size: 12px; font-weight: 700; color: var(--rb-text-primary); font-variant-numeric: tabular-nums;
-  transition: transform 0.35s ease;
-}
-.bt-col__label { font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); }
-.bt-col__status {
-  display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px;
-  font-size: 10px; font-weight: 700; line-height: 1.2; text-align: center;
-}
-.bt-col__status--low { color: var(--rb-warning-text); }
-.bt-col__status--critical { color: var(--rb-accent-text); }
-/* A filter picks one type: it keeps full ink, the rest step back. */
-.bt-col--active .bt-col__label { color: var(--rb-primary-text); }
-.bt-col--dim .bt-col__bar { opacity: 0.3; }
-.bt-col--dim .bt-col__value { color: var(--rb-text-muted); }
-
-.bt-tooltip {
-  position: absolute; left: 50%; bottom: calc(var(--rise) + 26px); transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px;
-  background: var(--rb-text-primary); color: var(--rb-surface); text-align: left; white-space: nowrap;
-  box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.18); pointer-events: none; z-index: 2;
-}
-/* The outer columns anchor their tooltip inward, or it would run off the card. */
-.bt-tooltip--start { left: 0; transform: none; }
-.bt-tooltip--end { left: auto; right: 0; transform: none; }
-.bt-tooltip__value { font-size: 13px; font-weight: 700; }
-.bt-tooltip__label { font-size: 11px; opacity: 0.8; }
-.bt-tooltip__hint { font-size: 10.5px; opacity: 0.65; }
-
-.health-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
-.health-badge--healthy { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
-.health-badge--low { background: rgba(var(--rb-warning-rgb), 0.1); color: var(--rb-warning-text); }
-.health-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-
-/* Toolbar */
-/* Records table */
-.records-table td { vertical-align: middle; }
-.records-table .inventory-row { cursor: pointer; }
-.records-table .inventory-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
-.cell-main { margin: 0; font-weight: 600; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.cell-sub { margin: 2px 0 0; font-size: 11.5px; color: var(--rb-text-secondary); }
-.cell-muted { color: var(--rb-text-secondary); }
-
-.th-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  cursor: pointer;
-}
-.th-sort:hover,
-.th-sort--on { color: var(--rb-primary-text); }
-.th-sort:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; border-radius: 4px; }
-
-.expiry-badge {
-  display: inline-block;
-  margin-top: 3px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 700;
-}
-.expiry-badge--critical { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-.expiry-badge--low { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
-.expiry-badge--ok { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-.expiry-badge--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-
-.row-menu__group {
-  margin: 6px 0 2px;
-  padding: 0 10px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-.row-menu__group:first-child { margin-top: 2px; }
-
-.drawer-note { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
-.drawer-info-grid__wide { grid-column: 1 / -1; }
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-/* Filters inside the records panel */
-.records-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 18px 14px;
-  border-bottom: 1px solid var(--rb-border);
-}
-.records-filters__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-
-.sort-select { display: inline-flex; align-items: center; gap: 8px; }
-.sort-select__label { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
-
-.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px 4px 11px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.3);
-  border-radius: 999px;
-  background: rgba(var(--rb-primary-rgb), 0.07);
-  color: var(--rb-primary-text);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.filter-chip:hover { background: rgba(var(--rb-primary-rgb), 0.12); }
-.filter-chip:focus-visible,
-.filter-chips__clear:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.filter-chips__clear {
-  padding: 4px 6px;
-  border: 0;
-  background: none;
-  color: var(--rb-text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-/* Header "More" menu */
-.more-menu { position: relative; }
-.more-menu__list {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 20;
-  width: 280px;
-  padding: 6px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  background: var(--rb-surface);
-  box-shadow: 0 12px 32px -12px rgba(var(--rb-shadow-rgb), 0.3);
-}
-.more-menu__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--rb-text-secondary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.more-menu__item:hover,
-.more-menu__item:focus-visible { background: var(--rb-surface-hover); outline: none; }
-.more-menu__item :deep(svg) { margin-top: 2px; flex-shrink: 0; }
-.more-menu__item strong { display: block; font-size: 13px; color: var(--rb-text-primary); }
-.more-menu__item small { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
-
-/* Quarantine + recent activity */
-.side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-
-.stat-card__value--empty { font-size: 15px !important; font-weight: 600 !important; color: var(--rb-text-secondary) !important; }
-
-.search-box { position: relative; flex-shrink: 0; width: 200px; }
-.search-box--lg { width: 260px; flex: 1; min-width: 220px; max-width: 420px; }
-.search-box__icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
-.search-box__input {
-  width: 100%; padding: 8px 10px 8px 30px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
-  font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary); transition: border-color 0.15s ease, background 0.15s ease;
-}
-.search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
-  font-size: 12.5px; background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-  color: var(--rb-text-primary); appearance: none; font-family: inherit; cursor: pointer; transition: border-color 0.15s ease;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
-
-/* Panels (shared) */
-.panel { background: var(--rb-surface); border-radius: 14px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); border: 1px solid var(--rb-border); overflow: hidden; transition: background-color 0.2s ease, border-color 0.2s ease; }
-.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--rb-border); flex-wrap: wrap; }
-.panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
-.panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
-
-/* Stats grid */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
-.stat-card {
-  background: var(--rb-surface); border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
-  border: 1px solid var(--rb-border); display: flex; flex-direction: column; gap: 8px;
-  transition: border-color 0.15s ease, background-color 0.2s ease;
-}
-.stat-card:hover { border-color: var(--rb-border-hover); }
-.stat-card--emphasized { border-color: rgba(var(--rb-warning-rgb), 0.3); box-shadow: 0 0 0 1px rgba(var(--rb-warning-rgb), 0.15); }
-.stat-card__top { display: flex; align-items: center; justify-content: space-between; }
-.stat-card__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0; }
-.stat-card__badge { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.stat-card__value { font-size: 24px; font-weight: 800; color: var(--rb-text-primary); margin: 0; line-height: 1; }
-.stat-chip { display: inline-flex; align-items: center; align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-
-/* Inventory table */
-.inventory-table-wrap { overflow-x: auto; }
-.inventory-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.inventory-table thead th {
-  position: sticky; top: 0; z-index: 1; text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.04em; color: var(--rb-text-secondary); padding: 10px 16px; background: var(--rb-surface-alt); white-space: nowrap;
-}
-.actions-col { width: 48px; text-align: right; }
-.inventory-table tbody td { padding: 12px 16px; border-top: 1px solid var(--rb-surface-alt); color: var(--rb-text-primary); white-space: nowrap; }
-.inventory-row { cursor: pointer; transition: background-color 0.12s ease; }
-.inventory-row:hover { background: var(--rb-surface-hover); }
-.mono-cell { font-family: var(--rb-font-mono); font-size: 12px; }
-
-.type-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
-
-.status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: capitalize; }
-.status-pill__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
-.status-pill--available { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
-.status-pill--reserved { background: rgba(var(--rb-purple-rgb), 0.08); color: var(--rb-purple-text); }
-.status-pill--low { background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); }
-.status-pill--critical { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
-.status-pill--expired { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
-
-.expiry-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
-.expiry-row--low td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
+.btn-outline:hover:not(:disabled), .btn-danger:hover:not(:disabled) { background: var(--inv-hover); border-color: var(--rb-border-hover); }
+.btn-outline:disabled, .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline--sm { padding: 6px 11px; font-size: 12px; }
+.btn-outline--danger, .btn-danger { color: var(--inv-crit); }
 
 .link-btn {
-  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text);
-  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: none; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 500; color: var(--inv-muted); cursor: pointer; text-decoration: none;
 }
-.link-btn:hover { text-decoration: underline; }
+.link-btn:hover { color: var(--inv-text); text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:focus-visible { border-radius: 4px; }
+
+/* Summary cards: one surface, one shape. Only the icon takes a state colour. */
+.kpi-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.kpi {
+  position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; min-height: 88px;
+  padding: 16px 30px 16px 16px; border-radius: 12px; border: 1px solid var(--inv-border); background: var(--inv-surface);
+  color: var(--inv-text); font: inherit; text-align: left; text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.kpi--action { cursor: pointer; }
+.kpi--action:hover { border-color: var(--rb-border-hover); background: var(--inv-hover); }
+.kpi__icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--inv-elevated); border: 1px solid var(--inv-border); color: var(--tone);
+}
+.kpi__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi__label { font-size: 12.5px; font-weight: 500; color: var(--inv-muted); }
+.kpi__value { font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-text); font-variant-numeric: tabular-nums; }
+.kpi__sub { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--inv-muted); }
+.kpi__sub--up :deep(svg) { color: var(--inv-ok); }
+.kpi__chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--inv-faint); }
+.kpi--action:hover .kpi__chevron { color: var(--inv-muted); }
+
+/* Main grid: the mock-up's two columns, stacking once the page narrows. */
+.inv-grid {
+  display: grid; gap: 16px; align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-areas: "types expiring" "list activity";
+}
+.types-panel { grid-area: types; }
+.expiring-panel { grid-area: expiring; }
+.list-panel { grid-area: list; }
+.activity-panel { grid-area: activity; }
+
+/* Panels */
+.panel {
+  position: relative; background: var(--inv-surface); border: 1px solid var(--inv-border); border-radius: 12px;
+  min-width: 0; display: flex; flex-direction: column;
+}
+.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; flex-wrap: wrap; }
+.panel-title { font-size: 15px; font-weight: 600; color: var(--inv-text); margin: 0; }
+.panel-subtitle { font-size: 12.5px; color: var(--inv-muted); margin: 3px 0 0; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 2px 0 0; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--inv-muted); }
+.legend__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--tone); }
+
+.types-hint {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 18px 10px; padding: 9px 12px; border-radius: 8px;
+  border: 1px dashed var(--inv-border); font-size: 12.5px; color: var(--inv-muted);
+}
+
+.rare-chip {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+  padding: 3px 5px; border-radius: 4px; border: 1px solid var(--inv-border); color: var(--inv-muted);
+}
+
+/* Blood type cards */
+.types-panel { container-type: inline-size; container-name: types; }
+.type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 4px 18px 18px; }
+.type-card {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; border-radius: 10px;
+  border: 1px solid var(--inv-border); background: var(--inv-surface);
+  color: var(--inv-text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.type-card:hover { border-color: var(--rb-border-hover); background: var(--inv-hover); }
+/* A short type is marked along its top edge: the exception, not the rule. */
+.type-card { position: relative; overflow: hidden; }
+.type-card--low::before, .type-card--critical::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tone); }
+.type-card--active { border-color: var(--inv-muted); box-shadow: inset 0 0 0 1px var(--inv-muted); }
+.type-card__head { display: flex; align-items: center; gap: 8px; }
+.type-card__code { font-size: 17px; font-weight: 700; color: var(--inv-text); }
+.type-card__body { display: flex; gap: 12px; align-items: flex-start; }
+.type-card__summary { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; flex-shrink: 0; }
+.type-card__units { font-size: 12px; color: var(--inv-muted); white-space: nowrap; }
+.type-card__units strong { font-size: 13px; font-weight: 600; color: var(--inv-text); font-variant-numeric: tabular-nums; }
+
+/* The ring is a meter (named gauge: Tailwind's `ring` utility owns .ring).
+   Its fill is the one coloured mark on the card, over a neutral track. */
+.gauge { position: relative; width: 62px; height: 62px; display: inline-flex; }
+.gauge__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gauge__track { fill: none; stroke: var(--inv-border); stroke-width: 6; }
+.gauge__fill { fill: none; stroke: var(--tone); stroke-width: 6; stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
+.gauge__value {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 600; color: var(--inv-text); font-variant-numeric: tabular-nums;
+}
+
+/* Badge: neutral chip, state in the dot. */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--inv-border); background: var(--inv-elevated);
+  font-size: 11.5px; font-weight: 500; line-height: 1.5; color: var(--inv-text);
+}
+.badge__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
+
+.type-card__components { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; padding-top: 2px; }
+.type-card__components { gap: 6px; }
+.comp { display: grid; grid-template-columns: 34px minmax(0, 1fr) 22px; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.35; }
+.comp__code { color: var(--inv-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A meter: grey while healthy or ungraded, the state colour only when short. */
+.comp__meter { position: relative; height: 6px; border-radius: 999px; background: var(--inv-elevated); box-shadow: inset 0 0 0 1px var(--inv-border-soft); }
+.comp__fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: color-mix(in srgb, var(--inv-muted) 55%, transparent); transition: width 0.4s ease; }
+.comp.tone--success .comp__fill { background: color-mix(in srgb, var(--inv-ok) 70%, transparent); }
+.comp--short .comp__fill { background: var(--tone); }
+.comp__min { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--inv-text); opacity: 0.55; }
+.comp__count { color: var(--inv-text); font-variant-numeric: tabular-nums; text-align: right; }
+.comp--short .comp__count { font-weight: 600; color: var(--tone); }
+
+/* Side panels */
+.side-panel { overflow: hidden; }
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--inv-border); }
+.side-title { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; font-weight: 600; color: var(--inv-text); }
+.side-title__icon {
+  width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--inv-elevated); border: 1px solid var(--inv-border); color: var(--inv-muted);
+}
+.side-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0; padding: 36px 18px;
+  font-size: 12.5px; color: var(--inv-muted); text-align: center;
+}
+
+.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mini-table th {
+  text-align: left; font-size: 11.5px; font-weight: 500; color: var(--inv-muted); padding: 9px 8px;
+  border-bottom: 1px solid var(--inv-border); white-space: nowrap;
+}
+.mini-table th:first-child, .mini-table td:first-child { padding-left: 16px; }
+.mini-table td { padding: 11px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); vertical-align: middle; }
+.mini-table tr:last-child td { border-bottom: none; }
+.mini-row { cursor: pointer; transition: background 0.12s ease; }
+.mini-row:hover { background: var(--inv-hover); }
+.mini-row:focus-visible { outline-offset: -2px; }
+.mini-row__id { display: block; font-size: 11.5px; margin-bottom: 4px; white-space: nowrap; }
+.mini-row__chevron { width: 24px; color: var(--inv-faint); }
+
+.type-chip {
+  display: inline-flex; padding: 0 6px; border-radius: 4px; border: 1px solid var(--inv-border);
+  font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--inv-text);
+}
+.type-text { font-weight: 600; color: var(--inv-text); white-space: nowrap; }
+.type-chip--cell { min-width: 32px; justify-content: center; padding: 1px 7px; border-radius: 6px; background: var(--inv-elevated); font-size: 12px; }
+
+/* Activity */
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--inv-border-soft); }
+.activity-item:first-child { border-top: none; }
+.activity-item__icon {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--inv-elevated); border: 1px solid var(--inv-border); color: var(--tone);
+}
+.activity-item__icon--sm { width: 26px; height: 26px; border-radius: 7px; }
+.activity-item__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.activity-item__title { font-size: 13px; font-weight: 500; color: var(--inv-text); }
+.activity-item__meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11.5px; color: var(--inv-muted); }
+.activity-item__when { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; font-size: 11px; color: var(--inv-muted); text-align: right; }
+.activity-item__when span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inventory list */
+.list-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 0 18px 14px; }
+.search-field { position: relative; flex: 1 1 220px; min-width: 200px; }
+.search-field__icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--inv-muted); pointer-events: none; }
+.search-field__input {
+  width: 100%; height: 36px; padding: 0 12px 0 34px; border-radius: 8px; border: 1px solid var(--inv-border);
+  background: var(--inv-elevated); color: var(--inv-text); font: inherit; font-size: 12.5px; transition: border-color 0.15s ease;
+}
+.search-field__input::placeholder { color: var(--inv-muted); }
+.search-field__input:focus { outline: none; border-color: var(--inv-muted); }
+.filter-field { display: flex; flex-direction: column; gap: 4px; flex: 0 1 140px; min-width: 120px; }
+.filter-field__label { font-size: 11.5px; font-weight: 500; color: var(--inv-muted); }
+.filter-select {
+  width: 100%; height: 36px; padding: 0 30px 0 12px; border-radius: 8px; border: 1px solid var(--inv-border);
+  background: var(--inv-elevated) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color: var(--inv-text); appearance: none; font: inherit; font-size: 12.5px; cursor: pointer; transition: border-color 0.15s ease;
+}
+.filter-select:focus { outline: none; border-color: var(--inv-muted); }
+.clear-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: none; border-radius: 8px;
+  background: none; color: var(--inv-text); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.clear-btn:hover:not(:disabled) { background: var(--inv-hover); }
+.clear-btn:disabled { color: var(--inv-faint); cursor: default; }
+
+.list-error { margin: 0 18px 12px; font-size: 12.5px; color: var(--inv-crit); }
+
+.table-wrap { position: relative; overflow-x: auto; flex: 1; transition: opacity 0.15s ease; }
+.table-wrap--busy { opacity: 0.55; }
+.unit-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.unit-table thead th {
+  text-align: left; font-size: 11.5px; font-weight: 500; color: var(--inv-muted); padding: 9px 8px;
+  border-top: 1px solid var(--inv-border); border-bottom: 1px solid var(--inv-border); white-space: nowrap;
+}
+.unit-table tbody td { padding: 10px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); white-space: nowrap; vertical-align: middle; }
+.unit-table .wrap-cell { white-space: normal; min-width: 120px; }
+.unit-row { cursor: pointer; transition: background 0.12s ease; }
+.unit-row:hover { background: var(--inv-hover); }
+.unit-row:focus-visible { outline-offset: -2px; }
+.actions-col { width: 44px; text-align: right; }
+.mono { font-family: var(--rb-font-mono); font-size: 11.5px; }
+.num { font-variant-numeric: tabular-nums; }
+.cell-muted { color: var(--inv-muted) !important; }
+.ink-danger { color: var(--inv-crit) !important; }
+.days { font-variant-numeric: tabular-nums; color: var(--tone); }
+.days.tone--warning, .days.tone--danger { font-weight: 600; }
+.days.tone--neutral { color: var(--inv-text); }
+.days--pill { display: inline-flex; padding: 1px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
+
+.th-sort {
+  display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.th-sort:hover, .th-sort--on { color: var(--inv-text); }
+.th-sort:focus-visible { border-radius: 4px; }
+
+.avail { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--inv-text); white-space: nowrap; }
+.avail__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
 
 /* Row action menu */
 .row-menu { position: relative; display: inline-flex; }
 .row-menu__trigger {
-  width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--rb-text-secondary);
-  display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.12s ease;
+  width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--inv-muted);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.row-menu__trigger:hover { background: var(--rb-surface-alt); color: var(--rb-text-primary); }
+.row-menu__trigger:hover { background: var(--inv-elevated); color: var(--inv-text); }
 .row-menu__dropdown {
-  position: absolute; top: 34px; right: 0; z-index: 20; min-width: 210px; background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong); border-radius: 12px; box-shadow: 0 4px 16px rgba(var(--rb-shadow-rgb), 0.12);
-  padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  position: absolute; top: 34px; right: 0; z-index: 20; min-width: 200px; padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  background: var(--inv-elevated); border: 1px solid var(--inv-border); border-radius: 10px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
+.row-menu__dropdown--up { top: auto; bottom: 34px; }
 .row-menu__item {
-  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent;
-  color: var(--rb-text-primary); font-size: 12.5px; font-weight: 500; text-align: left; cursor: pointer; font-family: inherit; white-space: nowrap;
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 6px; border: none; background: transparent;
+  color: var(--inv-text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; white-space: nowrap;
 }
-.row-menu__item:hover { background: var(--rb-surface-alt); }
-.row-menu__item--danger { color: var(--rb-accent-text); }
-.row-menu__item--danger:hover { background: rgba(var(--rb-accent-rgb), 0.08); }
-.row-menu__divider { height: 1px; background: var(--rb-border); margin: 4px 2px; }
+.row-menu__item:hover, .row-menu__item:focus-visible { background: var(--inv-hover); outline: none; }
+.row-menu__item--danger { color: var(--inv-crit); }
+.row-menu__divider { height: 1px; background: var(--inv-border); margin: 4px 2px; }
 
-/* Expanded row */
-.expanded-col__title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 0 0 8px; }
-.expanded-col__title--spaced { margin-top: 14px; }
-.expanded-timeline__bar { flex: 1; height: 2px; background: var(--rb-border-strong); border-radius: 999px; }
-.expanded-col__note { font-size: 12px; color: var(--rb-text-secondary); margin: 4px 0 0; }
-.expanded-list { display: flex; flex-direction: column; gap: 4px; }
-.expanded-list__row { font-size: 12px; color: var(--rb-text-primary); margin: 0; }
-
-/* Pagination */
-.pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid var(--rb-border); }
-.pagination__summary { font-size: 12px; color: var(--rb-text-secondary); margin: 0; }
-.pagination__controls { display: flex; gap: 8px; }
-
-/* Insights */
-.insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.insight-card { display: flex; flex-direction: column; }
-.segmented-control { display: inline-flex; padding: 3px; background: var(--rb-surface-alt); border-radius: 999px; gap: 2px; flex-shrink: 0; }
-.segmented-control__btn { padding: 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary); background: transparent; border: none; border-radius: 999px; cursor: pointer; font-family: inherit; transition: background 0.15s ease, color 0.15s ease; }
-.segmented-control__btn--active { background: var(--rb-surface); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.08); }
-
-.chart-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
-.chart-legend { display: flex; gap: 16px; }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); font-weight: 600; }
-.legend-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
-.line-chart-wrap { position: relative; }
-.line-chart { width: 100%; height: 200px; display: block; overflow: visible; }
-.chart-grid-line { stroke: var(--rb-border); stroke-width: 1; }
-.chart-axis-label { font-size: 9.5px; fill: var(--rb-text-secondary); font-family: inherit; }
-.hover-target { cursor: pointer; }
-.chart-tooltip { position: absolute; transform: translate(-50%, -115%); background: var(--rb-text-primary); color: var(--rb-surface); border-radius: 10px; padding: 8px 10px; font-size: 11px; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 20px rgba(var(--rb-shadow-rgb), 0.18); z-index: 2; }
-.chart-tooltip__label { font-weight: 700; margin: 0 0 4px; }
-.chart-tooltip__row { display: flex; align-items: center; gap: 5px; margin: 2px 0; }
-
-.donut-body { padding: 16px 18px 18px; display: flex; align-items: center; gap: 22px; }
-.donut-chart-wrap { position: relative; width: 160px; height: 160px; flex-shrink: 0; }
-.donut-chart { width: 100%; height: 100%; }
-.donut-segment { transition: opacity 0.15s ease; cursor: pointer; }
-.donut-segment--dim { opacity: 0.35; }
-.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
-.donut-center__value { font-size: 20px; font-weight: 800; color: var(--rb-text-primary); margin: 0; }
-.donut-center__label { font-size: 10.5px; color: var(--rb-text-secondary); margin: 2px 0 0; max-width: 90px; }
-.donut-legend { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
-.donut-legend__row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 8px; transition: background 0.12s ease; }
-.donut-legend__row:hover { background: var(--rb-surface-alt); }
-.donut-legend__label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); flex: 1; }
-.donut-legend__value { font-size: 11.5px; color: var(--rb-text-secondary); flex-shrink: 0; }
-
-/* Timeline (activity) */
-.timeline { display: flex; flex-direction: column; }
-.timeline-item { display: flex; align-items: flex-start; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--rb-surface-alt); }
-.timeline-item:first-child { border-top: none; }
-.timeline-item__marker { width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.timeline-item__body { flex: 1; min-width: 0; }
-.timeline-item__name { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.timeline-item__meta { font-size: 11.5px; color: var(--rb-text-secondary); margin: 3px 0 0; }
-.timeline-item__right { text-align: right; flex-shrink: 0; }
-.timeline-item__user { font-size: 11px; color: var(--rb-text-secondary); margin: 2px 0 0; }
-.activity-feed__time { font-size: 11px; color: var(--rb-text-secondary); margin: 0; white-space: nowrap; }
-
-/* Quick actions */
-
-/* Empty state */
-.empty-state { padding: 40px 24px; text-align: center; color: var(--rb-text-secondary); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.empty-state__title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 4px 0 0; }
-.empty-state__desc { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 6px; }
-
-/* Modals */
-.modal-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
-.modal-card { background: var(--rb-surface); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 8px 28px rgba(var(--rb-shadow-rgb), 0.18); position: relative; }
-.modal-card--wide { max-width: 560px; }
-.modal-card .btn-primary { color: #ffffff; background: var(--rb-primary); }
-.modal-card .btn-outline { color: var(--rb-text-primary); background: var(--rb-surface); border: 1px solid var(--rb-border-strong); }
-.modal-close { position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--rb-text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
-.modal-close:hover { background: var(--rb-surface-alt); }
-.modal-title { font-size: 16px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 6px; }
-.modal-title--left { margin-top: 4px; }
-.modal-subtitle { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 20px; }
-.modal-subtitle--left { margin-bottom: 18px; }
-.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
-.modal-actions__btn { flex: 1; }
-
-.batch-form { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; padding-right: 2px; }
-.batch-form__section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-text-secondary); margin: 4px 0 -4px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-field { display: flex; flex-direction: column; gap: 6px; }
-.form-field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
-.form-field__input { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--rb-border-strong); font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface); transition: border-color 0.15s ease; font-family: inherit; }
-.form-field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.08); }
-.form-field__input::placeholder { color: var(--rb-placeholder); }
-.form-field__select { appearance: none; background: var(--rb-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center; }
-.form-field__textarea { resize: vertical; min-height: 64px; }
-.form-error { font-size: 12px; color: var(--rb-accent-text); margin: -6px 0 0; }
-
-.manage-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
-.manage-action-card {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px 10px; border-radius: 12px;
-  border: 1px solid var(--rb-border-strong); background: var(--rb-surface-alt); cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
-  color: var(--rb-text-primary); text-align: center; transition: background 0.15s ease;
+.list-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 18px; }
+.list-foot__summary { margin: 0; font-size: 12px; color: var(--inv-muted); }
+.pager { display: flex; align-items: center; gap: 6px; }
+.pager__btn {
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--inv-border);
+  background: var(--inv-surface); color: var(--inv-text); font: inherit; font-size: 12px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-variant-numeric: tabular-nums;
 }
-.manage-action-card:hover { background: var(--rb-surface); }
-.manage-action-card--danger { color: var(--rb-accent-text); }
-.manage-action-card--danger:hover { background: rgba(var(--rb-accent-rgb), 0.06); }
+.pager__btn:hover:not(:disabled) { background: var(--inv-hover); }
+.pager__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pager__btn--on, .pager__btn--on:hover:not(:disabled) { background: var(--inv-text); border-color: var(--inv-text); color: var(--inv-surface); }
+.pager__gap { font-size: 12px; color: var(--inv-muted); padding: 0 2px; }
 
-/* Print labels modal */
-.print-batch-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 16px; }
-.print-batch-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rb-border); cursor: pointer; }
-.print-batch-row:hover { background: var(--rb-surface-hover); }
-.print-batch-row__info { flex: 1; min-width: 0; }
-.print-batch-row__title { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); margin: 0; }
-.print-batch-row__meta { font-size: 11px; color: var(--rb-text-secondary); margin: 2px 0 0; }
-.print-error { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-.print-preview { margin-bottom: 16px; }
-.print-preview__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
-.print-label-card { border: 1px dashed var(--rb-border-strong); border-radius: 10px; padding: 10px; font-size: 10.5px; }
-.print-label-card__type { font-weight: 800; color: var(--rb-accent-text); margin: 0; font-size: 13px; }
-.print-label-card__meta { color: var(--rb-text-secondary); margin: 2px 0 0; }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 24px; text-align: center;
+  font-size: 13px; color: var(--inv-muted);
+}
+.empty-state__title { font-size: 14px; font-weight: 600; color: var(--inv-text); margin: 4px 0 0; }
+.empty-state__desc { font-size: 12.5px; margin: 0 0 6px; }
 
-.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* Inventory detail drawer (View Details) */
-.drawer-overlay { position: fixed; inset: 0; background: var(--rb-overlay); display: flex; justify-content: flex-end; z-index: 1000; }
+/* The two children this page hosts keep their structure; their tinted chips
+   become neutral ones with the state in the ink, as everywhere else here. */
+.inv-page :deep(.low-banner),
+.inv-page :deep(.low-banner--critical) { background: var(--inv-surface); border-color: var(--inv-border); border-radius: 12px; }
+.inv-page :deep(.low-banner__icon) { background: var(--inv-elevated); border: 1px solid var(--inv-border); color: var(--inv-warn); }
+.inv-page :deep(.low-banner--critical .low-banner__icon) { color: var(--inv-crit); }
+.inv-page :deep(.low-banner__title) { font-weight: 600; color: var(--inv-text); }
+.inv-page :deep(.low-banner__chip) {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--inv-elevated); border: 1px solid var(--inv-border);
+  color: var(--inv-text); font-weight: 500;
+}
+.inv-page :deep(.low-banner__chip::before) { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--inv-warn-fill); }
+.inv-page :deep(.low-banner__chip--critical::before) { background: var(--inv-crit-fill); }
+.inv-page :deep(.low-banner__chip--more) { color: var(--inv-muted); }
+.inv-page :deep(.low-banner__chip--more::before) { display: none; }
+.inv-page :deep(.low-banner__link) { color: var(--inv-action-text); font-weight: 600; }
+
+/* Drawers */
+.drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.5); }
 .detail-drawer {
-  width: clamp(420px, 32vw, 520px); max-width: 100%; height: 100%; background: var(--rb-surface);
-  display: flex; flex-direction: column; box-shadow: -12px 0 32px rgba(var(--rb-shadow-rgb), 0.18);
-  animation: drawer-slide-in 0.25s ease;
+  width: clamp(400px, 32vw, 500px); max-width: 100%; height: 100%; display: flex; flex-direction: column;
+  background: var(--inv-surface); border-left: 1px solid var(--inv-border); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.3);
+  animation: drawer-slide-in 0.25s ease; font-family: var(--rb-font-sans); color: var(--inv-text);
 }
 @keyframes drawer-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.detail-drawer__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 22px; border-bottom: 1px solid var(--rb-border); position: relative; }
-.detail-drawer__eyebrow { font-family: var(--rb-font-mono); font-size: 11.5px; color: var(--rb-text-secondary); margin: 0 0 3px; }
-.detail-drawer__title { font-size: 16px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.detail-drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--inv-border); }
+.detail-drawer__eyebrow { font-family: var(--rb-font-mono); font-size: 11.5px; color: var(--inv-muted); margin: 0 0 3px; }
+.detail-drawer__title { font-size: 16px; font-weight: 600; color: var(--inv-text); margin: 0; }
 .detail-drawer__body { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 22px; }
-.detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--rb-border); }
-.detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 45%; justify-content: center; }
-.drawer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
-.drawer-info-grid dt { font-size: 11px; color: var(--rb-text-secondary); margin-bottom: 3px; }
-.drawer-info-grid dd { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); margin: 0; }
+.detail-drawer__body--flush { padding: 0; gap: 0; }
+.detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--inv-border); }
+.detail-drawer__footer .btn-outline { flex: 1 1 30%; }
+.drawer-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--inv-muted); margin: 0 0 10px; }
+.drawer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 0; }
+.drawer-info-grid dt { font-size: 11.5px; color: var(--inv-muted); margin-bottom: 3px; }
+.drawer-info-grid dd { font-size: 13px; font-weight: 500; color: var(--inv-text); margin: 0; }
+.drawer-info-grid__wide { grid-column: 1 / -1; }
+.drawer-note { display: block; font-size: 11.5px; font-weight: 400; color: var(--inv-muted); }
+.drawer-muted { font-size: 12.5px; color: var(--inv-muted); margin: 0; }
+.drawer-muted--pad { padding: 20px 22px; }
+.drawer-more { display: flex; justify-content: center; padding: 14px; border-top: 1px solid var(--inv-border); }
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.history-list__item { display: flex; align-items: flex-start; gap: 10px; }
+.history-list__body { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--inv-muted); }
+.history-list__body strong { font-size: 13px; font-weight: 500; color: var(--inv-text); }
 .drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.2s ease; }
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
-/* Responsive */
-@media (max-width: 1100px) {
-  .side-grid { grid-template-columns: 1fr; }
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.5); }
+.modal-card {
+  position: relative; width: 100%; max-width: 420px; padding: 24px; border-radius: 12px; background: var(--inv-surface);
+  border: 1px solid var(--inv-border); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3); font-family: var(--rb-font-sans); color: var(--inv-text);
+}
+.modal-card--wide { max-width: 560px; }
+.modal-close {
+  position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent;
+  color: var(--inv-muted); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.detail-drawer__header .modal-close { position: static; flex-shrink: 0; }
+.modal-close:hover { background: var(--inv-hover); color: var(--inv-text); }
+.modal-title { font-size: 16px; font-weight: 600; color: var(--inv-text); margin: 4px 32px 6px 0; }
+.modal-subtitle { font-size: 12.5px; line-height: 1.55; color: var(--inv-muted); margin: 0 0 18px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.modal-actions__btn { flex: 1; }
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+
+.batch-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field__label { font-size: 12px; font-weight: 500; color: var(--inv-muted); }
+.form-field__input {
+  padding: 9px 12px; border-radius: 8px; border: 1px solid var(--inv-border); font: inherit; font-size: 13px;
+  color: var(--inv-text); background: var(--inv-elevated); transition: border-color 0.15s ease;
+}
+.form-field__input:focus { outline: none; border-color: var(--inv-muted); }
+.form-field__input::placeholder { color: var(--inv-muted); }
+.form-field__select {
+  appearance: none; padding-right: 30px;
+  background: var(--inv-elevated) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+.form-field__textarea { resize: vertical; min-height: 72px; }
+.form-error { font-size: 12px; color: var(--inv-crit); margin: -4px 0 0; }
+
+
+.inventory-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1100;
+  display: flex; align-items: center; gap: 0.55rem; max-width: min(46rem, calc(100vw - 32px)); padding: 0.7rem 0.9rem;
+  border-radius: 10px; border: 1px solid var(--inv-border); background: var(--inv-elevated); color: var(--inv-text);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28); font-family: var(--rb-font-sans); font-size: 13px;
+}
+.inventory-toast__close { border: 0; background: none; color: var(--inv-muted); cursor: pointer; display: inline-flex; padding: 0.15rem; }
+
+/* ===== The system's colours (project owner, 2026-10-24) =====
+   Actions wear the app's blue, as on every other blood center page; state
+   keeps green, amber and red, now as soft tints so a badge reads at a
+   glance, and filled marks (rings, meters, edges) take the brighter fills. */
+.btn-primary { color: #fff; background: var(--inv-action); border-color: var(--inv-action); box-shadow: 0 1px 2px rgba(var(--rb-primary-rgb), 0.25); transition: background 0.15s ease, box-shadow 0.15s ease; }
+.btn-primary:hover:not(:disabled) { opacity: 1; background: var(--inv-action-hover); border-color: var(--inv-action-hover); box-shadow: 0 4px 12px rgba(var(--rb-primary-rgb), 0.28); }
+.btn-primary:active:not(:disabled), .btn-danger:active:not(:disabled) { transform: translateY(1px); }
+/* The one destructive confirm is solid; the drawer's Discard stays an outline. */
+.btn-danger { color: #fff; background: var(--inv-crit-fill); border-color: var(--inv-crit-fill); }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--inv-crit-fill) 85%, #000); border-color: transparent; }
+.btn-outline--danger { border-color: color-mix(in srgb, var(--inv-crit) 35%, var(--inv-border)); }
+.btn-outline--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--inv-crit) 8%, transparent); border-color: var(--inv-crit); }
+
+.link-btn, .clear-btn:not(:disabled) { color: var(--inv-action-text); font-weight: 600; }
+.link-btn:hover { color: var(--inv-action-text); }
+.clear-btn:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.08); }
+
+.inv-tones :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline-color: var(--inv-action-text); }
+.search-field__input:focus { border-color: var(--inv-action); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.12); }
+.th-sort--on { color: var(--inv-action-text); }
+.pager__btn--on, .pager__btn--on:hover:not(:disabled) { background: var(--inv-action); border-color: var(--inv-action); color: #fff; }
+
+/* The type picked as the list's filter: the action blue, never a state colour. */
+.type-card--active { border-color: var(--inv-action); box-shadow: 0 0 0 1px var(--inv-action), 0 4px 14px rgba(var(--rb-primary-rgb), 0.14); background: rgba(var(--rb-primary-rgb), 0.04); }
+
+/* KPI icons in a tint of their own state; plain counts in the action blue. */
+.kpi__icon { border-color: transparent; background: color-mix(in srgb, var(--tone-fill) 14%, transparent); color: var(--tone); }
+.kpi.tone--neutral .kpi__icon { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
+.kpi.tone--muted .kpi__icon { background: var(--inv-elevated); color: var(--inv-faint); }
+.kpi--action:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--inv-surface); box-shadow: 0 4px 14px rgba(var(--rb-shadow-rgb, 15, 23, 42), 0.06); }
+.kpi--action:hover .kpi__chevron { color: var(--inv-action-text); }
+
+/* Badges: a tint of the state, the neutral ones left grey. */
+.badge { border-color: color-mix(in srgb, var(--tone-fill) 30%, transparent); background: color-mix(in srgb, var(--tone-fill) 10%, transparent); }
+.badge.tone--neutral, .badge.tone--muted, .badge:not([class*="tone--"]) { border-color: var(--inv-border); background: var(--inv-elevated); }
+.badge__dot, .legend__dot, .avail__dot { background: var(--tone-fill); }
+.days--pill { background: color-mix(in srgb, var(--tone-fill) 14%, transparent); }
+
+/* Filled marks */
+.gauge__fill { stroke: var(--tone-fill); }
+.type-card--low::before, .type-card--critical::before { background: var(--tone-fill); }
+.comp.tone--success .comp__fill { background: var(--inv-ok-fill); }
+.comp--short .comp__fill { background: var(--tone-fill); }
+.live-note__dot { background: var(--inv-ok-fill); box-shadow: 0 0 0 3px color-mix(in srgb, var(--inv-ok-fill) 22%, transparent); }
+.activity-item__icon { border-color: transparent; background: color-mix(in srgb, var(--tone-fill) 12%, transparent); }
+.activity-item__icon.tone--neutral { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--inv-action-text); }
+
+/* Responsive: by the width the page actually has. */
+@container inv (max-width: 1240px) {
+  .kpi { padding-left: 14px; gap: 12px; }
+  .inv-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "types types" "list list" "expiring activity";
+  }
+}
+@container inv (max-width: 1040px) {
+  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-row > :first-child { grid-column: span 2; }
+}
+@container inv (max-width: 760px) {
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "types" "list" "expiring" "activity"; }
+}
+@container inv (max-width: 440px) {
+  .kpi-row { grid-template-columns: minmax(0, 1fr); }
+  .kpi-row > :first-child { grid-column: auto; }
+}
+@container types (max-width: 880px) {
+  .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container types (max-width: 440px) {
+  .type-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (max-width: 1024px) {
-  .insights-grid { grid-template-columns: 1fr; }
-}
 @media (max-width: 640px) {
   .inv-page { padding: 16px 16px 32px; }
-  .header-row { flex-direction: column; align-items: stretch; }
-  .header-actions { justify-content: space-between; }
-  .panel-header { flex-direction: column; align-items: stretch; }
-  .search-box--lg { width: 100%; }
+  .filter-field { flex: 1 1 calc(50% - 5px); }
   .form-row { grid-template-columns: 1fr; }
-  .donut-body { flex-direction: column; }
   .detail-drawer { width: 100%; }
-  .detail-drawer__footer .btn-outline, .detail-drawer__footer .btn-primary { flex: 1 1 100%; }
-}
-.inventory-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  max-width: min(46rem, calc(100vw - 32px));
-  padding: 0.7rem 0.9rem;
-  border-radius: 10px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  box-shadow: 0 8px 24px rgba(var(--rb-shadow-rgb), 0.18);
-  font-size: 13.5px;
-}
-
-.inventory-toast__close {
-  border: 0;
-  background: none;
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-  display: inline-flex;
-  padding: 0.15rem;
+  .detail-drawer__footer .btn-outline { flex: 1 1 100%; }
 }
 </style>

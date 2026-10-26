@@ -2,19 +2,26 @@
   <div class="bt-picker">
     <label class="bt-picker__field">
       <span class="bt-picker__label">{{ aboLabel }}</span>
-      <select v-model="abo" class="bt-picker__input" :disabled="disabled" @change="emitChoice">
-        <option value="">{{ optional ? 'Not done' : 'Select' }}</option>
-        <option v-for="group in ABO_GROUPS" :key="group" :value="group">{{ group }}</option>
-      </select>
+      <SelectField
+        v-model="abo"
+        :options="[{ value: '', label: optional ? 'Not done' : 'Select' }, ...ABO_GROUPS.map((group) => ({ value: group, label: group }))]"
+        :disabled="disabled"
+        @change="emitChoice"
+      />
     </label>
 
     <label class="bt-picker__field">
       <span class="bt-picker__label">{{ rhLabel }}</span>
-      <select v-model="rh" class="bt-picker__input" :disabled="disabled" @change="emitChoice">
-        <option value="">{{ optional ? 'Not done' : 'Select' }}</option>
-        <option value="positive">Positive (+)</option>
-        <option value="negative">Negative (−)</option>
-      </select>
+      <SelectField
+        v-model="rh"
+        :options="[
+          { value: '', label: optional ? 'Not done' : 'Select' },
+          { value: 'positive', label: 'Positive (+)' },
+          { value: 'negative', label: 'Negative (−)' },
+        ]"
+        :disabled="disabled"
+        @change="emitChoice"
+      />
     </label>
 
     <p v-if="unconfigured" class="bt-picker__warn" role="alert">
@@ -32,6 +39,7 @@ import {
   splitBloodTypeCode,
   type BloodTypeOption,
 } from '~/utils/bloodType'
+import SelectField from '~/components/common/SelectField.vue'
 
 /**
  * The form's "Blood Type" and "Rh Typing" rows, resolved to one `blood_types` id.

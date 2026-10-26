@@ -98,96 +98,6 @@
         </template>
       </nav>
 
-      <!--
-        Account block.
-
-        The donor and blood-centre portals put this in a top-bar dropdown. The
-        admin console has no per-page chrome competing for that corner, so the
-        same vocabulary — #1565C0 avatar, initial fallback, name over access
-        level — sits at the foot of the rail instead. Collapses to the avatar
-        alone at 80px, where a dropdown would have nothing to align against.
-      -->
-      <div ref="profileRoot" class="relative flex-shrink-0 px-3 pt-2.5 pb-3.5 border-t"
-        :style="{ borderColor: SIDEBAR_BORDER }">
-        <button type="button"
-          class="account-btn flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl border border-transparent transition-colors"
-          :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
-          :title="railCollapsed && !isMobile ? user?.full_name : null"
-          :aria-expanded="menuOpen"
-          aria-haspopup="menu"
-          @click="menuOpen = !menuOpen">
-          <span class="relative flex-shrink-0">
-            <span
-              class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-[13px] text-white overflow-hidden"
-              style="background:#1565C0">
-              {{ initial }}
-            </span>
-
-            <span v-if="user?.is_super_admin"
-              class="absolute -top-0.5 -right-0.5 rounded-full p-0.5 flex" :style="{ background: SIDEBAR_BG }"
-              title="Unrestricted administrator">
-              <AssetIcon name="badge-check" :size="12" class="text-[#0052FF]" />
-            </span>
-          </span>
-
-          <span v-if="showLabels" class="flex-1 min-w-0 flex flex-col gap-0.5 text-left">
-            <span class="text-[13px] font-bold truncate" :style="{ color: SIDEBAR_HEADING_TEXT }">
-              {{ user?.full_name || 'Administrator' }}
-            </span>
-            <span class="text-[11px] truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
-              {{ adminRoleLabel(user?.admin_role) }}
-            </span>
-          </span>
-
-          <AssetIcon v-if="showLabels" name="chevron-down" :size="14"
-            class="flex-shrink-0 transition-transform duration-150"
-            :class="{ 'rotate-180': menuOpen }"
-            :style="{ color: SIDEBAR_IDLE_TEXT }" />
-        </button>
-
-        <Transition name="popup">
-          <!--
-            Surface and border are bound rather than written as `dark:` classes
-            beside a hard-coded inline colour: an inline `border-color` outranks
-            the variant, which is what pinned this popup's border to the light
-            #EEF1F5 in dark mode.
-          -->
-          <div v-if="menuOpen"
-            class="absolute left-3 right-3 bottom-[calc(100%-4px)] rounded-xl overflow-hidden border shadow-lg z-20"
-            :style="{ background: SIDEBAR_POPUP_BG, borderColor: SIDEBAR_BORDER }">
-            <div class="flex items-start gap-3 px-4 py-3.5 border-b" :style="{ borderColor: SIDEBAR_BORDER }">
-              <div
-                class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
-                style="background:#1565C0">
-                {{ initial }}
-              </div>
-
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold truncate" :style="{ color: SIDEBAR_HEADING_TEXT }">
-                  {{ user?.full_name || 'Administrator' }}
-                </p>
-                <p class="text-xs truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
-                  {{ user?.email }}
-                </p>
-                <p class="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold"
-                  :style="{ color: SIDEBAR_ACTIVE_TEXT }">
-                  <AssetIcon name="shield-check" :size="14" />
-                  {{ adminRoleLabel(user?.admin_role) }}
-                </p>
-              </div>
-            </div>
-
-            <div class="py-2">
-              <button type="button"
-                class="logout-btn flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium transition-colors"
-                style="color:#D32F2F" :disabled="loggingOut" @click="handleLogout">
-                <AssetIcon name="log-out" :size="16" />
-                <span>{{ loggingOut ? 'Logging out…' : 'Log Out' }}</span>
-              </button>
-            </div>
-          </div>
-        </Transition>
-      </div>
     </aside>
   </div>
 </template>
@@ -227,7 +137,7 @@ const {
   closeMobile
 } = useSidebar('admin')
 
-const { user, logout } = useUser()
+const { user } = useUser()
 
 const route = useRoute()
 const router = useRouter()
@@ -241,9 +151,6 @@ let themeObserver = null
 const isMobile = ref(false)
 let mobileMql = null
 
-const menuOpen = ref(false)
-const profileRoot = ref(null)
-const loggingOut = ref(false)
 const hoveredPath = ref(null)
 const navigatingHome = ref(false)
 
@@ -281,15 +188,8 @@ const handleSidebarLeave = () => {
 
 const handleEscape = (e) => {
   if (e.key !== 'Escape') return
-  if (menuOpen.value) menuOpen.value = false
-  else if (mobileOpen.value) closeMobile()
+  if (mobileOpen.value) closeMobile()
   else if (hoverExpanded.value) collapseOnHover()
-}
-
-function onDocumentClick(event) {
-  if (!menuOpen.value) return
-  if (profileRoot.value?.contains(event.target)) return
-  menuOpen.value = false
 }
 
 onMounted(() => {
@@ -303,7 +203,6 @@ onMounted(() => {
   isMobile.value = mobileMql.matches
   mobileMql.addEventListener('change', updateIsMobile)
 
-  document.addEventListener('click', onDocumentClick, true)
   window.addEventListener('keydown', handleEscape)
 })
 
@@ -311,7 +210,6 @@ onUnmounted(() => {
   clearTimeout(leaveTimer)
   themeObserver?.disconnect()
   mobileMql?.removeEventListener('change', updateIsMobile)
-  document.removeEventListener('click', onDocumentClick, true)
   window.removeEventListener('keydown', handleEscape)
   if (typeof document !== 'undefined') document.body.style.removeProperty('overflow')
 })
@@ -324,11 +222,6 @@ watch(mobileOpen, (open) => {
   else document.body.style.removeProperty('overflow')
 })
 
-// A menu anchored to an 80px rail would have nothing to line up against.
-watch(railCollapsed, (isRail) => {
-  if (isRail && !isMobile.value) menuOpen.value = false
-})
-
 // Light/dark theme tokens — the same palette the donor and blood-centre rails
 // use, so the three portals read as one product rather than three.
 const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
@@ -338,16 +231,11 @@ const SIDEBAR_HOVER_BG = computed(() => (isDark.value ? 'rgba(148,163,184,0.12)'
 const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
 const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
 const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
-// --rb-surface, so the popup lifts off the #0F172A rail instead of blending
-// into it the way a slate-900 panel did.
-const SIDEBAR_POPUP_BG = computed(() => (isDark.value ? '#1E293B' : '#FFFFFF'))
 const sidebarShadow = computed(() =>
   isDark.value
     ? `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(0,0,0,0.35)`
     : `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(15,23,42,0.04)`
 )
-
-const initial = computed(() => user.value?.full_name?.charAt(0) || 'A')
 
 /*
  * `requires` names the privilege the page's endpoints are guarded by. An item
@@ -411,19 +299,6 @@ const goHome = async () => {
     navigatingHome.value = false
   }
 }
-
-const handleLogout = async () => {
-  if (loggingOut.value) return
-  loggingOut.value = true
-  menuOpen.value = false
-
-  try {
-    await logout('/auth/admin/login')
-  } catch (error) {
-    console.error('Logout error:', error)
-    loggingOut.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -469,13 +344,7 @@ const handleLogout = async () => {
   display: none;
 }
 
-.account-btn:hover {
-  background: rgba(100, 116, 139, 0.10);
-}
 
-.logout-btn:hover {
-  background: rgba(211, 47, 47, 0.08);
-}
 
 /*
  * The focus ring reads its colour from the token rather than a second
@@ -485,9 +354,7 @@ const handleLogout = async () => {
  * is needed.
  */
 .brand:focus-visible,
-.nav-item:focus-visible,
-.account-btn:focus-visible,
-.logout-btn:focus-visible {
+.nav-item:focus-visible {
   outline: 2px solid var(--rb-primary-text);
   outline-offset: -2px;
 }

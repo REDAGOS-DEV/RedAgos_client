@@ -6,6 +6,8 @@
       <template v-if="meta?.available">
         <span class="dhq-strip__fact">DHQ v{{ meta.question_version }}</span>
         <span class="dhq-strip__sep">·</span>
+        <span class="dhq-strip__fact">{{ meta.completed_via === 'counter' ? 'Onsite' : 'Donor Portal' }}</span>
+        <span class="dhq-strip__sep">·</span>
         <span class="dhq-strip__fact">Answered {{ shortDate(meta.screened_on) }}</span>
 
         <span class="dhq-strip__sep">·</span>
@@ -27,7 +29,7 @@
       </template>
 
       <span v-else class="dhq-strip__fact dhq-strip__fact--muted">
-        Not answered in the app — ask the donor to complete it on their phone.
+        Not completed in RedAgos. The donor can answer it onsite (select Check again once they have) or on the paper form.
       </span>
     </div>
 

@@ -12,24 +12,19 @@
       </div>
 
       <!-- HEADER -->
-      <header class="page-header fade-in" style="--delay:0ms">
-        <div>
-          <h1 class="page-title">Fulfillment</h1>
-          <p class="page-subtitle">
-            Dispatch the units held for each request. Releasing them is what fulfils it, partly or fully; the
-            hospital then confirms each unit arrived.
-          </p>
-        </div>
-        <button class="btn btn-outline" :disabled="loading" @click="load">
-          <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
-          Refresh
-        </button>
-      </header>
+      <PageHeader title="Fulfillment" subtitle="Dispatch the units held for each request; the hospital then confirms each one arrived.">
+        <template #actions>
+          <button class="ui-btn" :disabled="loading" @click="load">
+            <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
+            Refresh
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="error" class="banner banner--error">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ error }}</span>
-        <button class="btn btn-outline btn-sm" @click="load">Retry</button>
+        <button class="ui-btn ui-btn--sm" @click="load">Retry</button>
       </div>
 
       <!-- TABS on the left, the three unit states on the right -->
@@ -70,15 +65,13 @@
       </div>
 
       <div v-else-if="requests.length === 0" class="card">
-        <div class="empty">
-          <span class="empty__icon"><AssetIcon :name="activeTab === 'awaiting_release' ? 'truck' : 'inbox'" :size="20" /></span>
-          <h3>{{ activeTab === 'awaiting_release' ? 'Nothing to dispatch' : 'Nothing awaiting confirmation' }}</h3>
-          <p>
-            {{ activeTab === 'awaiting_release'
-              ? 'Approve a request on the Incoming Requests page to hold stock for it.'
-              : 'Units you dispatch appear here until the hospital confirms they arrived.' }}
-          </p>
-        </div>
+        <EmptyState
+          :icon="activeTab === 'awaiting_release' ? 'truck' : 'inbox'"
+          :title="activeTab === 'awaiting_release' ? 'Nothing to dispatch' : 'Nothing awaiting confirmation'"
+          :description="activeTab === 'awaiting_release'
+            ? 'Approve a request on the Incoming Requests page to hold stock for it.'
+            : 'Units you dispatch appear here until the hospital confirms they arrived.'"
+        />
       </div>
 
       <div v-else class="request-list">
@@ -97,13 +90,13 @@
                 <span
                   v-if="request.weekly_request"
                   class="tag tag--weekly"
-                  title="Part of the hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
+                  title="The hospital's weekly request: dispatched in one delivery, and whatever is not supplied is closed"
                 >Weekly · {{ request.weekly_request.reference_number }}</span>
                 <span class="status" :class="`status--${request.status}`">{{ requestStatusLabel(request) }}</span>
               </div>
               <p class="request-sub">
                 <span class="request-facility">{{ request.requesting_facility?.name || 'Hospital not recorded' }}</span>
-                <span class="blood-pill">{{ request.blood_type?.code || '?' }}</span>
+                <span v-for="code in (bloodTypeCodes(request).length ? bloodTypeCodes(request) : ['?'])" :key="code" class="blood-pill">{{ code }}</span>
                 <span>{{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested</span>
               </p>
             </div>
@@ -129,7 +122,7 @@
           <RequestFulfilmentTable v-if="request.detail" :request="request.detail" class="request-fulfilment" />
           <div v-else-if="request.items?.length" class="lines">
             <span v-for="item in request.items" :key="item.id" class="line-chip">
-              {{ item.component?.name }} &times;{{ item.quantity }}
+              {{ requestLineLabel(request, item) }} &times;{{ item.quantity }}
             </span>
           </div>
 
@@ -141,7 +134,9 @@
           >
             <AssetIcon :name="gateFor(request).ok ? 'check' : 'octagon-alert'" :size="15" />
             <span>{{ gateFor(request).message }}</span>
-            <NuxtLink v-if="!gateFor(request).ok" to="/blood-center/billing" class="gate-link">
+            <!-- Issuance only sees the release gate. Billing now owns every
+                 subsidy decision and checks its centrally scheduled dates. -->
+            <NuxtLink v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing" class="gate-link">
               Go to Billing
             </NuxtLink>
           </div>
@@ -166,6 +161,8 @@
                   <th scope="col">Expires</th>
                   <th scope="col">Storage</th>
                   <th scope="col">State</th>
+                  <th v-if="hasReleased(request)" scope="col">Dispatched</th>
+                  <th v-if="hasReleased(request) && canCorrectDispatch" scope="col"><span class="sr-only">Correct</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -191,6 +188,24 @@
                       {{ allocation.received_at ? 'Received' : allocation.status_label }}
                     </span>
                   </td>
+                  <td v-if="hasReleased(request)" :class="{ muted: allocation.status !== 'released' }">
+                    <template v-if="allocation.status === 'released'">
+                      {{ formatWhen(allocation.released_at) }}
+                      <span v-if="allocation.handed_to" class="handed-to">to {{ allocation.handed_to }}</span>
+                    </template>
+                    <template v-else>—</template>
+                  </td>
+                  <td v-if="hasReleased(request) && canCorrectDispatch">
+                    <button
+                      v-if="allocation.status === 'released'"
+                      type="button"
+                      class="ui-btn ui-btn--sm"
+                      :aria-label="`Request a correction to the dispatch record of unit ${allocation.unit_id}`"
+                      @click="openCorrect(request, allocation)"
+                    >
+                      Correct
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -206,14 +221,14 @@
                 : 'Nothing selected — Dispatch sends every reserved unit.' }}
             </span>
             <button
-              class="btn btn-outline btn-sm"
+              class="ui-btn ui-btn--sm"
               :disabled="busyId === request.id || reservedCount(request) === 0"
               @click="openReturn(request)"
             >
               Return to Stock
             </button>
             <button
-              class="btn btn-primary btn-sm"
+              class="ui-btn ui-btn--primary ui-btn--sm"
               :disabled="busyId === request.id || reservedCount(request) === 0 || !gateFor(request).ok"
               @click="openDispatch(request)"
             >
@@ -253,15 +268,6 @@
             <template v-else>Everything requested is reserved, so nothing will be closed.</template>
           </p>
 
-          <p v-if="dispatchFor.weekly_request" class="modal-warning" role="note">
-            <strong>Weekly request {{ dispatchFor.weekly_request.reference_number }}</strong> goes out in one delivery.
-            <template v-if="dispatchFor.outstanding_quantity > 0">
-              The {{ dispatchFor.outstanding_quantity }} unit(s) you have not reserved will be closed as not supplied —
-              the hospital's next request day replaces them.
-            </template>
-            <template v-else>Everything requested is reserved, so nothing will be closed.</template>
-          </p>
-
           <ul class="modal-units">
             <li v-for="unit in dispatchUnits" :key="unit.id" class="mono">
               {{ unit.unit_id }}<span class="unit-expiry"> · expires {{ unit.expiry_date || 'date not set' }}</span>
@@ -289,14 +295,60 @@
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="busyId" @click="closeDispatch">Cancel</button>
-            <button class="btn btn-primary" :disabled="busyId" @click="confirmDispatch">
+            <button class="ui-btn" :disabled="busyId" @click="closeDispatch">Cancel</button>
+            <button class="ui-btn ui-btn--primary" :disabled="busyId" @click="confirmDispatch">
               {{ busyId ? 'Dispatching…' : 'Dispatch' }}
             </button>
           </div>
         </div>
       </div>
     </Teleport>
+
+    <!-- CORRECT A DISPATCH RECORD. Steps aside while the request is reviewed: its overlay sits above the dialog's. -->
+    <Teleport to="body">
+      <div v-if="correctFor && !dispatchCorrection" class="modal-overlay" @click.self="closeCorrect">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="correct-title">
+          <h2 id="correct-title" class="modal-title">Correct Dispatch Record</h2>
+          <p class="modal-sub">
+            <span class="mono">{{ correctFor.allocation.unit_id }}</span> · {{ correctFor.request.reference_number }}
+          </p>
+
+          <p class="modal-desc">
+            Only when the unit left and who took it can change. Nothing else about the unit or the request is
+            touched, and receipt stays the hospital's to confirm. Your change is applied once it is approved.
+          </p>
+
+          <div class="field">
+            <label for="corrected-released-at" class="field-label">Left at</label>
+            <DateTimeField id="corrected-released-at" v-model="correctForm.releasedAt" />
+          </div>
+
+          <div class="field">
+            <label for="corrected-handed-to" class="field-label">
+              Handed to <span class="field-optional">optional</span>
+            </label>
+            <input id="corrected-handed-to" v-model.trim="correctForm.handedTo" type="text" class="input" maxlength="150">
+          </div>
+
+          <p v-if="correctError" class="field-error field-error--block">{{ correctError }}</p>
+
+          <div class="modal-actions">
+            <button class="ui-btn" @click="closeCorrect">Cancel</button>
+            <button class="ui-btn ui-btn--primary" @click="reviewCorrection">Review correction</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <BloodCenterCorrectionRequestDialog
+      v-if="dispatchCorrection"
+      subject="dispatch"
+      :target-id="dispatchCorrection.allocationId"
+      :changes="dispatchCorrection.changes"
+      :previous="dispatchCorrection.previous"
+      @close="dispatchCorrection = null"
+      @submitted="onDispatchCorrectionSent"
+    />
 
     <!-- RETURN TO STOCK -->
     <Teleport to="body">
@@ -325,8 +377,8 @@
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
 
           <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="busyId" @click="closeReturn">Cancel</button>
-            <button class="btn btn-primary" :disabled="busyId || !returnReason" @click="confirmReturn">
+            <button class="ui-btn" :disabled="busyId" @click="closeReturn">Cancel</button>
+            <button class="ui-btn ui-btn--primary" :disabled="busyId || !returnReason" @click="confirmReturn">
               {{ busyId ? 'Returning…' : 'Return to Stock' }}
             </button>
           </div>
@@ -339,8 +391,12 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
+import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeCodes, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
+import DateTimeField from '~/components/common/DateTimeField.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -437,22 +493,27 @@ function gateFor(request) {
   const billing = request.billing
 
   if (!billing) {
-    return { ok: false, message: 'No statement has been raised for this request yet.' }
+    return { ok: false, message: 'No invoice has been raised for this request yet.' }
   }
 
   if (billing.clears_release) {
-    return {
-      ok: true,
-      message: billing.is_subsidised
-        ? 'Met by the government subsidy. Cleared for release.'
-        : 'Statement settled. Cleared for release.',
+    let message = 'Invoice settled. Cleared for release.'
+
+    if (billing.is_statement_only) {
+      // A weekly order is billed to the hospital by invoice only and never
+      // waits on a payment in RedAgos (owner decision, 2026-10-10).
+      message = 'Weekly order, billed to the hospital by invoice only. Cleared for release.'
+    } else if (billing.is_subsidised) {
+      message = 'Met by the government subsidy. Cleared for release.'
     }
+
+    return { ok: true, message }
   }
 
   const owed = Number(billing.total_amount ?? 0) - Number(billing.collected ?? 0)
   return {
     ok: false,
-    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until this is settled or subsidised.`,
+    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until it is paid (cash or GCash) or subsidised.`,
   }
 }
 
@@ -466,7 +527,7 @@ function reservedCount(request) {
 
 function componentFor(request, allocation) {
   const item = (request.items ?? []).find((i) => i.id === allocation.request_item_id)
-  return item?.component?.name ?? '—'
+  return item ? requestLineLabel(request, item) : '—'
 }
 
 /** Flags a bag close enough to expiry that a dispatcher should notice. */
@@ -557,6 +618,88 @@ async function confirmDispatch() {
   }
 }
 
+/* CORRECT A DISPATCH RECORD */
+const { can, canFile } = useUser()
+const canCorrectDispatch = computed(() => can('corrections.request') && canFile('dispatch'))
+
+function hasReleased(request) {
+  return (request.allocations ?? []).some((a) => a.status === 'released')
+}
+
+function formatWhen(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+}
+
+// datetime-local wants the local wall time, to the minute.
+function toLocalInput(iso) {
+  if (!iso) return ''
+
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const correctFor = ref(null)
+const correctForm = reactive({ releasedAt: '', handedTo: '' })
+const correctError = ref('')
+const dispatchCorrection = ref(null)
+
+function openCorrect(request, allocation) {
+  correctError.value = ''
+  correctForm.releasedAt = toLocalInput(allocation.released_at)
+  correctForm.handedTo = allocation.handed_to ?? ''
+  correctFor.value = { request, allocation }
+}
+
+function closeCorrect() {
+  correctFor.value = null
+}
+
+// Only what differs goes to the dialog. The time is compared to the minute the
+// form can show, so an untouched time is not sent back with its seconds lost.
+function reviewCorrection() {
+  const { allocation } = correctFor.value
+  const changes = {}
+
+  if (correctForm.releasedAt && correctForm.releasedAt !== toLocalInput(allocation.released_at)) {
+    changes.released_at = new Date(correctForm.releasedAt).toISOString()
+  }
+
+  if ((correctForm.handedTo.trim() || null) !== (allocation.handed_to || null)) {
+    changes.handed_to = correctForm.handedTo.trim() || null
+  }
+
+  if (!Object.keys(changes).length) {
+    correctError.value = 'Nothing has changed yet.'
+    return
+  }
+
+  correctError.value = ''
+  dispatchCorrection.value = {
+    allocationId: allocation.id,
+    changes,
+    previous: {
+      released_at: allocation.released_at ? new Date(allocation.released_at).toISOString() : null,
+      handed_to: allocation.handed_to || null,
+    },
+  }
+}
+
+async function onDispatchCorrectionSent(response) {
+  dispatchCorrection.value = null
+  correctFor.value = null
+
+  // The Inventory Control Officer's own correction is applied at once.
+  if (response?.data?.status === 'approved') {
+    toast('Correction Applied', 'success', response?.message ?? 'The dispatch record is corrected.')
+    await load()
+    return
+  }
+
+  toast('Correction Requested', 'success', response?.message ?? 'It is applied once it is approved.')
+}
+
 /* RETURN TO STOCK */
 const returnFor = ref(null)
 const returnReason = ref('')
@@ -606,9 +749,8 @@ onMounted(load)
 .fx-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .fx-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
+/* The shared PageHeader, with the space below it the old header kept. */
+.fx-inner > .ph { margin-bottom: 16px; }
 
 /* tabs + legend */
 .tabbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -698,6 +840,8 @@ onMounted(load)
 }
 .units-table td { padding: 8px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); }
 .units-table td.muted { color: var(--rb-text-secondary); }
+.handed-to { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .units-table tr:last-child td { border-bottom: none; }
 .units-table .pick { width: 30px; }
 .units-empty { font-size: 12.5px; color: var(--rb-text-muted); margin: 0; }
@@ -795,4 +939,7 @@ onMounted(load)
   .units-table th, .units-table td { padding: 6px 6px; }
   .request-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* Cards in the shared SectionCard's shape (2026-10-15). */
+.card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
 </style>

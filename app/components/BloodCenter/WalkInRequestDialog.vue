@@ -51,16 +51,29 @@
           <div class="grid">
             <label class="field field--wide">
               <span class="field__label">Patient's hospital blood bank *</span>
-              <select v-model.number="form.hospitalId" class="field__input" :disabled="isContinuing">
-                <option :value="null" disabled>Select the hospital</option>
-                <option v-for="hospital in reference.hospitals" :key="hospital.id" :value="hospital.id">
-                  {{ hospital.name }}
-                </option>
-              </select>
-              <span v-if="!reference.hospitals.length" class="field__hint">
-                No hospital blood bank is registered in RedAgos yet. A walk-in can only be recorded for a registered one.
-              </span>
+              <SelectField
+                v-model="hospitalChoice"
+                :options="[
+                  ...reference.hospitals.map((hospital) => ({
+                    value: hospital.id,
+                    label: hospital.registered === false ? `${hospital.name} (not on RedAgos)` : hospital.name,
+                  })),
+                  { value: NEW_HOSPITAL, label: 'Not in the list — type its name…' },
+                ]"
+                placeholder="Select the hospital"
+                :disabled="isContinuing"
+              />
             </label>
+
+            <!-- A hospital not on RedAgos (project owner, 2026-10-19): its name only. -->
+            <label v-if="typingHospital" class="field field--wide">
+              <span class="field__label">Hospital name *</span>
+              <input v-model="form.hospitalName" class="field__input" maxlength="150" placeholder="e.g. St. Jude Hospital" autocomplete="off" :disabled="isContinuing">
+            </label>
+            <p v-if="hospitalNotOnRedAgos" class="field__hint field--wide">
+              This hospital is not on RedAgos: it will not be notified and cannot follow the request. The watcher takes
+              the units, and a referral slip if this center cannot supply everything.
+            </p>
 
             <label class="field">
               <span class="field__label">Patient surname *</span>
@@ -72,14 +85,16 @@
             </label>
 
             <label class="field">
-              <span class="field__label">Blood type</span>
-              <select v-model.number="form.bloodTypeId" class="field__input" :disabled="isContinuing">
-                <option :value="null">Not known yet</option>
-                <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-              </select>
+              <span class="field__label">Blood type *</span>
+              <SelectField
+                v-model="form.bloodTypeId"
+                :options="reference.blood_types.map((type) => ({ value: type.id, label: type.code }))"
+                placeholder="Select the blood type"
+                :disabled="isContinuing"
+              />
             </label>
             <label class="field">
-              <span class="field__label">Reference on the watcher's paperwork</span>
+              <span class="field__label">Reference on the watcher's paperwork <span class="field__optional">(optional)</span></span>
               <input v-model="form.presentedReference" class="field__input" maxlength="60" placeholder="e.g. RQ-4-0012" autocomplete="off">
             </label>
           </div>
@@ -149,70 +164,8 @@
           </p>
         </section>
 
-        <!-- STEP 2: PHONE VERIFICATION -->
+        <!-- STEP 2: THE REQUEST AND THE WATCHER -->
         <section v-show="step === 2" class="step">
-          <div class="call-card">
-            <AssetIcon name="phone" :size="20" />
-            <div>
-              <p class="call-card__title">Call {{ selectedHospital?.name || 'the hospital blood bank' }}</p>
-              <p v-if="selectedHospital?.phone" class="call-card__phone mono">{{ selectedHospital.phone }}</p>
-              <p class="call-card__body">
-                Confirm that {{ patientName || 'the patient' }} is admitted and that the request the watcher carries is
-                genuine. Nothing is saved while you are on the call.
-              </p>
-            </div>
-          </div>
-
-          <div v-if="declined" class="banner banner--muted" role="status">
-            <AssetIcon name="info" :size="15" />
-            <span>
-              The hospital did not confirm the request, so nothing was recorded. Ask the watcher to go through the
-              hospital blood bank.
-            </span>
-          </div>
-
-          <div v-if="!form.verification.confirmed && !declined" class="choice">
-            <p class="choice__question">Did the hospital blood bank confirm this request?</p>
-            <div class="choice__buttons">
-              <button type="button" class="btn btn--primary" @click="confirmByPhone">
-                <AssetIcon name="check" :size="15" /> Yes, they confirmed it
-              </button>
-              <button type="button" class="btn" @click="declined = true">
-                <AssetIcon name="x" :size="15" /> No, they did not
-              </button>
-            </div>
-          </div>
-
-          <div v-if="form.verification.confirmed" class="grid">
-            <p class="ok-text field--wide">
-              <AssetIcon name="check-circle" :size="15" /> Confirmed by the hospital. Record who you spoke to.
-              <button type="button" class="link-btn" @click="form.verification.confirmed = false">Change</button>
-            </p>
-            <label class="field">
-              <span class="field__label">Confirmed by (name) *</span>
-              <input v-model="form.verification.verifierName" class="field__input" maxlength="150" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Their position *</span>
-              <input v-model="form.verification.verifierPosition" class="field__input" maxlength="100" placeholder="e.g. Blood Bank Medical Technologist" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Number called *</span>
-              <input v-model="form.verification.verifierContact" class="field__input" maxlength="30" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Confirmed at *</span>
-              <input v-model="form.verification.verifiedAt" type="datetime-local" class="field__input" :max="nowInput">
-            </label>
-            <label class="field field--wide">
-              <span class="field__label">What was confirmed (optional)</span>
-              <textarea v-model="form.verification.notes" class="field__input" rows="2" maxlength="500" />
-            </label>
-          </div>
-        </section>
-
-        <!-- STEP 3: THE REQUEST AND THE WATCHER -->
-        <section v-show="step === 3" class="step">
           <h3 class="step__heading">Patient</h3>
           <div class="grid">
             <p v-if="isContinuing" class="field__hint field--wide">
@@ -229,25 +182,19 @@
               </label>
               <label class="field">
                 <span class="field__label">Sex *</span>
-                <select v-model="form.patient.sex" class="field__input">
-                  <option value="" disabled>Select</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="field__label">Blood type *</span>
-                <select v-model.number="form.bloodTypeId" class="field__input">
-                  <option :value="null" disabled>Select</option>
-                  <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-                </select>
+                <SelectField
+                  v-model="form.patient.sex"
+                  :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                  placeholder="Select"
+                />
               </label>
             </template>
             <label class="field">
               <span class="field__label">Priority *</span>
-              <select v-model="form.urgency" class="field__input">
-                <option v-for="priority in reference.priorities" :key="priority.value" :value="priority.value">{{ priority.label }}</option>
-              </select>
+              <SelectField
+                v-model="form.urgency"
+                :options="reference.priorities.map((priority) => ({ value: priority.value, label: priority.label }))"
+              />
             </label>
             <label class="field">
               <span class="field__label">Attending physician</span>
@@ -268,10 +215,13 @@
             <div v-for="(line, index) in form.lines" :key="index" class="line">
               <label class="field">
                 <span class="field__label">Component</span>
-                <select v-model.number="line.componentId" class="field__input" :disabled="isContinuing" @change="line.indicationCode = ''">
-                  <option :value="null" disabled>Select</option>
-                  <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
-                </select>
+                <SelectField
+                  v-model="line.componentId"
+                  :options="reference.components.map((component) => ({ value: component.id, label: component.name }))"
+                  placeholder="Select"
+                  :disabled="isContinuing"
+                  @change="line.indicationCode = ''"
+                />
               </label>
               <label class="field field--narrow">
                 <span class="field__label">Units{{ line.maxQuantity !== null ? ` (max ${line.maxQuantity})` : '' }}</span>
@@ -280,12 +230,11 @@
               <template v-if="!isContinuing">
                 <label v-if="indicationsFor(line).length" class="field field--grow">
                   <span class="field__label">Indication</span>
-                  <select v-model="line.indicationCode" class="field__input">
-                    <option value="" disabled>Select the clinical indication</option>
-                    <option v-for="code in indicationsFor(line)" :key="code.code" :value="code.code">
-                      {{ code.label }} — {{ code.description }}
-                    </option>
-                  </select>
+                  <SelectField
+                    v-model="line.indicationCode"
+                    :options="indicationsFor(line).map((code) => ({ value: code.code, label: `${code.label} — ${code.description}` }))"
+                    placeholder="Select the clinical indication"
+                  />
                 </label>
                 <label v-if="needsExplanation(line)" class="field field--grow">
                   <span class="field__label">Specify</span>
@@ -330,10 +279,10 @@
             </label>
             <label class="field">
               <span class="field__label">ID presented</span>
-              <select v-model="form.representative.idType" class="field__input">
-                <option value="">None</option>
-                <option v-for="type in reference.id_types" :key="type.value" :value="type.value">{{ type.label }}</option>
-              </select>
+              <SelectField
+                v-model="form.representative.idType"
+                :options="[{ value: '', label: 'None' }, ...reference.id_types.map((type) => ({ value: type.value, label: type.label }))]"
+              />
             </label>
             <label v-if="form.representative.idType" class="field">
               <span class="field__label">ID number *</span>
@@ -342,14 +291,16 @@
           </div>
         </section>
 
-        <!-- STEP 4: REVIEW -->
-        <section v-show="step === 4" class="step">
+        <!-- STEP 3: REVIEW -->
+        <section v-show="step === 3" class="step">
           <dl class="review">
-            <div><dt>Hospital (requester)</dt><dd>{{ selectedHospital?.name || '—' }}</dd></div>
+            <div>
+              <dt>Hospital (requester)</dt>
+              <dd>{{ hospitalLabel || '—' }}<template v-if="hospitalNotOnRedAgos"> · not on RedAgos</template></dd>
+            </div>
             <div><dt>Patient</dt><dd>{{ patientName || '—' }}</dd></div>
             <div><dt>Blood type</dt><dd>{{ bloodTypeCode || '—' }}</dd></div>
             <div><dt>Priority</dt><dd>{{ priorityLabel }}</dd></div>
-            <div><dt>Confirmed by</dt><dd>{{ form.verification.verifierName }} ({{ form.verification.verifierPosition }})</dd></div>
             <div><dt>Presented by</dt><dd>{{ form.representative.name }} · {{ form.representative.relationship }}</dd></div>
             <div v-if="isContinuing" class="review__wide"><dt>Added to</dt><dd class="mono">{{ form.transfusionReference }}</dd></div>
             <div class="review__wide">
@@ -378,19 +329,19 @@
       </template>
 
       <footer class="dialog__footer">
-        <button v-if="step > 1 && !declined" type="button" class="btn" :disabled="saving" @click="back">Back</button>
+        <button v-if="step > 1" type="button" class="btn" :disabled="saving" @click="back">Back</button>
         <span class="dialog__spacer" />
-        <button type="button" class="btn" :disabled="saving" @click="requestClose">{{ declined ? 'Close' : 'Cancel' }}</button>
+        <button type="button" class="btn" :disabled="saving" @click="requestClose">Cancel</button>
         <button
-          v-if="step < 4 && !declined"
+          v-if="step < 3"
           type="button"
           class="btn btn--primary"
-          :disabled="!reference || (step === 1 && !lookupDone) || (step === 2 && !form.verification.confirmed)"
+          :disabled="!reference || (step === 1 && !lookupDone)"
           @click="next"
         >
           Continue
         </button>
-        <button v-if="step === 4" type="button" class="btn btn--primary" :disabled="saving" @click="submit">
+        <button v-if="step === 3" type="button" class="btn btn--primary" :disabled="saving" @click="submit">
           {{ saving ? 'Recording…' : 'Record request' }}
         </button>
       </footer>
@@ -402,11 +353,15 @@
 /**
  * Record a Patient Transfusion request a watcher brought to the blood centre.
  *
- * Four steps, in the order the counter works: who the blood is for and whether
- * the hospital already has a request for them; the phone call to the hospital
- * blood bank; the request itself and the watcher; then a review. Nothing is
- * sent until the last step, and a hospital that does not confirm the request
- * ends the dialog with nothing recorded — that is the rule, not an option.
+ * Three steps, in the order the counter works: who the blood is for and whether
+ * the hospital already has a request for them; the request itself and the
+ * watcher; then a review. Nothing is sent until the last step.
+ *
+ * The phone call to the hospital blood bank that came second was removed by the
+ * project owner on 2026-10-19, and with it the rule that nothing was recorded
+ * until the hospital confirmed. Step one needs the hospital, the patient's
+ * surname and first name, and the blood type; the reference on the watcher's
+ * paperwork is optional.
  */
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -421,14 +376,14 @@ import {
   buildWalkInPayload,
   clearContinuation,
   matchesNeedingAcknowledgement,
-  toLocalInputValue,
   walkInStepProblems,
 } from '~/utils/requestFulfilment'
+import SelectField from '~/components/common/SelectField.vue'
 
 const emit = defineEmits(['close', 'created', 'open-existing'])
 
-const STEP_LABELS = ['Patient', 'Hospital confirmation', 'Request & watcher', 'Review']
-const STEP_KEYS = { 1: 'lookup', 2: 'verify', 3: 'details' }
+const STEP_LABELS = ['Patient', 'Request & watcher', 'Review']
+const STEP_KEYS = { 1: 'lookup', 2: 'details' }
 
 const dialogRef = ref(null)
 const step = ref(1)
@@ -441,16 +396,29 @@ const referenceError = ref('')
 const checking = ref(false)
 const lookupDone = ref(false)
 const matches = ref([])
-const declined = ref(false)
 
 const attempted = ref(false)
 const saving = ref(false)
 const submitError = ref('')
 
-const nowInput = ref(toLocalInputValue(new Date()))
-
 const isContinuing = computed(() => form.value.transfusionRequestId !== null)
 const selectedHospital = computed(() => reference.value?.hospitals.find((h) => h.id === form.value.hospitalId) ?? null)
+
+// The hospital select: an id from the list, or NEW_HOSPITAL to type the name
+// of one not on RedAgos (project owner, 2026-10-19).
+const NEW_HOSPITAL = 'new'
+const typingHospital = ref(false)
+const hospitalChoice = computed({
+  get: () => (typingHospital.value ? NEW_HOSPITAL : form.value.hospitalId),
+  set: (value) => {
+    typingHospital.value = value === NEW_HOSPITAL
+    form.value.hospitalId = typingHospital.value || value === null ? null : Number(value)
+    if (!typingHospital.value) form.value.hospitalName = ''
+  },
+})
+// Typed by hand, or one an earlier walk-in named.
+const hospitalNotOnRedAgos = computed(() => (typingHospital.value && Boolean(form.value.hospitalName.trim())) || selectedHospital.value?.registered === false)
+const hospitalLabel = computed(() => selectedHospital.value?.name || form.value.hospitalName.trim())
 const bloodTypeCode = computed(() => reference.value?.blood_types.find((t) => t.id === form.value.bloodTypeId)?.code ?? '')
 const priorityLabel = computed(() => PRIORITY_LABELS[form.value.urgency] ?? form.value.urgency)
 
@@ -463,9 +431,12 @@ const patientName = computed(() => {
   return given ? `${surname.trim().toUpperCase()}, ${given}` : surname.trim().toUpperCase()
 })
 
+// The four step one requires; the reference narrows the lookup when given.
 const canCheck = computed(() => Boolean(
-  form.value.hospitalId
-  && ((form.value.patient.surname.trim() && form.value.patient.firstName.trim()) || form.value.presentedReference.trim()),
+  (form.value.hospitalId || form.value.hospitalName.trim())
+  && form.value.patient.surname.trim()
+  && form.value.patient.firstName.trim()
+  && form.value.bloodTypeId,
 ))
 
 const acknowledgementNeeded = computed(() => matchesNeedingAcknowledgement(matches.value, form.value.transfusionRequestId))
@@ -473,10 +444,9 @@ const acknowledgementNeeded = computed(() => matchesNeedingAcknowledgement(match
 const problems = computed(() => {
   if (!reference.value) return []
 
-  if (step.value === 4) {
+  if (step.value === 3) {
     const all = [
       ...walkInStepProblems(form.value, 'lookup'),
-      ...walkInStepProblems(form.value, 'verify'),
       ...walkInStepProblems(form.value, 'details', reference.value.components),
     ]
 
@@ -493,7 +463,7 @@ const problems = computed(() => {
 // A different patient or hospital is a different lookup. A continuation fills
 // these in itself from the requirement, so it is not a reason to re-check.
 watch(
-  () => [form.value.hospitalId, form.value.patient.surname, form.value.patient.firstName, form.value.bloodTypeId, form.value.presentedReference],
+  () => [form.value.hospitalId, form.value.hospitalName, form.value.patient.surname, form.value.patient.firstName, form.value.bloodTypeId, form.value.presentedReference],
   () => {
     if (!isContinuing.value) {
       lookupDone.value = false
@@ -522,7 +492,7 @@ async function checkDuplicates() {
 
   try {
     const response = await bloodCenterService.checkWalkInDuplicates({
-      hospital_id: form.value.hospitalId,
+      ...(form.value.hospitalId ? { hospital_id: form.value.hospitalId } : { hospital_name: form.value.hospitalName.trim() }),
       patient_surname: form.value.patient.surname.trim() || null,
       patient_first_name: form.value.patient.firstName.trim() || null,
       blood_type_id: form.value.bloodTypeId || null,
@@ -546,16 +516,6 @@ function undoContinuation() {
   form.value = clearContinuation(form.value)
 }
 
-function confirmByPhone() {
-  form.value.verification.confirmed = true
-  nowInput.value = toLocalInputValue(new Date())
-  form.value.verification.verifiedAt = nowInput.value
-
-  if (!form.value.verification.verifierContact && selectedHospital.value?.phone) {
-    form.value.verification.verifierContact = selectedHospital.value.phone
-  }
-}
-
 function indicationsFor(line) {
   return reference.value?.components.find((component) => component.id === line.componentId)?.indication_codes ?? []
 }
@@ -574,7 +534,6 @@ function next() {
 
   attempted.value = false
   step.value += 1
-  nowInput.value = toLocalInputValue(new Date())
 }
 
 function back() {
@@ -916,51 +875,8 @@ function formatDate(value) {
   align-items: center;
 }
 
-.call-card {
-  display: flex;
-  gap: 0.8rem;
-  align-items: flex-start;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-}
-
-.call-card__title {
-  margin: 0;
-  font-weight: 700;
-  color: var(--rb-text-primary);
-}
-
-.call-card__phone {
-  margin: 0.15rem 0 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.call-card__body {
-  margin: 0.35rem 0 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
-
-.choice {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.choice__question {
-  margin: 0;
-  font-weight: 700;
-}
-
-.choice__buttons {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+/* The one field on step one that may be left empty. */
+.field__optional { font-weight: 400; color: var(--rb-text-secondary); }
 
 .banner {
   display: flex;

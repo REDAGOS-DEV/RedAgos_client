@@ -3,9 +3,9 @@
  *
  * Two inflows. A **weekly request** is the scheduled restock the blood bank
  * sends a blood center on its request days (Mon/Wed/Fri, say): one order per
- * center per request day, written as one replenishment request per blood type.
- * The center supplies what it can; whatever it does not is closed as
- * unavailable when it dispatches. A **direct distribution** is a delivery from
+ * center per request day, written as one replenishment request whose lines
+ * each name their own blood type. The center supplies what it can; whatever it
+ * does not is closed as unavailable when it dispatches. A **direct distribution** is a delivery from
  * outside RedAgos — the Philippine Red Cross, say — whose bags carry no RedAgos
  * barcode, so staff type each bag's own number.
  *
@@ -88,7 +88,11 @@ export interface WeeklyRequest {
   status_label: string
   is_open: boolean
   totals: WeeklyTotals
-  /** One replenishment request per blood type. Allocations only on the detail view. */
+  /**
+   * Its one replenishment request, whose lines name their blood types — or
+   * one per blood type, if sent before lines carried their own. Allocations
+   * only on the detail view.
+   */
   requests: BloodRequest[]
 }
 

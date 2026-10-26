@@ -5,14 +5,17 @@
  * what the product is and its number, and nothing that says it is safe. No
  * blood type, no clearance.
  *
- * Phase 2 — the FINAL label, printed by Issuance when the bag leaves
- * quarantine: the verified blood type, the expiry and the clearance codes.
- * The server only gives this for bags already released, so a "cleared" label
- * can never be printed for a bag that is not.
+ * Phase 2 — the FINAL label, printed by Processing once Testing has cleared
+ * the donation, before the bags are handed over (project owner, 2026-10-22):
+ * the verified blood type, the expiry and the clearance codes. The server
+ * refuses it until both clearances are in, so a "cleared" label can never be
+ * printed for a bag that is not.
  *
- * Neither prints a barcode: every bag already carries the donation's
- * pre-printed sticker, and the bag number is that sticker plus the component.
- * Neither names the donor.
+ * Both print as a 100 × 150 mm courier-style waybill (project owner,
+ * 2026-10-19), with a QR of the bag or unit number beside it in large type.
+ * No 1-D barcode: every bag already carries the donation's pre-printed
+ * sticker, and the bag number is that sticker plus the component. Neither
+ * names the donor.
  */
 
 export type LabelVariant = 'base' | 'final'
@@ -30,10 +33,12 @@ export interface FinalLabel {
   rh: string
   component: string
   volume_ml: number | null
+  /** The day the blood was drawn, as the label prints it; empty when unknown. */
+  collected: string
   expiry: string
   donation_barcode: string | null
   clearances: string[]
-  released: string | null
+  labelled: string | null
   facility: string | null
 }
 
@@ -88,6 +93,7 @@ export function baseLabelsFrom(donation: {
 
 interface LabelsPayload {
   donation_barcode?: string | null
+  collected_on?: string | null
   facility?: string | null
   clearances?: Array<{ label?: string; code?: string; issued_at?: string | null; issued_by?: string | null }>
   units?: Array<{
@@ -96,8 +102,8 @@ interface LabelsPayload {
     component?: string | null
     volume_ml?: number | null
     expiry_date?: string | null
-    released_at?: string | null
-    released_by?: string | null
+    labelled_at?: string | null
+    labelled_by?: string | null
   }>
 }
 
@@ -123,11 +129,12 @@ export function finalLabelsFrom(payload: LabelsPayload | null | undefined, onlyU
         rh,
         component: unit.component ?? '',
         volume_ml: unit.volume_ml ?? null,
+        collected: labelDate(payload?.collected_on),
         expiry: labelDate(unit.expiry_date),
         donation_barcode: payload?.donation_barcode ?? null,
         clearances,
-        released: unit.released_at
-          ? `Released ${labelDate(unit.released_at)}${unit.released_by ? ` by ${unit.released_by}` : ''}`
+        labelled: unit.labelled_at
+          ? `Labelled ${labelDate(unit.labelled_at)}${unit.labelled_by ? ` by ${unit.labelled_by}` : ''}`
           : null,
         facility: payload?.facility ?? null,
       }

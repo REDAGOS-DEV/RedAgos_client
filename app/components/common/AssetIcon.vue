@@ -17,12 +17,11 @@ import arrowLeft from '~/assets/icons/arrow-left.svg?raw'
 import arrowRight from '~/assets/icons/arrow-right.svg?raw'
 import arrowUpRight from '~/assets/icons/arrow-up-right.svg?raw'
 import badgeCheck from '~/assets/icons/badge-check.svg?raw'
+import ban from '~/assets/icons/ban.svg?raw'
 import barChart from '~/assets/icons/bar-chart.svg?raw'
 import bell from '~/assets/icons/bell.svg?raw'
 import bloodDrop from '~/assets/icons/blood-drop.svg?raw'
-import bloodDropSmile from '~/assets/icons/blood-drop-smile.svg?raw'
 import bolt from '~/assets/icons/bolt.svg?raw'
-import boltFill from '~/assets/icons/bolt-fill.svg?raw'
 import box from '~/assets/icons/box.svg?raw'
 import briefcase from '~/assets/icons/briefcase.svg?raw'
 import building2 from '~/assets/icons/building-2.svg?raw'
@@ -47,9 +46,7 @@ import clipboardCheck from '~/assets/icons/clipboard-check.svg?raw'
 import clipboardList from '~/assets/icons/clipboard-list.svg?raw'
 import clipboardPlus from '~/assets/icons/clipboard-plus.svg?raw'
 import clock from '~/assets/icons/clock.svg?raw'
-import cloudUpload from '~/assets/icons/cloud-upload.svg?raw'
 import creditCard from '~/assets/icons/credit-card.svg?raw'
-import database from '~/assets/icons/database.svg?raw'
 import dollarSign from '~/assets/icons/dollar-sign.svg?raw'
 import drawerSlide from '~/assets/icons/drawer-slide.svg?raw'
 import dropletOff from '~/assets/icons/droplet-off.svg?raw'
@@ -62,8 +59,9 @@ import filePlus from '~/assets/icons/file-plus.svg?raw'
 import fileText from '~/assets/icons/file-text.svg?raw'
 import flag from '~/assets/icons/flag.svg?raw'
 import flaskConical from '~/assets/icons/flask-conical.svg?raw'
+import folder from '~/assets/icons/folder.svg?raw'
+import folderOpen from '~/assets/icons/folder-open.svg?raw'
 import heart from '~/assets/icons/heart.svg?raw'
-import heartFill from '~/assets/icons/heart-fill.svg?raw'
 import helpCircle from '~/assets/icons/help-circle.svg?raw'
 import history from '~/assets/icons/history.svg?raw'
 import hospital from '~/assets/icons/hospital.svg?raw'
@@ -81,7 +79,6 @@ import logIn from '~/assets/icons/log-in.svg?raw'
 import logOut from '~/assets/icons/log-out.svg?raw'
 import mail from '~/assets/icons/mail.svg?raw'
 import mapPin from '~/assets/icons/map-pin.svg?raw'
-import mapPinSimple from '~/assets/icons/map-pin-simple.svg?raw'
 import menu from '~/assets/icons/menu.svg?raw'
 import monitor from '~/assets/icons/monitor.svg?raw'
 import moon from '~/assets/icons/moon.svg?raw'
@@ -91,12 +88,13 @@ import Package from '~/assets/icons/package.svg?raw'
 import packageCheck from '~/assets/icons/package-check.svg?raw'
 import packageSearch from '~/assets/icons/package-search.svg?raw'
 import palette from '~/assets/icons/palette.svg?raw'
+import pipette from '~/assets/icons/pipette.svg?raw'
 import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
+import philippinePeso from '~/assets/icons/philippine-peso.svg?raw'
 import plus from '~/assets/icons/plus.svg?raw'
 import printer from '~/assets/icons/printer.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
-import quote from '~/assets/icons/quote.svg?raw'
 import receipt from '~/assets/icons/receipt.svg?raw'
 import refreshCw from '~/assets/icons/refresh-cw.svg?raw'
 import route from '~/assets/icons/route.svg?raw'
@@ -108,18 +106,20 @@ import settings from '~/assets/icons/settings.svg?raw'
 import share from '~/assets/icons/share.svg?raw'
 import shield from '~/assets/icons/shield.svg?raw'
 import shieldCheck from '~/assets/icons/shield-check.svg?raw'
-import shieldPlus from '~/assets/icons/shield-plus.svg?raw'
 import slidersHorizontal from '~/assets/icons/sliders-horizontal.svg?raw'
 import smartphone from '~/assets/icons/smartphone.svg?raw'
-import smile from '~/assets/icons/smile.svg?raw'
 import triangleAlert from '~/assets/icons/triangle-alert.svg?raw'
 import starFill from '~/assets/icons/star-fill.svg?raw'
+import pill from '~/assets/icons/pill.svg?raw'
+import plane from '~/assets/icons/plane.svg?raw'
 import stethoscope from '~/assets/icons/stethoscope.svg?raw'
+import syringe from '~/assets/icons/syringe.svg?raw'
 import sun from '~/assets/icons/sun.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
 import truck from '~/assets/icons/truck.svg?raw'
+import undo2 from '~/assets/icons/undo-2.svg?raw'
 import unlock from '~/assets/icons/unlock.svg?raw'
 import upload from '~/assets/icons/upload.svg?raw'
 import user from '~/assets/icons/user.svg?raw'
@@ -137,12 +137,11 @@ const icons = {
   'arrow-right': arrowRight,
   'arrow-up-right': arrowUpRight,
   'badge-check': badgeCheck,
+  ban,
   'bar-chart': barChart,
   bell,
   'blood-drop': bloodDrop,
-  'blood-drop-smile': bloodDropSmile,
   bolt,
-  'bolt-fill': boltFill,
   box,
   briefcase,
   'building-2': building2,
@@ -158,6 +157,8 @@ const icons = {
   'chevron-down' :chevronDown,
   'chevron-up': chevronUp,
   'circle-alert': circleAlert,
+  // Server notifications send this older Lucide name.
+  'alert-circle': circleAlert,
   'circle-plus': circlePlus,
   'circle-check-big': circleCheck,
   'circle-x': circleX,
@@ -167,9 +168,7 @@ const icons = {
   'clipboard-check': clipboardCheck,
   'clipboard-list': clipboardList,
   clock,
-  'cloud-upload': cloudUpload,
   'credit-card': creditCard,
-  database,
   'dollar-sign': dollarSign,
   'drawer-slide': drawerSlide,
   'droplet-off': dropletOff,
@@ -182,8 +181,9 @@ const icons = {
   'file-text': fileText,
   flag,
   'flask-conical': flaskConical,
+  folder,
+  'folder-open': folderOpen,
   heart,
-  'heart-fill': heartFill,
   'help-circle': helpCircle,
   history,
   hospital,
@@ -201,7 +201,6 @@ const icons = {
   'log-out': logOut,
   mail,
   'map-pin': mapPin,
-  'map-pin-simple': mapPinSimple,
   menu,
   monitor,
   moon,
@@ -211,12 +210,13 @@ const icons = {
   'package-check': packageCheck,
   'package-search': packageSearch,
   palette,
+  pipette,
   pencil,
   phone,
+  'philippine-peso': philippinePeso,
   plus,
   printer,
   'qr-code': qrCode,
-  quote,
   receipt,
   'refresh-cw': refreshCw,
   route,
@@ -228,11 +228,12 @@ const icons = {
   share,
   shield,
   'shield-check': shieldCheck,
-  'shield-plus': shieldPlus,
   'sliders-horizontal': slidersHorizontal,
   smartphone,
-  smile,
+  pill,
+  plane,
   stethoscope,
+  syringe,
   'star-fill': starFill,
   'triangle-alert': triangleAlert,
   'trending-down': trendingDown,
@@ -240,6 +241,7 @@ const icons = {
   truck,
   sun,
   'trash-2': trash,
+  'undo-2': undo2,
   unlock,
   upload,
   user,

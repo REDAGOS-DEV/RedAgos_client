@@ -31,7 +31,7 @@
 
       <div v-else-if="loadError" class="panel panel--error" role="alert">
         <p>{{ loadError }}</p>
-        <button type="button" class="btn" @click="load">Try again</button>
+        <button type="button" class="ui-btn" @click="load">Try again</button>
       </div>
 
       <template v-else-if="request">
@@ -53,7 +53,7 @@
                 not supply {{ request.totals.unallocated === 1 ? 'it' : 'them' }}. Search again to ask another facility.
               </p>
             </div>
-            <button v-if="!allocating" type="button" class="btn btn--primary" @click="openAllocate">
+            <button v-if="!allocating" type="button" class="ui-btn ui-btn--primary" @click="openAllocate">
               <AssetIcon name="search" :size="15" />
               Allocate remaining units
             </button>
@@ -69,10 +69,10 @@
               @retry="loadPlan"
             />
             <div class="allocate__actions">
-              <button type="button" class="btn" :disabled="sending" @click="allocating = false">Cancel</button>
+              <button type="button" class="ui-btn" :disabled="sending" @click="allocating = false">Cancel</button>
               <button
                 type="button"
-                class="btn btn--primary"
+                class="ui-btn ui-btn--primary"
                 :disabled="sending || !plan || splitProblems.length > 0"
                 @click="sendAllocations"
               >
@@ -97,7 +97,7 @@
                 {{ request.totals.remaining }} remaining
               </p>
             </div>
-            <button v-if="canCancelTransfusion(request)" type="button" class="btn btn--quiet" @click="confirm = { kind: 'cancel' }">
+            <button v-if="canCancelTransfusion(request)" type="button" class="ui-btn ui-btn--ghost" @click="confirm = { kind: 'cancel' }">
               Cancel request
             </button>
           </div>
@@ -144,11 +144,11 @@
               </p>
             </div>
             <div class="panel-head__actions">
-              <NuxtLink :to="`/hospital/receiving/direct-distribution?ptr=${requestId}`" class="btn">
+              <NuxtLink :to="`/hospital/receiving/direct-distribution?ptr=${requestId}`" class="ui-btn">
                 <AssetIcon name="truck" :size="15" />
                 Receive units
               </NuxtLink>
-              <NuxtLink to="/hospital/inventory?tab=tagged" class="btn">
+              <NuxtLink to="/hospital/inventory?tab=tagged" class="ui-btn">
                 <AssetIcon name="package" :size="15" />
                 Blood Bank Inventory
               </NuxtLink>
@@ -189,7 +189,7 @@
             <div><dt>{{ request.is_walk_in ? 'Recorded by' : 'Requested by' }}</dt><dd>{{ request.requester_name || request.recorder_name || '—' }}</dd></div>
             <div>
               <dt>Own stock checked</dt>
-              <dd>{{ request.internal_stock_checked_at ? formatDateTime(request.internal_stock_checked_at) : (request.is_walk_in ? 'Confirmed by phone' : '—') }}</dd>
+              <dd>{{ request.internal_stock_checked_at ? formatDateTime(request.internal_stock_checked_at) : (request.is_walk_in && request.walk_in?.verification ? 'Confirmed by phone' : '—') }}</dd>
             </div>
             <div v-if="request.fulfilled_at"><dt>Fulfilled</dt><dd>{{ formatDateTime(request.fulfilled_at) }}</dd></div>
           </dl>
@@ -250,10 +250,10 @@
         <p v-if="dialogError" class="dialog__error" role="alert">{{ dialogError }}</p>
 
         <div class="dialog__actions">
-          <button type="button" class="btn btn--danger" :disabled="confirmBusy" @click="runConfirm">
+          <button type="button" class="ui-btn ui-btn--danger" :disabled="confirmBusy" @click="runConfirm">
             {{ confirmBusy ? 'Working…' : (confirm.kind === 'withdraw' ? 'Withdraw' : 'Cancel request') }}
           </button>
-          <button type="button" class="btn" :disabled="confirmBusy" @click="confirm = null">Keep it</button>
+          <button type="button" class="ui-btn" :disabled="confirmBusy" @click="confirm = null">Keep it</button>
         </div>
       </div>
     </div>
@@ -293,7 +293,7 @@ import {
   transfusionProgressLabel,
 } from '~/utils/transfusionSourcing'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const route = useRoute()
 const requestId = computed(() => route.params.id)
@@ -528,9 +528,9 @@ function formatDateTime(value) {
   min-height: 100%;
   background: var(--rb-page-bg);
   font-family: var(--rb-font-sans);
-  padding: 20px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
-.ptr-inner { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.ptr-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .back-link {
   display: inline-flex; align-items: center; gap: 6px;
@@ -539,7 +539,7 @@ function formatDateTime(value) {
 .back-link:hover { color: var(--rb-primary-text); }
 .page-header__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .eyebrow { margin: 0 0 2px; font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--rb-text-secondary); }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; }
 .stat { color: var(--rb-accent-text); font-weight: 700; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -552,7 +552,8 @@ function formatDateTime(value) {
 .panel {
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
-  border-radius: 14px;
+  border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm);
   padding: 20px;
 }
 .panel--attention { border-color: rgba(var(--rb-accent-rgb), .35); }
@@ -594,19 +595,6 @@ function formatDateTime(value) {
 }
 .banner--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit;
-  border-radius: 9px; cursor: pointer; text-decoration: none; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn--quiet { color: var(--rb-accent-text); }
-.btn--danger { background: var(--rb-accent); color: #fff; border-color: var(--rb-accent); }
-.btn--danger:hover:not(:disabled) { opacity: .9; background: var(--rb-accent); }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 
 .dialog-backdrop {
   position: fixed; inset: 0; z-index: 320;

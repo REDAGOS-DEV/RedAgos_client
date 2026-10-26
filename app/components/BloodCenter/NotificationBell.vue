@@ -205,22 +205,26 @@ onBeforeUnmount(() => clearInterval(timer))
 .bell__trigger:hover { background: var(--rb-surface-hover); }
 .bell__trigger:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
+/* On the bell's top-right corner only: 16px with its ring, so one digit is a
+   small dot, and longer counts grow to the right, away from the icon. */
 .bell__badge {
   position: absolute;
   top: 3px;
-  right: 2px;
+  left: calc(50% + 3px);
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  border: 2px solid var(--rb-page-bg);
+  /* Ring in the bar's own colour, so the badge stands off the bell. */
+  border: 2px solid var(--rb-surface);
   background: var(--rb-accent);
   color: #fff;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 12px;
   text-align: center;
-  box-sizing: content-box;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 .bell__panel {

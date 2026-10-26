@@ -263,35 +263,8 @@ const buttonLabel = computed(() => {
   }
 }
 
-/* .dark lives on <html>, outside this component, so it has to be :global */
-:global(.dark .login-alert) {
-  --tone-fg: #F97066;
-  --tone-text: #FECDCA;
-  --tone-bg: rgba(240, 68, 56, 0.10);
-  --tone-border: rgba(240, 68, 56, 0.28);
-}
-
-:global(.dark .login-alert--warning) {
-  --tone-fg: #FDB022;
-  --tone-text: #FEF0C7;
-  --tone-bg: rgba(247, 144, 9, 0.10);
-  --tone-border: rgba(247, 144, 9, 0.30);
-}
-
-:global(.dark .login-alert--info) {
-  --tone-fg: #64B5F6;
-  --tone-text: #D6E8FB;
-  --tone-bg: rgba(100, 181, 246, 0.10);
-  --tone-border: rgba(100, 181, 246, 0.28);
-}
-
-:global(.dark .login-alert__button) {
-  background: rgba(15, 23, 42, 0.6);
-}
-
-:global(.dark .login-alert__error) {
-  color: #FDA29B;
-}
+/* No dark variant: the sign-in screen, the only place this is used, is
+   always light. */
 
 @media (prefers-reduced-motion: reduce) {
   .login-alert__spinner { animation: none; }

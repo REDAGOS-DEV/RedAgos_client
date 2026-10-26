@@ -1,12 +1,24 @@
 <template>
   <div class="corrections">
-    <header class="corrections__header">
-      <h1 class="corrections__title">Corrections</h1>
-      <p class="corrections__subtitle">
-        Saved records are never edited directly. Whoever entered a record requests a correction, and the department's
-        approver or the Center Admin decides. An approved correction is applied under the same rules as the original.
-      </p>
-    </header>
+    <PageHeader title="Corrections">
+      <template #subtitle>
+        Saved records are never edited directly; a change goes through a correction.
+      </template>
+    </PageHeader>
+
+    <!-- The full rules, one click away instead of a four-line subtitle. -->
+    <details class="how">
+      <summary class="how__summary">How corrections work</summary>
+      <ul class="how__list">
+        <li>Whoever entered a record requests a correction, and the department's head decides.</li>
+        <li>The head's own correction is applied as soon as it is sent.</li>
+        <li>An approved correction is applied under the same rules as the original.</li>
+        <li>
+          A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
+          directly, and everyone else files a correction.
+        </li>
+      </ul>
+    </details>
 
     <div class="toolbar">
       <div class="tabs" role="tablist" aria-label="Corrections">
@@ -80,7 +92,7 @@
       <li v-for="item in items" :key="item.id" class="item" :class="`item--${item.status}`">
         <div class="item__head">
           <div class="item__heading">
-            <p class="item__title">{{ item.subject_label }} <span class="item__ref">Donation #{{ item.donation_id }}</span></p>
+            <p class="item__title">{{ item.subject_label }} <span class="item__ref">{{ item.target_label || ('Donation #' + item.donation_id) }}</span></p>
             <p class="item__meta">
               <template v-if="item.donation_barcode">Barcode <span class="mono">{{ item.donation_barcode }}</span> · </template>
               Requested by {{ item.requested_by || 'Unknown' }} · {{ formatDate(item.requested_at) }}
@@ -102,7 +114,7 @@
             <span role="columnheader">Corrected</span>
           </div>
           <div v-for="field in item.changed_fields" :key="field" class="diff__row" role="row">
-            <span class="diff__field" role="cell">{{ field.replace(/_/g, ' ') }}</span>
+            <span class="diff__field" role="cell">{{ fieldName(field) }}</span>
             <span class="diff__before" role="cell">
               <template v-if="isEmpty(item.previous?.[field])"><i class="diff__empty">empty</i></template>
               <template v-else>{{ display(item.previous?.[field]) }}</template>
@@ -136,12 +148,12 @@
             />
           </label>
           <div class="actions">
-            <button type="button" class="btn btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
               {{ busy === item.id ? 'Working…' : 'Approve and apply' }}
             </button>
             <button
               type="button"
-              class="btn btn--danger"
+              class="ui-btn ui-btn--danger"
               :disabled="busy === item.id || !(notes[item.id] || '').trim()"
               @click="decide(item, 'reject')"
             >
@@ -158,13 +170,15 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 /**
- * Correction requests: the caller's own, and — for a department approver or
- * the Center Admin — those waiting on their decision.
+ * Correction requests: the caller's own, and — for a department's head —
+ * those waiting on their decision.
  *
- * The server decides who may decide (`can_decide`): never the requester, and
- * for an approver's own request only the Center Admin. Approving applies the
+ * The server decides who may decide (`can_decide`): the department's head,
+ * never a peer head, and nobody else for their own request. A head's own
+ * correction is applied as it is filed, so it never waits here. Approving applies the
  * change through the original write, so a request whose record has since been
  * cleared or rejected is refused and stays pending until someone rejects it.
  */
@@ -228,8 +242,14 @@ function statusLabel(status) {
   return STATUS[status] ?? status
 }
 
+// A payment void carries one field, whether the payment is voided.
+function fieldName(field) {
+  return field === 'void' ? 'voided' : field.replace(/_/g, ' ')
+}
+
 function display(value) {
   if (isEmpty(value)) return ''
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (Array.isArray(value)) return value.map((row) => (typeof row === 'object' ? Object.values(row).join(' / ') : row)).join('; ')
   if (typeof value === 'object') return JSON.stringify(value)
 
@@ -271,11 +291,17 @@ function switchScope(next) {
 
 const REFUSALS = {
   self_approval: 'You cannot decide on your own correction request.',
-  not_the_approver: 'This correction is decided by the department approver or the Center Admin.',
+  not_the_approver: "This correction is decided by the department's head.",
   correction_decided: 'This correction has already been decided.',
   results_cleared: 'The record was cleared since this was requested, so it can no longer be corrected. Reject it.',
   results_locked: 'The donation was rejected since this was requested. Reject the correction.',
   run_not_open: 'The serology run has been decided since this was requested. Reject the correction.',
+  record_changed: 'The record has been changed since this was requested. Reject the correction and ask for it again.',
+  nothing_to_correct: 'There is nothing left to correct here. Reject the correction.',
+  unit_not_editable: 'The unit can no longer be edited, so this cannot be applied. Reject the correction.',
+  not_dispatched: 'The unit is no longer dispatched, so there is no dispatch record to correct. Reject the correction.',
+  dispatch_time_invalid: 'That release time no longer fits between when the unit was reserved and when it was received. Reject the correction.',
+  billing_void: 'The invoice has been voided, so its payments can no longer be corrected. Reject the correction.',
 }
 
 async function decide(item, action) {
@@ -329,6 +355,47 @@ onMounted(load)
   font-size: 13px;
   line-height: 1.55;
   color: var(--rb-text-secondary);
+}
+
+/* How corrections work */
+.how {
+  margin: -6px 0 16px;
+  max-width: 76ch;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
+}
+.how__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--rb-primary);
+  list-style: none;
+}
+.how__summary::-webkit-details-marker { display: none; }
+.how__summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+.how[open] .how__summary::before { transform: rotate(45deg); }
+.how__summary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 3px; border-radius: 4px; }
+.how__list {
+  margin: 10px 0 0;
+  padding: 12px 16px 12px 30px;
+  border-left: 3px solid var(--rb-primary);
+  border-radius: 0 12px 12px 0;
+  background: rgba(var(--rb-primary-rgb), 0.05);
+  line-height: 1.6;
+}
+.how__list li + li { margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .how__summary::before { transition: none; }
 }
 
 /* Tabs + status chips */

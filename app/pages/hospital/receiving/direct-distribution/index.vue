@@ -1,15 +1,9 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Direct Distribution</h1>
-          <p class="page-subtitle">
-            Receive blood delivered from outside RedAgos, under the identifier its sender gave it — such as
-            <span class="mono">PRC-920923323</span>. RedAgos keeps that identifier as is and does not issue a barcode of its own.
-          </p>
-        </div>
-      </header>
+      <PageHeader title="Direct Distribution">
+        <template #subtitle>Receive blood delivered from outside RedAgos, under the identifier its sender gave it — such as <span class="mono">PRC-920923323</span>. RedAgos keeps that identifier as is and does not issue a barcode of its own.</template>
+      </PageHeader>
 
       <div class="modes" role="tablist" aria-label="How the blood is being received">
         <button
@@ -58,12 +52,17 @@
               aria-label="Search patient transfusion requests"
             >
           </div>
-          <select v-model.number="ptrId" class="input" aria-label="Patient transfusion request" :disabled="ptrLoading">
-            <option :value="null">{{ ptrLoading ? 'Loading…' : openRequests.length ? 'Choose a request…' : 'No open requests' }}</option>
-            <option v-for="ptr in openRequests" :key="ptr.id" :value="ptr.id">
-              {{ ptr.reference_number }} — {{ ptr.patient?.full_name || 'Patient' }} · {{ ptr.blood_type?.code }}
-            </option>
-          </select>
+          <!-- Every request except a cancelled one: open first, the rest marked with their status. -->
+          <SelectField
+            v-model="ptrId"
+            :options="selectableRequests.map((ptr) => ({
+              value: ptr.id,
+              label: `${ptr.reference_number} — ${ptr.patient?.full_name || 'Patient'} · ${ptr.blood_type?.code ?? ''}${ptr.is_open === false ? ` · ${ptr.status_label}` : ''}`,
+            }))"
+            :placeholder="ptrLoading ? 'Loading…' : selectableRequests.length ? 'Choose a request…' : 'No requests found'"
+            aria-label="Patient transfusion request"
+            :disabled="ptrLoading"
+          />
         </div>
         <p v-if="ptrError" class="field-error" role="alert">{{ ptrError }}</p>
 
@@ -83,7 +82,7 @@
         <h2 id="scan-title" class="panel__title">2. Blood unit</h2>
 
         <div class="scan">
-          <button type="button" class="btn btn--primary scan__button" :disabled="!ptr || busy" @click="armScanner">
+          <button type="button" class="ui-btn ui-btn--primary scan__button" :disabled="!ptr || busy" @click="armScanner">
             <AssetIcon name="scan-line" :size="16" />
             Scan Blood Unit
           </button>
@@ -114,7 +113,7 @@
               @blur="scannerArmed = false"
             >
           </div>
-          <button type="submit" class="btn" :disabled="!ptr || busy || !entry.trim()">Receive</button>
+          <button type="submit" class="ui-btn" :disabled="!ptr || busy || !entry.trim()">Receive</button>
         </form>
         <p class="field-hint">Typing is optional — use it only when a unit cannot be scanned.</p>
 
@@ -194,10 +193,13 @@
         <div class="field-grid">
           <div class="field">
             <label for="ext-source" class="field-label">Source facility <span class="req">*</span></label>
-            <select id="ext-source" v-model.number="form.external_blood_source_id" class="input" :class="{ 'input--error': fieldErrors.external_blood_source_id }">
-              <option :value="null">Select a blood service…</option>
-              <option v-for="source in sources" :key="source.id" :value="source.id">{{ source.name }}</option>
-            </select>
+            <SelectField
+              id="ext-source"
+              v-model="form.external_blood_source_id"
+              :options="sources.map((source) => ({ value: source.id, label: source.name }))"
+              placeholder="Select a blood service…"
+              :invalid="Boolean(fieldErrors.external_blood_source_id)"
+            />
             <button type="button" class="link-btn" @click="addingSource = !addingSource">
               {{ addingSource ? 'Cancel' : 'Source not listed? Add it' }}
             </button>
@@ -206,19 +208,25 @@
 
           <div class="field">
             <label for="ext-comp" class="field-label">Blood component <span class="req">*</span></label>
-            <select id="ext-comp" v-model.number="form.component_id" class="input" :class="{ 'input--error': fieldErrors.component_id }">
-              <option :value="null">Select…</option>
-              <option v-for="component in components" :key="component.id" :value="component.id">{{ component.name }}</option>
-            </select>
+            <SelectField
+              id="ext-comp"
+              v-model="form.component_id"
+              :options="components.map((component) => ({ value: component.id, label: component.name }))"
+              placeholder="Select…"
+              :invalid="Boolean(fieldErrors.component_id)"
+            />
             <p v-if="fieldErrors.component_id" class="field-error">{{ fieldErrors.component_id }}</p>
           </div>
 
           <div class="field">
             <label for="ext-type" class="field-label">Blood type <span class="req">*</span></label>
-            <select id="ext-type" v-model.number="form.blood_type_id" class="input" :class="{ 'input--error': fieldErrors.blood_type_id }">
-              <option :value="null">Select…</option>
-              <option v-for="type in bloodTypes" :key="type.id" :value="type.id">{{ type.code }}</option>
-            </select>
+            <SelectField
+              id="ext-type"
+              v-model="form.blood_type_id"
+              :options="bloodTypes.map((type) => ({ value: type.id, label: type.code }))"
+              placeholder="Select…"
+              :invalid="Boolean(fieldErrors.blood_type_id)"
+            />
             <p v-if="fieldErrors.blood_type_id" class="field-error">{{ fieldErrors.blood_type_id }}</p>
           </div>
 
@@ -230,19 +238,19 @@
 
           <div class="field">
             <label for="ext-coll" class="field-label">Collection date <span class="optional">if on the label</span></label>
-            <input id="ext-coll" v-model="form.collection_date" type="date" class="input" :max="todayLocal()" :class="{ 'input--error': fieldErrors.collection_date }">
+            <DatePicker id="ext-coll" v-model="form.collection_date" :max="todayLocal()" :invalid="Boolean(fieldErrors.collection_date)" />
             <p v-if="fieldErrors.collection_date" class="field-error">{{ fieldErrors.collection_date }}</p>
           </div>
 
           <div class="field">
             <label for="ext-exp" class="field-label">Expiration date <span class="req">*</span></label>
-            <input id="ext-exp" v-model="form.expiry_date" type="date" class="input" :min="todayLocal()" :class="{ 'input--error': fieldErrors.expiry_date }">
+            <DatePicker id="ext-exp" v-model="form.expiry_date" :min="todayLocal()" :invalid="Boolean(fieldErrors.expiry_date)" />
             <p v-if="fieldErrors.expiry_date" class="field-error">{{ fieldErrors.expiry_date }}</p>
           </div>
 
           <div class="field">
             <label for="ext-at" class="field-label">Date / time received</label>
-            <input id="ext-at" v-model="form.received_at" type="datetime-local" class="input" :max="nowLocal()" :class="{ 'input--error': fieldErrors.received_at }">
+            <DateTimeField id="ext-at" v-model="form.received_at" :max="nowLocal()" :invalid="Boolean(fieldErrors.received_at)" />
             <p v-if="fieldErrors.received_at" class="field-error">{{ fieldErrors.received_at }}</p>
           </div>
 
@@ -255,7 +263,7 @@
         <form v-if="addingSource" class="add-source" @submit.prevent="addSource">
           <input v-model.trim="newSource.name" type="text" class="input" maxlength="150" placeholder="Name of the blood service" aria-label="New blood service name">
           <input v-model.trim="newSource.code" type="text" class="input input--code mono" maxlength="20" placeholder="Code" aria-label="Code, optional">
-          <button type="submit" class="btn" :disabled="savingSource || !newSource.name">{{ savingSource ? 'Adding…' : 'Add source' }}</button>
+          <button type="submit" class="ui-btn" :disabled="savingSource || !newSource.name">{{ savingSource ? 'Adding…' : 'Add source' }}</button>
           <p v-if="sourceError" class="field-error">{{ sourceError }}</p>
         </form>
 
@@ -265,8 +273,8 @@
         </div>
 
         <div class="form-actions">
-          <button v-if="mode === 'ptr'" type="button" class="btn" :disabled="busy" @click="cancelPending">Cancel</button>
-          <button type="button" class="btn btn--primary" :disabled="busy" @click="receiveExternal">
+          <button v-if="mode === 'ptr'" type="button" class="ui-btn" :disabled="busy" @click="cancelPending">Cancel</button>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="busy" @click="receiveExternal">
             <AssetIcon name="package-check" :size="14" />
             {{ busy ? 'Receiving…' : receiveLabel }}
           </button>
@@ -359,6 +367,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * Direct Distribution: receiving blood for one patient's transfusion request.
  *
@@ -376,8 +385,11 @@ import { useUser } from '~/composables/useUser'
 import { HOSPITAL_UNIT_STATUS_LABELS, HOSPITAL_UNIT_STATUS_TONES } from '~/types/hospitalInventory'
 import { RECEIVING_REFUSAL_MESSAGES } from '~/types/receiving'
 import { awaitingBagsFor, matchScannedBag, normalizeUnitNumber, UNIT_NUMBER_PATTERN } from '~/utils/receiving'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import DateTimeField from '~/components/common/DateTimeField.vue'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.receiving.direct' })
 
 const route = useRoute()
 const { user } = useUser()
@@ -431,7 +443,20 @@ const receiveLabel = computed(() => {
   return `Receive ${count} unit${count === 1 ? '' : 's'}`
 })
 
-const openRequests = computed(() => ptrList.value.filter((request) => request.is_open !== false))
+/*
+ * Every Patient Transfusion Request raised in RedAgos can take a bag received
+ * from outside it, whatever the centres did with it — fulfilled, rejected or
+ * still open — except a cancelled one, as the server rules. Open ones first;
+ * the rest follow, marked with their status.
+ */
+const selectableRequests = computed(() => {
+  const usable = ptrList.value.filter((request) => request.status !== 'cancelled')
+
+  return [
+    ...usable.filter((request) => request.is_open !== false),
+    ...usable.filter((request) => request.is_open === false),
+  ]
+})
 const awaiting = computed(() => awaitingBagsFor(ptr.value?.allocations))
 const staffName = computed(() => user.value?.full_name || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ') || '—')
 
@@ -740,16 +765,16 @@ function formatDateTime(value) {
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css; nothing is redeclared here. */
-.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 20px; }
-.rcv-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 78ch; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 .panel--pad { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .panel--off { opacity: 0.55; }
@@ -852,16 +877,6 @@ function formatDateTime(value) {
 }
 .link-btn:hover { text-decoration: underline; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
-  padding: 0 16px; font-size: 13px; font-weight: 600; font-family: inherit; text-decoration: none;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .scan__button { height: auto; }
 
 .toast {
@@ -892,7 +907,7 @@ function formatDateTime(value) {
   .field-grid { grid-template-columns: 1fr; }
   .field--wide { grid-column: auto; }
   .modes { grid-template-columns: 1fr; }
-  .form-actions > .btn, .scan__button { flex: 1; }
+  .form-actions > .ui-btn, .scan__button { flex: 1; }
   .ptr-pick .input, .search-box { min-width: 0; width: 100%; }
 }
 </style>

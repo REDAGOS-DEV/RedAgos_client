@@ -6,6 +6,7 @@ import type {
   BloodRequestFilters,
   BloodRequestStatus,
   CreateTransfusionRequestPayload,
+  HospitalBillingView,
   PatientMatch,
   RequestEvent,
   RequestReferenceData,
@@ -13,6 +14,9 @@ import type {
   TransfusionRequest,
   TransfusionRequestFilters,
 } from '~/types/bloodRequest'
+import type { HospitalNotificationList } from '~/types/hospitalNotification'
+import type { HospitalRoleOption, HospitalStaffMember } from '~/types/hospitalStaff'
+import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
 import type {
   HospitalInventoryFilters,
   HospitalInventorySummary,
@@ -255,18 +259,25 @@ class HospitalService extends BaseService {
   }
 
   /**
-   * Billing summary for a request.
+   * What a request was billed, read only: the live statement, the Statements
+   * of Account issued for it, and its payment receipts.
    *
-   * No Laravel route serves this yet — `useBloodRequestBilling` mocks it
-   * until one exists.
+   * There is no way to pay from here. The patient or watcher pays at the blood
+   * centre's billing counter (cash or GCash), and a weekly order is billed by
+   * statement only. Payment references are not part of this view.
    */
   requestBilling(id: number | string) {
-    return this.request<any>(`/hospital/blood-requests/${id}/billing`)
+    return this.request<HospitalBillingView>(`/hospital/blood-requests/${id}/billing`)
   }
 
-  /** Record a payment against a request's billing. Also mock-gated for now. */
-  payRequestBilling(id: number | string, payload: { amount: number; method: 'CASH' | 'GCASH' }) {
-    return this.request<any>(`/hospital/blood-requests/${id}/billing/pay`, 'POST', payload)
+  /** An issued statement addressed to this hospital, as its printed PDF. */
+  downloadStatement(revisionId: number | string) {
+    return this.requestBlob(`/hospital/statements/${revisionId}/pdf`)
+  }
+
+  /** A receipt for one of this hospital's requests, as its printed PDF. */
+  downloadReceipt(receiptId: number | string) {
+    return this.requestBlob(`/hospital/receipts/${receiptId}/pdf`)
   }
 
   /**
@@ -340,6 +351,47 @@ class HospitalService extends BaseService {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/discard`, 'POST', { reason })
   }
 
+  /**
+   * Stock in arrived bags (inventory staff): each becomes available, stored
+   * where staff said. The location is optional. All or nothing.
+   */
+  stockIn(units: Array<{ unit_id: string; storage_location?: string | null }>) {
+    return this.request<{ message: string; stocked_count: number; units: HospitalUnit[] }>(
+      '/hospital/inventory/stock-in',
+      'POST',
+      { units },
+    )
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Staff: the blood bank's accounts and their roles, kept by its Head.
+   * ---------------------------------------------------------------- */
+
+  /** The blood bank's accounts, removed ones included, and the roles a colleague can hold. */
+  staff() {
+    return this.request<{ data: HospitalStaffMember[]; roles: HospitalRoleOption[] }>('/hospital/staff')
+  }
+
+  /** Add a colleague with their role; they verify their address before signing in. */
+  addStaff(payload: Record<string, unknown>) {
+    return this.request<{ message: string; data: HospitalStaffMember }>('/hospital/staff', 'POST', payload)
+  }
+
+  /** Change a colleague's role or title. */
+  updateStaff(uuid: string, payload: { hospital_role?: string; position?: string | null }) {
+    return this.request<{ message: string; data: HospitalStaffMember }>(`/hospital/staff/${uuid}`, 'PATCH', payload)
+  }
+
+  /** Remove a colleague's account and end their sessions. */
+  removeStaff(uuid: string) {
+    return this.request<{ message: string }>(`/hospital/staff/${uuid}`, 'DELETE')
+  }
+
+  /** Restore a removed colleague, with the role they had. */
+  restoreStaff(uuid: string) {
+    return this.request<{ message: string; data: HospitalStaffMember }>(`/hospital/staff/${uuid}/restore`, 'POST')
+  }
+
   /* ---------------------------------------------------------------- *
    * Receiving: the blood bank's request days, the weekly request it
    * sends a center on them, and deliveries from outside RedAgos typed
@@ -398,6 +450,15 @@ class HospitalService extends BaseService {
     )
   }
 
+  /** The hospital's minimum stock per blood type and component, against its own shelf. */
+  stockThresholds() {
+    return this.request<StockThresholdStatus>('/hospital/inventory/thresholds')
+  }
+
+  saveStockThresholds(payload: SaveStockThresholdsPayload) {
+    return this.request<StockThresholdStatus>('/hospital/inventory/thresholds', 'PUT', payload)
+  }
+
   /** The blood services a bag can be received from. */
   externalBloodSources() {
     return this.request<{ sources: ExternalBloodSource[] }>('/hospital/external-blood-sources')
@@ -407,8 +468,8 @@ class HospitalService extends BaseService {
     return this.request<{ message: string; source: ExternalBloodSource }>('/hospital/external-blood-sources', 'POST', payload)
   }
 
-  listNotifications(params: { category?: string; read?: boolean; per_page?: number } = {}) {
-    return this.request<any>('/hospital/notifications', 'GET', params)
+  listNotifications(params: { category?: string; read?: boolean; per_page?: number; page?: number } = {}) {
+    return this.request<HospitalNotificationList>('/hospital/notifications', 'GET', params)
   }
 
   notificationsUnreadCount() {

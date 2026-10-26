@@ -1,24 +1,22 @@
 <template>
   <div class="hinv-page">
     <div class="hinv-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Blood Bank Inventory</h1>
-          <p class="page-subtitle">
-            Bags your blood bank received — from a blood center or by direct distribution — first-expiring-first, and
-            the patients they are tagged to.
-          </p>
-        </div>
-        <button type="button" class="btn" :disabled="refreshing" @click="refresh">
-          <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
-          {{ refreshing ? 'Refreshing…' : 'Refresh' }}
-        </button>
-      </header>
+      <PageHeader title="Blood Bank Inventory">
+        <template #subtitle>Bags your blood bank received — from a blood center or by direct distribution — first-expiring-first, and the patients they are tagged to.</template>
+        <template #actions>
+          <button type="button" class="ui-btn" :disabled="refreshing" @click="refresh">
+            <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
+            {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+          </button>
+        </template>
+      </PageHeader>
 
       <div v-if="summaryError" class="banner banner--error" role="alert">
         <AssetIcon name="triangle-alert" :size="16" />
         <span>{{ summaryError }}</span>
       </div>
+
+      <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" />
 
       <!-- A lapsed tag the sweep has not reached yet. Normally gone within a
            minute; one that lingers means the scheduler is down. -->
@@ -30,6 +28,150 @@
           {{ summary.overdue_active_tags === 1 ? 'is' : 'are' }} being released.
         </span>
       </div>
+
+      <!-- ============ AWAITING STOCK-IN ============ -->
+      <!-- Receiving's second step (project owner, 2026-10-11): bags whose
+           arrival was confirmed, or that came from outside RedAgos, wait here
+           until inventory staff put them on a shelf. They are not stock until then. -->
+      <section v-if="arrived.length" class="panel stockin" aria-labelledby="stockin-title">
+        <div class="stockin__head">
+          <div>
+            <h2 id="stockin-title" class="stockin__title">
+              Awaiting stock-in
+              <span class="tabs__count">{{ arrived.length }}</span>
+            </h2>
+            <p class="stockin__desc">
+              {{ canStockIn
+                ? 'These bags arrived. Scan each one as you put it away, give the scanned bags their storage location, and stock them in. They cannot be tagged until then.'
+                : 'These bags arrived and wait for inventory staff to stock them in. They cannot be tagged until then.' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Scan a fridge's bags, give them its location, stock them in; then the next fridge. -->
+        <div v-if="canStockIn" class="stockin__tools">
+          <form class="stockin__scan" @submit.prevent="scanBag">
+            <AssetIcon name="scan-line" :size="15" class="stockin__scan-icon" />
+            <input
+              ref="scanInput"
+              v-model="scanEntry"
+              type="text"
+              class="filter-select stockin__input stockin__input--scan mono"
+              placeholder="Scan or type a bag number"
+              aria-label="Scan a bag to stock in"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="characters"
+              maxlength="50"
+            />
+          </form>
+          <p class="stockin__note" :class="{ 'stockin__note--alert': scanAlert }" aria-live="polite">
+            {{ scanNote || `${ticked.length} of ${tickable.length} scanned` }}
+          </p>
+          <form class="stockin__bulk" @submit.prevent="applyBulkLocation">
+            <input
+              v-model="bulkLocation"
+              list="hinv-storage-locations"
+              maxlength="100"
+              class="filter-select stockin__input"
+              placeholder="Location for the scanned bags"
+              aria-label="Storage location for the scanned bags"
+            />
+            <button type="submit" class="ui-btn" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th v-if="canStockIn" class="check-col">
+                  <input
+                    type="checkbox"
+                    :checked="allTicked"
+                    :indeterminate.prop="ticked.length > 0 && !allTicked"
+                    aria-label="Mark every bag in date, without scanning"
+                    @change="toggleAllTicked"
+                  />
+                </th>
+                <th>Bag</th>
+                <th>Type</th>
+                <th>Component</th>
+                <th>Expiry</th>
+                <th>Arrived</th>
+                <th>Storage location</th>
+                <th v-if="canDiscard" class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="unit in arrived" :key="unit.id" :class="{ 'row--expired': unit.bag_expired, 'row--scanned': ticked.includes(unit.unit_id) }">
+                <td v-if="canStockIn" class="check-col">
+                  <input
+                    v-model="ticked"
+                    type="checkbox"
+                    :value="unit.unit_id"
+                    :disabled="unit.bag_expired"
+                    :aria-label="`Tick ${unit.bag_number || unit.unit_id}`"
+                  />
+                </td>
+                <td>
+                  <span class="mono">{{ unit.bag_number || unit.unit_id }}</span>
+                  <span v-if="unit.source?.reference_number" class="cell-sub">from {{ unit.source.reference_number }}</span>
+                  <span v-else-if="unit.source?.direct_distribution" class="cell-sub">from {{ unit.source.direct_distribution.source_name }}</span>
+                </td>
+                <td><span class="type-pill">{{ unit.blood_type?.code || '—' }}</span></td>
+                <td>
+                  {{ unit.component?.name || '—' }}
+                  <span v-if="unit.volume_ml" class="cell-sub">{{ unit.volume_ml }} mL</span>
+                </td>
+                <td>
+                  {{ formatDate(unit.expiry_date) }}
+                  <span class="cell-sub" :class="{ 'cell-sub--alert': unit.bag_expired || (unit.days_remaining ?? 99) <= 3 }">
+                    {{ daysRemainingLabel(unit) }}
+                  </span>
+                </td>
+                <td>{{ formatDateTime(unit.received_at) }}</td>
+                <td>
+                  <input
+                    v-if="canStockIn && !unit.bag_expired"
+                    v-model="locations[unit.unit_id]"
+                    list="hinv-storage-locations"
+                    maxlength="100"
+                    class="filter-select stockin__input"
+                    placeholder="Optional"
+                    :aria-label="`Storage location for ${unit.bag_number || unit.unit_id}`"
+                  />
+                  <span v-else-if="unit.bag_expired" class="cell-sub cell-sub--alert">Past its date — discard it</span>
+                  <span v-else class="muted">—</span>
+                </td>
+                <td v-if="canDiscard" class="actions-col">
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="ui-btn ui-btn--sm ui-btn--ghost"
+                      :disabled="busyUnit === unit.unit_id"
+                      @click="startAction('discard', unit)"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <datalist id="hinv-storage-locations">
+            <option v-for="location in summary?.storage_locations ?? []" :key="location" :value="location" />
+          </datalist>
+        </div>
+
+        <div v-if="canStockIn" class="stockin__foot">
+          <p v-if="stockInError" class="stockin__error" role="alert">{{ stockInError }}</p>
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
+            <AssetIcon name="package" :size="14" />
+            {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} scanned bag${ticked.length === 1 ? '' : 's'}` }}
+          </button>
+        </div>
+      </section>
 
       <!-- ============ SUMMARY ============ -->
       <section class="stats-grid" aria-label="Stock summary">
@@ -65,7 +207,14 @@
             @click="selectTab(item.value)"
           >
             {{ item.label }}
-            <span v-if="item.count !== null" class="tabs__count">{{ item.count }}</span>
+            <span
+              v-if="item.count !== null"
+              class="tabs__count"
+              :class="{
+                'tabs__count--zero': !item.count,
+                'tabs__count--active': item.count && tab === item.value,
+                [`tabs__count--${item.tone}`]: item.count && item.tone && tab !== item.value,
+              }">{{ item.count }}</span>
           </button>
         </div>
 
@@ -82,22 +231,35 @@
           </div>
 
           <template v-if="tab !== 'history'">
-            <select v-model="filters.blood_type_id" class="filter-select" aria-label="Blood type">
-              <option :value="null">All blood types</option>
-              <option v-for="type in reference.blood_types" :key="type.id" :value="type.id">{{ type.code }}</option>
-            </select>
-            <select v-model="filters.component_id" class="filter-select" aria-label="Component">
-              <option :value="null">All components</option>
-              <option v-for="component in reference.components" :key="component.id" :value="component.id">{{ component.name }}</option>
-            </select>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.blood_type_id"
+                :options="[{ value: null, label: 'All blood types' }, ...reference.blood_types.map((type) => ({ value: type.id, label: type.code }))]"
+                aria-label="Blood type"
+                size="sm"
+              />
+            </div>
+            <div class="filter-select">
+              <SelectField
+                v-model="filters.component_id"
+                :options="[{ value: null, label: 'All components' }, ...reference.components.map((component) => ({ value: component.id, label: component.name }))]"
+                aria-label="Component"
+                size="sm"
+              />
+            </div>
           </template>
 
-          <select v-else v-model="filters.event_status" class="filter-select" aria-label="Outcome">
-            <option :value="null">All outcomes</option>
-            <option value="untagged_assigned">{{ UNIT_TAG_STATUS_LABELS.untagged_assigned }}</option>
-            <option value="untagged_crossmatched">{{ UNIT_TAG_STATUS_LABELS.untagged_crossmatched }}</option>
-            <option value="transfused">{{ UNIT_TAG_STATUS_LABELS.transfused }}</option>
-          </select>
+          <div v-else class="filter-select">
+            <SelectField
+              v-model="filters.event_status"
+              :options="[
+                { value: null, label: 'All outcomes' },
+                ...['untagged_assigned', 'untagged_crossmatched', 'transfused'].map((value) => ({ value, label: UNIT_TAG_STATUS_LABELS[value] })),
+              ]"
+              aria-label="Outcome"
+              size="sm"
+            />
+          </div>
         </div>
 
         <p class="tab-hint">{{ tabHint }}</p>
@@ -110,7 +272,7 @@
 
         <div v-else-if="listError" class="list-state list-state--error" role="alert">
           <p>{{ listError }}</p>
-          <button type="button" class="btn" @click="loadList">Try again</button>
+          <button type="button" class="ui-btn" @click="loadList">Try again</button>
         </div>
 
         <!-- ---------- HISTORY: tags that ended ---------- -->
@@ -195,6 +357,7 @@
                     <span v-else-if="unit.source?.direct_distribution" class="cell-sub">
                       from {{ unit.source.direct_distribution.source_name }}<template v-if="unit.source.direct_distribution.requested_for"> · for {{ unit.source.direct_distribution.requested_for }}</template>
                     </span>
+                    <span v-if="unit.storage_location" class="cell-sub">Stored in {{ unit.storage_location }}</span>
                   </td>
                   <td><span class="type-pill">{{ unit.blood_type?.code || '—' }}</span></td>
                   <td>
@@ -244,10 +407,10 @@
                   <td class="actions-col">
                     <div class="row-actions">
                       <button
-                        v-for="action in actionsFor(unit.status, unit.bag_expired)"
+                        v-for="action in allowedActions(unit)"
                         :key="action"
                         type="button"
-                        class="btn btn--sm"
+                        class="ui-btn ui-btn--sm"
                         :class="ACTION_STYLES[action]"
                         :disabled="busyUnit === unit.unit_id || (action !== 'release' && Boolean(unit.active_tag) && remainingFor(unit) <= 0)"
                         @click="startAction(action, unit)"
@@ -327,10 +490,10 @@
         <p class="dialog__body">{{ confirmCopy.body }}</p>
         <p v-if="dialogError" class="dialog__error" role="alert">{{ dialogError }}</p>
         <div class="dialog__actions">
-          <button type="button" class="btn btn--primary" :disabled="dialogBusy" @click="runConfirm">
+          <button type="button" class="ui-btn ui-btn--primary" :disabled="dialogBusy" @click="runConfirm">
             {{ dialogBusy ? 'Working…' : confirmCopy.action }}
           </button>
-          <button type="button" class="btn" :disabled="dialogBusy" @click="closeDialog">Cancel</button>
+          <button type="button" class="ui-btn" :disabled="dialogBusy" @click="closeDialog">Cancel</button>
         </div>
       </div>
     </div>
@@ -344,6 +507,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The hospital blood bank's own stock: the bags it received, and the patients they are tagged to.
  *
@@ -357,6 +521,7 @@
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import HospitalTagUnitDialog from '~/components/Hospital/TagUnitDialog.vue'
 import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue'
 import HospitalUnitTagHistory from '~/components/Hospital/UnitTagHistory.vue'
@@ -370,8 +535,10 @@ import {
   UNIT_TAG_STATUS_TONES,
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
+import SelectField from '~/components/common/SelectField.vue'
+import { matchStockInScan } from '~/utils/stockIn'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
 const ACTION_LABELS = {
   tag: 'Tag to patient',
@@ -428,6 +595,117 @@ const dialogFieldErrors = ref({})
 const busyUnit = ref(null)
 const historyFor = ref(null)
 
+/*
+ * What this role may do (hospital roles, project owner 2026-10-11). The
+ * server refuses the endpoints with `can:` either way; this only keeps a role
+ * from being offered a button that would be refused.
+ */
+const { can } = useUser()
+const canStockIn = computed(() => can('hospital.inventory.stock_in'))
+const canHandle = computed(() => can('hospital.inventory.handle'))
+const canDiscard = computed(() => can('hospital.inventory.discard'))
+
+/** The row actions this role may take on a bag. */
+function allowedActions(unit) {
+  return actionsFor(unit.status, unit.bag_expired)
+    .filter((action) => (action === 'discard' ? canDiscard.value : canHandle.value))
+}
+
+/* AWAITING STOCK-IN: arrived bags, ticked and given a location, then stocked in. */
+const arrived = ref([])
+const ticked = ref([])
+const locations = reactive({})
+const bulkLocation = ref('')
+const stockingIn = ref(false)
+const stockInError = ref('')
+
+const tickable = computed(() => arrived.value.filter((unit) => !unit.bag_expired).map((unit) => unit.unit_id))
+const allTicked = computed(() => tickable.value.length > 0 && tickable.value.every((id) => ticked.value.includes(id)))
+
+async function loadArrived() {
+  try {
+    const page = await hospitalService.inventory({ status: 'received', per_page: 100 })
+    arrived.value = page?.data ?? []
+
+    // Nothing is marked until it is scanned (or ticked by hand); a bag no
+    // longer waiting drops out of the marks.
+    const waiting = new Set(tickable.value)
+    ticked.value = ticked.value.filter((id) => waiting.has(id))
+  } catch {
+    // The list below still works; the panel just does not show.
+    arrived.value = []
+  }
+}
+
+/* SCANNING: each bag's barcode as it is put away marks it for stock-in. */
+const scanInput = ref(null)
+const scanEntry = ref('')
+const scanNote = ref('')
+const scanAlert = ref(false)
+
+function scanBag() {
+  const code = scanEntry.value
+  scanEntry.value = ''
+  if (!code.trim()) return
+
+  const result = matchStockInScan(code, arrived.value, ticked.value)
+  scanAlert.value = result.kind !== 'scanned'
+
+  if (result.kind === 'scanned') {
+    ticked.value = [...ticked.value, result.unitId]
+    scanNote.value = `${result.label} scanned — ${ticked.value.length} of ${tickable.value.length}.`
+  } else if (result.kind === 'expired') {
+    scanNote.value = `${result.code} is past its date. Discard it instead of stocking it in.`
+  } else if (result.kind === 'already') {
+    scanNote.value = `${result.code} is already scanned.`
+  } else {
+    scanNote.value = `${result.code} is not awaiting stock-in here.`
+  }
+}
+
+function toggleAllTicked() {
+  ticked.value = allTicked.value ? [] : [...tickable.value]
+}
+
+function applyBulkLocation() {
+  const location = bulkLocation.value.trim()
+  if (!location) return
+
+  for (const id of ticked.value) locations[id] = location
+  bulkLocation.value = ''
+}
+
+async function stockInTicked() {
+  if (!ticked.value.length) return
+
+  stockingIn.value = true
+  stockInError.value = ''
+
+  try {
+    const response = await hospitalService.stockIn(ticked.value.map((id) => ({
+      unit_id: id,
+      storage_location: (locations[id] || '').trim() || null,
+    })))
+
+    for (const id of ticked.value) delete locations[id]
+    ticked.value = []
+    scanNote.value = ''
+    scanAlert.value = false
+    showToast(response?.message || 'Stocked in.')
+    await refresh()
+
+    // Ready for the next fridge's bags.
+    nextTick(() => scanInput.value?.focus())
+  } catch (err) {
+    stockInError.value = err?.status === 422 ? firstError(err) : refusalMessage(err)
+
+    // Someone else stocked one in, or it was discarded: show the list as it stands.
+    if (err?.status === 409 || err?.status === 404) await loadArrived()
+  } finally {
+    stockingIn.value = false
+  }
+}
+
 const toast = ref('')
 
 /** The local clock, ticked so countdowns move between loads. */
@@ -455,8 +733,9 @@ const cards = computed(() => [
 const tabs = computed(() => [
   { value: 'stock', label: 'In stock', count: totals.value.available ?? null },
   { value: 'tagged', label: 'Tagged', count: summary.value ? (totals.value.tag_assigned ?? 0) + (totals.value.tag_crossmatched ?? 0) : null },
-  { value: 'pending', label: 'Pending return', count: totals.value.pending_return ?? null },
-  { value: 'expired', label: 'Expired', count: totals.value.expired ?? null },
+  // The two that need someone to act carry a colour when they hold bags.
+  { value: 'pending', label: 'Pending return', count: totals.value.pending_return ?? null, tone: 'warning' },
+  { value: 'expired', label: 'Expired', count: totals.value.expired ?? null, tone: 'danger' },
   { value: 'history', label: 'History', count: null },
 ])
 
@@ -536,6 +815,7 @@ onMounted(() => {
   ticker = setInterval(() => { now.value = Date.now() }, 30_000)
   loadReference()
   loadSummary()
+  loadArrived()
   loadList()
 })
 
@@ -554,7 +834,7 @@ async function refresh() {
   refreshing.value = true
 
   try {
-    await Promise.all([loadSummary(), loadList({ quiet: true })])
+    await Promise.all([loadSummary(), loadArrived(), loadList({ quiet: true })])
   } finally {
     refreshing.value = false
   }
@@ -569,6 +849,19 @@ async function loadReference() {
   }
 }
 
+// The blood bank's own minimums against its shelf. Supplementary: a failure
+// leaves no banner. Loaded with the summary, so it follows every refresh and
+// every tag, crossmatch, transfusion or discard that changes what is on the shelf.
+const lowStock = ref([])
+
+async function loadLowStock() {
+  try {
+    lowStock.value = (await hospitalService.stockThresholds()).low ?? []
+  } catch {
+    // The banner is a convenience; the page works without it.
+  }
+}
+
 async function loadSummary() {
   summaryError.value = ''
 
@@ -577,6 +870,7 @@ async function loadSummary() {
     summary.value = data
     skew.value = serverSkew(data.as_of, Date.now())
     now.value = Date.now()
+    loadLowStock()
   } catch (err) {
     summaryError.value = err?.message || 'Could not load the stock summary.'
   } finally {
@@ -798,12 +1092,12 @@ function formatDateTime(value) {
   min-height: 100%;
   background: var(--rb-page-bg);
   font-family: var(--rb-font-sans);
-  padding: 20px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
-.hinv-inner { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.hinv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 70ch; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .muted { color: var(--rb-text-secondary); }
@@ -834,8 +1128,8 @@ function formatDateTime(value) {
 .stat-chip { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 
 /* overflow-y is clipped as well: with overflow-x set the other axis becomes auto, and the
@@ -849,7 +1143,17 @@ function formatDateTime(value) {
 .tabs__tab:hover { color: var(--rb-text-primary); }
 .tabs__tab--active { color: var(--rb-primary-text); border-bottom-color: var(--rb-primary); }
 .tabs__tab:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; border-radius: 6px; }
-.tabs__count { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.tabs__count {
+  min-width: 20px; padding: 1px 7px; border-radius: 999px; text-align: center;
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--rb-surface-alt); color: var(--rb-text-secondary);
+}
+/* Nothing there: just a faint number, so a row of zeros does not compete. */
+.tabs__count--zero { background: transparent; color: var(--rb-text-muted); font-weight: 600; }
+.tabs__count--active { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text); }
+/* Bags waiting on someone: the colour of the action. */
+.tabs__count--warning { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
+.tabs__count--danger { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 16px 6px; }
 .search-box { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
@@ -859,12 +1163,7 @@ function formatDateTime(value) {
   font: inherit; font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
 }
 .search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
-  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); cursor: pointer; appearance: none;
-  background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
+.filter-select { width: 190px; }
 .tab-hint { margin: 0; padding: 0 16px 12px; font-size: 12px; color: var(--rb-text-secondary); }
 
 .list-state { padding: 18px 16px; }
@@ -893,6 +1192,38 @@ function formatDateTime(value) {
 .row--critical td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
 .row--soon td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
 
+/* Awaiting stock-in: the arrived bags, above the stock they are about to join. */
+.stockin { margin-bottom: 16px; border-color: rgba(var(--rb-warning-rgb), 0.45); }
+.stockin__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 14px 16px 12px; border-bottom: 1px solid var(--rb-border); }
+.stockin__title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.stockin__desc { margin: 4px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 70ch; }
+.stockin__tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
+.stockin__scan { position: relative; flex: 1 1 260px; max-width: 360px; }
+.stockin__scan-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
+.stockin__input--scan { width: 100%; max-width: none; padding-left: 34px; background-color: var(--rb-surface); }
+.stockin__note { margin: 0; flex: 1 1 auto; font-size: 12.5px; color: var(--rb-text-secondary); }
+.stockin__note--alert { color: var(--rb-accent-text); }
+.row--scanned td { background: rgba(var(--rb-success-rgb), 0.06); }
+.stockin__bulk { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.stockin__bulk .stockin__input { width: 230px; max-width: none; }
+/* A text field in the filter style, without the select's arrow. The look is
+   set here: .filter-select now only sizes the SelectField filters. */
+.stockin__input {
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong);
+  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); background: var(--rb-surface-alt);
+}
+.stockin__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.stockin__input { cursor: text; background-image: none; padding-right: 12px; min-width: 0; width: 100%; max-width: 220px; }
+.stockin__foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
+.stockin__error { margin: 0; margin-right: auto; font-size: 12.5px; color: var(--rb-accent-text); }
+.check-col { width: 36px; text-align: center; }
+.row--expired td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+
+@media (max-width: 640px) {
+  .stockin__bulk { width: 100%; }
+  .stockin__input, .stockin__bulk .stockin__input { width: 100%; max-width: none; }
+}
+
 .type-pill { display: inline-flex; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .pill__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
@@ -911,18 +1242,6 @@ function formatDateTime(value) {
 }
 .link-btn:hover { text-decoration: underline; }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn--quiet { color: var(--rb-accent-text); }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

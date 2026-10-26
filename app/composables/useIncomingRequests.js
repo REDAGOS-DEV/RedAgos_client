@@ -28,12 +28,23 @@ export const useIncomingRequests = () => {
 
   const filters = reactive({
     status: undefined,
+    // 1 for every request still being worked, whatever its status.
+    open: undefined,
     urgency_level: undefined,
     request_source: undefined,
+    // patient_transfusion or replenishment: the list keeps the two apart.
+    request_purpose: undefined,
     blood_type_id: undefined,
     component_id: undefined,
+    // A reference, a patient's name or the hospital's name.
     search: undefined,
+    // When it was asked for, as Y-m-d.
+    from: undefined,
+    to: undefined,
   })
+
+  // One page of the list, as the other list pages show.
+  const PER_PAGE = 25
 
   // The selected request's history, read from the API's own event log.
   const history = ref([])
@@ -71,7 +82,7 @@ export const useIncomingRequests = () => {
     error.value = null
 
     try {
-      const response = await bloodCenterService.incomingRequests({ ...activeFilters(), page })
+      const response = await bloodCenterService.incomingRequests({ ...activeFilters(), page, per_page: PER_PAGE })
       requests.value = response?.data ?? []
       meta.value = {
         current_page: response?.current_page ?? 1,
@@ -171,8 +182,9 @@ export const useIncomingRequests = () => {
     }
   }
 
-  function allocate(id, quantity) {
-    return act(() => bloodCenterService.allocateRequest(id, quantity))
+  /** Hold the units staff picked for a request, or, given none, the oldest-dated. */
+  function allocate(id, unitIds) {
+    return act(() => bloodCenterService.allocateRequest(id, undefined, undefined, unitIds))
   }
 
   function reject(id, reason) {

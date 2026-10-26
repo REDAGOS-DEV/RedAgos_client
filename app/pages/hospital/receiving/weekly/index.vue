@@ -1,25 +1,19 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Weekly Request</h1>
-          <p class="page-subtitle">
-            Your scheduled restock. Send each blood center its weekly request on your request days — the center
-            supplies what it can, and whatever it cannot is closed when it dispatches.
-          </p>
-        </div>
-        <div class="header-actions">
-          <button type="button" class="btn" :disabled="refreshing" @click="refresh">
+      <PageHeader title="Weekly Request">
+        <template #subtitle>Your scheduled restock. Send each blood center its weekly request on your request days — the center supplies what it can, and whatever it cannot is closed when it dispatches.</template>
+        <template #actions>
+          <button type="button" class="ui-btn" :disabled="refreshing" @click="refresh">
             <AssetIcon name="refresh-cw" :size="14" :class="{ 'spin-icon': refreshing }" />
             {{ refreshing ? 'Refreshing…' : 'Refresh' }}
           </button>
-          <NuxtLink to="/hospital/receiving/weekly/new" class="btn btn--primary">
+          <NuxtLink to="/hospital/receiving/weekly/new" class="ui-btn ui-btn--primary">
             <AssetIcon name="plus" :size="14" />
             New weekly request
           </NuxtLink>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <div v-if="statusError" class="banner banner--error" role="alert">
         <AssetIcon name="triangle-alert" :size="16" />
@@ -65,13 +59,13 @@
                   :disabled="savingSchedule"
                 />
                 <div class="centre__edit-actions">
-                  <button type="button" class="btn btn--primary btn--sm" :disabled="savingSchedule || !editing.days.length" @click="saveEdit">
+                  <button type="button" class="ui-btn ui-btn--primary ui-btn--sm" :disabled="savingSchedule || !editing.days.length" @click="saveEdit">
                     {{ savingSchedule ? 'Saving…' : 'Save days' }}
                   </button>
-                  <button type="button" class="btn btn--sm" :disabled="savingSchedule" @click="editing = null">Cancel</button>
+                  <button type="button" class="ui-btn ui-btn--sm" :disabled="savingSchedule" @click="editing = null">Cancel</button>
                   <button
                     type="button"
-                    class="btn btn--sm btn--quiet"
+                    class="ui-btn ui-btn--sm ui-btn--ghost"
                     :disabled="savingSchedule"
                     @click="removeSchedule(entry.schedule.target_facility.id)"
                   >
@@ -121,7 +115,7 @@
               <NuxtLink
                 v-else-if="entry.due_today"
                 :to="`/hospital/receiving/weekly/new?target=${entry.schedule.target_facility?.id}`"
-                class="btn btn--primary btn--sm"
+                class="ui-btn ui-btn--primary ui-btn--sm"
               >Send today's request</NuxtLink>
 
               <span v-else-if="entry.next_request_day" class="centre__next">Next: {{ formatDay(entry.next_request_day, true) }}</span>
@@ -137,14 +131,20 @@
         <div class="add-centre">
           <h3 class="add-centre__title">Add a blood center</h3>
           <div class="add-centre__row">
-            <select v-model.number="adding.target" class="filter-select" aria-label="Blood center" :disabled="savingSchedule">
-              <option :value="null">{{ unscheduled.length ? 'Choose a blood center…' : 'Every eligible center has request days' }}</option>
-              <option v-for="facility in unscheduled" :key="facility.id" :value="facility.id">{{ facility.name }}</option>
-            </select>
+            <div class="filter-select">
+              <SelectField
+                v-model="adding.target"
+                :options="unscheduled.map((facility) => ({ value: facility.id, label: facility.name }))"
+                :placeholder="unscheduled.length ? 'Choose a blood center…' : 'Every eligible center has request days'"
+                aria-label="Blood center"
+                :disabled="savingSchedule"
+                size="sm"
+              />
+            </div>
             <HospitalWeekdayPicker v-model="adding.days" label="Request days for the new center" :disabled="savingSchedule" />
             <button
               type="button"
-              class="btn"
+              class="ui-btn"
               :disabled="savingSchedule || !adding.target || !adding.days.length"
               @click="addSchedule"
             >
@@ -175,7 +175,7 @@
 
         <div v-else-if="listError" class="list-state list-state--error" role="alert">
           <p>{{ listError }}</p>
-          <button type="button" class="btn" @click="loadList">Try again</button>
+          <button type="button" class="ui-btn" @click="loadList">Try again</button>
         </div>
 
         <div v-else-if="!weeklyRequests.length" class="empty-state">
@@ -230,6 +230,7 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The weekly request: the blood bank's scheduled restock from each blood center.
  *
@@ -241,9 +242,11 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalWeekdayPicker from '~/components/Hospital/WeekdayPicker.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import { bloodTypeCodes } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS, WEEKLY_STATUS_TONES } from '~/types/receiving'
+import SelectField from '~/components/common/SelectField.vue'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const status = ref(null)
 const statusLoading = ref(true)
@@ -413,9 +416,9 @@ async function addSchedule() {
   }
 }
 
-/** The blood types a weekly request asked for, as one line. */
+/** The blood types a weekly request asked for, as one line. Its one request may restock several. */
 function bloodTypesOf(weekly) {
-  const codes = (weekly.requests ?? []).map((request) => request.blood_type?.code).filter(Boolean)
+  const codes = [...new Set((weekly.requests ?? []).flatMap((request) => bloodTypeCodes(request)))]
 
   return codes.length ? codes.join(' · ') : '—'
 }
@@ -447,11 +450,11 @@ function formatDay(value, withWeekday = false) {
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css; nothing is redeclared here. */
-.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 20px; }
-.rcv-inner { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.rcv-page { min-height: 100%; background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
+.rcv-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: 24px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
 .page-subtitle { font-size: 13.5px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -460,8 +463,8 @@ function formatDay(value, withWeekday = false) {
 .banner--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
 
 .panel {
-  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); overflow: hidden;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 .panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 16px 10px; }
 .panel__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
@@ -513,12 +516,7 @@ function formatDay(value, withWeekday = false) {
   font: inherit; font-size: 12.5px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
 }
 .search-box__input:focus { outline: none; border-color: var(--rb-primary); background: var(--rb-surface); }
-.filter-select {
-  padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--rb-border-strong); min-width: 220px;
-  font: inherit; font-size: 12.5px; color: var(--rb-text-primary); cursor: pointer; appearance: none;
-  background: var(--rb-surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E") no-repeat right 12px center;
-}
-.filter-select:focus { outline: none; border-color: var(--rb-primary); }
+.filter-select { width: 260px; }
 
 .list-state { padding: 18px 16px; }
 .list-state--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); font-size: 13px; }
@@ -552,18 +550,6 @@ function formatDay(value, withWeekday = false) {
 
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit; text-decoration: none;
-  border-radius: 9px; cursor: pointer; white-space: nowrap;
-  background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong);
-}
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn--sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
-.btn--primary { background: var(--rb-primary); color: #fff; border-color: var(--rb-primary); }
-.btn--primary:hover:not(:disabled) { background: #10509c; }
-.btn--quiet { color: var(--rb-accent-text); }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

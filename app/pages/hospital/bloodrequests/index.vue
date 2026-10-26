@@ -12,79 +12,54 @@
 
     <div v-else class="page-inner">
       <!-- Page header -->
-      <header class="page-header fade-in" style="--delay:0ms">
-        <div>
-          <h1 class="page-title">Blood Requests</h1>
-          <p class="page-subtitle">Create, monitor, and manage blood requests submitted to the Blood Center.</p>
-        </div>
-        <button type="button" class="btn-primary" @click="openNewRequest">
-          <AssetIcon name="plus" :size="16" />
-          New Blood Request
-        </button>
-      </header>
+      <PageHeader title="Blood Requests" subtitle="Create, monitor, and manage blood requests submitted to the Blood Center.">
+        <template #actions>
+          <button type="button" class="ui-btn ui-btn--primary" @click="openNewRequest">
+            <AssetIcon name="plus" :size="15" />
+            New Blood Request
+          </button>
+        </template>
+      </PageHeader>
 
-      <!-- Summary KPI cards -->
-      <div class="stats-grid fade-in" style="--delay:60ms">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#F57C0014">
-              <AssetIcon name="clock" :size="18" style="color:#F57C00" />
-            </div>
-            <span class="stat-card__title">Pending Requests</span>
-          </div>
-          <p class="stat-card__value">{{ animatedCounts.pending }}</p>
-          <p class="stat-card__helper">Awaiting Blood Center review</p>
-          <span v-if="trends.pending.hasData" class="stat-card__trend" :class="trends.pending.up ? 'up' : 'down'">
-            <AssetIcon :name="trends.pending.up ? 'trending-up' : 'trending-down'" :size="12" />
-            {{ trends.pending.label }}
-          </span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#2E7D3214">
-              <AssetIcon name="check-circle" :size="18" style="color:#2E7D32" />
-            </div>
-            <span class="stat-card__title">Processing</span>
-          </div>
-          <p class="stat-card__value">{{ animatedCounts.approved }}</p>
-          <p class="stat-card__helper">Stock reserved by the blood center</p>
-          <span v-if="trends.approved.hasData" class="stat-card__trend" :class="trends.approved.up ? 'up' : 'down'">
-            <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="12" />
-            {{ trends.approved.label }}
-          </span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#7C3AED14">
-              <AssetIcon name="package-check" :size="18" style="color:#7C3AED" />
-            </div>
-            <span class="stat-card__title">Partially Fulfilled</span>
-          </div>
-          <p class="stat-card__value">{{ animatedCounts.ready }}</p>
-          <p class="stat-card__helper">Some units supplied, the rest outstanding</p>
-          <span v-if="trends.ready.hasData" class="stat-card__trend" :class="trends.ready.up ? 'up' : 'down'">
-            <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="12" />
-            {{ trends.ready.label }}
-          </span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#1565C014">
-              <AssetIcon name="clipboard-check" :size="18" style="color:#1565C0" />
-            </div>
-            <span class="stat-card__title">Fulfilled</span>
-          </div>
-          <p class="stat-card__value">{{ animatedCounts.completed }}</p>
-          <p class="stat-card__helper">Every requested unit released</p>
-          <span v-if="trends.completed.hasData" class="stat-card__trend" :class="trends.completed.up ? 'up' : 'down'">
-            <AssetIcon :name="trends.completed.up ? 'trending-up' : 'trending-down'" :size="12" />
-            {{ trends.completed.label }}
-          </span>
-        </div>
-      </div>
+      <!-- Summary figures -->
+      <StatStrip>
+        <StatItem label="Pending requests" :value="animatedCounts.pending" icon="clock" tone="warning">
+          <template #hint>
+            Awaiting Blood Center review
+            <span v-if="trends.pending.hasData" class="stat-trend" :class="trends.pending.up ? 'up' : 'down'">
+              <AssetIcon :name="trends.pending.up ? 'trending-up' : 'trending-down'" :size="11" />
+              {{ trends.pending.label }}
+            </span>
+          </template>
+        </StatItem>
+        <StatItem label="Processing" :value="animatedCounts.approved" icon="check-circle" tone="success">
+          <template #hint>
+            Stock reserved by the blood center
+            <span v-if="trends.approved.hasData" class="stat-trend" :class="trends.approved.up ? 'up' : 'down'">
+              <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="11" />
+              {{ trends.approved.label }}
+            </span>
+          </template>
+        </StatItem>
+        <StatItem label="Partially fulfilled" :value="animatedCounts.ready" icon="package-check" tone="purple">
+          <template #hint>
+            Some units supplied, the rest outstanding
+            <span v-if="trends.ready.hasData" class="stat-trend" :class="trends.ready.up ? 'up' : 'down'">
+              <AssetIcon :name="trends.ready.up ? 'trending-up' : 'trending-down'" :size="11" />
+              {{ trends.ready.label }}
+            </span>
+          </template>
+        </StatItem>
+        <StatItem label="Fulfilled" :value="animatedCounts.completed" icon="clipboard-check" tone="primary">
+          <template #hint>
+            Every requested unit released
+            <span v-if="trends.completed.hasData" class="stat-trend" :class="trends.completed.up ? 'up' : 'down'">
+              <AssetIcon :name="trends.completed.up ? 'trending-up' : 'trending-down'" :size="11" />
+              {{ trends.completed.label }}
+            </span>
+          </template>
+        </StatItem>
+      </StatStrip>
 
       <!-- Restocking the blood bank is not requested here: it is the weekly request. -->
       <p class="restock-note fade-in" style="--delay:80ms">
@@ -115,51 +90,36 @@
 
         <div v-show="filtersOpen" class="filter-panel">
           <div class="filter-field">
-            <label class="filter-field__label">Status</label>
-            <select v-model="filters.status" class="filter-select">
-              <option value="">All statuses</option>
-              <option v-for="(v, k) in statusMap" :key="k" :value="k">{{ v.label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-status">Status</label>
+            <SelectField id="hbr-status" v-model="filters.status" :options="[{ value: '', label: 'All statuses' }, ...Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Source</label>
-            <select v-model="filters.source" class="filter-select">
-              <option value="">All sources</option>
-              <option v-for="(label, value) in REQUEST_SOURCE_LABELS" :key="value" :value="value">{{ label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-source">Source</label>
+            <SelectField id="hbr-source" v-model="filters.source" :options="[{ value: '', label: 'All sources' }, ...Object.entries(REQUEST_SOURCE_LABELS).map(([value, label]) => ({ value, label }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Blood Type</label>
-            <select v-model="filters.bloodType" class="filter-select">
-              <option value="">All types</option>
-              <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-blood-type">Blood Type</label>
+            <SelectField id="hbr-blood-type" v-model="filters.bloodType" :options="[{ value: '', label: 'All types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Blood Component</label>
-            <select v-model="filters.component" class="filter-select">
-              <option value="">All components</option>
-              <option v-for="c in components" :key="c" :value="c">{{ c }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-component">Blood Component</label>
+            <SelectField id="hbr-component" v-model="filters.component" :options="[{ value: '', label: 'All components' }, ...components.map((c) => ({ value: c, label: c }))]" size="sm" />
           </div>
           <div class="filter-field">
-            <label class="filter-field__label">Priority</label>
-            <select v-model="filters.priority" class="filter-select">
-              <option value="">All priorities</option>
-              <option v-for="(v, k) in priorityMap" :key="k" :value="k">{{ v.label }}</option>
-            </select>
+            <label class="filter-field__label" for="hbr-priority">Priority</label>
+            <SelectField id="hbr-priority" v-model="filters.priority" :options="[{ value: '', label: 'All priorities' }, ...Object.entries(priorityMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
           </div>
           <div class="filter-field">
             <label class="filter-field__label">Date Range</label>
             <div class="filter-field__range">
-              <input v-model="filters.dateFrom" type="date" class="filter-select filter-select--date" />
+              <DatePicker id="hbr-from" v-model="filters.dateFrom" :max="filters.dateTo || undefined" aria-label="From" size="sm" />
               <span class="filter-field__range-sep">–</span>
-              <input v-model="filters.dateTo" type="date" class="filter-select filter-select--date" />
+              <DatePicker id="hbr-to" v-model="filters.dateTo" :min="filters.dateFrom || undefined" aria-label="To" size="sm" />
             </div>
           </div>
           <div class="filter-actions">
-            <button type="button" class="btn-ghost" @click="resetFilters">Reset Filters</button>
-            <button type="button" class="btn-primary btn-primary--sm" @click="filtersOpen = false">Apply Filters</button>
+            <button type="button" class="ui-btn" @click="resetFilters">Reset Filters</button>
+            <button type="button" class="ui-btn ui-btn--primary" @click="filtersOpen = false">Apply Filters</button>
           </div>
         </div>
       </section>
@@ -168,13 +128,13 @@
       <div class="export-row fade-in" style="--delay:130ms">
         <p class="export-row__count">{{ filteredRequests.length }} request{{ filteredRequests.length === 1 ? '' : 's' }} found</p>
         <div class="export-row__actions">
-          <button type="button" class="btn-ghost btn-ghost--sm" @click="exportCsv">
+          <button type="button" class="ui-btn ui-btn--sm" @click="exportCsv">
             <AssetIcon name="file-down" :size="14" /> Export CSV
           </button>
-          <button type="button" class="btn-ghost btn-ghost--sm" @click="printPage">
+          <button type="button" class="ui-btn ui-btn--sm" @click="printPage">
             <AssetIcon name="file-text" :size="14" /> Export PDF
           </button>
-          <button type="button" class="btn-ghost btn-ghost--sm" @click="printPage">
+          <button type="button" class="ui-btn ui-btn--sm" @click="printPage">
             <AssetIcon name="printer" :size="14" /> Print
           </button>
         </div>
@@ -207,14 +167,10 @@
               <span class="req-row__component" data-label="Component">{{ req.component }}</span>
               <span data-label="Units">{{ req.units }}</span>
               <span data-label="Priority">
-                <span class="priority-chip" :style="{ color: priorityOf(req.priority).color, background: priorityOf(req.priority).bg }">
-                  {{ priorityOf(req.priority).label }}
-                </span>
+                <StatusBadge :tone="priorityOf(req.priority).tone" :dot="false">{{ priorityOf(req.priority).label }}</StatusBadge>
               </span>
               <span data-label="Status">
-                <span class="badge" :style="{ background: statusOf(req.status).bg, color: statusOf(req.status).color }">
-                  {{ req.status_text }}
-                </span>
+                <StatusBadge :tone="statusOf(req.status).tone">{{ req.status_text }}</StatusBadge>
               </span>
               <span class="req-row__progress" data-label="Progress">
                 <span class="step-dots" :title="progressLabel(req.status)">
@@ -258,11 +214,9 @@
           <div class="pagination">
             <div class="pagination__rows">
               <label for="rowsPerPage">Rows per page</label>
-              <select id="rowsPerPage" v-model.number="rowsPerPage" class="filter-select filter-select--sm">
-                <option :value="10">10</option>
-                <option :value="25">25</option>
-                <option :value="50">50</option>
-              </select>
+              <div class="rows-select">
+                <SelectField id="rowsPerPage" v-model="rowsPerPage" :options="[10, 25, 50].map((n) => ({ value: n, label: String(n) }))" size="sm" />
+              </div>
             </div>
             <div class="pagination__nav">
               <button type="button" class="pagination__btn" :disabled="currentPage === 1" @click="currentPage--">
@@ -279,31 +233,23 @@
         </div>
 
         <!-- Error state -->
-        <div v-else-if="loadError" class="empty-state">
-          <div class="empty-state__icon">
-            <AssetIcon name="triangle-alert" :size="40" style="color:#CBD5E1" />
-          </div>
-          <h3 class="empty-state__title">Couldn't Load Blood Requests</h3>
-          <p class="empty-state__desc">Something went wrong while fetching your requests. Please try again.</p>
-          <button type="button" class="btn-ghost" @click="loadRequests">Retry</button>
-        </div>
+        <EmptyState v-else-if="loadError" icon="triangle-alert" title="Couldn't Load Blood Requests" description="Something went wrong while fetching your requests. Please try again.">
+          <button type="button" class="ui-btn" @click="loadRequests">Retry</button>
+        </EmptyState>
 
         <!-- Empty state -->
-        <div v-else class="empty-state">
-          <div class="empty-state__icon">
-            <AssetIcon name="droplets" :size="40" style="color:#CBD5E1" />
-          </div>
-          <h3 class="empty-state__title">No Blood Requests Found</h3>
-          <p class="empty-state__desc">
-            {{ hasActiveFilters
-              ? "No requests match your search or filters. Try adjusting them."
-              : "You haven't submitted any blood requests yet. Create a new blood request to begin." }}
-          </p>
-          <button v-if="hasActiveFilters" type="button" class="btn-ghost" @click="resetFilters">Reset Filters</button>
-          <button v-else type="button" class="btn-primary" @click="openNewRequest">
-            <AssetIcon name="plus" :size="16" /> Create Blood Request
+        <EmptyState
+          v-else
+          icon="droplets"
+          title="No Blood Requests Found"
+          :description="hasActiveFilters
+            ? 'No requests match your search or filters. Try adjusting them.'
+            : 'You haven\'t submitted any blood requests yet. Create a new blood request to begin.'">
+          <button v-if="hasActiveFilters" type="button" class="ui-btn" @click="resetFilters">Reset Filters</button>
+          <button v-else type="button" class="ui-btn ui-btn--primary" @click="openNewRequest">
+            <AssetIcon name="plus" :size="15" /> Create Blood Request
           </button>
-        </div>
+        </EmptyState>
       </section>
     </div>
 
@@ -318,19 +264,15 @@
             <p class="drawer__eyebrow">Request Details</p>
             <h2 class="drawer__title">{{ selectedRequest.reference_number }}</h2>
           </div>
-          <button type="button" class="icon-btn" @click="closeDrawer" aria-label="Close details">
+          <button type="button" class="ui-btn ui-btn--icon" @click="closeDrawer" aria-label="Close details">
             <AssetIcon name="x" :size="18" />
           </button>
         </div>
 
         <div class="drawer__body">
           <div class="drawer__status-row">
-            <span class="badge badge--lg" :style="{ background: statusOf(selectedRequest.status).bg, color: statusOf(selectedRequest.status).color }">
-              {{ selectedRequest.status_text }}
-            </span>
-            <span class="priority-chip priority-chip--lg" :style="{ color: priorityOf(selectedRequest.priority).color, background: priorityOf(selectedRequest.priority).bg }">
-              {{ priorityOf(selectedRequest.priority).label }} Priority
-            </span>
+            <StatusBadge :tone="statusOf(selectedRequest.status).tone">{{ selectedRequest.status_text }}</StatusBadge>
+            <StatusBadge :tone="priorityOf(selectedRequest.priority).tone" :dot="false">{{ priorityOf(selectedRequest.priority).label }} Priority</StatusBadge>
           </div>
 
           <dl class="drawer__grid">
@@ -406,10 +348,10 @@
         </div>
 
         <div class="drawer__footer">
-          <button type="button" class="btn-primary btn-primary--sm" @click="viewDetails(selectedRequest)">
+          <button type="button" class="ui-btn ui-btn--primary" @click="viewDetails(selectedRequest)">
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
-          <button v-if="canCancel(selectedRequest)" type="button" class="btn-danger" @click="cancelRequest(selectedRequest)">
+          <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="cancelRequest(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
         </div>
@@ -419,14 +361,21 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import StatusBadge from '~/components/ui/StatusBadge.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { componentSummary, REQUEST_SOURCE_LABELS, requestStatusLabel } from '~/types/bloodRequest'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const router = useRouter()
 const route = useRoute()
@@ -449,21 +398,22 @@ const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platele
  * partial and fulfilled — so `statusMap[req.status].bg` threw on the first
  * partly or fully supplied request and took the whole list down with it.
  */
+// Each status as a StatusBadge tone, so the colours match every staff page.
 const statusMap = {
-  pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
-  processing: { label: 'Processing', bg: '#1565C014', color: '#1565C0' },
-  partial: { label: 'Partially Fulfilled', bg: '#B4530914', color: '#B45309' },
-  fulfilled: { label: 'Fulfilled', bg: '#2E7D3214', color: '#2E7D32' },
-  rejected: { label: 'Rejected', bg: '#D32F2F14', color: '#D32F2F' },
-  cancelled: { label: 'Cancelled', bg: '#64748B14', color: '#64748B' },
+  pending: { label: 'Pending', tone: 'warning' },
+  processing: { label: 'Processing', tone: 'info' },
+  partial: { label: 'Partially Fulfilled', tone: 'purple' },
+  fulfilled: { label: 'Fulfilled', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
 }
 
-const FALLBACK_STYLE = { label: '—', bg: '#64748B14', color: '#64748B' }
+const FALLBACK_STYLE = { label: '—', tone: 'neutral' }
 
 // The API speaks routine / emergency; the DOH form prints ROUTINE and STAT.
 const priorityMap = {
-  routine: { label: 'Routine', bg: '#1565C014', color: '#1565C0' },
-  emergency: { label: 'STAT', bg: '#D32F2F14', color: '#D32F2F' },
+  routine: { label: 'Routine', tone: 'info' },
+  emergency: { label: 'STAT', tone: 'danger' },
 }
 
 function statusOf(status) {
@@ -808,24 +758,24 @@ onUnmounted(() => {
 
 <style scoped>
 .requests-page {
-  --primary: var(--rb-primary, #1565c0);
-  --primary-hover: #0d47a1;
-  --bg: #f7f9fc;
-  --surface: #ffffff;
-  --border: #e5eaf0;
-  --border-dark: #2a3447;
-  --text-primary: #1e293b;
-  --text-secondary: var(--rb-text-secondary, #64748b);
-  --text-muted: var(--rb-text-muted, #94a3b8);
-  --danger: var(--rb-accent, #d32f2f);
-  --warning: var(--rb-warning, #F57C00);
-  --success: var(--rb-success, #2e7d32);
+  --primary: var(--rb-primary);
+  --primary-hover: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  --bg: var(--rb-page-bg);
+  --surface: var(--rb-surface);
+  --border: var(--rb-border);
+  --border-dark: var(--rb-border-strong);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
+  --text-muted: var(--rb-text-muted);
+  --danger: var(--rb-accent);
+  --warning: var(--rb-warning);
+  --success: var(--rb-success);
   --purple: var(--rb-purple, #7c3aed);
   font-family: var(--rb-font-sans);
-  max-width: 1400px;
+  max-width: var(--rb-content-max, 1600px);
   background: var(--bg);
   margin: 0 auto;
-  padding: 32px 32px 40px;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
 
 .sr-only {
@@ -877,7 +827,7 @@ onUnmounted(() => {
   transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
 }
-.btn-ghost:hover { color: var(--primary); border-color: var(--primary); transform: translateY(-1px); }
+.btn-ghost:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); transform: translateY(-1px); }
 .btn-ghost--sm { height: 36px; padding: 0 12px; font-size: 12.5px; }
 
 .btn-danger {
@@ -887,7 +837,7 @@ onUnmounted(() => {
   background: var(--danger); border: none; cursor: pointer;
   transition: background 0.15s ease;
 }
-.btn-danger:hover { background: #b71c1c; }
+.btn-danger:hover { background: color-mix(in srgb, var(--rb-accent) 85%, #000); }
 
 .icon-btn {
   width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
@@ -895,7 +845,7 @@ onUnmounted(() => {
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.icon-btn:hover { color: var(--primary); border-color: var(--primary); }
+.icon-btn:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); }
 
 /* Stat cards */
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
@@ -916,18 +866,18 @@ onUnmounted(() => {
   font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
   margin-top: 12px;
 }
-.stat-card__trend.up { color: var(--success); background: #2e7d3214; }
-.stat-card__trend.down { color: var(--danger); background: #d32f2f14; }
+.stat-card__trend.up { color: var(--success); background: rgba(var(--rb-success-rgb), 0.1); }
+.stat-card__trend.down { color: var(--danger); background: rgba(var(--rb-accent-rgb), 0.09); }
 
 /* Toolbar: search + filters */
 .toolbar { display: flex; flex-direction: column; gap: 12px; }
 .search-bar {
   display: flex; align-items: center; gap: 10px;
-  height: 48px; padding: 0 16px; border-radius: 14px;
-  background: #f8fafc; border: 1px solid var(--border);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  height: 46px; padding: 0 8px 0 16px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.search-bar:focus-within { border-color: var(--primary); background: var(--surface); }
+.search-bar:focus-within { border-color: rgba(var(--rb-primary-rgb), 0.4); background: var(--surface); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.1); }
 .search-bar__icon { color: var(--text-muted); flex-shrink: 0; }
 .search-bar__input {
   flex: 1; min-width: 0; height: 100%; border: none; background: transparent; outline: none;
@@ -944,7 +894,7 @@ onUnmounted(() => {
   background: var(--surface); border: 1px solid var(--border); cursor: pointer; flex-shrink: 0;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.filter-toggle:hover { color: var(--primary); border-color: var(--primary); }
+.filter-toggle:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); }
 .filter-toggle__badge {
   min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
   background: var(--primary); color: #fff; font-size: 10px; font-weight: 700;
@@ -952,23 +902,15 @@ onUnmounted(() => {
 }
 
 .filter-panel {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm);
   padding: 18px 20px; display: grid;
   grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: end;
 }
 .filter-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .filter-field--full { grid-column: 1 / -1; }
-.filter-field__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+.filter-field__label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .filter-field__range { display: flex; align-items: center; gap: 6px; }
 .filter-field__range-sep { color: var(--text-muted); font-size: 12px; }
-.filter-select {
-  height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--border);
-  background: #f8fafc; font-family: inherit; font-size: 13px; color: var(--text-primary);
-  outline: none; transition: border-color 0.15s ease; width: 100%;
-}
-.filter-select:focus { border-color: var(--primary); }
-.filter-select--date { min-width: 0; }
-.filter-select--sm { height: 32px; font-size: 12.5px; width: auto; }
 .filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
 
 /* Export row */
@@ -978,16 +920,16 @@ onUnmounted(() => {
 
 /* Panel */
 .panel {
-  background: var(--surface); border-radius: 18px; border: 1px solid var(--border);
-  box-shadow: 0 4px 20px rgba(15,23,42,0.05); overflow: hidden;
+  background: var(--surface); border-radius: var(--rb-radius-lg); border: 1px solid var(--border);
+  box-shadow: var(--rb-shadow-sm); overflow: hidden;
 }
 
 /* Table */
-.req-table { padding: 4px 0; }
+.req-table { padding: 0; }
 .req-table__head {
   display: grid; grid-template-columns: 1.1fr 0.9fr 0.7fr 1.1fr 0.5fr 0.9fr 1.1fr 1fr 0.5fr;
-  gap: 10px; padding: 14px 24px; font-size: 13px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted);
+  gap: 10px; padding: 11px 24px; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); background: var(--rb-surface-alt);
   border-bottom: 1px solid var(--border);
 }
 .req-row {
@@ -997,7 +939,7 @@ onUnmounted(() => {
   cursor: pointer; transition: background 0.15s ease;
 }
 .req-row:last-child { border-bottom: none; }
-.req-row:hover { background: #f8fafc; }
+.req-row:hover { background: var(--rb-surface-alt); }
 .req-row__ref { font-weight: 600; }
 .source-chip {
   display: inline-block;
@@ -1022,7 +964,7 @@ onUnmounted(() => {
 .type-chip {
   display: inline-flex; align-items: center; justify-content: center; min-width: 36px;
   padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  background: #1565c014; color: var(--primary);
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
 }
 .priority-chip {
   display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
@@ -1035,7 +977,7 @@ onUnmounted(() => {
 .req-row:hover .badge { transform: translateY(-1px); }
 
 .step-dots { display: inline-flex; align-items: center; gap: 3px; }
-.step-dot { width: 7px; height: 7px; border-radius: 999px; background: #e2e8f0; transition: background 0.2s ease, transform 0.2s ease; }
+.step-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--rb-border-strong); transition: background 0.2s ease, transform 0.2s ease; }
 .step-dot--done { background: var(--success); }
 .step-dot--current { background: var(--primary); transform: scale(1.3); }
 .step-dot--halted { background: var(--danger); }
@@ -1047,7 +989,7 @@ onUnmounted(() => {
   background: transparent; color: var(--text-secondary); cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, border-color 0.15s ease;
 }
-.action-menu__btn:hover { background: #f1f5f9; border-color: var(--border); }
+.action-menu__btn:hover { background: var(--rb-surface-alt); border-color: var(--border); }
 .action-menu__dropdown {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
   width: 190px; background: var(--surface); border: 1px solid var(--border);
@@ -1059,9 +1001,9 @@ onUnmounted(() => {
   font-family: inherit; font-size: 13px; font-weight: 500; color: var(--text-primary);
   background: none; border: none; cursor: pointer; text-align: left; transition: background 0.12s ease;
 }
-.action-menu__item:hover { background: #f1f5f9; }
+.action-menu__item:hover { background: var(--rb-surface-alt); }
 .action-menu__item--danger { color: var(--danger); }
-.action-menu__item--danger:hover { background: #d32f2f0f; }
+.action-menu__item--danger:hover { background: rgba(var(--rb-accent-rgb), 0.07); }
 
 /* Empty state */
 .empty-state {
@@ -1069,7 +1011,7 @@ onUnmounted(() => {
   padding: 64px 24px; gap: 6px;
 }
 .empty-state__icon {
-  width: 76px; height: 76px; border-radius: 999px; background: #f1f5f9;
+  width: 76px; height: 76px; border-radius: 999px; background: var(--rb-surface-alt);
   display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
 }
 .empty-state__title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0; }
@@ -1088,14 +1030,14 @@ onUnmounted(() => {
   font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.pagination__btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination__btn:hover:not(:disabled) { border-color: var(--rb-primary-text); color: var(--rb-primary-text); }
 .pagination__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .pagination__page {
   width: 34px; height: 34px; border-radius: 9px; border: 1px solid transparent;
   background: transparent; font-family: inherit; font-size: 12.5px; font-weight: 600;
   color: var(--text-secondary); cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
 }
-.pagination__page:hover { background: #f1f5f9; }
+.pagination__page:hover { background: var(--rb-surface-alt); }
 .pagination__page--active { background: var(--primary); color: #fff; }
 
 /* Drawer */
@@ -1117,7 +1059,7 @@ onUnmounted(() => {
 .drawer__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0; }
 .drawer__field { display: flex; flex-direction: column; gap: 3px; }
 .drawer__field--full { grid-column: 1 / -1; }
-.drawer__field dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); margin: 0; }
+.drawer__field dt { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 0; }
 .drawer__field dd { font-size: 14px; font-weight: 500; color: var(--text-primary); margin: 0; line-height: 1.45; }
 
 .drawer__section-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 14px; }
@@ -1125,7 +1067,7 @@ onUnmounted(() => {
 .v-timeline__row { display: flex; gap: 12px; }
 .v-timeline__rail { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
 .v-timeline__dot {
-  width: 20px; height: 20px; border-radius: 999px; background: #e2e8f0; color: #fff;
+  width: 20px; height: 20px; border-radius: 999px; background: var(--rb-border-strong); color: #fff;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .v-timeline__dot--done { background: var(--success); }
@@ -1173,19 +1115,13 @@ onUnmounted(() => {
   .page-title { font-size: 24px; }
 }
 
-/* Dark mode */
-:global(.dark .requests-page) {
-  --text-primary: #F1F5F9; --text-secondary: #94A3B8; --text-muted: #64748B;
-  --border: #2A3447; --surface: #1E293B; --bg: #0F172A;
-  background: #0F172A;
+.rows-select { width: 84px; }
+
+/* The trend under a figure, beside its note. */
+.stat-trend {
+  display: flex; width: fit-content; align-items: center; gap: 3px; margin-top: 6px;
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
 }
-:global(.dark .requests-page .stat-card), :global(.dark .requests-page .panel), :global(.dark .requests-page .filter-panel),
-:global(.dark .requests-page .icon-btn), :global(.dark .requests-page .btn-ghost), :global(.dark .requests-page .filter-select),
-:global(.dark .requests-page .filter-toggle), :global(.dark .requests-page .drawer), :global(.dark .requests-page .action-menu__dropdown),
-:global(.dark .requests-page .pagination__btn) { background: #1E293B; border-color: #2A3447; }
-:global(.dark .requests-page .search-bar) { background: #1E293B; border-color: #2A3447; }
-:global(.dark .requests-page .search-bar:focus-within) { background: #263449; }
-:global(.dark .requests-page .req-row:hover), :global(.dark .requests-page .action-menu__item:hover), :global(.dark .requests-page .pagination__page:hover) { background: #263449; }
-:global(.dark .requests-page .empty-state__icon) { background: #263449; }
-:global(.dark .requests-page .type-chip) { background: rgba(66,165,245,0.14); }
+.stat-trend.up { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), 0.1); }
+.stat-trend.down { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), 0.09); }
 </style>

@@ -1,201 +1,189 @@
 <template>
   <div class="qr-page">
-    <div v-if="loading" class="qr-page-inner">
+    <div v-if="loading" class="qr-page-inner" aria-busy="true">
       <div class="header-row">
-        <div class="skeleton skeleton-line" style="width:120px;height:20px" />
+        <div class="skeleton skeleton-line" style="width:160px;height:20px" />
         <div class="skeleton skeleton-line" style="width:320px;height:13px;margin-top:8px" />
       </div>
-
       <div class="main-grid">
-        <!-- QR skeleton -->
-        <div class="panel qr-panel">
-          <div class="skeleton skeleton-line" style="width:160px;height:15px" />
-          <div class="skeleton skeleton-line" style="width:220px;height:12.5px;margin-top:10px;margin-bottom:20px" />
-
-          <div class="qr-image-wrap">
-            <div class="skeleton" style="width:200px;height:200px;border-radius:8px" />
-          </div>
-
-          <div class="qr-details">
-            <div v-for="n in 6" :key="n" class="qr-details__row">
-              <div class="skeleton skeleton-line" style="width:90px;height:11px" />
-              <div class="skeleton skeleton-line" style="width:70px;height:11px" />
-            </div>
-          </div>
-
-          <div class="qr-actions">
-            <div class="skeleton skeleton-btn" />
-            <div class="skeleton skeleton-btn" />
-          </div>
-        </div>
-
-        <!-- Steps skeleton -->
-        <div class="panel steps-panel">
-          <div class="skeleton skeleton-line" style="width:150px;height:15px;margin-bottom:20px" />
-
-          <div class="steps-list">
-            <div v-for="n in 5" :key="n" class="step-row">
-              <div class="step-row__marker">
-                <span class="skeleton" style="width:14px;height:14px;border-radius:999px" />
-                <span v-if="n < 5" class="step-line" />
-              </div>
-              <div class="step-row__body" style="width:100%">
-                <div class="skeleton skeleton-line" style="width:70%;height:13px" />
-                <div class="skeleton skeleton-line" style="width:95%;height:11px;margin-top:8px" />
-              </div>
-            </div>
-          </div>
-
-          <div class="skeleton" style="width:100%;height:56px;border-radius:12px;margin-top:4px" />
-        </div>
+        <div class="skeleton skeleton--pass" />
+        <div class="skeleton skeleton--steps" />
       </div>
     </div>
 
     <div v-else class="qr-page-inner">
       <div class="header-row">
         <h1 class="page-title">Quick check-in</h1>
-        <p class="page-subtitle">Access your personal QR Code for faster check-in during appointments and donation visits.</p>
+        <p class="page-subtitle">Show this pass at the blood center so staff can check you in quickly.</p>
       </div>
 
       <div class="main-grid">
-        <!-- Left: QR card -->
-        <div class="panel qr-panel">
-          <template v-if="canShowQr">
-            <h2 class="qr-panel__title">Donor Eligibility QR</h2>
-            <p class="qr-panel__subtitle">Present this to blood center staff upon arrival.</p>
-
-            <div class="qr-image-wrap">
-              <img :src="qrCodeDataUrl" alt="Donor eligibility QR code" class="qr-image">
+        <!-- Left: the check-in pass -->
+        <article class="pass" aria-label="Donor check-in pass">
+          <header class="pass__head">
+            <p class="pass__brand">
+              <span class="pass__logo"><AssetIcon name="blood-drop" :size="14" /></span>
+              Donor check-in pass
+            </p>
+            <div class="pass__who">
+              <div class="pass__who-text">
+                <p class="pass__name">{{ displayName }}</p>
+                <p class="pass__id">{{ profile?.donor_id || '-' }}</p>
+              </div>
+              <div v-if="profile?.blood_type" class="pass__blood">
+                <span class="pass__blood-type">{{ profile.blood_type }}</span>
+                <span class="pass__blood-label">Blood type</span>
+              </div>
             </div>
-          </template>
+          </header>
 
-          <div v-else class="qr-empty">
-            <AssetIcon name="qr-code" :size="40" style="color:#e5e7eb" />
-            <p class="qr-empty__title">{{ qrEmptyCopy.title }}</p>
-            <p class="qr-empty__sub">{{ qrEmptyCopy.sub }}</p>
-            <button v-if="qrState === 'ready'" type="button" class="btn-primary" :disabled="minting"
-              @click="mintQrCode">
-              {{ minting ? 'Generating…' : (hasActiveToken ? 'Generate new code' : 'Generate QR code') }}
-            </button>
+          <div class="pass__code">
+            <!--
+              The pass could not be read. Say so, rather than fall back to
+              "book a visit first" for a donor who may well have booked.
+            -->
+            <div v-if="loadError" class="qr-empty" role="alert">
+              <span class="qr-empty__frame" aria-hidden="true">
+                <AssetIcon name="circle-alert" :size="30" />
+              </span>
+              <p class="qr-empty__title">Couldn't load your Pass</p>
+              <p class="qr-empty__sub">{{ loadError }}</p>
+              <button type="button" class="btn-primary" @click="load()">Try again</button>
+            </div>
 
-            <button v-else-if="qrState === 'unverified'" type="button" class="btn-primary"
-              :disabled="resending" @click="resendVerification">
-              {{ resending ? 'Sending...' : 'Resend verification email' }}
-            </button>
+            <template v-else-if="canShowQr">
+              <div class="pass__qr">
+                <img :src="qrCodeDataUrl" alt="Donor eligibility QR code" class="qr-image">
+              </div>
+              <p class="pass__hint">Present this to blood center staff when you arrive.</p>
+            </template>
 
-            <NuxtLink v-else-if="qrEmptyCopy.action" :to="qrEmptyCopy.action.to" class="btn-primary">
-              {{ qrEmptyCopy.action.label }}
-            </NuxtLink>
+            <div v-else class="qr-empty">
+              <span class="qr-empty__frame" aria-hidden="true">
+                <AssetIcon name="qr-code" :size="34" />
+              </span>
+              <p class="qr-empty__title">{{ qrEmptyCopy.title }}</p>
+              <p class="qr-empty__sub">{{ qrEmptyCopy.sub }}</p>
+              <button v-if="qrState === 'ready'" type="button" class="btn-primary" :disabled="minting"
+                @click="mintQrCode">
+                <AssetIcon name="qr-code" :size="16" />
+                {{ minting ? 'Generating…' : (hasActiveToken ? 'Generate new code' : 'Generate QR code') }}
+              </button>
 
-            <p v-if="resendMessage" class="qr-resend-note">{{ resendMessage }}</p>
+              <button v-else-if="qrState === 'unverified'" type="button" class="btn-primary"
+                :disabled="resending" @click="resendVerification">
+                {{ resending ? 'Sending...' : 'Resend verification email' }}
+              </button>
+
+              <NuxtLink v-else-if="qrEmptyCopy.action" :to="qrEmptyCopy.action.to" class="btn-primary">
+                {{ qrEmptyCopy.action.label }}
+              </NuxtLink>
+              <NuxtLink v-if="qrEmptyCopy.alt" :to="qrEmptyCopy.alt.to" class="qr-empty__alt">
+                {{ qrEmptyCopy.alt.label }}
+              </NuxtLink>
+
+              <p v-if="resendMessage" class="qr-resend-note">{{ resendMessage }}</p>
+            </div>
+
+            <p v-if="qrError" class="qr-error">{{ qrError }}</p>
           </div>
-
-          <p v-if="qrError" class="qr-error">{{ qrError }}</p>
 
           <!-- Ipakita basta naa nay screening, bisan walay QR image nga na-mint -->
-          <div v-if="profile?.screening_date" class="qr-details">
-            <div class="qr-details__row">
-              <span class="qr-details__label">Donor name</span>
-              <span class="qr-details__value">{{ profile?.full_name || '—' }}</span>
-            </div>
-            <div class="qr-details__row">
-              <span class="qr-details__label">Donor ID</span>
-              <span class="qr-details__value">{{ profile?.donor_id || '—' }}</span>
-            </div>
-            <div class="qr-details__row">
-              <span class="qr-details__label">Blood type</span>
-              <span class="qr-details__value">{{ profile?.blood_type || '—' }}</span>
-            </div>
-            <div class="qr-details__row">
-              <span class="qr-details__label">Screening date</span>
-              <span class="qr-details__value">{{ formatDate(profile?.screening_date) }}</span>
-            </div>
-            <div class="qr-details__row">
-              <span class="qr-details__label">Screening valid until</span>
-              <span class="qr-details__value" :class="statusValueClass">{{ formatDate(profile?.screening_valid_until) }}</span>
-            </div>
-            <div class="qr-details__row">
-              <span class="qr-details__label">QR status</span>
-              <span class="qr-details__value" :class="statusValueClass">{{ qrStatusLabel }}</span>
-            </div>
-          </div>
+          <template v-if="profile?.screening_date">
+            <div class="pass__tear" aria-hidden="true" />
+            <dl class="pass__facts">
+              <div>
+                <dt>Answered</dt>
+                <dd>{{ formatDate(profile?.screening_date) }}</dd>
+              </div>
+              <div>
+                <dt>Answers good until</dt>
+                <dd :class="statusValueClass">{{ formatDate(profile?.screening_valid_until) }}</dd>
+              </div>
+              <div>
+                <dt>QR code</dt>
+                <dd :class="{ 'pass__fact--muted': !hasActiveToken }">{{ qrStatusLabel }}</dd>
+              </div>
+            </dl>
+          </template>
 
-          <div v-if="canShowQr" class="qr-actions">
-            <button type="button" class="btn-primary" :disabled="!qrCodeDataUrl" @click="downloadQr">
+          <div v-if="canShowQr" class="pass__actions">
+            <button type="button" class="pass__action" :disabled="!qrCodeDataUrl" @click="downloadQr">
               <AssetIcon name="download" :size="16" />
               Download
             </button>
-            <button type="button" class="btn-outline" :disabled="!qrCodeDataUrl" @click="shareQr">
+            <button type="button" class="pass__action" :disabled="!qrCodeDataUrl" @click="shareQr">
               <AssetIcon name="share" :size="16" />
               Share
             </button>
-            <button type="button" class="btn-outline" :disabled="minting" @click="mintQrCode">
+            <button type="button" class="pass__action" :disabled="minting" @click="mintQrCode">
               <AssetIcon name="refresh-cw" :size="16" />
               {{ minting ? 'Generating…' : 'New code' }}
             </button>
           </div>
-        </div>
+        </article>
 
         <!-- Right: how to use -->
-        <div class="panel steps-panel">
+        <section class="steps-panel" aria-labelledby="steps-title">
           <div class="steps-panel__head">
-            <h2 class="steps-panel__title">How to use QR code</h2>
+            <h2 id="steps-title" class="steps-panel__title">How your visit goes</h2>
             <span class="steps-panel__count">{{ stepsDone }} of {{ steps.length }} done</span>
           </div>
 
-          <div
-            class="steps-progress"
-            role="progressbar"
-            :aria-valuenow="stepsDone"
-            aria-valuemin="0"
-            :aria-valuemax="steps.length"
-            :aria-label="`${stepsDone} of ${steps.length} steps done`"
-          >
-            <span class="steps-progress__fill" :style="{ width: `${(stepsDone / steps.length) * 100}%` }" />
-          </div>
-
-          <ol class="steps-list">
+          <!-- The journey as one row of icons; only the next step gets words. -->
+          <ol class="journey">
             <li
-              v-for="(step, i) in steps"
+              v-for="step in steps"
               :key="step.title"
-              class="step-row"
-              :class="`step-row--${step.state}`"
+              class="journey__stop"
+              :class="`journey__stop--${step.state}`"
               :aria-current="step.state === 'current' ? 'step' : undefined"
             >
-              <div class="step-row__marker">
-                <span class="step-dot" :class="`step-dot--${step.state}`">
-                  <AssetIcon v-if="step.state === 'done'" name="check" :size="12" />
-                  <template v-else>{{ i + 1 }}</template>
-                </span>
-                <span
-                  v-if="i < steps.length - 1"
-                  class="step-line"
-                  :class="{ 'step-line--done': step.state === 'done' }"
-                />
-              </div>
-              <div class="step-row__body">
-                <p class="step-row__title">
-                  {{ step.title }}
-                  <span v-if="step.state === 'current'" class="step-row__badge">Next step</span>
-                </p>
-                <p class="step-row__desc">{{ step.desc }}</p>
-              </div>
+              <span class="journey__icon">
+                <AssetIcon :name="step.state === 'done' ? 'check' : step.icon" :size="18" />
+              </span>
+              <span class="journey__label">{{ step.short }}</span>
+              <span class="visually-hidden">{{ step.state === 'done' ? '(done)' : step.state === 'current' ? '(next)' : '' }}</span>
             </li>
           </ol>
 
-          <div class="warning-banner">
-            <AssetIcon name="alert" :size="16" class="warning-banner__icon" />
-            <p class="warning-banner__text">
-              This QR code is personal and tied to your eligibility screening result. Do not share your QR code with others.
-              <template v-if="hasActiveToken">
-                Your current code expires on {{ formatDate(qrValidUntil) }} — refresh it from this page to get a new one.
-              </template>
-              <template v-else-if="profile?.screening_valid_until && !donationIntervalActive">
-                Once issued, a code stays valid for {{ qrValidDays }} days, separate from your screening, which is valid until {{ formatDate(profile.screening_valid_until) }}.
-              </template>
+          <div v-if="currentStep" class="journey-next">
+            <span class="journey-next__icon"><AssetIcon :name="currentStep.icon" :size="20" /></span>
+            <div>
+              <p class="journey-next__eyebrow">Next step</p>
+              <p class="journey-next__title">{{ currentStep.title }}</p>
+              <p class="journey-next__desc">{{ currentStep.desc }}</p>
+            </div>
+          </div>
+          <div v-else class="journey-next journey-next--done">
+            <span class="journey-next__icon"><AssetIcon name="check" :size="20" /></span>
+            <div>
+              <p class="journey-next__title">All steps done for this visit</p>
+              <p class="journey-next__desc">Thank you for donating. Your record is in Donation History.</p>
+            </div>
+          </div>
+
+          <!-- Every step in full, for anyone who wants to read ahead -->
+          <details class="journey-all">
+            <summary>See what happens at each step</summary>
+            <ol class="journey-all__list">
+              <li v-for="step in steps" :key="step.title">
+                <p class="journey-all__title">{{ step.title }}</p>
+                <p class="journey-all__desc">{{ step.desc }}</p>
+              </li>
+            </ol>
+          </details>
+
+          <!-- Only once there is a code to keep. -->
+          <div v-if="hasActiveToken" class="privacy-note">
+            <span class="privacy-note__icon"><AssetIcon name="shield" :size="16" /></span>
+            <p class="privacy-note__text">
+              <strong>Keep this code to yourself.</strong>
+              It is tied to your own screening answers.
+              Your current code expires on {{ formatDate(qrValidUntil) }}. You can get a new one from this page.
             </p>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   </div>
@@ -233,8 +221,15 @@ const hasActiveToken = ref(false)
 const donationIntervalActive = ref(false)
 const nextEligibleDate = ref(null) // 'YYYY-MM-DD'
 const emailVerified = ref(false)
+// The active booking and its health-question window, from GET
+// /donors/eligibility: { id, appointment_datetime, screening_window_opens_on,
+// screening_window_open }, or null with nothing booked.
+const booking = ref(null)
 const minting = ref(false)
 const qrError = ref('')
+// GET /donors/qr-code failed: nothing on the pass can be trusted, so the page
+// says that instead of guessing a state.
+const loadError = ref('')
 const resending = ref(false)
 const resendMessage = ref('')
 
@@ -294,6 +289,50 @@ const qrState = computed(() => {
   return emailVerified.value ? 'ready' : 'unverified'
 })
 
+/*
+ * No current answers: what to do depends on the booking. The questions for a
+ * booked visit open the day before it (the server refuses earlier), and a
+ * code made from answers given with nothing booked lasts its 14 days, not
+ * until the visit, so booking first is the path the portal points to.
+ */
+const answerFirstCopy = computed(() => {
+  const again = qrState.value === 'expired'
+  if (!booking.value) {
+    return {
+      title: again ? 'Book your next visit' : 'Book a visit first',
+      sub: 'Your QR code comes with your health questions, which you answer the day before your visit.',
+      action: { label: 'Book a donation', to: '/donor/appointments' },
+      alt: { label: 'Walking in instead? Answer the questions now', to: '/donor/eligibility' },
+    }
+  }
+  if (!booking.value.screening_window_open) {
+    return {
+      title: `Your health questions open on ${formatDateOnly(booking.value.screening_window_opens_on) ?? 'the day before your visit'}`,
+      sub: 'Answer them then, and your QR code is made as soon as you submit.',
+      action: { label: 'View my appointment', to: '/donor/appointments' },
+      alt: null,
+    }
+  }
+  return {
+    title: again ? 'Your answers need updating' : 'Answer your health questions',
+    sub: 'Your visit is coming up. Answer now and your QR code is made as soon as you submit.',
+    action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
+    alt: null,
+  }
+})
+
+/*
+ * How long a code made now lasts. With a visit booked the server caps it at
+ * the end of that day (the visit the answers are for); without one it runs
+ * its own qr_validity_days.
+ */
+const codeLifetimeNote = computed(() => {
+  const visit = booking.value?.appointment_datetime
+  return visit
+    ? `A code made now works until the end of your appointment day, ${formatDate(visit)}.`
+    : `A code made now stays valid for ${qrValidDays.value} days.`
+})
+
 const qrEmptyCopy = computed(() => {
   switch (qrState.value) {
     case 'waiting':
@@ -305,36 +344,36 @@ const qrEmptyCopy = computed(() => {
         action: null,
       }
     case 'ready':
-      return {
-        title: 'Your questionnaire is submitted',
-        sub: hasActiveToken.value
-          ? `You have an active check-in code, valid until ${formatDate(qrValidUntil.value)}.`
-          : 'Generate your check-in QR code to present at the blood center.',
-        action: null,
-      }
+      return hasActiveToken.value
+        ? {
+            title: 'You have a check-in code',
+            sub: `It is valid until ${formatDate(qrValidUntil.value)}. Generate it again here to see it on this device.`,
+            action: null,
+          }
+        : {
+            title: 'Get your QR code',
+            sub: `Your answers from ${formatDate(profile.value?.screening_date)} are on file. ${codeLifetimeNote.value}`,
+            action: null,
+          }
     case 'unverified':
       return {
         title: 'Verify your email address',
         sub: 'Your questionnaire is submitted. Confirm your email address to receive your check-in QR code.',
         action: null,
       }
-    case 'expired':
-      return {
-        title: 'Your questionnaire needs answering again',
-        sub: 'Complete the health questionnaire again to restore your check-in code.',
-        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
-      }
     default:
-      return {
-        title: 'No QR code yet',
-        sub: 'Complete the health questionnaire first. Your QR code is generated as soon as you submit it.',
-        action: { label: 'Answer questionnaire', to: '/donor/eligibility' },
-      }
+      // 'expired' and 'pending' (not answered): see answerFirstCopy.
+      return answerFirstCopy.value
   }
 })
 
+// The server keeps names as typed ("yana cruz"); show them capitalised.
+const displayName = computed(() =>
+  (profile.value?.full_name || 'Donor').replace(/(^|[\s-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+)
+
 const qrStatusLabel = computed(() =>
-  hasActiveToken.value ? `Active until ${formatDate(qrValidUntil.value)}` : 'Not issued'
+  hasActiveToken.value ? `Until ${formatDate(qrValidUntil.value)}` : 'Not issued yet'
 )
 
 const statusValueClass = computed(() =>
@@ -359,7 +398,11 @@ const cycleAppointment = computed(() => {
   const confirmed = list.find(a => a.status === 'confirmed')
   if (confirmed) return confirmed
 
-  const scheduled = list.filter(a => a.status === 'scheduled').sort(byDate)[0]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const scheduled = list
+    .filter(a => a.status === 'scheduled' && new Date(a.appointment_datetime) >= today)
+    .sort(byDate)[0]
   if (scheduled) return scheduled
 
   const since = profile.value?.screening_date
@@ -373,23 +416,33 @@ const cycleAppointment = computed(() => {
 
 const STEP_COPY = [
   {
-    title: 'Complete the health questionnaire',
-    desc: 'Answer it on the donor portal the day before your appointment. Your QR code is generated as soon as you submit it.',
-  },
-  {
     title: 'Book your appointment',
+    short: 'Book',
+    icon: 'calendar-check',
     desc: 'Choose a blood center or mobile drive, select your preferred date and time slot, and confirm your booking.',
   },
   {
+    title: 'Answer the health questions',
+    short: 'Questions',
+    icon: 'clipboard-check',
+    desc: 'They open the day before your appointment, so what the blood center reads is current. Your QR code is made as soon as you submit.',
+  },
+  {
     title: 'Arrive at the blood center',
+    short: 'Arrive',
+    icon: 'hospital',
     desc: 'Present this QR code to the blood center staff upon arrival. They will scan it to verify your eligibility screening status.',
   },
   {
     title: 'Proceed to physical screening',
+    short: 'Screening',
+    icon: 'stethoscope',
     desc: 'After QR verification, the blood center nurse or med tech will conduct a final on-site physical screening (blood pressure, hemoglobin, weight, etc.).',
   },
   {
     title: 'Donate blood',
+    short: 'Donate',
+    icon: 'droplets',
     desc: 'If you pass the physical screening, you will proceed to donation. The staff records your donation in the system.',
   },
 ]
@@ -398,22 +451,33 @@ const STEP_COPY = [
 // o 'upcoming'.
 const steps = computed(() => {
   const status = cycleAppointment.value?.status
+  const answered = questionnaireStatus.value === 'answered'
   const done = [
-    // Human sa donation 'expired' na ang questionnaire, pero na-answer gihapon
-    // siya para niini nga cycle.
-    questionnaireStatus.value === 'answered' || status === 'completed',
     !!cycleAppointment.value,
+    // The questions step is done once there is a code to show: answers alone
+    // still leave the donor with nothing to scan. Human sa donation 'expired'
+    // na ang questionnaire, pero nahuman gihapon kini nga step para sa cycle.
+    (answered && hasActiveToken.value) || status === 'confirmed' || status === 'completed',
     status === 'confirmed' || status === 'completed',
     status === 'completed',
     status === 'completed',
   ]
   const current = done.indexOf(false)
 
-  return STEP_COPY.map((copy, i) => ({
-    ...copy,
-    state: done[i] ? 'done' : i === current ? 'current' : 'upcoming',
-  }))
+  return STEP_COPY.map((copy, i) => {
+    // Answered, no code yet: what is left of this step is the code itself.
+    const step = i === 1 && answered && !done[1]
+      ? {
+          ...copy,
+          title: 'Get your QR code',
+          desc: 'Your answers are on file. Generate your code on this page, then show it when you arrive.',
+        }
+      : copy
+    return { ...step, state: done[i] ? 'done' : i === current ? 'current' : 'upcoming' }
+  })
 })
+
+const currentStep = computed(() => steps.value.find(step => step.state === 'current') ?? null)
 
 const stepsDone = computed(() => steps.value.filter(step => step.state === 'done').length)
 
@@ -424,11 +488,17 @@ function formatDate(value) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/*
+ * The minted code is kept on this device in localStorage, not sessionStorage:
+ * the server keeps only a hash, so a code lost with the browser session could
+ * never be shown again without minting a new one. It is the donor's own pass
+ * on their own device, the same as the PNG the Download button saves.
+ */
 function readStoredQr(donorId) {
   if (!import.meta.client || !donorId) return null
 
   try {
-    const raw = sessionStorage.getItem(QR_STORAGE_KEY)
+    const raw = localStorage.getItem(QR_STORAGE_KEY) ?? sessionStorage.getItem(QR_STORAGE_KEY)
     if (!raw) return null
 
     const stored = JSON.parse(raw)
@@ -445,7 +515,7 @@ function storeQr(donorId, data) {
   if (!import.meta.client || !donorId) return
 
   try {
-    sessionStorage.setItem(QR_STORAGE_KEY, JSON.stringify({
+    localStorage.setItem(QR_STORAGE_KEY, JSON.stringify({
       donorId,
       token: data?.qr_token,
       validUntil: data?.qr_valid_until,
@@ -458,13 +528,14 @@ function storeQr(donorId, data) {
 function clearStoredQr() {
   if (!import.meta.client) return
   try {
+    localStorage.removeItem(QR_STORAGE_KEY)
     sessionStorage.removeItem(QR_STORAGE_KEY)
   } catch (err) {
     console.error('Failed to clear cached QR code:', err)
   }
 }
 
-// I-drop ang daan nga QR sa memory ug sa sessionStorage para dili na makita
+// I-drop ang daan nga QR sa memory ug sa storage para dili na makita
 // o magamit.
 function dropLocalQr() {
   qrCodeDataUrl.value = ''
@@ -488,14 +559,21 @@ async function renderQr(token) {
   }
 }
 
-async function mintQrCode() {
+const { confirm: confirmDialog } = useConfirmDialog()
+
+async function mintQrCode({ silent = false } = {}) {
   if (donationIntervalActive.value) return
 
   // Ang pag-mint kay mo-revoke sa daan nga token, so pahibaw-on sa donor.
-  if (hasActiveToken.value) {
-    const confirmed = window.confirm(
-      'This replaces your current check-in code. Any copy you have saved or downloaded will stop working.'
-    )
+  if (hasActiveToken.value && !silent) {
+    const confirmed = await confirmDialog({
+      title: 'Make a new check-in code?',
+      message: 'This replaces your current code. Any copy you saved or downloaded will stop working.',
+      cancelLabel: 'Keep current one',
+      confirmLabel: 'Make new code',
+      tone: 'warning',
+      icon: 'refresh-cw',
+    })
     if (!confirmed) return
   }
 
@@ -571,6 +649,7 @@ let loadedOnce = false
 
 async function load({ silent = false } = {}) {
   if (!silent) loading.value = true
+  autoMinted = false
   try {
     // GET /api/donors/qr-code
     // Response: { profile: { full_name, donor_id, blood_type, screening_date,
@@ -578,6 +657,7 @@ async function load({ silent = false } = {}) {
     //   qr_valid_days, has_active_token, email_verified }
     // NOTE: kanunay null ang profile.qr_token — tinuyo na sa server.
     const data = await donorService.qrCode()
+    loadError.value = ''
 
     profile.value = data?.profile ?? null
     questionnaireStatus.value = data?.questionnaire_status ?? 'not_answered'
@@ -601,9 +681,11 @@ async function load({ silent = false } = {}) {
       await renderQr(stored.token)
     }
 
-    await loadAppointments()
+    await Promise.all([loadAppointments(), loadBooking()])
+    await autoMintForBooking()
   } catch (err) {
     console.error('Failed to load QR code data:', err)
+    loadError.value = 'Something went wrong on our side. Please try again in a moment.'
   } finally {
     loading.value = false
     loadedOnce = true
@@ -615,6 +697,33 @@ async function load({ silent = false } = {}) {
 // Ang request number kay para dili ma-overwrite sa mas daan nga response ang
 // mas bag-o, kay mahimong magdungan ang load() ug ang poll.
 let appointmentsRequest = 0
+
+/*
+ * A booked visit with answers on file: the Pass should simply be there. With
+ * no code yet, make one. With a live code that this device can't show (made
+ * on another device, or before codes were kept here), make a fresh one too;
+ * the server keeps only a hash, so there is no other way to show it, and the
+ * old copy stops working, as with New code. The server caps it at the end of
+ * the appointment day. Only once per page visit, so a refusal can't loop.
+ */
+let autoMinted = false
+
+async function autoMintForBooking() {
+  if (autoMinted || !booking.value || qrState.value !== 'ready' || minting.value) return
+  if (hasActiveToken.value && qrCodeDataUrl.value) return
+  autoMinted = true
+  await mintQrCode({ silent: true })
+}
+
+// Best effort: without it the empty state falls back to "book a visit first".
+async function loadBooking() {
+  try {
+    const status = await donorService.eligibilityStatus()
+    booking.value = status?.appointment ?? null
+  } catch (err) {
+    console.error('Failed to load the booking window:', err)
+  }
+}
 
 async function loadAppointments({ keepOnError = false } = {}) {
   const request = ++appointmentsRequest
@@ -689,350 +798,459 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .qr-page {
-  --primary: #1565c0;
-  --accent: #d32f2f;
+  --primary: var(--rb-primary);
   --success: #2e7d32;
-  --warning: #f57c00;
   --text-primary: #1f2937;
-  --text-secondary: #9ca3af;
+  --text-secondary: #94A3B8;
+  --border: #eef0f3;
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px 32px 60px;
   background: var(--rb-page-bg);
 }
 
-.qr-error {
-  margin: 12px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: #C62828;
-  text-align: center;
-}
+.qr-page-inner { display: flex; flex-direction: column; gap: 24px; }
 
-.qr-resend-note {
-  margin: 12px 0 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.qr-page-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.header-row {
-  display: flex;
-  flex-direction: column;
-}
+.header-row { display: flex; flex-direction: column; }
 
 .page-title {
-  font-size: 20px;
+  font-size: var(--rb-fs-title);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
-.page-subtitle {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
-}
+.page-subtitle { font-size: var(--rb-fs-small); color: var(--text-secondary); margin: 2px 0 0; }
 
-/* Layout */
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr 1.3fr;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-.panel {
-  background: white;
-  border-radius: 14px;
-  padding: 24px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  border: 1px solid #f3f4f6;
-}
-
-/* QR panel */
-.qr-panel {
+/* ── The pass ── */
+.pass {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 24px 48px -32px rgba(15, 23, 42, 0.45);
+}
+
+.pass__head {
+  padding: 20px 22px 18px;
+  border-radius: 23px 23px 0 0;
+  background: linear-gradient(135deg, var(--rb-grad-from, #E3F2FD), var(--rb-grad-to, #BBDEFB));
+  color: #0F172A;
+}
+
+.pass__brand {
+  display: flex;
   align-items: center;
-  text-align: center;
-}
-
-.qr-panel__title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
+  gap: 8px;
   margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
-.qr-panel__subtitle {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 4px 0 20px;
-}
-
-.qr-image-wrap {
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #eef0f3;
-  margin-bottom: 20px;
-}
-
-.qr-image {
-  width: 200px;
-  height: 200px;
-  display: block;
-}
-
-.qr-image--placeholder {
+.pass__logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f9fafb;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #fff;
+  color: #C62828;
 }
 
-.qr-details {
-  width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #f3f4f6;
-  margin-bottom: 20px;
-}
-
-.qr-details__row {
+.pass__who {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 10px 14px;
-  font-size: 12.5px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
-.qr-details__row:nth-child(odd) {
-  background: #fafbfc;
+.pass__who-text { min-width: 0; }
+
+.pass__name {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--rb-font-sans);
+  font-size: var(--rb-fs-title);
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.qr-details__label {
-  color: var(--text-secondary);
+.pass__id {
+  margin: 3px 0 0;
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
 }
 
-.qr-details__value {
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.qr-details__value--success {
-  color: var(--success);
-}
-
-.qr-actions {
+.pass__blood {
   display: flex;
-  gap: 10px;
-  width: 100%;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 12px 7px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
 }
 
-.qr-actions .btn-primary,
-.qr-actions .btn-outline {
-  flex: 1;
-}
+.pass__blood-type { font-family: var(--rb-font-sans); font-size: 20px; font-weight: 800; line-height: 1.1; color: #B71C1C; }
+.pass__blood-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #64748B; }
 
-/* Empty state */
-.qr-empty {
+.pass__code {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 32px 12px;
+  padding: 24px 22px 22px;
+  text-align: center;
 }
 
-.qr-empty__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 8px 0 0;
+.pass__qr {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.5);
 }
+
+.qr-image { display: block; width: 200px; height: 200px; }
+
+.pass__hint { margin: 12px 0 0; font-size: var(--rb-fs-small); color: #64748B; }
+
+/* Empty state, framed like the QR it is waiting for */
+.qr-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.qr-empty__alt {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-primary-text);
+  text-decoration: none;
+}
+.qr-empty__alt:hover { text-decoration: underline; }
+
+.qr-empty__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 8px;
+  border: 2px dashed rgba(var(--rb-primary-rgb), 0.35);
+  border-radius: 22px;
+  background: rgba(var(--rb-primary-rgb), 0.05);
+  color: var(--rb-primary-text);
+}
+
+.qr-empty__title { margin: 0; font-size: var(--rb-fs-section); font-weight: 700; color: var(--text-primary); }
 
 .qr-empty__sub {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin: 0 0 16px;
-  max-width: 260px;
+  max-width: 280px;
+  margin: 0 0 12px;
+  font-size: var(--rb-fs-small);
   line-height: 1.5;
+  color: #64748B;
 }
 
-/* Steps panel */
+.qr-error {
+  margin: 12px 0 0;
+  font-size: var(--rb-fs-small);
+  font-weight: 500;
+  line-height: 1.5;
+  color: #C62828;
+}
+
+.qr-resend-note { margin: 12px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #64748B; }
+
+/* Perforation, with notches cut into the card's sides */
+.pass__tear {
+  position: relative;
+  margin: 0 22px;
+  border-top: 2px dashed var(--border);
+}
+
+.pass__tear::before,
+.pass__tear::after {
+  content: '';
+  position: absolute;
+  top: -11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--rb-page-bg, #F5F7FA);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.pass__tear::before { left: -33px; clip-path: inset(0 0 0 50%); }
+.pass__tear::after { right: -33px; clip-path: inset(0 50% 0 0); }
+
+.pass__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 18px 22px;
+}
+
+.pass__facts dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.pass__facts dd {
+  margin: 3px 0 0;
+  font-size: var(--rb-fs-small);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.qr-details__value--success { color: var(--success); }
+.pass__facts dd.pass__fact--muted { color: #64748B; }
+
+.pass__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 22px 22px;
+}
+
+.pass__action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: #334155;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.pass__action :deep(svg) { color: var(--rb-primary-text); }
+.pass__action:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.05); }
+.pass__action:disabled { opacity: 0.5; cursor: not-allowed; }
+.pass__action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+
+/* ── Steps ── */
+.steps-panel {
+  padding: 22px 24px 24px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
 .steps-panel__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 18px;
 }
 
 .steps-panel__title {
-  font-size: 15px;
+  margin: 0;
+  font-size: var(--rb-fs-section);
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0;
 }
 
 .steps-panel__count {
   flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.steps-progress {
-  height: 6px;
-  margin: 12px 0 22px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  overflow: hidden;
-}
-
-.steps-progress__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--primary);
-  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.steps-list {
-  display: flex;
-  flex-direction: column;
+/* Journey: five icon stops on one line */
+.journey {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.step-row {
-  display: flex;
-  gap: 14px;
-}
-
-.step-row__marker {
+.journey__stop {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex-shrink: 0;
+  gap: 8px;
+  text-align: center;
 }
 
-.step-dot {
+/* Connector from the previous stop */
+.journey__stop + .journey__stop::before {
+  content: '';
+  position: absolute;
+  top: 21px;
+  right: calc(50% + 28px);
+  width: calc(100% - 56px);
+  height: 2px;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.journey__stop--done::before,
+.journey__stop--current::before { background: var(--rb-primary) !important; }
+
+.journey__icon {
   display: flex;
-  width: 22px;
-  height: 22px;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  border: 2px solid #cbd5e1;
-  background: white;
-  color: #94a3b8;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  color: #94A3B8;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.journey__stop--done .journey__icon { background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text); }
+
+.journey__stop--current .journey__icon {
+  background: var(--rb-primary);
+  color: #fff;
+  box-shadow: 0 0 0 5px rgba(var(--rb-primary-rgb), 0.14);
+}
+
+.journey__label { font-size: var(--rb-fs-caption); font-weight: 600; color: var(--text-secondary); }
+.journey__stop--done .journey__label { color: #475569; }
+.journey__stop--current .journey__label { color: var(--rb-primary-text); font-weight: 700; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The one step with words */
+.journey-next {
+  display: flex;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
+  border-radius: 18px;
+  background: rgba(var(--rb-primary-rgb), 0.05);
+}
+
+.journey-next__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--rb-primary);
+  color: #fff;
+}
+
+.journey-next--done { border-color: #CFE3D0; background: #F1F7F1; }
+.journey-next--done .journey-next__icon { background: var(--success); }
+
+.journey-next__eyebrow {
+  margin: 0;
   font-size: 11px;
   font-weight: 700;
-  line-height: 1;
-  flex-shrink: 0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-primary-text);
 }
 
-.step-dot--done {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: white;
+.journey-next__title { margin: 2px 0 0; font-size: var(--rb-fs-section); font-weight: 700; color: var(--text-primary); }
+.journey-next__desc { margin: 4px 0 0; font-size: var(--rb-fs-small); line-height: 1.55; color: #475569; }
+
+/* All steps, folded away */
+.journey-all { margin-top: 12px; }
+
+.journey-all summary {
+  display: inline-flex;
+  padding: 6px 2px;
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  color: var(--rb-primary-text);
+  cursor: pointer;
 }
 
-.step-dot--current {
-  border-color: var(--primary);
-  color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.14);
-}
+.journey-all summary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; border-radius: 6px; }
 
-.step-line {
-  width: 2px;
-  flex: 1;
-  min-height: 24px;
-  background: #e5e7eb;
-  margin: 4px 0;
-  border-radius: 999px;
-}
-
-.step-line--done {
-  background: var(--primary);
-}
-
-.step-row__body {
-  padding-bottom: 20px;
-}
-
-.step-row__title {
+.journey-all__list {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 2px 0 0;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0 0 0 20px;
 }
 
-.step-row--upcoming .step-row__title {
-  color: var(--text-secondary);
-}
-
-.step-row__badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(21, 101, 192, 0.1);
-  color: var(--primary);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
+.journey-all__title { margin: 0; font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); }
+.journey-all__desc { margin: 2px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #64748B; }
 
 @media (prefers-reduced-motion: reduce) {
-  .steps-progress__fill {
-    transition: none;
-  }
+  .journey__icon { transition: none; }
 }
 
-.step-row__desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 3px 0 0;
-  line-height: 1.5;
+@media (max-width: 480px) {
+  .journey__icon { width: 38px; height: 38px; border-radius: 12px; }
+  .journey__stop + .journey__stop::before { top: 18px; right: calc(50% + 24px); width: calc(100% - 48px); }
+  .journey__label { font-size: 11px; }
+  .journey-next { padding: 14px; }
 }
 
-/* Warning banner */
-.warning-banner {
+.privacy-note {
   display: flex;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 12px;
-  background: #FDF6EC;
-  border: 1px solid #F3DDBB;
-  margin-top: 4px;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f8fafc;
 }
 
-.warning-banner__icon {
-  color: var(--warning);
-  flex-shrink: 0;
-  margin-top: 1px;
+.privacy-note__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
 }
 
-.warning-banner__text {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: #475569;
-  margin: 0;
-  line-height: 1.6;
-}
+.privacy-note__text { margin: 0; font-size: var(--rb-fs-small); line-height: 1.55; color: #475569; }
+.privacy-note__text strong { color: var(--text-primary); }
 
 /* Buttons */
 .btn-primary {
@@ -1040,67 +1258,23 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 11px 20px;
-  border-radius: 10px;
-  font-size: 13px;
+  padding: 11px 22px;
+  border-radius: 999px;
+  font-size: var(--rb-fs-small);
   font-weight: 700;
   color: white;
   background: var(--primary);
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
-}
+.btn-primary:hover:not(:disabled) { background: var(--rb-primary-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:active:not(:disabled) { transform: translateY(1px); }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 11px 20px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: #f3f4f6;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: #e5e7eb;
-}
-
-.btn-outline:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Spinner (kept for the QR image lazy-render placeholder) */
-.spinner--sm {
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  border: 3px solid #e3ebf6;
-  border-top-color: var(--primary);
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+.btn-primary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 /* Skeleton */
 .skeleton {
@@ -1114,75 +1288,75 @@ onBeforeUnmount(() => {
   100% { background-position: 0 50%; }
 }
 .skeleton-line { border-radius: 4px; }
-.skeleton-btn { height: 40px; border-radius: 10px; }
+.skeleton--pass { height: 520px; border-radius: 24px; }
+.skeleton--steps { height: 460px; border-radius: 22px; }
 
-@media (max-width: 900px) {
-  .main-grid {
-    grid-template-columns: 1fr;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .pass__action, .btn-primary { transition: none; }
+}
+
+@media (max-width: 960px) {
+  .main-grid { grid-template-columns: minmax(0, 1fr); }
+  .pass { max-width: 440px; width: 100%; justify-self: center; }
 }
 
 @media (max-width: 640px) {
-  .qr-page {
-    padding: 16px 16px 40px;
-  }
+  .qr-page { padding: 16px 16px 40px; }
+  .steps-panel { padding: 18px 16px; }
+}
+
+@media (max-width: 380px) {
+  .pass__facts { grid-template-columns: 1fr 1fr; }
 }
 
 /* ============ Dark mode ============ */
 :global(.dark .qr-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    background: #0F172A;
+  --text-primary: var(--ink-text, #F1F5F9);
+  --text-secondary: var(--ink-text-2, #94A3B8);
+  --border: var(--ink-border, #334155);
+  background: var(--ink-page, #0F172A);
 }
 
-:global(.dark .qr-page .panel) {
-    background: #1E293B;
-    border-color: #334155;
+:global(.dark .qr-page .pass),
+:global(.dark .qr-page .steps-panel) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+
+:global(.dark .qr-page .pass__head) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, var(--ink-surface, #1E293B)), color-mix(in srgb, var(--rb-primary) 18%, var(--ink-surface, #1E293B)));
+  color: var(--ink-text, #F1F5F9);
 }
+:global(.dark .qr-page .pass__blood) { background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.45); }
+:global(.dark .qr-page .pass__blood-type) { color: #EF9A9A; }
+:global(.dark .qr-page .pass__blood-label) { color: var(--ink-text-3, #CBD5E1); }
+/* The QR itself stays on white so scanners can read it */
+:global(.dark .qr-page .pass__qr) { border-color: var(--ink-border, #334155); }
+:global(.dark .qr-page .pass__tear::before),
+:global(.dark .qr-page .pass__tear::after) { background: var(--ink-page, #0F172A); }
+:global(.dark .qr-page .pass__action) { background: var(--ink-hover, #263449); border-color: var(--ink-border, #334155); color: var(--ink-text-4, #E2E8F0); }
+:global(.dark .qr-page .pass__action:hover:not(:disabled)) { background: var(--ink-border, #334155); }
+:global(.dark .qr-page .pass__hint),
+:global(.dark .qr-page .qr-empty__sub),
+:global(.dark .qr-page .pass__facts dd.pass__fact--muted) { color: var(--ink-text-2, #94A3B8); }
+:global(.dark .qr-page .qr-details__value--success) { color: #81C784; }
+:global(.dark .qr-page .qr-empty__frame) { background: color-mix(in srgb, var(--rb-primary-text) 8%, transparent); border-color: color-mix(in srgb, var(--rb-primary-text) 35%, transparent); }
 
-:global(.dark .qr-page .spinner--sm) { border-color: #334155; border-top-color: var(--primary); }
+:global(.dark .qr-page .journey__stop + .journey__stop::before) { background: var(--ink-border, #334155); }
+:global(.dark .qr-page .journey__icon) { background: var(--ink-hover, #263449); color: var(--ink-muted, #64748B); }
+:global(.dark .qr-page .journey__stop--done .journey__icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); color: var(--rb-primary-text); }
+:global(.dark .qr-page .journey__stop--current .journey__icon) { background: var(--rb-primary); color: #fff; }
+:global(.dark .qr-page .journey__stop--done .journey__label) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .qr-page .journey-next) { background: color-mix(in srgb, var(--rb-primary-text) 8%, transparent); border-color: color-mix(in srgb, var(--rb-primary-text) 25%, transparent); }
+:global(.dark .qr-page .journey-next--done) { background: rgba(102, 187, 106, 0.1); border-color: rgba(102, 187, 106, 0.3); }
+:global(.dark .qr-page .journey-next__desc),
+:global(.dark .qr-page .journey-all__desc) { color: var(--ink-text-2, #94A3B8); }
+:global(.dark .qr-page .steps-panel__count) { background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent); }
 
-:global(.dark .qr-page .qr-image-wrap) { border-color: #334155; }
-:global(.dark .qr-page .qr-image--placeholder) { background: #172033; }
-
-:global(.dark .qr-page .qr-details) { border-color: #334155; }
-:global(.dark .qr-page .qr-details__row:nth-child(odd)) { background: #172033; }
-
-/* Ang done/current kay kinahanglan i-override pud dinhi, kay kining
-   .dark .step-dot rule mas lig-on sa scoped .step-dot--done. */
-:global(.dark .qr-page .step-dot) { border-color: #475569; background: #1E293B; color: #94A3B8; }
-:global(.dark .qr-page .step-dot--done) { border-color: #64B5F6; background: #64B5F6; color: #0F172A; }
-:global(.dark .qr-page .step-dot--current) {
-  border-color: #64B5F6;
-  color: #64B5F6;
-  box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.18);
-}
-:global(.dark .qr-page .step-line) { background: #334155; }
-:global(.dark .qr-page .step-line--done) { background: #64B5F6; }
-:global(.dark .qr-page .steps-progress) { background: #334155; }
-:global(.dark .qr-page .steps-progress__fill) { background: #64B5F6; }
-:global(.dark .qr-page .step-row__badge) { background: rgba(100, 181, 246, 0.16); color: #90CAF9; }
-
-:global(.dark .qr-page .warning-banner) {
-    background: rgba(245,124,0,0.10);
-    border-color: rgba(245,124,0,0.24);
-}
-:global(.dark .qr-page .warning-banner__text) { color: #CBD5E1; }
-
-:global(.dark .qr-page .btn-outline) {
-    background: #263449;
-    color: #E2E8F0;
-}
-:global(.dark .qr-page .btn-outline:hover:not(:disabled)) { background: #334155; }
+:global(.dark .qr-page .privacy-note) { background: var(--ink-inset, #172033); }
+:global(.dark .qr-page .privacy-note__icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .qr-page .privacy-note__text) { color: var(--ink-text-3, #CBD5E1); }
 
 :global(.dark .qr-page .skeleton) {
-    background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
-    background-size: 400% 100%;
-}
-
-.btn-primary:focus-visible,
-.btn-outline:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+  background: linear-gradient(90deg, var(--ink-hover, #263449) 25%, var(--ink-border, #334155) 37%, var(--ink-hover, #263449) 63%);
+  background-size: 400% 100%;
 }
 </style>

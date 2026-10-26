@@ -12,12 +12,30 @@ class AuthService extends BaseService {
  
     private resource = '/auths';
 
-    async login(payload: { email: string; password: string }): Promise<any> {
+    /**
+     * `login` takes an email address, a donor code or a username; `email` is
+     * the older field the server still accepts.
+     */
+    async login(payload: { login?: string; email?: string; password: string; role?: string }): Promise<any> {
         return await this.request('/login', 'POST', payload);
     }
 
     async forgotPassword(payload: { email: string }): Promise<any> {
         return await this.request('/forgot-password', 'POST', payload);
+    }
+
+    /**
+     * Set a new password from the emailed reset link. `token` and `email` come
+     * from the link's query string (see ResetPasswordNotification on the
+     * server); the server revokes every existing session on success.
+     */
+    async resetPassword(payload: {
+        token: string;
+        email: string;
+        password: string;
+        password_confirmation: string;
+    }): Promise<any> {
+        return await this.request('/reset-password', 'POST', payload);
     }
 
     async logout(): Promise<any> {

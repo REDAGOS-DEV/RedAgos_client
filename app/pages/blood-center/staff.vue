@@ -22,6 +22,7 @@
     <!-- At-a-glance counts for the current view -->
     <div v-if="!loading && rows.length" class="summary">
       <span class="summary__item"><strong>{{ activeRows.length }}</strong> staff</span>
+      <span class="summary__item"><strong>{{ adminCount }}</strong> admin{{ adminCount === 1 ? '' : 's' }}</span>
       <span class="summary__item"><strong>{{ supervisorCount }}</strong> supervisor{{ supervisorCount === 1 ? '' : 's' }}</span>
       <span v-if="unverifiedCount" class="summary__item summary__item--warning">
         <strong>{{ unverifiedCount }}</strong> waiting to verify email
@@ -43,12 +44,9 @@
         </button>
       </div>
 
-      <select v-model="departmentFilter" class="select" aria-label="Filter by department" @change="load">
-        <option value="">All departments</option>
-        <option v-for="group in departments" :key="group.department" :value="group.department">
-          {{ group.label }}
-        </option>
-      </select>
+      <SelectField v-model="departmentFilter" class="sel-filter" size="sm" aria-label="Filter by department"
+        :options="[{ value: '', label: 'All departments' }, ...departments.map(group => ({ value: group.department, label: group.label }))]"
+        @change="load" />
 
       <label class="toggle">
         <input v-model="includeDeleted" type="checkbox" @change="load" >
@@ -65,7 +63,7 @@
       </div>
     </div>
 
-    <!-- Nobody yet: the supervisor's first step -->
+    <!-- Nobody yet: the Admin's first step -->
     <div v-else-if="!rows.length && !hasFilters" class="empty empty--onboarding">
       <span class="empty__icon"><AssetIcon name="users" :size="22" /></span>
       <p class="empty__title">Add your first team member</p>
@@ -114,22 +112,31 @@
                 <span class="person__avatar" aria-hidden="true">{{ initials(row.full_name) }}</span>
                 <div class="person__text">
                   <p class="cell-strong">
-                    {{ row.full_name }}
-                    <span v-if="row.is_supervisor" class="pill pill--supervisor">Supervisor</span>
+                    <!-- As it prints on what they sign: "Rowena Tan, RMT". -->
+                    {{ row.signature_name || row.full_name }}
+                    <span v-if="row.management_level" class="pill" :class="`pill--${row.management_level}`">
+                      {{ row.management_level === 'admin' ? 'Admin' : 'Supervisor' }}
+                    </span>
                   </p>
                   <p class="cell-sub">{{ row.email }}</p>
                 </div>
               </div>
             </td>
             <td>
-              <p class="cell-strong">
-                {{ row.role_label || (row.is_supervisor ? 'Management' : 'No role yet') }}
-                <span v-if="row.custom_role" class="tag">custom</span>
-              </p>
-              <p v-if="row.position" class="cell-sub">{{ row.position }}</p>
+              <!-- Every role, the main one first; a custom one is tagged. -->
+              <template v-if="row.role_labels?.length">
+                <p v-for="(label, i) in row.role_labels" :key="label" :class="i === 0 ? 'cell-strong' : 'cell-role'">
+                  {{ label }}
+                  <span v-if="row.custom_role && label === row.custom_role" class="tag">custom</span>
+                </p>
+              </template>
+              <p v-else class="cell-strong">{{ row.management_level ? 'Management' : 'No role yet' }}</p>
             </td>
             <td>
-              <span v-if="row.is_supervisor" class="cell-sub">All</span>
+              <!-- A level is not capped by privileges; they cap a role, and this account has none. -->
+              <span v-if="row.management_level && !row.role_label" class="cell-sub">
+                {{ row.management_level === 'admin' ? 'Admin access' : 'View only' }}
+              </span>
               <span v-else class="privs">
                 <span
                   v-for="p in PRIVILEGE_ORDER"
@@ -248,59 +255,86 @@
                 </label>
               </div>
 
-              <!-- Title: pick RMT or RN, or type any other. A label only. -->
+              <!--
+                Title: credentials only (RMT, RN, MD), printed after the name on
+                everything the person signs, in every department, the stock
+                report's "BY:" line included. No job post: the role says what
+                they do (project owner, 2026-10-22).
+              -->
               <div class="form__field">
                 <label for="staff-title" class="form__label">Title <i>optional</i></label>
                 <ComboInput
                   id="staff-title"
-                  v-model="form.position"
-                  :options="titles"
-                  maxlength="100"
+                  v-model="form.credentials"
+                  :options="credentialOptions"
+                  maxlength="40"
                   placeholder="Choose or type, e.g. RMT"
                 />
-                <em v-if="errors.position">{{ errors.position[0] }}</em>
+                <em v-if="errors.credentials">{{ errors.credentials[0] }}</em>
               </div>
             </section>
 
             <section class="form__section">
               <h3 class="form__section-title">Role and access</h3>
+              <label class="form__field">
+                <span>Department</span>
+                <SelectField v-model="form.department" placeholder="Select a department" aria-label="Department"
+                  :options="departments.map(group => ({ value: group.department, label: group.label }))" />
+                <em v-if="errors.department">{{ errors.department[0] }}</em>
+                <em v-if="catalogueError">{{ catalogueError }}</em>
+              </label>
+
+              <!-- Several roles, all in this department (project owner, 2026-10-17). -->
+              <fieldset class="form__field roles">
+                <legend>Roles <i>tick every role they cover</i></legend>
+                <p v-if="!form.department" class="form__hint">Choose a department to see its roles.</p>
+                <div v-else class="roles__list">
+                  <label v-for="role in departmentRoles" :key="role.key" class="privilege role-option">
+                    <input v-model="form.roles" type="checkbox" :value="role.key" >
+                    <span>
+                      <strong>
+                        {{ role.label }}
+                        <span v-if="form.roles.length > 1 && form.main_role === role.key" class="tag tag--main">main</span>
+                      </strong>
+                      <small>{{ role.description }}</small>
+                    </span>
+                  </label>
+                </div>
+                <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
+                <em v-if="errors.additional_staff_roles">{{ errors.additional_staff_roles[0] }}</em>
+              </fieldset>
+
               <div class="form__row">
-                <label class="form__field">
-                  <span>Department</span>
-                  <select v-model="form.department">
-                    <option value="">Select a department</option>
-                    <option v-for="group in departments" :key="group.department" :value="group.department">
-                      {{ group.label }}
-                    </option>
-                  </select>
-                  <em v-if="errors.department">{{ errors.department[0] }}</em>
+                <!-- Only asked when there is a choice to make. -->
+                <label v-if="form.roles.length > 1" class="form__field">
+                  <span>Main role</span>
+                  <SelectField v-model="form.main_role" aria-label="Main role" :options="form.roles.map(key => ({ value: key, label: roleLabelOf(key) }))" />
+                  <small>Where they start after signing in.</small>
                 </label>
 
-                <!-- Role: pick one of the department's roles, or type a custom one. -->
                 <!-- A div, not a label: a click on a suggestion would otherwise
                      refocus the field and reopen the list. -->
                 <div class="form__field">
-                  <label for="staff-role" class="form__label">Role</label>
-                  <ComboInput
-                    id="staff-role"
-                    v-model="form.role"
-                    :options="departmentRoles.map((role) => role.label)"
+                  <label for="staff-custom-role" class="form__label">Custom role <i>optional</i></label>
+                  <input
+                    id="staff-custom-role"
+                    v-model="form.custom_role"
+                    type="text"
                     maxlength="100"
-                    :placeholder="form.department ? 'Choose or type a role' : 'Choose a department first'"
-                    :disabled="!form.department && !form.role"
-                  />
-                  <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
+                    :placeholder="form.department ? 'e.g. Quality Lead' : 'Choose a department first'"
+                    :disabled="!form.department"
+                    @blur="adoptTypedRole"
+                  >
                   <em v-if="errors.custom_role">{{ errors.custom_role[0] }}</em>
-                  <em v-if="catalogueError">{{ catalogueError }}</em>
                 </div>
               </div>
               <p class="form__hint form__hint--role">
-                <template v-if="matchedRole">{{ matchedRole.description }}</template>
-                <template v-else-if="form.role.trim()">
-                  A custom role: it can do what the {{ departmentLabel }} department does, within the privileges ticked below.
+                <template v-if="form.roles.length || form.custom_role.trim()">
+                  They can do everything their roles allow<template v-if="form.custom_role.trim()">, and a custom role can do what the {{ departmentLabel }} department does</template>,
+                  within the privileges ticked below.
                 </template>
                 <template v-else>
-                  A supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
+                  An Admin or Supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
                 </template>
               </p>
 
@@ -315,25 +349,29 @@
                     </span>
                   </label>
                 </div>
-                <small>They cap the role: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
+                <small>They cap the role, not the access level below: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
                 <em v-if="errors.staff_privileges">{{ errors.staff_privileges[0] }}</em>
               </fieldset>
 
-              <label class="toggle toggle--block">
-                <input v-model="form.is_supervisor" type="checkbox" >
-                <span>
-                  <strong>Supervisor</strong>
-                  <small>Can manage staff and see the whole Blood Center overview.</small>
-                </span>
-              </label>
+              <!-- Above the role, not instead of it: an account may hold both. -->
+              <fieldset class="form__field levels">
+                <legend>Access level</legend>
+                <div class="levels__list">
+                  <label v-for="level in levelOptions" :key="level.key || 'staff'" class="privilege level">
+                    <input v-model="form.management_level" type="radio" name="management_level" :value="level.key" >
+                    <span>
+                      <strong>{{ level.label }}</strong>
+                      <small>{{ level.description }}</small>
+                    </span>
+                  </label>
+                </div>
+                <em v-if="errors.management_level">{{ errors.management_level[0] }}</em>
+              </fieldset>
 
               <label v-if="editing" class="form__field">
                 <span>Account status</span>
-                <select v-model="form.account_status">
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
-                  <option value="deactivated">Deactivated</option>
-                </select>
+                <SelectField v-model="form.account_status" aria-label="Account status"
+                  :options="[{ value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' }, { value: 'deactivated', label: 'Deactivated' }]" />
                 <small>Suspending or deactivating an account signs it out immediately.</small>
               </label>
             </section>
@@ -355,6 +393,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
@@ -366,6 +405,8 @@ definePageMeta({
 
 useHead({ title: 'Staff Accounts · RedAgos' })
 
+const { user, fetchUser } = useUser()
+
 const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
 
 /**
@@ -374,44 +415,90 @@ const PRIVILEGE_ORDER = ['read', 'write', 'update', 'delete']
  * permission matrix enforces.
  */
 const departments = ref([])
+const levels = ref([])
 const privileges = ref([])
-const titles = ref(['RMT', 'RN'])
+// Suggested credentials; the server's catalogue may list others.
+const credentialOptions = ref(['RMT', 'RN', 'MD'])
 const catalogueError = ref('')
 
 const departmentRoles = computed(() => departments.value.find((group) => group.department === form.department)?.roles ?? [])
 const departmentLabel = computed(() => departments.value.find((group) => group.department === form.department)?.label ?? 'chosen')
 
-/** The predefined role the typed text names, if any — matched on its title. */
-const matchedRole = computed(() => {
-  const typed = form.role.trim().toLowerCase()
+const allRoles = computed(() => departments.value.flatMap((group) => group.roles.map((role) => ({ ...role, department: group.department }))))
 
+function roleLabelOf(key) {
+  return allRoles.value.find((role) => role.key === key)?.label ?? key
+}
+
+/** The listed role a typed name means, if any — matched on its title or key. */
+function roleNamed(text) {
+  const typed = text.trim().toLowerCase()
   if (!typed) return null
+  return allRoles.value.find((role) => role.label.toLowerCase() === typed || role.key === typed) ?? null
+}
 
-  return departments.value
-    .flatMap((group) => group.roles)
-    .find((role) => role.label.toLowerCase() === typed || role.key === typed) ?? null
-})
+/**
+ * A custom role typed as the name of a listed one is that role: tick it
+ * rather than keep a custom "Phlebotomist" beside the real one. One from
+ * another department moves the form there, but only while nothing is ticked.
+ */
+function adoptTypedRole() {
+  const role = roleNamed(form.custom_role)
+  if (!role) return
+
+  if (role.department !== form.department) {
+    if (form.roles.length) return
+    form.department = role.department
+  }
+
+  if (!form.roles.includes(role.key)) form.roles = [...form.roles, role.key]
+  form.custom_role = ''
+}
 
 async function loadCatalogue() {
   try {
     const response = await bloodCenterService.staffRoles()
     departments.value = response?.data?.departments ?? []
+    levels.value = response?.data?.levels ?? []
     privileges.value = response?.data?.privileges ?? []
-    if (response?.data?.titles?.length) titles.value = response.data.titles
+    if (response?.data?.titles?.length) credentialOptions.value = response.data.titles
   } catch (error) {
     catalogueError.value = error?.message || 'Could not load the list of roles.'
   }
 }
 
-/** A predefined role is sent as its key; anything else as a custom role. */
+/**
+ * The access levels, least first. The two management levels take their words
+ * from the server's catalogue, so the form describes them as the matrix
+ * enforces them; the fallback covers a catalogue that failed to load.
+ */
+const LEVEL_FALLBACK = {
+  supervisor: { label: 'Supervisor', description: 'Sees the dashboard, the reports and the view-only monitoring pages. Cannot record, approve or manage anyone.' },
+  admin: { label: 'Blood Center Admin', description: 'Creates staff accounts, assigns roles and privileges, and sets the centre\'s logo. Sees the dashboard, the reports and the audit log; no department pages and no corrections.' },
+}
+
+const levelOptions = computed(() => [
+  { key: '', label: 'Staff', description: 'Does the work of their role, within the privileges above. No management access.' },
+  ...['supervisor', 'admin'].map((key) => {
+    const served = levels.value.find((level) => level.key === key)
+
+    return { key, label: served?.label ?? LEVEL_FALLBACK[key].label, description: served?.description ?? LEVEL_FALLBACK[key].description }
+  }),
+])
+
+/**
+ * The roles as the server takes them: the main one, the others in the
+ * department's own order, and a custom one by name.
+ */
 function rolePayload() {
-  const typed = form.role.trim()
+  const ordered = departmentRoles.value.map((role) => role.key).filter((key) => form.roles.includes(key))
+  const main = ordered.includes(form.main_role) ? form.main_role : (ordered[0] ?? null)
 
-  if (!typed) return { staff_role: null, custom_role: null }
-
-  return matchedRole.value
-    ? { staff_role: matchedRole.value.key, custom_role: null }
-    : { staff_role: null, custom_role: typed }
+  return {
+    staff_role: main,
+    additional_staff_roles: ordered.filter((key) => key !== main),
+    custom_role: form.custom_role.trim() || null,
+  }
 }
 
 /*
@@ -457,20 +544,28 @@ const bannerKind = ref('success')
 function blankForm() {
   return {
     first_name: '', last_name: '', email: '', password: '', password_confirmation: '',
-    phone: '', employee_id: '', position: '', department: '', role: '',
-    staff_privileges: [...PRIVILEGE_ORDER], is_supervisor: false,
+    phone: '', employee_id: '', credentials: '', department: '',
+    roles: [], main_role: '', custom_role: '',
+    staff_privileges: [...PRIVILEGE_ORDER], management_level: '',
     account_status: 'active',
   }
 }
 
 const form = reactive(blankForm())
 
-// Picking a predefined role from another department moves the department to it.
-watch(matchedRole, (role) => {
-  if (role) {
-    const home = departments.value.find((group) => group.roles.some((r) => r.key === role.key))
-    if (home) form.department = home.department
-  }
+// One person's roles are all in one department: a new department keeps only
+// the ticked roles that belong to it.
+watch(() => form.department, () => {
+  // Nothing to judge by until the catalogue has loaded.
+  if (!departments.value.length) return
+  const keys = new Set(departmentRoles.value.map((role) => role.key))
+  const kept = form.roles.filter((key) => keys.has(key))
+  if (kept.length !== form.roles.length) form.roles = kept
+})
+
+// The main role is always one of the ticked ones; the first, until chosen.
+watch(() => form.roles, (roles) => {
+  if (!roles.includes(form.main_role)) form.main_role = roles[0] ?? ''
 })
 
 function resetForm() {
@@ -509,11 +604,13 @@ function openEdit(row) {
   Object.assign(form, {
     phone: row.phone || '',
     employee_id: row.employee_id || '',
-    position: row.position || '',
+    credentials: row.credentials || '',
     department: row.department || '',
-    role: row.role_label || '',
+    roles: [...(row.staff_roles ?? (row.staff_role ? [row.staff_role] : []))],
+    main_role: row.staff_role || '',
+    custom_role: row.custom_role || '',
     staff_privileges: [...(row.staff_privileges ?? PRIVILEGE_ORDER)],
-    is_supervisor: row.is_supervisor,
+    management_level: row.management_level ?? '',
     account_status: row.account_status === 'pending_verification' ? 'active' : row.account_status,
   })
   modalOpen.value = true
@@ -529,32 +626,42 @@ async function submit() {
       const payload = {
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position.trim() || null,
+        credentials: form.credentials.trim() || null,
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],
-        is_supervisor: form.is_supervisor,
+        management_level: form.management_level || null,
       }
 
-      // Ang pending_verification kay dili ma-set balik sa supervisor, so
+      // Ang pending_verification kay dili ma-set balik sa Admin, so
       // ipadala ra kung nausab gyud.
       if (form.account_status !== editing.value.account_status) {
         payload.account_status = form.account_status
       }
 
       await bloodCenterService.updateStaff(editing.value.uuid, payload)
+
+      // An Admin who just stepped down can no longer open this page.
+      if (editing.value.uuid === user.value?.uuid && payload.management_level !== 'admin') {
+        await fetchUser()
+        modalOpen.value = false
+        await navigateTo(departmentHome(user.value))
+        return
+      }
+
       showBanner('Account updated.', 'success')
     } else {
-      const { role: _role, ...fields } = form
+      const { roles: _roles, main_role: _main, custom_role: _custom, ...fields } = form
 
       await bloodCenterService.createStaff({
         ...fields,
         phone: form.phone || null,
         employee_id: form.employee_id || null,
-        position: form.position.trim() || null,
+        credentials: form.credentials.trim() || null,
         department: form.department || null,
         ...rolePayload(),
         staff_privileges: [...form.staff_privileges],
+        management_level: form.management_level || null,
       })
       showBanner('Staff account created. A verification email has been sent.', 'success')
     }
@@ -566,7 +673,7 @@ async function submit() {
       errors.value = error.errors || {}
       formError.value = error.message || 'Please correct the highlighted fields.'
     } else if (error?.status === 409) {
-      // last_supervisor — ang facility mahibilin nga walay makadumala.
+      // last_admin — ang facility mahibilin nga walay makadumala sa staff.
       formError.value = error.message
     } else {
       formError.value = error?.message || 'Something went wrong.'
@@ -609,13 +716,14 @@ function showBanner(message, kind) {
 const hasFilters = computed(() => Boolean(search.value.trim() || departmentFilter.value || includeDeleted.value))
 
 const activeRows = computed(() => rows.value.filter((row) => !row.deleted_at))
-const supervisorCount = computed(() => activeRows.value.filter((row) => row.is_supervisor).length)
+const adminCount = computed(() => activeRows.value.filter((row) => row.management_level === 'admin').length)
+const supervisorCount = computed(() => activeRows.value.filter((row) => row.management_level === 'supervisor').length)
 const unverifiedCount = computed(() => activeRows.value.filter((row) => !row.email_verified).length)
 
 /**
  * Rows grouped by department, in the catalogue's order, so the roster reads
- * the way the sidebar does. Accounts without a department (usually
- * supervisors) come first, under Management.
+ * the way the sidebar does. Accounts without a department (usually the
+ * Admin and Supervisors) come first, under Management.
  */
 const groupedRows = computed(() => {
   const groups = [{ key: '__none', label: 'Management / no department', rows: [] }]
@@ -969,6 +1077,7 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-secondary);
 }
 
+.pill--admin { background: var(--rb-primary); color: #fff; }
 .pill--supervisor { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
 .pill--success { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .pill--warning { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
@@ -1282,9 +1391,64 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   font-weight: 600;
 }
 
+/* The department's roles, as ticks: same cards as the privileges. */
+.roles {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.roles legend {
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.roles legend i { font-style: normal; font-weight: 400; color: var(--rb-text-secondary); }
+
+.roles__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.role-option strong { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+.tag--main {
+  margin-left: 0;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+
+/* A person's other roles, under the main one. */
+.cell-role { margin: 1px 0 0; font-size: 12.5px; color: var(--rb-text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.levels {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.levels legend {
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.levels__list {
+  display: grid;
+  gap: 6px;
+}
+
 @media (max-width: 560px) {
-  .privileges__grid {
+  .privileges__grid,
+  .roles__list {
     grid-template-columns: 1fr;
   }
 }
+</style>
+
+<style scoped>
+/* The system dropdown in a toolbar: a fixed width rather than the row's. */
+.sel-filter { width: 180px; flex: none; }
 </style>

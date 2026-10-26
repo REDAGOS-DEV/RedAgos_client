@@ -1,3 +1,4 @@
+import type { HospitalRole } from './hospitalStaff'
 /**
  * The shape `GET /api/user` actually returns.
  *
@@ -25,6 +26,14 @@ export type Department = 'collection' | 'processing' | 'testing' | 'issuance' | 
 export type StaffPrivilege = 'read' | 'write' | 'update' | 'delete'
 
 /**
+ * A blood-centre account's level above (or instead of) a staff role, from the
+ * server's `ManagementLevel` enum. The Admin runs staff accounts, roles and the
+ * centre's settings; the Supervisor only watches: dashboard, reports and the
+ * view-only monitoring pages. Neither does department work.
+ */
+export type ManagementLevel = 'admin' | 'supervisor'
+
+/**
  * The predefined blood-centre staff roles, from the server's `StaffRole` enum.
  */
 export type StaffRole =
@@ -40,6 +49,23 @@ export type StaffRole =
   | 'dispatch_coordinator'
   | 'it_data_clerk'
   | 'billing_clerk'
+  | 'billing_supervisor'
+
+/**
+ * What a correction request is about, from the server's `CorrectionSubject`
+ * enum. The first five are records of a donation; the last three are kept by
+ * Issuance and Billing.
+ */
+export type CorrectionSubject =
+  | 'screening'
+  | 'collection'
+  | 'immunohematology'
+  | 'serology'
+  | 'components'
+  | 'unit_details'
+  | 'dispatch'
+  | 'payment'
+  | 'payment_void'
 
 export interface Facility {
   id: number
@@ -64,6 +90,12 @@ export interface AppUser {
   username: string | null
   account_status: string | null
   email_verified: boolean
+  /**
+   * Signed in with the temporary password the blood center's desk gave. Every
+   * page but "set your password" waits until the donor chooses their own; the
+   * server refuses the rest with `password_change_required`.
+   */
+  temporary_sign_in: boolean
   /** ISO 8601, or null while the account is not yet activated. */
   activated_at: string | null
 
@@ -76,8 +108,10 @@ export interface AppUser {
 
   department: Department | null
   department_label: string | null
-  /** Null for donors, admins, blood-bank staff, a custom role and a management-only supervisor. */
+  /** Null for donors, admins, blood-bank staff, a custom role, and an Admin or Supervisor with no post. */
   staff_role: StaffRole | null
+  /** Every predefined role held, the main one (staff_role) first. All in one department. */
+  staff_roles: StaffRole[]
   staff_role_label: string | null
   /** A typed role, when none of the predefined ones fits. */
   custom_role: string | null
@@ -85,7 +119,14 @@ export interface AppUser {
   role_label: string | null
   /** The privileges in force; all four for an account that never had them set. */
   staff_privileges: StaffPrivilege[]
-  is_supervisor: boolean
+  /** admin, supervisor, or null. Not the Laboratory or Billing Supervisor, which are staff roles. */
+  management_level: ManagementLevel | null
+  /** "Blood Center Admin" or "Supervisor". */
+  management_level_label: string | null
+
+  /** A hospital blood bank account's role. Null for everyone else. */
+  hospital_role: HospitalRole | null
+  hospital_role_label: string | null
 
   /**
    * Unrestricted platform admin. Holds every `admin.*` privilege without any of
@@ -114,6 +155,14 @@ export interface AppUser {
    * Never treat this as authorization.
    */
   permissions: string[]
+
+  /**
+   * The corrections this account may file. `permissions` alone cannot say:
+   * some subjects are open only to a named post, so a custom role in the same
+   * department holds the ability and is still refused. Presentation only — the
+   * server asks the same question on every filing.
+   */
+  correction_subjects: CorrectionSubject[]
 
   /** Only present when the donor profile was eager-loaded. */
   blood_type: string | null

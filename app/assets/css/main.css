@@ -19,6 +19,20 @@
  */
 :root {
   --rb-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  /* UI font for dense portal text: clearer at 12-14px, aligned digits. */
+  --rb-font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /*
+   * Portal type scale: six sizes. The donor portal uses only these (numbers
+   * that are the data itself, like stat values and date chips, keep their
+   * own larger sizes). 12px is the floor for anything people need to read.
+   */
+  --rb-fs-display: 24px;  /* dashboard greeting */
+  --rb-fs-title: 20px;    /* page titles */
+  --rb-fs-section: 15px;  /* card and step titles */
+  --rb-fs-body: 14px;     /* most text, buttons, inputs */
+  --rb-fs-small: 13px;    /* descriptions, secondary lines */
+  --rb-fs-caption: 12px;  /* labels, chips, badges, timestamps */
   /* For barcodes, unit numbers and reference codes. One stack, so a code looks
      the same on every page; plain `monospace` fell back to Courier New on
      Windows. */
@@ -48,7 +62,9 @@
    * Light values are the base colours, except warning: #F57C00 is only 2.7:1
    * on white, so text uses amber-700 (4.8:1). The fill keeps #F57C00.
    */
-  --rb-primary-text: #1565C0;
+  /* --accent-text-* are set by the donor colour theme (useAccentTheme). */
+  --rb-primary-text: var(--accent-text-light, #1565C0);
+  --rb-primary-hover: #0D47A1;
   --rb-accent-text: #D32F2F;
   --rb-success-text: #2E7D32;
   --rb-warning-text: #B45309;
@@ -133,7 +149,7 @@
    * fills (--rb-primary and friends) deliberately do not move: they still
    * carry white text.
    */
-  --rb-primary-text: #64B5F6;
+  --rb-primary-text: var(--accent-text-dark, #64B5F6);
   --rb-accent-text: #F87171;
   --rb-success-text: #66BB6A;
   --rb-warning-text: #FFB74D;
@@ -165,6 +181,83 @@ html {
    * transition.
    */
   scrollbar-gutter: stable;
+  /*
+   * The reserved gutter paints with the root's own background. Without one it
+   * showed as a white strip down the right edge of any page too short to
+   * scroll (2026-10-15); the staff canvas colour makes it disappear.
+   */
+  background-color: #F6F8FB;
+}
+html.dark {
+  background-color: #0B1220;
+}
+
+/*
+ * Donor portal light: a neutral grey canvas under solid white chrome and
+ * cards, so the portal sits with the browser's own light toolbar. The blood
+ * centre (`portal-bc`, its layout) uses the same palette, light and dark.
+ */
+html.portal-donor:not(.dark),
+html.portal-bc:not(.dark) {
+  /* Tinted by the colour theme (useAccentTheme); neutral fallbacks. */
+  --rb-page-bg: var(--accent-canvas-light, #F5F6F8);
+  --rb-chrome: var(--accent-chrome-light, #FFFFFF);
+  background-color: var(--rb-page-bg);
+}
+
+/*
+ * Donor portal dark: "ink", a blue slate taken from the browser's own dark
+ * chrome, so the page sits with it. The blue identity stays
+ * in the backdrop glow, the buttons and the Pass. The donor layout puts
+ * `portal-donor` on <html>; every other portal keeps the navy above, and the
+ * shared components read `var(--ink-*, <navy>)` so they fall back to it there.
+ */
+html.dark.portal-donor,
+html.dark.portal-bc {
+  /* Blue slate, after the browser's own dark chrome: the tab strip, the
+     address bar and the toolbar. Text levels re-checked on the cards (#2B3445)
+     and the chrome (#333C4D): text-2 is 5.8:1 on the chrome. */
+  --ink-base: var(--accent-ink-base, #172030);
+  --ink-base-rgb: var(--accent-ink-base-rgb, 23, 32, 48);
+  --ink-page: var(--accent-ink-page, #1D2636);
+  --ink-page-rgb: var(--accent-ink-page-rgb, 29, 38, 54);
+  --ink-surface: var(--accent-ink-surface, #2B3445);
+  --ink-surface-rgb: var(--accent-ink-surface-rgb, 43, 52, 69);
+  --ink-chrome: var(--accent-ink-chrome, #333C4D);
+  --ink-surface-alt: var(--accent-ink-surface-alt, #252E3E);
+  --ink-hover: var(--accent-ink-hover, #364053);
+  --ink-border: var(--accent-ink-border, #3D4759);
+  --ink-border-rgb: var(--accent-ink-border-rgb, 61, 71, 89);
+  --ink-border-hover: var(--accent-ink-border-hover, #525D72);
+  --ink-text: #EEF1F5;
+  --ink-text-2: #B4BCC9;
+  --ink-text-3: #D0D6E0;
+  --ink-text-4: #E3E7EE;
+  --ink-muted: #97A0AF;
+  --ink-inset: var(--accent-ink-inset, #242C3B);
+  --ink-field-border: #46506A;
+  --ink-hover-border: #5D6880;
+
+  /* Lifted to keep 4.5:1 on the lighter slate surfaces. */
+  --rb-accent-text: #FF8A8A;
+  --rb-success-text: #81C784;
+
+  --rb-text-primary: var(--ink-text);
+  --rb-text-secondary: var(--ink-text-2);
+  --rb-text-muted: var(--ink-muted);
+  --rb-placeholder: var(--ink-text-2);
+  --rb-border: var(--ink-border);
+  --rb-border-strong: var(--ink-border);
+  --rb-border-hover: var(--ink-border-hover);
+  --rb-surface: var(--ink-surface);
+  --rb-surface-alt: var(--ink-surface-alt);
+  --rb-surface-hover: var(--ink-hover);
+  --rb-page-bg: var(--ink-page);
+  --rb-chrome: var(--ink-chrome);
+  --rb-skeleton-a: var(--ink-surface-alt);
+  --rb-skeleton-b: var(--ink-hover);
+
+  background-color: var(--ink-base);
 }
 
 /*
@@ -262,39 +355,34 @@ transform:translateY(0);
  *                 only. It never carries a button.
  */
 :root {
-  --lp-bg: #F6F8FB;
-  --lp-surface: #FCFDFF;
-  --lp-surface-alt: #EDF2FA;
-  --lp-text: #111827;
-  --lp-text-2: #4B5563;
+  --lp-bg: #F5F8FC;
+  --lp-surface: #FFFFFF;
+  --lp-surface-alt: #EEF4FB;
+  --lp-navy: #0B2A55;
+  --lp-text: #0B1F3A;
+  --lp-text-2: #475569;
   --lp-muted: #64748B;
-  --lp-border: #E2E8F0;
-  --lp-accent: #2563EB;
-  --lp-accent-hover: #1D4ED8;
-  --lp-accent-text: #1D4ED8;
-  --lp-accent-soft: rgba(37, 99, 235, 0.08);
-  --lp-on-accent: #FCFDFF;
-  --lp-brand: #D32F2F;
-  --lp-brand-soft: rgba(211, 47, 47, 0.08);
-  --lp-shadow: 0 18px 40px -24px rgba(30, 58, 138, 0.35);
+  --lp-border: #E3EAF3;
+  /* Same blue as --rb-primary, so landing, sign-in and the portals match. */
+  --lp-accent: #1565C0;
+  --lp-accent-hover: #0D47A1;
+  --lp-accent-text: #1565C0;
+  --lp-accent-soft: #E8F1FB;
+  --lp-on-accent: #FFFFFF;
+  --lp-brand: #C62828;
+  --lp-brand-soft: #FDECEC;
+  --lp-shadow: 0 1px 2px rgba(11, 31, 58, 0.04), 0 16px 40px -20px rgba(21, 101, 192, 0.28);
+  --lp-shadow-lg: 0 2px 4px rgba(11, 31, 58, 0.04), 0 32px 64px -28px rgba(11, 42, 85, 0.35);
+  --lp-radius: 20px;
   --lp-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.dark {
-  --lp-bg: #0B1220;
-  --lp-surface: #111A2E;
-  --lp-surface-alt: #16213A;
-  --lp-text: #F1F5F9;
-  --lp-text-2: #CBD5E1;
-  --lp-muted: #94A3B8;
-  --lp-border: #24324D;
-  /* The fill keeps its value so white text on it stays above 4.5:1. */
-  --lp-accent-text: #7AB0FF;
-  --lp-accent-soft: rgba(122, 176, 255, 0.1);
-  --lp-brand: #F87171;
-  --lp-brand-soft: rgba(248, 113, 113, 0.12);
-  --lp-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.7);
-}
+/*
+ * The landing page is light in both themes on purpose. A public healthcare
+ * page is expected to look bright and clinical, and following a dark OS
+ * setting made it read as murky navy. The portals behind sign-in still
+ * follow useDarkMode.
+ */
 
 /*
  * `v-reveal` (plugins/reveal.ts) adds .reveal on mount and .is-revealed once
@@ -316,4 +404,128 @@ transform:translateY(0);
     transform: none;
     transition: none;
   }
+}
+
+/*
+ * Landing building blocks.
+ *
+ * Every section used to restyle its own heading, badge and buttons, which is
+ * how the page ended up with six heading sizes and three button radii. They
+ * share these instead. Shape rule: buttons are pills, cards and panels 16px.
+ */
+.lp-section {
+  padding: 112px 1.5rem;
+  scroll-margin-top: 72px;
+}
+.lp-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.lp-head {
+  max-width: 680px;
+  margin-bottom: 48px;
+}
+.lp-head--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.lp-h2 {
+  margin: 0;
+  font-size: clamp(1.875rem, 3.4vw, 2.75rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--lp-text);
+  /* No single orphaned word on the last line ("…of the blood / chain"). */
+  text-wrap: balance;
+}
+.lp-lead {
+  margin: 14px 0 0;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--lp-text-2);
+}
+.lp-head--center .lp-lead {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 56ch;
+}
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.lp-btn:active { transform: scale(0.98); }
+.lp-btn:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; }
+.lp-btn--primary {
+  background: var(--lp-accent);
+  color: var(--lp-on-accent);
+  box-shadow: 0 10px 24px -12px rgba(21, 101, 192, 0.7);
+}
+.lp-btn--primary:hover { background: var(--lp-accent-hover); }
+.lp-btn--secondary {
+  background: var(--lp-surface);
+  border-color: var(--lp-border);
+  color: var(--lp-text);
+}
+.lp-btn--secondary:hover { border-color: var(--lp-accent); color: var(--lp-accent-text); }
+.lp-btn--sm { height: 40px; padding: 0 18px; font-size: 14px; }
+
+@media (max-width: 640px) {
+  .lp-section { padding: 80px 1rem; }
+  .lp-head { margin-bottom: 36px; }
+  .lp-lead { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-btn { transition: none; }
+}
+
+/* Small pill label. Used at most once every three sections. */
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  box-shadow: var(--lp-shadow);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-text);
+}
+.lp-pill-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--lp-brand-soft);
+  color: var(--lp-brand);
+}
+
+/* Rounded photo with a soft frame, shared by every landing image. */
+.lp-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--lp-radius);
+  background: var(--lp-surface-alt);
 }

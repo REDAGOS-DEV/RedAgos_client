@@ -15,6 +15,23 @@ export interface DonorBlock {
 }
 
 /**
+ * The donor block as this viewer may see it.
+ *
+ * The server blinds it already (DonorBlinding). This holds the line on the
+ * page as well: a viewer without donors.view_identity is shown the blood type
+ * and nothing else, whatever the payload carried.
+ */
+export function visibleDonor(
+  donor: DonorBlock | null | undefined,
+  mayViewIdentity: boolean,
+): DonorBlock | null {
+  if (!donor) return null
+  if (mayViewIdentity && !donor.blinded) return donor
+
+  return { blinded: true, blood_type: donor.blood_type ?? null }
+}
+
+/**
  * The row or unit-bar title: the donor's name, or the donation's barcode sticker.
  */
 export function donorTitle(

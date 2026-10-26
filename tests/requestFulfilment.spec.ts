@@ -7,13 +7,22 @@ import {
   clearContinuation,
   fulfilmentRows,
   fulfilmentTotals,
-  localInputToIso,
   matchesNeedingAcknowledgement,
-  toLocalInputValue,
   walkInStepProblems,
   type WalkInForm,
 } from '~/utils/requestFulfilment'
-import { requestStage, requestStatusLabel, type BloodRequest, type ComponentOption, type DuplicateMatch } from '~/types/bloodRequest'
+import {
+  bloodTypeCodes,
+  bloodTypeSummary,
+  componentSummary,
+  hasMixedBloodTypes,
+  requestLineLabel,
+  requestStage,
+  requestStatusLabel,
+  type BloodRequest,
+  type ComponentOption,
+  type DuplicateMatch,
+} from '~/types/bloodRequest'
 
 /**
  * Request versus fulfilment, and the walk-in form.
@@ -90,6 +99,54 @@ describe('the fulfilment table', () => {
   })
 })
 
+describe('a weekly request restocking several blood types in one request', () => {
+  function weekly(): BloodRequest {
+    return {
+      status: 'pending',
+      is_open: true,
+      blood_type: { id: null, code: null },
+      blood_types: ['A+', 'AB+', 'O-'],
+      items: [
+        { id: 21, blood_type: { id: 1, code: 'A+' }, component: { id: 5, name: 'Cryoprecipitate' }, quantity: 12 },
+        { id: 22, blood_type: { id: 4, code: 'AB+' }, component: { id: 5, name: 'Cryoprecipitate' }, quantity: 12 },
+        { id: 23, blood_type: { id: 8, code: 'O-' }, component: { id: 3, name: 'Platelet Concentrate' }, quantity: 12 },
+      ],
+    } as unknown as BloodRequest
+  }
+
+  it('names every blood type it asks for', () => {
+    expect(bloodTypeCodes(weekly())).toEqual(['A+', 'AB+', 'O-'])
+    expect(bloodTypeSummary(weekly())).toBe('A+, AB+, O-')
+    expect(hasMixedBloodTypes(weekly())).toBe(true)
+  })
+
+  it('names each line with its blood type, so one component in two types reads as two lines', () => {
+    expect(fulfilmentRows(weekly()).map((row) => row.component)).toEqual([
+      'A+ Cryoprecipitate',
+      'AB+ Cryoprecipitate',
+      'O- Platelet Concentrate',
+    ])
+  })
+
+  it('lists each component once in the one-line summary', () => {
+    expect(componentSummary(weekly())).toBe('Cryoprecipitate, Platelet Concentrate')
+  })
+
+  it('reads the types from the lines when the request was loaded without them', () => {
+    const request = { ...weekly(), blood_types: undefined }
+
+    expect(bloodTypeCodes(request)).toEqual(['A+', 'AB+', 'O-'])
+  })
+
+  it('leaves a request of one blood type reading as before', () => {
+    const single = scenario({ blood_type: { id: 7, code: 'O+' }, blood_types: ['O+'] })
+
+    expect(bloodTypeSummary(single)).toBe('O+')
+    expect(hasMixedBloodTypes(single)).toBe(false)
+    expect(requestLineLabel(single, single.items[0]!)).toBe('Packed RBC')
+  })
+})
+
 describe('the request status as it reads', () => {
   it('marks a finished partial request as closed', () => {
     expect(requestStatusLabel(scenario())).toBe('Partially Fulfilled')
@@ -147,7 +204,7 @@ describe('a walk-in continuing a Patient Transfusion Request', () => {
 
 describe('the walk-in form', () => {
   function completed(): WalkInForm {
-    const form = blankWalkInForm(new Date(Date.now() - 60_000))
+    const form = blankWalkInForm()
 
     form.hospitalId = 3
     form.patient = { surname: ' Dela Cruz ', firstName: 'Juan', middleName: '', age: '54', sex: 'male' }
@@ -158,42 +215,55 @@ describe('the walk-in form', () => {
       { componentId: 2, requirementItemId: null, quantity: 2, maxQuantity: null, indicationCode: 'F-1', indicationOther: '' },
     ]
     form.representative = { name: 'Pedro Dela Cruz', relationship: 'Son', contact: '09171234567', idType: '', idNumber: '' }
-    form.verification = {
-      ...form.verification,
-      confirmed: true,
-      verifierName: 'Ana Lim',
-      verifierPosition: 'Medical Technologist',
-      verifierContact: '(082) 222-1234',
-    }
 
     return form
   }
 
-  it('cannot get past verification unless the hospital said yes', () => {
+  it('needs the hospital, both names and the blood type on the first step (project owner, 2026-10-19)', () => {
     const form = completed()
-    form.verification.confirmed = false
+    form.hospitalId = null
+    form.patient.surname = ' '
+    form.patient.firstName = ''
+    form.bloodTypeId = null
 
-    expect(walkInStepProblems(form, 'verify')).toEqual([
-      'A walk-in request can only be recorded once the hospital blood bank has confirmed it.',
+    expect(walkInStepProblems(form, 'lookup')).toEqual([
+      "Choose the patient's hospital blood bank.",
+      'Enter the patient surname.',
+      'Enter the patient first name.',
+      'Select the blood type required.',
     ])
   })
 
-  it('needs the person who confirmed it named', () => {
+  it('leaves the reference on the watcher\'s paperwork optional', () => {
     const form = completed()
-    form.verification.verifierName = ' '
-    form.verification.verifierPosition = ''
+    form.presentedReference = ''
 
-    expect(walkInStepProblems(form, 'verify')).toEqual([
-      'Enter who at the hospital confirmed the request.',
-      'Enter their position.',
-    ])
+    expect(walkInStepProblems(form, 'lookup')).toEqual([])
+    expect(buildWalkInPayload(form).presented_reference).toBeNull()
   })
 
-  it('refuses a confirmation time in the future', () => {
+  it('takes a hospital not on RedAgos by the name typed for it, address left out (project owner, 2026-10-19)', () => {
     const form = completed()
-    form.verification.verifiedAt = toLocalInputValue(new Date(Date.now() + 60 * 60 * 1000))
+    form.hospitalId = null
+    form.hospitalName = '  St. Jude Hospital '
 
-    expect(walkInStepProblems(form, 'verify')).toContain('The confirmation cannot be in the future.')
+    expect(walkInStepProblems(form, 'lookup')).toEqual([])
+
+    const payload = buildWalkInPayload(form)
+    expect(payload.hospital_name).toBe('St. Jude Hospital')
+    expect(payload).not.toHaveProperty('hospital_id')
+
+    form.hospitalName = '   '
+    expect(walkInStepProblems(form, 'lookup')).toEqual(["Choose the patient's hospital blood bank."])
+  })
+
+  it('takes the patient and blood type from the requirement when continuing one', () => {
+    const form = completed()
+    form.transfusionRequestId = 40
+    form.patient.surname = ''
+    form.bloodTypeId = null
+
+    expect(walkInStepProblems(form, 'lookup')).toEqual([])
   })
 
   it('checks every line against the indications its component allows', () => {
@@ -227,11 +297,10 @@ describe('the walk-in form', () => {
     const form = completed()
 
     expect(walkInStepProblems(form, 'lookup')).toEqual([])
-    expect(walkInStepProblems(form, 'verify')).toEqual([])
     expect(walkInStepProblems(form, 'details', COMPONENTS)).toEqual([])
   })
 
-  it('sends the patient, lines, watcher and verifier as the API takes them', () => {
+  it('sends the patient, lines and watcher as the API takes them, and no phone confirmation', () => {
     const payload = buildWalkInPayload(completed())
 
     expect(payload).toMatchObject({
@@ -245,11 +314,11 @@ describe('the walk-in form', () => {
         { component_id: 2, quantity: 2, indication_code: 'F-1', indication_other: null },
       ],
       representative: { name: 'Pedro Dela Cruz', relationship: 'Son', contact: '09171234567', id_type: null, id_number: null },
-      verification: { confirmed: true, verifier_name: 'Ana Lim', verifier_position: 'Medical Technologist' },
       duplicate_acknowledgement: null,
     })
-    expect(payload.verification.verified_at).toMatch(/Z$/)
+    expect(payload).not.toHaveProperty('verification')
     expect(payload).not.toHaveProperty('transfusion_request_id')
+    expect(payload).not.toHaveProperty('hospital_name')
   })
 
   it('sends a continuation as requirement lines only, leaving the patient to the requirement', () => {
@@ -263,13 +332,5 @@ describe('the walk-in form', () => {
     expect(payload.items).toEqual([{ transfusion_request_item_id: 12, quantity: 1 }])
     expect(payload).not.toHaveProperty('patient_surname')
     expect(payload).not.toHaveProperty('blood_type_id')
-  })
-
-  it('round-trips the confirmation time through the datetime input', () => {
-    const at = new Date(2026, 8, 27, 14, 30)
-
-    expect(toLocalInputValue(at)).toBe('2026-09-27T14:30')
-    expect(localInputToIso('2026-09-27T14:30')).toBe(at.toISOString())
-    expect(localInputToIso('')).toBeNull()
   })
 })

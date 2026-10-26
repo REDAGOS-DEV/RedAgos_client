@@ -1,43 +1,42 @@
 <template>
   <div class="laboratory">
+    <!--
+      Rebuilt from the owner's mock-up (2026-10-22): the list on the left as
+      tall as the bench, and the bench always shown — Component separation
+      and the rejection — locked until a unit is picked.
+    -->
+    <!-- No icon, steps or card of Testing's outcome (project owner, 2026-10-22). -->
     <header class="laboratory__header">
-      <div>
-        <h1 class="laboratory__title">Processing</h1>
-        <p class="laboratory__subtitle">
-          Record what each unit was separated into, then clear it for issue or reject it. Testing's outcome shows here
-          as it is recorded.
-        </p>
-      </div>
+      <h1 class="laboratory__title">Processing</h1>
+      <p class="laboratory__subtitle">
+        Record component separation and prepare units for issuance. A processed unit moves to the Processed list,
+        where it is handed over to Issuance.
+      </p>
     </header>
 
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <!--
-      Workspace: the queue stays on the left while a unit is open on the right,
-      the same layout as Stock Intake. Opening, closing and filtering call the
-      same functions as before.
-    -->
     <div class="workspace">
-      <aside class="queue-panel" aria-label="Units awaiting the laboratory">
+      <aside class="queue-panel" aria-label="Donation units">
         <div class="queue-panel__head">
-          <p class="queue-panel__title">
-            Units
-            <span class="queue-panel__count">{{ loadingQueue ? '…' : queue.length }}</span>
-          </p>
+          <h2 class="queue-panel__title">
+            Donation units
+            <span class="count">{{ loadingQueue ? '…' : queueTotal }}</span>
+          </h2>
           <button
             type="button"
             class="icon-btn"
             :disabled="loadingQueue"
-            aria-label="Refresh the queue"
+            aria-label="Refresh the list"
             title="Refresh"
             @click="loadQueue"
           >
-            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loadingQueue }" />
+            <AssetIcon name="refresh-cw" :size="16" :class="{ spin: loadingQueue }" />
           </button>
         </div>
 
-        <!-- The status filter as chips: the choice is visible without opening a menu. -->
+        <!-- The status filter as chips, each with how many units it holds. -->
         <div class="status-chips" role="group" aria-label="Show">
           <button
             v-for="option in STATUS_OPTIONS"
@@ -50,6 +49,7 @@
             @click="setStatusFilter(option.value)"
           >
             {{ option.label }}
+            <span class="status-chip__count">{{ counts[option.value] ?? '·' }}</span>
           </button>
         </div>
 
@@ -61,10 +61,14 @@
         </ul>
 
         <div v-else-if="!queue.length" class="queue-empty">
-          <AssetIcon :name="statusFilter ? 'search-x' : 'circle-check-big'" :size="18" />
-          <p>
-            <template v-if="statusFilter">Nothing matches this filter yet.</template>
-            <template v-else>All caught up. Donations appear here once the counter records a collection.</template>
+          <BagIcon class="queue-empty__icon" />
+          <p class="queue-empty__title">{{ statusFilter ? 'Nothing matches this filter' : 'No units awaiting processing' }}</p>
+          <p class="queue-empty__text">
+            <template v-if="statusFilter">Units show here once they reach this stage. Pick another filter or check back later.</template>
+            <template v-else>
+              Donations appear here once the counter records a collection. Processed ones are on the
+              <NuxtLink to="/blood-center/processed" class="queue-empty__link">Processed list</NuxtLink>.
+            </template>
           </p>
         </div>
 
@@ -95,341 +99,303 @@
       </aside>
 
       <section class="bench" aria-live="polite">
-        <!-- Nothing open yet -->
-        <div v-if="!selected" class="bench__idle">
-          <span class="bench__idle-icon"><AssetIcon name="flask-conical" :size="26" /></span>
-          <p class="bench__idle-title">Pick a unit to start</p>
-          <p class="bench__idle-text">
-            Choose a donation from the list. Its testing outcome, component breakdown and hand-over open here.
-          </p>
-        </div>
+        <!-- COMPONENT SEPARATION -->
+        <section class="card">
+          <div class="sep__head">
+            <h2 class="card__title">Component separation</h2>
 
-    <!-- ONE UNIT -->
-    <template v-else>
-      <section class="unit-bar">
-        <div class="unit-bar__identity">
-          <!-- A bag, not a person, for the roles that work blind. -->
-          <span class="unit-bar__avatar">
-            <AssetIcon v-if="selected.donor?.blinded" name="droplets" :size="16" />
-            <template v-else>{{ initials }}</template>
-          </span>
-          <div class="unit-bar__names">
-            <p class="unit-bar__name">{{ donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) }}</p>
-            <p class="unit-bar__sub">
-              Donation #{{ selected.id }} · {{ donorReference(selected.donor) }} ·
-              {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
-            </p>
+            <div class="picked">
+              <span class="picked__icon"><BagIcon class="picked__bag" /></span>
+              <div class="picked__text">
+                <span class="picked__label">Selected unit</span>
+                <span class="picked__value">
+                  {{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}
+                  <span v-if="selected" class="picked__meta">
+                    · #{{ selected.id }} · {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
+                  </span>
+                </span>
+              </div>
+              <span v-if="selected" class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
+              <button
+                v-if="selected"
+                type="button"
+                class="icon-btn"
+                :disabled="busy"
+                aria-label="Close this unit"
+                title="Close"
+                @click="backToQueue"
+              >
+                <AssetIcon name="x" :size="16" />
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="fact">
-          <span class="fact__label">Type on file</span>
-          <span class="fact__value">{{ selected.donor?.blood_type || 'Not known yet' }}</span>
-        </div>
-
-        <div class="fact">
-          <span class="fact__label">Barcode</span>
-          <span class="fact__value mono">{{ selected.collection?.donation_barcode || 'None' }}</span>
-        </div>
-
-        <div class="fact">
-          <span class="fact__label">Status</span>
-          <span class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
-        </div>
-
-        <button type="button" class="icon-btn" :disabled="busy" aria-label="Close this unit" title="Close" @click="backToQueue">
-          <AssetIcon name="x" :size="16" />
-        </button>
-      </section>
-
-      <ol class="steps" aria-label="Unit progress">
-        <li v-for="step in steps" :key="step.key" class="step" :class="step.state">
-          <span class="step__dot">
-            <AssetIcon v-if="step.state === 'step--done'" name="check" :size="12" />
-            <template v-else>{{ step.index }}</template>
-          </span>
-          <span class="step__label">{{ step.label }}</span>
-        </li>
-      </ol>
-
-      <!-- Terminal: nothing left to record -->
-      <section v-if="isFinal" class="card">
-        <div class="outcome" :class="selected.status === 'completed' ? 'outcome--success' : 'outcome--rejected'">
-          <AssetIcon :name="selected.status === 'completed' ? 'circle-check-big' : 'circle-alert'" :size="26" />
-          <div>
-            <h2 class="card__title">
-              {{ selected.status === 'completed' ? 'Processing complete' : 'Donation rejected' }}
-            </h2>
-            <p class="card__hint">
-              <template v-if="selected.status === 'completed'">
-                Handed over. Issuance books the bags into quarantine at Stock Intake, then releases them and prints
-                their final labels once Serology and Immunohematology have both cleared the donation.
-              </template>
-              <template v-else>
-                {{ selected.rejection_reason || 'No reason was recorded.' }}
-                This unit can never become stock.
-              </template>
-            </p>
+          <!-- Terminal: nothing left to record -->
+          <div v-if="isFinal" class="outcome" :class="selected.status === 'completed' ? 'outcome--success' : 'outcome--rejected'">
+            <AssetIcon :name="selected.status === 'completed' ? 'circle-check-big' : 'circle-alert'" :size="24" />
+            <div>
+              <p class="outcome__title">{{ selected.status === 'completed' ? 'Processing complete' : 'Donation rejected' }}</p>
+              <p class="card__hint">
+                <template v-if="selected.status === 'completed'">
+                  Handed over with its final labels. Issuance books the bags straight into stock at Stock Intake.
+                </template>
+                <template v-else>
+                  {{ selected.rejection_reason || 'No reason was recorded.' }}
+                  This unit can never become stock.
+                </template>
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div class="actions">
-          <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
-          <NuxtLink v-if="selected.status === 'completed'" to="/blood-center/inventory" class="btn">
-            Go to inventory
-          </NuxtLink>
-        </div>
-      </section>
-
-      <template v-else>
-        <!-- The two branches the technologist works in parallel -->
-        <div class="lab-grid">
           <!--
-            TESTING — read-only here. The Testing department records
-            immunohematology and serology on its own page. Processing sees the
-            outcome and the typing, never which serology marker was reactive:
-            the server does not send it to this department.
+            A saved breakdown is shown, not edited, here. It is viewed and
+            corrected on the Processed list (project owner, 2026-10-19), as a
+            saved serology panel is on Serology Results.
           -->
-          <section class="card">
-            <h2 class="card__title">Testing</h2>
-            <p class="card__hint">
-              Recorded by Serology and Immunohematology. You do not wait for them: the bags go into quarantine,
-              and each clearance is what releases them.
-            </p>
-
-            <div class="clearances" aria-label="Clearances">
-              <span class="clearance" :class="{ 'clearance--done': selected.clearances?.tti }">
-                <AssetIcon v-if="selected.clearances?.tti" name="check" :size="11" />
-                TTI cleared
-              </span>
-              <span class="clearance" :class="{ 'clearance--done': selected.clearances?.immunohematology }">
-                <AssetIcon v-if="selected.clearances?.immunohematology" name="check" :size="11" />
-                ABO/Rh cleared
-              </span>
+          <template v-if="hasComponents">
+            <p class="bags__title">Component bags ({{ selected.components.length }})</p>
+            <div class="table-wrap">
+              <table class="bag-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Component</th>
+                    <th scope="col" class="num">Volume (mL)</th>
+                    <th scope="col" class="end">Bag number</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="c in selected.components" :key="c.id ?? c.component_id">
+                    <td>{{ c.component }}</td>
+                    <td class="num">{{ bagLabel(c) }}</td>
+                    <!-- The number on the bag's Phase 1 label: the sticker plus what it holds. -->
+                    <td class="end mono">{{ c.bag_number || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div class="recorded">
-              <div class="fact">
-                <span class="fact__label">Immunohematology</span>
-                <span class="fact__value">
-                  {{ selected.immunohematology?.blood_type || (selected.test_result?.is_legacy ? selected.test_result.blood_type : null) || 'Not yet recorded' }}
-                </span>
-                <span v-if="selected.immunohematology?.recorded_by" class="fact__sub">
-                  {{ selected.immunohematology.recorded_by }} · {{ formatDate(selected.immunohematology.recorded_at) }}
-                </span>
-              </div>
-
-              <div class="fact">
-                <span class="fact__label">Serology</span>
-                <span
-                  v-if="selected.serology"
-                  class="pill"
-                  :class="selected.serology.outcome === 'reactive' ? 'pill--rejected' : 'pill--collected'"
-                >
-                  {{ selected.serology.outcome_label }}
-                </span>
-                <span v-else class="fact__value">Not yet recorded</span>
-                <span v-if="selected.serology?.recorded_by" class="fact__sub">
-                  {{ selected.serology.recorded_by }} · {{ formatDate(selected.serology.recorded_at) }}
-                </span>
-              </div>
-
-              <div v-if="selected.test_result" class="fact">
-                <span class="fact__label">Outcome</span>
-                <span class="pill" :class="selected.test_result.clears_for_issue ? 'pill--collected' : 'pill--rejected'">
-                  {{ selected.test_result.result_label }}
-                </span>
-              </div>
-            </div>
-
-            <p v-if="selected.test_result?.is_legacy" class="card__hint card__hint--warn">
-              Recorded before the five-marker panel existed ({{ selected.test_result.result_label }}). The Testing
-              department must record serology before this unit can be cleared.
-            </p>
-            <p v-else-if="!selected.test_result" class="card__hint">
-              Waiting for the Testing department to record {{ testingOutstanding }}.
-            </p>
-
-            <NuxtLink v-if="canRecordResult" :to="`/blood-center/testing?donation=${selected.id}`" class="btn btn--link">
-              Open on the Testing page
-            </NuxtLink>
-          </section>
-
-          <!-- PROCESSING -->
-          <section class="card">
-            <h2 class="card__title">Processing</h2>
-            <p class="card__hint">
-              Record each bag this unit was separated into, with its volume. Two bags of the same component are two
-              rows. This runs alongside testing; neither waits on the other.
-              <template v-if="selected.collection?.blood_bag_type_label">
-                Drawn into a {{ selected.collection.blood_bag_type_label.toLowerCase() }} bag.
-              </template>
-            </p>
-
-            <div v-if="selected.components?.length" class="recorded">
-              <div v-for="c in selected.components" :key="c.id ?? c.component_id" class="fact">
-                <span class="fact__label">{{ c.component }}</span>
-                <span class="fact__value">{{ bagLabel(c) }}</span>
-                <!-- The number on the bag's Phase 1 label: the sticker plus what it holds. -->
-                <span v-if="c.bag_number" class="fact__sub mono">{{ c.bag_number }}</span>
-              </div>
-            </div>
-
-            <!-- Phase 1 labelling: what the product is and its number. No blood type, no clearance. -->
-            <div v-if="phaseOneLabels.length" class="actions">
-              <button type="button" class="btn" @click="printBaseLabels">
+            <!--
+              Phase 1 labelling: what the product is and its number. No blood
+              type, no clearance. Phase 2, the final label, is Processing's too
+              (project owner, 2026-10-22): once Testing has cleared the unit,
+              before the hand-over.
+            -->
+            <div v-if="!isFinal || phaseOneLabels.length" class="actions">
+              <button v-if="phaseOneLabels.length" type="button" class="btn" @click="printBaseLabels">
                 <AssetIcon name="file-down" :size="14" />
                 Print bag labels (Phase 1)
               </button>
-              <span class="card__hint">
-                Base labels: bag number, component and volume, marked "Quarantine, not for issue".
-              </span>
+              <button
+                v-if="selected.status !== 'rejected'"
+                type="button"
+                class="btn"
+                :class="{ 'btn--primary': cleared && !selected.labelled_at && !isFinal }"
+                :disabled="!cleared || busy"
+                :title="cleared ? '' : 'Final labels print once Testing has cleared both sections.'"
+                @click="printFinal"
+              >
+                <AssetIcon name="printer" :size="14" />
+                {{ selected.labelled_at ? 'Reprint final labels' : 'Print final labels' }}
+              </button>
+              <NuxtLink v-if="!isFinal" :to="`/blood-center/processed?donation=${selected.id}&open=edit`" class="btn">
+                <AssetIcon name="pencil" :size="14" />
+                View or edit on the Processed list
+              </NuxtLink>
+            </div>
+            <p v-if="!isFinal" class="card__hint">
+              <template v-if="selected.labelled_at">
+                Final labels printed {{ formatDate(selected.labelled_at) }}<template v-if="selected.labelled_by"> by {{ selected.labelled_by }}</template>.
+                Hand the bags over on the Processed list.
+              </template>
+              <template v-else-if="cleared">
+                Testing has cleared this unit. Print and affix its final labels, then hand it over on the Processed list.
+              </template>
+              <template v-else>
+                Final labels print once Testing has cleared both sections. Until then the bags stay with Processing.
+              </template>
+            </p>
+            <p v-if="!isFinal" class="card__hint">
+              Base labels carry the bag number, component and volume, marked "Quarantine, not for issue". A saved
+              breakdown changes only through a correction the component technologist approves on the Processed list.
+            </p>
+          </template>
+
+          <div v-if="isFinal" class="actions">
+            <button type="button" class="btn btn--primary" @click="backToQueue">Back to queue</button>
+            <!-- Processing does not read inventory (project owner, 2026-10-19): its list says what Issuance booked in. -->
+            <NuxtLink v-if="selected.status === 'completed'" :to="`/blood-center/processed?donation=${selected.id}`" class="btn">
+              View on the Processed list
+            </NuxtLink>
+          </div>
+
+          <p v-else-if="!hasComponents && !canRecordComponents" class="card__hint">
+            Waiting for the Processing department to record the breakdown.
+          </p>
+
+          <!--
+            One bag per row, with its volume: two bags of the same component are
+            two rows. Locked until a unit is open, so the bench reads the same
+            before one is picked.
+          -->
+          <fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">
+            <div class="entry">
+              <label class="field">
+                <span class="field__label">Component <span class="req" aria-hidden="true">*</span></span>
+                <span class="select">
+                  <SelectField v-model="draft.component_id" placeholder="Select component" aria-label="Component"
+                    :options="components.map(c => ({ value: c.id, label: c.name }))" />
+                  <AssetIcon name="chevron-down" :size="16" class="select__chevron" />
+                </span>
+              </label>
+
+              <label class="field">
+                <span class="field__label">Volume (mL) <span class="req" aria-hidden="true">*</span></span>
+                <input
+                  v-model.number="draft.volume_ml"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  inputmode="numeric"
+                  class="field__input"
+                  placeholder="e.g. 250"
+                  @keydown.enter.prevent="addBag"
+                >
+              </label>
+
+              <button
+                type="button"
+                class="btn btn--soft entry__add"
+                :disabled="!isCompleteBag(draft) || componentRows.length >= 10"
+                @click="addBag"
+              >
+                <AssetIcon name="plus" :size="16" />
+                Add component bag
+              </button>
             </div>
 
-            <p v-if="!canRecordComponents" class="card__hint">
-              {{ selected.components?.length ? 'Recorded by the Processing department.' : 'Waiting for the Processing department to record the breakdown.' }}
+            <p class="bags__title">Added component bags ({{ componentRows.length }})</p>
+            <div class="table-wrap">
+              <table class="bag-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Component</th>
+                    <th scope="col" class="num">Volume (mL)</th>
+                    <th scope="col" class="end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, index) in componentRows" :key="index">
+                    <td>{{ componentName(row.component_id) }}</td>
+                    <td class="num">{{ row.volume_ml }}</td>
+                    <td class="end">
+                      <button
+                        type="button"
+                        class="icon-btn icon-btn--danger"
+                        aria-label="Remove this bag"
+                        title="Remove"
+                        @click="componentRows.splice(index, 1)"
+                      >
+                        <AssetIcon name="trash-2" :size="15" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!componentRows.length">
+                    <td colspan="3">
+                      <div class="bag-table__empty">
+                        <BagIcon class="bag-table__icon" />
+                        <p class="bag-table__empty-title">No component bags added yet.</p>
+                        <p>Add a component and volume to continue.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Information only: nothing here decides what a bag should hold. -->
+            <p v-if="declaredVolume > 0" class="card__hint">
+              {{ declaredVolume }} mL across {{ componentRows.length }} bag(s)<template v-if="selected?.volume_ml">.
+                {{ selected.volume_ml }} mL was collected</template>.
             </p>
 
-            <template v-else>
-              <div v-for="(row, index) in componentRows" :key="index" class="component-row">
-                <label class="field">
-                  <span class="field__label">Component</span>
-                  <select v-model.number="row.component_id" class="field__input">
-                    <option :value="null" disabled>Select</option>
-                    <option v-for="c in components" :key="c.id" :value="c.id">{{ c.name }}</option>
-                  </select>
-                </label>
-
-                <label class="field field--qty">
-                  <span class="field__label">Volume (mL)</span>
-                  <input
-                    v-model.number="row.volume_ml"
-                    type="number"
-                    min="1"
-                    max="1000"
-                    inputmode="numeric"
-                    class="field__input"
-                    placeholder="mL"
-                  >
-                </label>
-
-                <button
-                  type="button"
-                  class="btn btn--icon"
-                  :disabled="componentRows.length === 1"
-                  aria-label="Remove this bag"
-                  @click="componentRows.splice(index, 1)"
-                >
-                  <AssetIcon name="trash-2" :size="14" />
-                </button>
-              </div>
-
-              <!-- Information only: nothing here decides what a bag should hold. -->
-              <p v-if="declaredVolume > 0" class="card__hint">
-                {{ declaredVolume }} mL across {{ componentRows.filter(isCompleteBag).length }} bag(s)<template v-if="selected.volume_ml">.
-                  {{ selected.volume_ml }} mL was collected</template>.
-              </p>
-
-              <div class="actions">
-                <button type="button" class="btn" :disabled="componentRows.length >= 10" @click="addComponentRow">
-                  Add bag
-                </button>
-                <button
-                  type="button"
-                  class="btn btn--primary"
-                  :disabled="busy || !validComponents"
-                  @click="submitComponents"
-                >
-                  {{ selected.components?.length ? 'Request correction' : 'Record components' }}
-                </button>
-              </div>
-              <p v-if="selected.components?.length" class="card__hint">
-                A saved breakdown changes only with the component technologist's approval.
-              </p>
-            </template>
-          </section>
-        </div>
+            <button
+              type="button"
+              class="btn btn--primary btn--block"
+              :disabled="busy || !validComponents"
+              @click="submitComponents"
+            >
+              <AssetIcon name="file-text" :size="16" />
+              Record components
+            </button>
+          </fieldset>
+        </section>
 
         <!--
-          THE HAND-OVER. Final labelling is not here: it is Issuance's, at Stock
-          Intake, once testing has cleared the donation.
+          THE HAND-OVER is on the Processed list (project owner, 2026-10-19),
+          where a unit waits once its breakdown is recorded, and so are its
+          final labels once testing has cleared the donation (project owner,
+          2026-10-22). The bench offers them too, for a unit opened from there.
+
+          A unit that cannot be separated never reaches the Processed list, so
+          it is rejected here.
         -->
-        <section class="card">
-          <h2 class="card__title">Hand-over to Issuance</h2>
-          <p class="card__hint">
-            Complete processing to send the bags to Stock Intake, where they are booked into quarantine. Their final
-            labels (verified blood type, expiry, clearance) are printed there once testing clears the donation.
-          </p>
+        <section v-if="!hasComponents && canUpdateStatus && !isFinal" class="card reject">
+          <span class="reject__icon"><AssetIcon name="triangle-alert" :size="22" /></span>
+          <div class="reject__body">
+            <h2 class="reject__title">Cannot process this unit?</h2>
+            <p class="reject__text">
+              If the unit is damaged, hemolyzed or clotted, it cannot be separated.<br>
+              It is marked as rejected and can never become stock.
+            </p>
 
-          <ul v-if="blockers.length" class="blockers">
-            <li v-for="blocker in blockers" :key="blocker">
-              <AssetIcon name="circle-alert" :size="14" />
-              {{ blocker }}
-            </li>
-          </ul>
+            <div v-if="rejecting" class="defer">
+              <label class="field">
+                <span class="field__label">Why is this unit not being issued?</span>
+                <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
+              </label>
+              <div class="actions">
+                <button type="button" class="btn btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
+                  {{ busy ? 'Saving…' : 'Confirm rejection' }}
+                </button>
+                <button type="button" class="btn" :disabled="busy" @click="rejecting = false">Cancel</button>
+              </div>
+            </div>
 
-          <p v-if="!canUpdateStatus" class="card__hint">
-            The component technologist completes or rejects this donation.
-          </p>
-
-          <div v-else-if="rejecting" class="defer">
-            <label class="field">
-              <span class="field__label">Why is this unit not being issued?</span>
-              <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
-            </label>
-            <div class="actions">
-              <button type="button" class="btn btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
-                {{ busy ? 'Saving…' : 'Confirm rejection' }}
+            <div v-else class="actions">
+              <button type="button" class="btn btn--danger" :disabled="busy || !selected" @click="rejecting = true">
+                <AssetIcon name="trash-2" :size="15" />
+                Reject unit
               </button>
-              <button type="button" class="btn" :disabled="busy" @click="rejecting = false">Cancel</button>
             </div>
           </div>
-
-          <div v-else class="actions">
-            <button type="button" class="btn btn--primary" :disabled="busy || blockers.length > 0" @click="submitRelease">
-              {{ busy ? 'Saving…' : 'Complete processing' }}
-            </button>
-            <button type="button" class="btn btn--danger" :disabled="busy" @click="rejecting = true">
-              Reject this unit
-            </button>
-          </div>
         </section>
-      </template>
-    </template>
       </section>
     </div>
-
-    <BloodCenterCorrectionRequestDialog
-      v-if="correction"
-      :donation-id="selected.id"
-      subject="components"
-      :changes="correction"
-      :previous="previousBreakdown"
-      @close="correction = null"
-      @submitted="onCorrectionSent"
-    />
 
     <BloodCenterBagLabelSheet />
   </div>
 </template>
 
 <script setup>
+import { h } from 'vue'
+import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { donorInitials, donorReference, donorTitle } from '~/utils/donorLabel'
-import { baseLabelsFrom } from '~/utils/bagLabels'
+import { donorTitle } from '~/utils/donorLabel'
+import { baseLabelsFrom, finalLabelsFrom } from '~/utils/bagLabels'
 
 /**
  * The Processing department's side of a donation.
  *
  * The counter leaves every donation at `collected`; the Testing department
  * records immunohematology and serology on its own page, and a donation that
- * passes both becomes `tested`. From there `completed` — *cleared for issue to
- * a patient* — is Processing's to set, here. Testing's work shows on this page
- * read-only, as its outcome: which serology marker was reactive never reaches
- * this department. Everything on this page is a record of what a medical
+ * passes both becomes `tested`. Processing records the breakdown here; from
+ * there `completed` — handed over to Issuance — is Processing's to set, on the
+ * Processed list (pages/blood-center/processed.vue, project owner
+ * 2026-10-19), where a processed unit waits. Testing's results are not shown
+ * here (project owner, 2026-10-22); the list's next step still says whether
+ * Testing is outstanding. Everything on this page is a record of what a medical
  * technologist found at the bench — nothing here performs or interprets a test.
  */
 
@@ -439,35 +405,59 @@ definePageMeta({
   requires: 'lab.record_components',
 })
 
-const { user, can } = useUser()
-const facilityLabel = computed(() => user.value?.facility?.facility_name || '')
+const { can } = useUser()
+const route = useRoute()
 
-// Processing records the breakdown and makes the final call. A supervisor
-// holds every ability, so can also jump across to the Testing page.
-// Either testing section: both are recorded on the TTI Testing page.
-const canRecordResult = computed(() => can(['lab.record_serology', 'lab.record_immunohematology']))
+// The sidebar counts units waiting for their hand-over; recording a breakdown adds one.
+const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
+
+// Processing records the breakdown and makes the final call.
 const canRecordComponents = computed(() => can('lab.record_components'))
 const canUpdateStatus = computed(() => can('lab.update_status'))
+
+/** A blood bag, drawn here: the icon set has none. Sized by the class it is given. */
+const BagIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  'stroke-width': 1.6,
+  'stroke-linecap': 'round',
+  'stroke-linejoin': 'round',
+  'aria-hidden': 'true',
+}, [
+  h('path', { d: 'M10 2h4M12 2v3M12 19v3' }),
+  h('rect', { x: 6, y: 5, width: 12, height: 14, rx: 3 }),
+  h('path', { d: 'M12 9.5c1.3 1.6 2 2.6 2 3.5a2 2 0 0 1-4 0c0-.9.7-1.9 2-3.5z' }),
+])
 
 const service = bloodCenterService
 
 const queue = ref([])
+const queueTotal = ref(0)
 const selected = ref(null)
 const components = ref([])
 
-// Empty means the laboratory's own working queue: collected and tested, which
-// is what the endpoint returns when no status is given.
+// Empty means Processing's own working queue: drawn donations with no
+// breakdown yet (stage=processing). A processed one waits on the Processed list.
 const statusFilter = ref('')
 
-// The filter as chips. Same values the select carried; picking one reloads,
-// exactly as the select's @change did.
+// The filter as chips. Picking one reloads the list.
 const STATUS_OPTIONS = [
-  { value: '', label: 'Awaiting', title: 'Awaiting the laboratory' },
-  { value: 'collected', label: 'With Testing', title: 'With Testing, not yet tested' },
+  { value: '', label: 'Awaiting', title: 'Not yet processed' },
+  { value: 'collected', label: 'With testing', title: 'With Testing, not yet tested' },
   { value: 'tested', label: 'Ready', title: 'Tested, ready for processing' },
-  { value: 'completed', label: 'Cleared', title: 'Cleared for issue' },
+  { value: 'completed', label: 'Handed over', title: 'Handed over to Issuance' },
   { value: 'rejected', label: 'Rejected', title: 'Rejected' },
 ]
+
+/** The queue's query for one chip. */
+function queueParams(value) {
+  return value ? { status: value } : { stage: 'processing' }
+}
+
+// How many units each chip holds, keyed by its value. Read from each list's
+// paginated total, one row asked for, so the server needs no new count.
+const counts = ref({})
 
 function setStatusFilter(value) {
   if (statusFilter.value === value) return
@@ -481,9 +471,11 @@ const notice = ref(null)
 const rejecting = ref(false)
 const rejectReason = ref('')
 
-// One row per bag, with its volume. Two bags of the same component are two
-// rows; inventory books in exactly one unit per row.
-const componentRows = ref([{ component_id: null, volume_ml: null }])
+// The bag being entered, and the bags added so far: one row per bag, with its
+// volume. Two bags of the same component are two rows; inventory books in
+// exactly one unit per row.
+const draft = reactive({ component_id: null, volume_ml: null })
+const componentRows = ref([])
 
 function isCompleteBag(row) {
   const volume = Number(row.volume_ml)
@@ -491,20 +483,32 @@ function isCompleteBag(row) {
   return Boolean(row.component_id) && Number.isInteger(volume) && volume >= 1 && volume <= 1000
 }
 
-/** The total declared across complete rows, shown beside the collected volume. */
+function addBag() {
+  if (!isCompleteBag(draft) || componentRows.value.length >= 10) return
+
+  componentRows.value.push({ component_id: draft.component_id, volume_ml: Number(draft.volume_ml) })
+  draft.component_id = null
+  draft.volume_ml = null
+}
+
+function componentName(id) {
+  return components.value.find((c) => c.id === id)?.name ?? '—'
+}
+
+/** The total declared across the added bags, shown beside the collected volume. */
 const declaredVolume = computed(() => componentRows.value
   .filter(isCompleteBag)
   .reduce((sum, row) => sum + Number(row.volume_ml), 0))
 
 /** How a recorded bag reads. A breakdown from before volumes were kept shows its count. */
 function bagLabel(bag) {
-  if (bag.volume_ml) return `${bag.volume_ml} mL`
+  if (bag.volume_ml) return `${bag.volume_ml}`
 
   return `${bag.quantity} unit${bag.quantity === 1 ? '' : 's'}`
 }
 
 // Phase 1 labelling: the base label for each numbered bag. The final label,
-// with the blood type, is Issuance's to print once testing clears the bags.
+// with the blood type, follows once testing clears the bags (printFinal).
 const { print: printLabels } = useLabelPrint()
 const phaseOneLabels = computed(() => baseLabelsFrom(selected.value))
 
@@ -512,59 +516,33 @@ function printBaseLabels() {
   printLabels(phaseOneLabels.value, 'base')
 }
 
-// Testing is finished once the donation has an outcome under the five-marker
-// panel. A legacy result — recorded before the panel existed — does not count.
-const hasResult = computed(() => Boolean(selected.value?.test_result) && !selected.value?.test_result?.is_legacy)
+// Phase 2, the final label, once Testing has cleared both sections. Printing
+// records who labelled the bags, which the hand-over needs, so the unit is
+// read again after.
+const cleared = computed(() => Boolean(selected.value?.clearances?.tti && selected.value?.clearances?.immunohematology))
 
-/** Which Testing sections are still missing, in words. */
-const testingOutstanding = computed(() => {
-  const missing = []
+async function printFinal() {
+  const id = selected.value?.id
+  if (!id || !cleared.value) return
 
-  if (!selected.value?.immunohematology) missing.push('immunohematology')
-  if (!selected.value?.serology) missing.push('serology')
+  const res = await run(() => service.printFinalLabels(id))
+  if (!res) return
 
-  return missing.length ? missing.join(' and ') : 'its outcome'
-})
+  const labels = finalLabelsFrom(res)
+  if (labels.length) await printLabels(labels, 'final')
+
+  const fresh = await run(() => service.laboratoryDonation(id))
+  if (fresh) adopt(fresh.data ?? fresh)
+  notice.value = res.message ?? null
+}
+
 const hasComponents = computed(() => Boolean(selected.value?.components?.length))
 const isFinal = computed(() => ['completed', 'rejected'].includes(selected.value?.status))
-
-const initials = computed(() => donorInitials(selected.value?.donor) || '—')
 
 // Every row complete, not just one: a half-filled row would otherwise be
 // dropped silently, and a bag would go unrecorded.
 const validComponents = computed(() => componentRows.value.length > 0
   && componentRows.value.every(isCompleteBag))
-
-/**
- * What still stands between this donation and completion.
- *
- * Mirrors the server's guardReadyToComplete: only the component breakdown.
- * Test results are not a condition — the bags go into quarantine, and the
- * clearances are what release them.
- */
-const blockers = computed(() => {
-  const list = []
-
-  if (!hasComponents.value) list.push('The component breakdown has not been recorded.')
-
-  return list
-})
-
-const steps = computed(() => {
-  const done = (ok) => (ok ? 'step--done' : '')
-
-  return [
-    { key: 'received', index: 1, label: 'Received', state: 'step--done' },
-    { key: 'testing', index: 2, label: 'Testing', state: done(hasResult.value) },
-    { key: 'processing', index: 3, label: 'Processing', state: done(hasComponents.value) },
-    {
-      key: 'release',
-      index: 4,
-      label: 'Hand-over',
-      state: isFinal.value ? 'step--done' : (blockers.value.length ? '' : 'step--current'),
-    },
-  ]
-})
 
 function pillClass(status) {
   return status ? `pill--${status}` : ''
@@ -584,7 +562,7 @@ function formatDate(value) {
  * The one line a technologist scanning the queue actually needs.
  */
 function nextStepFor(row) {
-  if (row.status === 'completed') return 'Cleared for issue'
+  if (row.status === 'completed') return 'Handed over'
   if (row.status === 'rejected') return row.rejection_reason || 'Rejected'
   if (row.test_result?.is_legacy) return 'Needs serology from Testing'
   if (row.test_result && !row.test_result.clears_for_issue) return 'Needs rejecting'
@@ -596,7 +574,7 @@ function nextStepFor(row) {
   if (!row.test_result) outstanding.push('testing')
   if (!row.components?.length) outstanding.push('processing')
 
-  return outstanding.length ? `Needs ${outstanding.join(' and ')}` : 'Ready to release'
+  return outstanding.length ? `Needs ${outstanding.join(' and ')}` : 'Hand over on the Processed list'
 }
 
 /**
@@ -625,6 +603,15 @@ function messageFor(err) {
       return err?.data?.message || 'This type disagrees with the donor’s profile. Collection must correct it.'
     case 'donation_already_final':
       return 'This donation has already been cleared or rejected.'
+    case 'tti_not_cleared':
+    case 'immunohematology_not_cleared':
+      return 'Testing has not cleared both sections yet, so the bags cannot be labelled.'
+    // The server's own words name the component or the fix.
+    case 'shelf_life_missing':
+    case 'barcode_missing':
+    case 'bags_unnumbered':
+    case 'donor_blood_type_missing':
+      return err?.data?.message || 'These bags cannot be labelled yet.'
     case 'facility_missing':
       return 'This account is not linked to a facility.'
     default:
@@ -646,16 +633,31 @@ async function run(work) {
   }
 }
 
+/** Each chip's count. A count that fails to load shows a dot, not a wrong number. */
+async function loadCounts() {
+  const results = await Promise.allSettled(
+    STATUS_OPTIONS.map((option) => service.laboratoryQueue({ ...queueParams(option.value), per_page: 1 })),
+  )
+
+  const next = {}
+  STATUS_OPTIONS.forEach((option, index) => {
+    const total = results[index].status === 'fulfilled' ? results[index].value?.total : undefined
+    if (Number.isInteger(total)) next[option.value] = total
+  })
+
+  counts.value = next
+}
+
 async function loadQueue() {
   loadingQueue.value = true
   error.value = null
+  loadCounts()
 
   try {
-    const res = await service.laboratoryQueue(
-      statusFilter.value ? { status: statusFilter.value } : { stage: 'processing' },
-    )
+    const res = await service.laboratoryQueue(queueParams(statusFilter.value))
 
     queue.value = res?.data ?? []
+    queueTotal.value = Number.isInteger(res?.total) ? res.total : queue.value.length
   } catch (err) {
     error.value = messageFor(err)
   } finally {
@@ -683,16 +685,11 @@ function adopt(payload) {
   rejecting.value = false
   rejectReason.value = ''
 
-  if (!payload) return
-
-  // A breakdown recorded before volumes were kept has a count and no
-  // volume; it opens as that many rows, each waiting for its volume.
-  componentRows.value = payload.components?.length
-    ? payload.components.flatMap((c) => Array.from(
-      { length: c.volume_ml ? 1 : Math.max(1, Number(c.quantity) || 1) },
-      () => ({ component_id: c.component_id, volume_ml: c.volume_ml ?? null }),
-    ))
-    : [{ component_id: null, volume_ml: null }]
+  // The form is for a first breakdown only: a saved one is corrected on the
+  // Processed list.
+  componentRows.value = []
+  draft.component_id = null
+  draft.volume_ml = null
 }
 
 async function openDonation(id) {
@@ -708,25 +705,11 @@ async function openDonation(id) {
 }
 
 function backToQueue() {
-  selected.value = null
+  // Clears the bags too: the locked form shows empty, not the last unit's.
+  adopt(null)
   error.value = null
   notice.value = null
   loadQueue()
-}
-
-function addComponentRow() {
-  componentRows.value.push({ component_id: null, volume_ml: null })
-}
-
-const correction = ref(null)
-
-const previousBreakdown = computed(() => (selected.value?.components?.length
-  ? { components: selected.value.components.map((c) => ({ component_id: c.component_id, volume_ml: c.volume_ml })) }
-  : null))
-
-function onCorrectionSent(response) {
-  correction.value = null
-  notice.value = response?.message ?? 'Correction requested.'
 }
 
 async function submitComponents() {
@@ -734,27 +717,17 @@ async function submitComponents() {
     .filter(isCompleteBag)
     .map((row) => ({ component_id: row.component_id, volume_ml: Number(row.volume_ml) }))
 
-  // A saved breakdown is never saved over: it becomes a correction request.
-  if (selected.value.components?.length) {
-    correction.value = { components: payload }
-    return
-  }
-
   const res = await run(() => service.declareComponents(selected.value.id, { components: payload }))
 
   if (!res) return
 
   adopt(res.data)
   notice.value = res.message ?? null
-}
 
-async function submitRelease() {
-  const res = await run(() => service.updateLaboratoryStatus(selected.value.id, { status: 'completed' }))
-
-  if (!res) return
-
-  adopt(res.data)
-  notice.value = res.message ?? null
+  // Processed: it leaves this queue for the Processed list, and the sidebar
+  // counts one more unit waiting for its hand-over.
+  badgeRefresh.value++
+  loadQueue()
 }
 
 async function submitReject() {
@@ -767,11 +740,17 @@ async function submitReject() {
 
   adopt(res.data)
   notice.value = res.message ?? null
+  loadQueue()
 }
 
 onMounted(async () => {
   await loadReference()
   await loadQueue()
+
+  // ?donation= from the Processed list: a processed unit is off the queue, but
+  // its breakdown is viewed and its labels reprinted here.
+  const wanted = Number(route.query.donation)
+  if (Number.isInteger(wanted) && wanted > 0) await openDonation(wanted)
 })
 </script>
 
@@ -784,392 +763,30 @@ onMounted(async () => {
   background: var(--rb-page-bg);
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-}
-
-.laboratory__header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.laboratory__eyebrow {
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rb-primary-text);
+  gap: 20px;
 }
 
 .laboratory__title {
-  margin: 0.15rem 0 0;
-  font-size: 20px;
+  margin: 0;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--rb-text-primary);
 }
 
 .laboratory__subtitle {
-  margin: 0.3rem 0 0;
-  max-width: 68ch;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-}
-
-.laboratory__facility {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 999px;
-  background: var(--rb-surface);
-  font-size: 12.5px;
-  color: var(--rb-text-secondary);
-}
-
-/* --- cards --- */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  padding: 1.1rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  background: var(--rb-surface);
-}
-
-.card__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.card__tools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
-
-.card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
-
-.card__hint {
-  margin: 0;
+  margin: 4px 0 0;
   max-width: 68ch;
   font-size: 13.5px;
-  line-height: 1.5;
   color: var(--rb-text-secondary);
 }
 
-/* The two bench branches sit side by side: they are worked in parallel, and
-   stacking them would suggest one waits on the other more than it does. */
-.clearances {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.25rem 0 0.5rem;
-}
-
-.clearance {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.15rem 0.55rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 999px;
-  font-size: 11.5px;
-  color: var(--rb-text-secondary);
-}
-
-.clearance--done {
-  border-color: transparent;
-  background: rgba(var(--rb-success-rgb), 0.14);
-  color: var(--rb-success-text);
-}
-
-.lab-grid {
-  display: grid;
-  gap: 1.1rem;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 900px) {
-  .lab-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-}
-
-@media (max-width: 640px) {
-  .laboratory { padding: 16px 16px 32px; }
-}
-
-/* --- queue --- */
-.empty {
-  display: grid;
-  place-items: center;
-  gap: 0.5rem;
-  padding: 2rem 1rem;
-  text-align: center;
-  color: var(--rb-text-secondary);
-  font-size: 13.5px;
-}
-
-.queue { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
-
-.queue__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.queue__main { flex: 1 1 16rem; min-width: 0; }
-.queue__name { margin: 0; font-size: 14px; font-weight: 600; color: var(--rb-text-primary); }
-.queue__meta { margin: 0.15rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-
-.queue__state { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
-.queue__next { font-size: 12px; color: var(--rb-text-secondary); }
-
-/* --- the selected unit --- */
-.unit-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  background: var(--rb-surface-alt);
-}
-
-.unit-bar__identity { display: flex; align-items: center; gap: 0.7rem; min-width: 0; flex: 1 1 14rem; }
-
-.unit-bar__avatar {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  background: rgba(var(--rb-primary-rgb), 0.12);
-  color: var(--rb-primary-text);
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.unit-bar__names { min-width: 0; }
-.unit-bar__name { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
-.unit-bar__sub { margin: 0.15rem 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-
-.fact { display: flex; flex-direction: column; gap: 0.25rem; }
-
-.fact__label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-
-.fact__value { font-size: 13.5px; color: var(--rb-text-primary); }
-
-/* Who screened a section, and when — the form's "Screened by" column. */
-.fact__sub { font-size: 12px; color: var(--rb-text-secondary); }
-
-.mono {
-  font-family: var(--rb-font-mono);
-  letter-spacing: 0.02em;
-}
-
-.card__hint--warn { color: var(--rb-warning-text); font-weight: 600; }
-
-.btn--link { align-self: flex-start; }
-
-.recorded {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.1rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.pill {
-  display: inline-block;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--rb-surface-alt);
-  color: var(--rb-text-secondary);
-  border: 1px solid var(--rb-border);
-}
-
-.pill--collected { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); border-color: transparent; }
-.pill--tested { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: transparent; }
-.pill--completed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: transparent; }
-.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
-
-/* --- progress --- */
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.2rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; }
-
-.step__dot {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-secondary);
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.step--done .step__dot { background: var(--rb-success); border-color: var(--rb-success); color: #fff; }
-.step--current .step__dot { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
-.step--done .step__label,
-.step--current .step__label { color: var(--rb-text-primary); font-weight: 600; }
-
-.step__label { color: var(--rb-text-secondary); }
-
-/* --- forms --- */
-.field { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
-.field--qty { max-width: 7rem; }
-.field--filter { max-width: 15rem; }
-
-.field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
-.field__optional { font-weight: 400; color: var(--rb-text-secondary); font-size: 11.5px; }
-
-.field__input {
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 8px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 13.5px;
-}
-
-.field__input:focus-visible {
-  outline: 2px solid var(--rb-primary);
-  outline-offset: 1px;
-  border-color: var(--rb-primary);
-}
-
-.field__input:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.component-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
-
-.blockers {
-  margin: 0;
-  padding: 0.7rem 0.85rem;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  border: 1px solid rgba(var(--rb-warning-rgb), 0.35);
-  border-radius: 10px;
-  background: rgba(var(--rb-warning-rgb), 0.06);
-  font-size: 13px;
-  color: var(--rb-warning-text);
-}
-
-.blockers li { display: flex; align-items: center; gap: 0.45rem; }
-
-.defer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.8rem;
-  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
-  border-radius: 10px;
-  background: rgba(var(--rb-accent-rgb), 0.05);
-}
-
-/* --- actions --- */
-.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  border-radius: 10px;
-  padding: 0.5rem 0.95rem;
-  font-size: 13.5px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease;
-}
-
-.btn:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn--icon { padding: 0.5rem 0.6rem; }
-
-.btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
-.btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
-  border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
-}
-
-.btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
-.btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--rb-accent) 88%, #000);
-  border-color: color-mix(in srgb, var(--rb-accent) 88%, #000);
-}
-
-/* --- feedback --- */
-.alert {
-  margin: 0;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
-  font-size: 13.5px;
-}
-
-.alert--error {
-  background: rgba(var(--rb-accent-rgb), 0.1);
-  color: var(--rb-accent-text);
-  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
-}
-
-.alert--notice {
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
-}
-
-.outcome { display: flex; align-items: flex-start; gap: 0.75rem; }
-.outcome--success { color: var(--rb-success-text); }
-.outcome--rejected { color: var(--rb-accent-text); }
-.outcome .card__title { color: var(--rb-text-primary); }
-/* ---------- workspace (queue + bench), as on Stock Intake ---------- */
-.laboratory__header { margin-bottom: 0; }
-
+/* ---------- workspace: the list as tall as the bench ---------- */
 .workspace {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
 }
 
 .queue-panel {
@@ -1183,37 +800,58 @@ onMounted(async () => {
   background: var(--rb-surface);
   overflow: hidden;
 }
-.queue-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+
+.queue-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 12px; }
 .queue-panel__title {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11px;
+  gap: 10px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
+  color: var(--rb-text-primary);
 }
-.queue-panel__count { padding: 1px 8px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-primary); letter-spacing: 0; }
 
-.status-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 10px; border-bottom: 1px solid var(--rb-border); }
+.count {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+}
+
+.status-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 18px 16px; border-bottom: 1px solid var(--rb-border); }
 .status-chip {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
   border: 1px solid var(--rb-border-strong);
   border-radius: 999px;
   background: var(--rb-surface);
   color: var(--rb-text-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
 .status-chip:hover { color: var(--rb-text-primary); border-color: var(--rb-border-hover); }
-.status-chip--on { border-color: rgba(var(--rb-primary-rgb), 0.35); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.status-chip--on { border-color: rgba(var(--rb-success-rgb), 0.55); background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
 .status-chip:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.status-chip__count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-primary);
+  font-size: 11.5px;
+  text-align: center;
+}
+.status-chip--on .status-chip__count { background: rgba(var(--rb-success-rgb), 0.16); color: var(--rb-success-text); }
 
-.qlist { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.qlist { list-style: none; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; }
 .qitem {
   width: 100%;
   display: flex;
@@ -1238,29 +876,285 @@ onMounted(async () => {
 .qitem__meta { font-size: 12px; color: var(--rb-text-secondary); }
 .qitem__next { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text); }
 
-.queue-empty { display: flex; align-items: flex-start; gap: 10px; margin: 10px 12px 14px; padding: 12px; border-radius: 10px; background: var(--rb-surface-alt); color: var(--rb-success-text); }
-.queue-empty p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
-
-.bench { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-/* The open unit's identity reads as the workbench header, like the other cards. */
-.bench .unit-bar { gap: 24px; padding: 16px 18px; border-color: var(--rb-border); border-radius: 14px; background: var(--rb-surface); }
-.bench .unit-bar__identity { flex: 1; }
-.bench__idle {
+/* Nothing listed: centred in the panel, a little above the middle. */
+.queue-empty {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 420px;
-  padding: 48px 24px;
+  padding: 48px 32px 120px;
+  text-align: center;
+}
+.queue-empty__icon { width: 72px; height: 72px; margin-bottom: 18px; color: var(--rb-text-secondary); }
+.queue-empty__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.queue-empty__text { margin: 0; max-width: 34ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+.queue-empty__link { color: var(--rb-primary-text); font-weight: 600; }
+
+/* ---------- bench ---------- */
+.bench {
+  container: bench / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
   border: 1px solid var(--rb-border);
   border-radius: 14px;
   background: var(--rb-surface);
-  text-align: center;
 }
-.bench__idle-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
-.bench__idle-title { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
-.bench__idle-text { margin: 0; max-width: 42ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+
+.card__head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.card__title { margin: 0; font-size: 17px; font-weight: 700; color: var(--rb-text-primary); }
+
+.card__hint {
+  margin: 0;
+  max-width: 80ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rb-text-secondary);
+}
+/* Component separation */
+.sep__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+  min-height: 36px;
+  padding: 3px 6px 3px 0;
+  border: 1px solid var(--rb-border);
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
+}
+.picked__icon { display: grid; place-items: center; align-self: stretch; padding: 0 10px; border-right: 1px solid var(--rb-border); color: var(--rb-text-secondary); }
+.picked__bag { width: 20px; height: 20px; }
+.picked__text { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1; line-height: 1.3; }
+.picked__label { font-size: 11px; color: var(--rb-text-secondary); }
+.picked__value { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picked__meta { font-weight: 400; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* The bag form; a fieldset so that no unit open disables all of it at once. */
+.bags {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+@container bench (min-width: 720px) {
+  .entry { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) auto; gap: 14px; }
+  .entry__add { margin-left: 36px; }
+}
+
+.bags__title { margin: 2px 0 -6px; font-size: 13.5px; font-weight: 600; color: var(--rb-text-primary); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rb-border); border-radius: 10px; }
+.bag-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bag-table th {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rb-border);
+  background: var(--rb-surface-alt);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--rb-text-secondary);
+}
+.bag-table td { padding: 8px 16px; border-top: 1px solid var(--rb-border); color: var(--rb-text-primary); }
+.bag-table tbody tr:first-child td { border-top: 0; }
+.bag-table .num { text-align: center; }
+.bag-table .end { text-align: right; }
+.bag-table td.end .icon-btn { margin-left: auto; }
+
+.bag-table__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+}
+.bag-table__empty p { margin: 0; }
+.bag-table__icon { width: 22px; height: 22px; margin-bottom: 6px; }
+.bag-table__empty-title { color: var(--rb-text-primary); }
+
+/* Cannot process: tinted, so it never reads as part of the separation form. */
+.reject {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 18px;
+  border-color: rgba(var(--rb-accent-rgb), 0.45);
+  background: rgba(var(--rb-accent-rgb), 0.07);
+}
+.reject__icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: rgba(var(--rb-accent-rgb), 0.18);
+  color: var(--rb-accent-text);
+  flex-shrink: 0;
+}
+.reject__body { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex: 1; }
+.reject__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.reject__text { margin: -6px 0 0; max-width: 80ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+.defer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 10px;
+  background: var(--rb-surface);
+}
+
+.outcome { display: flex; align-items: flex-start; gap: 12px; }
+.outcome--success { color: var(--rb-success-text); }
+.outcome--rejected { color: var(--rb-accent-text); }
+.outcome__title { margin: 0 0 2px; font-size: 14.5px; font-weight: 700; color: var(--rb-text-primary); }
+
+/* ---------- shared bits ---------- */
+.mono { font-family: var(--rb-font-mono); letter-spacing: 0.02em; }
+
+.pill {
+  display: inline-block;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
+  border: 1px solid var(--rb-border);
+}
+
+.pill--collected { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); border-color: transparent; }
+.pill--tested { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); border-color: transparent; }
+.pill--completed { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); border-color: transparent; }
+.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
+
+.field { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.field__label { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); }
+.req { color: var(--rb-accent-text); }
+
+.field__input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 8px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 13.5px;
+}
+.field__input:focus-visible {
+  outline: 2px solid var(--rb-primary);
+  outline-offset: 1px;
+  border-color: var(--rb-primary);
+}
+.field__input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* A select with the set's chevron, not the browser's. */
+.select { position: relative; display: block; }
+.select .field__input { appearance: none; padding-right: 36px; }
+.select__chevron { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); pointer-events: none; color: var(--rb-text-secondary); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  border-radius: 8px;
+  padding: 0 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.btn:hover:not(:disabled) { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.btn--link { align-self: flex-start; }
+.btn--block { width: 100%; height: 42px; }
+
+.btn--soft { background: var(--rb-surface-hover); border-color: var(--rb-border); }
+.btn--soft:disabled { opacity: 0.75; color: var(--rb-text-secondary); }
+
+.btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+.btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
+  border-color: color-mix(in srgb, var(--rb-primary) 88%, #000);
+}
+/* Muted, not faded: a locked Record reads as waiting, as on the mock-up. */
+.btn--primary:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--rb-primary) 28%, var(--rb-surface));
+  border-color: transparent;
+  color: var(--rb-text-secondary);
+}
+
+.btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
+.btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rb-accent) 88%, #000);
+  border-color: color-mix(in srgb, var(--rb-accent) 88%, #000);
+}
+
+.alert {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+
+.alert--error {
+  background: rgba(var(--rb-accent-rgb), 0.1);
+  color: var(--rb-accent-text);
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
+}
+
+.alert--notice {
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.25);
+}
 
 .icon-btn {
   width: 32px;
@@ -1277,6 +1171,7 @@ onMounted(async () => {
 .icon-btn:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 .icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .icon-btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.icon-btn--danger:hover:not(:disabled) { color: var(--rb-accent-text); }
 
 .skeleton {
   display: block;
@@ -1296,8 +1191,24 @@ onMounted(async () => {
 .spin { animation: lab-spin 0.9s linear infinite; }
 @keyframes lab-spin { to { transform: rotate(360deg); } }
 
+@media (max-width: 1280px) {
+  .workspace { grid-template-columns: 330px minmax(0, 1fr); }
+}
+
 @media (max-width: 1100px) {
-  .workspace { grid-template-columns: 300px minmax(0, 1fr); }
+  .workspace { grid-template-columns: 300px minmax(0, 1fr); gap: 16px; }
+}
+
+/* Stacked: the list first, kept short, then the bench under it. */
+@media (max-width: 860px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .queue-panel { position: static; max-height: 26rem; }
+  .queue-empty { padding: 32px 24px; }
+}
+
+@media (max-width: 640px) {
+  .laboratory { padding: 16px 16px 32px; }
+  .reject { flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

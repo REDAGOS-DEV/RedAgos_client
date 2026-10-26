@@ -1,365 +1,328 @@
 <template>
-  <section id="drives" class="drives" ref="sectionRef">
-    <div class="section-inner">
-      <div class="badge" :class="{ 'animate-in': visible }">
-        <span class="badge-dot"></span>
-        DONATION DRIVES
-      </div>
+  <section id="drives" class="drives lp-section">
+    <div class="lp-inner">
+      <header v-reveal class="lp-head">
+        <h2 class="lp-h2">Upcoming donation drives</h2>
+        <p class="lp-lead">Join a mobile blood donation drive near you and help save lives.</p>
+      </header>
 
-      <div class="heading-wrap" :class="{ 'animate-in': visible }">
-        <h2 class="heading-top">Upcoming Donation Drives</h2>
-        <p class="subheading">Join a mobile blood donation drive near you and help save lives.</p>
-      </div>
-
+      <!-- Nothing scheduled: point people at the one thing that helps. -->
       <div v-if="drives.length === 0" class="empty-state">
-        <IconCalendar />
-        <p>No upcoming drives at the moment. Check back soon!</p>
+        <span class="empty-icon"><AssetIcon name="calendar" :size="24" /></span>
+        <p class="empty-title">No drives scheduled yet</p>
+        <p class="empty-desc">New drives are posted here as blood centers schedule them.</p>
+        <NuxtLink to="/auth/donor/register" class="lp-btn lp-btn--primary lp-btn--sm">
+          Create an account to be notified
+        </NuxtLink>
       </div>
 
-      <div v-else class="drive-grid">
-        <article
-          v-for="(drive, index) in drives"
-          :key="drive.title"
-          class="drive-card"
-          :class="{ 'animate-in': visible }"
-          :style="{ '--drive-delay': `${index * 0.08}s` }"
-        >
-          <div class="card-top">
-            <span class="status-pill">Upcoming</span>
-            <span class="capacity">
-              <IconUsers />
-              {{ drive.registered }}/{{ drive.capacity }}
-            </span>
+      <!--
+        Registration counts and capacity are internal to the blood center and
+        are not shown on the public page.
+      -->
+      <div v-else class="drives-layout">
+        <!-- ── The soonest drive, featured ── -->
+        <article v-reveal class="featured">
+          <div class="featured-date">
+            <span class="featured-month">{{ featured.month }}</span>
+            <span class="featured-day">{{ featured.day }}</span>
+            <span v-if="relative[featured.date]" class="featured-when">{{ relative[featured.date] }}</span>
           </div>
 
-          <div class="card-body">
-            <h3>{{ drive.title }}</h3>
-
-            <ul class="drive-details">
-              <li>
-                <IconMapPin />
-                <span>{{ drive.location }}</span>
-              </li>
-              <li>
-                <IconCalendar />
-                <span>{{ drive.date }}</span>
-              </li>
-              <li>
-                <IconClock />
-                <span>{{ drive.time }}</span>
-              </li>
+          <div class="featured-body">
+            <p class="featured-label">Next drive</p>
+            <h3>{{ featured.title }}</h3>
+            <ul class="meta">
+              <li><AssetIcon name="map-pin" :size="16" />{{ featured.location }}</li>
+              <li><AssetIcon name="calendar" :size="16" />{{ featured.weekday }}</li>
+              <li><AssetIcon name="clock" :size="16" />{{ featured.time }}</li>
             </ul>
+
+            <div class="actions">
+              <NuxtLink to="/auth/login" class="lp-btn lp-btn--primary lp-btn--sm">
+                Register to join
+              </NuxtLink>
+              <button type="button" class="lp-btn lp-btn--secondary lp-btn--sm" @click="addToCalendar(featured)">
+                <AssetIcon name="calendar-check" :size="16" />
+                Add to calendar
+              </button>
+              <a
+                :href="driveMapsUrl(featured)"
+                target="_blank"
+                rel="noopener"
+                class="lp-btn lp-btn--secondary lp-btn--sm"
+              >
+                <AssetIcon name="map-pin" :size="16" />
+                Directions
+              </a>
+            </div>
           </div>
         </article>
+
+        <!-- ── The rest, compact ── -->
+        <ol v-if="rest.length" class="rest">
+          <li v-for="(drive, i) in rest" :key="drive.title" v-reveal="i * 80" class="row">
+            <time class="row-date" :datetime="drive.date">
+              <span class="row-month">{{ drive.month }}</span>
+              <span class="row-day">{{ drive.day }}</span>
+            </time>
+
+            <div class="row-main">
+              <h3>{{ drive.title }}</h3>
+              <p class="row-meta">{{ drive.weekday }} · {{ drive.time }}</p>
+              <p class="row-meta row-place">
+                <AssetIcon name="map-pin" :size="14" />{{ drive.location }}
+              </p>
+            </div>
+
+            <div class="row-actions">
+              <button
+                type="button"
+                class="icon-action"
+                :aria-label="`Add ${drive.title} to your calendar`"
+                title="Add to calendar"
+                @click="addToCalendar(drive)"
+              >
+                <AssetIcon name="calendar-check" :size="18" />
+              </button>
+              <a
+                :href="driveMapsUrl(drive)"
+                target="_blank"
+                rel="noopener"
+                class="icon-action"
+                :aria-label="`Directions to ${drive.location}`"
+                title="Directions"
+              >
+                <AssetIcon name="map-pin" :size="18" />
+              </a>
+              <NuxtLink to="/auth/login" class="row-link">Register to join</NuxtLink>
+            </div>
+          </li>
+        </ol>
       </div>
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, defineComponent, h } from 'vue'
+import AssetIcon from '~/components/common/AssetIcon.vue'
+import { driveIcs, driveMapsUrl, relativeDay, upcomingDrives } from '~/utils/donationDrives'
 
-const sectionRef = ref(null)
-const visible = ref(false)
+// The list lives in utils/donationDrives.ts, shared with the hero's
+// "Next drive" card.
+const drives = computed(() => upcomingDrives())
+const featured = computed(() => drives.value[0])
+const rest = computed(() => drives.value.slice(1))
 
-const drives = [
-  {
-    title: 'Davao City Hall Community Drive',
-    location: 'Davao City Hall, San Pedro St.',
-    date: 'August 5, 2026',
-    time: '7:00 AM – 12:00 PM',
-    registered: 8,
-    capacity: 60,
-  },
-  {
-    title: 'SM Lanang Blood Donation',
-    location: 'SM Lanang Premier, J.P. Laurel Ave.',
-    date: 'July 22, 2026',
-    time: '9:00 AM – 5:00 PM',
-    registered: 15,
-    capacity: 80,
-  },
-  {
-    title: 'Ateneo de Davao Blood Drive',
-    location: 'Ateneo de Davao University, Jacinto St.',
-    date: 'July 15, 2026',
-    time: '8:00 AM – 3:00 PM',
-    registered: 42,
-    capacity: 100,
-  },
-]
-
-const svgProps = {
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  'stroke-width': '2.2',
-  'stroke-linecap': 'round',
-  'stroke-linejoin': 'round',
-  width: '16',
-  height: '16',
-}
-
-const IconUsers = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }),
-      h('circle', { cx: '9', cy: '7', r: '4' }),
-      h('path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }),
-      h('path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }),
-    ])
-  },
-})
-
-const IconMapPin = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('path', { d: 'M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z' }),
-      h('circle', { cx: '12', cy: '10', r: '3' }),
-    ])
-  },
-})
-
-const IconCalendar = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('rect', { x: '3', y: '4', width: '18', height: '18', rx: '2' }),
-      h('path', { d: 'M16 2v4' }),
-      h('path', { d: 'M8 2v4' }),
-      h('path', { d: 'M3 10h18' }),
-    ])
-  },
-})
-
-const IconClock = defineComponent({
-  setup() {
-    return () => h('svg', svgProps, [
-      h('circle', { cx: '12', cy: '12', r: '10' }),
-      h('path', { d: 'M12 6v6l4 2' }),
-    ])
-  },
-})
-
-let observer
-
+// "In 3 weeks" depends on today's date, so it is filled in on the client to
+// keep the server render and hydration identical.
+const relative = ref({})
 onMounted(() => {
-  observer = new IntersectionObserver(
-    ([entry]) => { if (entry.isIntersecting) visible.value = true },
-    { threshold: 0.18 }
-  )
-  if (sectionRef.value) observer.observe(sectionRef.value)
+  relative.value = Object.fromEntries(drives.value.map(d => [d.date, relativeDay(d.date)]))
 })
 
-onUnmounted(() => observer?.disconnect())
+// Builds the .ics file in the browser and hands it over as a download. Phones
+// open it straight into the calendar app.
+function addToCalendar(drive) {
+  const ics = driveIcs(drive)
+  if (!ics) return
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${drive.title.replace(/[^\w]+/g, '-').toLowerCase()}.ics`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 </script>
 
 <style scoped>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+.drives-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
 }
 
-@keyframes cardRise {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* ── Featured ── */
+.featured {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  border-radius: 24px;
+  box-shadow: var(--lp-shadow);
 }
-
-.donation-drives {
-  padding: 50px 0 80px;
-  background: #f9fafb;
-  border-radius:60px;
-  font-family: var(--rb-font-sans);
-}
-
-.section-inner{
-  width: 100%;
-  max-width:1700px;
-  margin:0 auto;
-  padding:0 80px;
+.featured-date {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 24px 12px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.22), transparent 60%),
+    linear-gradient(160deg, #D32F2F, #B71C1C);
+  color: #fff;
+  text-align: center;
+}
+.featured-month { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.9; }
+.featured-day { font-size: 52px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
+.featured-when {
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-/* ── Badge ── */
-.badge {
+.featured-body { padding: 26px 28px; }
+.featured-label {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-brand);
+}
+.featured-body h3 {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--lp-text);
+}
+.meta {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--lp-text-2);
+}
+.meta :deep(svg) { flex-shrink: 0; margin-top: 2px; color: var(--lp-muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Compact rows ── */
+.rest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  grid-template-areas:
+    'date main'
+    'date actions';
+  column-gap: 16px;
+  row-gap: 12px;
+  padding: 18px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  border-radius: var(--lp-radius);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.row:hover { border-color: #C9DCF2; box-shadow: var(--lp-shadow); }
+.row-date {
+  grid-area: date;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: var(--lp-brand-soft);
+}
+.row-month { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-brand); }
+.row-day { font-size: 22px; font-weight: 800; line-height: 1; color: var(--lp-text); }
+.row-main { grid-area: main; min-width: 0; }
+.row-main h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--lp-text); }
+.row-meta { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--lp-text-2); }
+.row-place { display: flex; align-items: flex-start; gap: 6px; color: var(--lp-muted); }
+.row-place :deep(svg) { flex-shrink: 0; margin-top: 3px; }
+
+.row-actions { grid-area: actions; display: flex; align-items: center; gap: 6px; }
+.icon-action {
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  font-size: 11px;
+  justify-content: center;
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  background: var(--lp-surface);
+  color: var(--lp-text-2);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.icon-action:hover { border-color: var(--lp-accent); color: var(--lp-accent-text); }
+.row-link {
+  margin-left: auto;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.18em;
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  opacity: 0;
+  color: var(--lp-accent-text);
+  text-decoration: none;
 }
-.badge.animate-in {
-  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #2563eb;
-}
-
-/* ── Heading ── */
-.heading-wrap {
-  text-align: center;
-  margin-top: 28px;
-  margin-bottom: 70px;
-  opacity: 0;
-}
-.heading-wrap.animate-in {
-  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s forwards;
-}
-.heading-top {
-  font-size: 44px;
-  font-weight: 800;
-  color: #111827;
-  line-height: 1.2;
-}
-.subheading {
-  margin-top: 12px;
-  color: #6b7280;
-  font-size: 17px;
-  max-width: 680px;
-}
+.row-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.icon-action:focus-visible,
+.row-link:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
 
 /* ── Empty state ── */
 .empty-state {
+  padding: 56px 24px;
+  border: 1px dashed var(--lp-border);
+  border-radius: var(--lp-radius);
   text-align: center;
-  padding: 64px 0;
-  color: #9ca3af;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  font-size: 15px;
 }
-
-/* ── Grid ── */
-.drive-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 50px;
-}
-
-/* ── Card ── */
-.drive-card {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  opacity: 0;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
-}
-.drive-card.animate-in {
-  animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--drive-delay) forwards;
-}
-.drive-card:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-/* ── Card top row ── */
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.status-pill {
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all .3s ease;
-}
-
-.status-pill:hover {
-  background: #2563eb;
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37,99,235,.25);
-
-}
-
-.capacity {
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  color: #9ca3af;
-  font-size: 12px;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-text);
 }
-
-/* ── Card body ── */
-.card-body h3 {
-  font-size: 17px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 14px;
-  line-height: 1.35;
-}
-
-.drive-details {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.drive-details li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.drive-details svg {
-  color: #2563eb;
-  flex-shrink: 0;
-}
+.empty-title { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--lp-text); }
+.empty-desc { margin: 0 0 20px; font-size: 14px; color: var(--lp-text-2); }
 
 /* ── Responsive ── */
-@media (max-width: 1024px) {
-  .drive-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+@media (max-width: 960px) {
+  .drives-layout { grid-template-columns: 1fr; }
 }
-
-@media (max-width: 640px) {
-  .donation-drives {
-    padding: 56px 1rem 72px;
+@media (max-width: 560px) {
+  .featured { grid-template-columns: 1fr; }
+  .featured-date {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    padding: 16px 20px;
+    justify-content: flex-start;
   }
-  .heading-top {
-    font-size: 28px;
-  }
-  .drive-grid {
-    grid-template-columns: 1fr;
-    margin-top: 36px;
-  }
+  .featured-day { font-size: 34px; }
+  .featured-when { margin: 0 0 0 auto; align-self: center; }
+  .featured-body { padding: 20px; }
+  .featured-body h3 { font-size: 19px; }
+  .actions .lp-btn { flex: 1 1 auto; }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .badge, .heading-wrap, .drive-card {
-    opacity: 1;
-    transform: none;
-    animation: none;
-  }
-  .drive-card:hover { box-shadow: none; }
+  .row,
+  .icon-action { transition: none; }
 }
 </style>

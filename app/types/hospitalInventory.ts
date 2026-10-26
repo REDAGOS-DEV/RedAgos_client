@@ -15,8 +15,14 @@
 
 import type { Tone } from '~/utils/requestFulfilment'
 
-/** hospital_units.status — where a bag in the hospital's custody stands. */
+/**
+ * hospital_units.status — where a bag in the hospital's custody stands.
+ *
+ * `received`: arrived (receipt confirmed, or booked from outside RedAgos) and
+ * awaiting stock-in by inventory staff; not stock until then.
+ */
 export type HospitalUnitStatus =
+  | 'received'
   | 'available'
   | 'tag_assigned'
   | 'tag_crossmatched'
@@ -110,7 +116,13 @@ export interface HospitalUnit {
   expiry_date: string | null
   days_remaining: number | null
   bag_expired: boolean
+  /** When the bag arrived: custody began. */
+  received_at?: string | null
+  /** When it was stocked in; null while it awaits stock-in. */
   stocked_at: string | null
+  /** Who stocked it in, and where it is stored (optional, a label only). */
+  stocked_by?: string | null
+  storage_location?: string | null
   /**
    * Where the bag came from: the request it was received for — the PTR, when
    * it was a patient's share — or a delivery from outside RedAgos.
@@ -144,6 +156,8 @@ export interface HospitalInventorySummary {
   near_expiry: { within_3_days: number }
   /** Active tags past their deadline. Above zero for more than a minute means the sweep is down. */
   overdue_active_tags: number
+  /** Suggestions for the stock-in form: configured fridges and freezers, and places already used. */
+  storage_locations?: string[]
   as_of: string
 }
 
@@ -186,6 +200,7 @@ export interface UnitActionResult {
 }
 
 export const HOSPITAL_UNIT_STATUS_LABELS: Record<HospitalUnitStatus, string> = {
+  received: 'Awaiting stock-in',
   available: 'Available',
   tag_assigned: 'Tag Assigned',
   tag_crossmatched: 'Tag Crossmatched',
@@ -202,6 +217,7 @@ export const HOSPITAL_UNIT_STATUS_LABELS: Record<HospitalUnitStatus, string> = {
  * operational stages, one still in the fridge and one at the bedside.
  */
 export const HOSPITAL_UNIT_STATUS_TONES: Record<HospitalUnitStatus, Tone> = {
+  received: 'warning',
   available: 'success',
   tag_assigned: 'info',
   tag_crossmatched: 'progress',
@@ -245,7 +261,8 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
   unit_not_available: 'That bag is no longer available — it may have just been tagged. The list has been refreshed.',
   invalid_transition: 'That step does not apply to the bag as it now stands. The list has been refreshed.',
   tag_deadline_passed: 'The 24-hour period for this tag has ended. The bag is being released from the patient.',
-  bag_expired: 'This bag is past its expiry date and cannot be issued to a patient.',
+  bag_expired: 'This bag is past its expiry date and cannot be issued to a patient or stocked in. Discard it instead.',
+  not_awaiting_stock_in: 'One of those bags has already been stocked in. The list has been refreshed.',
   unit_not_discardable: 'This bag cannot be discarded as it stands. Release its tag first.',
   transfusion_request_not_found: 'That Patient Transfusion Request was not found.',
   transfusion_request_closed: 'That Patient Transfusion Request was cancelled. Tag the bag to the patient directly instead.',
@@ -253,6 +270,7 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
 
 /** Status filter options, in lifecycle order. */
 export const HOSPITAL_UNIT_STATUSES: HospitalUnitStatus[] = [
+  'received',
   'available',
   'tag_assigned',
   'tag_crossmatched',

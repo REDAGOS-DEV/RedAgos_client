@@ -12,33 +12,36 @@
  * template and styling around this handful of facts.
  */
 
-/** Role ids the selection screen understands. */
-export type PublicRoleId = 'donor' | 'admin'
+/**
+ * Role ids the selection screen offers for sign-up.
+ *
+ * Donor only. Administrator used to sit here too, but its card led straight
+ * to sign-in, never to a form: administrator accounts are created by another
+ * administrator (`POST /users`). A sign-in disguised as a sign-up choice was
+ * confusing, so administrators now appear only in the screen's "Sign in"
+ * list, like every other portal.
+ */
+export type PublicRoleId = 'donor'
 
 export interface PublicRole {
   id: PublicRoleId
   name: string
   description: string
-  colorClass: string
-  iconClass: string
 }
 
 export const PUBLIC_ROLES: PublicRole[] = [
   {
     id: 'donor',
-    name: 'Donor',
-    description: 'Register to donate blood and book appointments.',
-    colorClass: 'role-donor',
-    iconClass: 'icon-donor',
-  },
-  {
-    id: 'admin',
-    name: 'Administrator',
-    description: 'Manage the system, users, and overall operations.',
-    colorClass: 'role-admin',
-    iconClass: 'icon-admin',
+    name: 'Create a donor account',
+    description: 'Book donations, check your eligibility, and track your history.',
   },
 ]
+
+/**
+ * Roles that must never be offered as a public sign-up choice, listed so the
+ * rule is testable. Administrators are created by another administrator.
+ */
+export const NON_PUBLIC_ROLE_IDS = ['admin', 'administrator'] as const
 
 /**
  * Facility roles, listed here only so the removal is testable.
@@ -49,14 +52,7 @@ export const PUBLIC_ROLES: PublicRole[] = [
  */
 export const FACILITY_ROLE_IDS = ['blood-center', 'hospital', 'blood_center', 'blood_bank'] as const
 
-/**
- * Where the Continue button sends each role.
- *
- * Neither of these is a facility. Administrators have never self-registered —
- * their accounts are created by another administrator through `POST /users` —
- * so they go straight to sign-in rather than to a registration form that would
- * have nothing to submit to.
- */
+/** Where each sign-up choice leads: its registration form. */
 export function destinationFor(roleId: PublicRoleId): string {
-  return roleId === 'admin' ? '/auth/admin/login' : `/register/${roleId}`
+  return `/register/${roleId}`
 }

@@ -1,270 +1,163 @@
 <template>
   <div class="bl-page">
     <div class="bl-inner">
-      <!-- TOASTS -->
-      <div class="toast-stack">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
-
-      <!-- HEADER -->
-      <header class="page-header fade-in" style="--delay:0ms">
-        <div>
-          <h1 class="page-title">Billing &amp; Payment</h1>
-          <p class="page-subtitle">
-            Settle the statement raised against each request. Blood is not released until it
-            is either paid or met by the government subsidy.
-          </p>
-        </div>
-        <button class="btn btn-outline" :disabled="loading" @click="load">
-          <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
-          Refresh
-        </button>
-      </header>
-
-      <!-- ERROR -->
-      <div v-if="error" class="banner banner--error">
-        <AssetIcon name="triangle-alert" :size="16" />
-        <span>{{ error }}</span>
-        <button class="btn btn-outline btn-sm" @click="load">Retry</button>
-      </div>
-
-      <!-- STATS -->
-      <div class="stats-grid fade-in" style="--delay:60ms">
-        <div v-for="stat in stats" :key="stat.key" class="stat-card">
-          <span class="stat-label">{{ stat.label }}</span>
-          <span class="stat-value" :class="stat.tone && `stat-value--${stat.tone}`">{{ stat.value }}</span>
-          <span class="stat-note">{{ stat.note }}</span>
-        </div>
-      </div>
-
-      <!-- FILTERS -->
-      <div class="toolbar fade-in" style="--delay:90ms">
-        <div class="toolbar-search">
-          <AssetIcon name="search" :size="16" class="search-icon" />
-          <input v-model="search" type="text" placeholder="Search by reference number…" @input="onSearch">
-        </div>
-        <div class="pills">
-          <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            class="pill"
-            :class="{ 'pill--on': activeTab === tab.value }"
-            @click="activeTab = tab.value"
-          >
-            {{ tab.label }}
+      <!-- Invoices only (project owner, 2026-10-25): one per billable request.
+           A hospital's period summary is Statements; payments are Receipts. -->
+      <PageHeader title="Invoices">
+        <template #actions>
+          <button class="ui-btn btn-icon-only" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refreshAll">
+            <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
+            <span class="btn-label">Refresh</span>
           </button>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
 
-      <!-- LIST -->
-      <div class="card fade-in" style="--delay:120ms">
-        <div v-if="loading" class="skeleton-wrap">
-          <div v-for="n in 4" :key="n" class="skeleton skeleton--row" />
-        </div>
-
-        <div v-else-if="statements.length === 0" class="empty">
-          <AssetIcon name="inbox" :size="36" />
-          <h3>No statements</h3>
-          <p>A statement is raised the moment stock is reserved for a request.</p>
-        </div>
-
-        <table v-else class="bl-table">
-          <thead>
-            <tr>
-              <th scope="col">Reference</th>
-              <th scope="col">Hospital</th>
-              <th scope="col">Components</th>
-              <th scope="col" class="num">Total</th>
-              <th scope="col" class="num">Collected</th>
-              <th scope="col">Status</th>
-              <th scope="col" class="num">Release</th>
-              <th scope="col" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in statements" :key="s.id">
-              <td class="mono">
-                {{ s.request?.reference_number || '—' }}
-                <span v-if="s.request?.is_emergency" class="tag tag--stat">STAT</span>
-              </td>
-              <td>{{ s.request?.requesting_facility || '—' }}</td>
-              <td class="components">
-                <span class="blood-pill">{{ s.request?.blood_type || '—' }}</span>
-                {{ (s.request?.components || []).join(', ') || '—' }}
-              </td>
-              <td class="num">{{ peso(s.total_amount) }}</td>
-              <td class="num">{{ s.collected > 0 ? peso(s.collected) : '—' }}</td>
-              <td>
-                <span class="status" :class="`status--${s.status}`">{{ s.status_label }}</span>
-              </td>
-              <td class="num">
-                <span class="gate" :class="s.clears_release ? 'gate--ok' : 'gate--blocked'">
-                  <AssetIcon :name="s.clears_release ? 'check' : 'x'" :size="12" />
-                  {{ s.clears_release ? 'Cleared' : 'Blocked' }}
-                </span>
-              </td>
-              <td class="actions">
-                <button
-                  v-if="!s.clears_release"
-                  class="btn btn-primary btn-sm"
-                  @click="openPayment(s)"
-                >
-                  Record Payment
-                </button>
-                <button
-                  v-if="!s.clears_release"
-                  class="btn btn-outline btn-sm"
-                  @click="openSubsidy(s)"
-                >
-                  Apply Subsidy
-                </button>
-                <span v-if="s.clears_release" class="settled-note">
-                  {{ s.is_subsidised ? 'Government funded' : 'Settled' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- RECORD PAYMENT -->
-    <Teleport to="body">
-      <div v-if="paymentFor" class="modal-overlay" @click.self="closePayment">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pay-title">
-          <h2 id="pay-title" class="modal-title">Record Payment</h2>
-          <p class="modal-sub">
-            {{ paymentFor.request?.reference_number }} · {{ paymentFor.request?.requesting_facility }}
-          </p>
-
-          <dl class="modal-facts">
-            <div><dt>Statement total</dt><dd>{{ peso(paymentFor.total_amount) }}</dd></div>
-            <div><dt>Already collected</dt><dd>{{ peso(paymentFor.collected) }}</dd></div>
-            <div><dt>Outstanding</dt><dd class="owing">{{ peso(outstanding) }}</dd></div>
-          </dl>
-
-          <div class="field">
-            <label for="pay-amount" class="field-label">Amount received <span class="req">*</span></label>
-            <input
-              id="pay-amount"
-              v-model.number="payment.amount_paid"
-              type="number"
-              step="0.01"
-              min="0.01"
-              class="input"
-              :class="{ 'input--error': payErrors.amount_paid }"
+      <section class="card list-card" aria-label="Invoices">
+        <div class="list-head">
+          <!-- Owed by different people, never added together. -->
+          <div class="categories" role="tablist" aria-label="Bill category">
+            <button
+              v-for="c in CATEGORIES"
+              :key="c.value"
+              role="tab"
+              class="category"
+              :class="{ 'category--on': category === c.value }"
+              :aria-selected="category === c.value"
+              @click="category = c.value"
             >
-            <p v-if="payErrors.amount_paid" class="field-error">{{ payErrors.amount_paid }}</p>
-            <p v-else class="field-hint">
-              A part payment is recorded, but does not release blood — the Capstone requires
-              payment in full.
-            </p>
+              <span class="category-top">
+                {{ c.label }}
+                <span v-if="waitingIn(c.value)" class="category-count">{{ waitingIn(c.value) }}</span>
+              </span>
+            </button>
           </div>
 
-          <div class="field">
-            <span class="field-label">Method <span class="req">*</span></span>
-            <div class="method-row">
-              <label
-                v-for="method in methods"
-                :key="method.value"
-                class="pill"
-                :class="{ 'pill--on': payment.payment_method === method.value }"
+          <div class="filters">
+            <div class="search">
+              <AssetIcon name="search" :size="16" class="search-icon" />
+              <input
+                v-model="search"
+                type="search"
+                class="input search-input"
+                :placeholder="category === 'weekly' ? 'Invoice or request number' : 'Invoice, request or patient'"
+                aria-label="Search invoices"
+                @input="onSearch"
               >
-                <input v-model="payment.payment_method" type="radio" name="method" :value="method.value" class="sr-only">
-                {{ method.label }}
-              </label>
+            </div>
+            <div class="pills" role="group" aria-label="Status">
+              <button v-for="tab in tabs" :key="tab.value" class="pill" :class="{ 'pill--on': activeTab === tab.value }" :aria-pressed="activeTab === tab.value" @click="activeTab = tab.value">
+                {{ tab.label }}
+              </button>
             </div>
           </div>
-
-          <div v-if="payment.payment_method === 'gcash'" class="field">
-            <label for="pay-ref" class="field-label">GCash reference <span class="req">*</span></label>
-            <input
-              id="pay-ref"
-              v-model.trim="payment.reference_number"
-              type="text"
-              class="input"
-              :class="{ 'input--error': payErrors.reference_number }"
-              maxlength="100"
-            >
-            <p v-if="payErrors.reference_number" class="field-error">{{ payErrors.reference_number }}</p>
-            <p v-else class="field-hint">
-              No payment gateway is connected, so this reference is the only evidence the
-              money moved.
-            </p>
-          </div>
-
-          <p v-if="payError" class="field-error field-error--block">{{ payError }}</p>
-
-          <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="saving" @click="closePayment">Cancel</button>
-            <button class="btn btn-primary" :disabled="saving" @click="submitPayment">
-              {{ saving ? 'Recording…' : 'Record Payment' }}
-            </button>
-          </div>
         </div>
-      </div>
-    </Teleport>
 
-    <!-- APPLY SUBSIDY -->
-    <Teleport to="body">
-      <div v-if="subsidyFor" class="modal-overlay" @click.self="closeSubsidy">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sub-title">
-          <h2 id="sub-title" class="modal-title">Apply Government Subsidy</h2>
-          <p class="modal-sub">
-            {{ subsidyFor.request?.reference_number }} · {{ subsidyFor.request?.requesting_facility }}
-          </p>
-
-          <p class="modal-desc">
-            This writes the statement down to zero and clears the request for release.
-            No payment is recorded, because none is being taken.
-          </p>
-
-          <dl class="modal-facts">
-            <div><dt>Amount to be waived</dt><dd class="owing">{{ peso(subsidyFor.total_amount) }}</dd></div>
-          </dl>
-
-          <p v-if="subsidyFor.collected > 0" class="banner banner--warn">
-            <AssetIcon name="triangle-alert" :size="15" />
-            <span>
-              {{ peso(subsidyFor.collected) }} has already been collected against this statement.
-              It stays recorded — any refund is settled outside this system.
-            </span>
-          </p>
-
-          <div class="field">
-            <label for="sub-reason" class="field-label">Reason <span class="optional">(optional)</span></label>
-            <input
-              id="sub-reason"
-              v-model.trim="subsidyReason"
-              type="text"
-              class="input"
-              maxlength="255"
-              placeholder="e.g. DOH allocation"
-            >
-          </div>
-
-          <p v-if="subsidyError" class="field-error field-error--block">{{ subsidyError }}</p>
-
-          <div class="modal-actions">
-            <button class="btn btn-outline" :disabled="saving" @click="closeSubsidy">Cancel</button>
-            <button class="btn btn-primary" :disabled="saving" @click="submitSubsidy">
-              {{ saving ? 'Applying…' : 'Apply Subsidy' }}
-            </button>
-          </div>
+        <div v-if="error" class="banner banner--error banner--inset">
+          <AssetIcon name="triangle-alert" :size="15" />
+          <span>{{ error }}</span>
+          <button class="ui-btn ui-btn--sm" @click="load()">Retry</button>
         </div>
-      </div>
-    </Teleport>
+
+        <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton" /></div>
+
+        <div v-else-if="!statements.length && !error" class="empty">
+          <span class="empty-icon" aria-hidden="true"><AssetIcon name="inbox" :size="26" /></span>
+          <h2>{{ search.trim() ? 'Nothing matches that search' : category === 'weekly' ? 'No hospital invoices here' : 'No patient invoices here' }}</h2>
+        </div>
+
+        <div v-else-if="statements.length" class="table-scroll">
+          <table class="bl-table">
+            <thead>
+              <tr>
+                <th scope="col">Invoice</th>
+                <th scope="col">Request</th>
+                <th scope="col">{{ category === 'weekly' ? 'Hospital' : 'Patient' }}</th>
+                <th scope="col">Components</th>
+                <th scope="col" class="num">Total</th>
+                <th v-if="category === 'patient'" scope="col" class="num">Balance</th>
+                <th scope="col">Status</th>
+                <th v-if="category === 'patient'" scope="col">Release</th>
+                <th v-else scope="col">Settled</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in statements" :key="s.id" class="row" @click="open(s)">
+                <td>
+                  <NuxtLink v-if="s.invoice_number" :to="`/blood-center/invoice/${requestIdOf(s)}`" class="link mono" @click.stop>{{ s.invoice_number }}</NuxtLink>
+                  <span v-else class="muted">Not issued</span>
+                  <span class="sub">{{ day(s.billing_date) }}</span>
+                </td>
+                <td>
+                  <span class="mono">{{ s.request?.reference_number || '—' }}</span>
+                  <BillingBadge v-if="s.request?.is_emergency" tone="danger">STAT</BillingBadge>
+                </td>
+                <td>
+                  <template v-if="category === 'weekly'">{{ s.request?.requesting_facility || '—' }}</template>
+                  <div v-else class="who">
+                    <span class="who-avatar" aria-hidden="true">{{ initialsOf(s.request?.patient_name) }}</span>
+                    <div>
+                      {{ s.request?.patient_name || 'Patient' }}
+                      <span class="sub">{{ s.request?.requesting_facility || '—' }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="components">
+                  <span v-if="s.request?.blood_type" class="type">{{ s.request.blood_type }}</span>
+                  {{ (s.request?.components || []).join(', ') || '—' }}
+                </td>
+                <td class="num strong">{{ pesos(s.total_amount) }}</td>
+                <td v-if="category === 'patient'" class="num" :class="{ owing: balanceOf(s) > 0 }">{{ balanceOf(s) > 0 ? pesos(balanceOf(s)) : '—' }}</td>
+                <td><BillingBadge :tone="statementStamp(s.status).tone">{{ s.status_label }}</BillingBadge></td>
+                <td v-if="category === 'patient'">
+                  <span class="gate" :class="s.clears_release ? 'gate--ok' : 'gate--held'">
+                    <AssetIcon :name="s.clears_release ? 'check' : 'x'" :size="12" />
+                    {{ s.clears_release ? 'Cleared' : 'Held' }}
+                  </span>
+                </td>
+                <td v-else class="nowrap">
+                  <template v-if="s.settlement">
+                    {{ day(s.settlement.settled_at) }}
+                    <span class="sub mono">{{ s.settlement.reference }}</span>
+                  </template>
+                  <span v-else class="muted">Awaiting the hospital</span>
+                </td>
+                <td class="row-actions" @click.stop>
+                  <!-- Write actions only for whoever may record money; billing.view alone reads. -->
+                  <NuxtLink v-if="canSeePayments && takesPayment(s)" :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="ui-btn ui-btn--primary ui-btn--sm">
+                    Take payment
+                  </NuxtLink>
+                  <NuxtLink :to="`/blood-center/invoice/${requestIdOf(s)}`" class="ui-btn ui-btn--sm">Open</NuxtLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer v-if="!loading && meta.last_page > 1" class="pager">
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
+          <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
+        </footer>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
+/**
+ * Every invoice raised against this centre's requests, one per billable
+ * request, in the two categories that are owed by different people and never
+ * added together: patient invoices, paid at the counter, and the hospitals'
+ * weekly invoices, settled outside RedAgos. A row opens its invoice, where
+ * everything about it is done. Kept at /blood-center/billing, the Billing
+ * department's home; the page was "Statements" until 2026-10-25.
+ */
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { pesos, statementStamp, takesPayment } from '~/utils/billing'
+import PageHeader from '~/components/ui/PageHeader.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -272,84 +165,88 @@ definePageMeta({
   requires: 'billing.view',
 })
 
-/*
- * This page was a 41-line placeholder wrapping a generic department dashboard.
- * The endpoints behind it — list, record payment, apply subsidy — are real, and
- * release is blocked until a statement is settled, so without this screen the
- * workflow dead-ended immediately after stock was reserved.
- */
+const { can } = useUser()
 
+// Taking money, and the counter and receipts that go with it, are the Billing
+// department's; billing.view alone reads the invoices.
+const canSeePayments = computed(() => can('billing.record_payment'))
+
+const CATEGORIES = [
+  { value: 'patient', label: 'Patient invoices' },
+  { value: 'weekly', label: 'Hospital invoices' },
+]
+
+const TABS = {
+  patient: [
+    { value: 'outstanding', label: 'Outstanding' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'subsidised', label: 'Subsidised' },
+    { value: 'all', label: 'All' },
+  ],
+  weekly: [
+    { value: 'statement_only', label: 'Awaiting settlement' },
+    { value: 'settled_outside', label: 'Settled' },
+    { value: 'all', label: 'All' },
+  ],
+}
+
+const route = useRoute()
 const statements = ref([])
+const meta = reactive({ current_page: 1, last_page: 1 })
 const loading = ref(true)
-const saving = ref(false)
 const error = ref('')
 const search = ref('')
-const activeTab = ref('outstanding')
+const category = ref(route.query.category === 'weekly' ? 'weekly' : 'patient')
+const activeTab = ref(TABS[category.value][0].value)
+const summary = ref(null)
 
-const tabs = [
-  { value: 'outstanding', label: 'Outstanding' },
-  { value: 'all', label: 'All' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'subsidised', label: 'Subsidised' },
-]
+const tabs = computed(() => TABS[category.value])
 
-const methods = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'gcash', label: 'GCash' },
-]
-
-/* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
+function day(value) {
+  return value ? new Date(value).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'
 }
 
-function peso(value) {
-  const amount = Number(value ?? 0)
-  return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+function requestIdOf(statement) {
+  return statement?.request?.id ?? statement?.request_id
 }
 
-const stats = computed(() => {
-  const owing = statements.value.filter((s) => !s.clears_release)
-  const owed = owing.reduce((sum, s) => sum + Number(s.total_amount ?? 0) - Number(s.collected ?? 0), 0)
-  const subsidised = statements.value.filter((s) => s.is_subsidised).length
-  // Only statements where money actually moved. A subsidised statement cleared
-  // its request without a peso changing hands and must not be counted here.
-  const collected = statements.value
-    .filter((s) => s.represents_collected_money)
-    .reduce((sum, s) => sum + Number(s.collected ?? 0), 0)
+// Read from the row's own figures; the invoice page shows the server's exact balance.
+function balanceOf(statement) {
+  if (!statement.collects_payment) return 0
+  return Math.max(Math.round((Number(statement.total_amount) - Number(statement.collected)) * 100), 0) / 100
+}
 
-  return [
-    { key: 'blocked', label: 'Blocking Release', value: owing.length, note: 'Unsettled statements', tone: owing.length ? 'danger' : null },
-    { key: 'owed', label: 'Outstanding', value: peso(owed), note: 'Still to be settled' },
-    { key: 'collected', label: 'Collected', value: peso(collected), note: 'Money actually received' },
-    { key: 'subsidy', label: 'Subsidised', value: subsidised, note: 'Met by government funding' },
-  ]
-})
+function initialsOf(name) {
+  return (name || 'P').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+}
 
-const outstanding = computed(() => {
-  if (!paymentFor.value) return 0
-  return Math.max(0, Number(paymentFor.value.total_amount ?? 0) - Number(paymentFor.value.collected ?? 0))
-})
+// Beside each category tab: what is still waiting in it.
+function waitingIn(value) {
+  if (!summary.value) return 0
+  return value === 'weekly' ? summary.value.weekly_awaiting_settlement?.count ?? 0 : summary.value.outstanding?.count ?? 0
+}
+
+function open(statement) {
+  navigateTo(`/blood-center/invoice/${requestIdOf(statement)}`)
+}
 
 let searchDebounce = null
 function onSearch() {
   clearTimeout(searchDebounce)
-  searchDebounce = setTimeout(load, 400)
+  searchDebounce = setTimeout(() => load(), 350)
 }
 
+watch(category, () => {
+  activeTab.value = tabs.value[0].value
+  load()
+})
 watch(activeTab, () => load())
 
-async function load() {
+async function load(page = 1) {
   loading.value = true
   error.value = ''
 
-  const params = {}
+  const params = { category: category.value, page }
   if (activeTab.value === 'outstanding') params.outstanding = 1
   else if (activeTab.value !== 'all') params.status = activeTab.value
   if (search.value.trim()) params.search = search.value.trim()
@@ -357,279 +254,152 @@ async function load() {
   try {
     const response = await bloodCenterService.billings(params)
     statements.value = response?.data ?? []
+    meta.current_page = response?.current_page ?? 1
+    meta.last_page = response?.last_page ?? 1
   } catch (err) {
-    error.value = err?.message || 'Could not load statements.'
+    error.value = err?.message || 'Could not load invoices.'
     statements.value = []
   } finally {
     loading.value = false
   }
 }
 
-/* RECORD PAYMENT */
-const paymentFor = ref(null)
-const payError = ref('')
-const payErrors = reactive({})
-const payment = reactive({ amount_paid: null, payment_method: 'cash', reference_number: '' })
-
-function openPayment(statement) {
-  paymentFor.value = statement
-  payError.value = ''
-  Object.keys(payErrors).forEach((k) => delete payErrors[k])
-  Object.assign(payment, {
-    // Defaults to what is still owed, which is what a counter clerk almost
-    // always takes.
-    amount_paid: Math.max(0, Number(statement.total_amount ?? 0) - Number(statement.collected ?? 0)),
-    payment_method: 'cash',
-    reference_number: '',
-  })
-}
-
-function closePayment() {
-  if (saving.value) return
-  paymentFor.value = null
-}
-
-async function submitPayment() {
-  payError.value = ''
-  Object.keys(payErrors).forEach((k) => delete payErrors[k])
-
-  if (!payment.amount_paid || payment.amount_paid <= 0) {
-    payErrors.amount_paid = 'Record the amount actually received.'
-    return
-  }
-
-  if (payment.payment_method === 'gcash' && !payment.reference_number) {
-    payErrors.reference_number = 'A GCash payment needs its reference number.'
-    return
-  }
-
-  saving.value = true
-
+async function loadSummary() {
   try {
-    const response = await bloodCenterService.recordPayment(paymentFor.value.request.id, {
-      amount_paid: payment.amount_paid,
-      payment_method: payment.payment_method,
-      ...(payment.reference_number ? { reference_number: payment.reference_number } : {}),
-    })
-
-    const settled = response?.billing?.clears_release
-    toast(
-      'Payment Recorded',
-      'success',
-      settled ? 'The statement is settled and the units can be released.' : 'Part payment recorded — the statement is still outstanding.',
-    )
-    paymentFor.value = null
-    await load()
-  } catch (err) {
-    Object.entries(err?.errors ?? {}).forEach(([key, messages]) => {
-      payErrors[key] = Array.isArray(messages) ? messages[0] : messages
-    })
-    payError.value = err?.message || 'Could not record that payment.'
-  } finally {
-    saving.value = false
+    summary.value = await bloodCenterService.billingSummary()
+  } catch {
+    // The tab counts are a convenience; the list still works without them.
+    summary.value = null
   }
 }
 
-/* APPLY SUBSIDY */
-const subsidyFor = ref(null)
-const subsidyReason = ref('')
-const subsidyError = ref('')
-
-function openSubsidy(statement) {
-  subsidyFor.value = statement
-  subsidyReason.value = ''
-  subsidyError.value = ''
+async function refreshAll() {
+  await Promise.all([load(meta.current_page), loadSummary()])
 }
 
-function closeSubsidy() {
-  if (saving.value) return
-  subsidyFor.value = null
-}
-
-async function submitSubsidy() {
-  subsidyError.value = ''
-  saving.value = true
-
-  try {
-    await bloodCenterService.applySubsidy(subsidyFor.value.request.id, subsidyReason.value || undefined)
-    toast('Subsidy Applied', 'success', 'The statement is met by government funding and the units can be released.')
-    subsidyFor.value = null
-    await load()
-  } catch (err) {
-    subsidyError.value = err?.message || 'Could not apply the subsidy.'
-  } finally {
-    saving.value = false
-  }
-}
-
-onMounted(load)
+onMounted(() => Promise.all([load(), loadSummary()]))
 </script>
 
 <style scoped>
 /* Tokens come from app/assets/css/main.css. */
 .bl-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
-.bl-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; }
+.bl-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 70ch; }
+/* Text | actions. The actions column never wraps under the text, so the
+   buttons stay on the right at every width; only the text column shrinks. */
+.page-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
+.page-heading { min-width: 0; }
+.page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); margin: 0; }
+.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 4px 0 0; max-width: 72ch; }
+.header-actions { display: flex; gap: 8px; justify-content: flex-end; align-self: start; }
 
-.card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden; }
-
-.banner { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; }
-.banner--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .25); }
-.banner--warn { background: rgba(var(--rb-warning-rgb), .1); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3); align-items: flex-start; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.stat-card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
-.stat-label { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--rb-text-secondary); }
-.stat-value { font-size: 21px; font-weight: 700; color: var(--rb-text-primary); }
-.stat-value--danger { color: var(--rb-accent-text); }
-.stat-note { font-size: 11.5px; color: var(--rb-text-muted); }
-
-.toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
-.toolbar-search { position: relative; flex: 1; min-width: 220px; }
-.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); }
-.toolbar-search input {
-  width: 100%; padding: 9px 11px 9px 34px; font-size: 13.5px; font-family: inherit;
-  color: var(--rb-text-primary); background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong); border-radius: 9px;
+/* Category tabs on top, with search and status beneath them. */
+.list-head { display: flex; flex-direction: column; border-bottom: 1px solid var(--rb-border); }
+.categories { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--rb-border); }
+.category {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 14px 14px 12px;
+  border: 0; background: transparent; font-family: inherit; font-size: 13.5px; font-weight: 700;
+  color: var(--rb-text-secondary); cursor: pointer; text-align: left;
 }
-.toolbar-search input:focus { outline: none; border-color: var(--rb-primary); }
-.pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.pill {
-  padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
-  color: var(--rb-text-secondary); background: var(--rb-surface);
-  border: 1px solid var(--rb-border-strong); border-radius: 999px;
-}
-.pill--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .07); color: var(--rb-primary-text); }
+.category::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: transparent; }
+.category-top { display: inline-flex; align-items: center; gap: 7px; }
+.category-count { min-width: 20px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; text-align: center; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
+.category:hover { color: var(--rb-text-primary); }
+.category:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 8px; }
+.category--on { color: var(--rb-primary-text); }
+.category--on::after { background: var(--rb-primary); }
+.category--on .category-count { color: #fff; background: var(--rb-primary); border-color: var(--rb-primary); }
 
-.bl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.bl-table th {
-  text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
-  color: var(--rb-text-secondary); padding: 12px 14px; border-bottom: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface-alt);
-}
+.filters { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 16px; background: var(--rb-surface-alt); }
+.search { position: relative; width: 320px; max-width: 100%; }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
+.search .search-input { padding-left: 36px; }
+.pills { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--rb-surface); border: 1px solid var(--rb-border); }
+.pill { padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; }
+.pill:hover { color: var(--rb-text-primary); }
+.pill--on { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+
+.table-scroll { overflow-x: auto; }
+.bl-table { width: 100%; min-width: 1040px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.bl-table th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rb-text-secondary); background: var(--rb-surface); padding: 10px 14px; border-bottom: 1px solid var(--rb-border); white-space: nowrap; }
 .bl-table td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
-.bl-table tr:last-child td { border-bottom: none; }
-.bl-table .num { text-align: right; white-space: nowrap; }
-.mono { font-family: var(--rb-font-mono); font-size: 12.5px; }
-.components { color: var(--rb-text-secondary); }
-.blood-pill {
-  display: inline-block; padding: 1px 7px; margin-right: 6px; border-radius: 6px;
-  font-weight: 700; font-size: 11.5px;
-  background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text);
-}
-.tag { margin-left: 6px; padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
-.tag--stat { background: var(--rb-accent); color: #fff; }
+.bl-table tbody tr:last-child td { border-bottom: 0; }
+.row { cursor: pointer; transition: background-color .12s var(--rb-ease-out); }
+.row:hover td { background: var(--rb-surface-hover); }
+.sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); margin-top: 1px; }
+.components { max-width: 280px; }
+.type { display: inline-block; margin-right: 4px; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
+.owing { color: var(--rb-accent-text); font-weight: 700; }
+.gate { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.gate--ok { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .1); }
+.gate--held { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), .08); }
+.who { display: flex; align-items: center; gap: 10px; }
+.who-avatar { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1); }
+.row-actions { text-align: right; white-space: nowrap; }
+.row-actions .btn + .btn { margin-left: 6px; }
+.num { text-align: right !important; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+.strong { font-weight: 700; }
+.muted { color: var(--rb-text-muted); }
+.mono { font-family: var(--rb-font-mono); }
+.link { color: var(--rb-primary-text); font-weight: 700; text-decoration: none; margin-right: 6px; white-space: nowrap; }
+.link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-.status { padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.status--unpaid { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
-.status--partial { background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); }
-.status--paid { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
-.status--subsidised { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
-.status--void { background: var(--rb-surface-hover); color: var(--rb-text-muted); }
+.pager { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border-top: 1px solid var(--rb-border); font-size: 12.5px; color: var(--rb-text-secondary); }
 
-.gate { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; }
-.gate--ok { color: var(--rb-success-text); }
-.gate--blocked { color: var(--rb-accent-text); }
-
-.actions { display: flex; gap: 6px; justify-content: flex-end; }
-.settled-note { font-size: 11.5px; color: var(--rb-text-muted); }
-
-.empty { text-align: center; padding: 48px 20px; color: var(--rb-text-secondary); }
-.empty h3 { font-size: 15px; color: var(--rb-text-primary); margin: 10px 0 4px; }
-.empty p { font-size: 13px; margin: 0; }
-
-.skeleton-wrap { padding: 16px; }
-.skeleton {
-  border-radius: 7px; margin-bottom: 10px;
-  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 50%, var(--rb-skeleton-a) 75%);
-  background-size: 200% 100%; animation: shimmer 1.4s infinite;
-}
-.skeleton--row { height: 38px; }
-@keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-
-/* Buttons */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 15px; font-size: 13px; font-weight: 600; font-family: inherit;
-  border-radius: 8px; cursor: pointer; white-space: nowrap;
-}
-.btn-primary { background: var(--rb-primary); color: #fff; border: 1px solid var(--rb-primary); }
-.btn-primary:hover:not(:disabled) { background: #10509c; }
-.btn-outline { background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong); }
-.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn-sm { padding: 6px 11px; font-size: 12px; }
-
-/* Modals */
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 90; background: var(--rb-overlay);
-  display: flex; align-items: center; justify-content: center; padding: 20px;
-}
-.modal {
-  width: 100%; max-width: 460px; background: var(--rb-surface);
-  border-radius: 15px; padding: 22px; font-family: var(--rb-font-sans);
-  max-height: 90vh; overflow-y: auto;
-}
-.modal-title { font-size: 17px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 3px; }
-.modal-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; }
-.modal-desc { font-size: 13px; color: var(--rb-text-secondary); margin: 0 0 14px; }
-.modal-facts { margin: 0 0 16px; border: 1px solid var(--rb-border); border-radius: 10px; padding: 12px 14px; }
-.modal-facts > div { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
-.modal-facts dt { color: var(--rb-text-secondary); margin: 0; }
-.modal-facts dd { margin: 0; font-weight: 600; color: var(--rb-text-primary); }
-.modal-facts .owing { color: var(--rb-accent-text); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
-
-.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
-.field-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
-.req { color: var(--rb-accent-text); }
-.optional { color: var(--rb-text-muted); font-weight: 400; }
 .input {
   width: 100%; padding: 9px 11px; font-size: 13.5px; font-family: inherit;
   color: var(--rb-text-primary); background: var(--rb-surface);
   border: 1px solid var(--rb-border-strong); border-radius: 9px;
 }
-.input:focus { outline: none; border-color: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), .12); }
-.input--error { border-color: var(--rb-accent); }
-.field-error { font-size: 11.5px; color: var(--rb-accent-text); margin: 0; }
-.field-error--block { margin: 4px 0 0; }
-.field-hint { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
-.method-row { display: flex; gap: 8px; }
-.method-row .pill { flex: 1; text-align: center; border-radius: 9px; }
+.input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+.banner { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: 10px; font-size: 13px; margin: 0; }
+.banner--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .25); }
+.banner--inset { margin: 12px 16px 0; }
+
+.empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); margin-bottom: 4px; }
+.empty { text-align: center; padding: 56px 20px; color: var(--rb-text-secondary); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.empty h2 { font-size: 15px; color: var(--rb-text-primary); margin: 4px 0 0; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; font-family: inherit;
+  border-radius: 9px; cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition: background-color .15s var(--rb-ease-out);
 }
-
-/* Toasts */
-.toast-stack { position: fixed; top: 18px; right: 18px; z-index: 120; display: flex; flex-direction: column; gap: 8px; }
-.toast { background: var(--rb-surface); border: 1px solid var(--rb-border-strong); border-left-width: 3px; border-radius: 10px; padding: 11px 15px; min-width: 250px; }
-.toast--success { border-left-color: var(--rb-success); }
-.toast--danger { border-left-color: var(--rb-accent); }
-.toast--info { border-left-color: var(--rb-primary); }
-.toast-title { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); }
-.toast-message { font-size: 12px; color: var(--rb-text-secondary); margin-top: 2px; }
-.toast-enter-active, .toast-leave-active { transition: opacity .25s, transform .25s; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(14px); }
-
-.spinning { animation: spin 1s linear infinite; }
+.btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.btn-primary { background: var(--rb-primary); color: #fff; border: 1px solid var(--rb-primary); }
+.btn-primary:hover:not(:disabled) { background: #10509c; }
+.btn-outline { background: var(--rb-surface); color: var(--rb-text-primary); border: 1px solid var(--rb-border-strong); }
+.btn-outline:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.spinning { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg) } }
 
-.fade-in { animation: fade-in .3s ease both; animation-delay: var(--delay, 0ms); }
-@keyframes fade-in { from { opacity: 0; transform: translateY(5px) } to { opacity: 1; transform: none } }
+.skeleton-wrap { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.skeleton {
+  height: 46px; border-radius: 8px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 50%, var(--rb-skeleton-a) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton, .spinning { animation: none; }
+  .skeleton, .spinning { animation: none; }
+  .row, .btn { transition: none; }
 }
 
+/* Narrow: the subtitle gives way and Refresh becomes an icon, but the actions stay right. */
 @media (max-width: 900px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .bl-table { font-size: 12px; }
-  .bl-table th, .bl-table td { padding: 9px 8px; }
-  .actions { flex-direction: column; }
+  .btn-icon-only .btn-label { display: none; }
+  .btn-icon-only { width: 38px; padding: 0; }
+}
+
+@media (max-width: 640px) {
+  .search { width: 100%; }
 }
 </style>

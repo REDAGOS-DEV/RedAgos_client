@@ -15,24 +15,19 @@
         <span class="crumb-current">Request Details</span>
       </nav> -->
 
-      <div class="page-header__row">
-        <div class="page-header__titles">
-          <h1 class="page-title">Blood Request Details</h1>
-          <p class="page-subtitle">View the complete information and progress of this blood request.</p>
-        </div>
-
-        <div class="page-header__actions" v-if="!isLoadingRequest && request">
+      <PageHeader title="Blood Request Details" subtitle="View the complete information and progress of this blood request.">
+        <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
-          <button class="btn btn--outline" type="button" @click="handleDownloadPdf">
-            <AssetIcon name="download" />
+          <button class="ui-btn" type="button" @click="handleDownloadPdf">
+            <AssetIcon name="download" :size="15" />
             <span>Download PDF</span>
           </button>
-          <button class="btn btn--outline" type="button" @click="handlePrint">
-            <AssetIcon name="printer" />
+          <button class="ui-btn" type="button" @click="handlePrint">
+            <AssetIcon name="printer" :size="15" />
             <span>Print</span>
           </button>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
     </div>
 
     <!-- ============== LOADING SKELETON ============== -->
@@ -49,20 +44,18 @@
     </div>
 
     <!-- ============== ERROR STATE ============== -->
-    <div v-else-if="requestError" class="empty-state empty-state--error">
-      <AssetIcon name="alert-triangle" />
-      <h3>We couldn't load this request</h3>
-      <p>Something went wrong while fetching the request details. Please try again.</p>
-      <button class="btn btn--primary" type="button" @click="fetchRequest">Retry</button>
-    </div>
+    <section v-else-if="requestError" class="card">
+      <EmptyState icon="triangle-alert" title="We couldn't load this request" description="Something went wrong while fetching the request details. Please try again.">
+        <button class="ui-btn ui-btn--primary" type="button" @click="fetchRequest">Retry</button>
+      </EmptyState>
+    </section>
 
     <!-- ============== EMPTY STATE (not found) ============== -->
-    <div v-else-if="!request" class="empty-state">
-      <AssetIcon name="file-search" />
-      <h3>Request not found</h3>
-      <p>This blood request may have been removed, or the link is incorrect.</p>
-      <button class="btn btn--primary" type="button" @click="goBack">Back to Blood Requests</button>
-    </div>
+    <section v-else-if="!request" class="card">
+      <EmptyState icon="search-x" title="Request not found" description="This blood request may have been removed, or the link is incorrect.">
+        <button class="ui-btn ui-btn--primary" type="button" @click="goBack">Back to Blood Requests</button>
+      </EmptyState>
+    </section>
 
     <!-- ============== MAIN CONTENT ============== -->
     <template v-else>
@@ -181,24 +174,25 @@
               ({{ requestStatusLabel(request.transfusion_request) }}). The patient needs {{ requiredSummary }}; other
               facilities may be asked for the rest.
             </p>
-            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="btn btn--outline btn--sm">
+            <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="ui-btn ui-btn--sm">
               <span>Open the Patient Transfusion Request</span>
             </NuxtLink>
           </section>
 
           <!--
-            One blood type of a weekly request. It goes out in one delivery,
-            and whatever the center does not supply is closed when it does.
+            A weekly request: every blood type it restocks, in this one
+            request. It goes out in one delivery, and whatever the center does
+            not supply is closed when it does.
           -->
           <section v-else-if="request.weekly_request" class="card part-of">
             <h2 class="section-title">Weekly Request</h2>
             <p class="part-of__text">
-              This is the {{ request.blood_type?.code || '' }} part of weekly request
+              This request was sent as weekly request
               <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="part-of__ref">{{ request.weekly_request.reference_number || 'WR' }}</NuxtLink>.
               The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
               dispatches.
             </p>
-            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="btn btn--outline btn--sm">
+            <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="ui-btn ui-btn--sm">
               <span>Open the weekly request</span>
             </NuxtLink>
           </section>
@@ -219,7 +213,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value info-value--emphasis">{{ request.blood_type?.code || '—' }}</span>
+                <span class="info-value info-value--emphasis">{{ bloodTypeSummary(request) }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Priority</span>
@@ -253,7 +247,7 @@
               </thead>
               <tbody>
                 <tr v-for="item in request.items" :key="item.id">
-                  <td>{{ item.component?.name || '—' }}</td>
+                  <td>{{ item.component?.name ? requestLineLabel(request, item) : '—' }}</td>
                   <td class="num">{{ item.quantity }}</td>
                   <td>
                     <template v-if="item.indication_code">
@@ -289,138 +283,139 @@
             />
           </section>
 
-          <!-- SECTION: BILLING & PAYMENT -->
+          <!-- SECTION: BILLING (read only) -->
           <section id="request-billing" class="card billing-card">
             <div class="billing-card__header">
-              <h2 class="section-title">Billing &amp; Payment</h2>
+              <h2 class="section-title">Billing</h2>
               <span
                 v-if="showBillingSection && billing"
                 class="status-badge status-badge--sm"
                 :class="billingStatusColorClass"
               >
-                {{ billing.status }}
+                {{ billing.status_label }}
               </span>
             </div>
 
             <div v-if="!showBillingSection" class="billing-gated">
               <AssetIcon name="clock" />
-              <p>Billing becomes available once blood availability is confirmed for this request.</p>
+              <p>An invoice is raised once the blood centre reserves units for this request.</p>
             </div>
 
             <div v-else-if="isLoadingBilling" class="availability-skeleton">
               <div class="skeleton skeleton--row" v-for="n in 3" :key="n" />
             </div>
 
-            <template v-else-if="billing">
+            <p v-else-if="billingError" class="receipt-error">{{ billingError }}</p>
+
+            <div v-else-if="!billing" class="billing-gated">
+              <AssetIcon name="clock" />
+              <p>No invoice has been raised for this request yet.</p>
+            </div>
+
+            <template v-else>
               <div class="billing-summary">
-                <div class="summary-item">
-                  <span class="summary-label">Billing Reference</span>
-                  <span class="summary-value summary-value--mono">{{ billing.billing_id }}</span>
-                </div>
                 <div class="summary-item">
                   <span class="summary-label">Billing Date</span>
                   <span class="summary-value">{{ formatDate(billing.billing_date) }}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">Total Amount</span>
+                  <span class="summary-label">Total</span>
                   <span class="summary-value info-value--emphasis">{{ formatCurrency(billing.total_amount) }}</span>
                 </div>
-              </div>
-
-              <div class="table-wrapper">
-                <table class="history-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qty</th>
-                      <th>Unit Price</th>
-                      <th>Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="item in lineItemsWithSubtotal" :key="item.component_id">
-                      <td>{{ item.component_name }}</td>
-                      <td>{{ item.quantity }}</td>
-                      <td>{{ formatCurrency(item.price) }}</td>
-                      <td>{{ formatCurrency(item.subtotal) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div v-if="billing.status !== 'PAID'" class="payment-panel">
-                <span class="info-label">Select Payment Method</span>
-                <div class="payment-chips" role="radiogroup" aria-label="Payment method">
-                  <button
-                    type="button"
-                    class="payment-chip"
-                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'CASH' }"
-                    role="radio"
-                    :aria-checked="selectedPaymentMethod === 'CASH'"
-                    @click="selectedPaymentMethod = 'CASH'"
-                  >
-                    <AssetIcon name="box" :size="16" />
-                    <span>Cash</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="payment-chip"
-                    :class="{ 'payment-chip--active': selectedPaymentMethod === 'GCASH' }"
-                    role="radio"
-                    :aria-checked="selectedPaymentMethod === 'GCASH'"
-                    @click="selectedPaymentMethod = 'GCASH'"
-                  >
-                    <AssetIcon name="phone" :size="16" />
-                    <span>GCash</span>
-                  </button>
+                <div v-if="billing.collects_payment" class="summary-item">
+                  <span class="summary-label">Received</span>
+                  <span class="summary-value">{{ formatCurrency(billing.collected) }}</span>
                 </div>
-                <button
-                  class="btn btn--primary"
-                  type="button"
-                  :disabled="!selectedPaymentMethod || isPaying"
-                  @click="handlePay"
-                >
-                  <span v-if="isPaying">Processing…</span>
-                  <span v-else>Pay Now</span>
-                </button>
               </div>
 
-              <div v-if="billing.status === 'PAID' && payments.length" class="receipt-block">
-                <AssetIcon name="check-circle" />
-                <div class="receipt-block__body">
-                  <span class="receipt-block__title">Payment received</span>
-                  <span class="receipt-block__meta">
-                    {{ formatCurrency(payments[payments.length - 1].amount_paid) }}
-                    &middot; {{ payments[payments.length - 1].payment_method }}
-                    &middot; {{ formatDateTime(payments[payments.length - 1].paid_at) }}
-                  </span>
-                </div>
-                <button
-                  class="btn btn--outline btn--sm"
-                  type="button"
-                  @click="showToast('Receipt download will be available once connected to the billing system.')"
-                >
-                  <AssetIcon name="download" :size="16" />
-                  <span>Download Receipt</span>
-                </button>
-              </div>
+              <p class="billing-note">
+                <template v-if="billing.settlement">
+                  Weekly order, settled by your facility outside RedAgos on {{ formatDate(billing.settlement.settled_at) }}
+                  <template v-if="billing.settlement.reference">(reference {{ billing.settlement.reference }})</template>,
+                  as recorded by the blood centre.
+                </template>
+                <template v-else-if="billing.is_statement_only">
+                  Weekly order, billed to your facility by invoice only and settled outside RedAgos.
+                  It does not hold the units back.
+                </template>
+                <template v-else-if="billing.is_subsidised">
+                  Covered by the government subsidy. Nothing is payable on this request.
+                </template>
+                <template v-else-if="billing.clears_release">
+                  Settled. The blood centre may release the units.
+                </template>
+                <template v-else>
+                  Payable by the patient or watcher at the blood centre's billing counter, in cash or
+                  by GCash. The units are released once it is paid.
+                </template>
+              </p>
 
-              <div v-if="payments.length" class="payment-history">
-                <span class="info-label">Payment History</span>
+              <div v-if="statements.length" class="payment-history">
+                <span class="info-label">Invoices</span>
                 <div class="table-wrapper">
                   <table class="history-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Method</th>
-                        <th>Amount</th>
+                        <th>Invoice</th>
+                        <th>Issued</th>
+                        <th>{{ billing.is_statement_only ? 'Billed' : 'Due' }}</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="p in payments" :key="p.payment_id">
-                        <td>{{ formatDateTime(p.paid_at) }}</td>
-                        <td>{{ p.payment_method }}</td>
-                        <td>{{ formatCurrency(p.amount_paid) }}</td>
+                      <tr v-for="s in statements" :key="s.id">
+                        <td class="summary-value--mono">{{ s.document_number }} <span class="muted">r{{ s.revision_number }}</span></td>
+                        <td>{{ formatDateTime(s.issued_at) }}</td>
+                        <td>{{ formatCurrency(s.amount_due) }}</td>
+                        <td>
+                          <button
+                            class="ui-btn ui-btn--sm"
+                            type="button"
+                            :disabled="downloadingId === `soa-${s.id}`"
+                            @click="downloadStatement(s)"
+                          >
+                            <AssetIcon name="download" :size="16" />
+                            <span>PDF</span>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div v-if="receipts.length" class="payment-history">
+                <span class="info-label">Payment Receipts</span>
+                <div class="table-wrapper">
+                  <table class="history-table">
+                    <thead>
+                      <tr>
+                        <th>Receipt</th>
+                        <th>Issued</th>
+                        <th>Amount</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in receipts" :key="r.id">
+                        <td class="summary-value--mono">
+                          {{ r.receipt_number }}
+                          <span v-if="r.voided" class="muted">(void)</span>
+                          <span v-else-if="r.is_partial" class="muted">(part payment)</span>
+                        </td>
+                        <td>{{ formatDateTime(r.issued_at) }}</td>
+                        <td>{{ formatCurrency(r.amount_paid) }}</td>
+                        <td>
+                          <button
+                            class="ui-btn ui-btn--sm"
+                            type="button"
+                            :disabled="downloadingId === `ar-${r.id}`"
+                            @click="downloadReceipt(r)"
+                          >
+                            <AssetIcon name="download" :size="16" />
+                            <span>PDF</span>
+                          </button>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -539,19 +534,19 @@
           <section class="card side-card">
             <h3 class="side-card__title">Quick Actions</h3>
             <div class="quick-actions">
-              <button class="btn btn--outline btn--full" type="button" @click="handleDownloadPdf">
+              <button class="ui-btn btn--full" type="button" @click="handleDownloadPdf">
                 <AssetIcon name="download" />
                 <span>Download PDF</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="handlePrint">
+              <button class="ui-btn btn--full" type="button" @click="handlePrint">
                 <AssetIcon name="printer" />
                 <span>Print</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="scrollToTimeline">
+              <button class="ui-btn btn--full" type="button" @click="scrollToTimeline">
                 <AssetIcon name="map-pin" />
                 <span>Track Request</span>
               </button>
-              <button v-if="showBillingSection" class="btn btn--outline btn--full" type="button" @click="scrollToBilling">
+              <button v-if="showBillingSection" class="ui-btn btn--full" type="button" @click="scrollToBilling">
                 <AssetIcon name="clipboard-list" />
                 <span>View Billing</span>
               </button>
@@ -563,7 +558,7 @@
       <!-- ============== PAYMENT TOAST ============== -->
       <Transition name="toast">
         <div v-if="toastMessage" class="toast" role="status">
-          <AssetIcon name="check-circle" :size="16" style="color:#346538" />
+          <AssetIcon name="check-circle" :size="16" style="color: var(--rb-success-text)" />
           {{ toastMessage }}
         </div>
       </Transition>
@@ -582,7 +577,8 @@
             <p class="receipt-sub">
               {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
               they physically arrive — only your facility can assert it, and it completes the
-              chain of custody for each unit.
+              chain of custody for each unit. Inventory staff then stock them in from Blood Bank
+              Inventory, choosing where each is stored.
             </p>
           </div>
         </div>
@@ -622,14 +618,15 @@
 
         <p v-if="receiptError" class="receipt-error">{{ receiptError }}</p>
 
-        <div class="receipt-actions">
+        <!-- Requesting staff and the Head confirm arrival; inventory staff stock in. -->
+        <div v-if="canConfirmReceipt" class="receipt-actions">
           <span class="receipt-note">
             {{ receiptSelection.length
               ? `${receiptSelection.length} of ${awaitingReceipt.length} selected`
               : 'Nothing selected — confirming will accept every dispatched unit.' }}
           </span>
           <button
-            class="btn btn--primary"
+            class="ui-btn ui-btn--primary"
             type="button"
             :disabled="confirmingReceipt"
             @click="handleConfirmReceipt"
@@ -637,18 +634,21 @@
             {{ confirmingReceipt ? 'Confirming…' : 'Confirm Receipt' }}
           </button>
         </div>
+        <p v-else class="receipt-note receipt-actions">
+          Requesting staff or the Blood Bank Head confirm receipt once the units arrive.
+        </p>
       </section>
 
       <!-- ============== BOTTOM ACTIONS ============== -->
       <div class="bottom-actions">
-        <button class="btn btn--outline" type="button" @click="goBack">Back to Blood Requests</button>
-        <button class="btn btn--outline" type="button" @click="scrollToTimeline">Track Request</button>
-        <button class="btn btn--outline" type="button" @click="handleDownloadPdf">Download PDF</button>
-        <button class="btn btn--outline" type="button" @click="handlePrint">Print</button>
+        <button class="ui-btn" type="button" @click="goBack">Back to Blood Requests</button>
+        <button class="ui-btn" type="button" @click="scrollToTimeline">Track Request</button>
+        <button class="ui-btn" type="button" @click="handleDownloadPdf">Download PDF</button>
+        <button class="ui-btn" type="button" @click="handlePrint">Print</button>
         <NuxtLink
           v-if="canEdit"
           :to="`/hospital/bloodrequests/edit/${requestId}`"
-          class="btn btn--primary"
+          class="ui-btn ui-btn--primary"
         >
           Edit
         </NuxtLink>
@@ -669,8 +669,10 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
@@ -680,17 +682,7 @@ import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
-})
-
-// Editorial serif for headings only — scoped to this page, does not touch
-// the app-wide font set in nuxt.config.ts.
-useHead({
-  link: [
-    {
-      rel: 'stylesheet',
-      href: 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&display=swap',
-    },
-  ],
+  requires: 'hospital.requests.view',
 })
 
 const route = useRoute()
@@ -719,12 +711,14 @@ const {
 
 const {
   billing,
-  lineItems,
-  payments,
+  statements,
+  receipts,
   isLoadingBilling,
-  isPaying,
+  billingError,
+  downloadingId,
   fetchBilling,
-  payBilling,
+  downloadStatement,
+  downloadReceipt,
 } = useBloodRequestBilling(requestId)
 
 onMounted(() => {
@@ -733,27 +727,24 @@ onMounted(() => {
   fetchBilling()
 })
 
-// Billing only becomes relevant once blood availability has been confirmed
-// for the request — see the Billing BPMN in the proposal (Fig. 10).
-const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'Pending')
+// A statement is raised when the centre first reserves units, so a request
+// still pending has none to show. The API sends statuses lowercase; comparing
+// against 'Pending' used to show the section for every request.
+const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'pending')
 
-const lineItemsWithSubtotal = computed(() =>
-  lineItems.value.map((item) => ({ ...item, subtotal: item.quantity * item.price }))
-)
-
-const selectedPaymentMethod = ref(null)
-
-const billingStatusMap = { UNPAID: 'warning', PARTIAL: 'info', PAID: 'success' }
+const billingStatusMap = {
+  unpaid: 'warning',
+  partial: 'info',
+  paid: 'success',
+  subsidised: 'success',
+  statement_only: 'neutral',
+  settled_outside: 'success',
+  void: 'neutral',
+}
 const billingStatusColorClass = computed(() => {
   const s = billing.value?.status
   return s ? `badge--${billingStatusMap[s] ?? 'neutral'}` : 'badge--neutral'
 })
-
-async function handlePay() {
-  if (!selectedPaymentMethod.value || !billing.value) return
-  const ok = await payBilling({ amount: billing.value.total_amount, method: selectedPaymentMethod.value })
-  if (ok) showToast('Payment successful.')
-}
 
 function scrollToBilling() {
   document.getElementById('request-billing')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -807,10 +798,10 @@ async function handleConfirmReceipt() {
     const response = await confirmReceipt(receiptSelection.value.length ? receiptSelection.value : undefined)
     receiptSelection.value = []
 
-    // Receipt is what puts the bags on the blood bank's own shelf.
-    const stocked = response?.stocked_count ?? 0
-    showToast(stocked > 0
-      ? `Receipt confirmed. ${stocked} bag${stocked === 1 ? ' is' : 's are'} now in Blood Bank Inventory.`
+    // Receipt takes the bags into custody; inventory staff then stock them in.
+    const arrived = response?.awaiting_stock_in ?? response?.stocked_count ?? 0
+    showToast(arrived > 0
+      ? `Receipt confirmed. ${arrived} bag${arrived === 1 ? ' waits' : 's wait'} in Blood Bank Inventory for stock-in.`
       : 'Receipt confirmed. Thank you.')
   } catch (err) {
     receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'
@@ -898,7 +889,11 @@ const requiredSummary = computed(() => {
     .join(', ') || 'what was requested'
 })
 
-const canEdit = computed(() => request.value?.status === 'Pending')
+// What this role may do here (hospital roles, project owner 2026-10-11). The
+// server refuses with `can:` either way; this only hides what would be refused.
+const { can } = useUser()
+const canEdit = computed(() => request.value?.status === 'Pending' && can('hospital.requests.manage'))
+const canConfirmReceipt = computed(() => can('hospital.receipt.confirm'))
 
 function formatDate(value) {
   if (!value) return '—'
@@ -965,21 +960,11 @@ function scrollToTimeline() {
 
 <style scoped>
 .request-details-page {
-  --rb-canvas: #FBF9F6;
-  --rb-surface: #FFFFFF;
-  --rb-border: #EAE7E1;
-  --rb-text: #1F1D1B;
-  --rb-text-muted: #78746D;
-  padding: 24px;
-  background: var(--rb-canvas);
+  max-width: var(--rb-content-max, 1600px);
+  margin: 0 auto;
+  padding: 24px var(--rb-gutter, 24px) 40px;
+  background: var(--rb-page-bg);
   min-height: 100%;
-}
-:global(.dark .request-details-page) {
-  --rb-canvas: #14120F;
-  --rb-surface: #1C1A17;
-  --rb-border: #2E2B26;
-  --rb-text: #EDEAE5;
-  --rb-text-muted: #A19C93;
 }
 
 /* ---------- Header ---------- */
@@ -989,7 +974,7 @@ function scrollToTimeline() {
   gap: 6px;
   background: none;
   border: none;
-  color: #1565c0;
+  color: var(--rb-primary-text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1002,19 +987,20 @@ function scrollToTimeline() {
 
 .breadcrumb {
   font-size: 13px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   margin-bottom: 16px;
   display: flex;
   gap: 6px;
 }
 .crumb-sep {
-  color: #b7c0cc;
+  color: var(--rb-text-muted);
 }
 .crumb-current {
-  color: #1a2233;
+  color: var(--rb-text-primary);
   font-weight: 600;
 }
 
+.page-header :deep(.ph) { margin-bottom: 24px; }
 .page-header__row {
   display: flex;
   justify-content: space-between;
@@ -1024,17 +1010,17 @@ function scrollToTimeline() {
   margin-bottom: 24px;
 }
 .page-title {
-  font-family: 'Newsreader', var(--rb-font-sans);
+  font-family: var(--rb-font-sans);
   font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 4px;
 }
 .page-subtitle {
   font-size: 14px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   margin: 0;
 }
 .page-header__actions {
@@ -1066,20 +1052,20 @@ function scrollToTimeline() {
   cursor: not-allowed;
 }
 .btn--primary {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: #0f4f9c;
+  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
 }
 .btn--outline {
   background: var(--rb-surface);
-  color: #1565c0;
+  color: var(--rb-primary-text);
   border-color: var(--rb-border);
 }
 .btn--outline:hover {
-  background: #f1f6fb;
-  border-color: #1565c0;
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border-color: var(--rb-primary);
 }
 .btn--full {
   width: 100%;
@@ -1093,6 +1079,8 @@ function scrollToTimeline() {
 /* ---------- Status badges ---------- */
 .status-badge {
   display: inline-flex;
+  width: fit-content;
+  justify-self: start;
   align-items: center;
   padding: 6px 14px;
   border-radius: 999px;
@@ -1106,38 +1094,33 @@ function scrollToTimeline() {
   letter-spacing: 0.05em;
 }
 .badge--success {
-  background: #EDF3EC;
-  color: #346538;
+  background: rgba(var(--rb-success-rgb), .1);
+  color: var(--rb-success-text);
 }
 .badge--warning {
-  background: #FBF3DB;
-  color: #956400;
+  background: rgba(var(--rb-warning-rgb), .14);
+  color: var(--rb-warning-text);
 }
 .badge--danger {
-  background: #FDEBEC;
-  color: #9F2F2D;
+  background: rgba(var(--rb-accent-rgb), .09);
+  color: var(--rb-accent-text);
 }
 .badge--info {
-  background: #E1F3FE;
-  color: #1F6C9F;
+  background: rgba(var(--rb-primary-rgb), .1);
+  color: var(--rb-primary-text);
 }
 .badge--neutral {
-  background: #F0EEE9;
-  color: #6B675F;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
 }
-:global(.dark .request-details-page .badge--success) { background: #1D2B1E; color: #8FCB94; }
-:global(.dark .request-details-page .badge--warning) { background: #322A12; color: #E4B54B; }
-:global(.dark .request-details-page .badge--danger) { background: #331A19; color: #E58E8B; }
-:global(.dark .request-details-page .badge--info) { background: #122733; color: #7EC1EE; }
-:global(.dark .request-details-page .badge--neutral) { background: #2A2721; color: #B3AEA4; }
 
 /* ---------- Cards ---------- */
 .card {
   background: var(--rb-surface);
   border: 1px solid var(--rb-border);
-  border-radius: 12px;
+  border-radius: var(--rb-radius-lg);
   padding: 24px;
-  box-shadow: none;
+  box-shadow: var(--rb-shadow-sm);
   margin-bottom: 20px;
   transition: box-shadow 0.2s ease;
 }
@@ -1157,7 +1140,7 @@ function scrollToTimeline() {
 }
 .summary-label {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -1165,18 +1148,18 @@ function scrollToTimeline() {
 .summary-value {
   font-size: 15px;
   font-weight: 600;
-  color: #1a2233;
+  color: var(--rb-text-primary);
 }
 .summary-value--mono {
   font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 .section-title {
-  font-family: 'Newsreader', var(--rb-font-sans);
+  font-family: var(--rb-font-sans);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 18px;
 }
 
@@ -1211,14 +1194,14 @@ function scrollToTimeline() {
 }
 .info-label {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 .info-value {
   font-size: 14px;
-  color: #2a3447;
+  color: var(--rb-text-primary);
   line-height: 1.5;
 }
 .info-value--mono {
@@ -1227,7 +1210,7 @@ function scrollToTimeline() {
 .info-value--emphasis {
   font-size: 20px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 
 /* ---------- Documents ---------- */
@@ -1246,20 +1229,20 @@ function scrollToTimeline() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #f1f6fb;
-  border: 1px solid #e5eaf0;
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border: 1px solid var(--rb-border);
   border-radius: 10px;
   padding: 8px 12px;
   font-size: 13px;
-  color: #1565c0;
+  color: var(--rb-primary-text);
   text-decoration: none;
 }
 .document-chip:hover {
-  border-color: #1565c0;
+  border-color: var(--rb-primary);
 }
 .documents-empty {
   font-size: 13px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   margin: 0;
 }
 
@@ -1286,7 +1269,7 @@ function scrollToTimeline() {
   top: 24px;
   bottom: 0;
   width: 2px;
-  background: #e5eaf0;
+  background: var(--rb-border);
 }
 .timeline-step:last-child::before {
   display: none;
@@ -1299,8 +1282,8 @@ function scrollToTimeline() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef0f3;
-  color: #8792a2;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-secondary);
   z-index: 1;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -1311,14 +1294,14 @@ function scrollToTimeline() {
   background: currentColor;
 }
 .timeline-step--completed .timeline-marker {
-  background: #2e7d32;
+  background: var(--rb-success);
   color: #fff;
 }
 .timeline-step--completed::before {
-  background: #2e7d32;
+  background: var(--rb-success);
 }
 .timeline-step--current .timeline-marker {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
   box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.15);
 }
@@ -1331,15 +1314,15 @@ function scrollToTimeline() {
 .timeline-label {
   font-size: 14px;
   font-weight: 600;
-  color: #1a2233;
+  color: var(--rb-text-primary);
 }
 .timeline-step--upcoming .timeline-label {
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 500;
 }
 .timeline-timestamp {
   font-size: 12px;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
 }
 
 /* ---------- History table ---------- */
@@ -1356,19 +1339,19 @@ function scrollToTimeline() {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   padding: 10px 12px;
-  border-bottom: 1px solid #e5eaf0;
+  border-bottom: 1px solid var(--rb-border);
 }
 .history-table td {
   padding: 12px;
-  border-bottom: 1px solid #f1f3f6;
-  color: #2a3447;
+  border-bottom: 1px solid var(--rb-border);
+  color: var(--rb-text-primary);
 }
 .table-empty {
   text-align: center;
-  color: #8792a2;
+  color: var(--rb-text-secondary);
   padding: 24px 12px;
 }
 
@@ -1376,7 +1359,7 @@ function scrollToTimeline() {
 .side-card__title {
   font-size: 16px;
   font-weight: 700;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 0 0 14px;
 }
 .side-card__row {
@@ -1389,20 +1372,20 @@ function scrollToTimeline() {
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #eef0f3;
+  background: var(--rb-surface-alt);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 8px;
 }
 .progress-bar__fill {
   height: 100%;
-  background: #1565c0;
+  background: var(--rb-primary);
   border-radius: 999px;
   transition: width 0.5s ease;
 }
 .progress-percent {
   font-size: 13px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
   font-weight: 600;
 }
 
@@ -1420,15 +1403,15 @@ function scrollToTimeline() {
   align-items: center;
   padding: 8px 10px;
   border-radius: 10px;
-  background: #f7f9fc;
+  background: var(--rb-surface-alt);
   font-size: 13px;
 }
 .availability-type {
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 .availability-units {
-  color: #55606e;
+  color: var(--rb-text-secondary);
 }
 
 .quick-actions {
@@ -1468,61 +1451,14 @@ function scrollToTimeline() {
   gap: 18px;
   margin-bottom: 20px;
 }
-.payment-panel {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--rb-border);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-start;
+.billing-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rb-text-secondary);
 }
-.payment-chips {
-  display: flex;
-  gap: 10px;
-}
-.payment-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface);
-  color: var(--rb-text);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.payment-chip--active {
-  border-color: #1565c0;
-  background: #E1F3FE;
-  color: #1F6C9F;
-}
-.receipt-block {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 10px;
-  background: #EDF3EC;
-  color: #346538;
-}
-.receipt-block__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-.receipt-block__title {
-  font-size: 14px;
-  font-weight: 700;
-}
-.receipt-block__meta {
-  font-size: 12.5px;
-  opacity: 0.85;
+.billing-card .muted {
+  color: var(--rb-text-muted);
+  font-weight: 400;
 }
 .payment-history {
   margin-top: 20px;
@@ -1548,7 +1484,7 @@ function scrollToTimeline() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--rb-text);
+  color: var(--rb-text-primary);
 }
 .toast-enter-active,
 .toast-leave-active {
@@ -1577,11 +1513,11 @@ function scrollToTimeline() {
   justify-content: center;
   text-align: center;
   padding: 80px 20px;
-  color: #6b7686;
+  color: var(--rb-text-secondary);
 }
 .empty-state h3 {
   font-size: 18px;
-  color: #1a2233;
+  color: var(--rb-text-primary);
   margin: 12px 0 4px;
 }
 .empty-state p {
@@ -1589,12 +1525,12 @@ function scrollToTimeline() {
   margin: 0 0 20px;
 }
 .empty-state--error h3 {
-  color: #d32f2f;
+  color: var(--rb-accent-text);
 }
 
 /* ---------- Skeletons ---------- */
 .skeleton {
-  background: linear-gradient(90deg, var(--rb-border) 25%, var(--rb-canvas) 37%, var(--rb-border) 63%);
+  background: linear-gradient(90deg, var(--rb-border) 25%, var(--rb-surface-hover) 37%, var(--rb-border) 63%);
   background-size: 400% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
   border-radius: 12px;
@@ -1646,72 +1582,8 @@ function scrollToTimeline() {
 /* .request-details-page / .card / .skeleton already read the warm --rb-*
    tokens redefined near the top of this file, so no hardcoded overrides
    are needed for those here. */
-:global(.dark .request-details-page .page-title),
-:global(.dark .request-details-page .crumb-current),
-:global(.dark .request-details-page .section-title),
-:global(.dark .request-details-page .side-card__title),
-:global(.dark .request-details-page .summary-value),
-:global(.dark .request-details-page .info-value),
-:global(.dark .request-details-page .timeline-label) {
-  color: var(--rb-text);
-}
-:global(.dark .request-details-page .page-subtitle),
-:global(.dark .request-details-page .breadcrumb),
-:global(.dark .request-details-page .info-label),
-:global(.dark .request-details-page .summary-label),
-:global(.dark .request-details-page .documents-empty),
-:global(.dark .request-details-page .timeline-timestamp),
-:global(.dark .request-details-page .progress-percent) {
-  color: var(--rb-text-muted);
-}
-:global(.dark .request-details-page .btn--outline) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: #6fa8dc;
-}
-:global(.dark .request-details-page .btn--outline:hover) {
-  background: #262319;
-}
-:global(.dark .request-details-page .history-table th) {
-  color: var(--rb-text-muted);
-  border-color: var(--rb-border);
-}
-:global(.dark .request-details-page .history-table td) {
-  color: var(--rb-text);
-  border-color: var(--rb-border);
-}
-:global(.dark .request-details-page .document-chip),
-:global(.dark .request-details-page .availability-item) {
-  background: #262319;
-  border-color: var(--rb-border);
-}
 :global(.dark) .timeline-step::before {
   background: var(--rb-border);
-}
-:global(.dark .request-details-page .timeline-marker) {
-  background: #262319;
-}
-:global(.dark .request-details-page .billing-gated) {
-  color: var(--rb-text-muted);
-}
-:global(.dark .request-details-page .payment-chip) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: var(--rb-text);
-}
-:global(.dark .request-details-page .payment-chip--active) {
-  border-color: #7EC1EE;
-  background: #122733;
-  color: #7EC1EE;
-}
-:global(.dark .request-details-page .receipt-block) {
-  background: #1D2B1E;
-  color: #8FCB94;
-}
-:global(.dark .request-details-page .toast) {
-  background: var(--rb-surface);
-  border-color: var(--rb-border);
-  color: var(--rb-text);
 }
 
 /* ---------- Responsive ---------- */
@@ -1732,9 +1604,6 @@ function scrollToTimeline() {
   .info-grid,
   .billing-summary {
     grid-template-columns: 1fr;
-  }
-  .payment-chips {
-    flex-wrap: wrap;
   }
   .bottom-actions {
     justify-content: stretch;

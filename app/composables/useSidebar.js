@@ -34,6 +34,35 @@ export function useSidebar(namespace = 'donor') {
     hoverExpanded.value = false
   }
 
+  /*
+   * Click-to-collapse, for rails with a toggle button instead of hover (the
+   * donor portal). The choice is remembered per portal in localStorage, so a
+   * reload keeps the rail as the user left it.
+   */
+  const storageKey = `redagos:${namespace}-sidebar-collapsed`
+
+  const setCollapsed = (value) => {
+    collapsed.value = value
+    hoverExpanded.value = false
+    try {
+      localStorage.setItem(storageKey, value ? '1' : '0')
+    } catch {
+      // Storage blocked: the toggle still works for this visit.
+    }
+  }
+
+  const toggleCollapsed = () => setCollapsed(!collapsed.value)
+
+  /** Read the remembered choice; `fallback` when there is none. Client only. */
+  const restoreCollapsed = (fallback = false) => {
+    try {
+      const stored = localStorage.getItem(storageKey)
+      collapsed.value = stored === null ? fallback : stored === '1'
+    } catch {
+      collapsed.value = fallback
+    }
+  }
+
   const openMobile = () => {
     mobileOpen.value = true
   }
@@ -44,6 +73,9 @@ export function useSidebar(namespace = 'donor') {
 
   return {
     collapsed,
+    setCollapsed,
+    toggleCollapsed,
+    restoreCollapsed,
     hoverExpanded,
     railExpanded,
     expandOnHover,

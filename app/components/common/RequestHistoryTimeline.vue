@@ -22,7 +22,7 @@
               <template v-else>{{ event.allocation.reference_number }}</template>
               <template v-if="event.allocation.facility"> · {{ event.allocation.facility }}</template>
             </span>
-            <span v-if="event.item?.component" class="history__tag">{{ event.item.component }}</span>
+            <span v-if="event.item?.component" class="history__tag">{{ lineName(event, event.item) }}</span>
             <span
               v-if="event.to_status && event.to_status !== event.from_status"
               class="history__transition"
@@ -64,7 +64,7 @@
               </thead>
               <tbody>
                 <tr v-for="line in event.lines" :key="line.request_item_id ?? line.transfusion_request_item_id">
-                  <td>{{ line.component || '—' }}</td>
+                  <td>{{ line.component ? lineName(event, line) : '—' }}</td>
                   <td class="num">{{ line.required ?? line.requested }}</td>
                   <td v-if="isRequirementSnapshot(event)" class="num">{{ line.approved ?? 0 }}</td>
                   <td class="num">{{ line.fulfilled }}</td>
@@ -148,6 +148,18 @@ const TONES = {
 /** A requirement-level snapshot carries what the patient needs, not what one centre was asked. */
 function isRequirementSnapshot(event) {
   return event.lines?.[0]?.required !== undefined
+}
+
+/**
+ * Name a line as the event recorded it, with its blood type when the lines differ.
+ *
+ * Only a weekly request's lines differ in type — "A+ Cryoprecipitate" beside
+ * "AB+ Cryoprecipitate" — so any other request reads exactly as before.
+ */
+function lineName(event, line) {
+  const types = new Set((event.lines ?? []).map((snapshot) => snapshot.blood_type).filter(Boolean))
+
+  return types.size > 1 && line.blood_type ? `${line.blood_type} ${line.component}` : line.component
 }
 
 function iconFor(event) {

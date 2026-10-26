@@ -82,27 +82,70 @@ export type BloodUnitStatus =
   | 'expired'
   | 'discarded'
 
-/** billings.status */
-export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void'
+/**
+ * billings.status.
+ *
+ * `subsidised`: the government met the cost. `statement_only`: a weekly
+ * (replenishment) order, billed to the hospital by statement and settled
+ * outside RedAgos — it takes no payment here and never blocks release.
+ * `settled_outside`: that weekly bill once billing staff record the hospital's
+ * settlement of it, with its reference and date.
+ */
+export type BillingStatus = 'unpaid' | 'partial' | 'paid' | 'void' | 'subsidised' | 'statement_only' | 'settled_outside'
 
-/** payments.payment_method / payments.status */
-export type PaymentMethod = 'cash' | 'gcash'
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'
+/**
+ * payments.payment_method / payments.status / payments.source
+ *
+ * `voided`: a counter payment voided on the Billing Supervisor's approval
+ * while its shift was open. It stays on record and no longer counts.
+ */
+export type PaymentMethod = 'cash' | 'gcash' | 'card' | 'bank_transfer'
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided'
+export type PaymentSource = 'manual' | 'gateway'
+
+/** billing_transactions: what a journal row was for, what it was, and where it came in. */
+export type TransactionCategory = 'patient_transfusion' | 'weekly_replenishment'
+export type TransactionType =
+  | 'charge'
+  | 'charge_adjustment'
+  | 'payment'
+  | 'payment_correction'
+  | 'payment_void'
+  | 'subsidy'
+  | 'external_settlement'
+  | 'opening_balance'
+export type TransactionChannel = 'counter' | 'gateway' | 'outside' | 'system'
+
+/** payment_attempts.status — one GCash checkout's state. */
+export type PaymentAttemptStatus =
+  | 'creating'
+  | 'active'
+  | 'awaiting_verification'
+  | 'completed'
+  | 'expired'
+  | 'canceled'
+  | 'failed'
+  | 'superseded'
 
 export interface FacilityStub {
   id: number
+  /** False for a hospital known only from a walk-in: no accounts, nobody notified. */
+  is_registered?: boolean
   name: string
   address: string | null
 }
 
+/** On a request, both are null when its lines differ in blood type: a weekly request restocking several. */
 export interface BloodTypeStub {
-  id: number
+  id: number | null
   code: string | null
 }
 
 export interface ComponentStub {
   id: number
   name: string | null
+  /** The code on its bag label (PRBC, FFP, PC), where the API sends it. */
+  code?: string | null
 }
 
 export interface RequestAllocation {
@@ -116,6 +159,8 @@ export interface RequestAllocation {
   storage_location?: string | null
   allocated_at: string | null
   released_at: string | null
+  /** Who physically took the units. Null for a release made before it was recorded, or with no name given. */
+  handed_to?: string | null
   received_at: string | null
 }
 
@@ -134,6 +179,8 @@ export interface BloodRequestItem {
   id: number
   /** On a facility allocation: the patient's requirement line this is a share of. */
   transfusion_request_item_id?: number | null
+  /** The request's own on every request but a weekly one, whose lines can each restock a different type. */
+  blood_type?: BloodTypeStub
   component: ComponentStub
   quantity: number
   indication_code: string | null
@@ -173,7 +220,7 @@ export interface TransfusionRequestStub {
   required: Array<{ transfusion_request_item_id: number; component_id: number; component: string | null; quantity: number }>
 }
 
-/** The watcher who presented a walk-in, and who at the hospital confirmed it. */
+/** The watcher who presented a walk-in, and, on one recorded before 2026-10-19, who at the hospital confirmed it. */
 export interface WalkInDetails {
   representative: {
     name: string
@@ -187,6 +234,7 @@ export interface WalkInDetails {
   attending_physician: string | null
   patient_ward: string | null
   patient_record_number: string | null
+  /** The hospital's phone confirmation: only on walk-ins recorded before 2026-10-19, when the step was removed. */
   verification: {
     method: 'phone'
     verifier_name: string
@@ -195,7 +243,7 @@ export interface WalkInDetails {
     verified_at: string | null
     recorded_by: string | null
     notes: string | null
-  }
+  } | null
   duplicate_acknowledgement: string | null
 }
 
@@ -226,7 +274,10 @@ export interface BloodRequest {
   /** The blood-centre staff member who entered a walk-in. */
   recorder_name: string | null
   patient: PatientDetails | null
+  /** Null id and code when the lines differ in blood type; blood_types then names them all. */
   blood_type: BloodTypeStub
+  /** Every blood type the lines ask for, in blood-group order. One code on every request but a weekly one. */
+  blood_types?: string[]
   /** What the request asks for. A form can tick several components. */
   items: BloodRequestItem[]
   /** The sum of every line's units. Derived server-side, never stored. */
@@ -255,7 +306,7 @@ export interface BloodRequest {
   /** Set when this request is one facility's share of a Patient Transfusion Request. */
   transfusion_request: TransfusionRequestStub | null
   /**
-   * Set when this replenishment is one blood type of a weekly request. It is
+   * Set when this replenishment was sent as a weekly request. It is
    * dispatched in one delivery, and whatever is not supplied is closed as
    * unavailable when it goes.
    */
@@ -275,6 +326,8 @@ export interface BloodRequest {
 export interface RequestEventLine {
   request_item_id?: number
   transfusion_request_item_id?: number
+  /** The line's blood type code, on an allocation's snapshot recorded since lines carried their own. */
+  blood_type?: string | null
   component: string | null
   required?: number
   requested: number
@@ -299,7 +352,7 @@ export interface RequestEvent {
   actor_facility: { id: number; name: string } | null
   /** Which facility allocation it happened to; null for an event on the requirement itself. */
   allocation?: { id: number; reference_number: string; facility: string | null } | null
-  item: { id: number; component: string | null } | null
+  item: { id: number; blood_type?: string | null; component: string | null } | null
   related_request: { id: number; reference_number: string; facility: string | null } | null
   lines: RequestEventLine[]
   unit_count: number
@@ -349,7 +402,8 @@ export interface DuplicateMatch {
 
 /** GET /blood-center/blood-requests/walk-in/reference */
 export interface WalkInReference {
-  hospitals: Array<{ id: number; name: string; address: string | null; phone: string | null }>
+  /** registered is false for a hospital a centre named on an earlier walk-in. */
+  hospitals: Array<{ id: number; name: string; address: string | null; phone: string | null; registered?: boolean }>
   blood_types: Array<{ id: number; code: string; label: string }>
   components: ComponentOption[]
   priorities: Array<{ value: UrgencyLevel; label: string }>
@@ -359,7 +413,9 @@ export interface WalkInReference {
 }
 
 export interface CreateWalkInPayload {
-  hospital_id: number
+  /** The hospital chosen from the list, or hospital_name for one not on RedAgos. */
+  hospital_id?: number
+  hospital_name?: string
   /** Set to add this centre's share to an existing Patient Transfusion Request. */
   transfusion_request_id?: number | null
   urgency_level: UrgencyLevel
@@ -386,14 +442,6 @@ export interface CreateWalkInPayload {
     contact: string
     id_type?: string | null
     id_number?: string | null
-  }
-  verification: {
-    confirmed: true
-    verifier_name: string
-    verifier_position: string
-    verifier_contact: string
-    verified_at: string
-    notes?: string | null
   }
   duplicate_acknowledgement?: string | null
 }
@@ -428,8 +476,329 @@ export interface Billing {
   status: BillingStatus
   status_label: string
   is_zero_rated: boolean
+  is_subsidised: boolean
+  /** A weekly bill, before and after the hospital settles it. */
+  is_statement_only: boolean
+  is_settled_outside?: boolean
+  /** False for void, subsidised and statement-only statements: nothing is collected in RedAgos. */
+  collects_payment: boolean
+  represents_collected_money: boolean
   clears_release: boolean
   billing_date: string | null
+  /** Set once the hospital settled a weekly bill outside RedAgos. */
+  settlement?: { settled_at: string | null; reference: string | null; note: string | null } | null
+}
+
+/** One payment on a statement, as GET …/billings/{id}/payments lists it to whoever may record payments. */
+export interface RecordedPayment {
+  id: number
+  amount_paid: number
+  /** Cash at the counter: what was handed over, and the change given back. */
+  amount_tendered: string | null
+  change_given: string | null
+  payment_method: PaymentMethod
+  payment_method_label: string
+  reference_number: string | null
+  /** Card only: the cardholder's last name, if the counter recorded it. */
+  additional_information: string | null
+  status: PaymentStatus
+  status_label: string
+  source: PaymentSource
+  source_label: string
+  payment_date: string | null
+  cash_session: { id: number; session_number: string; is_open: boolean } | null
+  voided_at: string | null
+  void_reason: string | null
+  receipt: PaymentReceiptSummary | null
+  pending_correction: boolean
+  pending_void: boolean
+  can_request_correction: boolean
+  can_request_void: boolean
+}
+
+/** One row of the billing journal. Amounts are decimal strings, signed against the bill. */
+export interface BillingTransaction {
+  id: number
+  transaction_number: string
+  occurred_at: string | null
+  category: TransactionCategory
+  category_label: string
+  type: TransactionType
+  type_label: string
+  channel: TransactionChannel
+  channel_label: string
+  payment_method: PaymentMethod | null
+  payment_method_label: string | null
+  amount: string
+  /** A debit raises what is owed; a credit settles it. */
+  direction: 'debit' | 'credit' | 'none'
+  balance_after: string
+  billing_id: number
+  request: { id: number; reference_number: string; patient_name: string | null; requesting_facility: string | null } | null
+  payment_id: number | null
+  receipt: { id: number; receipt_number: string } | null
+  statement: { id: number; document_number: string } | null
+  cash_session: { id: number; session_number: string } | null
+  reverses_transaction_number: string | null
+  reference: string | null
+  note: string | null
+  recorded_by: string | null
+}
+
+/** The totals of every journal row a filter matches, as positive money. */
+export interface BillingTransactionTotals {
+  count: number
+  charged: string
+  collected: string
+  subsidised: string
+  settled_outside: string
+}
+
+/** GET /blood-center/billings/summary — counted on the server. */
+export interface BillingSummary {
+  /** This month's patient bills by where they stand now. */
+  patient_bills_this_month: { paid: number; partial: number; unpaid: number; subsidised: number }
+  payments_today: number
+  outstanding: { count: number; amount: string }
+  collected_today: string
+  collected_this_month: string
+  subsidised_this_month: { count: number; amount: string }
+  weekly_awaiting_settlement: { count: number; amount: string }
+  weekly_settled_this_month: number
+  issuer: { name: string | null; logo_url: string | null }
+  as_of: string
+}
+
+/** A cash shift's drawer, in decimal strings. Counted and variance only once closed. */
+export interface CashShiftFigures {
+  opening_float: string
+  cash_collected: string
+  cash_voided: string
+  expected_cash: string
+  gcash_counter: string
+  gcash_checkout: string
+  card_counter: string
+  bank_transfer_counter: string
+  total_collected: string
+  counted_cash?: string
+  variance?: string
+}
+
+/** A cashier's shift at the billing counter. `figures` and `transactions` come with a reading. */
+export interface CashShift {
+  id: number
+  session_number: string
+  status: 'open' | 'closed'
+  status_label: string
+  counter_label: string | null
+  cashier: { id: number; name: string } | null
+  opened_at: string | null
+  closed_at: string | null
+  closed_by: string | null
+  opening_float: string
+  expected_cash: string | null
+  counted_cash: string | null
+  variance: string | null
+  count_breakdown: Record<string, number> | null
+  closing_note: string | null
+  figures?: CashShiftFigures
+  counts?: { payments: number; voids: number }
+  pending_voids?: number
+  transactions?: BillingTransaction[]
+}
+
+/** A patient bill as the counter finds it. Amounts are decimal strings. */
+export interface CounterBill {
+  request_id: number
+  reference_number: string
+  transfusion_reference: string | null
+  presented_reference: string | null
+  is_walk_in: boolean
+  patient_name: string | null
+  requesting_facility: string | null
+  blood_types: string[]
+  is_emergency: boolean
+  urgency_label: string
+  purpose_label: string
+  /** Named on a walk-in's request form only. */
+  attending_physician: string | null
+  request_date: string | null
+  billing_status: BillingStatus
+  billing_status_label: string
+  total_amount: string
+  collected: string
+  outstanding: string
+  clears_release: boolean
+  takes_payment: boolean
+  /** Only on GET /pos/bills/{id}. */
+  lines?: StatementLine[]
+  billing?: Billing
+  checkout?: CheckoutAvailability
+  open_attempt?: PaymentAttempt | null
+}
+
+/** One frozen line of an issued statement. Amounts are decimal strings. */
+export interface StatementLine {
+  component_name: string
+  /** On the live lines a billing screen reads; an issued statement folds it into the name. */
+  blood_type?: string | null
+  quantity: number
+  unit_price: string
+  line_total: string
+}
+
+/** One issued invoice (INV-…; SOA-… if issued before 2026-10-25). It never changes once issued. */
+export interface StatementRevision {
+  id: number
+  document_number: string
+  revision_number: number
+  reason: 'statement' | 'checkout' | 'payment'
+  billing_status: BillingStatus
+  billing_status_label: string
+  statement_only: boolean
+  currency: string
+  total_amount: string
+  collected_at_issue: string
+  amount_due: string
+  issued_at: string | null
+  /** The staff member whose action issued it; null for one issued by the system. */
+  issued_by?: string | null
+  issuer?: BillingFacilityCard
+  /** A Patient Transfusion statement bills the patient; a weekly one the hospital, with no patient. */
+  bill_to?: { patient_name: string | null; facility: string | null }
+  request_reference?: string | null
+  lines: StatementLine[]
+}
+
+/** The issuing centre as a billing document heads it. */
+export interface BillingFacilityCard {
+  name: string | null
+  address: string | null
+  doh_license_number?: string | null
+  phone?: string | null
+  email?: string | null
+  /**
+   * A signed, expiring link to the logo the document was issued with — the
+   * centre's own, never a shared mark. Null when the centre has none; its
+   * initials stand in.
+   */
+  logo_url?: string | null
+}
+
+/** A Payment Acknowledgement Receipt (AR-…), as lists show it. Not a BIR official receipt. */
+export interface PaymentReceiptSummary {
+  id: number
+  receipt_number: string
+  payment_id?: number | null
+  /** The request the receipt's statement belongs to, for opening it. */
+  request_id?: number | null
+  issued_at: string | null
+  amount_paid: string | null
+  balance_after: string | null
+  is_partial: boolean
+  payment_method_label: string | null
+  statement_document_number: string | null
+  voided: boolean
+  void_reason: string | null
+  replaces_receipt_number: string | null
+  /*
+   * The rest of the receipt, frozen when it was issued, for showing it as it
+   * prints. Never the payment reference: that comes with the payment, to
+   * whoever may record payments.
+   */
+  balance_before?: string | null
+  payer_name?: string | null
+  received_by?: string | null
+  issuing_facility?: BillingFacilityCard | null
+  request?: { reference_number: string | null; patient_name: string | null; requesting_facility: string | null } | null
+  statement?: { document_number: string; revision_number: number; total_amount: string; amount_due: string } | null
+  payment?: {
+    method_label: string | null
+    source: PaymentSource | null
+    paid_at: string | null
+    /** Cash at the counter: what was handed over, and the change given back. */
+    amount_tendered?: string | null
+    change_given?: string | null
+    cash_session_number?: string | null
+  }
+  /**
+   * Each part of what was handed over, in the order it was recorded: one, or
+   * every part of a payment split across methods, all on this one receipt.
+   * Without references, like `payment`. Empty on a receipt issued before
+   * receipts listed their parts.
+   */
+  tenders?: ReceiptTender[]
+  /** Empty on a receipt issued before receipts carried their lines. */
+  lines?: StatementLine[]
+}
+
+/** One part of the payment a receipt acknowledges. Amounts are decimal strings. */
+export interface ReceiptTender {
+  method_label: string | null
+  amount_paid: string | null
+  /** The cash part only: what was handed over, and the change given back. */
+  amount_tendered: string | null
+  change_given: string | null
+}
+
+/**
+ * One GCash checkout opened at the counter. The payer's name is never sent
+ * back. `checkout_url` is present only while the checkout can still be paid.
+ */
+export interface PaymentAttempt {
+  id: number
+  status: PaymentAttemptStatus
+  status_label: string
+  amount: string
+  currency: string
+  checkout_url: string | null
+  expires_at: string | null
+  statement_document_number: string | null
+  failure_code: string | null
+  review_required: boolean
+  review_reason: string | null
+  created_at: string | null
+  completed_at: string | null
+}
+
+/** Why a checkout cannot be opened right now, from GET /blood-center/billings/{id}. */
+export interface CheckoutAvailability {
+  available: boolean
+  reason: string | null
+}
+
+/** GET /blood-center/billings/{id}: one statement with its request and live lines. */
+export interface StatementDetail extends Billing {
+  request: {
+    id: number
+    reference_number: string
+    status: string
+    status_label: string
+    request_purpose: string
+    purpose_label: string
+    requesting_facility: string | null
+    patient_name: string | null
+    blood_type: string | null
+    urgency_level: string
+    urgency_label: string
+    is_emergency: boolean
+    components: string[]
+    request_date: string | null
+    transfusion_reference: string | null
+    presented_reference: string | null
+    attending_physician: string | null
+    is_walk_in: boolean
+    is_closed: boolean
+  } | null
+  lines: StatementLine[]
+  outstanding: string
+}
+
+/** GET /hospital/blood-requests/{id}/billing — read only. */
+export interface HospitalBillingView {
+  billing: Billing
+  statements: StatementRevision[]
+  receipts: PaymentReceiptSummary[]
 }
 
 export interface CreateBloodRequestItemPayload {
@@ -757,14 +1126,61 @@ export const REQUEST_STATUS_TONES: Record<BloodRequestStatus, 'info' | 'progress
  * that it counts the rest rather than overflowing the column.
  */
 export function componentSummary(request: Pick<BloodRequest, 'items'>): string {
-  const names = (request.items ?? [])
+  // Distinct: a weekly request can ask for one component in several blood types.
+  const names = [...new Set((request.items ?? [])
     .map((item) => item.component?.name)
-    .filter((name): name is string => Boolean(name))
+    .filter((name): name is string => Boolean(name)))]
 
   if (names.length === 0) return '\u2014'
   if (names.length <= 2) return names.join(', ')
 
   return `${names[0]}, ${names[1]} +${names.length - 2} more`
+}
+
+type BloodTyped = Partial<Pick<BloodRequest, 'blood_type' | 'blood_types' | 'items'>>
+
+/**
+ * Every blood type a request asks for, in the order the API sends them.
+ *
+ * Read from blood_types, which the API sends in blood-group order; the lines
+ * and then the request's own type are the fallback for a request loaded
+ * without it.
+ */
+export function bloodTypeCodes(request: BloodTyped | null | undefined): string[] {
+  if (request?.blood_types?.length) return request.blood_types
+
+  const fromLines = [...new Set((request?.items ?? [])
+    .map((item) => item.blood_type?.code)
+    .filter((code): code is string => Boolean(code)))]
+
+  if (fromLines.length) return fromLines
+
+  return request?.blood_type?.code ? [request.blood_type.code] : []
+}
+
+/** Whether a request's lines differ in blood type \u2014 a weekly request restocking several. */
+export function hasMixedBloodTypes(request: BloodTyped | null | undefined): boolean {
+  return bloodTypeCodes(request).length > 1
+}
+
+/** Name the blood type a request is for: "O+", or "A+, B+, O-" when its lines differ. */
+export function bloodTypeSummary(request: BloodTyped | null | undefined): string {
+  const codes = bloodTypeCodes(request)
+
+  return codes.length ? codes.join(', ') : '\u2014'
+}
+
+/**
+ * Name one line of a request: its component, with its blood type when the lines differ.
+ *
+ * "A+ Cryoprecipitate" and "AB+ Cryoprecipitate" are two lines of one weekly
+ * request; on any other request the type is the request's and is shown once.
+ */
+export function requestLineLabel(request: BloodTyped | null | undefined, item: Pick<BloodRequestItem, 'blood_type' | 'component'>): string {
+  const name = item.component?.name ?? '\u2014'
+  const code = item.blood_type?.code
+
+  return hasMixedBloodTypes(request) && code ? `${code} ${name}` : name
 }
 
 /**

@@ -1,6 +1,6 @@
 import { authService } from '~/api/auth/AuthService'
 import { resolveApiAssetURL, resolveApiBaseURL } from '~/api/BaseService'
-import type { AppUser } from '~/types/user'
+import type { AppUser, CorrectionSubject } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
 // sa composable aron usa ra ka request bisan pila ka caller ang mo-dungan.
@@ -17,61 +17,96 @@ export function useUser() {
   async function fetchUser(): Promise<void> {
     loading.value = true
     try {
-      const token = import.meta.client ? localStorage.getItem('_token') : null
-      const res = await $fetch<any>('/user', {
-        baseURL: resolveApiBaseURL(),
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-
-      // Ang /user kay mo-return og UserResource, ug gi-wrap sa Laravel ang
-      // JsonResource sulod sa "data" key. Ang `?? res` kay safety net lang kung
-      // mo-withoutWrapping ta puhon.
-      const payload = res?.data ?? res
-
-      user.value = {
-        uuid: payload.uuid,
-        // Naa nay full_name ang resource. Ang fallback kay gi-filter aron dili
-        // mo-produce og "undefined undefined" kung wala ang name parts.
-        full_name: payload.full_name || [payload.first_name, payload.last_name].filter(Boolean).join(' '),
-        first_name: payload.first_name ?? null,
-        last_name: payload.last_name ?? null,
-        email: payload.email,
-        phone: payload.phone ?? null,
-        username: payload.username ?? null,
-        account_status: payload.account_status ?? null,
-        email_verified: Boolean(payload.email_verified),
-        activated_at: payload.activated_at ?? null,
-        roles: Array.isArray(payload.roles) ? payload.roles.map((role: any) => role?.name ?? role) : [],
-        // Ang facility kay gi-eager-load na sa /user, so ang portal header
-        // makakuha na sa ngalan sa center.
-        facility: payload.facility ?? null,
-        // Blood center department + permissions. Ang server gihapon ang tinuod
-        // nga gate — presentation ra ni.
-        department: payload.department ?? null,
-        department_label: payload.department_label ?? null,
-        staff_role: payload.staff_role ?? null,
-        staff_role_label: payload.staff_role_label ?? null,
-        custom_role: payload.custom_role ?? null,
-        role_label: payload.role_label ?? null,
-        staff_privileges: Array.isArray(payload.staff_privileges) ? payload.staff_privileges : [],
-        is_supervisor: Boolean(payload.is_supervisor),
-        // Admin privileges. Sama sa department permissions sa ibabaw: ang
-        // server gihapon ang gate, presentation ra ni nga kopya para sa nav.
-        is_super_admin: Boolean(payload.is_super_admin),
-        admin_privileges: Array.isArray(payload.admin_privileges) ? payload.admin_privileges : [],
-        admin_role: payload.admin_role ?? null,
-        permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
-        blood_type: payload.blood_type ?? null,
-        // Signed URL nga mo-expire sa 30 minutos, bag-o sa matag /user. Kaniadto
-        // ang upload ra ang nag-set ani, so nawala ang photo human sa login,
-        // refresh o pagbalhin og page.
-        avatar: resolveApiAssetURL(payload.avatar_url),
-      }
+      user.value = await requestUser()
     } catch (err) {
       console.error('Failed to load user:', err)
       user.value = null
     } finally {
       loading.value = false
+    }
+  }
+
+  /**
+   * Re-read the signed-in user quietly, to pick up a change made elsewhere —
+   * an Admin giving them a role or privileges in another session.
+   *
+   * Unlike fetchUser() it shows no loading state and, on failure, keeps the
+   * user it has: a dropped request in the background must not sign anyone
+   * out. A truly expired session is caught by the next real request.
+   */
+  async function refreshUser(): Promise<void> {
+    if (!import.meta.client || !user.value || !localStorage.getItem('_token')) return
+
+    try {
+      user.value = await requestUser()
+    } catch {
+      // Keep the user already loaded.
+    }
+  }
+
+  /** One read of /user, shaped as the app keeps it. Throws on failure. */
+  async function requestUser(): Promise<AppUser> {
+    const token = import.meta.client ? localStorage.getItem('_token') : null
+    const res = await $fetch<any>('/user', {
+      baseURL: resolveApiBaseURL(),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+
+    // Ang /user kay mo-return og UserResource, ug gi-wrap sa Laravel ang
+    // JsonResource sulod sa "data" key. Ang `?? res` kay safety net lang kung
+    // mo-withoutWrapping ta puhon.
+    const payload = res?.data ?? res
+
+    return {
+      uuid: payload.uuid,
+      // Naa nay full_name ang resource. Ang fallback kay gi-filter aron dili
+      // mo-produce og "undefined undefined" kung wala ang name parts.
+      full_name: payload.full_name || [payload.first_name, payload.last_name].filter(Boolean).join(' '),
+      first_name: payload.first_name ?? null,
+      last_name: payload.last_name ?? null,
+      email: payload.email,
+      phone: payload.phone ?? null,
+      username: payload.username ?? null,
+      account_status: payload.account_status ?? null,
+      email_verified: Boolean(payload.email_verified),
+      temporary_sign_in: Boolean(payload.temporary_sign_in),
+      activated_at: payload.activated_at ?? null,
+      roles: Array.isArray(payload.roles) ? payload.roles.map((role: any) => role?.name ?? role) : [],
+      // Ang facility kay gi-eager-load na sa /user, so ang portal header
+      // makakuha na sa ngalan sa center.
+      facility: payload.facility ?? null,
+      // Blood center department + permissions. Ang server gihapon ang tinuod
+      // nga gate — presentation ra ni.
+      department: payload.department ?? null,
+      department_label: payload.department_label ?? null,
+      staff_role: payload.staff_role ?? null,
+      // Every listed role held, main first; staff_role is the main one.
+      staff_roles: Array.isArray(payload.staff_roles)
+        ? payload.staff_roles
+        : (payload.staff_role ? [payload.staff_role] : []),
+      staff_role_label: payload.staff_role_label ?? null,
+      custom_role: payload.custom_role ?? null,
+      role_label: payload.role_label ?? null,
+      staff_privileges: Array.isArray(payload.staff_privileges) ? payload.staff_privileges : [],
+      // A hospital blood bank account's role: head, inventory_staff or requesting_staff.
+      hospital_role: payload.hospital_role ?? null,
+      hospital_role_label: payload.hospital_role_label ?? null,
+      // Admin or Supervisor, the levels above a staff role. Presentation
+      // only, like the permissions below.
+      management_level: payload.management_level ?? null,
+      management_level_label: payload.management_level_label ?? null,
+      // Admin privileges. Sama sa department permissions sa ibabaw: ang
+      // server gihapon ang gate, presentation ra ni nga kopya para sa nav.
+      is_super_admin: Boolean(payload.is_super_admin),
+      admin_privileges: Array.isArray(payload.admin_privileges) ? payload.admin_privileges : [],
+      admin_role: payload.admin_role ?? null,
+      permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+      correction_subjects: Array.isArray(payload.correction_subjects) ? payload.correction_subjects : [],
+      blood_type: payload.blood_type ?? null,
+      // Signed URL nga mo-expire sa 30 minutos, bag-o sa matag /user. Kaniadto
+      // ang upload ra ang nag-set ani, so nawala ang photo human sa login,
+      // refresh o pagbalhin og page.
+      avatar: resolveApiAssetURL(payload.avatar_url),
     }
   }
 
@@ -115,6 +150,17 @@ export function useUser() {
       : ability.some((one) => held.includes(one))
   }
 
+  /**
+   * May the user file a correction of this subject.
+   *
+   * Fail-closed like `can()`. Presentation only: it decides whether a
+   * "Request correction" control is drawn, and the server refuses a filing
+   * the account may not make.
+   */
+  function canFile(subject: CorrectionSubject): boolean {
+    return user.value?.correction_subjects?.includes(subject) ?? false
+  }
+
   function updateAvatar(newUrl: string | null): void {
     if (user.value) {
       user.value = { ...user.value, avatar: newUrl }
@@ -137,6 +183,9 @@ export function useUser() {
     if (!import.meta.client) return
 
     localStorage.removeItem('_token')
+    // The donor's check-in code is kept on the device (qrcode.vue); it goes
+    // with the session, so a shared computer doesn't keep the next user's pass.
+    localStorage.removeItem('donor-qr-code')
     inFlight = null
     clearUser()
   }
@@ -161,5 +210,5 @@ export function useUser() {
     }
   }
 
-  return { user, loading, fetchUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can }
+  return { user, loading, fetchUser, refreshUser, ensureUser, updateAvatar, clearUser, clearSession, logout, can, canFile }
 }

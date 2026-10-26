@@ -4,22 +4,28 @@
       <div>
         <h1 class="components-page__title">Blood Components</h1>
         <p class="components-page__subtitle">
-          Shelf life and price for each component. Every unit's expiry date comes from its shelf life, so a component
-          without one cannot be booked into stock.
+          The components this centre prepares, and how long each keeps. Every unit's expiry date comes from its shelf
+          life, so a component without one cannot be booked into stock.
         </p>
       </div>
 
-      <button type="button" class="btn btn--ghost" :disabled="busy" @click="load">
-        <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-        {{ busy ? 'Loading…' : 'Refresh' }}
-      </button>
+      <div class="header-actions">
+        <button type="button" class="btn btn--ghost" :disabled="busy" @click="load">
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+          {{ busy ? 'Loading…' : 'Refresh' }}
+        </button>
+        <button v-if="!adding" type="button" class="btn btn--primary" @click="openAdd">
+          <AssetIcon name="plus" :size="14" />
+          Add component
+        </button>
+      </div>
     </header>
 
     <!-- Whose settings these are, and how far along they are -->
     <div class="scope">
       <span class="scope__item">
         <AssetIcon name="building-2" :size="14" />
-        Settings for <strong>{{ facilityName || 'this centre' }}</strong> only. Other centres set their own.
+        Shelf life for <strong>{{ facilityName || 'this centre' }}</strong> only. Other centres set their own.
       </span>
       <span v-if="rows.length" class="scope__progress" :class="{ 'scope__progress--done': configuredCount === rows.length }">
         <AssetIcon :name="configuredCount === rows.length ? 'circle-check-big' : 'circle-alert'" :size="14" />
@@ -32,13 +38,95 @@
       <span>{{ banner }}</span>
     </div>
 
+    <!-- Add a component: it joins the catalogue every centre shares. -->
+    <form v-if="adding" class="card add" novalidate @submit.prevent="submitAdd">
+      <div class="add__head">
+        <h2 class="add__title">Add a component</h2>
+        <p class="add__note">
+          <AssetIcon name="info" :size="13" />
+          Every centre and every hospital's request form will list it. Other centres see it as not configured until they
+          set their own shelf life.
+        </p>
+      </div>
+
+      <div class="add__fields">
+        <label class="field field--name">
+          <span class="field__label">Name</span>
+          <input
+            ref="nameInput"
+            v-model="addForm.name"
+            type="text"
+            maxlength="150"
+            placeholder="e.g. Leukoreduced Packed RBC"
+            class="text-input"
+            :class="{ 'text-input--invalid': addErrors.name }"
+            required
+          >
+          <em v-if="addErrors.name" class="field__error">{{ addErrors.name }}</em>
+        </label>
+
+        <label class="field field--code">
+          <span class="field__label">Bag code</span>
+          <input
+            v-model="addForm.code"
+            type="text"
+            maxlength="10"
+            placeholder="e.g. LPRBC"
+            class="text-input text-input--code"
+            :class="{ 'text-input--invalid': addErrors.code }"
+            autocapitalize="characters"
+            spellcheck="false"
+            required
+          >
+          <em v-if="addErrors.code" class="field__error">{{ addErrors.code }}</em>
+          <small v-else class="field__hint">Printed on each bag: 1234567-{{ codePreview }}</small>
+        </label>
+
+        <label class="field field--temp">
+          <span class="field__label">Storage <i>optional</i></span>
+          <input
+            v-model="addForm.storage_temperature"
+            type="text"
+            maxlength="50"
+            placeholder="e.g. 1–6 °C"
+            class="text-input"
+            :class="{ 'text-input--invalid': addErrors.storage_temperature }"
+          >
+          <em v-if="addErrors.storage_temperature" class="field__error">{{ addErrors.storage_temperature }}</em>
+        </label>
+
+        <label class="field field--days">
+          <span class="field__label">Shelf life <i>optional</i></span>
+          <span class="input-group" :class="{ 'input-group--invalid': addErrors.shelf_life_days }">
+            <input
+              v-model="addForm.shelf_life_days"
+              type="number"
+              min="1"
+              max="3650"
+              placeholder="Not set"
+              class="cell-input"
+            >
+            <span class="input-group__suffix">days</span>
+          </span>
+          <em v-if="addErrors.shelf_life_days" class="field__error">{{ addErrors.shelf_life_days }}</em>
+        </label>
+      </div>
+
+      <div class="add__actions">
+        <button type="button" class="btn btn--ghost" :disabled="addSaving" @click="closeAdd">Cancel</button>
+        <button type="submit" class="btn btn--primary" :disabled="addSaving || !canSubmitAdd">
+          {{ addSaving ? 'Adding…' : 'Add component' }}
+        </button>
+      </div>
+    </form>
+
     <section class="card">
       <table class="components">
         <thead>
           <tr>
             <th>Component</th>
+            <th>Bag code</th>
             <th>Shelf life</th>
-            <th>Price per unit</th>
             <th>Status</th>
             <th class="right"><span class="sr-only">Actions</span></th>
           </tr>
@@ -47,7 +135,7 @@
           <template v-if="busy && !rows.length">
             <tr v-for="n in 4" :key="`sk-${n}`" class="row--skeleton">
               <td><span class="skeleton skeleton--name" /></td>
-              <td><span class="skeleton skeleton--input" /></td>
+              <td><span class="skeleton skeleton--code" /></td>
               <td><span class="skeleton skeleton--input" /></td>
               <td><span class="skeleton skeleton--pill" /></td>
               <td />
@@ -60,9 +148,13 @@
             v-for="row in rows"
             v-else
             :key="row.id"
-            :class="{ 'row--unset': !row.shelf_life_configured, 'row--dirty': isDirty(row) }"
+            :class="{ 'row--unset': !row.shelf_life_configured, 'row--dirty': isDirty(row), 'row--new': row.id === justAddedId }"
           >
-            <td class="name">{{ row.name }}</td>
+            <td class="name">
+              {{ row.name }}
+              <span v-if="row.storage_temperature" class="name__sub">{{ row.storage_temperature }}</span>
+            </td>
+            <td><span class="code">{{ row.code }}</span></td>
             <td>
               <label class="input-group">
                 <span class="sr-only">{{ row.name }} shelf life in days</span>
@@ -78,20 +170,6 @@
               </label>
             </td>
             <td>
-              <label class="input-group">
-                <span class="input-group__prefix">₱</span>
-                <span class="sr-only">{{ row.name }} price per unit</span>
-                <input
-                  v-model="drafts[row.id].price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="No price"
-                  class="cell-input"
-                >
-              </label>
-            </td>
-            <td>
               <span class="pill" :class="row.shelf_life_configured ? 'pill--ok' : 'pill--warn'">
                 <AssetIcon :name="row.shelf_life_configured ? 'check' : 'circle-alert'" :size="12" />
                 {{ row.shelf_life_configured ? 'Configured' : 'Shelf life needed' }}
@@ -100,7 +178,7 @@
             <td class="right">
               <div class="row-actions">
                 <span v-if="isDirty(row)" class="unsaved">Unsaved</span>
-                <!-- Undo puts the fields back to what is saved; nothing is sent. -->
+                <!-- Undo puts the field back to what is saved; nothing is sent. -->
                 <button
                   v-if="isDirty(row)"
                   type="button"
@@ -128,8 +206,8 @@
     <p class="footnote">
       <AssetIcon name="info" :size="14" />
       <span>
-        A blank field means no approved value yet. Stock intake refuses a component with no shelf life rather than
-        guessing one, and a component with no price can be released without payment.
+        A blank shelf life means no approved value yet: stock intake refuses the component rather than guessing one.
+        Prices are set by Billing, under Component Prices.
       </span>
     </p>
   </div>
@@ -140,18 +218,22 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
- * A blood centre's own settings for each blood component.
+ * Processing's components: the shared catalogue, and this centre's shelf life for each.
  *
- * Held per facility rather than on the shared `blood_components` row: four
- * facilities share that row, so a value written there would decide another
- * centre's expiry dates, and a price set there would switch on the
- * payment-before-release gate for centres that never set one.
+ * The shelf life is held per facility rather than on the shared
+ * `blood_components` row: four facilities share that row, so a value written
+ * there would decide another centre's expiry dates. Adding a component, by
+ * contrast, adds to that shared row on purpose: every centre and every
+ * hospital's request form sees it.
+ *
+ * The Component Technologist's (`components.configure`). The price on the
+ * same settings row is Billing's and is set on Component Prices.
  */
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'center.configure',
+  requires: 'components.configure',
 })
 
 useHead({ title: 'Blood Components · RedAgos' })
@@ -168,10 +250,7 @@ const bannerKind = ref('notice')
 const configuredCount = computed(() => rows.value.filter((row) => row.shelf_life_configured).length)
 
 function seedDraft(row) {
-  drafts[row.id] = {
-    shelf_life_days: row.shelf_life_days ?? '',
-    price: row.price ?? '',
-  }
+  drafts[row.id] = { shelf_life_days: row.shelf_life_days ?? '' }
 }
 
 /**
@@ -184,9 +263,15 @@ function isDirty(row) {
   if (!draft) return false
 
   const days = draft.shelf_life_days === '' ? null : Number(draft.shelf_life_days)
-  const price = draft.price === '' ? null : Number(draft.price)
 
-  return days !== row.shelf_life_days || price !== row.price
+  return days !== row.shelf_life_days
+}
+
+function firstError(err, fallback) {
+  return err?.data?.message
+    || Object.values(err?.data?.errors ?? err?.errors ?? {}).flat()[0]
+    || err?.message
+    || fallback
 }
 
 async function load() {
@@ -208,7 +293,7 @@ async function load() {
     }
   } catch (err) {
     bannerKind.value = 'error'
-    banner.value = err?.data?.message || 'The component settings could not be loaded.'
+    banner.value = firstError(err, 'The components could not be loaded.')
   } finally {
     busy.value = false
   }
@@ -223,9 +308,8 @@ async function save(row) {
   try {
     const res = await bloodCenterService.updateComponentSetting(row.id, {
       // An empty field is null, not 0: null means "not configured", which the
-      // server accepts and stock intake then refuses on. Zero is a real price.
+      // server accepts and stock intake then refuses on.
       shelf_life_days: draft.shelf_life_days === '' ? null : Number(draft.shelf_life_days),
-      price: draft.price === '' ? null : Number(draft.price),
     })
 
     const updated = res?.data
@@ -241,11 +325,84 @@ async function save(row) {
     banner.value = res?.message || `${row.name} updated.`
   } catch (err) {
     bannerKind.value = 'error'
-    banner.value = err?.data?.message
-      || Object.values(err?.data?.errors ?? {}).flat()[0]
-      || 'The component could not be saved.'
+    banner.value = firstError(err, 'The shelf life could not be saved.')
   } finally {
     savingId.value = null
+  }
+}
+
+/* --- Adding a component --- */
+
+const adding = ref(false)
+const addSaving = ref(false)
+const nameInput = ref(null)
+const justAddedId = ref(null)
+const addErrors = reactive({})
+
+function blankAdd() {
+  return { name: '', code: '', storage_temperature: '', shelf_life_days: '' }
+}
+
+const addForm = reactive(blankAdd())
+
+// The server stores the code in capitals; show it the way it will print.
+const codePreview = computed(() => addForm.code.trim().toUpperCase() || 'CODE')
+const canSubmitAdd = computed(() => addForm.name.trim().length >= 2 && addForm.code.trim() !== '')
+
+function clearAddErrors() {
+  Object.keys(addErrors).forEach((key) => delete addErrors[key])
+}
+
+async function openAdd() {
+  Object.assign(addForm, blankAdd())
+  clearAddErrors()
+  adding.value = true
+  await nextTick()
+  nameInput.value?.focus()
+}
+
+function closeAdd() {
+  adding.value = false
+}
+
+async function submitAdd() {
+  addSaving.value = true
+  clearAddErrors()
+  banner.value = ''
+
+  try {
+    const res = await bloodCenterService.addComponent({
+      name: addForm.name.trim(),
+      code: addForm.code.trim(),
+      storage_temperature: addForm.storage_temperature.trim() || null,
+      shelf_life_days: addForm.shelf_life_days === '' ? null : Number(addForm.shelf_life_days),
+    })
+
+    const added = res?.data
+
+    if (added) {
+      // Into its place in the name order the server lists by.
+      rows.value = [...rows.value, added].sort((a, b) => a.name.localeCompare(b.name))
+      seedDraft(added)
+      justAddedId.value = added.id
+    }
+
+    adding.value = false
+    bannerKind.value = 'success'
+    banner.value = res?.message || `${addForm.name.trim()} added.`
+  } catch (err) {
+    const fieldErrors = err?.data?.errors ?? err?.errors
+
+    if (fieldErrors) {
+      for (const [field, messages] of Object.entries(fieldErrors)) {
+        addErrors[field] = Array.isArray(messages) ? messages[0] : messages
+      }
+    } else {
+      bannerKind.value = 'error'
+      banner.value = firstError(err, 'The component could not be added.')
+    }
+  } finally {
+    addSaving.value = false
   }
 }
 
@@ -265,9 +422,10 @@ onMounted(load)
   color: var(--rb-text-primary);
 }
 
-.components-page__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.components-page__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .components-page__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .components-page__subtitle { margin: 4px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 
 /* scope + progress */
 .scope { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -302,7 +460,6 @@ onMounted(load)
 .alert--success { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), 0.25); }
 .alert--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
 
-/* table */
 .card {
   border: 1px solid var(--rb-border);
   border-radius: 14px;
@@ -311,6 +468,45 @@ onMounted(load)
   box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
 }
 
+/* add form */
+.add { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; overflow: visible; }
+.add__head { display: flex; flex-direction: column; gap: 4px; }
+.add__title { margin: 0; font-size: 14px; font-weight: 700; }
+.add__note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--rb-text-secondary); }
+.add__note :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+.add__fields {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(130px, 1fr) minmax(130px, 1fr) 170px;
+  gap: 12px;
+  align-items: start;
+}
+.add__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field__label { font-size: 12px; font-weight: 600; color: var(--rb-text-primary); }
+.field__label i { font-style: normal; font-weight: 500; color: var(--rb-text-secondary); }
+.field__hint { font-size: 11.5px; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.field__error { font-size: 11.5px; font-style: normal; color: var(--rb-accent-text); }
+
+.text-input {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 10px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.text-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.text-input::placeholder { color: var(--rb-placeholder); }
+.text-input--code { text-transform: uppercase; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.text-input--code::placeholder { text-transform: none; letter-spacing: normal; }
+.text-input--invalid,
+.input-group--invalid { border-color: var(--rb-accent); }
+
+/* table */
 .components { width: 100%; border-collapse: collapse; font-size: 13px; }
 .components th {
   text-align: left;
@@ -330,9 +526,22 @@ onMounted(load)
 
 .row--unset td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
 .row--dirty { background: rgba(var(--rb-primary-rgb), 0.04); }
+.row--new { background: rgba(var(--rb-success-rgb), 0.06); }
 
 .right { text-align: right; }
 .name { font-weight: 600; }
+.name__sub { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.code {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
 .empty { padding: 32px 16px; text-align: center; color: var(--rb-text-secondary); }
 
 /* inputs with a unit */
@@ -348,7 +557,6 @@ onMounted(load)
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .input-group:focus-within { border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-.input-group__prefix,
 .input-group__suffix {
   padding: 0 10px;
   font-size: 12.5px;
@@ -358,9 +566,8 @@ onMounted(load)
   align-self: stretch;
   display: grid;
   place-items: center;
+  border-left: 1px solid var(--rb-border);
 }
-.input-group__prefix { border-right: 1px solid var(--rb-border); }
-.input-group__suffix { border-left: 1px solid var(--rb-border); }
 
 .cell-input {
   flex: 1;
@@ -452,6 +659,7 @@ onMounted(load)
   animation: comp-shimmer 1.4s ease infinite;
 }
 .skeleton--name { width: 60%; height: 12px; }
+.skeleton--code { width: 52px; height: 20px; }
 .skeleton--input { width: 170px; height: 36px; border-radius: 10px; }
 .skeleton--pill { width: 90px; height: 20px; border-radius: 999px; }
 @keyframes comp-shimmer {
@@ -463,6 +671,15 @@ onMounted(load)
 @keyframes comp-spin { to { transform: rotate(360deg); } }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .add__fields { grid-template-columns: 1fr 1fr; }
+  .field--name { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  .add__fields { grid-template-columns: 1fr; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }

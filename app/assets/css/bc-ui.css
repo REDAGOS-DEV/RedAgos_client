@@ -1,0 +1,101 @@
+/*
+ * The blood centre's shared UI layer.
+ *
+ * Every blood-centre list and work page draws the same parts under the same
+ * class names (.page-title, .panel, .toolbar, .search, .table-wrap, .pager,
+ * .empty-state, .btn-outline, .btn-primary), each in its own scoped styles.
+ * This layer gives them one modern finish without touching a page's markup
+ * or logic: loaded by the blood-centre layout, and scoped to `html.portal-bc`
+ * so no other portal is affected. `html.portal-bc .bc-shell` outranks a
+ * page's scoped rule, so the finish here wins where the two disagree.
+ *
+ * Its signature is the "agos" (flow): the thin line in the portal colour that
+ * runs down the sidebar's folders. It appears under each page title, and
+ * along the edge of the table row under the pointer.
+ */
+
+/* ── Page header: a bolder title ── */
+html.portal-bc .bc-shell .page-title,
+html.portal-bc .bc-shell .collection__title {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+html.portal-bc .bc-shell .page-subtitle {
+  margin-top: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* ── Panels: softer corners, a quiet lift off the canvas ── */
+html.portal-bc .bc-shell .panel {
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px -20px rgba(15, 23, 42, 0.22);
+}
+html.portal-bc.dark .bc-shell .panel { box-shadow: none; }
+
+/* ── Toolbar: its own band above the table ── */
+html.portal-bc .bc-shell .panel > .toolbar {
+  padding: 14px 18px;
+  background: color-mix(in srgb, var(--rb-surface-alt, var(--rb-surface)) 55%, var(--rb-surface));
+}
+html.portal-bc .bc-shell .search__input {
+  border-radius: 999px;
+  padding-left: 34px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+html.portal-bc .bc-shell .search__input:focus {
+  border-color: var(--rb-primary);
+  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.14);
+}
+
+/* ── Buttons: one height and corner, a pressed state ── */
+html.portal-bc .bc-shell .btn-outline,
+html.portal-bc .bc-shell .btn-primary {
+  border-radius: 10px;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+}
+html.portal-bc .bc-shell .btn-outline:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.45); }
+html.portal-bc .bc-shell .btn-outline:active:not(:disabled),
+html.portal-bc .bc-shell .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+html.portal-bc .bc-shell .btn-primary { box-shadow: 0 6px 14px -8px rgba(var(--rb-primary-rgb), 0.7); }
+html.portal-bc.dark .bc-shell .btn-primary { box-shadow: none; }
+
+/* ── Tables: calmer headings, roomier rows, the agos on hover ── */
+html.portal-bc .bc-shell .table-wrap thead th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--rb-text-muted, var(--rb-text-secondary));
+}
+html.portal-bc .bc-shell .table-wrap tbody td {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+html.portal-bc .bc-shell .table-wrap tbody tr { transition: background-color 120ms ease; }
+html.portal-bc .bc-shell .table-wrap tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 rgba(var(--rb-primary-rgb), 0.6);
+}
+
+/* ── Empty states: the icon in a soft ring ── */
+html.portal-bc .bc-shell .empty-state { padding-top: 56px; padding-bottom: 56px; }
+html.portal-bc .bc-shell .empty-state__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+  box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04);
+}
+
+/* ── Pager: rounded steps ── */
+html.portal-bc .bc-shell .pager { padding: 12px 18px; }
+html.portal-bc .bc-shell .pager__btn { border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html.portal-bc .bc-shell .btn-outline,
+  html.portal-bc .bc-shell .btn-primary,
+  html.portal-bc .bc-shell .search__input,
+  html.portal-bc .bc-shell .table-wrap tbody tr { transition: none; }
+}

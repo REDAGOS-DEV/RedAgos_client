@@ -1,23 +1,19 @@
 <template>
   <div class="track-page">
     <!-- ============== PAGE HEADER ============== -->
-    <div class="page-header">
-      <div class="page-header__titles">
-        <h1 class="page-title">Track Requests</h1>
-        <p class="page-subtitle">
-          Monitor the real-time progress and fulfillment status of submitted blood requests.
-        </p>
-      </div>
-      <button
-        class="btn btn--primary"
-        type="button"
-        :disabled="!request || isRefreshing"
-        @click="handleRefresh"
-      >
-        <AssetIcon name="refresh-cw" :class="{ spin: isRefreshing }" />
-        <span>Refresh Status</span>
-      </button>
-    </div>
+    <PageHeader class="page-header" title="Track Requests" subtitle="Monitor the real-time progress and fulfillment status of submitted blood requests.">
+      <template #actions>
+        <button
+          class="ui-btn ui-btn--primary"
+          type="button"
+          :disabled="!request || isRefreshing"
+          @click="handleRefresh"
+        >
+          <AssetIcon name="refresh-cw" :size="15" :class="{ spin: isRefreshing }" />
+          <span>Refresh Status</span>
+        </button>
+      </template>
+    </PageHeader>
 
     <!-- ============== SEARCH SECTION ============== -->
     <section class="card search-card">
@@ -58,7 +54,7 @@
             </button>
           </div>
         </div>
-        <button type="submit" class="btn btn--primary search-btn" :disabled="isSearching">
+        <button type="submit" class="ui-btn ui-btn--primary search-btn" :disabled="isSearching">
           {{ isSearching ? 'Searching…' : 'Search' }}
         </button>
       </form>
@@ -67,22 +63,21 @@
     </section>
 
     <!-- ============== EMPTY STATE ============== -->
-    <div v-if="!hasSearched" class="empty-state">
-      <AssetIcon name="package-search" class="empty-state__icon" />
-      <h3>No Request Selected</h3>
-      <p>Search using a blood request reference number to begin tracking.</p>
-    </div>
+    <section v-if="!hasSearched" class="card">
+      <EmptyState icon="package-search" title="No Request Selected" description="Search using a blood request reference number to begin tracking." />
+    </section>
 
     <!-- ============== ERROR STATE ============== -->
-    <div v-else-if="searchError" class="empty-state empty-state--error">
-      <AssetIcon name="triangle-alert" class="empty-state__icon" />
-      <h3>Request Not Found</h3>
-      <p v-if="searchError === 'not_found'">
-        The entered reference number could not be located.
-      </p>
-      <p v-else>Something went wrong while searching. Please try again.</p>
-      <button class="btn btn--primary" type="button" @click="handleSearchSubmit">Search Again</button>
-    </div>
+    <section v-else-if="searchError" class="card">
+      <EmptyState
+        icon="triangle-alert"
+        title="Request Not Found"
+        :description="searchError === 'not_found'
+          ? 'The entered reference number could not be located.'
+          : 'Something went wrong while searching. Please try again.'">
+        <button class="ui-btn ui-btn--primary" type="button" @click="handleSearchSubmit">Search Again</button>
+      </EmptyState>
+    </section>
 
     <!-- ============== SEARCHING SKELETON ============== -->
     <div v-else-if="isSearching && !request" class="skeleton-stack">
@@ -112,7 +107,7 @@
         <div class="hero-grid">
           <div class="hero-item">
             <span class="hero-label">Blood Type</span>
-            <span class="hero-value hero-value--emphasis">{{ request.blood_type || '—' }}</span>
+            <span class="hero-value hero-value--emphasis">{{ bloodTypeSummary(request) }}</span>
           </div>
           <div class="hero-item">
             <span class="hero-label">Blood Component</span>
@@ -163,7 +158,7 @@
         <h2 class="section-title">Source &amp; Patient Transfusion Request</h2>
         <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
           A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
-          it after your blood bank confirmed it by phone.
+          it<template v-if="request.walk_in?.verification"> after your blood bank confirmed it by phone</template><template v-else> on your behalf</template>.
         </p>
         <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
           This is {{ request.target_facility?.name || 'one facility' }}'s share of
@@ -225,7 +220,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Type</span>
-                <span class="info-value">{{ request.blood_type || '—' }}</span>
+                <span class="info-value">{{ bloodTypeSummary(request) }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Blood Component</span>
@@ -281,8 +276,8 @@
                   <span>{{ doc.label || doc.name }}</span>
                 </div>
                 <div class="documents-row__actions">
-                  <a :href="doc.url" target="_blank" rel="noopener" class="btn btn--outline btn--sm">View</a>
-                  <a :href="doc.url" download class="btn btn--outline btn--sm">Download</a>
+                  <a :href="doc.url" target="_blank" rel="noopener" class="ui-btn ui-btn--sm">View</a>
+                  <a :href="doc.url" download class="ui-btn ui-btn--sm">Download</a>
                 </div>
               </div>
             </div>
@@ -346,20 +341,20 @@
           <section class="card side-card">
             <h3 class="side-card__title">Quick Actions</h3>
             <div class="quick-actions">
-              <button class="btn btn--outline btn--full" type="button" @click="viewRequestDetails">
+              <button class="ui-btn btn--full" type="button" @click="viewRequestDetails">
                 <AssetIcon name="eye" />
                 <span>View Request Details</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="handleDownloadPdf">
+              <button class="ui-btn btn--full" type="button" @click="handleDownloadPdf">
                 <AssetIcon name="download" />
                 <span>Download PDF</span>
               </button>
-              <button class="btn btn--outline btn--full" type="button" @click="handlePrint">
+              <button class="ui-btn btn--full" type="button" @click="handlePrint">
                 <AssetIcon name="printer" />
                 <span>Print</span>
               </button>
               <button
-                class="btn btn--outline btn--full"
+                class="ui-btn btn--full"
                 type="button"
                 :disabled="!pickup?.blood_center_contact"
                 @click="contactBloodCenter"
@@ -391,9 +386,11 @@
 </template>
 
 <script setup>
+import PageHeader from '~/components/ui/PageHeader.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
-import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 /**
  * /hospital/track-requests
  * Tracking-only page (NOT a management page) for Hospital Blood Bank staff.
@@ -407,6 +404,7 @@ import { PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/typ
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
+  requires: 'hospital.requests.view',
 })
 
 const route = useRoute()
@@ -563,8 +561,10 @@ function contactBloodCenter() {
 
 <style scoped>
 .track-page {
-  padding: 24px;
-  background: #f7f9fc;
+  max-width: var(--rb-content-max, 1600px);
+  margin: 0 auto;
+  padding: 24px var(--rb-gutter, 24px) 40px;
+  background: var(--rb-page-bg);
   min-height: 100%;
   animation: page-fade-in 0.25s ease;
 }
@@ -574,7 +574,8 @@ function contactBloodCenter() {
 }
 
 /* ---------- Header ---------- */
-.page-header {
+.page-header { margin-bottom: 20px; }
+.page-header-old {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -586,12 +587,12 @@ function contactBloodCenter() {
   font-family: var(--rb-font-sans);
   font-size: 30px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--rb-text-primary);
   margin: 0 0 4px;
 }
 .page-subtitle {
   font-size: 15px;
-  color: #64748b;
+  color: var(--rb-text-secondary);
   margin: 0;
 }
 
@@ -618,20 +619,20 @@ function contactBloodCenter() {
   transform: scale(0.98);
 }
 .btn--primary {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: #0d47a1;
+  background: color-mix(in srgb, var(--rb-primary) 88%, #000);
 }
 .btn--outline {
-  background: #fff;
-  color: #1565c0;
-  border-color: #e5eaf0;
+  background: var(--rb-surface);
+  color: var(--rb-primary-text);
+  border-color: var(--rb-border);
 }
 .btn--outline:hover:not(:disabled) {
-  background: #f1f6fb;
-  border-color: #1565c0;
+  background: rgba(var(--rb-primary-rgb), 0.06);
+  border-color: var(--rb-primary);
 }
 .btn--full {
   width: 100%;
@@ -649,21 +650,21 @@ function contactBloodCenter() {
 
 /* ---------- Cards ---------- */
 .card {
-  background: #fff;
-  border: 1px solid #e5eaf0;
-  border-radius: 18px;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
   padding: 24px;
-  box-shadow: 0 2px 10px rgba(20, 30, 50, 0.04);
+  box-shadow: var(--rb-shadow-sm);
   margin-bottom: 20px;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .card:hover {
-  box-shadow: 0 6px 18px rgba(20, 30, 50, 0.07);
+  box-shadow: var(--rb-shadow-sm);
 }
 .section-title {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--rb-text-primary);
   margin: 0 0 18px;
 }
 
@@ -685,21 +686,21 @@ function contactBloodCenter() {
 .search-icon {
   position: absolute;
   left: 14px;
-  color: #94a3b8;
+  color: var(--rb-text-muted);
 }
 .search-input {
   width: 100%;
-  border: 1px solid #e5eaf0;
+  border: 1px solid var(--rb-border);
   border-radius: 12px;
   padding: 14px 40px 14px 42px;
   font-size: 15px;
-  color: #1e293b;
-  background: #f7f9fc;
+  color: var(--rb-text-primary);
+  background: var(--rb-surface-alt);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .search-input:focus {
   outline: none;
-  border-color: #1565c0;
+  border-color: var(--rb-primary);
   box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
 }
 .recent-toggle {
@@ -707,7 +708,7 @@ function contactBloodCenter() {
   right: 10px;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--rb-text-muted);
   cursor: pointer;
   padding: 6px;
 }
@@ -718,7 +719,7 @@ function contactBloodCenter() {
 .recent-loading {
   margin-top: 10px;
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--rb-text-muted);
 }
 
 .recent-dropdown {
@@ -726,8 +727,8 @@ function contactBloodCenter() {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid #e5eaf0;
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
   border-radius: 14px;
   box-shadow: 0 12px 28px rgba(20, 30, 50, 0.14);
   padding: 10px;
@@ -739,7 +740,7 @@ function contactBloodCenter() {
 .recent-dropdown__label {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--rb-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 6px 10px 2px;
@@ -754,12 +755,12 @@ function contactBloodCenter() {
   border-radius: 10px;
   padding: 10px;
   font-size: 14px;
-  color: #1e293b;
+  color: var(--rb-text-primary);
   cursor: pointer;
   text-align: left;
 }
 .recent-item:hover {
-  background: #f1f6fb;
+  background: rgba(var(--rb-primary-rgb), 0.06);
 }
 .recent-item__ref {
   font-family: 'SFMono-Regular', Consolas, monospace;
@@ -786,18 +787,18 @@ function contactBloodCenter() {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
-.badge--success { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
-.badge--warning { background: rgba(245, 158, 11, 0.14); color: #b8790a; }
-.badge--danger { background: rgba(211, 47, 47, 0.12); color: #d32f2f; }
-.badge--info { background: rgba(21, 101, 192, 0.12); color: #1565c0; }
-.badge--neutral { background: #eef0f3; color: #55606e; }
+.badge--success { background: rgba(var(--rb-success-rgb), .1); color: var(--rb-success-text); }
+.badge--warning { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
+.badge--danger { background: rgba(var(--rb-accent-rgb), .09); color: var(--rb-accent-text); }
+.badge--info { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.badge--neutral { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 
 .attention-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: rgba(211, 47, 47, 0.1);
-  color: #d32f2f;
+  color: var(--rb-accent-text);
   border-radius: 999px;
   padding: 5px 12px;
   font-size: 12px;
@@ -806,13 +807,13 @@ function contactBloodCenter() {
 
 /* ---------- Hero card ---------- */
 .hero-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f1f6fb 100%);
+  background: linear-gradient(135deg, var(--rb-surface) 0%, rgba(var(--rb-primary-rgb), 0.06) 100%);
 }
 .hero-ref {
   font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 20px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--rb-text-primary);
 }
 .hero-badges {
   display: flex;
@@ -834,7 +835,7 @@ function contactBloodCenter() {
 }
 .hero-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -842,12 +843,12 @@ function contactBloodCenter() {
 .hero-value {
   font-size: 15px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--rb-text-primary);
 }
 .hero-value--emphasis {
   font-size: 22px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 
 /* ---------- Horizontal stepper ---------- */
@@ -874,11 +875,11 @@ function contactBloodCenter() {
   left: 55%;
   width: 90%;
   height: 2px;
-  background: #e5eaf0;
+  background: var(--rb-border);
   z-index: 0;
 }
 .stepper-step--completed:not(:last-child)::after {
-  background: #2e7d32;
+  background: var(--rb-success);
 }
 .stepper-marker {
   width: 30px;
@@ -887,19 +888,19 @@ function contactBloodCenter() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef0f3;
-  color: #94a3b8;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-muted);
   font-size: 13px;
   font-weight: 700;
   z-index: 1;
   transition: background 0.4s ease, color 0.4s ease, transform 0.2s ease;
 }
 .stepper-step--completed .stepper-marker {
-  background: #2e7d32;
+  background: var(--rb-success);
   color: #fff;
 }
 .stepper-step--current .stepper-marker {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
   transform: scale(1.15);
   box-shadow: 0 0 0 5px rgba(21, 101, 192, 0.15);
@@ -907,14 +908,14 @@ function contactBloodCenter() {
 .stepper-label {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--rb-text-secondary);
   max-width: 100px;
 }
 .stepper-step--current .stepper-label {
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 .stepper-step--completed .stepper-label {
-  color: #2e7d32;
+  color: var(--rb-success-text);
 }
 
 /* ---------- Content grid ---------- */
@@ -937,12 +938,12 @@ function contactBloodCenter() {
 .info-item--full { grid-column: 1 / -1; }
 .info-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--rb-text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.info-value { font-size: 14px; color: #1e293b; line-height: 1.5; }
+.info-value { font-size: 14px; color: var(--rb-text-primary); line-height: 1.5; }
 .info-value--mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
 /* ---------- Vertical timeline ---------- */
@@ -966,7 +967,7 @@ function contactBloodCenter() {
   top: 24px;
   bottom: 0;
   width: 2px;
-  background: #e5eaf0;
+  background: var(--rb-border);
 }
 .v-timeline-step:last-child::before { display: none; }
 .v-timeline-marker {
@@ -977,52 +978,52 @@ function contactBloodCenter() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef0f3;
-  color: #94a3b8;
+  background: var(--rb-surface-alt);
+  color: var(--rb-text-muted);
   z-index: 1;
 }
 .v-timeline-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
-.v-timeline-step--completed .v-timeline-marker { background: #2e7d32; color: #fff; }
-.v-timeline-step--completed::before { background: #2e7d32; }
+.v-timeline-step--completed .v-timeline-marker { background: var(--rb-success); color: #fff; }
+.v-timeline-step--completed::before { background: var(--rb-success); }
 .v-timeline-step--current .v-timeline-marker {
-  background: #1565c0;
+  background: var(--rb-primary);
   color: #fff;
   box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.15);
 }
 .v-timeline-body { display: flex; flex-direction: column; gap: 3px; padding-top: 1px; }
 .v-timeline-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.v-timeline-activity { font-size: 14px; font-weight: 700; color: #1e293b; }
-.v-timeline-step--upcoming .v-timeline-activity { color: #94a3b8; font-weight: 600; }
+.v-timeline-activity { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.v-timeline-step--upcoming .v-timeline-activity { color: var(--rb-text-muted); font-weight: 600; }
 .v-timeline-tag {
   font-size: 11px;
   font-weight: 700;
-  color: #1565c0;
-  background: rgba(21, 101, 192, 0.1);
+  color: var(--rb-primary-text);
+  background: rgba(var(--rb-primary-rgb), 0.1);
   padding: 2px 8px;
   border-radius: 999px;
 }
-.v-timeline-tag--pending { color: #64748b; background: #eef0f3; }
-.v-timeline-time { font-size: 12px; color: #94a3b8; }
-.v-timeline-desc { font-size: 13px; color: #475569; margin: 2px 0 0; }
+.v-timeline-tag--pending { color: var(--rb-text-secondary); background: var(--rb-surface-alt); }
+.v-timeline-time { font-size: 12px; color: var(--rb-text-muted); }
+.v-timeline-desc { font-size: 13px; color: var(--rb-text-secondary); margin: 2px 0 0; }
 
 /* ---------- Updates / notifications ---------- */
 .updates-list, .notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .update-item { display: flex; gap: 12px; }
 .update-icon {
   width: 32px; height: 32px; border-radius: 999px;
-  background: rgba(21, 101, 192, 0.1); color: #1565c0;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .update-body { display: flex; flex-direction: column; gap: 2px; }
-.update-desc { font-size: 14px; color: #1e293b; margin: 0; }
-.update-time { font-size: 12px; color: #94a3b8; }
+.update-desc { font-size: 14px; color: var(--rb-text-primary); margin: 0; }
+.update-time { font-size: 12px; color: var(--rb-text-muted); }
 
 .notif-item { display: flex; gap: 10px; align-items: flex-start; }
-.notif-dot { width: 8px; height: 8px; border-radius: 999px; background: #1565c0; margin-top: 6px; flex-shrink: 0; }
-.notif-desc { font-size: 13px; color: #1e293b; margin: 0; }
-.notif-time { font-size: 11px; color: #94a3b8; }
+.notif-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--rb-primary); margin-top: 6px; flex-shrink: 0; }
+.notif-desc { font-size: 13px; color: var(--rb-text-primary); margin: 0; }
+.notif-time { font-size: 11px; color: var(--rb-text-muted); }
 
-.empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
+.empty-hint { font-size: 13px; color: var(--rb-text-muted); margin: 0; }
 .track-walk-in { margin-bottom: 10px; color: var(--rb-text-secondary); }
 .track-ptr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
 
@@ -1034,16 +1035,16 @@ function contactBloodCenter() {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  background: #f7f9fc;
-  border: 1px solid #e5eaf0;
+  background: var(--rb-surface-alt);
+  border: 1px solid var(--rb-border);
   border-radius: 12px;
   flex-wrap: wrap;
 }
-.documents-row__label { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #1e293b; font-weight: 600; }
+.documents-row__label { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--rb-text-primary); font-weight: 600; }
 .documents-row__actions { display: flex; gap: 8px; }
 
 /* ---------- Sidebar cards ---------- */
-.side-card__title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 16px; }
+.side-card__title { font-size: 16px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 16px; }
 .side-card__row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
 
 .progress-circle-wrap {
@@ -1053,10 +1054,10 @@ function contactBloodCenter() {
   margin: 0 auto 12px;
 }
 .progress-circle { width: 100%; height: 100%; transform: rotate(-90deg); }
-.progress-circle__track { fill: none; stroke: #eef0f3; stroke-width: 8; }
+.progress-circle__track { fill: none; stroke: var(--rb-surface-alt); stroke-width: 8; }
 .progress-circle__fill {
   fill: none;
-  stroke: #1565c0;
+  stroke: var(--rb-primary);
   stroke-width: 8;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.6s ease;
@@ -1069,7 +1070,7 @@ function contactBloodCenter() {
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--rb-primary-text);
 }
 
 .pickup-rows { display: flex; flex-direction: column; gap: 12px; }
@@ -1080,7 +1081,7 @@ function contactBloodCenter() {
   gap: 6px;
   align-self: flex-start;
   background: rgba(124, 58, 237, 0.1);
-  color: #7c3aed;
+  color: var(--rb-purple-text);
   border-radius: 999px;
   padding: 5px 12px;
   font-size: 12px;
@@ -1097,17 +1098,17 @@ function contactBloodCenter() {
   justify-content: center;
   text-align: center;
   padding: 70px 20px;
-  color: #64748b;
+  color: var(--rb-text-secondary);
 }
-.empty-state__icon { width: 48px; height: 48px; color: #94a3b8; margin-bottom: 14px; }
-.empty-state h3 { font-size: 18px; color: #1e293b; margin: 0 0 4px; }
+.empty-state__icon { width: 48px; height: 48px; color: var(--rb-text-muted); margin-bottom: 14px; }
+.empty-state h3 { font-size: 18px; color: var(--rb-text-primary); margin: 0 0 4px; }
 .empty-state p { font-size: 14px; margin: 0 0 20px; }
-.empty-state--error h3 { color: #d32f2f; }
-.empty-state--error .empty-state__icon { color: #d32f2f; }
+.empty-state--error h3 { color: var(--rb-accent-text); }
+.empty-state--error .empty-state__icon { color: var(--rb-accent-text); }
 
 /* ---------- Skeletons ---------- */
 .skeleton {
-  background: linear-gradient(90deg, #eef0f3 25%, #f6f7f9 37%, #eef0f3 63%);
+  background: linear-gradient(90deg, var(--rb-surface-alt) 25%, var(--rb-surface-hover) 37%, var(--rb-surface-alt) 63%);
   background-size: 400% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
   border-radius: 18px;
@@ -1121,53 +1122,6 @@ function contactBloodCenter() {
 .skeleton--stepper { height: 90px; }
 
 /* ---------- Dark mode ---------- */
-:global(.dark .track-page) { background: #0f1420; }
-:global(.dark .track-page .card) { background: #161d2e; border-color: #2a3447; }
-:global(.dark .track-page .page-title),
-:global(.dark .track-page .section-title),
-:global(.dark .track-page .side-card__title),
-:global(.dark .track-page .hero-ref),
-:global(.dark .track-page .hero-value),
-:global(.dark .track-page .info-value),
-:global(.dark .track-page .v-timeline-activity),
-:global(.dark .track-page .update-desc),
-:global(.dark .track-page .notif-desc),
-:global(.dark .track-page .documents-row__label),
-:global(.dark .track-page .search-input) {
-  color: #eef1f6;
-}
-:global(.dark .track-page .page-subtitle),
-:global(.dark .track-page .info-label),
-:global(.dark .track-page .hero-label),
-:global(.dark .track-page .empty-hint),
-:global(.dark .track-page .v-timeline-time),
-:global(.dark .track-page .update-time),
-:global(.dark .track-page .notif-time),
-:global(.dark .track-page .stepper-label) {
-  color: #8a93a6;
-}
-:global(.dark .track-page .hero-card) {
-  background: linear-gradient(135deg, #161d2e 0%, #1c2438 100%);
-}
-:global(.dark .track-page .btn--outline) {
-  background: #161d2e;
-  border-color: #2a3447;
-  color: #6fa8dc;
-}
-:global(.dark .track-page .btn--outline:hover:not(:disabled)) { background: #1c2438; }
-:global(.dark .track-page .search-input) { background: #1c2438; border-color: #2a3447; }
-:global(.dark .track-page .recent-dropdown) { background: #161d2e; border-color: #2a3447; }
-:global(.dark .track-page .recent-item:hover) { background: #1c2438; }
-:global(.dark .track-page .documents-row) { background: #1c2438; border-color: #2a3447; }
-:global(.dark .track-page .v-timeline-step::before),
-:global(.dark .track-page .stepper-step:not(:last-child)::after) { background: #2a3447; }
-:global(.dark .track-page .v-timeline-marker),
-:global(.dark .track-page .stepper-marker) { background: #232c40; }
-:global(.dark .track-page .progress-circle__track) { stroke: #232c40; }
-:global(.dark .track-page .skeleton) {
-  background: linear-gradient(90deg, #1c2438 25%, #232c40 37%, #1c2438 63%);
-  background-size: 400% 100%;
-}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1080px) {
@@ -1192,7 +1146,7 @@ function contactBloodCenter() {
 .search-input:focus-visible,
 .recent-item:focus-visible,
 .recent-toggle:focus-visible {
-  outline: 2px solid #1565c0;
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 

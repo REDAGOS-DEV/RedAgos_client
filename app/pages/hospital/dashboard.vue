@@ -21,78 +21,32 @@
     </div>
 
     <div v-else class="dashboard-inner">
-      <!-- Header -->
-      <header class="header-row fade-in" style="--delay: 0ms">
-        <div>
-          <h1 class="page-title">Hospital Blood Bank Dashboard</h1>
-          <p class="page-subtitle">Manage blood requests, monitor request status, and check blood availability.</p>
-        </div>
-        <div class="header-actions">
-          <NuxtLink to="/hospital/bloodrequests/newrequest" class="btn-primary">
-            <AssetIcon name="plus" :size="16" />
+      <PageHeader title="Hospital Blood Bank Dashboard" subtitle="Manage blood requests, monitor request status, and check blood availability.">
+        <template #actions>
+          <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn ui-btn--primary">
+            <AssetIcon name="plus" :size="15" />
             New Blood Request
           </NuxtLink>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
-      <!-- Summary KPI cards -->
-      <div class="stats-grid">
-        <div class="stat-card fade-in" style="--delay: 60ms">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#1565C014">
-              <AssetIcon name="blood-drop" :size="16" style="color:#1565C0" />
-            </div>
-            <span class="stat-card__label">Available Blood Units</span>
-          </div>
-          <p class="stat-card__value">{{ unitsAvailable }}</p>
-          <p class="stat-card__helper">Across all compatible blood types</p>
-        </div>
+      <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" class="low-stock-banner" />
 
-        <div class="stat-card fade-in" style="--delay: 110ms">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#F57C0014">
-              <AssetIcon name="clock" :size="16" style="color:#F57C00" />
-            </div>
-            <span class="stat-card__label">Pending Requests</span>
-          </div>
-          <p class="stat-card__value" style="color:#F57C00">{{ pendingCount }}</p>
-          <p class="stat-card__helper">Awaiting Blood Center approval</p>
-        </div>
-
-        <div class="stat-card fade-in" style="--delay: 160ms">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#2E7D3214">
-              <AssetIcon name="check-circle" :size="16" style="color:#2E7D32" />
-            </div>
-            <span class="stat-card__label">Approved Requests</span>
-          </div>
-          <p class="stat-card__value" style="color:#2E7D32">{{ approvedCount }}</p>
-          <p class="stat-card__helper">Ready for processing</p>
-        </div>
-
-        <div class="stat-card fade-in" style="--delay: 210ms">
-          <div class="stat-card__top">
-            <div class="stat-card__icon" style="background:#1565C014">
-              <AssetIcon name="trending-up" :size="16" style="color:#1565C0" />
-            </div>
-            <span class="stat-card__label">Completed Requests Today</span>
-          </div>
-          <p class="stat-card__value">{{ completedToday }}</p>
-          <p class="stat-card__helper">Successfully fulfilled today</p>
-        </div>
-      </div>
+      <!-- Summary figures: each opens the page that owns the number. -->
+      <StatStrip>
+        <StatItem label="Available blood units" :value="unitsAvailable" hint="Across all compatible blood types" icon="blood-drop" tone="primary" to="/hospital/bloodavailability" />
+        <StatItem label="Pending requests" :value="pendingCount" hint="Awaiting Blood Center approval" icon="clock" tone="warning" to="/hospital/bloodrequests" />
+        <StatItem label="Approved requests" :value="approvedCount" hint="Ready for processing" icon="check-circle" tone="success" to="/hospital/bloodrequests" />
+        <StatItem label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
+      </StatStrip>
 
       <!-- Main content -->
       <div class="main-grid">
         <!-- Left column -->
         <div class="col-left">
           <!-- Blood request trend -->
-          <section class="panel fade-in" style="--delay: 260ms">
-            <div class="panel-header">
-              <div>
-                <h2 class="panel-title">Blood Request Trend</h2>
-                <p class="panel-subtitle">Requests submitted over time</p>
-              </div>
+          <SectionCard title="Blood Request Trend" subtitle="Requests submitted over time" flush>
+            <template #actions>
               <div class="segmented" role="tablist" aria-label="Trend period">
                 <button type="button" role="tab" :aria-selected="trendPeriod === 'weekly'"
                   class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'weekly' }"
@@ -104,7 +58,7 @@
                   class="segmented__btn" :class="{ 'segmented__btn--active': trendPeriod === 'yearly' }"
                   @click="trendPeriod = 'yearly'">Yearly</button>
               </div>
-            </div>
+            </template>
 
             <!-- Trend summary stats -->
             <div class="trend-stats">
@@ -141,10 +95,7 @@
                     @focus="hoveredPoint = i" @blur="hoveredPoint = null" />
                 </g>
               </svg>
-              <div v-else class="trend-empty">
-                <AssetIcon name="trending-up" :size="36" style="color:#e5e7eb" />
-                <p>Not enough data yet to show a request trend.</p>
-              </div>
+              <EmptyState v-else icon="trending-up" title="No trend yet" description="Not enough data yet to show a request trend." compact />
 
               <div v-if="hoveredPoint !== null" class="trend-tooltip"
                 :style="{ left: tooltipLeft + '%' }">
@@ -152,24 +103,20 @@
                 <span class="trend-tooltip__label">{{ chartPoints[hoveredPoint].label }}</span>
               </div>
 
-              <div class="trend-labels">
+              <div v-if="chartPoints.length" class="trend-labels">
                 <span v-for="pt in chartPoints" :key="pt.label">{{ pt.label }}</span>
               </div>
             </div>
-          </section>
+          </SectionCard>
 
           <!-- Recent blood requests -->
-          <section class="panel fade-in" style="--delay: 300ms">
-            <div class="panel-header">
-              <div>
-                <h2 class="panel-title">Recent Blood Requests</h2>
-                <p class="panel-subtitle">Latest requests submitted from your facility</p>
-              </div>
+          <SectionCard title="Recent Blood Requests" subtitle="Latest requests submitted from your facility" flush>
+            <template #actions>
               <NuxtLink to="/hospital/bloodrequests" class="panel-link">
                 View All
                 <AssetIcon name="chevron-right" :size="14" />
               </NuxtLink>
-            </div>
+            </template>
 
             <div v-if="recentRequests.length" class="request-table">
               <div class="request-table__head">
@@ -190,39 +137,31 @@
                 <span class="request-row__component">{{ req.component_name }}</span>
                 <span class="request-row__date">{{ req.date_label }}</span>
                 <span>
-                  <span class="badge" :style="{
-                    background: statusMap[req.status]?.bg || '#f1f5f9',
-                    color: statusMap[req.status]?.color || '#64748b',
-                  }">{{ statusMap[req.status]?.label || req.status }}</span>
+                  <StatusBadge :tone="statusMap[req.status]?.tone || 'neutral'">{{ statusMap[req.status]?.label || req.status }}</StatusBadge>
                 </span>
                 <span>
                   <NuxtLink :to="`/hospital/bloodrequests/${req.id}`" class="row-link">View Details</NuxtLink>
                 </span>
               </div>
             </div>
-            <div v-else class="empty-state">
-              <AssetIcon name="inbox" :size="36" style="color:#e5e7eb" />
-              <p>No blood requests submitted today.</p>
-              <p class="empty-state__hint">New requests you submit will appear here.</p>
-            </div>
-          </section>
+            <EmptyState v-else icon="inbox" title="No blood requests submitted today." description="New requests you submit will appear here." />
+          </SectionCard>
         </div>
 
         <!-- Right column -->
         <div class="col-right">
           <!-- Blood availability -->
-          <section class="panel fade-in" style="--delay: 260ms">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Blood Availability</h2>
-              <NuxtLink to="/hospital/availability" class="panel-link-plain">View Availability</NuxtLink>
-            </div>
+          <SectionCard title="Blood Availability" flush>
+            <template #actions>
+              <NuxtLink to="/hospital/bloodavailability" class="panel-link">View Availability</NuxtLink>
+            </template>
 
             <div v-if="bloodAvailability.length" class="availability-list">
               <div v-for="(item, i) in bloodAvailability" :key="item.blood_type" class="availability-row">
                 <div class="availability-row__top">
                   <span class="availability-row__type">{{ item.blood_type }}</span>
                   <span class="availability-row__units">{{ item.units }} units</span>
-                  <span class="status-dot" :class="`status-dot--${item.status}`">{{ statusLabel[item.status] }}</span>
+                  <StatusBadge :tone="availabilityTone[item.status] || 'neutral'">{{ statusLabel[item.status] }}</StatusBadge>
                 </div>
                 <div class="progress-track">
                   <div class="progress-fill" :class="`progress-fill--${item.status}`"
@@ -230,19 +169,11 @@
                 </div>
               </div>
             </div>
-            <div v-else class="empty-state">
-              <AssetIcon name="blood-drop" :size="36" style="color:#e5e7eb" />
-              <p>No blood availability data available.</p>
-              <p class="empty-state__hint">Stock levels from the Blood Center will show here.</p>
-            </div>
-          </section>
+            <EmptyState v-else icon="blood-drop" title="No blood availability data available." description="Stock levels from the Blood Center will show here." compact />
+          </SectionCard>
 
           <!-- Today's activities -->
-          <section class="panel fade-in" style="--delay: 310ms">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Today's Activities</h2>
-            </div>
-
+          <SectionCard title="Today's Activities" flush>
             <div v-if="activities.length" class="timeline">
               <div v-for="(item, i) in activities" :key="i" class="timeline-row">
                 <div class="timeline-row__rail">
@@ -255,18 +186,11 @@
                 </div>
               </div>
             </div>
-            <div v-else class="empty-state empty-state--sm">
-              <AssetIcon name="calendar" :size="30" style="color:#e5e7eb" />
-              <p>No activities recorded today.</p>
-            </div>
-          </section>
+            <EmptyState v-else icon="calendar" title="No activities recorded today." compact />
+          </SectionCard>
 
           <!-- Recent notifications -->
-          <section class="panel fade-in" style="--delay: 360ms">
-            <div class="panel-header panel-header--simple">
-              <h2 class="panel-title">Recent Notifications</h2>
-            </div>
-
+          <SectionCard title="Recent Notifications" flush>
             <div v-if="notifications.length" class="notif-list">
               <div v-for="(n, i) in notifications" :key="i" class="notif-row">
                 <div class="notif-row__icon" :style="{ background: `${n.color}14` }">
@@ -278,21 +202,18 @@
                 </div>
               </div>
             </div>
-            <div v-else class="empty-state empty-state--sm">
-              <AssetIcon name="bell" :size="30" style="color:#e5e7eb" />
-              <p>No urgent notifications.</p>
-            </div>
-          </section>
+            <EmptyState v-else icon="bell" title="No urgent notifications." compact />
+          </SectionCard>
         </div>
       </div>
 
       <!-- Quick actions -->
-      <section class="quick-section fade-in" style="--delay: 400ms">
+      <section class="quick-section">
         <h2 class="quick-section__title">Quick Actions</h2>
         <div class="quick-grid">
           <NuxtLink v-for="item in quickActions" :key="item.path" :to="item.path" class="quick-card">
-            <div class="quick-card__icon" :style="{ background: `${item.color}14` }">
-              <AssetIcon :name="item.icon" :size="20" :style="{ color: item.color }" />
+            <div class="quick-card__icon">
+              <AssetIcon :name="item.icon" :size="20" />
             </div>
             <div class="quick-card__body">
               <p class="quick-card__title">{{ item.title }}</p>
@@ -308,6 +229,13 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
+import SectionCard from '~/components/ui/SectionCard.vue'
+import StatusBadge from '~/components/ui/StatusBadge.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -361,17 +289,24 @@ function animateCounter(targetRef, endValue, duration = 800) {
 }
 
 // ---------- Status maps ----------
+// Each status as a StatusBadge tone, so the colours match every staff page.
 const statusMap = {
-  pending: { label: 'Pending', bg: '#F57C0014', color: '#F57C00' },
-  approved: { label: 'Approved', bg: '#2E7D3214', color: '#2E7D32' },
-  processing: { label: 'Processing', bg: '#1565C014', color: '#1565C0' },
+  pending: { label: 'Pending', tone: 'warning' },
+  approved: { label: 'Approved', tone: 'success' },
+  processing: { label: 'Processing', tone: 'info' },
   // The two fulfilment states the API sends once units are released.
-  partial: { label: 'Partially Fulfilled', bg: '#B4530914', color: '#B45309' },
-  fulfilled: { label: 'Fulfilled', bg: '#2E7D3214', color: '#2E7D32' },
-  ready: { label: 'Ready for Pickup', bg: '#5E35B114', color: '#5E35B1' },
-  completed: { label: 'Completed', bg: '#2E7D3214', color: '#2E7D32' },
-  rejected: { label: 'Rejected', bg: '#D32F2F14', color: '#D32F2F' },
-  cancelled: { label: 'Cancelled', bg: '#94A3B814', color: '#64748B' },
+  partial: { label: 'Partially Fulfilled', tone: 'warning' },
+  fulfilled: { label: 'Fulfilled', tone: 'success' },
+  ready: { label: 'Ready for Pickup', tone: 'purple' },
+  completed: { label: 'Completed', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+}
+
+const availabilityTone = {
+  healthy: 'success',
+  low: 'warning',
+  critical: 'danger',
 }
 
 const statusLabel = {
@@ -492,27 +427,36 @@ const areaPath = computed(() => {
 // ---------- Quick actions ----------
 const quickActions = [
   {
-    path: '/hospital/newrequest',
+    path: '/hospital/bloodrequests/newrequest',
     icon: 'file-plus',
-    color: '#1565C0',
     title: 'Create Blood Request',
     description: 'Submit a new request to the Blood Center',
   },
   {
-    path: '/hospital/availability',
+    path: '/hospital/bloodavailability',
     icon: 'search',
-    color: '#2E7D32',
     title: 'Search Blood Availability',
     description: 'Check current stock by blood type',
   },
   {
-    path: '/hospital/bloodrequests',
-    icon: 'truck',
-    color: '#5E35B1',
+    path: '/hospital/trackrequests',
+    icon: 'route',
     title: 'Track Requests',
     description: 'Follow the status of active requests',
   },
 ]
+
+// Loaded on its own so the banner does not depend on the dashboard call below.
+// Supplementary: a failure leaves no banner.
+const lowStock = ref([])
+
+onMounted(async () => {
+  try {
+    lowStock.value = (await hospitalService.stockThresholds()).low ?? []
+  } catch (err) {
+    console.error('Failed to load stock thresholds:', err)
+  }
+})
 
 onMounted(async () => {
   try {
@@ -552,27 +496,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* On the shared staff UI (2026-10-15): tokens only, so dark mode follows them. */
 .dashboard {
-  --primary: var(--rb-primary, #1565c0);
-  --primary-hover: #0d47a1;
-  --light-blue: var(--rb-secondary, #42a5f5);
-  --bg: #f7f9fc;
-  --surface: #ffffff;
-  --border: #e5eaf0;
-  --text-primary: #1e293b;
-  --text-secondary: var(--rb-text-secondary, #64748b);
-  --text-muted: var(--rb-text-muted, #94a3b8);
-  --danger: var(--rb-accent, #d32f2f);
-  --warning: var(--rb-warning, #f57c00);
-  --success: var(--rb-success, #2e7d32);
-  --info: #0288d1;
-  --purple: #5e35b1;
   font-family: var(--rb-font-sans);
-  max-width: 1400px;
-  background: var(--bg);
+  max-width: var(--rb-content-max, 1600px);
+  background: var(--rb-page-bg);
   margin: 0 auto;
-  padding: 24px 32px 40px;
-  transition: background-color 0.2s ease;
+  padding: 24px var(--rb-gutter, 24px) 40px;
 }
 
 .sr-only {
@@ -586,34 +516,26 @@ onMounted(async () => {
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+  background: linear-gradient(90deg, var(--rb-surface-alt) 25%, var(--rb-surface-hover) 37%, var(--rb-surface-alt) 63%);
   background-size: 400% 100%;
-  border-radius: 18px;
+  border-radius: var(--rb-radius-lg);
   animation: shimmer 1.4s ease infinite;
 }
 .skeleton--header { height: 48px; max-width: 360px; }
-.skeleton--card { height: 128px; }
-.skeleton--panel { border-radius: 18px; }
+.skeleton--card { height: 96px; }
 
 @keyframes shimmer {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
 
-
-.fade-in {
-  animation: fadeInUp 0.45s ease both;
-  animation-delay: var(--delay, 0ms);
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in, .skeleton { animation: none !important; }
+  .skeleton, .trend-line--animate, .trend-area--animate { animation: none !important; }
+  .trend-line--animate { stroke-dashoffset: 0; }
+  .progress-fill { transition: none; }
 }
+
+.low-stock-banner:empty { display: none; }
 
 .dashboard-inner {
   display: flex;
@@ -621,286 +543,110 @@ onMounted(async () => {
   gap: 20px;
 }
 
-/* Header */
-.header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 4px 0 0;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.icon-btn {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
-}
-.icon-btn:hover { color: var(--primary); border-color: var(--primary); transform: translateY(-1px); }
-.icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.icon-btn__dot {
-  position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--danger);
-  border: 1.5px solid var(--surface);
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 18px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: white;
-  background: var(--primary);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  transition: background 0.15s ease, transform 0.15s ease;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-}
-.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-.btn-primary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-
-/* Stat cards */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-
-.stat-card {
-  background: var(--surface);
-  border-radius: 18px;
-  padding: 22px 24px 20px;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-}
-
-.stat-card__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.stat-card__icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.stat-card__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-}
-.stat-card__value {
-  font-size: 42px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  margin: 4px 0 0;
-  line-height: 1;
-}
-.stat-card__helper {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin: 6px 0 0;
+  gap: 14px;
 }
 
 /* Layout */
 .main-grid {
   display: grid;
-  grid-template-columns: 7fr 3fr;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
   gap: 20px;
 }
 .col-left, .col-right {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
 }
 
-/* Panels */
-.panel {
-  background: var(--surface);
-  border-radius: 18px;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
-}
-.panel-header--simple { padding: 20px 24px; }
-.panel-title {
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.panel-subtitle {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 3px 0 0;
-}
 .panel-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 2px;
-  text-decoration: none;
-  border-radius: 4px;
   flex-shrink: 0;
-}
-
-.panel-link:hover { text-decoration: underline; }
-.panel-link:focus-visible, .panel-link-plain:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.panel-link-plain {
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--rb-primary-text);
   text-decoration: none;
   border-radius: 4px;
 }
-
-.panel-link-plain:hover { text-decoration: underline; }
+.panel-link:hover { text-decoration: underline; }
+.panel-link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 /* Segmented control */
 .segmented {
   display: inline-flex;
-  background: #f1f5f9;
-  border-radius: 10px;
-  padding: 3px;
   flex-shrink: 0;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--rb-surface-alt);
 }
 .segmented__btn {
-  border: none;
-  background: transparent;
   padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-secondary);
-  border-radius: 8px;
+  color: var(--rb-text-secondary);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .segmented__btn--active {
-  background: var(--surface);
-  color: var(--primary);
+  background: var(--rb-surface);
+  color: var(--rb-primary-text);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
-.segmented__btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.segmented__btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 
 /* Trend summary stats */
 .trend-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  padding: 16px 24px 0;
+  padding: 16px 20px 0;
 }
 .trend-stat {
-  background: #f8fafc;
-  border: 1px solid var(--border);
-  border-radius: 12px;
   padding: 10px 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 12px;
+  background: var(--rb-surface-alt);
 }
 .trend-stat__label {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
   margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
 }
 .trend-stat__value {
+  margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
+  color: var(--rb-text-primary);
   font-variant-numeric: tabular-nums;
 }
 .trend-stat__value--sm { font-size: 13.5px; }
-.trend-stat__value--up { color: var(--success); }
-.trend-stat__value--down { color: var(--danger); }
+.trend-stat__value--up { color: var(--rb-success); }
+.trend-stat__value--down { color: var(--rb-accent); }
 
 /* Trend chart */
 .trend-body {
   position: relative;
-  padding: 18px 24px 20px;
+  padding: 18px 20px 20px;
 }
 .trend-svg {
   width: 100%;
   height: 176px;
   overflow: visible;
 }
-.trend-grid { stroke: var(--border); stroke-width: 1; }
-.trend-area { fill: rgba(21, 101, 192, 0.08); }
+.trend-grid { stroke: var(--rb-border); stroke-width: 1; }
+.trend-area { fill: rgba(var(--rb-primary-rgb), 0.08); }
 .trend-line {
   fill: none;
-  stroke: var(--primary);
+  stroke: var(--rb-primary);
   stroke-width: 2.5;
   stroke-linecap: round;
 }
@@ -912,86 +658,73 @@ onMounted(async () => {
 @keyframes drawLine {
   to { stroke-dashoffset: 0; }
 }
-.trend-area--animate {
-  animation: fadeInArea 0.9s ease forwards;
-}
+.trend-area--animate { animation: fadeInArea 0.9s ease forwards; }
 @keyframes fadeInArea {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 .trend-dot {
-  fill: var(--surface);
-  stroke: var(--primary);
+  fill: var(--rb-surface);
+  stroke: var(--rb-primary);
   stroke-width: 2;
   transition: r 0.15s ease;
 }
-.trend-dot--active { r: 5.5; fill: var(--primary); }
+.trend-dot--active { r: 5.5; fill: var(--rb-primary); }
 
 .trend-tooltip {
   position: absolute;
   top: 6px;
-  transform: translateX(-50%);
-  background: var(--text-primary);
-  color: white;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 11.5px;
-  white-space: nowrap;
-  pointer-events: none;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #0F172A;
+  color: #fff;
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 .trend-tooltip__value { font-weight: 700; }
-.trend-tooltip__label { color: #cbd5e1; font-size: 10.5px; }
+.trend-tooltip__label { color: #CBD5E1; font-size: 10.5px; }
 
 .trend-labels {
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
   font-size: 11px;
-  color: var(--text-muted);
-}
-.trend-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 30px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
+  color: var(--rb-text-muted);
 }
 
 /* Request table */
-.request-table {
-  padding: 4px 0 8px;
-}
-.request-table__head {
-  display: grid;
-  grid-template-columns: 1.2fr 0.7fr 0.6fr 1fr 1fr 1fr 1fr;
-  gap: 8px;
-  padding: 10px 24px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
-}
+.request-table { padding: 0 0 6px; }
+.request-table__head,
 .request-row {
   display: grid;
-  grid-template-columns: 1.2fr 0.7fr 0.6fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 0.7fr 0.6fr 1fr 1fr 1.1fr 0.9fr;
   gap: 8px;
   align-items: center;
-  padding: 12px 24px;
-  border-top: 1px solid var(--border);
+  padding: 10px 20px;
+}
+.request-table__head {
+  background: var(--rb-surface-alt);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+}
+.request-row {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-top: 1px solid var(--rb-border);
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--rb-text-primary);
   transition: background 0.15s ease;
 }
-.request-row:hover { background: #f8fafc; }
-.request-row__ref { font-weight: 600; }
+.request-row:hover { background: var(--rb-surface-hover); }
+.request-row__ref { font-weight: 600; font-family: var(--rb-font-mono, ui-monospace, monospace); font-size: 12.5px; }
 .type-chip {
   display: inline-flex;
   align-items: center;
@@ -999,47 +732,26 @@ onMounted(async () => {
   min-width: 34px;
   padding: 3px 8px;
   border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
   font-size: 11px;
   font-weight: 700;
-  background: #1565c014;
-  color: var(--primary);
 }
-.request-row__component, .request-row__date { color: var(--text-secondary); }
-.badge {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  display: inline-block;
-}
+.request-row__component, .request-row__date { color: var(--rb-text-secondary); }
 .row-link {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--rb-primary-text);
   text-decoration: none;
 }
 .row-link:hover { text-decoration: underline; }
 
-.empty-state {
-  padding: 32px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-.empty-state p { margin: 10px 0 0; }
-.empty-state__hint {
-  font-size: 11.5px !important;
-  color: var(--text-muted);
-  margin-top: 4px !important;
-}
-.empty-state--sm { padding: 24px; }
-
 /* Blood availability */
 .availability-list {
-  padding: 16px 24px 22px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 16px 20px 20px;
 }
 .availability-row__top {
   display: flex;
@@ -1048,93 +760,81 @@ onMounted(async () => {
   margin-bottom: 6px;
 }
 .availability-row__type {
+  min-width: 32px;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--text-primary);
-  min-width: 32px;
+  color: var(--rb-text-primary);
 }
 .availability-row__units {
-  font-size: 12px;
-  color: var(--text-secondary);
   flex: 1;
+  font-size: 12px;
+  color: var(--rb-text-secondary);
 }
-.status-dot {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-.status-dot--healthy { background: #2e7d3214; color: var(--success); }
-.status-dot--low { background: #f57c0014; color: var(--warning); }
-.status-dot--critical { background: #d32f2f14; color: var(--danger); }
 
 .progress-track {
   height: 6px;
-  border-radius: 999px;
-  background: #f1f5f9;
   overflow: hidden;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
 }
 .progress-fill {
+  width: 0%;
   height: 100%;
   border-radius: 999px;
-  width: 0%;
   transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.progress-fill--healthy { background: var(--success); }
-.progress-fill--low { background: var(--warning); }
-.progress-fill--critical { background: var(--danger); }
+.progress-fill--healthy { background: var(--rb-success); }
+.progress-fill--low { background: var(--rb-warning); }
+.progress-fill--critical { background: var(--rb-accent); }
 
 /* Timeline */
 .timeline {
-  padding: 16px 24px 20px;
   display: flex;
   flex-direction: column;
+  padding: 16px 20px 20px;
 }
-.timeline-row {
-  display: flex;
-  gap: 12px;
-}
+.timeline-row { display: flex; gap: 12px; }
 .timeline-row__rail {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   align-items: center;
   width: 12px;
-  flex-shrink: 0;
 }
 .timeline-dot {
+  flex-shrink: 0;
   width: 9px;
   height: 9px;
-  border-radius: 999px;
-  background: var(--primary);
   margin-top: 4px;
-  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--rb-primary);
 }
 .timeline-line {
   flex: 1;
   width: 2px;
-  background: var(--border);
-  margin: 3px 0;
   min-height: 22px;
+  margin: 3px 0;
+  background: var(--rb-border);
 }
 .timeline-row__body { padding-bottom: 16px; }
 .timeline-time {
+  margin: 0 0 2px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
-  margin: 0 0 2px;
+  color: var(--rb-text-muted);
 }
 .timeline-label {
-  font-size: 13px;
-  color: var(--text-primary);
   margin: 0;
+  font-size: 13px;
+  color: var(--rb-text-primary);
 }
 
 /* Notifications */
 .notif-list {
-  padding: 10px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 10px 12px 14px;
 }
 .notif-row {
   display: flex;
@@ -1143,85 +843,87 @@ onMounted(async () => {
   border-radius: 12px;
   transition: background 0.15s ease;
 }
-.notif-row:hover { background: #f8fafc; }
+.notif-row:hover { background: var(--rb-surface-hover); }
 .notif-row__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 .notif-row__message {
+  margin: 0;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--text-primary);
-  margin: 0;
   line-height: 1.4;
+  color: var(--rb-text-primary);
 }
 .notif-row__time {
-  font-size: 11px;
-  color: var(--text-muted);
   margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--rb-text-muted);
 }
 
 /* Quick actions */
 .quick-section__title {
-  font-size: 18px;
+  margin: 0 0 12px;
+  font-size: var(--rb-fs-section);
   font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 14px;
+  color: var(--rb-text-primary);
 }
 .quick-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 .quick-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 20px;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  padding: 16px 18px;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  background: var(--rb-surface);
+  box-shadow: var(--rb-shadow-sm);
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .quick-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  border-color: rgba(var(--rb-primary-rgb), 0.35);
+  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.18);
 }
-.quick-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.quick-card:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .quick-card__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
 }
 .quick-card__body { flex: 1; min-width: 0; }
 .quick-card__title {
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
+  color: var(--rb-text-primary);
 }
 .quick-card__desc {
-  font-size: 12px;
-  color: var(--text-secondary);
   margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
 }
-.quick-card__chevron { color: #d1d5db; flex-shrink: 0; transition: color 0.15s ease; }
-.quick-card:hover .quick-card__chevron { color: var(--primary); }
+.quick-card__chevron { flex-shrink: 0; color: var(--rb-text-muted); transition: color 0.15s ease; }
+.quick-card:hover .quick-card__chevron { color: var(--rb-primary-text); }
 
 /* Responsive */
 @media (max-width: 1180px) {
-  .quick-grid { grid-template-columns: repeat(2, 1fr); }
+  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1235,51 +937,6 @@ onMounted(async () => {
 }
 @media (max-width: 640px) {
   .dashboard { padding: 16px 16px 32px; }
-  .header-row { flex-direction: column; align-items: stretch; }
-  .header-actions { justify-content: flex-end; flex-wrap: wrap; }
   .quick-grid { grid-template-columns: 1fr; }
-  .page-title { font-size: 22px; }
-  .stat-card__value { font-size: 34px; }
-}
-
-/* ============ Dark mode ============ */
-:global(.dark .scope-hospital-dashboard) {
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --border: #334155;
-  --surface: #1E293B;
-  --bg: #0F172A;
-  background: #0F172A;
-}
-:global(.dark .scope-hospital-dashboard .stat-card),
-:global(.dark .scope-hospital-dashboard .panel),
-:global(.dark .scope-hospital-dashboard .quick-card),
-:global(.dark .scope-hospital-dashboard .icon-btn) {
-  background: #1E293B;
-  border-color: #334155;
-}
-:global(.dark .scope-hospital-dashboard .icon-btn__dot) { border-color: #1E293B; }
-:global(.dark .scope-hospital-dashboard .segmented) { background: #263449; }
-:global(.dark .scope-hospital-dashboard .segmented__btn--active) { background: #1E293B; }
-:global(.dark .scope-hospital-dashboard .panel-header) { border-color: #334155; }
-:global(.dark .scope-hospital-dashboard .request-row) { border-color: #334155; }
-:global(.dark .scope-hospital-dashboard .request-row:hover) { background: #263449; }
-:global(.dark .scope-hospital-dashboard .trend-stat) { background: #263449; border-color: #334155; }
-:global(.dark .scope-hospital-dashboard .trend-grid) { stroke: #334155; }
-:global(.dark .scope-hospital-dashboard .trend-area) { fill: rgba(66, 165, 245, 0.12); }
-:global(.dark .scope-hospital-dashboard .trend-dot) { fill: #1E293B; }
-:global(.dark .scope-hospital-dashboard .trend-tooltip) { background: #0B1220; }
-:global(.dark .scope-hospital-dashboard .progress-track) { background: #263449; }
-:global(.dark .scope-hospital-dashboard .notif-row:hover) { background: #263449; }
-:global(.dark .scope-hospital-dashboard .type-chip) { background: rgba(66,165,245,0.14); }
-:global(.dark .scope-hospital-dashboard .status-dot--healthy) { background: rgba(102,187,106,0.16); }
-:global(.dark .scope-hospital-dashboard .status-dot--low) { background: rgba(255,167,38,0.16); }
-:global(.dark .scope-hospital-dashboard .status-dot--critical) { background: rgba(239,83,80,0.16); }
-/* background-image, not the `background` shorthand: the shorthand resets
-   background-size to `auto`, which collapses the 400%-wide gradient to the
-   element width and leaves the shimmer keyframes with zero travel. */
-:global(.dark .scope-hospital-dashboard .skeleton) {
-  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
 }
 </style>

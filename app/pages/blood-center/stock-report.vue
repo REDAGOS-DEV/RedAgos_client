@@ -1,25 +1,20 @@
 <template>
   <div class="stock">
-    <header class="stock__header">
-      <div>
-        <h1 class="stock__title">Daily Stock Report</h1>
-        <p class="stock__subtitle">Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.</p>
-      </div>
-
-      <div class="stock__actions">
+    <PageHeader title="Daily Stock Report" subtitle="Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.">
+      <template #actions>
         <span v-if="report" class="stock__stamp">
           As of {{ report.as_of_time }}<template v-if="updatedAgo"> · updated {{ updatedAgo }}</template>
         </span>
-        <button type="button" class="btn" :disabled="loading" @click="load">
+        <button type="button" class="ui-btn" :disabled="loading" @click="load">
           <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
           {{ loading ? 'Loading…' : 'Refresh' }}
         </button>
-        <button type="button" class="btn btn--primary" :disabled="downloading || !report" @click="download">
+        <button type="button" class="ui-btn ui-btn--primary" :disabled="downloading || !report" @click="download">
           <AssetIcon name="file-down" :size="14" />
           {{ downloading ? 'Preparing…' : 'Download PDF' }}
         </button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="error" class="alert alert--error" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
@@ -43,42 +38,43 @@
 
     <template v-if="report">
       <!-- The answers first: how much can go out, what expires, what is out. -->
-      <div class="summary">
-        <div class="summary__item">
-          <span class="summary__label">Issuable units</span>
-          <span class="summary__value">{{ totalIssuable }}</span>
-          <span class="summary__note">Available, not past expiry</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--critical': report.near_expiry.today }">
-          <span class="summary__label">Expire today</span>
-          <span class="summary__value">{{ report.near_expiry.today }}</span>
-          <span class="summary__note">{{ report.near_expiry.today ? 'Issue these first' : 'None' }}</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--warning': report.near_expiry.tomorrow }">
-          <span class="summary__label">Expire tomorrow</span>
-          <span class="summary__value">{{ report.near_expiry.tomorrow }}</span>
-          <span class="summary__note">{{ report.near_expiry.tomorrow ? 'Plan to issue next' : 'None' }}</span>
-        </div>
-        <div class="summary__item" :class="{ 'summary__item--critical': outOfStock.length && totalIssuable }">
-          <span class="summary__label">Out of stock</span>
-          <span class="summary__value">{{ outOfStock.length }}</span>
-          <!-- Every type, always in the same place: red has none, grey has stock.
-               Fixed size, so the card never grows or wraps. -->
-          <span class="type-strip" role="list" :aria-label="outOfStock.length ? `Out of stock: ${outOfStock.join(', ')}` : 'Every blood type has stock'">
-            <span
-              v-for="t in typeTotals"
-              :key="t.type"
-              role="listitem"
-              class="type-strip__cell"
-              :class="{ 'type-strip__cell--out': t.total === 0 }"
-              :title="t.total === 0 ? `${t.type}: none issuable` : `${t.type}: ${t.total} issuable`"
-            >{{ t.type }}</span>
-          </span>
-          <span class="summary__note">
-            {{ !outOfStock.length ? 'Every type has stock' : outOfStock.length === typeTotals.length ? 'No blood type has stock' : `${outOfStock.length} of ${typeTotals.length} types have none` }}
-          </span>
-        </div>
-      </div>
+      <StatStrip>
+        <StatItem label="Issuable units" :value="totalIssuable" hint="Available, not past expiry" icon="package-check" tone="primary" />
+        <StatItem
+          label="Expire today"
+          :value="report.near_expiry.today"
+          :hint="report.near_expiry.today ? 'Issue these first' : 'None'"
+          icon="clock"
+          tone="danger"
+          :alert="report.near_expiry.today > 0"
+        />
+        <StatItem
+          label="Expire tomorrow"
+          :value="report.near_expiry.tomorrow"
+          :hint="report.near_expiry.tomorrow ? 'Plan to issue next' : 'None'"
+          icon="calendar"
+          tone="warning"
+          :alert="report.near_expiry.tomorrow > 0"
+        />
+        <StatItem label="Out of stock" :value="outOfStock.length" icon="circle-x" tone="danger" :alert="Boolean(outOfStock.length && totalIssuable)">
+          <template #hint>
+            <span class="out-hint">
+              <!-- Every type, always in the same place: red has none, grey has stock. -->
+              <span class="type-strip" role="list" :aria-label="outOfStock.length ? `Out of stock: ${outOfStock.join(', ')}` : 'Every blood type has stock'">
+                <span
+                  v-for="t in typeTotals"
+                  :key="t.type"
+                  role="listitem"
+                  class="type-strip__cell"
+                  :class="{ 'type-strip__cell--out': t.total === 0 }"
+                  :title="t.total === 0 ? `${t.type}: none issuable` : `${t.type}: ${t.total} issuable`"
+                >{{ t.type }}</span>
+              </span>
+              {{ !outOfStock.length ? 'Every type has stock' : outOfStock.length === typeTotals.length ? 'No blood type has stock' : `${outOfStock.length} of ${typeTotals.length} types have none` }}
+            </span>
+          </template>
+        </StatItem>
+      </StatStrip>
 
       <!-- Nothing to issue at all: say so plainly; the zero sheet still prints. -->
       <div v-if="!totalIssuable" class="callout callout--info" role="status">
@@ -106,22 +102,26 @@
       <!-- A print preview: white paper whatever the theme, because this is what prints. -->
       <div class="canvas">
       <article ref="sheetEl" class="sheet paper" :class="{ 'sheet--flash': flashSoon }" aria-label="Daily Blood Stock Inventory">
+        <!--
+          The seal and the logo run from the first header line down to the
+          title (project owner, 2026-10-22), so the title sits in the head's
+          middle column, under the lines.
+        -->
         <div class="sheet__head">
-          <div class="sheet__logo">
-            <img v-if="sealVisible" :src="SEAL_SRC" alt="Department of Health" @error="sealVisible = false" >
+          <div class="sheet__logo sheet__logo--seal">
+            <img v-if="sealSrc" :src="sealSrc" :alt="ownSealFailed || !report.facility.seal_url ? 'Department of Health' : report.facility.name" @error="onSealError" >
           </div>
           <div class="sheet__lines">
             <p v-for="line in report.header" :key="line">{{ line }}</p>
             <p class="sheet__facility">{{ report.facility.name }}</p>
           </div>
-          <div class="sheet__logo">
+          <div class="sheet__logo sheet__logo--own">
             <img v-if="report.facility.logo_url" :src="report.facility.logo_url" :alt="report.facility.name" >
           </div>
+          <h2 class="sheet__title">
+            Daily Blood Stock Inventory as of {{ report.as_of_date }} at {{ report.as_of_time }}
+          </h2>
         </div>
-
-        <h2 class="sheet__title">
-          Daily Blood Stock Inventory as of {{ report.as_of_date }} at {{ report.as_of_time }}
-        </h2>
         <p class="sheet__legend">
           Issuable units only (available, not past expiry). Components with a shelf life of
           {{ report.reference.shelf_life_days }} days or less are listed by expiry date.&#32;<template
@@ -236,9 +236,13 @@ import {
   slotEntries,
   stockReportFilename,
 } from '~/utils/stockReport'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 /**
- * The Daily Blood Stock Inventory: Issuance's live view and printable sheet.
+ * The Daily Blood Stock Inventory: Issuance's live view and printable sheet,
+ * which the Supervisor and the Admin also read (`inventory.stock_report`).
  *
  * The numbers are the server's, already grouped into the sheet's tables; this
  * page only draws them. The PDF is rendered by the server from the same data,
@@ -248,11 +252,12 @@ import {
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
-  requires: 'inventory.create',
+  requires: 'inventory.stock_report',
 })
 
 const { can } = useUser()
-const canConfigure = computed(() => can('center.configure'))
+// Shelf life is Processing's to set, on Blood Components.
+const canConfigure = computed(() => can('components.configure'))
 
 const report = ref(null)
 
@@ -314,6 +319,23 @@ const error = ref('')
 // to exist; until it is supplied, the header simply goes without it.
 const SEAL_SRC = '/images/doh-seal.png'
 const sealVisible = ref(true)
+
+// The left-hand logo: the centre's own when the Admin uploaded one in
+// Settings (project owner, 2026-10-22), else the DOH seal. One that fails to
+// load falls back to the seal, and then to nothing.
+const ownSealFailed = ref(false)
+const sealSrc = computed(() => {
+  const own = report.value?.facility?.seal_url
+
+  if (own && !ownSealFailed.value) return own
+
+  return sealVisible.value ? SEAL_SRC : null
+})
+
+function onSealError() {
+  if (report.value?.facility?.seal_url && !ownSealFailed.value) ownSealFailed.value = true
+  else sealVisible.value = false
+}
 
 async function load() {
   loading.value = true
@@ -540,21 +562,28 @@ onMounted(load)
   background: var(--rb-surface);
 }
 
+/* Two rows, the header lines and the title, with a logo either side of both. */
 .sheet__head {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  gap: 0.75rem;
+  grid-template-columns: 120px minmax(0, 1fr) 120px;
+  grid-template-rows: auto auto;
+  column-gap: 0.75rem;
+  row-gap: 0.9rem;
 }
 
-.sheet__logo { display: grid; place-items: center; height: 64px; }
-.sheet__logo img { max-width: 64px; max-height: 64px; object-fit: contain; }
+/* The box is the two rows' height; the image fills it whatever its own size. */
+.sheet__logo { position: relative; grid-row: 1 / span 2; }
+.sheet__logo--seal { grid-column: 1; }
+.sheet__logo--own { grid-column: 3; }
+.sheet__logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
-.sheet__lines { text-align: center; }
+.sheet__lines { grid-column: 2; grid-row: 1; text-align: center; }
 .sheet__lines p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--rb-text-primary); }
 .sheet__lines .sheet__facility { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 
 .sheet__title {
+  grid-column: 2;
+  grid-row: 2;
   margin: 0;
   text-align: center;
   font-size: 16px;
@@ -668,7 +697,9 @@ onMounted(load)
 @media (max-width: 640px) {
   .stock { padding: 16px 16px 32px; }
   .sheet { padding: 0.9rem; }
-  .sheet__head { grid-template-columns: 48px minmax(0, 1fr) 48px; }
-  .sheet__logo img { max-width: 44px; max-height: 44px; }
+  .sheet__head { grid-template-columns: 56px minmax(0, 1fr) 56px; column-gap: 0.5rem; }
 }
+
+/* The shared header; the "As of" stamp sits with its actions. */
+.out-hint { display: flex; flex-direction: column; gap: 4px; }
 </style>

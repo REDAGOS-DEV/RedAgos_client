@@ -42,57 +42,73 @@
         </div>
 
         <div v-else class="my-appointment-list">
-          <div v-for="appointment in activeAppointments" :key="appointment.id" class="panel my-appointment-card"
-            :class="{ 'my-appointment-card--rescheduling': reschedulingId === appointment.id }">
-            <p v-if="reschedulingId === appointment.id" class="my-appointment-card__flag">
-              Rescheduling this appointment
-            </p>
-            <div class="my-appointment-card__top">
-              <div>
-                <p class="my-appointment-card__name">
+          <article v-for="appointment in activeAppointments" :key="appointment.id" class="appt-ticket"
+            :class="{ 'appt-ticket--rescheduling': reschedulingId === appointment.id }">
+            <!-- Date stub, like the torn-off end of a ticket -->
+            <div class="appt-ticket__stub">
+              <span class="appt-ticket__dow">{{ dateParts(appointment.date).weekday }}</span>
+              <span class="appt-ticket__day">{{ dateParts(appointment.date).day }}</span>
+              <span class="appt-ticket__month">{{ dateParts(appointment.date).month }} {{ dateParts(appointment.date).year }}</span>
+              <span class="appt-ticket__time">{{ formatTime(appointment.time) }}</span>
+            </div>
+
+            <div class="appt-ticket__body">
+              <p v-if="reschedulingId === appointment.id" class="appt-ticket__flag">
+                <AssetIcon name="calendar" :size="13" /> Rescheduling this appointment
+              </p>
+              <div class="appt-ticket__top">
+                <h3 class="appt-ticket__name">
                   {{ appointment.drive_name || appointment.facility_name || 'Blood center' }}
-                </p>
-                <p class="my-appointment-card__meta">
-                  {{ formatDate(appointment.date) }} · {{ formatTime(appointment.time) }} ·
-                  {{ appointment.appointment_type === 'mobile' ? 'Mobile drive' : 'Walk-in' }}
-                </p>
+                </h3>
+                <span class="badge" :class="appointmentStatusClass(appointment.status)">
+                  {{ appointment.status_label || appointment.status }}
+                </span>
               </div>
-              <span class="badge" :class="appointmentStatusClass(appointment.status)">
-                {{ appointment.status_label || appointment.status }}
-              </span>
-            </div>
-            <p class="my-appointment-card__note">
-              {{ appointment.can_cancel
-                ? 'You can cancel or reschedule this any time before it starts.'
-                : 'This appointment can no longer be changed.' }}
-            </p>
+              <p class="appt-ticket__meta">
+                <span>
+                  <AssetIcon :name="appointment.appointment_type === 'mobile' ? 'truck' : 'building-2'" :size="13" />
+                  {{ appointment.appointment_type === 'mobile' ? 'Mobile blood drive' : 'Walk-in' }}
+                </span>
+                <span><AssetIcon name="calendar" :size="13" /> {{ formatDate(appointment.date) }}, {{ formatTime(appointment.time) }}</span>
+              </p>
 
-            <!--
-              Booking no longer requires a health questionnaire, so this is the
-              only thing on the donor's own screens that tells them one is due.
-              Silent here means a donor arrives at the counter with nothing to
-              scan.
-            -->
-            <div v-if="screeningNotice(appointment)" class="screening-notice"
-              :class="`screening-notice--${screeningNotice(appointment).tone}`">
-              <p class="screening-notice__text">{{ screeningNotice(appointment).text }}</p>
-              <NuxtLink v-if="screeningNotice(appointment).cta" to="/donor/eligibility" class="screening-notice__link">
-                {{ screeningNotice(appointment).cta }}
-              </NuxtLink>
-            </div>
+              <!--
+                Booking no longer requires a health questionnaire, so this is the
+                only thing on the donor's own screens that tells them one is due.
+                Silent here means a donor arrives at the counter with nothing to
+                scan.
+              -->
+              <div v-if="screeningNotice(appointment)" class="screening-notice"
+                :class="`screening-notice--${screeningNotice(appointment).tone}`">
+                <p class="screening-notice__text">{{ screeningNotice(appointment).text }}</p>
+                <NuxtLink v-if="screeningNotice(appointment).cta" to="/donor/eligibility" class="screening-notice__link">
+                  {{ screeningNotice(appointment).cta }}
+                </NuxtLink>
+              </div>
 
-            <div v-if="appointment.can_cancel" class="my-appointment-card__actions">
-              <button type="button" class="btn-outline" :disabled="appointmentActionId === appointment.id"
-                @click="startReschedule(appointment)">
-                Reschedule
-              </button>
-              <button type="button" class="my-appointment-card__cancel"
-                :disabled="appointmentActionId === appointment.id" @click="handleCancel(appointment)">
-                {{ appointmentActionId === appointment.id ? 'Cancelling...' : 'Cancel appointment' }}
-              </button>
+              <div class="appt-ticket__foot">
+                <p class="appt-ticket__note">
+                  {{ appointment.can_cancel
+                    ? 'You can cancel or reschedule this any time before it starts.'
+                    : 'This appointment can no longer be changed.' }}
+                </p>
+                <div v-if="appointment.can_cancel" class="appt-ticket__actions">
+                  <button type="button" class="appt-ticket__cancel"
+                    :disabled="appointmentActionId === appointment.id" @click="handleCancel(appointment)">
+                    {{ appointmentActionId === appointment.id ? 'Cancelling...' : 'Cancel' }}
+                  </button>
+                  <button type="button" class="btn-outline appt-ticket__reschedule"
+                    :disabled="appointmentActionId === appointment.id || reschedulingId === appointment.id"
+                    @click="startReschedule(appointment)">
+                    <AssetIcon name="calendar" :size="14" />
+                    Reschedule
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          </article>
         </div>
+
           <p v-if="appointmentActionError" class="my-appointment-error">{{ appointmentActionError }}</p>
           <!-- Ang Reschedule kay mogawas ra kung can_cancel (gikan sa server; naka-config ang window) -->
           <p v-if="!showBookingWizard" class="one-booking-note">
@@ -104,6 +120,77 @@
               blood center directly.
             </template>
           </p>
+
+          <!--
+            The wait between booking and the visit: what to do before it, and
+            what the day itself looks like, so a first-time donor arrives
+            knowing. Shown only with a booking standing and the wizard closed.
+          -->
+          <section v-if="nextAppointment && !showBookingWizard" class="prep" aria-label="Getting ready">
+            <div class="prep__bar">
+              <p class="prep__when">
+                <AssetIcon name="clock" :size="15" />
+                {{ countdownLabel }}
+              </p>
+              <div class="prep__actions">
+                <a :href="directionsUrl" target="_blank" rel="noopener" class="prep__action">
+                  <AssetIcon name="map-pin" :size="14" />
+                  Directions
+                </a>
+                <button type="button" class="prep__action" aria-label="Add to calendar" @click="downloadCalendar">
+                  <AssetIcon name="calendar-check" :size="14" />
+                  <span class="prep__long">Add to calendar</span>
+                  <span class="prep__short" aria-hidden="true">Calendar</span>
+                </button>
+                <NuxtLink to="/donor/qrcode" class="prep__action" aria-label="Show my Pass">
+                  <AssetIcon name="qr-code" :size="14" />
+                  <span class="prep__long">Show my Pass</span>
+                  <span class="prep__short" aria-hidden="true">My Pass</span>
+                </NuxtLink>
+              </div>
+            </div>
+
+            <div class="prep__grid">
+              <div class="prep__card">
+                <h3 class="prep__title">Before you go</h3>
+                <ul class="prep__list">
+                  <li class="prep__item" :class="{ 'is-done': questionsItem.done }">
+                    <span class="prep__check" aria-hidden="true">
+                      <AssetIcon v-if="questionsItem.done" name="check" :size="12" />
+                    </span>
+                    <span class="prep__text">
+                      Answer the health questions
+                      <small>{{ questionsItem.note }}</small>
+                    </span>
+                    <NuxtLink v-if="questionsItem.link" to="/donor/eligibility" class="prep__link">Answer now</NuxtLink>
+                  </li>
+                  <li v-for="item in PREP_ITEMS" :key="item.key" class="prep__item" :class="{ 'is-done': prepChecked[item.key] }">
+                    <label class="prep__label">
+                      <input type="checkbox" class="prep__input" :checked="!!prepChecked[item.key]" @change="togglePrep(item.key)">
+                      <span class="prep__check" aria-hidden="true">
+                        <AssetIcon v-if="prepChecked[item.key]" name="check" :size="12" />
+                      </span>
+                      <span class="prep__text">{{ item.label }}</span>
+                    </label>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="prep__card">
+                <h3 class="prep__title">On the day</h3>
+                <ol class="day">
+                  <li v-for="step in DAY_STEPS" :key="step.title" class="day__step">
+                    <span class="day__icon"><AssetIcon :name="step.icon" :size="15" /></span>
+                    <span class="day__text">
+                      <strong>{{ step.title }}</strong>
+                      <span>{{ step.text }}</span>
+                    </span>
+                  </li>
+                </ol>
+                <p class="day__note">Plan for about an hour at the blood center in all.</p>
+              </div>
+            </div>
+          </section>
       </div>
 
       <!--
@@ -121,201 +208,306 @@
         <button type="button" class="btn-outline" @click="cancelReschedule">Keep current</button>
       </div>
 
-      <!-- Step 1: Select type -->
-      <div class="step-section">
-        <h2 class="step-label">
-          <span class="step-label__num">1</span>
-          Select type
-        </h2>
-        <div class="type-grid">
-          <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'walkin' }"
-            @click="selectType('walkin')">
-            <span class="type-card__icon">
-              <AssetIcon name="calendar" :size="18" />
-            </span>
+      <!--
+        Two columns: the choices on the left, and a ticket on the right that
+        fills in as the donor picks. On small screens the ticket becomes a bar
+        pinned to the bottom.
+      -->
+      <div ref="bookingEl" class="booking-layout">
+        <div class="booking-steps">
+          <!-- Type: always visible, so the mobile drive option is never hidden -->
+          <div class="type-switch" role="radiogroup" aria-label="How do you want to donate?">
+            <button type="button" role="radio" class="type-switch__opt"
+              :class="{ 'type-switch__opt--active': appointmentType === 'walkin' }"
+              :aria-checked="appointmentType === 'walkin' ? 'true' : 'false'" @click="selectType('walkin')">
+              <span class="type-switch__icon"><AssetIcon name="building-2" :size="18" /></span>
+              <span class="type-switch__body">
+                <span class="type-switch__title">Walk-in at a blood center</span>
+                <span class="type-switch__desc">Pick a center and a time slot</span>
+              </span>
+            </button>
+            <button type="button" role="radio" class="type-switch__opt"
+              :class="{ 'type-switch__opt--active': appointmentType === 'mobile' }"
+              :aria-checked="appointmentType === 'mobile' ? 'true' : 'false'" @click="selectType('mobile')">
+              <span class="type-switch__icon"><AssetIcon name="truck" :size="18" /></span>
+              <span class="type-switch__body">
+                <span class="type-switch__title">Mobile blood drive</span>
+                <span class="type-switch__desc">Join a community drive near you</span>
+              </span>
+            </button>
+          </div>
 
-            <span class="type-card__body">
-              <span class="type-card__title">Walk-in at blood center</span>
-              <span class="type-card__desc">Book a time slot at a blood center</span>
-            </span>
-            <span class="radio" :class="{ 'radio--active': appointmentType === 'walkin' }" />
-          </button>
+          <!-- Step 1: where -->
+          <section class="bstep" :class="{ 'bstep--open': openStep === 'place', 'bstep--done': stepDone.place }">
+            <button type="button" class="bstep__head" :aria-expanded="openStep === 'place' ? 'true' : 'false'"
+              aria-controls="bstep-place" @click="openStep = 'place'">
+              <span class="bstep__num">
+                <AssetIcon v-if="stepDone.place && openStep !== 'place'" name="check" :size="13" />
+                <template v-else>1</template>
+              </span>
+              <span class="bstep__titles">
+                <span class="bstep__title">{{ appointmentType === 'walkin' ? 'Choose a blood center' : 'Choose a blood drive' }}</span>
+                <span v-if="openStep !== 'place' && placeSummary" class="bstep__summary">{{ placeSummary }}</span>
+              </span>
+              <span v-if="openStep !== 'place' && stepDone.place" class="bstep__change">Change</span>
+            </button>
 
-          <button type="button" class="type-card" :class="{ 'type-card--active': appointmentType === 'mobile' }"
-            @click="selectType('mobile')">
-            <span class="type-card__icon">
-              <AssetIcon name="truck" :size="18" />
-            </span>
-            <span class="type-card__body">
-              <span class="type-card__title">Register for mobile drive</span>
-              <span class="type-card__desc">Join an upcoming community blood drive</span>
-            </span>
-            <span class="radio" :class="{ 'radio--active': appointmentType === 'mobile' }" />
-          </button>
-        </div>
-      </div>
+            <div v-show="openStep === 'place'" id="bstep-place" class="bstep__body">
+              <!-- Walk-in: centers -->
+              <template v-if="appointmentType === 'walkin'">
+                <div v-if="centersLoading" class="list-skeleton" aria-busy="true" aria-label="Loading blood centers">
+                  <span v-for="n in 3" :key="n" class="slot-skeleton" />
+                </div>
 
-      <!-- Step 2 (walk-in): choose blood center -->
-      <div v-if="appointmentType === 'walkin'" class="step-section">
-        <h2 class="step-label">
-          <span class="step-label__num">2</span>
-          Choose blood center
-        </h2>
-        <div v-if="centersLoading" class="drive-state">
-          <div class="spinner" />
-          <p>Loading blood centers...</p>
-        </div>
+                <div v-else-if="centersError" class="drive-state">
+                  <p>{{ centersError }}</p>
+                  <button type="button" class="btn-outline" @click="fetchBloodCenters">Try again</button>
+                </div>
 
-        <div v-else-if="centersError" class="drive-state">
-          <p>{{ centersError }}</p>
-        </div>
-
-        <div v-else-if="bloodCenters.length" class="center-grid">
-          <button v-for="center in bloodCenters" :key="center.id" type="button" class="center-card"
-            :class="{ 'center-card--active': selectedCenterId === center.id }" @click="selectedCenterId = center.id">
-            <span class="center-card__top">
-              <span class="center-card__name">{{ center.name }}</span>
-              <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
-            </span>
-            <span class="center-card__meta">{{ center.location }} · {{ center.hours }}</span>
-          </button>
-        </div>
-
-        <div v-else class="drive-state">
-          <p>No blood centers available</p>
-          <p class="drive-state__sub">No centers are accepting donations right now. Please check back later.</p>
-        </div>
-      </div>
-
-      <!-- Step 2 (mobile): choose blood drive -->
-      <div v-else-if="appointmentType === 'mobile'" class="step-section">
-        <h2 class="step-label">
-          <span class="step-label__num">2</span>
-          Choose blood drive
-        </h2>
-
-        <div v-if="drivesLoading" class="drive-state">
-          <div class="spinner" />
-          <p>Loading blood drives...</p>
-        </div>
-
-        <div v-else-if="drivesError" class="drive-state">
-          <p>{{ drivesError }}</p>
-          <button type="button" class="btn-outline" @click="fetchBloodDrives">Try again</button>
-        </div>
-
-        <div v-else-if="bloodDrives.length" class="drive-list">
-          <button v-for="drive in bloodDrives" :key="drive.id" type="button" class="drive-card"
-            :class="{ 'drive-card--active': selectedDriveId === drive.id }"
-            :disabled="driveSlotsLeft(drive) === 0 || driveTooEarly(drive)"
-            @click="selectedDriveId = drive.id">
-            <div class="drive-card__top">
-              <div>
-                <p class="drive-card__name">{{ drive.name }}</p>
-                <p class="drive-card__meta">{{ formatDate(drive.date) }} · {{ drive.location }}</p>
-              </div>
-              <span class="badge" :class="driveStatusClass(drive)">{{ drive.status }}</span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill" :class="driveProgressClass(drive)"
-                :style="{ width: driveProgressPct(drive) + '%' }" />
-            </div>
-            <div class="drive-card__bottom">
-              <span>{{ drive.registered }} registered</span>
-              <span>{{ driveSlotsLeft(drive) }} slots left</span>
-            </div>
-            <p v-if="driveTooEarly(drive)" class="drive-card__note">
-              Before your next eligible date ({{ formatDate(nextEligibleDate) }})
-            </p>
-          </button>
-        </div>
-
-        <div v-else class="drive-state">
-          <AssetIcon name="truck" :size="32" class="drive-state__icon" />
-          <p>No blood drives posted yet.</p>
-          <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
-        </div>
-      </div>
-
-      <!-- Step 3 (walk-in only): date & time slot -->
-      <div v-if="appointmentType === 'walkin'" class="step-section">
-        <h2 class="step-label">
-          <span class="step-label__num">3</span>
-          Select date &amp; time slot
-        </h2>
-        <div class="panel">
-          <div class="form-body">
-            <p class="form-label" id="date-chips-label">Date</p>
-            <!-- Sunod 14 ka adlaw isip chips; ang "Other date" para sa mas layo -->
-            <div class="date-chips" role="radiogroup" aria-labelledby="date-chips-label">
-              <button
-                v-for="chip in dateChips"
-                :key="chip.value"
-                type="button"
-                role="radio"
-                class="date-chip"
-                :class="{ 'date-chip--active': selectedDate === chip.value }"
-                :aria-checked="selectedDate === chip.value ? 'true' : 'false'"
-                @click="selectedDate = chip.value"
-              >
-                <span class="date-chip__dow">{{ chip.weekday }}</span>
-                <span class="date-chip__day">{{ chip.day }}</span>
-                <span class="date-chip__month">{{ chip.month }}</span>
-              </button>
-            </div>
-            <label class="date-other">
-              <span>Other date</span>
-              <input v-model="selectedDate" :min="minBookingDate" type="date" class="form-input date-other__input"
-                :class="{ 'date-other__input--active': !selectedIsChip }">
-            </label>
-
-            <p class="slots-heading">Available times · {{ formattedSelectedDate }}</p>
-
-            <div v-if="slotsLoading" class="drive-state">
-              <div class="spinner" />
-              <p>Loading time slots...</p>
-            </div>
-
-            <div v-else-if="slotsError" class="drive-state">
-              <p>{{ slotsError }}</p>
-            </div>
-
-            <div v-else-if="timeSlots.length" class="slot-groups">
-              <div v-for="group in slotGroups" :key="group.label" class="slot-group">
-                <p v-if="slotGroups.length > 1" class="slot-group__label">{{ group.label }}</p>
-                <div class="slots-grid">
-                  <button v-for="slot in group.slots" :key="slot.time" type="button" class="slot-btn"
-                    :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
-                    :disabled="slot.available === 0" :aria-pressed="selectedTimeSlot === slot.time ? 'true' : 'false'"
-                    @click="selectedTimeSlot = slot.time">
-                    <span class="slot-btn__time">{{ formatTime(slot.time) }}</span>
-                    <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} left` }}</span>
+                <div v-else-if="bloodCenters.length" class="choice-list" role="radiogroup" aria-label="Blood centers">
+                  <button v-for="center in bloodCenters" :key="center.id" type="button" role="radio" class="choice"
+                    :class="{ 'choice--active': selectedCenterId === center.id }"
+                    :aria-checked="selectedCenterId === center.id ? 'true' : 'false'" @click="pickCenter(center.id)">
+                    <span class="choice__icon"><AssetIcon name="building-2" :size="16" /></span>
+                    <span class="choice__body">
+                      <span class="choice__name">{{ center.name }}</span>
+                      <span class="choice__meta">
+                        <span><AssetIcon name="map-pin" :size="12" /> {{ center.location }}</span>
+                        <span><AssetIcon name="clock" :size="12" /> {{ center.hours }}</span>
+                      </span>
+                    </span>
+                    <span class="radio" :class="{ 'radio--active': selectedCenterId === center.id }" />
                   </button>
                 </div>
+
+                <div v-else class="drive-state">
+                  <p>No blood centers available</p>
+                  <p class="drive-state__sub">No centers are accepting donations right now. Please check back later.</p>
+                </div>
+              </template>
+
+              <!-- Mobile: drives -->
+              <template v-else>
+                <div v-if="drivesLoading" class="list-skeleton" aria-busy="true" aria-label="Loading blood drives">
+                  <span v-for="n in 3" :key="n" class="slot-skeleton" />
+                </div>
+
+                <div v-else-if="drivesError" class="drive-state">
+                  <p>{{ drivesError }}</p>
+                  <button type="button" class="btn-outline" @click="fetchBloodDrives">Try again</button>
+                </div>
+
+                <div v-else-if="bloodDrives.length" class="choice-list" role="radiogroup" aria-label="Blood drives">
+                  <button v-for="drive in bloodDrives" :key="drive.id" type="button" role="radio" class="choice choice--drive"
+                    :class="{ 'choice--active': selectedDriveId === drive.id }"
+                    :aria-checked="selectedDriveId === drive.id ? 'true' : 'false'"
+                    :disabled="driveSlotsLeft(drive) === 0 || driveTooEarly(drive)"
+                    @click="pickDrive(drive.id)">
+                    <span class="choice__date">
+                      <span class="choice__date-month">{{ dateParts(drive.date).month }}</span>
+                      <span class="choice__date-day">{{ dateParts(drive.date).day }}</span>
+                    </span>
+                    <span class="choice__body">
+                      <span class="choice__top">
+                        <span class="choice__name">{{ drive.name }}</span>
+                        <span class="badge" :class="driveStatusClass(drive)">{{ drive.status }}</span>
+                      </span>
+                      <span class="choice__meta">
+                        <span><AssetIcon name="map-pin" :size="12" /> {{ drive.location }}</span>
+                      </span>
+                      <span class="progress-track">
+                        <span class="progress-fill" :class="driveProgressClass(drive)"
+                          :style="{ width: driveProgressPct(drive) + '%' }" />
+                      </span>
+                      <span class="choice__foot">
+                        <span>{{ drive.registered }} registered</span>
+                        <span>{{ driveSlotsLeft(drive) }} slots left</span>
+                      </span>
+                      <span v-if="driveTooEarly(drive)" class="drive-card__note">
+                        Before your next eligible date ({{ formatDate(nextEligibleDate) }})
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                <div v-else class="drive-state">
+                  <AssetIcon name="truck" :size="32" class="drive-state__icon" />
+                  <p>No blood drives posted yet.</p>
+                  <p class="drive-state__sub">Check back later once a blood center schedules one near you.</p>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <!-- Step 2 (walk-in only): when -->
+          <section v-if="appointmentType === 'walkin'" class="bstep"
+            :class="{ 'bstep--open': openStep === 'time', 'bstep--done': stepDone.time, 'bstep--locked': !stepDone.place }">
+            <button type="button" class="bstep__head" :disabled="!stepDone.place"
+              :aria-expanded="openStep === 'time' ? 'true' : 'false'" aria-controls="bstep-time" @click="openStep = 'time'">
+              <span class="bstep__num">
+                <AssetIcon v-if="stepDone.time && openStep !== 'time'" name="check" :size="13" />
+                <template v-else>2</template>
+              </span>
+              <span class="bstep__titles">
+                <span class="bstep__title">Pick a date and time</span>
+                <span v-if="!stepDone.place" class="bstep__summary">Choose a blood center first</span>
+                <span v-else-if="openStep !== 'time' && stepDone.time" class="bstep__summary">
+                  {{ formattedSelectedDate }} · {{ formatTime(selectedTimeSlot) }}
+                </span>
+              </span>
+              <span v-if="openStep !== 'time' && stepDone.time" class="bstep__change">Change</span>
+            </button>
+
+            <div v-show="openStep === 'time'" id="bstep-time" class="bstep__body">
+              <div class="date-head">
+                <p class="form-label" id="date-chips-label">Date</p>
+                <div class="date-other">
+                  <label for="other-date">Later date</label>
+                  <DatePicker
+                    id="other-date"
+                    v-model="selectedDate"
+                    :min="minBookingDate"
+                    size="sm"
+                    placeholder="Pick a later date"
+                    class="date-other__picker"
+                    :class="{ 'date-other__picker--active': !selectedIsChip }"
+                  />
+                </div>
+              </div>
+              <!-- Sunod 14 ka adlaw isip chips; ang "Later date" para sa mas layo -->
+              <div class="date-chips" role="radiogroup" aria-labelledby="date-chips-label">
+                <button
+                  v-for="chip in dateChips"
+                  :key="chip.value"
+                  type="button"
+                  role="radio"
+                  class="date-chip"
+                  :class="{ 'date-chip--active': selectedDate === chip.value, 'date-chip--closed': chip.closed }"
+                  :aria-checked="selectedDate === chip.value ? 'true' : 'false'"
+                  :disabled="!!chip.closed"
+                  :title="chip.closed || undefined"
+                  @click="selectedDate = chip.value"
+                >
+                  <span class="date-chip__dow">{{ chip.weekday }}</span>
+                  <span class="date-chip__day">{{ chip.day }}</span>
+                  <span class="date-chip__month">{{ chip.closed ? 'Closed' : chip.month }}</span>
+                </button>
+              </div>
+
+              <p class="slots-heading">Available times · {{ formattedSelectedDate }}</p>
+
+              <div v-if="slotsLoading" class="slots-grid" aria-busy="true" aria-label="Loading time slots">
+                <span v-for="n in 8" :key="n" class="slot-skeleton" />
+              </div>
+
+              <div v-else-if="slotsError" class="drive-state">
+                <p>{{ slotsError }}</p>
+                <button type="button" class="btn-outline" @click="fetchTimeSlots">Try again</button>
+              </div>
+
+              <div v-else-if="timeSlots.length" class="slot-groups">
+                <div v-for="group in slotGroups" :key="group.label" class="slot-group">
+                  <p v-if="slotGroups.length > 1" class="slot-group__label">
+                    {{ group.label }}
+                  </p>
+                  <div class="slots-grid">
+                    <button v-for="slot in group.slots" :key="slot.time" type="button" class="slot-btn"
+                      :class="{ 'slot-btn--active': selectedTimeSlot === slot.time, 'slot-btn--full': slot.available === 0 }"
+                      :disabled="slot.available === 0" :aria-pressed="selectedTimeSlot === slot.time ? 'true' : 'false'"
+                      @click="selectedTimeSlot = slot.time">
+                      <span class="slot-btn__time">{{ formatTime(slot.time) }}</span>
+                      <span class="slot-btn__avail">{{ slot.available === 0 ? 'Full' : `${slot.available} left` }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="drive-state drive-state--flat">
+                <AssetIcon name="calendar" :size="28" class="drive-state__icon" />
+                <p v-if="closedReason(selectedDate)">The centre takes no bookings on this day ({{ closedReason(selectedDate) }}). Please pick another date.</p>
+                <p v-else>No time slots set for this date.</p>
+                <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet. Try another date.</p>
               </div>
             </div>
-
-            <div v-else class="drive-state">
-              <AssetIcon name="calendar" :size="32" class="drive-state__icon" />
-              <p>No time slots set for this date.</p>
-              <p class="drive-state__sub">This blood center hasn't opened slots for {{ formattedSelectedDate }} yet. Try another date.</p>
-            </div>
-          </div>
+          </section>
         </div>
-      </div>
 
-      <!-- Sticky: makita permi ang gipili ug ang Continue, bisan taas ang lista -->
-      <div class="booking-bar">
-        <p class="booking-bar__summary" aria-live="polite">
-          <span v-if="selectionSummary" class="booking-bar__text">{{ selectionSummary }}</span>
-          <span v-else class="booking-bar__hint">{{ selectionHint }}</span>
-        </p>
-        <button type="button" class="btn-primary booking-bar__btn" :disabled="!canContinue" @click="openSummary">
-          Continue
-          <AssetIcon name="arrow-right" :size="15" />
-        </button>
+        <!-- The ticket: what the donor has picked so far, and Confirm -->
+        <aside class="ticket" :class="{ 'ticket--ready': canContinue }" aria-label="Your booking">
+          <div class="ticket__head">
+            <p class="ticket__eyebrow">{{ reschedulingId ? 'New slot' : 'Your booking' }}</p>
+            <p class="ticket__type">
+              <AssetIcon :name="appointmentType === 'walkin' ? 'building-2' : 'truck'" :size="14" />
+              {{ appointmentType === 'walkin' ? 'Walk-in' : 'Mobile blood drive' }}
+            </p>
+          </div>
+
+          <dl class="ticket__rows" aria-live="polite">
+            <div class="ticket__row">
+              <dt>Where</dt>
+              <dd v-if="locationLabel !== '-'">
+                {{ locationLabel }}
+                <span class="ticket__sub">{{ appointmentType === 'walkin' ? selectedCenter?.location : selectedDrive?.location }}</span>
+              </dd>
+              <dd v-else class="ticket__empty">Not chosen yet</dd>
+            </div>
+            <div class="ticket__row ticket__row--pair">
+              <div>
+                <dt>Date</dt>
+                <dd v-if="appointmentType === 'walkin' || selectedDrive">{{ summaryDateLabel }}</dd>
+                <dd v-else class="ticket__empty">-</dd>
+              </div>
+              <div v-if="appointmentType === 'walkin'">
+                <dt>Time</dt>
+                <dd v-if="selectedTimeSlot">{{ formatTime(selectedTimeSlot) }}</dd>
+                <dd v-else class="ticket__empty">-</dd>
+              </div>
+            </div>
+          </dl>
+
+          <div class="ticket__tear" aria-hidden="true" />
+
+          <div class="ticket__tips">
+            <p class="ticket__tips-title">Before you go</p>
+            <ul>
+              <li><AssetIcon name="id-card" :size="14" /> Bring a valid ID</li>
+              <li><AssetIcon name="moon" :size="14" /> Get a good night's sleep</li>
+              <li><AssetIcon name="droplets" :size="14" /> Drink plenty of water</li>
+              <li><AssetIcon name="clipboard-check" :size="14" /> Answer the health questionnaire the day before</li>
+            </ul>
+          </div>
+
+          <div class="ticket__foot">
+            <p class="ticket__hint" aria-live="polite">
+              <template v-if="canContinue">
+                <span class="ticket__hint-text ticket__hint-text--full">{{ selectionSummary }}</span>
+                <span class="ticket__hint-text ticket__hint-text--short">{{ shortSummary }}</span>
+              </template>
+              <template v-else>{{ selectionHint }}</template>
+            </p>
+            <button type="button" class="btn-primary ticket__btn" :disabled="!canContinue" @click="openSummary">
+              {{ reschedulingId ? 'Review new slot' : 'Review booking' }}
+              <AssetIcon name="arrow-right" :size="15" />
+            </button>
+          </div>
+        </aside>
       </div>
       </template>
+
+      <!-- Earlier bookings: kept, done, cancelled or missed -->
+      <details v-if="pastBookings.length" class="past">
+        <summary class="past__summary">
+          Past bookings
+          <span class="past__count">{{ pastBookings.length }}</span>
+        </summary>
+        <ul class="past__list">
+          <li v-for="a in pastBookings" :key="a.id" class="past__row">
+            <span class="past__date">{{ formatDate(a.date || a.appointment_datetime) }}</span>
+            <span class="past__place">{{ a.drive_name || a.facility_name || 'Blood center' }}</span>
+            <span class="past__status" :class="`past__status--${pastTone(a)}`">{{ pastLabel(a) }}</span>
+          </li>
+        </ul>
+      </details>
     </div>
 
     <!-- Booking summary modal -->
@@ -451,17 +643,20 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import { donorService } from '~/api/donor/DonorService'
 
 
 const router = useRouter()
+const route = useRoute()
 
 // Page-level loading state: shows the skeleton on first mount while we
 // fetch whatever's needed before the form is interactive.
 const loading = ref(true)
 
 const appointmentType = ref('walkin')
+let drivesFetched = false
 const selectedCenterId = ref(null)
 const selectedDriveId = ref(null)
 // Ang date input kailangan og YYYY-MM-DD base sa LOCAL na oras. Dili
@@ -497,9 +692,30 @@ const appointmentActionError = ref('')
 const MOBILE_DRIVE_TIME = '09:00'
 
 
+// Which step card is open. Only one at a time; the others show a summary.
+const openStep = ref('place')
+
+// Open the first step that still needs an answer for the current type.
+function openFirstPending() {
+  if (appointmentType.value === 'walkin') openStep.value = selectedCenterId.value ? 'time' : 'place'
+  else openStep.value = selectedDriveId.value ? null : 'place'
+}
+
 function selectType(type) {
   appointmentType.value = type
   selectedTimeSlot.value = null
+  openFirstPending()
+}
+
+// Picking a place moves the donor straight on to the next step.
+function pickCenter(id) {
+  selectedCenterId.value = id
+  openStep.value = 'time'
+}
+
+function pickDrive(id) {
+  selectedDriveId.value = id
+  openStep.value = null
 }
 
 
@@ -516,7 +732,7 @@ async function fetchBloodCenters() {
     // Ang server mo-filter na sa accepting-donations nga centers, so ang
     // status kanunay "Open today".
     const data = await bookingCatalogService.bloodCenters()
-    bloodCenters.value = data ?? []
+    bloodCenters.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load blood centers:', err)
     centersError.value = 'Could not load blood centers. Please try again.'
@@ -551,7 +767,7 @@ async function fetchTimeSlots() {
       center_id: selectedCenterId.value,
       date: selectedDate.value,
     })
-    timeSlots.value = data ?? []
+    timeSlots.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load time slots:', err)
     slotsError.value = err?.message || 'Could not load time slots. Please try again.'
@@ -597,9 +813,36 @@ async function load({ silent = false } = {}) {
   }
 }
 
-onMounted(() => load())
+/*
+ * Links from Home: `?type=mobile` opens on the drives, `&drive=ID` on that
+ * drive, picked, when it can still be booked. Applied once per link, so going
+ * back and forth doesn't undo what the donor changed since. Only while the
+ * booking form shows: with a booking already made there is nothing to pick.
+ */
+const bookingEl = ref(null)
+let appliedQuery = ''
+
+async function applyQuery() {
+  const type = route.query.type
+  const key = type === 'mobile' ? `mobile:${route.query.drive ?? ''}` : ''
+  if (key === appliedQuery) return
+  appliedQuery = key
+  if (!key || !showBookingWizard.value || reschedulingId.value) return
+
+  drivesFetched = true
+  if (appointmentType.value !== 'mobile') selectType('mobile')
+  await fetchBloodDrives()
+
+  const id = Number(route.query.drive)
+  const drive = bloodDrives.value.find(d => d.id === id)
+  if (drive && driveSlotsLeft(drive) > 0 && !driveTooEarly(drive)) pickDrive(drive.id)
+  await nextTick()
+  bookingEl.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
+onMounted(() => load().then(applyQuery))
 onActivated(() => {
-  if (loadedOnce) load({ silent: true })
+  if (loadedOnce) load({ silent: true }).then(applyQuery)
 })
 
 
@@ -619,7 +862,7 @@ async function fetchBloodDrives() {
     // GET /api/blood-drives
     // Ang `registered` kay live count sa active nga appointments.
     const data = await bookingCatalogService.bloodDrives()
-    bloodDrives.value = data ?? []
+    bloodDrives.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load blood drives:', err)
     drivesError.value = err?.message || 'Could not load blood drives. Please try again.'
@@ -663,7 +906,7 @@ function driveProgressClass(drive) {
 }
 
 // Fetch drives as soon as the donor switches to the "mobile drive" flow,
-let drivesFetched = false
+// (declared before applyQuery reads it)
 watch(appointmentType, (type) => {
   if (type === 'mobile' && !drivesFetched) {
     drivesFetched = true
@@ -741,7 +984,9 @@ async function fetchAppointments() {
     // Tanan appointment ang mo-return — bisan cancelled ug completed — newest
     // first. Walay filter param, so client na ang mo-pili.
     const data = await donorService.appointments()
-    myAppointments.value = data ?? []
+    // A list only: anything else (an error page, an unexpected shape) would
+    // crash the .filter() below and blank the whole booking page.
+    myAppointments.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Failed to load appointments:', err)
     appointmentsError.value = err?.message || 'Could not load your appointments. Please try again.'
@@ -765,6 +1010,147 @@ const activeAppointments = computed(() =>
 
 const formattedSelectedDate = computed(() => formatDate(selectedDate.value))
 
+// ── Getting ready for the booked visit ──
+const nextAppointment = computed(() => activeAppointments.value[0] ?? null)
+
+function dayIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const countdownLabel = computed(() => {
+  const appt = nextAppointment.value
+  if (!appt) return ''
+  const day = String(appt.date || '').slice(0, 10) || dayIso(new Date(appt.appointment_datetime))
+  const [y, m, d] = day.split('-').map(Number)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((new Date(y, m - 1, d) - today) / 86_400_000)
+  const at = formatTime(appt.time)
+  if (days <= 0) return `Today at ${at}`
+  if (days === 1) return `Tomorrow at ${at}`
+  return `In ${days} days, ${formatDate(day)} at ${at}`
+})
+
+// Google Maps, searched by the place as written: the booking carries no address.
+const directionsUrl = computed(() => {
+  const appt = nextAppointment.value
+  const place = appt?.drive_name || appt?.facility_name || ''
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
+})
+
+// An .ics file, so the visit lands in the donor's own calendar. An hour long.
+function downloadCalendar() {
+  const appt = nextAppointment.value
+  if (!appt) return
+  const start = new Date(appt.appointment_datetime)
+  if (Number.isNaN(start.getTime())) return
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const stamp = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const place = appt.drive_name || appt.facility_name || 'Blood center'
+  const escape = text => String(text).replace(/[\\;,]/g, m => `\\${m}`)
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//RedAgos//Donor portal//EN',
+    'BEGIN:VEVENT',
+    `UID:redagos-appointment-${appt.id}@redagos`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${escape(`Blood donation at ${place}`)}`,
+    `LOCATION:${escape(place)}`,
+    `DESCRIPTION:${escape('Bring a valid ID and your RedAgos Pass. Eat a proper meal and drink water before you go.')}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'redagos-donation.ics'
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// The health questions: ticked by the server's own screening status for the
+// booking, never by hand.
+const questionsItem = computed(() => {
+  const appt = nextAppointment.value
+  switch (appt?.screening_status) {
+    case 'answered':
+      return { done: true, note: 'Done. Your Pass is ready.', link: false }
+    case 'due':
+    case 'missed':
+      return { done: false, note: 'Open now, about 5 minutes.', link: true }
+    case 'not_due':
+      return { done: false, note: `Opens on ${formatDate(appt.screening_window_opens_on)}.`, link: false }
+    default:
+      return { done: false, note: 'The day before your visit.', link: false }
+  }
+})
+
+// General advice, checked off by the donor on this device only.
+const PREP_ITEMS = [
+  { key: 'meal', label: 'Eat a proper meal before you go' },
+  { key: 'water', label: 'Drink extra water the day before and on the day' },
+  { key: 'sleep', label: 'Get a good night of sleep' },
+  { key: 'id', label: 'Bring a valid ID' },
+]
+
+const DAY_STEPS = [
+  { icon: 'qr-code', title: 'Check in', text: 'Show your Pass at the counter.' },
+  { icon: 'stethoscope', title: 'Health check', text: 'Blood pressure, hemoglobin and weight.' },
+  { icon: 'blood-drop', title: 'Donation', text: 'The draw itself usually takes about 10 minutes.' },
+  { icon: 'heart', title: 'Rest and a snack', text: 'Stay a few minutes before you head off.' },
+]
+
+const prepChecked = ref({})
+const prepKey = () => `redagos:visit-prep:${nextAppointment.value?.id ?? 'none'}`
+
+function readPrep() {
+  try {
+    prepChecked.value = JSON.parse(localStorage.getItem(prepKey()) || '{}') || {}
+  } catch {
+    prepChecked.value = {}
+  }
+}
+
+function togglePrep(key) {
+  prepChecked.value = { ...prepChecked.value, [key]: !prepChecked.value[key] }
+  try {
+    localStorage.setItem(prepKey(), JSON.stringify(prepChecked.value))
+  } catch {
+    // Storage blocked: the ticks still hold for this visit to the page.
+  }
+}
+
+watch(() => nextAppointment.value?.id, (id) => {
+  if (id && import.meta.client) readPrep()
+}, { immediate: true })
+
+// ── Past bookings ──
+const pastBookings = computed(() =>
+  myAppointments.value
+    .filter(a => !activeAppointments.value.includes(a))
+    .sort((a, b) => new Date(b.appointment_datetime) - new Date(a.appointment_datetime))
+)
+
+// A booking still `scheduled` after its time came and went is a missed one.
+function isMissed(a) {
+  return (a.status === 'scheduled' && new Date(a.appointment_datetime) < new Date()) || a.status === 'no_show'
+}
+
+function pastLabel(a) {
+  if (isMissed(a)) return 'Missed'
+  return a.status_label || a.status
+}
+
+function pastTone(a) {
+  if (isMissed(a)) return 'muted'
+  if (a.status === 'completed') return 'success'
+  if (a.status === 'cancelled') return 'muted'
+  return 'info'
+}
+
 // Sunod 14 ka adlaw gikan sa unang ma-book nga petsa. Local time, dili UTC.
 const DATE_CHIP_COUNT = 14
 const dateChips = computed(() => {
@@ -778,11 +1164,37 @@ const dateChips = computed(() => {
       weekday: value === todayValue ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }),
       day: date.getDate(),
       month: date.toLocaleDateString('en-US', { month: 'short' }),
+      closed: closedReason(value),
     }
   })
 })
 
 const selectedIsChip = computed(() => dateChips.value.some(chip => chip.value === selectedDate.value))
+
+// The days the chosen centre takes no bookings: its closed dates, and the
+// weekdays it does not open (its booking schedule, set by the centre).
+function closedReason(value) {
+  const center = selectedCenter.value
+  if (!center || !value) return null
+  const closed = (center.closed_dates || []).find(c => c.date === value)
+  if (closed) return closed.reason || 'Closed'
+  const days = center.open_days
+  if (Array.isArray(days) && days.length) {
+    const [y, m, d] = value.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    if (!days.includes((date.getDay() + 6) % 7)) {
+      return `Closed on ${date.toLocaleDateString('en-US', { weekday: 'long' })}s`
+    }
+  }
+  return null
+}
+
+// A centre picked on a day it is shut moves to its first open day in view.
+watch(selectedCenterId, () => {
+  if (!closedReason(selectedDate.value)) return
+  const open = dateChips.value.find(chip => !chip.closed)
+  if (open) selectedDate.value = open.value
+})
 
 // Morning (una sa 12:00) ug Afternoon. Ang `time` kay H:i gikan sa server.
 const slotGroups = computed(() => {
@@ -807,6 +1219,13 @@ const showBookingWizard = computed(() =>
 const selectedDrive = computed(() => bloodDrives.value.find(d => d.id === selectedDriveId.value) || null)
 const selectedCenter = computed(() => bloodCenters.value.find(c => c.id === selectedCenterId.value) || null)
 
+// Which steps are complete, for the check marks on the step numbers.
+const stepDone = computed(() => ({
+  type: !!appointmentType.value,
+  place: appointmentType.value === 'mobile' ? !!selectedDriveId.value : !!selectedCenterId.value,
+  time: !!(selectedDate.value && selectedTimeSlot.value),
+}))
+
 const canContinue = computed(() => {
   if (appointmentType.value === 'walkin') {
     return !!(selectedCenterId.value && selectedDate.value && selectedTimeSlot.value)
@@ -829,9 +1248,39 @@ const selectionSummary = computed(() => {
   return `${selectedDrive.value.name} · ${formatDate(selectedDrive.value.date)}`
 })
 
-const selectionHint = computed(() =>
-  appointmentType.value === 'walkin' ? 'Choose a blood center, date and time.' : 'Choose a blood drive.'
+// Shown on the collapsed "where" step.
+const placeSummary = computed(() =>
+  appointmentType.value === 'walkin'
+    ? selectedCenter.value?.name || ''
+    : selectedDrive.value ? `${selectedDrive.value.name} · ${formatDate(selectedDrive.value.date)}` : ''
 )
+
+// "2026-10-18" -> { weekday: 'Sun', month: 'Oct', day: 18, year: 2026 } for
+// the date tiles. Parsed as local time, not UTC.
+function dateParts(value) {
+  const [y, m, d] = String(value ?? '').slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return { weekday: '', month: '-', day: '', year: '' }
+  const date = new Date(y, m - 1, d)
+  return {
+    weekday: date.toLocaleDateString('en-US', { weekday: 'short' }),
+    month: date.toLocaleDateString('en-US', { month: 'short' }),
+    day: d,
+    year: y,
+  }
+}
+
+// The bar on narrow phones has room for the when, not the where.
+const shortSummary = computed(() =>
+  appointmentType.value === 'walkin'
+    ? `${dateParts(selectedDate.value).month} ${dateParts(selectedDate.value).day} · ${formatTime(selectedTimeSlot.value)}`
+    : `${dateParts(selectedDrive.value?.date).month} ${dateParts(selectedDrive.value?.date).day}`
+)
+
+// What is still missing, one thing at a time (short enough for the mobile bar).
+const selectionHint = computed(() => {
+  if (appointmentType.value === 'mobile') return 'Choose a blood drive.'
+  return selectedCenterId.value ? 'Pick a time slot.' : 'Choose a blood center.'
+})
 
 const typeLabel = computed(() => appointmentType.value === 'walkin' ? 'Walk-in at blood center' : 'Register for mobile drive')
 
@@ -1028,9 +1477,11 @@ function chooseAnother() {
   showSummary.value = false
   if (appointmentType.value === 'walkin') {
     selectedTimeSlot.value = null
+    openStep.value = 'time'
     fetchTimeSlots()
   } else {
     selectedDriveId.value = null
+    openStep.value = 'place'
     fetchBloodDrives()
   }
 }
@@ -1049,6 +1500,7 @@ function startReschedule(appointment) {
   // ang donor og blangko.
   appointmentType.value = appointment.appointment_type === 'mobile' ? 'mobile' : 'walkin'
   selectedTimeSlot.value = null
+  openFirstPending()
 
   if (import.meta.client) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1116,8 +1568,8 @@ function goDashboard() {
 
 <style scoped>
 .appointment-page {
-  --primary: #1565c0;
-  --primary-dark: #0d47a1;
+  --primary: var(--rb-primary);
+  --primary-dark: var(--rb-primary-hover);
   --accent: #d32f2f;
   --success: #2e7d32;
   --warning: #f57c00;
@@ -1140,7 +1592,7 @@ function goDashboard() {
   border-radius: 10px;
   background: #FEF3F2;
   border: 1px solid #FECDCA;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   font-weight: 500;
   line-height: 1.5;
   color: #7A271A;
@@ -1173,7 +1625,7 @@ function goDashboard() {
 
 .summary-head__sub {
   margin: 2px 0 0;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
 }
 
@@ -1199,7 +1651,7 @@ function goDashboard() {
 }
 
 .summary-close:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 
@@ -1229,13 +1681,13 @@ function goDashboard() {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
 }
 
 .summary-item dd {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   line-height: 1.4;
   color: var(--text-primary);
@@ -1245,7 +1697,7 @@ function goDashboard() {
 .summary-item__sub {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -1274,70 +1726,185 @@ function goDashboard() {
 .my-appointment-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  min-width: 0;
 }
 
-.my-appointment-card {
-  padding: 16px;
+
+/* Upcoming appointment: a white card led by a date tile. The ticket look is
+   kept for the booking summary only, so it stays special there. */
+.appt-ticket {
+  display: flex;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.my-appointment-card__top {
+.appt-ticket--rescheduling {
+  border-color: var(--rb-primary);
+  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.12);
+}
+
+.appt-ticket__stub {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  align-self: flex-start;
+  gap: 1px;
+  width: 92px;
+  padding: 12px 8px;
+  border-radius: 16px;
+  background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text);
+  text-align: center;
+}
+
+.appt-ticket__dow,
+.appt-ticket__month {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.appt-ticket__day {
+  font-family: var(--rb-font-sans);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.appt-ticket__time {
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: white;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+}
+
+.appt-ticket__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.appt-ticket__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+  color: var(--rb-primary-text);
+}
+
+.appt-ticket__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.my-appointment-card__name {
+.appt-ticket__name {
   margin: 0;
-  font-size: 14px;
+  font-family: var(--rb-font-sans);
+  font-size: var(--rb-fs-section);
   font-weight: 700;
+  line-height: 1.35;
   color: var(--text-primary);
 }
 
-.my-appointment-card__meta {
-  margin: 4px 0 0;
-  font-size: 12.5px;
+.appt-ticket__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
 }
 
-.my-appointment-card__note {
-  margin: 12px 0 0;
-  font-size: 12px;
+.appt-ticket__meta > span { display: inline-flex; align-items: center; gap: 6px; }
+
+.appt-ticket .screening-notice { margin-top: 2px; border-radius: 12px; }
+
+.appt-ticket__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 4px;
+}
+
+.appt-ticket__note {
+  flex: 1 1 14rem;
+  margin: 0;
+  font-size: var(--rb-fs-caption);
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.my-appointment-card__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-}
+.appt-ticket__actions { display: flex; flex: none; gap: 8px; }
 
-.my-appointment-card__cancel {
+.appt-ticket__reschedule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.4) !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--rb-primary-text) !important;
+}
+.appt-ticket__reschedule:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.07) !important; }
+
+.appt-ticket__cancel {
   padding: 9px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
+  border: none;
+  border-radius: 999px;
   background: transparent;
-  color: var(--accent);
-  font-size: 13px;
+  color: #C62828;
+  font-size: var(--rb-fs-small);
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
-.my-appointment-card__cancel:hover:not(:disabled) {
-  background: rgba(211, 47, 47, 0.08);
-}
+.appt-ticket__cancel:hover:not(:disabled) { background: rgba(198, 40, 40, 0.08); }
+.appt-ticket__cancel:disabled { opacity: 0.55; cursor: not-allowed; }
+.appt-ticket__cancel:focus-visible { outline: 2px solid #C62828; outline-offset: 2px; }
 
-.my-appointment-card__cancel:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+/* Phones: the date tile becomes a strip across the top */
+@media (max-width: 560px) {
+  .appt-ticket { flex-direction: column; gap: 14px; padding: 14px; }
+
+  .appt-ticket__stub {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    align-self: stretch;
+    gap: 2px 8px;
+    width: auto;
+    padding: 10px 14px;
+    text-align: left;
+  }
+
+  .appt-ticket__day { font-size: 22px; }
+  .appt-ticket__time { margin: 0 0 0 auto; align-self: center; }
+  .appt-ticket__actions { width: 100%; }
+  .appt-ticket__actions > * { flex: 1; justify-content: center; }
 }
 
 .my-appointment-error {
   margin: 12px 0 0;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   line-height: 1.5;
   color: var(--accent);
 }
@@ -1355,7 +1922,7 @@ function goDashboard() {
 
 .reschedule-banner__text {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   font-weight: 400;
   line-height: 1.55;
   color: #475569;
@@ -1373,7 +1940,7 @@ function goDashboard() {
 }
 
 .page-title {
-  font-size: 21px;
+  font-size: var(--rb-fs-title);
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -1381,7 +1948,7 @@ function goDashboard() {
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
   margin: 3px 0 0;
 }
@@ -1417,94 +1984,14 @@ function goDashboard() {
 .step-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 10px;
+  font-size: var(--rb-fs-section);
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--text-primary);
   margin: 0;
 }
 
-.step-label__num {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: #eaf3fc;
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-/* Type cards */
-.type-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.type-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px;
-  cursor: pointer;
-  text-align: left;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.type-card:hover {
-  border-color: #d9e2ee;
-}
-
-.type-card--active {
-  background: #eaf3fc;
-  border-color: var(--primary);
-}
-
-.type-card__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #eaf3fc;
-  color: var(--primary);
-  transition: background 0.15s ease;
-}
-
-.type-card--active .type-card__icon {
-  background: var(--primary);
-  color: white;
-}
-
-.type-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-}
-
-.type-card__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.type-card__desc {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
 
 .radio {
   width: 20px;
@@ -1528,62 +2015,13 @@ function goDashboard() {
   background: var(--primary);
 }
 
-/* Center cards */
-.center-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
-
-.center-card {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  text-align: left;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px 18px;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.center-card:hover {
-  border-color: #d9e2ee;
-}
-
-.center-card--active {
-  background: #eaf3fc;
-  border-color: var(--primary);
-}
-
-.center-card__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.center-card__name {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.35;
-}
-
-.center-card__meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 3px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   font-weight: 700;
   width: fit-content;
 }
@@ -1606,7 +2044,7 @@ function goDashboard() {
 /* Date & time panel */
 .panel {
   background: white;
-  border-radius: 14px;
+  border-radius: 18px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -1618,7 +2056,7 @@ function goDashboard() {
 
 .form-label {
   display: block;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 6px;
@@ -1629,7 +2067,7 @@ function goDashboard() {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  font-size: 14px;
+  font-size: var(--rb-fs-body);
   color: var(--text-primary);
   background: white;
   transition: border-color 0.15s ease;
@@ -1646,7 +2084,7 @@ function goDashboard() {
 }
 
 .slots-heading {
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   color: var(--text-primary);
   margin: 22px 0 12px;
@@ -1654,9 +2092,19 @@ function goDashboard() {
 
 .slots-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   gap: 10px;
 }
+
+.slot-skeleton {
+  height: 54px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--rb-skeleton-a, #EEF1F5) 25%, var(--rb-skeleton-b, #F6F8FA) 50%, var(--rb-skeleton-a, #EEF1F5) 75%);
+  background-size: 200% 100%;
+  animation: slot-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes slot-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .slot-skeleton { animation: none; } }
 
 .slot-btn {
   display: flex;
@@ -1690,7 +2138,7 @@ function goDashboard() {
 }
 
 .slot-btn__time {
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -1700,7 +2148,7 @@ function goDashboard() {
 }
 
 .slot-btn__avail {
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   color: var(--text-secondary);
 }
 
@@ -1747,14 +2195,14 @@ function goDashboard() {
 }
 
 .drive-card__name {
-  font-size: 14px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
 .drive-card__meta {
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
@@ -1793,14 +2241,14 @@ function goDashboard() {
   padding: 40px 20px;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   background: white;
   border: 1px solid var(--border);
   border-radius: 14px;
 }
 
 .drive-state__sub {
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   color: var(--text-secondary);
   margin: -4px 0 0;
 }
@@ -1808,67 +2256,17 @@ function goDashboard() {
 .drive-card__bottom {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   color: var(--text-secondary);
-}
-
-/* Sticky booking bar */
-.booking-bar {
-  position: sticky;
-  bottom: 16px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 12px 12px 18px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: white;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
-}
-
-.booking-bar__summary {
-  min-width: 0;
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.booking-bar__text {
-  display: block;
-  overflow: hidden;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.booking-bar__hint {
-  color: var(--text-secondary);
-}
-
-.booking-bar__btn {
-  flex: none;
-}
-
-@media (max-width: 640px) {
-  .booking-bar {
-    bottom: 12px;
-    padding: 10px 10px 10px 14px;
-  }
-
-  .booking-bar__btn {
-    padding: 12px 18px;
-  }
 }
 
 /* Date chips */
 .date-chips {
   display: flex;
   gap: 8px;
-  margin: 0 -22px;
-  padding: 2px 22px 6px;
+  margin: 0 -20px;
+  padding: 2px 20px 6px;
+  scroll-padding-inline: 20px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
@@ -1893,6 +2291,12 @@ function goDashboard() {
 .date-chip:hover:not(.date-chip--active) {
   border-color: #b9d3ef;
 }
+.date-chip--closed,
+.date-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
 
 .date-chip--active {
   border-color: var(--primary);
@@ -1901,7 +2305,7 @@ function goDashboard() {
 
 .date-chip__dow,
 .date-chip__month {
-  font-size: 11px;
+  font-size: var(--rb-fs-caption);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -1920,7 +2324,7 @@ function goDashboard() {
 }
 
 .date-chip:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 
@@ -1928,21 +2332,15 @@ function goDashboard() {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-.date-other__input {
-  width: auto;
-  padding: 7px 10px;
-  font-size: 13px;
-}
+.date-other__picker { width: 220px; }
 
-.date-other__input--active {
-  border-color: var(--primary);
-}
+/* A date picked here (not one of the chips) gets the theme border. */
+.date-other__picker--active { --dp-border: var(--rb-primary); }
 
 /* Time slot groups */
 .slot-groups {
@@ -1953,7 +2351,7 @@ function goDashboard() {
 
 .slot-group__label {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--rb-fs-caption);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -1961,7 +2359,7 @@ function goDashboard() {
 /* Cancel dialog */
 .cancel-desc {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   line-height: 1.55;
   color: var(--text-secondary);
 }
@@ -1975,7 +2373,7 @@ function goDashboard() {
   border-radius: 10px;
   background: #c62828;
   color: white;
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -2008,7 +2406,7 @@ function goDashboard() {
   gap: 7px;
   padding: 13px 26px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   color: white;
   background: var(--primary);
@@ -2036,7 +2434,7 @@ function goDashboard() {
   justify-content: center;
   padding: 12px 24px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: var(--rb-fs-body);
   font-weight: 700;
   color: var(--text-primary);
   background: #f3f4f6;
@@ -2074,7 +2472,7 @@ function goDashboard() {
 }
 
 .modal-title {
-  font-size: 16px;
+  font-size: var(--rb-fs-section);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 12px;
@@ -2085,7 +2483,7 @@ function goDashboard() {
 }
 
 .modal-sub {
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
   text-align: center;
   margin: 0 0 16px;
@@ -2105,7 +2503,7 @@ function goDashboard() {
   align-items: center;
   padding: 9px 0;
   border-bottom: 1px solid #f3f4f6;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   color: var(--text-secondary);
 }
 
@@ -2141,33 +2539,161 @@ function goDashboard() {
 
 .eligible-banner__text {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--rb-fs-small);
   line-height: 1.55;
   color: #334155;
 }
 
+/* ── Getting ready ── */
+.prep { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.prep__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prep__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+}
+.prep__when :deep(.asset-icon) { color: var(--rb-primary-text); }
+.prep__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prep__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.prep__action:hover { border-color: var(--rb-border-hover, #CBD5E1); }
+.prep__action:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.prep__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.prep__card {
+  padding: 16px 18px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+.prep__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.prep__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.prep__item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.prep__label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
+.prep__input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.prep__check {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--rb-border-hover, #CBD5E1);
+  border-radius: 6px;
+  color: #fff;
+}
+.prep__item.is-done .prep__check { border-color: var(--rb-primary); background: var(--rb-primary); }
+.prep__input:focus-visible + .prep__check { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.prep__text { flex: 1; display: flex; flex-direction: column; font-size: 14px; color: var(--rb-text-primary); }
+.prep__text small { font-size: 12px; color: var(--rb-text-secondary); }
+.prep__item.is-done .prep__text { color: var(--rb-text-secondary); }
+.prep__link { flex: none; font-size: 13px; font-weight: 700; color: var(--rb-primary-text); text-decoration: none; }
+.prep__link:hover { text-decoration: underline; }
+.day { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.day__step { display: flex; align-items: flex-start; gap: 10px; }
+.day__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+.day__text { display: flex; flex-direction: column; font-size: 13px; color: var(--rb-text-secondary); }
+.day__text strong { font-size: 14px; color: var(--rb-text-primary); }
+.day__note { margin: 12px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* ── Past bookings ── */
+.past {
+  margin-top: 8px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+.past__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+.past__count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--rb-surface-alt);
+  font-size: 12px;
+  color: var(--rb-text-secondary);
+}
+.past__list { margin: 0; padding: 0 18px 12px; list-style: none; }
+.past__row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--rb-border);
+  font-size: 14px;
+}
+.past__date { color: var(--rb-text-secondary); font-weight: 600; }
+.past__place { color: var(--rb-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.past__status { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.past__status--success { background: rgba(var(--rb-success-rgb, 46, 125, 50), 0.12); color: var(--rb-success-text, #2E7D32); }
+.past__status--info { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.past__status--muted { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+
+.prep__short { display: none; }
+
+@media (max-width: 760px) {
+  .prep__grid { grid-template-columns: minmax(0, 1fr); }
+  /* One row of three equal buttons, with shorter labels. */
+  .prep__actions { width: 100%; flex-wrap: nowrap; }
+  .prep__action { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 8px; font-size: 12px; white-space: nowrap; }
+  .prep__long { display: none; }
+  .prep__short { display: inline; }
+  .past__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .past__date { grid-column: 1 / -1; font-size: 12px; }
+}
+
 .one-booking-note {
   margin: 4px 0 0;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.my-appointment-card--rescheduling {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
-}
-
-.my-appointment-card__flag {
-  margin: 0 0 10px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--primary);
-}
-
 .drive-card__note {
-  margin: -4px 0 0;
-  font-size: 12px;
+  display: block;
+  margin: 2px 0 0;
+  font-size: var(--rb-fs-caption);
   font-weight: 600;
   color: #B45309;
 }
@@ -2178,7 +2704,7 @@ function goDashboard() {
 }
 
 .modal-note {
-  font-size: 11.5px;
+  font-size: var(--rb-fs-caption);
   color: var(--text-secondary);
   text-align: center;
   margin: 4px 0 0;
@@ -2221,14 +2747,6 @@ function goDashboard() {
 }
 
 @media (max-width: 900px) {
-  .center-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .type-grid {
-    grid-template-columns: 1fr;
-  }
-
   .slots-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2240,6 +2758,472 @@ function goDashboard() {
   }
 }
 
+/* ============ Booking layout: steps + ticket ============ */
+.booking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.booking-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Type: two options in one segmented card */
+.type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.type-switch__opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.type-switch__opt:hover:not(.type-switch__opt--active) { background: #f8fafc; }
+
+.type-switch__opt--active {
+  background: rgba(var(--rb-primary-rgb), 0.07);
+  border-color: rgba(var(--rb-primary-rgb), 0.45);
+}
+
+.type-switch__opt:focus-visible,
+.bstep__head:focus-visible,
+.choice:focus-visible,
+.slot-btn:focus-visible {
+  outline: 2px solid var(--rb-primary);
+  outline-offset: 2px;
+}
+
+.type-switch__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.type-switch__opt--active .type-switch__icon {
+  background: var(--rb-primary);
+  color: #fff;
+}
+
+.type-switch__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.type-switch__title { font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); }
+.type-switch__desc { font-size: var(--rb-fs-caption); color: var(--text-secondary); }
+
+/* Step cards: one open at a time, the rest show what was picked */
+.bstep {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.bstep--open {
+  border-color: rgba(var(--rb-primary-rgb), 0.3);
+  box-shadow: 0 18px 40px -28px rgba(15, 23, 42, 0.35);
+}
+
+.bstep__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bstep--open .bstep__head { cursor: default; }
+.bstep__head:disabled { cursor: not-allowed; }
+
+.bstep__num {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef2f6;
+  color: var(--text-secondary);
+  font-size: var(--rb-fs-caption);
+  font-weight: 800;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.bstep--open .bstep__num,
+.bstep--done .bstep__num {
+  background: var(--rb-primary);
+  color: #fff;
+}
+
+.bstep__titles { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+
+.bstep__title {
+  font-family: var(--rb-font-sans);
+  font-size: var(--rb-fs-section);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bstep--locked .bstep__title { color: var(--text-secondary); }
+
+.bstep__summary {
+  overflow: hidden;
+  font-size: var(--rb-fs-small);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bstep__change {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: var(--rb-fs-small);
+  font-weight: 600;
+  color: var(--rb-primary-text);
+  transition: background-color 0.15s ease;
+}
+
+.bstep__head:hover .bstep__change { background: rgba(var(--rb-primary-rgb), 0.08); }
+
+.bstep__body { padding: 2px 20px 20px; }
+
+/* Center and drive choices */
+.choice-list { display: flex; flex-direction: column; gap: 10px; }
+.list-skeleton { display: grid; gap: 10px; }
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #e6eaf0;
+  border-radius: 16px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.choice:hover:not(:disabled):not(.choice--active) { border-color: rgba(var(--rb-primary-rgb), 0.35); background: #fafcfe; }
+
+.choice--active {
+  border-color: var(--rb-primary);
+  background: rgba(var(--rb-primary-rgb), 0.06);
+}
+
+.choice:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.choice__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+
+.choice__body { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; }
+.choice__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.choice__name { font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); line-height: 1.35; }
+
+.choice__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--rb-fs-caption);
+  color: var(--text-secondary);
+}
+
+.choice__meta > span { display: inline-flex; align-items: center; gap: 5px; }
+
+.choice--drive { align-items: flex-start; }
+.choice--drive .progress-track { display: block; margin-top: 4px; }
+.choice--drive .progress-fill { display: block; }
+
+.choice__foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--rb-fs-caption);
+  color: var(--text-secondary);
+}
+
+/* Calendar-page tile for a drive's date */
+.choice__date {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 50px;
+  padding: 6px 0 7px;
+  border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1);
+  color: var(--rb-primary-text);
+}
+
+.choice__date-month { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.choice__date-day { font-size: 20px; font-weight: 800; line-height: 1.1; }
+
+/* Date row */
+.date-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.date-head .form-label { margin: 0; }
+
+.drive-state--flat {
+  border-style: dashed;
+  background: transparent;
+}
+
+/* ── The ticket ── */
+.ticket {
+  position: sticky;
+  top: 88px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 24px 48px -32px rgba(15, 23, 42, 0.45);
+}
+
+.ticket__head {
+  padding: 18px 20px 16px;
+  border-radius: 21px 21px 0 0;
+  background: linear-gradient(135deg, var(--rb-grad-from, #E3F2FD), var(--rb-grad-to, #BBDEFB));
+  color: #0F172A;
+}
+
+.ticket__eyebrow {
+  margin: 0;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.ticket__type {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-family: var(--rb-font-sans);
+  font-size: var(--rb-fs-section);
+  font-weight: 700;
+}
+
+.ticket__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 18px 20px;
+}
+
+.ticket__row dt,
+.ticket__row--pair dt {
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ticket__row dd {
+  margin: 0;
+  font-size: var(--rb-fs-body);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.ticket__row--pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.ticket__sub {
+  display: block;
+  font-size: var(--rb-fs-caption);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ticket__row dd.ticket__empty { font-weight: 500; color: #94A3B8; }
+
+/* Perforation with two notches cut out of the card's sides */
+.ticket__tear {
+  position: relative;
+  margin: 0 20px;
+  border-top: 2px dashed var(--border);
+}
+
+.ticket__tear::before,
+.ticket__tear::after {
+  content: '';
+  position: absolute;
+  top: -11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--rb-page-bg, #F5F7FA);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.ticket__tear::before { left: -31px; clip-path: inset(0 0 0 50%); }
+.ticket__tear::after { right: -31px; clip-path: inset(0 50% 0 0); }
+
+.ticket__tips { padding: 16px 20px 6px; }
+
+.ticket__tips-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ticket__tips ul { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+
+.ticket__tips li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: var(--rb-fs-small);
+  line-height: 1.4;
+  color: #475569;
+}
+
+.ticket__tips li :deep(svg) { flex: none; margin-top: 2px; color: var(--rb-primary-text); }
+
+.ticket__foot { padding: 14px 20px 20px; }
+
+.ticket__hint {
+  margin: 0 0 10px;
+  font-size: var(--rb-fs-small);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.ticket__hint-text {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ticket__hint-text--short { display: none; }
+@media (max-width: 420px) {
+  .ticket__hint-text--full { display: none; }
+  .ticket__hint-text--short { display: block; }
+}
+
+.ticket__btn {
+  width: 100%;
+  justify-content: center;
+  border-radius: 999px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bstep, .bstep__num, .choice, .type-switch__opt, .type-switch__icon { transition: none; }
+}
+
+/* Below 1100px the ticket turns into a bar that sticks to the bottom. */
+@media (max-width: 1100px) {
+  /* minmax(0, ...) so the one-line drive name in the bar can't widen the page. */
+  .booking-layout { grid-template-columns: minmax(0, 1fr); }
+
+  .ticket {
+    top: auto;
+    bottom: 16px;
+    z-index: 20;
+    flex-direction: row;
+    border-color: rgba(255, 255, 255, 0.8);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+    box-shadow: 0 16px 36px -18px rgba(15, 23, 42, 0.4);
+  }
+
+  .ticket__head, .ticket__rows, .ticket__tear, .ticket__tips { display: none; }
+
+  .ticket__foot {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 8px 8px 8px 20px;
+  }
+
+  .ticket__hint { flex: 1; min-width: 0; margin: 0; }
+  .ticket__btn { width: auto; flex: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) and (max-width: 1100px) {
+  .ticket { background: rgba(255, 255, 255, 0.97); }
+}
+
+@media (max-width: 560px) {
+  .type-switch { grid-template-columns: 1fr; }
+  .bstep__head { padding: 14px 16px; }
+  .bstep__body { padding: 2px 16px 16px; }
+  .date-chips { margin: 0 -16px; padding: 2px 16px 6px; scroll-padding-inline: 16px; }
+  .ticket { bottom: 12px; }
+  .ticket__foot { padding-left: 16px; }
+  .choice { gap: 12px; padding: 12px; }
+  /* Badge goes under the name; side by side it spills out of the card. */
+  .choice__top { flex-direction: column; gap: 4px; }
+  .choice__date { width: 44px; }
+  .choice__foot { flex-wrap: wrap; gap: 2px 10px; }
+  .ticket__hint { font-size: var(--rb-fs-caption); }
+}
+
 /* ============ Dark mode ============ */
 /*
  * Tanan naka-anchor sa .appointment-page. `:global(…)` mogawas sa scope
@@ -2249,21 +3233,19 @@ function goDashboard() {
  * .appointment-page (walay Teleport), so ok ra ang anchor.
  */
 :global(.dark .appointment-page) {
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --border: #334155;
-  background: #0F172A;
+  --text-primary: var(--ink-text, #F1F5F9);
+  --text-secondary: var(--ink-text-2, #94A3B8);
+  --border: var(--ink-border, #334155);
+  background: var(--ink-page, #0F172A);
 }
 
-:global(.dark .appointment-page .type-card),
-:global(.dark .appointment-page .center-card),
 :global(.dark .appointment-page .drive-card),
 :global(.dark .appointment-page .drive-state),
 :global(.dark .appointment-page .panel),
 :global(.dark .appointment-page .slot-btn),
 :global(.dark .appointment-page .modal-card) {
-  background: #1E293B;
-  border-color: #334155;
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
 }
 
 :global(.dark .appointment-page .confirm-error) {
@@ -2273,102 +3255,85 @@ function goDashboard() {
 }
 :global(.dark .appointment-page .confirm-error__icon) { color: #F97066; }
 :global(.dark .appointment-page .summary-card) {
-  background: #172033;
-  border-color: #334155;
+  background: var(--ink-inset, #172033);
+  border-color: var(--ink-border, #334155);
 }
-:global(.dark .appointment-page .summary-item) { border-bottom-color: #334155; }
-:global(.dark .appointment-page .summary-close:hover:not(:disabled)) { background: #263449; }
+:global(.dark .appointment-page .summary-item) { border-bottom-color: var(--ink-border, #334155); }
+:global(.dark .appointment-page .summary-close:hover:not(:disabled)) { background: var(--ink-hover, #263449); }
 
-:global(.dark .appointment-page .type-card--active),
-:global(.dark .appointment-page .center-card--active),
 :global(.dark .appointment-page .drive-card--active),
 :global(.dark .appointment-page .slot-btn--active) {
-  background: rgba(66,165,245,0.14);
+  background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent);
 }
 
-:global(.dark .appointment-page .type-card__icon) { background: rgba(66,165,245,0.16); }
-:global(.dark .appointment-page .type-card--active .type-card__icon) { background: var(--primary); }
 
-:global(.dark .appointment-page .step-label__num) { background: rgba(66,165,245,0.16); }
 
 
 :global(.dark .appointment-page .form-input) {
-  background: #0F172A;
-  border-color: #334155;
-  color: #F1F5F9;
+  background: var(--ink-page, #0F172A);
+  border-color: var(--ink-border, #334155);
+  color: var(--ink-text, #F1F5F9);
 }
 
-:global(.dark .appointment-page .slot-btn--full) { background: #263449; }
-:global(.dark .appointment-page .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: #263449; border-color: #3f5878; }
+:global(.dark .appointment-page .slot-btn--full) { background: var(--ink-hover, #263449); }
+:global(.dark .appointment-page .slot-btn:hover:not(:disabled):not(.slot-btn--active)) { background: var(--ink-hover, #263449); border-color: var(--ink-hover-border, #3F5878); }
 
 :global(.dark .appointment-page .badge--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .appointment-page .badge--info) { background: rgba(66,165,245,0.16); color: #90CAF9; }
-:global(.dark .appointment-page .badge--full) { background: #263449; }
+:global(.dark .appointment-page .badge--info) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); color: var(--rb-primary-text); }
+:global(.dark .appointment-page .badge--full) { background: var(--ink-hover, #263449); }
 
 :global(.dark .appointment-page .reschedule-banner) {
-  background: rgba(66, 165, 245, 0.10);
-  border-color: rgba(66, 165, 245, 0.24);
+  background: color-mix(in srgb, var(--rb-primary-text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rb-primary-text) 24%, transparent);
 }
 
-:global(.dark .appointment-page .reschedule-banner__text) { color: #CBD5E1; }
+:global(.dark .appointment-page .reschedule-banner__text) { color: var(--ink-text-3, #CBD5E1); }
 
-:global(.dark .appointment-page .my-appointment-card__cancel:hover:not(:disabled)) {
-  background: rgba(239, 83, 80, 0.16);
-}
 
-:global(.dark .appointment-page .progress-track) { background: #334155; }
-:global(.dark .appointment-page .progress-fill--full) { background: #475569; }
+:global(.dark .appointment-page .progress-track) { background: var(--ink-border, #334155); }
+:global(.dark .appointment-page .progress-fill--full) { background: var(--ink-border-hover, #475569); }
 
 :global(.dark .appointment-page .btn-outline) {
-  background: #263449;
-  color: #E2E8F0;
+  background: var(--ink-hover, #263449);
+  color: var(--ink-text-4, #E2E8F0);
 }
-:global(.dark .appointment-page .btn-outline:hover) { background: #334155; }
+:global(.dark .appointment-page .btn-outline:hover) { background: var(--ink-border, #334155); }
 
-:global(.dark .appointment-page .summary-row) { border-color: #263449; }
+:global(.dark .appointment-page .summary-row) { border-color: var(--ink-hover, #263449); }
 
 /* background-image, not the `background` shorthand: the shorthand resets
    background-size to `auto`, which collapses the 400%-wide gradient to the
    element width and leaves the shimmer keyframes with zero travel. */
 :global(.dark .appointment-page .skeleton) {
-  background-image: linear-gradient(90deg, #1E293B 25%, #263449 37%, #1E293B 63%);
+  background-image: linear-gradient(90deg, var(--ink-surface, #1E293B) 25%, var(--ink-hover, #263449) 37%, var(--ink-surface, #1E293B) 63%);
 }
 
-:global(.dark .appointment-page .booking-bar) {
-  background: #1E293B;
-  border-color: #334155;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
 :global(.dark .appointment-page .date-chip) {
-  background: #1E293B;
-  border-color: #334155;
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
 }
-:global(.dark .appointment-page .date-chip:hover:not(.date-chip--active)) { border-color: #3f5878; }
+:global(.dark .appointment-page .date-chip:hover:not(.date-chip--active)) { border-color: var(--ink-hover-border, #3F5878); }
 :global(.dark .appointment-page .date-chip--active) {
-  background: rgba(66, 165, 245, 0.14);
-  border-color: #64B5F6;
+  background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent);
+  border-color: var(--rb-primary-text);
 }
 :global(.dark .appointment-page .date-chip--active .date-chip__dow),
 :global(.dark .appointment-page .date-chip--active .date-chip__month),
-:global(.dark .appointment-page .date-chip--active .date-chip__day) { color: #90CAF9; }
+:global(.dark .appointment-page .date-chip--active .date-chip__day) { color: var(--rb-primary-text); }
 :global(.dark .appointment-page .slot-btn--full) { background: transparent; }
 :global(.dark .appointment-page .eligible-banner) {
-  background: rgba(66, 165, 245, 0.10);
-  border-color: rgba(66, 165, 245, 0.24);
+  background: color-mix(in srgb, var(--rb-primary-text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rb-primary-text) 24%, transparent);
 }
 :global(.dark .appointment-page .eligible-banner__icon),
-:global(.dark .appointment-page .my-appointment-card__flag) { color: #64B5F6; }
-:global(.dark .appointment-page .eligible-banner__text) { color: #CBD5E1; }
-:global(.dark .appointment-page .my-appointment-card--rescheduling) {
-  border-color: #64B5F6;
-  box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.18);
-}
+:global(.dark .appointment-page .appt-ticket__flag) { color: var(--rb-primary-text); }
+:global(.dark .appointment-page .eligible-banner__text) { color: var(--ink-text-3, #CBD5E1); }
 :global(.dark .appointment-page .drive-card__note),
 :global(.dark .appointment-page .summary-row .summary-value--warning) { color: #FFB74D; }
 :global(.dark .appointment-page .screening-notice--info) {
-  background: rgba(66, 165, 245, 0.10);
-  border-color: rgba(66, 165, 245, 0.24);
-  color: #90CAF9;
+  background: color-mix(in srgb, var(--rb-primary-text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rb-primary-text) 24%, transparent);
+  color: var(--rb-primary-text);
 }
 :global(.dark .appointment-page .screening-notice--warn) {
   background: rgba(245, 158, 11, 0.10);
@@ -2379,7 +3344,7 @@ function goDashboard() {
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .slot-btn:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
+  outline: 2px solid var(--rb-primary);
   outline-offset: 2px;
 }
 
@@ -2394,7 +3359,7 @@ function goDashboard() {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid transparent;
-  font-size: 12.5px;
+  font-size: var(--rb-fs-small);
   line-height: 1.5;
 }
 
@@ -2419,4 +3384,52 @@ function goDashboard() {
   text-decoration: underline;
 }
 
+
+/* Booking steps + ticket, dark */
+:global(.dark .appointment-page .type-switch),
+:global(.dark .appointment-page .bstep),
+:global(.dark .appointment-page .ticket) {
+  background: var(--ink-surface, #1E293B);
+  border-color: var(--ink-border, #334155);
+}
+:global(.dark .appointment-page .type-switch__opt:hover:not(.type-switch__opt--active)) { background: var(--ink-hover, #263449); }
+:global(.dark .appointment-page .type-switch__opt--active),
+:global(.dark .appointment-page .choice--active) {
+  background: color-mix(in srgb, var(--rb-primary-text) 12%, transparent);
+  border-color: var(--rb-primary-text);
+}
+:global(.dark .appointment-page .type-switch__icon),
+:global(.dark .appointment-page .choice__icon),
+:global(.dark .appointment-page .choice__date) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .appointment-page .type-switch__opt--active .type-switch__icon) { background: var(--rb-primary); color: #fff; }
+:global(.dark .appointment-page .bstep__num) { background: var(--ink-hover, #263449); }
+:global(.dark .appointment-page .bstep--open .bstep__num),
+:global(.dark .appointment-page .bstep--done .bstep__num) { background: var(--rb-primary); }
+:global(.dark .appointment-page .choice) { border-color: var(--ink-border, #334155); }
+:global(.dark .appointment-page .choice:hover:not(:disabled):not(.choice--active)) { background: var(--ink-hover, #263449); border-color: var(--ink-hover-border, #3F5878); }
+:global(.dark .appointment-page .ticket__head) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rb-primary) 45%, var(--ink-surface, #1E293B)), color-mix(in srgb, var(--rb-primary) 18%, var(--ink-surface, #1E293B)));
+  color: var(--ink-text, #F1F5F9);
+}
+:global(.dark .appointment-page .ticket__tear::before),
+:global(.dark .appointment-page .ticket__tear::after) { background: var(--ink-page, #0F172A); }
+:global(.dark .appointment-page .ticket__tips li) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .appointment-page .ticket__row dd.ticket__empty) { color: var(--ink-muted, #64748B); }
+@media (max-width: 1100px) {
+  :global(.dark .appointment-page .ticket) {
+    background: rgba(var(--ink-surface-rgb, 30, 41, 59), 0.8);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Upcoming appointment ticket, dark */
+:global(.dark .appointment-page .appt-ticket) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+:global(.dark .appointment-page .appt-ticket__stub) { background: color-mix(in srgb, var(--rb-primary-text) 14%, transparent); }
+:global(.dark .appointment-page .appt-ticket__time) { background: rgba(var(--ink-page-rgb, 15, 23, 42), 0.5); }
+:global(.dark .appointment-page .appt-ticket--rescheduling) {
+  border-color: var(--rb-primary-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rb-primary-text) 18%, transparent);
+}
+:global(.dark .appointment-page .appt-ticket__cancel) { color: #EF9A9A; }
+:global(.dark .appointment-page .appt-ticket__cancel:hover:not(:disabled)) { background: rgba(239, 83, 80, 0.16); }
 </style>

@@ -1,5 +1,7 @@
+import type { MaybeRefOrGetter } from 'vue'
 import { authService } from '~/api/auth/AuthService'
 import type { AppUser } from '~/types/user'
+import { portalHomeFor } from '~/utils/authRoutes'
 
 /**
  * One sign-in flow for all four portals.
@@ -21,16 +23,20 @@ import type { AppUser } from '~/types/user'
  * Portal-specific behaviour stays in PORTALS. Everything else is shared.
  */
 
-/** Wire aliases the API accepts. Normalised server-side by `RoleName::normalize()`. */
-export type PortalKey = 'donor' | 'blood-center' | 'hospital' | 'admin'
+/**
+ * Wire aliases the API accepts. Normalised server-side by `RoleName::normalize()`.
+ *
+ * `user` is the one sign-in screen (project owner, 2026-10-24): it names no
+ * role, and the server admits a donor, blood-center staff or a hospital blood
+ * bank by the roles on the account (AuthService::guardUnifiedSignIn).
+ */
+export type PortalKey = 'user' | 'donor' | 'blood-center' | 'hospital' | 'admin'
 
 interface PortalConfig {
-  /** Sent as `role`. The server checks it against the roles the user holds. */
-  role: string
+  /** Sent as `role`. The server checks it against the roles the user holds. None for the one sign-in screen. */
+  role: string | null
   title: string
   forgotPasswordPath: string
-  /** Blood centres and hospitals are asked for their licence at sign-in. */
-  requiresLicense?: boolean
   /**
    * Where to land when there is no `?redirect`. Async so a portal can inspect
    * the login response or load the profile first.
@@ -39,6 +45,23 @@ interface PortalConfig {
 }
 
 const PORTALS: Record<PortalKey, PortalConfig> = {
+  'user': {
+    role: null,
+    title: 'Sign In · RedAgos',
+    // A reset is by address, whatever the portal: any forgot-password page will do.
+    forgotPasswordPath: '/auth/donor/forgot-password',
+    resolveHome: async (response) => {
+      // Each to their own portal, by the roles the account holds. A blood
+      // centre's landing page depends on the department, so its profile is
+      // loaded first.
+      const signedIn = response?.user ?? response?.data?.user
+      if (signedIn?.roles?.includes('blood_center')) {
+        const { ensureUser } = useUser()
+        return departmentHome(await ensureUser())
+      }
+      return portalHomeFor(signedIn)
+    },
+  },
   'donor': {
     role: 'donor',
     title: 'Sign In · RedAgos',
@@ -49,7 +72,6 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     role: 'blood-center',
     title: 'Blood Center Sign In · RedAgos',
     forgotPasswordPath: '/auth/blood-center/forgot-password',
-    requiresLicense: true,
     resolveHome: async () => {
       // No status branch here any more. A centre is created active by a Super
       // Admin, and the handful of legacy accounts whose facility never was are
@@ -68,7 +90,6 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     role: 'hospital',
     title: 'Hospital Sign In · RedAgos',
     forgotPasswordPath: '/auth/hospital/forgot-password',
-    requiresLicense: true,
     resolveHome: () => '/hospital/dashboard',
   },
   'admin': {
@@ -94,25 +115,24 @@ function extractToken(response: any): string | null {
     ?? null
 }
 
-export function useAuthLogin(portalKey: PortalKey) {
-  const portal = PORTALS[portalKey]
+export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
+  // Follows the key, so one screen can switch between User and Admin.
+  const config = computed(() => PORTALS[toValue(portalKey)])
   const route = useRoute()
 
-  useHead({ title: portal.title })
+  useHead({ title: () => config.value.title })
 
   const email = ref('')
   const password = ref('')
-  const licenseNumber = ref('')
   const showPassword = ref(false)
   const loading = ref(false)
   const errorMessage = ref('')
 
   // Drives the floating-label state in the templates.
-  const typed = reactive({ email: false, password: false, licenseNumber: false })
+  const typed = reactive({ email: false, password: false })
 
   watch(email, (v) => { typed.email = v.trim().length > 0 })
   watch(password, (v) => { typed.password = v.trim().length > 0 })
-  watch(licenseNumber, (v) => { typed.licenseNumber = v.trim().length > 0 })
 
   // Sign-in is refused until the address is verified, so offer the resend
   // rather than leaving the user with nothing to do. Previously donor and
@@ -149,7 +169,16 @@ export function useAuthLogin(portalKey: PortalKey) {
   })
 
   function goToForgotPassword() {
-    return navigateTo(portal.forgotPasswordPath)
+    return navigateTo(config.value.forgotPasswordPath)
+  }
+
+  /** Clears a refusal, e.g. when the screen switches between User and Admin. */
+  function clearError() {
+    errorMessage.value = ''
+    needsVerification.value = false
+    resendMessage.value = ''
+    resendFailed.value = false
+    resendSent.value = false
   }
 
   async function resendVerification() {
@@ -203,16 +232,26 @@ export function useAuthLogin(portalKey: PortalKey) {
     resendSent.value = false
 
     try {
+      // `login`, not `email`: the server matches an email address, a donor
+      // code (from the blood center desk's sign-in) or a username.
+      const portal = config.value
       const response = await authService.login({
-        email: email.value,
+        login: email.value,
         password: password.value,
-        role: portal.role,
-        ...(portal.requiresLicense ? { licenseNumber: licenseNumber.value } : {}),
+        ...(portal.role ? { role: portal.role } : {}),
       } as any)
 
       const token = extractToken(response)
       if (token) {
         localStorage.setItem('_token', token)
+      }
+
+      // The desk's temporary password: nothing opens until the donor sets
+      // their own, so `?redirect` waits too.
+      const signedIn = response?.user ?? response?.data?.user
+      if (signedIn?.temporary_sign_in) {
+        await navigateTo('/auth/set-password')
+        return
       }
 
       await navigateTo(safeRedirect() ?? await portal.resolveHome(response))
@@ -231,7 +270,6 @@ export function useAuthLogin(portalKey: PortalKey) {
   return {
     email,
     password,
-    licenseNumber,
     showPassword,
     loading,
     errorMessage,
@@ -246,6 +284,6 @@ export function useAuthLogin(portalKey: PortalKey) {
     login,
     resendVerification,
     goToForgotPassword,
-    requiresLicense: portal.requiresLicense ?? false,
+    clearError,
   }
 }

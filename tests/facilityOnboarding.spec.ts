@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-import { PUBLIC_ROLES, FACILITY_ROLE_IDS, destinationFor } from '~/utils/publicRoles'
+import { PUBLIC_ROLES, FACILITY_ROLE_IDS, NON_PUBLIC_ROLE_IDS, destinationFor } from '~/utils/publicRoles'
 import { portalRoleFor, portalHomeFor, loginRouteFor } from '~/utils/authRoutes'
 
 /**
@@ -35,8 +35,18 @@ function source(relative: string): string {
 vi.stubGlobal('departmentHome', () => '/blood-center/dashboard')
 
 describe('public role selection', () => {
-  it('offers only donor and administrator', () => {
-    expect(PUBLIC_ROLES.map((role) => role.id)).toEqual(['donor', 'admin'])
+  it('offers only donor sign-up', () => {
+    expect(PUBLIC_ROLES.map((role) => role.id)).toEqual(['donor'])
+  })
+
+  it('never offers administrator as a sign-up choice', () => {
+    const offered = PUBLIC_ROLES.map((role) => role.id) as string[]
+
+    // Administrator accounts are created by another administrator; the old
+    // card only ever led to sign-in.
+    for (const role of NON_PUBLIC_ROLE_IDS) {
+      expect(offered, `${role} is a public sign-up choice again`).not.toContain(role)
+    }
   })
 
   it('offers no facility role, whatever it is called', () => {
@@ -48,11 +58,8 @@ describe('public role selection', () => {
     }
   })
 
-  it('sends donors to registration and administrators straight to sign-in', () => {
+  it('sends donors to registration', () => {
     expect(destinationFor('donor')).toBe('/register/donor')
-    // Administrators have never self-registered; their accounts are created by
-    // another administrator.
-    expect(destinationFor('admin')).toBe('/auth/admin/login')
   })
 
   /**

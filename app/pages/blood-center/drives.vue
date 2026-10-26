@@ -14,46 +14,21 @@
 
     <div v-else class="drives-inner">
       <!-- Header -->
-      <header class="header-row">
-        <div>
-          <h1 class="page-title">Donation Drives</h1>
-          <p class="page-subtitle">{{ headerSummary }}</p>
-        </div>
-        <button type="button" class="btn-primary" @click="openCreateModal">
-          <AssetIcon name="plus" :size="15" />
-          Create drive
-        </button>
-      </header>
+      <PageHeader title="Donation Drives" :subtitle="headerSummary">
+        <template #actions>
+          <button type="button" class="ui-btn ui-btn--primary" @click="openCreateModal">
+            <AssetIcon name="plus" :size="15" />
+            Create drive
+          </button>
+        </template>
+      </PageHeader>
 
-      <!-- KPI cards, as on Inventory -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Upcoming Drives</p>
-            <span class="stat-card__badge stat-card__badge--primary"><AssetIcon name="calendar" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ upcomingDrivesCount }}</p>
-          <span class="stat-chip">{{ nextDriveLabel }}</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Registered Donors</p>
-            <span class="stat-card__badge stat-card__badge--purple"><AssetIcon name="users" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ totalRegistered }}</p>
-          <span class="stat-chip">Across upcoming drives</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card__top">
-            <p class="stat-card__label">Units Collected</p>
-            <span class="stat-card__badge stat-card__badge--success"><AssetIcon name="droplets" :size="14" /></span>
-          </div>
-          <p class="stat-card__value">{{ unitsCollectedMonth }}</p>
-          <span class="stat-chip">At drives this month</span>
-        </div>
-      </div>
+      <!-- Figures, as on Inventory -->
+      <StatStrip :columns="3">
+        <StatItem label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
+        <StatItem label="Registered donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
+        <StatItem label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
+      </StatStrip>
 
       <!-- Drive list -->
       <section class="panel">
@@ -84,14 +59,14 @@
           <span class="empty-state__icon empty-state__icon--error"><AssetIcon name="circle-alert" :size="20" /></span>
           <p class="empty-state__title">Could not load the drives</p>
           <p class="empty-state__text">{{ loadError }}</p>
-          <button type="button" class="btn-outline" @click="loadDrives">Try again</button>
+          <button type="button" class="ui-btn" @click="loadDrives">Try again</button>
         </div>
 
         <div v-else-if="!drives.length" class="empty-state">
           <span class="empty-state__icon"><AssetIcon name="truck" :size="20" /></span>
           <p class="empty-state__title">No drives yet</p>
           <p class="empty-state__text">Schedule a drive and donors can register for it in the donor portal.</p>
-          <button type="button" class="btn-primary" @click="openCreateModal">
+          <button type="button" class="ui-btn ui-btn--primary" @click="openCreateModal">
             <AssetIcon name="plus" :size="15" />
             Create drive
           </button>
@@ -166,12 +141,21 @@
             <!-- Staff manage their own drives. Both open their dialog; saving waits on the server. -->
             <div class="drive__actions">
               <template v-if="drive.status !== 'Completed'">
-                <button type="button" class="btn-small" @click="openEditModal(drive)">
+                <button type="button" class="ui-btn ui-btn--sm" @click="openEditModal(drive)">
                   <AssetIcon name="pencil" :size="13" />
                   Edit
                 </button>
-                <button type="button" class="btn-ghost-danger" @click="openCancelDialog(drive)">Cancel</button>
+                <button type="button" class="ui-btn ui-btn--sm ui-btn--ghost btn-ghost-danger" @click="openCancelDialog(drive)">Cancel</button>
               </template>
+              <!-- A drive held on paper: type its records in once they are back. -->
+              <NuxtLink
+                v-if="canRecordPaper && (drive.status === 'Completed' || drive.status === 'Open')"
+                :to="`/blood-center/paper-records?drive=${drive.id}`"
+                class="btn-small"
+              >
+                <AssetIcon name="file-text" :size="13" />
+                Enter paper records
+              </NuxtLink>
             </div>
           </li>
         </ul>
@@ -216,7 +200,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="drive-date">Date</label>
-                <input id="drive-date" v-model="driveForm.event_date" type="date" class="form-input" :min="todayIso" required>
+                <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="drive-capacity">Max donors</label>
@@ -256,10 +240,10 @@
             </div>
 
             <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeCreateModal">Discard</button>
+              <button type="button" class="ui-btn" @click="closeCreateModal">Discard</button>
               <button
                 type="submit"
-                class="btn-primary"
+                class="ui-btn ui-btn--primary"
                 :disabled="submitting || Boolean(editingDrive)"
                 :title="editingDrive ? 'Not connected yet: the server has no route for this.' : undefined"
               >
@@ -316,8 +300,8 @@
             </p>
 
             <div class="modal-actions">
-              <button type="button" class="btn-outline" @click="closeCancelDialog">Keep drive</button>
-              <button type="button" class="btn-danger" disabled title="Not connected yet: the server has no route for this.">
+              <button type="button" class="ui-btn" @click="closeCancelDialog">Keep drive</button>
+              <button type="button" class="ui-btn ui-btn--danger" disabled title="Not connected yet: the server has no route for this.">
                 Cancel drive
               </button>
             </div>
@@ -333,12 +317,19 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import StatStrip from '~/components/ui/StatStrip.vue'
+import StatItem from '~/components/ui/StatItem.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'drives.manage',
 })
+
+const { can } = useUser()
+const canRecordPaper = computed(() => can('donations.record_paper'))
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -424,6 +415,11 @@ function closeCancelDialog() {
 async function handleCreateDrive() {
   // Editing has no server route yet; the button is disabled, this is the backstop.
   if (editingDrive.value) return
+
+  if (!driveForm.event_date) {
+    formError.value = 'Choose the date of the drive.'
+    return
+  }
 
   submitting.value = true
   formError.value = ''
@@ -662,6 +658,7 @@ onMounted(loadDrives)
 }
 
 .btn-small:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
+a.btn-small { text-decoration: none; }
 
 .btn-danger {
   display: inline-flex;

@@ -48,6 +48,14 @@ class DonorService extends BaseService {
         return await this.request(`${this.resource}/eligibility`, 'GET');
     }
 
+    /**
+     * Whether a deferral stands on the donor's own record:
+     * { deferred, temporary, until, since }. Never the reason.
+     */
+    async deferralStatus(): Promise<any> {
+        return await this.request(`${this.resource}/deferral`, 'GET');
+    }
+
     async submitEligibilityScreening(payload: object): Promise<any> {
         return await this.request(`${this.resource}/eligibility/screening`, 'POST', payload);
     }

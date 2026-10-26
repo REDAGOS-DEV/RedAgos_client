@@ -9,9 +9,10 @@ import type { AppUser, RoleName } from '~/types/user'
  * user bounced to the wrong portal's login.
  */
 export const LOGIN_ROUTES: Record<string, string> = {
-  '/donor': '/auth/donor/login',
-  '/hospital': '/auth/hospital/login',
-  '/blood-center': '/auth/blood-center/login',
+  // The one sign-in screen; the administrators' opens on Admin (2026-10-24).
+  '/donor': '/auth/login',
+  '/hospital': '/auth/login',
+  '/blood-center': '/auth/login',
   '/admin': '/auth/admin/login',
 }
 

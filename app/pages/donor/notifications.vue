@@ -1,103 +1,127 @@
-Exit code: 0
-Wall time: 5 seconds
-Output:
 <template>
     <div class="notifications-page">
         <div class="header-row">
             <div>
-                <h1 class="page-title">Stay updated!</h1>
-                <p class="page-subtitle">Stay informed with important announcements.</p>
+                <h1 class="page-title">Notifications</h1>
+                <p class="page-subtitle">Updates about your screening, bookings and donations.</p>
             </div>
-            <button
-                type="button"
-                class="btn-outline"
-                :disabled="totalUnread === 0"
-                @click="markAllAsRead"
-            >
-                Mark all as read
-            </button>
+            <div class="header-actions">
+                <button
+                    type="button"
+                    class="btn-outline"
+                    :disabled="totalUnread === 0"
+                    @click="markAllAsRead"
+                >
+                    <AssetIcon name="check-check" :size="15" />
+                    Mark all as read
+                </button>
+                <!-- What arrives here, and by email, is chosen in Settings. -->
+                <NuxtLink to="/donor/settings#notifications" class="btn-icon" aria-label="Notification settings" title="Notification settings">
+                    <AssetIcon name="settings" :size="17" />
+                </NuxtLink>
+            </div>
         </div>
 
-        <!-- Tabs -->
-        <div v-if="!loading" class="tabs-bar">
+        <!-- Filters: pills, each with its unread count -->
+        <div v-if="!loading" class="filters" role="tablist" aria-label="Filter notifications">
             <button
                 v-for="tab in tabs"
                 :key="tab.key"
                 type="button"
-                class="tab-btn"
-                :class="{ 'tab-btn--active': activeTab === tab.key }"
+                role="tab"
+                class="filter"
+                :class="{ 'filter--active': activeTab === tab.key }"
+                :aria-selected="activeTab === tab.key"
                 @click="activeTab = tab.key"
             >
                 {{ tab.label }}
-                <span v-if="tab.unread > 0" class="tab-badge" :class="`tab-badge--${tab.tone}`">{{ tab.unread }}</span>
+                <span v-if="tab.unread > 0" class="filter__count">{{ tab.unread }}</span>
             </button>
         </div>
-        <div v-else class="tabs-bar">
-            <div v-for="n in 5" :key="n" class="skeleton skeleton-tab" />
+        <div v-else class="filters">
+            <div v-for="n in 5" :key="n" class="skeleton skeleton-pill" />
         </div>
 
-        <!-- List -->
-        <div class="panel">
-            <div v-if="loading" class="notif-list">
-                <div v-for="n in 5" :key="n" class="notif-row">
-                    <span class="notif-row__dot" />
-                    <div class="skeleton skeleton-icon" />
-                    <div class="notif-row__body">
-                        <div class="skeleton skeleton-line" style="width:55%;height:13.5px" />
-                        <div class="skeleton skeleton-line" style="width:85%;height:12px;margin-top:8px" />
-                        <div class="skeleton skeleton-line" style="width:30%;height:11px;margin-top:8px" />
-                    </div>
-                    <div class="notif-row__side">
-                        <div class="skeleton skeleton-line" style="width:64px;height:18px;border-radius:999px" />
-                        <div class="skeleton skeleton-line" style="width:70px;height:12px" />
-                    </div>
+        <!-- Loading -->
+        <div v-if="loading" class="panel notif-list" aria-busy="true">
+            <div v-for="n in 4" :key="n" class="notif-row">
+                <div class="skeleton skeleton-icon" />
+                <div class="notif-row__body">
+                    <div class="skeleton skeleton-line" style="width:45%;height:14px" />
+                    <div class="skeleton skeleton-line" style="width:80%;height:12px;margin-top:8px" />
+                    <div class="skeleton skeleton-line" style="width:25%;height:11px;margin-top:8px" />
                 </div>
             </div>
+        </div>
 
-            <div v-else-if="filteredNotifications.length === 0" class="state-wrap state-wrap--empty">
-                <AssetIcon name="bell" :size="32" style="color:#e5e7eb" />
-                <p class="state-title">You're all caught up</p>
-                <p class="state-sub">
-                    {{ emptyStateMessage }}
-                </p>
-            </div>
+        <!-- Empty -->
+        <div v-else-if="filteredNotifications.length === 0" class="panel state-wrap">
+            <span class="state-icon"><AssetIcon name="bell" :size="26" /></span>
+            <p class="state-title">You're all caught up</p>
+            <p class="state-sub">{{ emptyStateMessage }}</p>
+        </div>
 
-            <div v-else class="notif-list">
-                <div
-                    v-for="notif in filteredNotifications"
-                    :key="notif.id"
-                    class="notif-row"
-                    :class="{ 'notif-row--unread': !notif.read }"
-                >
-                    <span class="notif-row__dot" :class="{ 'notif-row__dot--visible': !notif.read }" />
+        <!-- Grouped by day: Today, Yesterday, This week, Earlier -->
+        <div v-else class="day-groups">
+            <section v-for="group in groupedNotifications" :key="group.key" class="day-group"
+                :aria-labelledby="`day-${group.key}`">
+                <h2 :id="`day-${group.key}`" class="day-label">{{ group.label }}</h2>
+                <div class="panel notif-list">
+                    <article
+                        v-for="notif in group.items"
+                        :key="notif.id"
+                        class="notif-row"
+                        :class="{ 'notif-row--unread': !notif.read }"
+                    >
+                        <div class="notif-row__icon" :class="`notif-row__icon--${notif.tone}`">
+                            <AssetIcon :name="notif.icon || CATEGORY_ICONS[notif.category] || 'bell'" :size="18" />
+                        </div>
 
-                    <div class="notif-row__icon" :class="`notif-row__icon--${notif.tone}`">
-                        <AssetIcon :name="notif.icon" :size="18" />
-                    </div>
+                        <div class="notif-row__body">
+                            <p class="notif-row__title">
+                                <span v-if="!notif.read" class="notif-row__dot" aria-label="Unread" />
+                                {{ notif.title }}
+                            </p>
+                            <p class="notif-row__desc">{{ notif.desc }}</p>
+                            <p class="notif-row__meta">
+                                <span class="notif-tag" :class="`notif-tag--${notif.category}`">{{ categoryLabel(notif.category) }}</span>
+                                <span>{{ notif.meta }}</span>
+                            </p>
+                        </div>
 
-                    <div class="notif-row__body">
-                        <p class="notif-row__title">{{ notif.title }}</p>
-                        <p class="notif-row__desc">{{ notif.desc }}</p>
-                        <p class="notif-row__meta">{{ notif.meta }}</p>
-                    </div>
-
-                    <div class="notif-row__side">
-                        <span class="notif-tag" :class="`notif-tag--${notif.category}`">{{ categoryLabel(notif.category) }}</span>
-                        <NuxtLink :to="notif.actionRoute" class="notif-row__action">
-                            {{ notif.actionLabel }}
-                            <AssetIcon name="arrow-right" :size="13" />
-                        </NuxtLink>
-                        <button
-                            v-if="!notif.read"
-                            type="button"
-                            class="notif-row__mark-read"
-                            @click="markAsRead(notif)"
-                        >
-                            Mark as read
-                        </button>
-                        <span v-else class="notif-row__read-status">Read</span>
-                    </div>
+                        <div class="notif-row__side">
+                            <!-- Some notices have nowhere to go (a call-us notice): no button then. -->
+                            <NuxtLink
+                                v-if="notif.actionRoute"
+                                :to="notif.actionRoute"
+                                class="notif-row__action"
+                                @click="openNotice(notif)"
+                            >
+                                {{ notif.actionLabel || 'Open' }}
+                                <AssetIcon name="arrow-right" :size="13" />
+                            </NuxtLink>
+                            <button
+                                v-if="!notif.read"
+                                type="button"
+                                class="notif-row__mark-read"
+                                @click="markAsRead(notif)"
+                            >
+                                Mark as read
+                            </button>
+                            <span v-else class="notif-row__read-status">
+                                <AssetIcon name="check" :size="12" /> Read
+                            </span>
+                        </div>
+                    </article>
                 </div>
+            </section>
+
+            <!-- The server pages the list, 20 at a time. -->
+            <div v-if="hasMore || loadMoreError" class="load-more">
+                <p v-if="loadMoreError" class="load-more__error" role="alert">{{ loadMoreError }}</p>
+                <button type="button" class="btn-outline" :disabled="loadingMore" @click="loadMore">
+                    {{ loadingMore ? 'Loading...' : loadMoreError ? 'Try again' : 'Show older notifications' }}
+                </button>
             </div>
         </div>
     </div>
@@ -133,6 +157,18 @@ function categoryLabel(key) {
     return categoryLabels[key] ?? key
 }
 
+// When a notice names no icon of its own.
+const CATEGORY_ICONS = {
+    reminder: 'calendar-check',
+    donation: 'droplets',
+    screening: 'clipboard-list',
+    system: 'bell',
+}
+
+// The bell's badge in the layout reads the same count, so marking here
+// updates it at once.
+const unreadCount = useState('donor-unread-count', () => 0)
+
 const tabDefs = [
     { key: 'all', label: 'All', category: null },
     { key: 'reminder', label: 'Reminders', category: 'reminder' },
@@ -141,18 +177,9 @@ const tabDefs = [
     { key: 'system', label: 'System', category: 'system' },
 ]
 
-const tabToneMap = {
-    all: 'primary',
-    reminder: 'warning',
-    donation: 'success',
-    screening: 'primary',
-    system: 'neutral',
-}
-
 const tabs = computed(() =>
     tabDefs.map(tab => ({
         ...tab,
-        tone: tabToneMap[tab.key],
         unread: tab.category === null
             ? notifications.value.filter(n => !n.read).length
             : notifications.value.filter(n => n.category === tab.category && !n.read).length,
@@ -166,6 +193,38 @@ const filteredNotifications = computed(() => {
     return notifications.value.filter(n => n.category === activeTab.value)
 })
 
+// Newest first (the server's order), under Today / Yesterday / This week /
+// Earlier. A notification without a date goes under Earlier.
+function dayKey(value) {
+    const d = value ? new Date(value) : null
+    if (!d || Number.isNaN(d.getTime())) return 'earlier'
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const day = new Date(d)
+    day.setHours(0, 0, 0, 0)
+    const diff = Math.round((today - day) / 86400000)
+    if (diff <= 0) return 'today'
+    if (diff === 1) return 'yesterday'
+    if (diff < 7) return 'week'
+    return 'earlier'
+}
+
+const DAY_LABELS = { today: 'Today', yesterday: 'Yesterday', week: 'This week', earlier: 'Earlier' }
+
+const groupedNotifications = computed(() => {
+    const groups = []
+    for (const notif of filteredNotifications.value) {
+        const key = dayKey(notif.createdAt)
+        let group = groups.find(g => g.key === key)
+        if (!group) {
+            group = { key, label: DAY_LABELS[key], items: [] }
+            groups.push(group)
+        }
+        group.items.push(notif)
+    }
+    return groups
+})
+
 const emptyStateMessage = computed(() => {
     if (activeTab.value === 'all') {
         return "You'll see updates here once you complete a screening, book an appointment, or make a donation."
@@ -173,8 +232,14 @@ const emptyStateMessage = computed(() => {
     return `No ${categoryLabel(activeTab.value).toLowerCase()} notifications yet.`
 })
 
+// Following a notice's button reads it, as opening a message would.
+function openNotice(notif) {
+    if (!notif.read) markAsRead(notif)
+}
+
 async function markAsRead(notif) {
     notif.read = true
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
     try {
         // PATCH /api/donors/notifications/{uuid}
         // Walay body ni: ang server mo-mark ra as read, dili siya mo-set og
@@ -183,12 +248,15 @@ async function markAsRead(notif) {
     } catch (err) {
         console.error('Failed to mark notification as read:', err)
         notif.read = false
+        unreadCount.value += 1
     }
 }
 
 async function markAllAsRead() {
     const previouslyUnread = notifications.value.filter(n => !n.read).map(n => n.id)
     notifications.value.forEach(n => { n.read = true })
+    const before = unreadCount.value
+    unreadCount.value = 0
     try {
         // POST /api/donors/notifications/mark-all-read
         await donorService.markAllNotificationsAsRead()
@@ -198,6 +266,54 @@ async function markAllAsRead() {
         notifications.value.forEach(n => {
             if (previouslyUnread.includes(n.id)) n.read = false
         })
+        unreadCount.value = before
+    }
+}
+
+function toNotice(n) {
+    return {
+        id: n.id,
+        category: n.category,
+        title: n.title,
+        desc: n.desc,
+        meta: n.meta,
+        icon: n.icon,
+        tone: n.tone,
+        read: n.read,
+        actionLabel: n.action_label,
+        actionRoute: n.action_route,
+        createdAt: n.created_at,
+    }
+}
+
+// Paging: the first page loads with the screen, older ones on request.
+const page = ref(1)
+const lastPage = ref(1)
+const loadingMore = ref(false)
+const loadMoreError = ref('')
+const hasMore = computed(() => page.value < lastPage.value)
+
+function applyPage(data) {
+    page.value = data?.meta?.page ?? 1
+    lastPage.value = data?.meta?.last_page ?? 1
+    loadMoreError.value = ''
+}
+
+async function loadMore() {
+    if (loadingMore.value) return
+    loadingMore.value = true
+    loadMoreError.value = ''
+    try {
+        const data = await donorService.notifications({ page: page.value + 1 })
+        const seen = new Set(notifications.value.map(n => n.id))
+        notifications.value.push(...(data?.notifications ?? []).map(toNotice).filter(n => !seen.has(n.id)))
+        page.value = data?.meta?.page ?? page.value + 1
+        lastPage.value = data?.meta?.last_page ?? lastPage.value
+    } catch (err) {
+        console.error('Failed to load older notifications:', err)
+        loadMoreError.value = 'Could not load older notifications.'
+    } finally {
+        loadingMore.value = false
     }
 }
 
@@ -215,18 +331,9 @@ async function load({ silent = false } = {}) {
         //   unread_count, meta: { page, per_page, total, last_page } }
         // Paginated (20 kada page); ang unang page ra ang gipakita karon.
         const data = await donorService.notifications()
-        notifications.value = (data?.notifications ?? []).map(n => ({
-            id: n.id,
-            category: n.category,
-            title: n.title,
-            desc: n.desc,
-            meta: n.meta,
-            icon: n.icon,
-            tone: n.tone,
-            read: n.read,
-            actionLabel: n.action_label,
-            actionRoute: n.action_route,
-        }))
+        notifications.value = (data?.notifications ?? []).map(toNotice)
+        applyPage(data)
+        if (typeof data?.unread_count === 'number') unreadCount.value = data.unread_count
     } catch (err) {
         console.error('Failed to load notifications:', err)
         notifications.value = []
@@ -244,258 +351,251 @@ onActivated(() => {
 
 <style scoped>
 .notifications-page {
-    --primary: #1565c0;
-    --accent: #d32f2f;
+    --primary: var(--rb-primary);
+    --accent: #C62828;
     --success: #2e7d32;
-    --warning: #f57c00;
+    --warning: #B45309;
     --text-primary: #1f2937;
-    --text-secondary: #9ca3af;
+    --text-secondary: #64748B;
+    --border: #eef0f3;
+    /* The same column and gutters as the other donor pages. */
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px 32px 40px;
     display: flex;
     background: var(--rb-page-bg);
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
 }
 
-.header-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.page-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.page-subtitle {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
-}
-
-/* Tabs */
-.tabs-bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    border-bottom: 1px solid #e5e7eb;
-    min-height: 41px;
-}
-
-.tab-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 14px;
-    border: none;
-    background: none;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.tab-btn:hover {
-    color: var(--text-primary);
-}
-
-.tab-btn--active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-}
-
-.tab-badge {
+.header-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    color: white;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    background: white;
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.btn-icon:hover { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.05); }
+.btn-icon:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.load-more { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.load-more__error { margin: 0; font-size: var(--rb-fs-caption); color: var(--accent); }
+.page-title { font-size: var(--rb-fs-title); font-weight: 700; color: var(--text-primary); margin: 0; }
+.page-subtitle { font-size: var(--rb-fs-small); color: var(--text-secondary); margin: 2px 0 0; }
+
+/* Filter pills. Five do not fit a phone: scroll sideways inside the row. */
+.filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px;
+    min-height: 40px;
 }
 
-.tab-badge--primary { background: var(--primary); }
-.tab-badge--warning { background: var(--warning); }
-.tab-badge--success { background: var(--success); }
-.tab-badge--neutral { background: #9ca3af; }
+.filter {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: white;
+    font-size: var(--rb-fs-small);
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
 
-/* Panel + states */
+.filter:hover:not(.filter--active) { border-color: rgba(var(--rb-primary-rgb), 0.35); }
+
+.filter--active {
+    border-color: var(--rb-primary);
+    background: var(--rb-primary);
+    color: #fff;
+}
+
+.filter__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(var(--rb-primary-rgb), 0.12);
+    color: var(--rb-primary-text);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.filter--active .filter__count { background: rgba(255, 255, 255, 0.25); color: #fff; }
+
+/* Panels and empty state */
 .panel {
     background: white;
-    border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-    border: 1px solid #eef0f3;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
 }
 
 .state-wrap {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
-}
-
-.state-wrap--empty {
     flex-direction: column;
+    align-items: center;
     gap: 6px;
+    padding: 56px 20px;
     text-align: center;
 }
 
-.state-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 8px 0 0;
-}
-
-.state-sub {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    margin: 0;
-    max-width: 320px;
-    line-height: 1.5;
-}
-
-/* Notification rows */
-.notif-list {
+.state-icon {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    background: rgba(var(--rb-primary-rgb), 0.1);
+    color: var(--rb-primary-text);
 }
+
+.state-title { margin: 10px 0 0; font-size: var(--rb-fs-section); font-weight: 700; color: var(--text-primary); }
+.state-sub { max-width: 340px; margin: 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #64748B; }
+
+/* Day groups */
+.day-groups { display: flex; flex-direction: column; gap: 20px; }
+.day-group { display: flex; flex-direction: column; gap: 10px; }
+
+.day-label {
+    margin: 0;
+    font-size: var(--rb-fs-caption);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748B;
+}
+
+/* Rows */
+.notif-list { display: flex; flex-direction: column; }
 
 .notif-row {
     display: flex;
     align-items: flex-start;
     gap: 14px;
-    padding: 18px 20px;
-    border-bottom: 1px solid #f3f4f6;
+    padding: 16px 18px;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.notif-row:last-child {
-    border-bottom: none;
-}
-
-.notif-row--unread {
-    background: #fafbfe;
-}
-
-.notif-row__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    flex-shrink: 0;
-    margin-top: 7px;
-    background: transparent;
-}
-
-.notif-row__dot--visible {
-    background: var(--primary);
-}
+.notif-row:last-child { border-bottom: none; }
+.notif-row--unread { background: rgba(var(--rb-primary-rgb), 0.035); }
 
 .notif-row__icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 999px;
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
 }
 
 .notif-row__icon--warning { background: #fff4e5; color: var(--warning); }
 .notif-row__icon--success { background: #eaf6ea; color: var(--success); }
-.notif-row__icon--primary { background: #eaf3fc; color: var(--primary); }
-.notif-row__icon--danger { background: #fbeaea; color: var(--accent); }
+.notif-row__icon--primary,
+.notif-row__icon--info { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.notif-row__icon--danger { background: #fdecec; color: var(--accent); }
 
-.notif-row__body {
-    flex: 1;
-    min-width: 0;
-}
+.notif-row__body { flex: 1; min-width: 0; }
 
 .notif-row__title {
-    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: var(--rb-fs-body);
     font-weight: 700;
     color: var(--text-primary);
-    margin: 0;
 }
 
-.notif-row__desc {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 4px 0 0;
+.notif-row__dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--rb-primary);
 }
+
+.notif-row__desc { margin: 4px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #475569; }
 
 .notif-row__meta {
-    font-size: 11.5px;
-    color: #b7bec9;
-    margin: 6px 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 8px 0 0;
+    font-size: var(--rb-fs-caption);
+    color: var(--text-secondary);
 }
+
+.notif-tag { padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.notif-tag--reminder { background: #fff4e5; color: var(--warning); }
+.notif-tag--donation { background: #eaf6ea; color: var(--success); }
+.notif-tag--screening { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.notif-tag--system { background: #f1f5f9; color: #64748B; }
 
 .notif-row__side {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
     flex-shrink: 0;
-    min-width: 130px;
+    align-items: flex-end;
+    gap: 8px;
 }
-
-.notif-tag {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 999px;
-}
-
-.notif-tag--reminder { background: #fff4e5; color: var(--warning); }
-.notif-tag--donation { background: #eaf6ea; color: var(--success); }
-.notif-tag--screening { background: #eaf3fc; color: var(--primary); }
-.notif-tag--system { background: #f3f4f6; color: var(--text-secondary); }
 
 .notif-row__action {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 12.5px;
+    padding: 7px 14px;
+    border: 1px solid rgba(var(--rb-primary-rgb), 0.35);
+    border-radius: 999px;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
-    color: var(--primary);
+    color: var(--rb-primary-text);
     text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
 }
 
-.notif-row__action:hover {
-    text-decoration: underline;
-}
+.notif-row__action:hover { background: rgba(var(--rb-primary-rgb), 0.07); }
 
 .notif-row__mark-read {
+    padding: 0;
     border: none;
     background: none;
-    padding: 0;
-    font-size: 11.5px;
+    font-size: var(--rb-fs-caption);
     font-weight: 600;
-    color: var(--text-secondary);
+    color: #64748B;
     cursor: pointer;
 }
 
-.notif-row__mark-read:hover {
-    color: var(--text-primary);
-    text-decoration: underline;
-}
+.notif-row__mark-read:hover { color: var(--text-primary); text-decoration: underline; }
 
 .notif-row__read-status {
-    font-size: 11.5px;
-    color: #c7ccd4;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--rb-fs-caption);
+    color: var(--text-secondary);
 }
 
 /* Buttons */
@@ -504,26 +604,20 @@ onActivated(() => {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-size: 13px;
+    padding: 9px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: white;
+    font-size: var(--rb-fs-small);
     font-weight: 700;
     color: var(--text-primary);
-    background: #f3f4f6;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s ease;
     white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.btn-outline:hover:not(:disabled) {
-    background: #e5e7eb;
-}
-
-.btn-outline:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
+.btn-outline:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.05); }
+.btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Skeleton */
 .skeleton {
@@ -537,75 +631,72 @@ onActivated(() => {
     100% { background-position: 0 50%; }
 }
 .skeleton-line { border-radius: 4px; }
-.skeleton-icon { width: 36px; height: 36px; border-radius: 999px; flex-shrink: 0; }
-.skeleton-tab { width: 78px; height: 16px; margin: 12px 6px; border-radius: 4px; }
+.skeleton-icon { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; }
+.skeleton-pill { flex: none; width: 92px; height: 36px; border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
+    .filter, .notif-row__action, .btn-outline { transition: none; }
+}
 
 @media (max-width: 640px) {
-    .notifications-page {
-        padding: 16px 16px 32px;
-    }
-
-    .notif-row {
-        flex-wrap: wrap;
-    }
-
+    .notifications-page { padding: 16px 16px 32px; }
+    .header-row { flex-wrap: wrap; align-items: flex-start; }
+    .notif-row { flex-wrap: wrap; padding: 14px; }
     .notif-row__side {
-        align-items: flex-start;
-        min-width: 0;
-        width: 100%;
         flex-direction: row;
         flex-wrap: wrap;
-        margin-left: 50px;
+        align-items: center;
+        width: 100%;
+        margin-left: 54px;
+        gap: 12px;
     }
 }
 
 /* ============ Dark mode ============ */
 :global(.dark .notifications-page) {
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    background: #0F172A;
+    --text-primary: var(--ink-text, #F1F5F9);
+    --text-secondary: var(--ink-text-2, #94A3B8);
+    --border: var(--ink-border, #334155);
+    background: var(--ink-page, #0F172A);
 }
 
-:global(.dark .notifications-page .tabs-bar) { border-color: #334155; }
-:global(.dark .notifications-page .tab-btn:hover) { color: #F1F5F9; }
+:global(.dark .notifications-page .panel),
+:global(.dark .notifications-page .filter),
+:global(.dark .notifications-page .btn-outline),
+:global(.dark .notifications-page .btn-icon) { background: var(--ink-surface, #1E293B); border-color: var(--ink-border, #334155); }
+:global(.dark .notifications-page .btn-icon) { color: var(--ink-text-4, #E2E8F0); }
+:global(.dark .notifications-page .filter) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .notifications-page .filter--active) { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+:global(.dark .notifications-page .filter__count) { background: color-mix(in srgb, var(--rb-primary-text) 18%, transparent); }
+:global(.dark .notifications-page .btn-outline) { color: var(--ink-text-4, #E2E8F0); }
+:global(.dark .notifications-page .btn-outline:hover:not(:disabled)) { background: var(--ink-hover, #263449); }
+:global(.dark .notifications-page .notif-row) { border-color: var(--ink-hover, #263449); }
+:global(.dark .notifications-page .notif-row--unread) { background: color-mix(in srgb, var(--rb-primary-text) 6%, transparent); }
+:global(.dark .notifications-page .notif-row__desc),
+:global(.dark .notifications-page .state-sub) { color: var(--ink-text-3, #CBD5E1); }
+:global(.dark .notifications-page .notif-row__icon--warning),
+:global(.dark .notifications-page .notif-tag--reminder) { background: rgba(245, 124, 0, 0.16); color: #FFB74D; }
+:global(.dark .notifications-page .notif-row__icon--success),
+:global(.dark .notifications-page .notif-tag--donation) { background: rgba(102, 187, 106, 0.16); color: #81C784; }
+:global(.dark .notifications-page .notif-row__icon--primary),
+:global(.dark .notifications-page .notif-row__icon--info),
+:global(.dark .notifications-page .notif-tag--screening),
+:global(.dark .notifications-page .state-icon) { background: color-mix(in srgb, var(--rb-primary-text) 16%, transparent); }
+:global(.dark .notifications-page .notif-row__icon--danger) { background: rgba(239, 83, 80, 0.16); color: #EF9A9A; }
+:global(.dark .notifications-page .notif-tag--system) { background: var(--ink-hover, #263449); color: var(--ink-text-2, #94A3B8); }
+:global(.dark .notifications-page .notif-row__mark-read) { color: var(--ink-text-2, #94A3B8); }
 
-:global(.dark .notifications-page .panel) {
-    background: #1E293B;
-    border-color: #334155;
-}
-
-:global(.dark .notifications-page .notif-row) { border-color: #263449; }
-:global(.dark .notifications-page .notif-row--unread) { background: #172033; }
-
-:global(.dark .notifications-page .notif-row__icon--warning) { background: rgba(245,124,0,0.16); }
-:global(.dark .notifications-page .notif-row__icon--success) { background: rgba(102,187,106,0.16); }
-:global(.dark .notifications-page .notif-row__icon--primary) { background: rgba(66,165,245,0.16); }
-:global(.dark .notifications-page .notif-row__icon--danger) { background: rgba(239,83,80,0.16); }
-
-:global(.dark .notifications-page .notif-row__meta) { color: #64748b; }
-
-:global(.dark .notifications-page .notif-tag--reminder) { background: rgba(245,124,0,0.16); }
-:global(.dark .notifications-page .notif-tag--donation) { background: rgba(102,187,106,0.16); }
-:global(.dark .notifications-page .notif-tag--screening) { background: rgba(66,165,245,0.16); }
-:global(.dark .notifications-page .notif-tag--system) { background: #263449; color: #94a3b8; }
-
-:global(.dark .notifications-page .notif-row__read-status) { color: #475569; }
-
-:global(.dark .notifications-page .btn-outline) {
-    background: #263449;
-    color: #E2E8F0;
-}
-:global(.dark .notifications-page .btn-outline:hover:not(:disabled)) { background: #334155;
-}
-
+/* background-image, not the shorthand: keeps the 400% size for the shimmer. */
 :global(.dark .notifications-page .skeleton) {
-    background: linear-gradient(90deg, #263449 25%, #334155 37%, #263449 63%);
-    background-size: 400% 100%;
+    background-image: linear-gradient(90deg, var(--ink-hover, #263449) 25%, var(--ink-border, #334155) 37%, var(--ink-hover, #263449) 63%);
 }
 
 .btn-outline:focus-visible,
-.tab-btn:focus-visible {
-  outline: 2px solid var(--rb-primary, #1565C0);
-  outline-offset: 2px;
+.filter:focus-visible,
+.notif-row__action:focus-visible,
+.notif-row__mark-read:focus-visible {
+    outline: 2px solid var(--rb-primary);
+    outline-offset: 2px;
 }
 </style>

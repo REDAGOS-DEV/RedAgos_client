@@ -14,7 +14,11 @@
         Request a correction
       </h2>
 
-      <p class="dialog__body">
+      <p v-if="isHead" class="dialog__body">
+        The {{ label }} is already saved, so it is not changed directly. As the department head, your correction needs
+        no other approval: it is <strong>applied as soon as you send it</strong>, and kept with your reason.
+      </p>
+      <p v-else class="dialog__body">
         The {{ label }} is already saved, so it is not changed directly. Your corrected values go to
         <strong>{{ approverText }}</strong> to approve. Nothing changes until they do.
       </p>
@@ -38,7 +42,7 @@
 
       <div class="dialog__actions">
         <button type="button" class="btn btn--primary" :disabled="busy || !reason.trim()" @click="submit">
-          {{ busy ? 'Sending…' : 'Send for approval' }}
+          {{ busy ? 'Sending…' : (isHead ? 'Apply correction' : 'Send for approval') }}
         </button>
         <button type="button" class="btn" :disabled="busy" @click="$emit('close')">Cancel</button>
       </div>
@@ -53,13 +57,19 @@
  * The page builds `changes` exactly as it would build the original save, so the
  * server can validate them against the same rules. `previous` is only for the
  * before-and-after shown here; the server takes its own snapshot.
+ *
+ * A donation's records are identified by `donationId` and sent with their
+ * subject. The records Issuance and Billing keep are identified by `targetId`
+ * — a unit's bag number, an allocation's id or a payment's id — and each has
+ * its own route, which fixes the subject.
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 const props = defineProps({
-  donationId: { type: Number, required: true },
+  donationId: { type: Number, default: null },
+  targetId: { type: [String, Number], default: null },
   subject: { type: String, required: true },
   changes: { type: Object, required: true },
   previous: { type: Object, default: null },
@@ -67,24 +77,40 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submitted'])
 
-const LABELS = {
-  screening: 'screening',
-  collection: 'collection record',
-  immunohematology: 'blood typing',
-  serology: 'serology panel',
-  components: 'component breakdown',
+const { user } = useUser()
+
+// Each subject's name and department. Mirrors the server's CorrectionSubject.
+const SUBJECTS = {
+  screening: { label: 'screening', department: 'collection' },
+  collection: { label: 'collection record', department: 'collection' },
+  immunohematology: { label: 'blood typing', department: 'testing' },
+  serology: { label: 'serology panel', department: 'testing' },
+  components: { label: 'component breakdown', department: 'processing' },
+  unit_details: { label: 'unit details', department: 'issuance' },
+  dispatch: { label: 'dispatch record', department: 'issuance' },
+  payment: { label: 'payment', department: 'billing' },
 }
 
-const APPROVERS = {
-  screening: 'the Center Admin',
-  collection: 'the Donor Screening Physician',
-  immunohematology: 'the Reference Laboratory Consultant',
-  serology: 'the Laboratory Supervisor',
-  components: 'the Component Laboratory Medical Technologist',
+// Every department's head approves its corrections. Mirrors the server's
+// Department::correctionApprover().
+const HEADS = {
+  collection: { role: 'screening_physician', title: 'the Donor Screening Physician' },
+  processing: { role: 'component_technologist', title: 'the Component Laboratory Medical Technologist' },
+  testing: { role: 'lab_supervisor', title: 'the Laboratory Supervisor' },
+  issuance: { role: 'inventory_control_officer', title: 'the Inventory Control Officer' },
+  billing: { role: 'billing_supervisor', title: 'the Billing Supervisor' },
 }
 
-const label = computed(() => LABELS[props.subject] ?? 'record')
-const approverText = computed(() => `${APPROVERS[props.subject] ?? 'the department approver'} or the Center Admin`)
+const label = computed(() => SUBJECTS[props.subject]?.label ?? 'record')
+
+const head = computed(() => HEADS[SUBJECTS[props.subject]?.department] ?? null)
+
+// The head's own correction needs nobody else's approval; the server applies
+// it as it is filed.
+// The head's role may be any of theirs, not only the main one.
+const isHead = computed(() => Boolean(head.value) && (user.value?.staff_roles ?? []).includes(head.value.role))
+
+const approverText = computed(() => head.value?.title ?? "the department's head")
 
 const changedFields = computed(() => {
   if (!props.previous) return []
@@ -115,8 +141,31 @@ const REFUSALS = {
   correction_pending: 'A correction to this record is already waiting for a decision.',
   results_cleared: 'This result has already been cleared and can no longer be corrected.',
   not_correctable: 'A reactive result can never be corrected.',
-  not_your_record: 'Your role does not record this, so it cannot correct it.',
+  verification_pending: 'This reactive result is waiting for the Laboratory Supervisor, who verifies it or returns it for re-entry.',
+  not_your_record: 'Your role does not file corrections to this record.',
   nothing_to_correct: 'Nothing is saved yet — record it directly instead.',
+  unit_not_editable: 'This unit can no longer be edited. An expired unit takes a new expiry date only.',
+  unit_not_found: 'That unit was not found.',
+  allocation_not_found: 'That dispatch record was not found.',
+  payment_not_found: 'That payment was not found.',
+  not_dispatched: 'Only a unit that has been dispatched has a dispatch record to correct.',
+  billing_void: 'This invoice has been voided, so its payments can no longer be corrected.',
+}
+
+/**
+ * File the correction through the route its subject belongs to.
+ */
+function file(payload) {
+  switch (props.subject) {
+    case 'unit_details':
+      return bloodCenterService.requestUnitCorrection(String(props.targetId), payload)
+    case 'dispatch':
+      return bloodCenterService.requestDispatchCorrection(Number(props.targetId), payload)
+    case 'payment':
+      return bloodCenterService.requestPaymentCorrection(Number(props.targetId), payload)
+    default:
+      return bloodCenterService.requestCorrection(props.donationId, { subject: props.subject, ...payload })
+  }
 }
 
 async function submit() {
@@ -124,8 +173,7 @@ async function submit() {
   error.value = null
 
   try {
-    const response = await bloodCenterService.requestCorrection(props.donationId, {
-      subject: props.subject,
+    const response = await file({
       reason: reason.value.trim(),
       changes: props.changes,
     })

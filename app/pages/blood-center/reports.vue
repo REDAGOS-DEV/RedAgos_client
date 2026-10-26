@@ -1,5 +1,15 @@
 <template>
-    <div class="reports-page">
+    <!--
+      The Admin and the Supervisor (reports.view_all) read the centre's own
+      reports, counted from its records; the Donor & Collection roles
+      (donations.view) read their department's. The other roles still see the page
+      below until their department reports replace it.
+    -->
+    <BloodCenterCentreReports v-if="canViewAll" kind="centre" />
+    <BloodCenterCentreReports v-else-if="canViewCollection" kind="collection" />
+    <!-- The Testing department's own (project owner, 2026-10-24). -->
+    <BloodCenterTestingReports v-else-if="canViewTesting" />
+    <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
             <div class="skeleton-block page-skeleton__title" />
             <div class="stats-row">
@@ -10,29 +20,28 @@
 
         <div v-else class="reports-inner">
             <!-- Header -->
-            <div class="header-row">
-                <div>
-                    <h1 class="page-title">Reports &amp; Analytics</h1>
-                    <p class="page-subtitle">Projected demand, shortage risks and generated reports.</p>
-                </div>
-                <div class="header-actions">
+            <PageHeader title="Reports &amp; Analytics" subtitle="Projected demand, shortage risks and generated reports.">
+                <template #actions>
                     <div class="select-wrap">
-                        <select v-model="facilityFilter" class="filter-select-input" @change="onFilterChange">
-                            <option value="all">All Facilities</option>
-                            <option v-for="f in facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
-                        </select>
-                        <AssetIcon name="chevron-down" :size="14" class="select-wrap__icon" />
+                        <SelectField
+                            v-model="facilityFilter"
+                            :options="[{ value: 'all', label: 'All Facilities' }, ...facilities.map((fac) => ({ value: fac.id, label: fac.name }))]"
+                            aria-label="Facility"
+                            size="sm"
+                            @change="onFilterChange()"
+                        />
                     </div>
                     <div class="select-wrap">
-                        <select v-model="horizonFilter" class="filter-select-input" @change="onFilterChange">
-                            <option value="7">Next 7 days</option>
-                            <option value="14">Next 14 days</option>
-                            <option value="30">Next 30 days</option>
-                        </select>
-                        <AssetIcon name="chevron-down" :size="14" class="select-wrap__icon" />
+                        <SelectField
+                            v-model="horizonFilter"
+                            :options="[{ value: '7', label: 'Next 7 days' }, { value: '14', label: 'Next 14 days' }, { value: '30', label: 'Next 30 days' }]"
+                            aria-label="Forecast horizon"
+                            size="sm"
+                            @change="onFilterChange()"
+                        />
                     </div>
-                </div>
-            </div>
+                </template>
+            </PageHeader>
 
             <!--
                 The /bloodcenter/reports endpoints are not built yet (see the
@@ -180,17 +189,24 @@
                                 <button type="button" class="view-toggle__btn" :class="{ 'view-toggle__btn--active': forecastView === 'table' }"
                                     :aria-pressed="forecastView === 'table'" @click="forecastView = 'table'">Table</button>
                             </div>
-                            <select v-model="forecastControls.bloodType" class="form-input filter-select" aria-label="Blood type" @change="loadForecastData">
-                                <option value="all">All blood types</option>
-                                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                            </select>
-                            <select v-model="forecastControls.component" class="form-input filter-select" aria-label="Blood component" @change="loadForecastData">
-                                <option value="all">All components</option>
-                                <option value="whole_blood">Whole Blood</option>
-                                <option value="plasma">Plasma</option>
-                                <option value="platelets">Platelets</option>
-                                <option value="red_cells">Red Cells</option>
-                            </select>
+                            <div class="filter-select">
+                                <SelectField
+                                    v-model="forecastControls.bloodType"
+                                    :options="[{ value: 'all', label: 'All blood types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]"
+                                    aria-label="Blood type"
+                                    size="sm"
+                                    @change="loadForecastData()"
+                                />
+                            </div>
+                            <div class="filter-select">
+                                <SelectField
+                                    v-model="forecastControls.component"
+                                    :options="[{ value: 'all', label: 'All components' }, { value: 'whole_blood', label: 'Whole Blood' }, { value: 'plasma', label: 'Plasma' }, { value: 'platelets', label: 'Platelets' }, { value: 'red_cells', label: 'Red Cells' }]"
+                                    aria-label="Blood component"
+                                    size="sm"
+                                    @change="loadForecastData()"
+                                />
+                            </div>
                             <button v-if="forecastFiltered" type="button" class="btn-link" @click="resetForecastControls">Reset</button>
                         </div>
                     </div>
@@ -329,7 +345,7 @@
 
                     <div v-if="!loadingAlerts && emergencyAlerts.length > 0" class="alert-footer">
                         <span>{{ criticalAlertCount }} blood type{{ criticalAlertCount === 1 ? '' : 's' }} require attention.</span>
-                        <button type="button" class="btn-outline-blue" @click="viewInventory">View Inventory</button>
+                        <button type="button" class="ui-btn ui-btn--ghost" @click="viewInventory">View Inventory</button>
                     </div>
 
                 </section>
@@ -344,36 +360,34 @@
                     <form class="report-generator" @submit.prevent="handleGenerateReport">
                         <div class="form-group">
                             <label class="form-label" for="report-type">Report Type</label>
-                            <select id="report-type" v-model="reportForm.type" class="form-input">
-                                <option value="request_trend">Request Trend Report</option>
-                                <option value="demand_forecast">Blood Demand Forecast Report</option>
-                                <option value="inventory_forecast">Inventory Forecast Report</option>
-                                <option value="emergency_demand">Emergency Demand Report</option>
-                                <option value="blood_type_demand">Blood Type Demand Report</option>
-                                <option value="forecasting_summary">Forecasting Summary Report</option>
-                            </select>
+                            <SelectField
+                                id="report-type"
+                                v-model="reportForm.type"
+                                :options="[{ value: 'request_trend', label: 'Request Trend Report' }, { value: 'demand_forecast', label: 'Blood Demand Forecast Report' }, { value: 'inventory_forecast', label: 'Inventory Forecast Report' }, { value: 'emergency_demand', label: 'Emergency Demand Report' }, { value: 'blood_type_demand', label: 'Blood Type Demand Report' }, { value: 'forecasting_summary', label: 'Forecasting Summary Report' }]"
+                            />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">From</label>
-                            <input v-model="reportForm.dateFrom" type="date" class="form-input" />
+                            <label class="form-label" for="report-from">From</label>
+                            <DatePicker id="report-from" v-model="reportForm.dateFrom" :max="reportForm.dateTo || undefined" />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">To</label>
-                            <input v-model="reportForm.dateTo" type="date" class="form-input" :min="reportForm.dateFrom || undefined" />
+                            <label class="form-label" for="report-to">To</label>
+                            <DatePicker id="report-to" v-model="reportForm.dateTo" :min="reportForm.dateFrom || undefined" />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Blood Type</label>
-                            <select v-model="reportForm.bloodType" class="form-input">
-                                <option value="all">All Blood Types</option>
-                                <option v-for="bt in bloodTypes" :key="bt" :value="bt">{{ bt }}</option>
-                            </select>
+                            <label class="form-label" for="report-blood-type">Blood Type</label>
+                            <SelectField
+                                id="report-blood-type"
+                                v-model="reportForm.bloodType"
+                                :options="[{ value: 'all', label: 'All Blood Types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]"
+                            />
                         </div>
                         <div class="report-generator__actions">
-                            <button type="submit" class="btn-primary" :disabled="!canGenerateReport || generatingReport || unavailable.recent">
+                            <button type="submit" class="ui-btn ui-btn--primary" :disabled="!canGenerateReport || generatingReport || unavailable.recent">
                                 <AssetIcon name="bar-chart" :size="15" />
                                 {{ generatingReport ? 'Generating...' : 'Generate Report' }}
                             </button>
-                            <button type="button" class="btn-cancel" @click="resetReportForm">Reset</button>
+                            <button type="button" class="ui-btn" @click="resetReportForm">Reset</button>
                         </div>
                     </form>
                     <p v-if="generateError" class="form-error" role="alert">{{ generateError }}</p>
@@ -450,7 +464,7 @@
                             <template v-if="unavailable.recent">Generated reports will be listed here once the reports service is connected.</template>
                             <template v-else>
                                 No reports generated yet.
-                                <button type="button" class="btn-outline-blue" @click="focusReportForm">Generate Report</button>
+                                <button type="button" class="ui-btn ui-btn--ghost" @click="focusReportForm">Generate Report</button>
                             </template>
                         </p>
                         <div v-else v-for="report in recentReports" :key="report.id" class="reports-row">
@@ -495,8 +509,8 @@
                         </div>
 
                         <div class="modal-actions">
-                            <button type="button" class="btn-cancel" @click="closeReportPreview">Close</button>
-                            <button type="button" class="btn-primary"
+                            <button type="button" class="ui-btn" @click="closeReportPreview">Close</button>
+                            <button type="button" class="ui-btn ui-btn--primary"
                                 @click="handleExport(selectedReport, 'pdf')">Export as PDF</button>
                         </div>
                     </div>
@@ -517,11 +531,16 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
+import SelectField from '~/components/common/SelectField.vue'
+import DatePicker from '~/components/common/DatePicker.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
+import BloodCenterCentreReports from '~/components/BloodCenter/CentreReports.vue'
 
 definePageMeta({
     middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
-  requires: 'reports.view_own',
+  // The same list as the sidebar's link (REPORTS_ABILITIES).
+  requires: ['reports.view_all', 'donations.view', 'lab.record_serology', 'lab.record_immunohematology'],
 })
 
 /**
@@ -1153,7 +1172,14 @@ async function handleExport(report, format) {
     }
 }
 
+const { can } = useUser()
+const canViewAll = computed(() => can('reports.view_all'))
+const canViewCollection = computed(() => can('donations.view'))
+const canViewTesting = computed(() => can('lab.record_serology') || can('lab.record_immunohematology'))
+
 onMounted(async () => {
+    // The centre reports load their own data.
+    if (canViewAll.value || canViewCollection.value || canViewTesting.value) return
     await loadAll()
     initialLoading.value = false
 })
@@ -1166,7 +1192,7 @@ onMounted(async () => {
    inherit them correctly instead of only the .reports-page scope.
    ------------------------------------------------------------------------- */
 :global(:root) {
-    --rf-bg: #F7F8FA;
+    --rf-bg: var(--rb-page-bg, #F7F8FA);
     --rf-card: #ffffff;
     --rf-border: #e5eaf0;
     --rf-text: #1e293b;
@@ -1197,11 +1223,11 @@ onMounted(async () => {
 }
 
 :global(.dark) {
-    --rf-bg: #0f172a;
-    --rf-card: #1a2437;
-    --rf-border: #2a3650;
-    --rf-text: #e5eaf0;
-    --rf-text-secondary: #94a3b8;
+    --rf-bg: var(--ink-page, #0f172a);
+    --rf-card: var(--ink-surface, #1a2437);
+    --rf-border: var(--ink-border, #2a3650);
+    --rf-text: var(--ink-text, #e5eaf0);
+    --rf-text-secondary: var(--ink-text-2, #94a3b8);
     --rf-primary: #4f9cf9;
     --rf-primary-hover: #7ab8ff;
     --rf-primary-fill: #1565c0;
@@ -1323,34 +1349,6 @@ onMounted(async () => {
 .select-wrap {
     position: relative;
     width: 168px;
-}
-
-.filter-select-input {
-    width: 100%;
-    height: 42px;
-    padding: 0 34px 0 14px;
-    appearance: none;
-    border: 1px solid var(--rf-border);
-    border-radius: 10px;
-    background: var(--rf-card);
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--rf-text);
-}
-
-.filter-select-input:focus {
-    outline: none;
-    border-color: var(--rf-primary);
-    box-shadow: 0 0 0 2px var(--rf-primary-soft);
-}
-
-.select-wrap__icon {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--rf-text-secondary);
 }
 
 .btn-primary {
@@ -1661,7 +1659,7 @@ onMounted(async () => {
     padding-right: 32px;
 }
 
-.filter-select { cursor: pointer; width: 180px; }
+.filter-select { width: 180px; }
 
 /* Chart card */
 .chart-card {

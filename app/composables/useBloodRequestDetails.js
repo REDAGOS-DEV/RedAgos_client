@@ -1,6 +1,5 @@
 import { hospitalService } from '~/api/hospital/HospitalService'
 import {
-  REQUEST_STATUSES as CANONICAL_STATUSES,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONES,
   requestStage,
@@ -16,8 +15,6 @@ import {
  * set now lives in ~/types/bloodRequest and is re-exported here so existing
  * imports keep working.
  */
-
-export const REQUEST_STATUSES = CANONICAL_STATUSES
 
 /**
  * Map a request status to the badge classes the detail pages use.
@@ -65,7 +62,10 @@ export function buildTimeline(request) {
   const steps = [
     {
       key: 'submitted',
-      label: request.is_walk_in ? 'Recorded at blood center — confirmed by phone' : 'Submitted',
+      // "Confirmed by phone" only on a walk-in that was: the step was dropped on 2026-10-19.
+      label: request.is_walk_in
+        ? (request.walk_in?.verification ? 'Recorded at blood center — confirmed by phone' : 'Recorded at blood center')
+        : 'Submitted',
       done: true,
       timestamp: request.request_date,
     },
@@ -178,8 +178,9 @@ export const useBloodRequestDetails = (requestId) => {
         return
       }
 
+      // The line's own type: a weekly request's lines can each differ.
       const response = await hospitalService.availability({
-        blood_type_id: request.value.blood_type?.id,
+        blood_type_id: firstLine.blood_type?.id ?? request.value.blood_type?.id,
         component_id: firstLine.component?.id,
         quantity: firstLine.outstanding_quantity || request.value.outstanding_quantity || undefined,
       })
