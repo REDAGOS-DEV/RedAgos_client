@@ -422,7 +422,7 @@ onMounted(() => {
 })
 
 const handleLogout = async () => {
-  await logout('/auth/hospital/login')
+  await logout('/auth/login')
 }
 
 

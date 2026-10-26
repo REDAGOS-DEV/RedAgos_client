@@ -7,6 +7,8 @@
     -->
     <BloodCenterCentreReports v-if="canViewAll" kind="centre" />
     <BloodCenterCentreReports v-else-if="canViewCollection" kind="collection" />
+    <!-- The Testing department's own (project owner, 2026-10-24). -->
+    <BloodCenterTestingReports v-else-if="canViewTesting" />
     <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
             <div class="skeleton-block page-skeleton__title" />
@@ -538,7 +540,7 @@ definePageMeta({
     middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
   // The same list as the sidebar's link (REPORTS_ABILITIES).
-  requires: ['reports.view_all', 'donations.view'],
+  requires: ['reports.view_all', 'donations.view', 'lab.record_serology', 'lab.record_immunohematology'],
 })
 
 /**
@@ -1173,10 +1175,11 @@ async function handleExport(report, format) {
 const { can } = useUser()
 const canViewAll = computed(() => can('reports.view_all'))
 const canViewCollection = computed(() => can('donations.view'))
+const canViewTesting = computed(() => can('lab.record_serology') || can('lab.record_immunohematology'))
 
 onMounted(async () => {
     // The centre reports load their own data.
-    if (canViewAll.value || canViewCollection.value) return
+    if (canViewAll.value || canViewCollection.value || canViewTesting.value) return
     await loadAll()
     initialLoading.value = false
 })

@@ -24,4 +24,11 @@ Before replacing any of these, prefer RedAgos's own photos of Davao facilities
 | `prc-drive-cots.jpg` | CC0 | [09104jfBloodletting Blood donation Philippine Red Cross SM City Baliuagfvf 07.jpg](https://commons.wikimedia.org/wiki/File%3A09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg) |
 | `prc-drive-overview.jpg` | CC0 | [09104jfBloodletting Blood donation Philippine Red Cross SM City Baliuagfvf 04.jpg](https://commons.wikimedia.org/wiki/File%3A09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg) |
 | `pgh-ward.jpg` | Public domain (PH government) | [Philippine General Hospital COVID-19 ward.jpg](https://commons.wikimedia.org/wiki/File:Philippine_General_Hospital_COVID-19_ward.jpg) |
-| `redagos-donor-phone.jpg` | RedAgos (own screenshot) | Donor portal dashboard at phone width (430px, 2x), from a test account, shown in the hero's phone frame. The greeting's first name is removed before capture; no other personal data in frame. Retaken Oct 14, 2026 after the donor portal redesign. Retake if the portal changes. |
+| `redagos-donor-phone.jpg` | RedAgos (own screenshot) | Donor portal Home at phone width (430px, 2x), first in the hero phone's carousel. Sample account ("Ana Reyes", made up); no real person's data. Retaken Oct 24, 2026. |
+| `redagos-donor-book.jpg` | RedAgos (own screenshot) | Donor portal, Book a donation with a center and a slot picked (430px, 2x). Sample data. Oct 24, 2026. |
+| `redagos-donor-pass.jpg` | RedAgos (own screenshot) | Donor portal, the check-in pass with a sample QR code that unlocks nothing (430px, 2x). Sample data. Oct 24, 2026. |
+| `redagos-donor-history.jpg` | RedAgos (own screenshot) | Donor portal, donation history (430px, 2x). Sample data. Oct 24, 2026. |
+| `redagos-centre-dashboard.jpg` | RedAgos (own screenshot) | Blood center Collection dashboard at 1440x900, shown on the hero's laptop. Sample data. Oct 24, 2026. |
+| `redagos-centre-requests.jpg` | RedAgos (own screenshot) | Blood center Incoming Requests (hospital requests) at 1280x960, 1.2x, shown on the hero's tablet. Sample hospitals and patients, made up. Oct 24, 2026. |
+
+Retake the RedAgos screenshots with sample data only whenever those pages change.

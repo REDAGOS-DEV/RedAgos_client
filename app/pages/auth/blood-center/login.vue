@@ -1,21 +1,13 @@
 <template>
-  <AuthLoginLayout
-    portal="blood-center"
-    title="Welcome, Blood Steward!"
-    subtitle="Sign in to your blood center account"
-    license-hint="Your blood center's license, printed on its DOH certificate."
-  >
-    <template #footer>
-      <!-- No self-registration link: a RedAgos administrator creates the
-           facility and its supervisor, and the supervisor adds staff
-           from Staff Accounts. So staff are pointed at their supervisor. -->
-      <p class="signup-text">
-        No account yet? Ask your blood center supervisor to add you.
-      </p>
-    </template>
-  </AuthLoginLayout>
+  <div />
 </template>
 
 <script setup>
-import AuthLoginLayout from '~/components/auth/AuthLoginLayout.vue'
+/**
+ * The old per-portal sign-in, kept so bookmarks and links still work: it
+ * opens the one sign-in screen, the page asked for (?redirect) carried along.
+ */
+definePageMeta({
+  middleware: [to => navigateTo({ path: '/auth/login', query: to.query }, { replace: true })],
+})
 </script>

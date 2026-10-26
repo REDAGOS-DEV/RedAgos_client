@@ -79,14 +79,10 @@ const hero = {
 // laing admin. Tan-awa ang publicRoles.ts.
 const roles = PUBLIC_ROLES
 
-// Ang sign-in sa matag portal. Wala ang administrator: ang admin login kay
-// dili gi-link sa bisan asang public nga page, para dili ma-advertise kung
-// asa ang pinaka-powerful nga portal. Dili ni security (makita gihapon ang
-// URL), pagpakunhod ra sa exposure; ang tinuod nga proteksyon kay sa server.
+// One sign-in screen for donors, blood centers and hospitals (2026-10-24);
+// an administrator picks Admin on it.
 const portals = [
-  { key: 'donor', label: 'Donor', icon: 'blood-drop', to: '/auth/donor/login' },
-  { key: 'hospital', label: 'Hospital', icon: 'hospital', to: '/auth/hospital/login' },
-  { key: 'blood-center', label: 'Blood Center', icon: 'building-2', to: '/auth/blood-center/login' },
+  { key: 'user', label: 'Sign in', icon: 'log-in', to: '/auth/login' },
 ]
 </script>
 
@@ -141,8 +137,8 @@ const portals = [
 }
 .facility-note :deep(svg) { flex-shrink: 0; margin-top: 2px; }
 
-/* Three portals (donor, hospital, blood center): one row of three. */
-.au-form .au-roles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+/* The one sign-in screen: a single full-width link. */
+.au-form .au-roles { grid-template-columns: 1fr; gap: 10px; }
 .au-form .au-roles :deep(.au-role) { gap: 6px; padding: 0 6px; font-size: 13.5px; }
 .au-roles :deep(.au-role-icon) { flex-shrink: 0; }
 @media (max-width: 420px) {

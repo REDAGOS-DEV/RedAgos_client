@@ -37,10 +37,11 @@ const ROLES = [
 
 describe('loginRouteFor', () => {
   it.each([
-    ['/donor/dashboard', '/auth/donor/login'],
-    ['/donor/appointments?tab=past', '/auth/donor/login'],
-    ['/blood-center/inventory', '/auth/blood-center/login'],
-    ['/hospital/dashboard', '/auth/hospital/login'],
+    // One sign-in screen for all but the administrators (2026-10-24).
+    ['/donor/dashboard', '/auth/login'],
+    ['/donor/appointments?tab=past', '/auth/login'],
+    ['/blood-center/inventory', '/auth/login'],
+    ['/hospital/dashboard', '/auth/login'],
     ['/admin/facilities', '/auth/admin/login'],
   ])('sends %s to %s', (path, expected) => {
     expect(loginRouteFor(path)).toBe(expected)

@@ -647,7 +647,7 @@ const vClickOutside = {
 
 const handleLogout = async () => {
   showUserMenu.value = false
-  await logout('/auth/blood-center/login')
+  await logout('/auth/login')
 }
 </script>
 

@@ -39,7 +39,7 @@
             </ul>
 
             <div class="actions">
-              <NuxtLink to="/auth/donor/login" class="lp-btn lp-btn--primary lp-btn--sm">
+              <NuxtLink to="/auth/login" class="lp-btn lp-btn--primary lp-btn--sm">
                 Register to join
               </NuxtLink>
               <button type="button" class="lp-btn lp-btn--secondary lp-btn--sm" @click="addToCalendar(featured)">
@@ -95,7 +95,7 @@
               >
                 <AssetIcon name="map-pin" :size="18" />
               </a>
-              <NuxtLink to="/auth/donor/login" class="row-link">Register to join</NuxtLink>
+              <NuxtLink to="/auth/login" class="row-link">Register to join</NuxtLink>
             </div>
           </li>
         </ol>

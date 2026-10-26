@@ -80,7 +80,7 @@ const roles = [
       'Get notified about donation drives',
     ],
     cta: 'Donor Sign In',
-    to: '/auth/donor/login',
+    to: '/auth/login',
     note: 'New donor?',
     noteLink: { label: 'Create an account', to: '/auth/donor/register' },
   },
@@ -98,7 +98,7 @@ const roles = [
       'Billing, receipts, and reports',
     ],
     cta: 'Blood Center Sign In',
-    to: '/auth/blood-center/login',
+    to: '/auth/login',
     note: 'Facility accounts are set up by the RedAgos administrator.',
   },
   {
@@ -115,7 +115,7 @@ const roles = [
       'Stock thresholds and low-stock alerts',
     ],
     cta: 'Hospital Sign In',
-    to: '/auth/hospital/login',
+    to: '/auth/login',
     note: 'Facility accounts are set up by the RedAgos administrator.',
   },
 ]

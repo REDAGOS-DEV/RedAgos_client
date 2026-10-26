@@ -14,14 +14,17 @@
 
 import type { PortalKey } from '~/composables/useAuthLogin'
 
+// One sign-in screen for all but the administrators (2026-10-24).
 export const PORTAL_LOGIN: Record<PortalKey, string> = {
-  'donor': '/auth/donor/login',
-  'hospital': '/auth/hospital/login',
-  'blood-center': '/auth/blood-center/login',
+  'user': '/auth/login',
+  'donor': '/auth/login',
+  'hospital': '/auth/login',
+  'blood-center': '/auth/login',
   'admin': '/auth/admin/login',
 }
 
 export const PORTAL_FORGOT: Record<PortalKey, string> = {
+  'user': '/auth/donor/forgot-password',
   'donor': '/auth/donor/forgot-password',
   'hospital': '/auth/hospital/forgot-password',
   'blood-center': '/auth/blood-center/forgot-password',

@@ -45,7 +45,7 @@
       </div>
 
       <ul v-else class="referrals">
-        <li v-for="referral in referrals" :key="referral.id" class="referral">
+        <li v-for="referral in referrals" :key="referral.id" class="referral" :class="`referral--${referral.status}`">
           <div class="referral__head">
             <div>
               <p class="referral__name">{{ referralTitle(referral) }}</p>
@@ -65,9 +65,28 @@
                 @click="openContact(referral)"
               >
                 <AssetIcon name="mail" :size="15" />
+                <span v-if="!referral.contact_requested_at" class="icon-btn__text">Ask to get in touch</span>
               </button>
             </div>
           </div>
+
+          <!-- Where the referral stands: forward only, from pending to closed. -->
+          <ol class="steps" :aria-label="`Referral ${referral.status_label}`">
+            <li
+              v-for="(step, i) in STATUS_ORDER"
+              :key="step"
+              class="steps__item"
+              :class="{
+                'steps__item--done': i < STATUS_ORDER.indexOf(referral.status),
+                'steps__item--now': i === STATUS_ORDER.indexOf(referral.status),
+              }"
+            >
+              <span class="steps__dot" aria-hidden="true">
+                <AssetIcon v-if="i < STATUS_ORDER.indexOf(referral.status) || (step === 'closed' && referral.status === 'closed')" name="check" :size="11" />
+              </span>
+              {{ statusLabel(step) }}
+            </li>
+          </ol>
 
           <div class="referral__facts">
             <span v-for="marker in referral.reactive_markers" :key="marker.value" class="chip chip--alarm">
@@ -118,11 +137,13 @@
             </template>
 
             <div v-else class="actions">
+              <!-- The next step forward is the one in blue; closing stays quiet. -->
               <button
-                v-for="next in nextStatuses(referral.status)"
+                v-for="(next, i) in nextStatuses(referral.status)"
                 :key="next"
                 type="button"
                 class="btn"
+                :class="{ 'btn--primary': i === 0 && next !== 'closed', 'btn--ghost': next === 'closed' }"
                 :disabled="busy"
                 @click="startReferralUpdate(referral, next)"
               >
@@ -667,4 +688,33 @@ onMounted(loadReferrals)
   .referrals-page { padding: 16px 16px 32px; }
   .referral__head { flex-direction: column; }
 }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+.confidential { padding: 0.55rem 0.8rem; font-size: 12.5px; }
+.filter--on { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+
+/* A referral: its state down its edge. */
+.referral { position: relative; overflow: hidden; padding-left: 1.15rem; border-radius: 14px; }
+.referral::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--rb-text-muted); }
+.referral--pending::before { background: var(--rb-accent); }
+.referral--referred::before { background: var(--rb-primary); }
+.referral--closed::before { background: var(--rb-success); }
+
+/* The mail button names its job until a request has gone. */
+.icon-btn:has(.icon-btn__text) { display: inline-flex; align-items: center; width: auto; height: 32px; gap: 6px; padding: 0 12px; border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-primary-text); font-size: 12.5px; font-weight: 700; }
+
+/* Pending, referred to doctor, closed. */
+.steps { display: flex; align-items: center; gap: 0; margin: 0.15rem 0 0; padding: 0; list-style: none; }
+.steps__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--rb-text-muted); }
+.steps__item + .steps__item::before { content: ''; width: 36px; height: 2px; margin: 0 8px; border-radius: 1px; background: var(--rb-border-strong); }
+.steps__item--done + .steps__item::before { background: var(--rb-success); }
+.steps__dot { display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid var(--rb-border-strong); border-radius: 50%; background: var(--rb-surface); color: #fff; }
+.steps__item--done { color: var(--rb-text-secondary); }
+.steps__item--done .steps__dot { border-color: var(--rb-success); background: var(--rb-success); }
+.steps__item--now { color: var(--rb-text-primary); }
+.steps__item--now .steps__dot { border-color: var(--rb-primary); box-shadow: inset 0 0 0 3px var(--rb-surface); background: var(--rb-primary); }
+.referral--closed .steps__item--now .steps__dot { border-color: var(--rb-success); background: var(--rb-success); box-shadow: none; }
+
+.btn--ghost { border-color: transparent; background: transparent; color: var(--rb-text-secondary); }
+.btn--ghost:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 </style>

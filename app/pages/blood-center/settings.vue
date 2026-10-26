@@ -671,7 +671,7 @@ async function logoutOtherDevices() {
     sessionMessage.value = 'Signed out everywhere. Taking you to the sign-in page...'
     confirmLogoutOthers.value = false
     // The server revoked this device's token too, so finish here.
-    await logout('/auth/blood-center/login')
+    await logout('/auth/login')
   } catch (err) {
     console.error('Failed to log out other devices (expected while backend is not yet wired up):', err)
   } finally {

@@ -3,9 +3,11 @@
     <header class="testing__header">
       <div>
         <h1 class="testing__title">{{ viewCopy.title }}</h1>
-        <p class="testing__subtitle">
-          {{ viewCopy.subtitle }} A passing result clears its section; a saved result changes only through an approved
-          correction. RedAgos records what the medical technologist found. It does not perform or interpret any test.
+        <p class="testing__subtitle">{{ viewCopy.subtitle }}</p>
+        <p class="testing__note">
+          <AssetIcon name="info" :size="13" />
+          A passing result clears its section; a saved result changes only through an approved correction. RedAgos
+          records what the medical technologist found. It does not perform or interpret any test.
         </p>
       </div>
     </header>
@@ -39,6 +41,7 @@
         <div class="queue-panel__tools">
           <!-- Scan the sticker on a tube to go straight to its donation. -->
           <form class="scan" @submit.prevent="findByBarcode">
+            <AssetIcon name="scan-line" :size="16" class="scan__icon" />
             <input
               v-model="barcodeSearch"
               type="text"
@@ -48,8 +51,7 @@
               placeholder="Scan or type a barcode"
               aria-label="Donation barcode"
             >
-            <button type="submit" class="btn" :disabled="loadingQueue">
-              <AssetIcon name="scan-line" :size="14" />
+            <button type="submit" class="btn btn--primary scan__go" :disabled="loadingQueue">
               Find
             </button>
           </form>
@@ -97,7 +99,7 @@
             <button
               type="button"
               class="qitem"
-              :class="{ 'qitem--on': selected?.id === row.id }"
+              :class="[`qitem--${rowTone(row)}`, { 'qitem--on': selected?.id === row.id }]"
               :aria-current="selected?.id === row.id ? 'true' : undefined"
               :disabled="busy"
               @click="openDonation(row.id)"
@@ -105,7 +107,7 @@
               <span class="qitem__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
               <span class="qitem__meta">
                 #{{ row.id }}
-                <template v-if="row.collection?.donation_barcode"> · <span class="mono">{{ row.collection.donation_barcode }}</span></template>
+                <template v-if="row.collection?.donation_barcode && !row.donor?.blinded"> · <span class="mono">{{ row.collection.donation_barcode }}</span></template>
                 <template v-if="row.collection?.blood_bag_type_label"> · {{ row.collection.blood_bag_type_label }}</template>
                 · {{ formatDate(row.collection?.ended_at || row.donation_date) }}
               </span>
@@ -290,9 +292,24 @@
                   Verify or return
                 </NuxtLink>
               </div>
-              <p class="card__hint">
-                The final reading for each marker, after any repeat testing at the bench. Every marker is required.
-              </p>
+              <div class="panel-head">
+                <p class="card__hint">
+                  The final reading for each marker, after any repeat testing at the bench. Every marker is required.
+                </p>
+                <span class="panel-head__count" :class="{ 'panel-head__count--done': readCount === markers.length }">
+                  {{ readCount }} of {{ markers.length }} read
+                </span>
+                <!-- Most panels read clean: one click marks them all. Still only a draft; Save sends it. -->
+                <button
+                  type="button"
+                  class="btn btn--sm panel-head__all"
+                  :disabled="locked || busy || Boolean(selected?.serology)"
+                  @click="markAllNonReactive"
+                >
+                  <AssetIcon name="check-check" :size="14" />
+                  All non-reactive
+                </button>
+              </div>
 
               <div class="panel">
                 <!-- Recorded once here. A saved panel is only shown: it is corrected on
@@ -310,6 +327,7 @@
                       :class="{ 'choice--on choice--safe': readings[marker.value] === 'non_reactive' }"
                     >
                       <input v-model="readings[marker.value]" type="radio" :name="`marker-${marker.value}`" value="non_reactive" class="choice__radio" >
+                      <AssetIcon name="check" :size="13" class="choice__icon" />
                       Non-reactive
                     </label>
                     <label
@@ -317,6 +335,7 @@
                       :class="{ 'choice--on choice--alarm': readings[marker.value] === 'reactive' }"
                     >
                       <input v-model="readings[marker.value]" type="radio" :name="`marker-${marker.value}`" value="reactive" class="choice__radio" >
+                      <AssetIcon name="circle-alert" :size="13" class="choice__icon" />
                       Reactive
                     </label>
                   </div>
@@ -627,6 +646,20 @@ const isFinal = computed(() => selected.value?.status === 'rejected')
 const locked = computed(() => !selected.value || isFinal.value)
 const isReactive = computed(() => selected.value?.serology?.outcome === 'reactive')
 const panelIsComplete = computed(() => panelComplete(readings, markers.value))
+const readCount = computed(() => markers.value.filter((m) => readings[m.value]).length)
+
+/** Every marker read as non-reactive: the usual panel, in one click, still a draft. */
+function markAllNonReactive() {
+  for (const marker of markers.value) readings[marker.value] = 'non_reactive'
+}
+
+/** A queue row's state, down its edge: held, waiting on the supervisor, or both cleared. */
+function rowTone(row) {
+  if (row.immunohematology?.clearance_hold) return 'held'
+  if (row.serology?.awaiting_verification) return 'verify'
+  if (row.clearances?.immunohematology && row.clearances?.tti) return 'done'
+  return 'open'
+}
 const pendingReactive = computed(() => reactiveMarkers(readings, markers.value))
 
 const initials = computed(() => donorInitials(selected.value?.donor) || '—')
@@ -1126,6 +1159,46 @@ onMounted(async () => {
 }
 
 .results__foot .btn { min-width: 7rem; }
+
+/* ===== Refresh (project owner, 2026-10-24) ===== */
+.testing__note { display: flex; align-items: flex-start; gap: 6px; max-width: 90ch; margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--rb-text-muted); }
+.testing__note :deep(.asset-icon) { flex: none; margin-top: 2px; }
+
+/* Scan: the icon inside, the font of the page until a code is typed. */
+.scan { position: relative; align-items: center; }
+.scan__icon { position: absolute; left: 12px; color: var(--rb-primary-text); pointer-events: none; }
+.scan .field__input { height: 40px; padding-left: 36px; border: 1.5px solid rgba(var(--rb-primary-rgb), 0.35); background: rgba(var(--rb-primary-rgb), 0.04); }
+.scan .field__input::placeholder { font-family: var(--rb-font-sans); letter-spacing: 0; }
+.scan .field__input:focus-visible { background: var(--rb-surface); }
+.scan__go { height: 40px; }
+
+/* Queue rows: their state on the edge. */
+.qitem { position: relative; }
+.qitem--held { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.qitem--verify { box-shadow: inset 3px 0 0 var(--rb-warning); }
+.qitem--done { box-shadow: inset 3px 0 0 var(--rb-success); }
+
+/* Serology head: the hint, how much is read, the shortcut. */
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.panel-head .card__hint { flex: 1 1 320px; margin: 0; }
+.panel-head__count { padding: 3px 10px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
+.panel-head__count--done { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
+
+/* Markers: the choice beside the name, as one segmented control. */
+.results .panel { border: 1px solid var(--rb-border); border-radius: 12px; overflow: hidden; }
+.results .panel .marker { padding: 10px 14px; justify-content: flex-start; gap: 0.5rem 1.25rem; }
+.results .panel .marker:nth-child(even) { background: var(--rb-surface-alt); }
+.results .panel .marker__name { min-width: 12rem; }
+.results .panel .marker__choices { gap: 2px; margin-left: 0; padding: 3px; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); }
+.results .panel .choice { gap: 6px; padding: 6px 14px; border: 0; border-radius: 7px; background: transparent; }
+.results .panel .choice__icon { opacity: 0.45; }
+.results .panel .choice--on .choice__icon { opacity: 1; }
+.results .panel .choice--safe { background: var(--rb-success); color: #fff; }
+.results .panel .choice--alarm { background: var(--rb-accent); color: #fff; }
+
+/* The Save line stays in reach while a long card scrolls. */
+.results__foot { position: sticky; bottom: 0; z-index: 2; border-radius: 0 0 var(--rb-radius-lg, 14px) var(--rb-radius-lg, 14px); box-shadow: 0 -10px 18px -14px rgba(var(--rb-shadow-rgb), 0.35); }
 
 /* ---------- workspace (queue + bench), as on Processing ---------- */
 .workspace {
