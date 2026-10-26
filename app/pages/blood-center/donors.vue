@@ -1276,17 +1276,12 @@ const deferrals = computed(() => {
           reason: d.screening.deferral_reason || null,
         })
       }
-      // A reactive result's confirmatory case, by its explicit status
-      // (project owner, 2026-10-25): pending confirmatory testing until the
-      // physician records the outcome. A cleared one no longer defers.
       if (d.laboratory_deferral) {
-        const lab = d.laboratory_deferral
-        const until = lab.deferred_until ? ` until ${formatShortDate(lab.deferred_until)}` : ''
         rows.push({
           key: `l-${d.id}`,
-          label: `${lab.status_label || lab.outcome_label || 'Deferred'}${until}`,
-          tone: lab.status === 'cleared' ? 'ok' : lab.is_blocking ? 'crit' : 'warn',
-          date: formatShortDate(lab.recorded_at),
+          label: d.laboratory_deferral.outcome_label || 'Permanently Deferred',
+          tone: 'crit',
+          date: formatShortDate(d.laboratory_deferral.recorded_at),
           reason: 'After laboratory testing',
         })
       }

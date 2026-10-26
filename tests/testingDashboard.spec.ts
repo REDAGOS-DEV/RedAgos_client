@@ -58,8 +58,7 @@ describe('the Testing dashboard', () => {
     expect(page).not.toMatch(/donor\.(first_name|last_name|full_name|email)/)
   })
 
-  it('shows the supervisor counts only when the server sends them, and no referral counts', () => {
-    expect(page).toContain('v-if="data.approvals"')
-    expect(page).not.toContain('referrals.')
+  it('shows the supervisor and referral counts only when the server sends them', () => {
+    expect(page).toContain('v-if="data.approvals || data.referrals"')
   })
 })

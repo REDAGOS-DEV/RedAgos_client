@@ -46,7 +46,7 @@ const TASKS: TaskDef[] = [
   { key: 'verification', requires: 'lab.verify_serology', label: ['results to verify', 'result to verify'], detail: 'Reactive results and corrections waiting for you.', to: '/blood-center/serology-results', action: 'Verify', icon: 'clipboard-list', tone: 'urgent' },
   { key: 'pending', requires: 'requests.view', label: ['hospital requests waiting', 'hospital request waiting'], detail: 'Requests not yet decided.', to: '/blood-center/bloodrequests', action: 'Review', icon: 'clipboard-check', tone: 'warning' },
   { key: 'corrections', requires: 'corrections.approve', label: ['corrections to approve', 'correction to approve'], detail: 'Filed in your department.', to: '/blood-center/corrections', action: 'Review', icon: 'pencil', tone: 'warning' },
-  { key: 'referrals', requires: 'referrals.manage', label: ['medical referrals not acted on', 'medical referral not acted on'], detail: 'Reactive donors still to contact.', to: '/blood-center/counselling-referrals', action: 'Contact', icon: 'life-buoy', tone: 'warning' },
+  { key: 'referrals', requires: 'lab.referrals', label: ['referrals not acted on', 'referral not acted on'], detail: 'Donors still to contact for counselling.', to: '/blood-center/counselling-referrals', action: 'Contact', icon: 'life-buoy', tone: 'warning' },
   { key: 'handover', requires: 'lab.update_status', label: ['units to hand over', 'unit to hand over'], detail: 'Processed and waiting for Issuance.', to: '/blood-center/processed?status=awaiting_handover', action: 'Hand over', icon: 'check-check', tone: 'info' },
   { key: 'lowStock', requires: 'inventory.view', label: ['stocks below minimum', 'stock below minimum'], detail: 'Blood types or components under their minimum.', to: '/blood-center/stock-thresholds', action: 'View stock', icon: 'triangle-alert', tone: 'warning' },
   { key: 'expiring', requires: 'inventory.view', label: ['units expire within 3 days', 'unit expires within 3 days'], detail: 'Issue these first.', to: '/blood-center/inventory', action: 'View units', icon: 'clock', tone: 'info' },
@@ -92,7 +92,7 @@ export function useBloodCenterTasks() {
       }))
     }
     // The summary route, not the list, which is audited on every read.
-    if (can('referrals.manage')) {
+    if (can('lab.referrals')) {
       jobs.push(bloodCenterService.counsellingReferralsSummary().then((summary) => {
         next.referrals = summary?.pending_count ?? 0
       }))

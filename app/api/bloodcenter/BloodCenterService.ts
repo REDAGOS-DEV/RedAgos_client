@@ -187,8 +187,7 @@ class BloodCenterService extends BaseService {
 
   /**
    * The five-marker panel. A reactive marker must carry `confirm_reactive: true`:
-   * once verified it rejects the donation, defers the donor pending
-   * confirmatory testing and opens a medical referral for the physician.
+   * it rejects the donation, permanently defers the donor and refers them.
    */
   async recordSerology(donationId: number, payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/laboratory/donations/${donationId}/serology`, 'POST', payload)
@@ -269,48 +268,22 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/corrections/${correctionId}/reject`, 'POST', payload)
   }
 
-  /**
-   * Reactive donors' medical referrals: the Donor Counselling Physician's alone
-   * (referrals.manage, project owner, 2026-10-25). The list also carries the
-   * SOP in force, for the confirmatory step's preview.
-   */
   async counsellingReferrals(params: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/medical-referrals`, 'GET', params)
+    return this.request(`${this.resource}/laboratory/referrals`, 'GET', params)
   }
 
-  /** Any of: consent, route, provider, note, and a move forward. */
   async updateCounsellingReferral(referralId: number, payload: Record<string, any> = {}): Promise<any> {
-    return this.request(`${this.resource}/medical-referrals/${referralId}`, 'PATCH', payload)
+    return this.request(`${this.resource}/laboratory/referrals/${referralId}`, 'PATCH', payload)
   }
 
   /** How many referrals nobody has acted on, for the sidebar. Not audited, unlike the list. */
   async counsellingReferralsSummary(): Promise<any> {
-    return this.request(`${this.resource}/medical-referrals/summary`, 'GET')
+    return this.request(`${this.resource}/laboratory/referrals/summary`, 'GET')
   }
 
   /** The mail icon: ask the donor to contact the centre, by email (if any) and in the app. */
   async requestReferralContact(referralId: number): Promise<any> {
-    return this.request(`${this.resource}/medical-referrals/${referralId}/contact-request`, 'POST')
-  }
-
-  /**
-   * Documented confirmatory results, and the decision the SOP gives for them,
-   * confirmed: `{ results: [{ marker, outcome, method, laboratory,
-   * reported_on, report_reference }], decision }`. A decision that differs
-   * from the SOP's is refused (409 decision_mismatch).
-   */
-  async recordConfirmation(referralId: number, payload: Record<string, any>): Promise<any> {
-    return this.request(`${this.resource}/medical-referrals/${referralId}/confirmation`, 'POST', payload)
-  }
-
-  /** The centre's marker-specific SOP: the version in force, its history and the choices. */
-  async confirmatorySop(): Promise<any> {
-    return this.request(`${this.resource}/confirmatory-sop`, 'GET')
-  }
-
-  /** Approve a new SOP version, which takes effect at once. */
-  async approveConfirmatorySop(payload: Record<string, any>): Promise<any> {
-    return this.request(`${this.resource}/confirmatory-sop`, 'POST', payload)
+    return this.request(`${this.resource}/laboratory/referrals/${referralId}/contact-request`, 'POST')
   }
 
   async declareComponents(donationId: number, payload: Record<string, any> = {}): Promise<any> {

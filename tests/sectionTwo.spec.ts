@@ -238,22 +238,24 @@ describe('the Testing page', () => {
     expect(page).not.toMatch(/typingForm\.blood_type_id\s*=.*donor\?\.blood_type/)
   })
 
-  // A reactive donor's follow-up is the Screening Physician's (project owner,
-  // 2026-10-25): Testing opens the referral and has no page for it.
-  it('hands the referral to the physician and keeps no referral link of its own', () => {
+  it('keeps the referral list behind its own ability, on its own page', () => {
     const referrals = source('app/pages/blood-center/counselling-referrals.vue')
     const nav = source('app/composables/useBloodCenterNav.ts')
 
-    expect(referrals).toContain("requires: 'referrals.manage'")
-    expect(nav).toMatch(/label: 'Medical Referrals', path: '\/blood-center\/counselling-referrals'[^}]*requires: 'referrals\.manage'/)
-    // Its own department and sidebar section, apart from Collection's screening.
-    expect(nav).toMatch(/label: 'Counselling',\s*items: \[\s*\{ label: 'Medical Referrals'[\s\S]*?\{ label: 'Confirmatory SOP'/)
-    expect(nav).toContain("counselling_physician: '/blood-center/counselling-referrals'")
-    expect(nav).toContain("counselling: ['Counselling']")
-    expect(nav).not.toContain('lab.referrals')
-    expect(page).not.toContain('lab.referrals')
-    expect(page).not.toContain('/blood-center/counselling-referrals')
-    expect(page).not.toContain('permanently defer')
+    expect(referrals).toContain("requires: 'lab.referrals'")
+    expect(nav).toMatch(/label: 'Counselling Referrals', path: '\/blood-center\/counselling-referrals'[^}]*requires: 'lab\.referrals'/)
+    // The testing page only links to it, and only for its holder.
+    expect(page).toContain("can('lab.referrals')")
+    expect(page).toMatch(/v-if="isReactive && canSeeReferrals" to="\/blood-center\/counselling-referrals"/)
+  })
+
+  // Testing refers the donor to a doctor (project owner, 2026-10-26).
+  it('moves a referral from pending to referred to doctor to closed', () => {
+    const referrals = source('app/pages/blood-center/counselling-referrals.vue')
+
+    expect(referrals).toContain("const STATUS_ORDER = ['pending', 'referred', 'closed']")
+    expect(referrals).toContain("referred: 'Referred to doctor'")
+    expect(referrals).not.toContain("'contacted'")
   })
 })
 

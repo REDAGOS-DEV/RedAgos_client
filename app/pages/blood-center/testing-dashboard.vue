@@ -226,9 +226,9 @@
             </section>
 
             <!-- ============ FOR THE SUPERVISOR ============ -->
-            <!-- Sent only to the Laboratory Supervisor: verification and corrections.
-                 Reactive donors' referrals are the Donor Counselling Physician's, not Testing's. -->
-            <section v-if="data.approvals" aria-labelledby="supervisor-title" class="card">
+            <!-- Sent only to the roles that work them: verification and corrections
+                 to the Laboratory Supervisor, referrals to whoever holds the list. -->
+            <section v-if="data.approvals || data.referrals" aria-labelledby="supervisor-title" class="card">
               <div class="card__head">
                 <div>
                   <h2 id="supervisor-title" class="card__label card__label--title">For the Laboratory Supervisor</h2>
@@ -292,7 +292,9 @@ const { can } = useUser()
  *    turnaround: { median_hours, units },          (last 30 days)
  *    reactive_by_marker: [{ marker, label, count }], (last 30 days)
  *    trend: [{ date, non_reactive, reactive }],      (30 days, oldest first)
- *    approvals: { corrections } | null }             (lab.verify_serology)
+ *    approvals: { corrections } | null,              (lab.verify_serology)
+ *    referrals: { pending, referred, no_contact_request,
+ *      closed_recently } | null }                    (lab.referrals)
  * -------------------------------------------------------------------------
  */
 
@@ -361,11 +363,22 @@ function markerWidth(count) {
 const supervisorRows = computed(() => {
   const rows = []
   const approvals = data.value?.approvals
+  const referrals = data.value?.referrals
 
   if (approvals) {
     rows.push(
       { key: 'verify', label: 'Reactive results to verify', value: data.value.queue.awaiting_verification, tone: 'crit', to: '/blood-center/serology-results?outcome=awaiting_verification' },
       { key: 'corrections', label: 'Corrections to decide', value: approvals.corrections, tone: 'warn', to: can('corrections.request') ? '/blood-center/corrections' : null },
+    )
+  }
+
+  if (referrals) {
+    const to = '/blood-center/counselling-referrals'
+    rows.push(
+      { key: 'no_contact', label: 'Referrals with no contact request', value: referrals.no_contact_request, tone: 'crit', to },
+      { key: 'pending', label: 'Not yet referred to a doctor', value: referrals.pending, tone: 'warn', to },
+      { key: 'open', label: 'Referred to doctor', value: referrals.referred, tone: 'info', to },
+      { key: 'closed', label: 'Closed, last 30 days', value: referrals.closed_recently, tone: 'neutral', to: null },
     )
   }
 

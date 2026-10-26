@@ -67,12 +67,11 @@ describe('the blind screens', () => {
     expect(results).toMatch(/rows\.value = \(res\?\.data \?\? \[\]\)\.map\(\(row\) => \(\{ \.\.\.row, donor: visibleDonor\(row\.donor, canViewIdentity\.value\) \}\)\)/)
   })
 
-  // The referrals left Testing for the Screening Physician, who meets donors
-  // and so sees who they are (project owner, 2026-10-25).
-  it('counselling-referrals.vue is the physician\'s page, not a Testing one', () => {
+  it('counselling-referrals.vue names a referral by its bag and shows no contact details', () => {
     const referrals = read('app/pages/blood-center/counselling-referrals.vue')
 
-    expect(referrals).toContain("requires: 'referrals.manage'")
-    expect(referrals).not.toContain('lab.')
+    expect(referrals).toContain('referralTitle(referral)')
+    expect(referrals).not.toMatch(/donor\??\.(full_name|donor_code|phone|email|contact_person|uuid)/)
+    expect(referrals).toContain('contact_by_email')
   })
 })

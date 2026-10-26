@@ -20,7 +20,7 @@ export type RoleName = 'admin' | 'donor' | 'blood_center' | 'blood_bank'
  * Blood-centre departments, from the server's `Department` enum. A predefined
  * role decides its own; a custom role is placed in one directly.
  */
-export type Department = 'collection' | 'processing' | 'testing' | 'counselling' | 'issuance' | 'billing'
+export type Department = 'collection' | 'processing' | 'testing' | 'issuance' | 'billing'
 
 /** The Read / Write / Update / Delete privileges that cap a staff member's role. */
 export type StaffPrivilege = 'read' | 'write' | 'update' | 'delete'
@@ -45,7 +45,6 @@ export type StaffRole =
   | 'processing_assistant'
   | 'serology_technologist'
   | 'lab_supervisor'
-  | 'counselling_physician'
   | 'inventory_control_officer'
   | 'dispatch_coordinator'
   | 'it_data_clerk'

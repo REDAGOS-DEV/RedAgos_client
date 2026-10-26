@@ -180,9 +180,8 @@
                 <h2 class="card__title">Donation rejected</h2>
                 <p class="card__hint">
                   <template v-if="isReactive">
-                    Serology was reactive. The donation has been rejected, and a confidential medical referral has gone
-                    to the Donor Counselling Physician. The donor is deferred pending confirmatory testing. These results can no
-                    longer be changed.
+                    Serology was reactive. The donation has been rejected, the donor permanently deferred and added to
+                    Counselling referrals. These results can no longer be changed.
                   </template>
                   <template v-else>
                     {{ selected.rejection_reason || 'No reason was recorded.' }} These results can no longer be changed.
@@ -193,6 +192,9 @@
 
             <div class="actions">
               <button type="button" class="btn btn--primary" @click="backToQueue">Close this unit</button>
+              <NuxtLink v-if="isReactive && canSeeReferrals" to="/blood-center/counselling-referrals" class="btn">
+                Open Counselling Referrals
+              </NuxtLink>
             </div>
           </section>
 
@@ -392,8 +394,8 @@
             </p>
             <ul>
               <li>reject the donation, so it can never become stock;</li>
-              <li>defer the donor pending confirmatory testing (never permanently on a screen alone);</li>
-              <li>send a confidential medical referral to the Donor Counselling Physician, who follows the donor up.</li>
+              <li>permanently defer the donor at every blood centre;</li>
+              <li>add the donor to Counselling referrals, where you refer them to a doctor.</li>
             </ul>
             <p>It cannot be undone here. Check the readings against the bench record first.</p>
           </template>
@@ -404,8 +406,8 @@
             </p>
             <ul>
               <li>the donation is rejected, so it can never become stock;</li>
-              <li>the donor is deferred pending confirmatory testing;</li>
-              <li>a confidential medical referral goes to the Donor Counselling Physician.</li>
+              <li>the donor is permanently deferred at every blood centre;</li>
+              <li>the donor is added to Counselling referrals.</li>
             </ul>
             <p>If the reading is wrong, the supervisor returns it to be entered again.</p>
           </template>
@@ -440,16 +442,14 @@ import {
 /**
  * The testing page: Section II's Immunohematology and Serology tables.
  *
- * The Serology Results list is a page of its own in the sidebar (project
- * owner, 2026-10-18). A reactive donor's follow-up is not Testing's: it is
- * the Donor Counselling Physician's Medical Referrals (project owner, 2026-10-25).
+ * The Serology Results list and the Counselling Referrals follow-up are pages
+ * of their own in the sidebar (project owner, 2026-10-18).
  *
  * One page for two departments. Immunohematology records the typing and TTI
  * Testing the serology panel; each card shows only to the role that records
  * it. Saving a result that passes issues that section's clearance at once. A
- * verified reactive marker rejects the donation, defers the donor pending
- * confirmatory testing and opens a confidential medical referral for the
- * Donor Counselling Physician, in one transaction, and the server refuses a
+ * reactive marker rejects the donation, permanently defers the donor and opens
+ * a counselling referral, in one transaction, and the server refuses a
  * reactive panel that was not explicitly confirmed here. A saved result is
  * never saved over: it goes as a correction request.
  */
@@ -464,9 +464,11 @@ definePageMeta({
 const route = useRoute()
 const { can } = useUser()
 
-// Technologists work blind; the Laboratory Supervisor alone is told who the
-// donor is. Every donation is taken in through this, so a name the server
-// should not have sent is never shown either.
+const canSeeReferrals = computed(() => can('lab.referrals'))
+
+// Testing works blind, its head included (project owner, 2026-10-25). Every
+// donation is taken in through this, so a name the server should not have
+// sent is never shown either.
 const canViewIdentity = computed(() => can('donors.view_identity'))
 const blindFor = (donation) => (donation ? { ...donation, donor: visibleDonor(donation.donor, canViewIdentity.value) } : null)
 
@@ -946,13 +948,13 @@ async function run(work) {
 }
 
 onMounted(async () => {
-  // The results were a tab here. A notification sent before they moved still
-  // links to ?tab=. An old ?tab=referrals link stays on this page: the
-  // referrals are the Donor Counselling Physician's now (project owner, 2026-10-25).
+  // The results and referrals were tabs here. A notification sent before they
+  // moved still links to ?tab=.
   if (route.query.tab === 'results') {
     const outcome = typeof route.query.outcome === 'string' ? `?outcome=${encodeURIComponent(route.query.outcome)}` : ''
     return navigateTo(`/blood-center/serology-results${outcome}`, { replace: true })
   }
+  if (route.query.tab === 'referrals') return navigateTo('/blood-center/counselling-referrals', { replace: true })
 
   await loadReference()
   await loadQueue()

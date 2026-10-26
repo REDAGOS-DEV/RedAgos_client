@@ -93,8 +93,6 @@ const ROLE_HOME: Record<string, string> = {
   processing_assistant: '/blood-center/laboratory',
   serology_technologist: '/blood-center/testing',
   lab_supervisor: '/blood-center/testing',
-  // The doctor who follows reactive donors up (project owner, 2026-10-25).
-  counselling_physician: '/blood-center/counselling-referrals',
   inventory_control_officer: '/blood-center/storage',
   dispatch_coordinator: '/blood-center/fulfillment',
   it_data_clerk: '/blood-center/inventory',
@@ -111,10 +109,10 @@ const ROLE_HOME: Record<string, string> = {
 const DEPARTMENT_HOME: Record<string, string> = {
   collection: '/blood-center/donations',
   // Each laboratory department has its own page. TTI Testing records the
-  // serology panel; Processing separates the unit and completes or rejects it.
+  // serology panel and works its referral list; Processing separates the
+  // unit and completes or rejects it.
   testing: '/blood-center/testing',
   processing: '/blood-center/laboratory',
-  counselling: '/blood-center/counselling-referrals',
   issuance: '/blood-center/storage',
   billing: '/blood-center/billing',
 }
@@ -164,7 +162,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Collection Dashboard', path: '/blood-center/collection-dashboard', icon: 'layout-dashboard', requires: 'donations.view', keywords: 'home donor collection today counter pool eligible trend drives' },
       // Testing's own (project owner, 2026-10-22). lab.record_serology, as on
       // the server: it splits results by marker, which Processing never sees.
-      { label: 'Testing Dashboard', path: '/blood-center/testing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_serology', keywords: 'home testing laboratory lab bench queue serology typing reactive verify turnaround trend' },
+      { label: 'Testing Dashboard', path: '/blood-center/testing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_serology', keywords: 'home testing laboratory lab bench queue serology typing reactive verify turnaround referrals trend' },
       // Processing's own (project owner, 2026-10-22): the department that records breakdowns.
       { label: 'Processing Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
@@ -203,17 +201,7 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Their own pages (project owner, 2026-10-18; they were tabs on the
       // Testing page). The badge on each counts what waits for its holder.
       { label: 'Serology Results', path: '/blood-center/serology-results', icon: 'clipboard-list', badge: 'verification', requires: 'lab.record_serology', keywords: 'tti serology results list reactive non-reactive export csv verify verification correction hiv hbsag hcv syphilis malaria' },
-    ],
-  },
-  {
-    // Counselling (project owner, 2026-10-25): the doctor who follows a donor
-    // up after a reactive result, a department of its own. Medical Referrals
-    // keeps Testing's old Counselling Referrals address, so old links and the
-    // reminder still land there.
-    label: 'Counselling',
-    items: [
-      { label: 'Medical Referrals', path: '/blood-center/counselling-referrals', icon: 'life-buoy', badge: 'referrals', requires: 'referrals.manage', keywords: 'medical counselling referrals reactive donor follow-up confirmatory confirmation sop consent public private provider contact request deferral' },
-      { label: 'Confirmatory SOP', path: '/blood-center/confirmatory-sop', icon: 'shield-check', requires: 'confirmatory_sop.configure', keywords: 'confirmatory sop reactive marker positive negative indeterminate deferral rule version approve policy' },
+      { label: 'Counselling Referrals', path: '/blood-center/counselling-referrals', icon: 'life-buoy', badge: 'referrals', requires: 'lab.referrals', keywords: 'counselling referrals reactive donor follow-up refer doctor contact request email mail notify referred closed' },
     ],
   },
   {
@@ -309,7 +297,6 @@ const DEPARTMENT_GROUPS: Record<string, readonly string[]> = {
   collection: ['Donor', 'Collection'],
   testing: ['Testing'],
   processing: ['Processing'],
-  counselling: ['Counselling'],
   issuance: ['Stock and Supply'],
   billing: ['Billing'],
 }
