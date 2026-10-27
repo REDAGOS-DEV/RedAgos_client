@@ -9,42 +9,76 @@
       tabindex="-1"
       @keydown.esc="$emit('close')"
     >
-      <h2 id="correction-title" class="dialog__title">
-        <AssetIcon name="pencil" :size="17" />
-        Request a correction
-      </h2>
+      <!-- Laid out as the Corrections page reads it (2026-10-27). -->
+      <header class="dialog__head">
+        <span class="kind-icon" :class="`kind--${kind.tone}`" aria-hidden="true"><AssetIcon :name="kind.icon" :size="20" /></span>
+        <div class="dialog__heading">
+          <h2 id="correction-title" class="dialog__title">Request a correction</h2>
+          <p class="dialog__sub">To the saved {{ label }}</p>
+        </div>
+        <button type="button" class="icon-btn" aria-label="Close" :disabled="busy" @click="$emit('close')">
+          <AssetIcon name="x" :size="16" />
+        </button>
+      </header>
 
-      <p v-if="isHead" class="dialog__body">
-        The {{ label }} is already saved, so it is not changed directly. As the department head, your correction needs
-        no other approval: it is <strong>applied as soon as you send it</strong>, and kept with your reason.
-      </p>
-      <p v-else class="dialog__body">
-        The {{ label }} is already saved, so it is not changed directly. Your corrected values go to
-        <strong>{{ approverText }}</strong> to approve. Nothing changes until they do.
-      </p>
+      <!-- Where it goes: straight in for the head, or to the head first. -->
+      <div class="route" :class="{ 'route--head': isHead }">
+        <AssetIcon :name="isHead ? 'bolt' : 'user-check'" :size="16" class="route__icon" />
+        <p v-if="isHead" class="route__text">
+          The {{ label }} is already saved, so it is not changed directly. As the department head, your correction needs
+          no other approval: it is <strong>applied as soon as you send it</strong>, and kept with your reason.
+        </p>
+        <p v-else class="route__text">
+          The {{ label }} is already saved, so it is not changed directly. Your corrected values go to
+          <strong>{{ approverText }}</strong> to approve. Nothing changes until they do.
+        </p>
+      </div>
 
-      <ul v-if="changedFields.length" class="diff">
-        <li v-for="field in changedFields" :key="field">
-          <span class="diff__field">{{ humanise(field) }}</span>
-          <span class="diff__before">{{ display(previous?.[field]) }}</span>
-          <AssetIcon name="arrow-right" :size="12" />
-          <span class="diff__after">{{ display(changes[field]) }}</span>
-        </li>
-      </ul>
-      <p v-else-if="previous" class="dialog__hint">Nothing differs from what is saved yet — change the form first.</p>
+      <section v-if="previous" class="changes" aria-label="Changes">
+        <p class="section-label">{{ changedFields.length === 1 ? '1 change' : `${changedFields.length} changes` }}</p>
+        <ul v-if="changedFields.length" class="diff">
+          <li v-for="field in changedFields" :key="field" class="diff__row">
+            <span class="diff__field">{{ humanise(field) }}</span>
+            <span class="diff__values">
+              <span class="val val--before" :class="{ 'val--none': display(previous?.[field]) === '—' }">
+                <span class="sr-only">Saved: </span>{{ display(previous?.[field]) === '—' ? 'empty' : display(previous?.[field]) }}
+              </span>
+              <AssetIcon name="arrow-right" :size="13" class="diff__arrow" aria-hidden="true" />
+              <span class="val val--after" :class="{ 'val--none': display(changes[field]) === '—' }">
+                <span class="sr-only">Corrected: </span>{{ display(changes[field]) === '—' ? 'empty' : display(changes[field]) }}
+              </span>
+            </span>
+          </li>
+        </ul>
+        <p v-else class="dialog__hint">
+          <AssetIcon name="info" :size="14" />
+          Nothing differs from what is saved yet — change the form first.
+        </p>
+      </section>
 
       <label class="field">
         <span class="field__label">What was entered wrongly, and why</span>
-        <textarea v-model="reason" class="field__input" rows="3" maxlength="1000" />
+        <textarea
+          v-model="reason"
+          class="field__input"
+          rows="3"
+          maxlength="1000"
+          placeholder="e.g. Typed 450 mL instead of 405 mL; the bag label reads 405."
+        />
+        <span class="field__count" aria-hidden="true">{{ reason.length }} / 1000</span>
       </label>
 
-      <p v-if="error" class="dialog__error" role="alert">{{ error }}</p>
+      <p v-if="error" class="dialog__error" role="alert">
+        <AssetIcon name="circle-alert" :size="15" />
+        {{ error }}
+      </p>
 
       <div class="dialog__actions">
+        <button type="button" class="btn" :disabled="busy" @click="$emit('close')">Cancel</button>
         <button type="button" class="btn btn--primary" :disabled="busy || !reason.trim()" @click="submit">
+          <AssetIcon :name="isHead ? 'check' : 'send'" :size="15" />
           {{ busy ? 'Sending…' : (isHead ? 'Apply correction' : 'Send for approval') }}
         </button>
-        <button type="button" class="btn" :disabled="busy" @click="$emit('close')">Cancel</button>
       </div>
     </div>
   </div>
@@ -66,6 +100,7 @@
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { correctionKind } from '~/utils/correctionKinds'
 
 const props = defineProps({
   donationId: { type: Number, default: null },
@@ -102,6 +137,7 @@ const HEADS = {
 }
 
 const label = computed(() => SUBJECTS[props.subject]?.label ?? 'record')
+const kind = computed(() => correctionKind(props.subject))
 
 const head = computed(() => HEADS[SUBJECTS[props.subject]?.department] ?? null)
 
@@ -191,135 +227,67 @@ async function submit() {
 </script>
 
 <style scoped>
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: var(--rb-overlay);
-}
-
+.dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: var(--rb-overlay); }
 .dialog {
-  width: min(520px, 100%);
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  padding: 1.25rem 1.35rem;
-  border-radius: 14px;
-  border: 1px solid var(--rb-border);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  outline: none;
+  width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: 20px 22px;
+  border: 1px solid var(--rb-border); border-radius: 18px; background: var(--rb-surface); color: var(--rb-text-primary);
+  box-shadow: 0 24px 60px -12px rgba(var(--rb-shadow-rgb), .35); outline: none;
 }
 
-.dialog__title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font-size: 16px;
-}
+.dialog__head { display: flex; align-items: flex-start; gap: 12px; }
+.dialog__heading { flex: 1; min-width: 0; }
+.dialog__title { margin: 2px 0 0; font-size: 17px; font-weight: 800; }
+.dialog__sub { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.icon-btn { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
+.icon-btn:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 
-.dialog__body,
-.dialog__hint {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
+.kind-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 13px; }
+.kind--red { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
+.kind--purple { background: rgba(var(--rb-purple-rgb, 124, 58, 237), .1); color: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.kind--blue { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.kind--green { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
+.kind--amber { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
 
-.diff {
-  list-style: none;
-  margin: 0;
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 13px;
-}
+/* Where it goes. */
+.route { display: flex; gap: 10px; padding: 12px 14px; border: 1px solid rgba(var(--rb-primary-rgb), .2); border-radius: 12px; background: rgba(var(--rb-primary-rgb), .05); }
+.route--head { border-color: rgba(var(--rb-success-rgb), .25); background: rgba(var(--rb-success-rgb), .07); }
+.route__icon { flex: none; margin-top: 2px; color: var(--rb-primary-text); }
+.route--head .route__icon { color: var(--rb-success-text); }
+.route__text { margin: 0; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
+.route__text strong { color: var(--rb-text-primary); }
 
-.diff li {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
+/* Saved → corrected, as on the Corrections page. */
+.changes { display: flex; flex-direction: column; gap: 8px; }
+.section-label { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); }
+.diff { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--rb-border); border-radius: 12px; }
+.diff__row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--rb-border); }
+.diff__row:first-child { border-top: 0; }
+.diff__field { font-size: 13px; font-weight: 600; text-transform: capitalize; color: var(--rb-text-secondary); }
+.diff__values { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.val { padding: 3px 9px; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.val--before { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); text-decoration: line-through; text-decoration-color: rgba(var(--rb-accent-rgb), .5); }
+.val--after { background: rgba(var(--rb-success-rgb), .1); font-weight: 700; color: var(--rb-success-text); }
+.val--none, .val--none.val--before { background: var(--rb-surface-alt); font-style: italic; font-weight: 500; color: var(--rb-text-muted); text-decoration: none; }
+.diff__arrow { flex: none; color: var(--rb-text-muted); }
+.dialog__hint { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(var(--rb-warning-rgb), .1); font-size: 13px; color: var(--rb-warning-text); }
 
-.diff__field {
-  min-width: 9rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
+.field { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.field__label { font-size: 13px; font-weight: 600; }
+.field__input { padding: 10px 12px 22px; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13.5px; resize: vertical; }
+.field__input::placeholder { color: var(--rb-placeholder); }
+.field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.field__count { position: absolute; right: 12px; bottom: 7px; font-size: 11px; color: var(--rb-text-muted); pointer-events: none; }
 
-.diff__before {
-  color: var(--rb-text-secondary);
-  text-decoration: line-through;
-}
+.dialog__error { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); font-size: 13px; }
+.dialog__error :deep(svg) { flex: none; margin-top: 1px; }
 
-.diff__after {
-  font-weight: 600;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field__label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.field__input {
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-}
-
-.dialog__error {
-  margin: 0;
-  padding: 0.5rem 0.7rem;
-  border-radius: 8px;
-  background: rgba(var(--rb-accent-rgb), 0.12);
-  color: var(--rb-accent-text);
-  font-size: 13px;
-}
-
-.dialog__actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.btn {
-  padding: 0.5rem 0.95rem;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--rb-text-primary);
-  font-weight: 600;
-  font-size: 13.5px;
-  cursor: pointer;
-}
-
-.btn--primary {
-  border-color: transparent;
-  background: var(--rb-primary);
-  color: #fff;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; border-top: 1px solid var(--rb-border); }
+.btn { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 16px; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
+.btn--primary { border-color: transparent; background: var(--rb-primary); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: var(--rb-primary-hover, #0D47A1); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .icon-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>

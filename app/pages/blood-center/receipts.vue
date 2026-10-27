@@ -10,42 +10,58 @@
         </transition-group>
       </div>
 
-      <!-- Receipts only (project owner, 2026-10-25). -->
-      <PageHeader title="Receipts" />
-
-      <section class="toolbar" aria-label="Filters">
-        <div class="search">
-          <AssetIcon name="search" :size="16" class="search-icon" />
-          <input
-            v-model="search"
-            type="search"
-            class="input search-input"
-            placeholder="Receipt number, request reference or patient"
-            aria-label="Search receipts"
-            @input="onSearch"
-          >
-        </div>
-        <div class="pills" role="group" aria-label="Status">
-          <button v-for="s in STATUSES" :key="s.value" class="pill" :class="{ 'pill--on': status === s.value }" :aria-pressed="status === s.value" @click="status = s.value">
-            {{ s.label }}
-          </button>
-        </div>
-        <label class="filter"><span>From</span><DatePicker id="receipts-from" v-model="from" :max="to || undefined" aria-label="From" size="sm" /></label>
-        <label class="filter"><span>To</span><DatePicker id="receipts-to" v-model="to" :min="from || undefined" aria-label="To" size="sm" /></label>
-      </section>
+      <!-- Payments, the Receipts tab (2026-10-27). -->
+      <PageHeader title="Payments" subtitle="Every payment, as the receipts issued for it." />
+      <BloodCenterPaymentsTabs class="pay-tabs-row" />
 
       <section class="card" aria-label="Receipts">
+        <!-- The filters inside the card, on one row (2026-10-27). -->
+        <div class="toolbar" aria-label="Filters">
+          <div class="search">
+            <AssetIcon name="search" :size="16" class="search-icon" />
+            <input
+              v-model="search"
+              type="search"
+              class="input search-input"
+              placeholder="Receipt number, request reference or patient"
+              aria-label="Search receipts"
+              @input="onSearch"
+            >
+          </div>
+          <div class="range" role="group" aria-label="Issued between">
+            <DatePicker id="receipts-from" v-model="from" :max="to || undefined" placeholder="From" aria-label="From" size="sm" />
+            <span class="range-sep" aria-hidden="true">–</span>
+            <DatePicker id="receipts-to" v-model="to" :min="from || undefined" placeholder="To" aria-label="To" size="sm" />
+          </div>
+          <div class="pills" role="group" aria-label="Status">
+            <button v-for="s in STATUSES" :key="s.value" class="pill" :class="{ 'pill--on': status === s.value }" :aria-pressed="status === s.value" @click="status = s.value">
+              {{ s.label }}
+            </button>
+          </div>
+        </div>
         <div v-if="loading" class="skeleton-wrap"><div v-for="n in 6" :key="n" class="skeleton" /></div>
 
         <EmptyState v-else-if="error" icon="triangle-alert" title="The receipts could not be loaded" :description="error">
           <button class="ui-btn" @click="load()">Try again</button>
         </EmptyState>
 
-        <EmptyState
-          v-else-if="!receipts.length"
-          icon="receipt"
-          :title="filtered ? 'No receipt matches these filters' : 'No receipts yet'"
-        />
+        <div v-else-if="!receipts.length" class="pay-empty">
+          <span class="pay-empty__icon" aria-hidden="true"><AssetIcon :name="filtered ? 'search-x' : 'receipt'" :size="24" /></span>
+          <h2 class="pay-empty__title">{{ filtered ? 'No receipt matches these filters' : 'No receipts yet' }}</h2>
+          <p class="pay-empty__text">
+            {{ filtered
+              ? 'Try another number or name, widen the dates, or show every status.'
+              : 'Every payment taken at the billing counter is given a receipt, listed here to reopen, reprint or download.' }}
+          </p>
+          <button v-if="filtered" type="button" class="ui-btn" @click="clearFilters">
+            <AssetIcon name="x" :size="14" />
+            Clear filters
+          </button>
+          <NuxtLink v-else to="/blood-center/pos" class="ui-btn">
+            <AssetIcon name="philippine-peso" :size="15" />
+            Open billing counter
+          </NuxtLink>
+        </div>
 
         <div v-else class="table-scroll">
           <table class="rl-table">
@@ -73,9 +89,14 @@
                   <span v-if="r.payer_name && r.request?.patient_name" class="sub">For {{ r.request.patient_name }}</span>
                 </td>
                 <td class="mono">{{ r.request?.reference_number || '—' }}</td>
-                <td>{{ r.payment?.method_label || r.payment_method_label || '—' }}</td>
+                <td>
+                  <span class="method-chip" :class="`method-chip--${methodKey(r)}`">
+                    <AssetIcon :name="methodIcon(r)" :size="13" />
+                    {{ r.payment?.method_label || r.payment_method_label || '—' }}
+                  </span>
+                </td>
                 <td class="num strong">{{ pesos(r.amount_paid) }}</td>
-                <td class="num">{{ Number(r.balance_after) > 0 ? pesos(r.balance_after) : 'Settled' }}</td>
+                <td class="num" :class="{ 'settled': !(Number(r.balance_after) > 0) }">{{ Number(r.balance_after) > 0 ? pesos(r.balance_after) : 'Settled' }}</td>
                 <td>
                   <BillingBadge v-if="r.voided" tone="muted">Voided</BillingBadge>
                   <BillingBadge v-else-if="r.is_partial" tone="warning">Part payment</BillingBadge>
@@ -94,10 +115,19 @@
           </table>
         </div>
 
-        <footer v-if="!loading && meta.last_page > 1" class="pager">
-          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Previous</button>
-          <span>Page {{ meta.current_page }} of {{ meta.last_page }} · {{ meta.total }} receipts</span>
-          <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Next</button>
+        <footer v-if="!loading && receipts.length" class="pager">
+          <span class="pager__count">{{ meta.total }} {{ meta.total === 1 ? 'receipt' : 'receipts' }}</span>
+          <div v-if="meta.last_page > 1" class="pager__steps">
+            <button class="ui-btn ui-btn--sm" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">
+              <AssetIcon name="chevron-left" :size="14" />
+              Previous
+            </button>
+            <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+            <button class="ui-btn ui-btn--sm" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">
+              Next
+              <AssetIcon name="chevron-right" :size="14" />
+            </button>
+          </div>
         </footer>
       </section>
     </div>
@@ -117,7 +147,6 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
-import EmptyState from '~/components/ui/EmptyState.vue'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -181,6 +210,23 @@ async function load(page = 1) {
     loading.value = false
   }
 }
+
+function clearFilters() {
+  search.value = ''
+  status.value = ''
+  from.value = ''
+  to.value = ''
+  load()
+}
+
+// The method, by its icon and colour.
+const METHOD_ICONS = { cash: 'philippine-peso', gcash: 'smartphone', card: 'credit-card', bank_transfer: 'building-2', check: 'file-text' }
+// The API gives the label only ("Cash", "GCash", "Bank transfer").
+const methodKey = (r) => {
+  const label = r.payment?.method_label || r.payment_method_label || ''
+  return label.toLowerCase().trim().replace(/\s+/g, '_') || 'other'
+}
+const methodIcon = r => METHOD_ICONS[methodKey(r)] ?? 'receipt'
 
 let searchTimer = null
 function onSearch() {
@@ -311,4 +357,43 @@ onMounted(() => load())
 
 /* Cards in the shared SectionCard's shape (2026-10-15). */
 .card { border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); }
+
+/* The Payments tabs sit at their own width, under the title. */
+.pay-tabs-row { align-self: flex-start; }
+
+/* ===== Refresh (project owner, 2026-10-27) ===== */
+/* The filters inside the card, on one row, as on Invoices. */
+.card > .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--rb-border); background: var(--rb-surface); }
+.toolbar .search { flex: 1 1 320px; min-width: 0; }
+.range { display: inline-flex; align-items: center; gap: 6px; }
+.range :deep(.dp) { width: 150px; }
+.range-sep { color: var(--rb-text-muted); }
+.pills { background: var(--rb-surface-alt); }
+.card { border-radius: 16px; }
+
+.rl-table td { padding: 13px 14px; }
+.rl-table td.num.strong { font-size: 14px; }
+.settled { font-weight: 700; color: var(--rb-success-text); }
+
+.method-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--rb-text-primary); }
+.method-chip :deep(.asset-icon) { color: var(--rb-text-secondary); }
+.method-chip--cash { background: rgba(var(--rb-success-rgb), 0.1); }
+.method-chip--cash :deep(.asset-icon) { color: var(--rb-success-text); }
+.method-chip--gcash { background: rgba(var(--rb-primary-rgb), 0.09); }
+.method-chip--gcash :deep(.asset-icon) { color: var(--rb-primary-text); }
+.method-chip--card { background: rgba(var(--rb-purple-rgb, 124, 58, 237), 0.1); }
+.method-chip--card :deep(.asset-icon) { color: var(--rb-purple-text, #6D28D9); }
+.method-chip--bank_transfer { background: rgba(var(--rb-warning-rgb), 0.12); }
+.method-chip--bank_transfer :deep(.asset-icon) { color: var(--rb-warning-text); }
+
+.pager { justify-content: space-between; padding: 12px 16px; }
+.pager__count { font-weight: 600; color: var(--rb-text-secondary); }
+.pager__steps { display: inline-flex; align-items: center; gap: 12px; }
+
+/* Empty: laid out as Invoices' and Statements'. */
+.pay-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; text-align: center; }
+.pay-empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.pay-empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.pay-empty__text { max-width: 520px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
+.pay-empty .ui-btn { margin-top: 6px; text-decoration: none; }
 </style>

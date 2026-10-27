@@ -1,8 +1,8 @@
 <template>
   <div class="tx-page">
     <div class="tx-inner">
-      <!-- The transactions only (project owner, 2026-10-25). -->
-      <PageHeader title="Billing Transactions">
+      <!-- Payments, the Transactions tab (2026-10-27). -->
+      <PageHeader title="Payments" subtitle="Every payment, refund and void, as the billing journal records it.">
         <template #actions>
           <button class="ui-btn ui-btn--download" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />
@@ -10,54 +10,54 @@
           </button>
         </template>
       </PageHeader>
-
-      <!-- FILTERS: the common ones in reach, the rest one click away -->
-      <section class="filter-bar" aria-label="Filters">
-        <div class="search">
-          <AssetIcon name="search" :size="16" class="search-icon" />
-          <input v-model.trim="filters.search" type="search" class="input search-input" placeholder="TXN, request or payment reference" aria-label="Search transactions" @input="onSearch">
-        </div>
-        <div class="range">
-          <DatePicker id="tx-from" v-model="filters.from" :max="filters.to || undefined" placeholder="From" aria-label="From" size="sm" />
-          <span class="range-sep" aria-hidden="true">–</span>
-          <DatePicker id="tx-to" v-model="filters.to" :min="filters.from || undefined" placeholder="To" aria-label="To" size="sm" />
-        </div>
-        <div class="select-sm">
-          <SelectField id="tx-type" v-model="filters.type" :options="typeOptions" icon="sliders-horizontal" size="sm" />
-        </div>
-        <button type="button" class="ui-btn btn-filters" :class="{ 'btn-filters--on': moreOpen }" :aria-expanded="moreOpen" aria-controls="tx-more" @click="moreOpen = !moreOpen">
-          <AssetIcon name="sliders-horizontal" :size="15" />
-          More filters
-          <span v-if="moreCount" class="count-badge">{{ moreCount }}</span>
-        </button>
-
-        <div v-if="moreOpen" id="tx-more" class="more">
-          <div class="field">
-            <label for="tx-category" class="field-label">Category</label>
-            <SelectField id="tx-category" v-model="filters.category" :options="CATEGORY_OPTIONS" size="sm" />
-          </div>
-          <div class="field">
-            <label for="tx-channel" class="field-label">Channel</label>
-            <SelectField id="tx-channel" v-model="filters.channel" :options="CHANNEL_OPTIONS" size="sm" />
-          </div>
-          <div class="field">
-            <label for="tx-method" class="field-label">Method</label>
-            <SelectField id="tx-method" v-model="filters.payment_method" :options="methodOptions" size="sm" />
-          </div>
-        </div>
-
-        <div v-if="activeChips.length" class="chips" aria-label="Active filters">
-          <span v-for="chip in activeChips" :key="chip.key" class="chip-filter">
-            <span class="chip-filter-label">{{ chip.label }}</span>
-            <button type="button" :aria-label="`Remove ${chip.label}`" @click="filters[chip.key] = ''"><AssetIcon name="x" :size="12" /></button>
-          </span>
-          <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="reset">Clear all</button>
-        </div>
-      </section>
+      <BloodCenterPaymentsTabs class="pay-tabs-row" />
 
       <p v-if="error" class="banner banner--error">{{ error }}</p>
 
       <div class="card">
+        <!-- FILTERS, inside the card (2026-10-27): the common ones in reach, the rest one click away -->
+        <div class="filter-bar" aria-label="Filters">
+          <div class="search">
+            <AssetIcon name="search" :size="16" class="search-icon" />
+            <input v-model.trim="filters.search" type="search" class="input search-input" placeholder="TXN, request or payment reference" aria-label="Search transactions" @input="onSearch">
+          </div>
+          <div class="range">
+            <DatePicker id="tx-from" v-model="filters.from" :max="filters.to || undefined" placeholder="From" aria-label="From" size="sm" />
+            <span class="range-sep" aria-hidden="true">–</span>
+            <DatePicker id="tx-to" v-model="filters.to" :min="filters.from || undefined" placeholder="To" aria-label="To" size="sm" />
+          </div>
+          <div class="select-sm">
+            <SelectField id="tx-type" v-model="filters.type" :options="typeOptions" icon="sliders-horizontal" size="sm" />
+          </div>
+          <button type="button" class="ui-btn btn-filters" :class="{ 'btn-filters--on': moreOpen }" :aria-expanded="moreOpen" aria-controls="tx-more" @click="moreOpen = !moreOpen">
+            <AssetIcon name="sliders-horizontal" :size="15" />
+            More filters
+            <span v-if="moreCount" class="count-badge">{{ moreCount }}</span>
+          </button>
+
+          <div v-if="moreOpen" id="tx-more" class="more">
+            <div class="field">
+              <label for="tx-category" class="field-label">Category</label>
+              <SelectField id="tx-category" v-model="filters.category" :options="CATEGORY_OPTIONS" size="sm" />
+            </div>
+            <div class="field">
+              <label for="tx-channel" class="field-label">Channel</label>
+              <SelectField id="tx-channel" v-model="filters.channel" :options="CHANNEL_OPTIONS" size="sm" />
+            </div>
+            <div class="field">
+              <label for="tx-method" class="field-label">Method</label>
+              <SelectField id="tx-method" v-model="filters.payment_method" :options="methodOptions" size="sm" />
+            </div>
+          </div>
+
+          <div v-if="activeChips.length" class="chips" aria-label="Active filters">
+            <span v-for="chip in activeChips" :key="chip.key" class="chip-filter">
+              <span class="chip-filter-label">{{ chip.label }}</span>
+              <button type="button" :aria-label="`Remove ${chip.label}`" @click="filters[chip.key] = ''"><AssetIcon name="x" :size="12" /></button>
+            </span>
+            <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="reset">Clear all</button>
+          </div>
+        </div>
         <div v-if="loading" class="skeleton-wrap">
           <div v-for="n in 6" :key="n" class="skeleton-row">
             <span class="skeleton skeleton--dot" />
@@ -66,10 +66,18 @@
           </div>
         </div>
 
-        <div v-else-if="!rows.length" class="empty">
-          <span class="empty-icon" aria-hidden="true"><AssetIcon name="list" :size="26" /></span>
-          <h3>No transactions</h3>
-          <p>Nothing matches these filters.</p>
+        <div v-else-if="!rows.length" class="pay-empty">
+          <span class="pay-empty__icon" aria-hidden="true"><AssetIcon :name="activeChips.length || filters.search ? 'search-x' : 'list'" :size="24" /></span>
+          <h2 class="pay-empty__title">{{ activeChips.length || filters.search ? 'No transaction matches these filters' : 'No transactions yet' }}</h2>
+          <p class="pay-empty__text">
+            {{ activeChips.length || filters.search
+              ? 'Try another number, widen the dates, or clear a filter.'
+              : 'Every charge, payment, subsidy and void is written to this journal as it happens, and never changed.' }}
+          </p>
+          <button v-if="activeChips.length || filters.search" type="button" class="ui-btn" @click="reset">
+            <AssetIcon name="x" :size="14" />
+            Clear filters
+          </button>
         </div>
 
         <!-- THE LEDGER: newest first, grouped by day, two lines a row -->
@@ -447,4 +455,18 @@ onMounted(() => load())
 @media (max-width: 960px) {
   .more { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 }
+
+/* The Payments tabs sit at their own width, under the title. */
+.pay-tabs-row { align-self: flex-start; }
+
+/* Empty: laid out as Receipts', Invoices' and Statements' (2026-10-27). */
+.pay-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; text-align: center; }
+.pay-empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.pay-empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.pay-empty__text { max-width: 520px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
+.pay-empty .ui-btn { margin-top: 6px; }
+.card { border-radius: 16px; }
+/* The filters inside the card, as on Receipts and Invoices. */
+.card > .filter-bar { padding: 14px 16px; border-bottom: 1px solid var(--rb-border); }
+.filter-bar .search { flex: 1 1 320px; min-width: 0; }
 </style>

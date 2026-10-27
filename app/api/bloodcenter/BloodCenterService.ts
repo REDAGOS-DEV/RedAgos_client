@@ -1127,6 +1127,11 @@ class BloodCenterService extends BaseService {
   }
 
   /** The centre's billing at a glance, counted on the server. */
+  /** The Billing department's dashboard (BillingDashboardService). */
+  async billingDashboard(): Promise<any> {
+    return this.request('/blood-center/billing-dashboard', 'GET')
+  }
+
   async billingSummary(): Promise<BillingSummary> {
     return this.request('/blood-center/billings/summary', 'GET')
   }

@@ -487,9 +487,10 @@ describe('corrections', () => {
   })
 
   it('lets only the server decide who may decide', () => {
-    expect(page).toContain('v-if="item.can_decide"')
+    expect(page).toContain('v-if="selected.can_decide"')
     expect(page).toContain("bloodCenterService.rejectCorrection(item.id, { note })")
-    expect(page).toContain(":disabled=\"busy === item.id || !(notes[item.id] || '').trim()\"")
+    // A reject without a note opens the note instead of sending (2026-10-27).
+    expect(page).toMatch(/function rejectClicked\(item\) \{\s+if \(!\(notes\[item\.id\] \|\| ''\)\.trim\(\)\) \{\s+openNote\(item\)\s+return/)
   })
 
   it('is reached from every page that saves a correctable record', () => {

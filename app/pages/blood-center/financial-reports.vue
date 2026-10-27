@@ -38,10 +38,13 @@
 
       <!-- The period in five figures, counted on the server. -->
       <dl class="figures" :aria-busy="loading">
-        <div v-for="f in figures" :key="f.label" class="figure">
-          <dt>{{ f.label }}</dt>
+        <div v-for="f in figures" :key="f.label" class="figure" :class="[`figure--${f.tone}`, { 'figure--zero': report && !(f.raw > 0) }]">
+          <dt>
+            <span class="figure__icon" aria-hidden="true"><AssetIcon :name="f.icon" :size="16" /></span>
+            {{ f.label }}
+          </dt>
           <dd>{{ f.value }}</dd>
-          <span>{{ f.note }}</span>
+          <span class="figure__note">{{ f.note }}</span>
         </div>
       </dl>
 
@@ -56,16 +59,26 @@
 
             <div class="methods">
               <h3 class="sub-title">By method</h3>
-              <ul class="meter-list">
-                <li v-for="m in methods" :key="m.method" class="meter-row">
-                  <span class="meter-label">{{ m.label }}</span>
+              <p v-if="report && !methodMax" class="none-line">
+                <AssetIcon name="receipt" :size="14" />
+                No payments in this period.
+              </p>
+              <ul v-else class="meter-list">
+                <li v-for="m in methods" :key="m.method" class="meter-row" :class="[`meter-row--${m.method}`, { 'meter-row--none': !(Number(m.amount) > 0) }]">
+                  <span class="meter-label">
+                    <span class="meter-icon" aria-hidden="true"><AssetIcon :name="METHOD_ICONS[m.method] ?? 'receipt'" :size="13" /></span>
+                    {{ m.label }}
+                  </span>
                   <span class="meter-value">{{ pesos(m.amount) }}</span>
                   <span class="meter-track" aria-hidden="true"><span class="meter-fill" :style="{ width: `${share(m.amount, methodMax)}%` }" /></span>
                   <span class="meter-note">{{ m.payments }} {{ m.payments === 1 ? 'payment' : 'payments' }}</span>
                 </li>
               </ul>
-              <p class="voids">
-                Voided: <strong>{{ report?.collections?.voids?.count ?? 0 }}</strong> · {{ pesos(report?.collections?.voids?.amount) }}
+              <p class="voids" :class="{ 'voids--none': !(report?.collections?.voids?.count) }">
+                <AssetIcon name="ban" :size="14" />
+                <span>Voided</span>
+                <strong>{{ report?.collections?.voids?.count ?? 0 }}</strong>
+                <span class="voids__amount">{{ pesos(report?.collections?.voids?.amount) }}</span>
               </p>
             </div>
           </div>
@@ -79,8 +92,25 @@
           <div class="owed">
             <div v-for="block in owed" :key="block.key" class="owed-block">
               <div class="owed-head">
-                <h3 class="sub-title">{{ block.title }}</h3>
-                <span class="owed-total">{{ pesos(block.data?.amount) }}</span>
+                <h3 class="owed-title">
+                  <AssetIcon :name="block.key === 'patients' ? 'user' : 'building-2'" :size="15" />
+                  {{ block.title }}
+                </h3>
+                <span class="owed-total" :class="{ 'owed-total--zero': report && !(Number(block.data?.amount) > 0) }">{{ pesos(block.data?.amount) }}</span>
+              </div>
+              <p v-if="report && !(Number(block.data?.amount) > 0)" class="none-line none-line--ok">
+                <AssetIcon name="check-circle" :size="14" />
+                Nothing owed by {{ block.key === 'patients' ? 'patients' : 'hospitals' }}.
+              </p>
+              <template v-else>
+              <div class="age-bar" aria-hidden="true">
+                <span
+                  v-for="age in block.data?.by_age ?? emptyAges"
+                  :key="age.key"
+                  class="age-bar__seg"
+                  :class="`age--${age.key}`"
+                  :style="{ flexGrow: Number(age.amount) || 0 }"
+                />
               </div>
               <table class="ages">
                 <thead class="sr-only">
@@ -88,12 +118,13 @@
                 </thead>
                 <tbody>
                   <tr v-for="age in block.data?.by_age ?? emptyAges" :key="age.key">
-                    <th scope="row">{{ age.label }}</th>
+                    <th scope="row"><span class="age-dot" :class="`age--${age.key}`" aria-hidden="true" />{{ age.label }}</th>
                     <td class="num muted">{{ age.count }} {{ age.count === 1 ? 'invoice' : 'invoices' }}</td>
                     <td class="num strong">{{ pesos(age.amount) }}</td>
                   </tr>
                 </tbody>
               </table>
+              </template>
             </div>
           </div>
         </section>
@@ -116,15 +147,25 @@
               </thead>
               <tbody>
                 <tr v-for="h in report?.by_hospital ?? []" :key="h.facility_id">
-                  <td>{{ h.name }}</td>
+                  <td>
+                    <span class="row-name">{{ h.name }}</span>
+                    <span class="row-bar" aria-hidden="true"><span :style="{ width: `${share(h.billed, hospitalMax)}%` }" /></span>
+                  </td>
                   <td class="num">{{ h.invoices }}</td>
                   <td class="num">{{ h.patient_invoices }}</td>
                   <td class="num">{{ h.weekly_invoices }}</td>
                   <td class="num strong">{{ pesos(h.billed) }}</td>
-                  <td class="num" :class="{ owing: Number(h.outstanding) > 0 }">{{ pesos(h.outstanding) }}</td>
+                  <td class="num" :class="Number(h.outstanding) > 0 ? 'owing' : 'settled'">{{ Number(h.outstanding) > 0 ? pesos(h.outstanding) : 'Settled' }}</td>
                 </tr>
                 <tr v-if="!(report?.by_hospital ?? []).length" class="empty-row">
-                  <td colspan="6">{{ loading ? 'Loading…' : 'No invoices in this period.' }}</td>
+                  <td colspan="6">
+                    <span v-if="loading">Loading…</span>
+                    <span v-else class="table-empty">
+                      <span class="table-empty__icon table-empty__icon--purple" aria-hidden="true"><AssetIcon name="building-2" :size="20" /></span>
+                      <strong>No hospital was invoiced in this period</strong>
+                      <span>Each hospital whose requests were billed is listed here, with what it still owes.</span>
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -146,12 +187,22 @@
               </thead>
               <tbody>
                 <tr v-for="c in report?.by_component ?? []" :key="c.component_id">
-                  <td>{{ c.name }}</td>
+                  <td>
+                    <span class="row-name">{{ c.name }}</span>
+                    <span class="row-bar" aria-hidden="true"><span :style="{ width: `${share(c.amount, componentMax)}%` }" /></span>
+                  </td>
                   <td class="num">{{ c.units }}</td>
-                  <td class="num strong">{{ pesos(c.amount) }}</td>
+                  <td class="num strong" :class="{ muted: !(Number(c.amount) > 0) }">{{ pesos(c.amount) }}</td>
                 </tr>
                 <tr v-if="!(report?.by_component ?? []).length" class="empty-row">
-                  <td colspan="3">{{ loading ? 'Loading…' : 'No invoices in this period.' }}</td>
+                  <td colspan="3">
+                    <span v-if="loading">Loading…</span>
+                    <span v-else class="table-empty">
+                      <span class="table-empty__icon" aria-hidden="true"><AssetIcon name="droplets" :size="20" /></span>
+                      <strong>No component was billed in this period</strong>
+                      <span>The units invoiced, by component, show here.</span>
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -246,11 +297,11 @@ const figures = computed(() => {
   const count = (n, one, many) => `${n ?? 0} ${(n ?? 0) === 1 ? one : many}`
 
   return [
-    { label: 'Invoiced', value: pesos(s?.invoiced), note: count(s?.invoices, 'invoice', 'invoices') },
-    { label: 'Collected', value: pesos(s?.collected), note: count(report.value?.collections?.payments, 'payment', 'payments') },
-    { label: 'Subsidised', value: pesos(s?.subsidised), note: count(report.value?.subsidies?.count, 'request', 'requests') },
-    { label: 'Settled by hospitals', value: pesos(s?.settled_by_hospitals), note: count(report.value?.receivables?.settlements?.count, 'settlement', 'settlements') },
-    { label: 'Outstanding', value: pesos(s?.outstanding), note: 'As of today' },
+    { label: 'Invoiced', raw: Number(s?.invoiced), icon: 'file-text', tone: 'neutral', value: pesos(s?.invoiced), note: count(s?.invoices, 'invoice', 'invoices') },
+    { label: 'Collected', raw: Number(s?.collected), icon: 'philippine-peso', tone: 'blue', value: pesos(s?.collected), note: count(report.value?.collections?.payments, 'payment', 'payments') },
+    { label: 'Subsidised', raw: Number(s?.subsidised), icon: 'shield-check', tone: 'green', value: pesos(s?.subsidised), note: count(report.value?.subsidies?.count, 'request', 'requests') },
+    { label: 'Settled by hospitals', raw: Number(s?.settled_by_hospitals), icon: 'building-2', tone: 'purple', value: pesos(s?.settled_by_hospitals), note: count(report.value?.receivables?.settlements?.count, 'settlement', 'settlements') },
+    { label: 'Outstanding', raw: Number(s?.outstanding), icon: 'clock', tone: 'amber', value: pesos(s?.outstanding), note: 'As of today' },
   ]
 })
 
@@ -260,6 +311,10 @@ const methods = computed(() => report.value?.collections?.by_method ?? [
   { method: 'card', label: 'Card', amount: '0.00', payments: 0 },
   { method: 'bank_transfer', label: 'Bank transfer', amount: '0.00', payments: 0 },
 ])
+// The method, by its icon (as on Payments).
+const METHOD_ICONS = { cash: 'philippine-peso', gcash: 'smartphone', card: 'credit-card', bank_transfer: 'building-2' }
+const hospitalMax = computed(() => Math.max(0, ...(report.value?.by_hospital ?? []).map((h) => Number(h.billed) || 0)))
+const componentMax = computed(() => Math.max(0, ...(report.value?.by_component ?? []).map((c) => Number(c.amount) || 0)))
 const methodMax = computed(() => Math.max(0, ...methods.value.map((m) => Number(m.amount) || 0)))
 
 const emptyAges = [
@@ -376,4 +431,82 @@ function share(amount, max) {
   .figure:nth-child(-n + 2) { border-top: 0; }
   .report-actions, .period { justify-content: flex-start; }
 }
+
+/* ===== Refresh (project owner, 2026-10-27) ===== */
+/* Figures: five tiles, each its icon and tone. */
+.figures { gap: 12px; background: none; border: 0; border-radius: 0; overflow: visible; }
+.figure {
+  --tone-rgb: var(--rb-primary-rgb);
+  gap: 6px; padding: 16px 18px; border: 1px solid var(--rb-border) !important; border-radius: 16px; background: var(--rb-surface);
+}
+.figure--neutral { --tone-rgb: var(--rb-shadow-rgb); }
+.figure--green { --tone-rgb: var(--rb-success-rgb); }
+.figure--purple { --tone-rgb: var(--rb-purple-rgb, 124, 58, 237); }
+.figure--amber { --tone-rgb: var(--rb-warning-rgb); }
+.figure dt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.figure__icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: rgba(var(--tone-rgb), .1); color: rgb(var(--tone-rgb)); }
+.figure--neutral .figure__icon { color: var(--rb-text-secondary); background: var(--rb-surface-alt); }
+.figure dd { font-size: 23px; font-variant-numeric: tabular-nums; }
+.figure--amber dd { color: var(--rb-warning-text); }
+.figure .figure__note { font-size: 12px; color: var(--rb-text-muted); }
+
+.card { border-radius: 16px; }
+.collections-body { grid-template-columns: minmax(0, 1fr) 260px; }
+.methods { padding-left: 24px; border-left: 1px solid var(--rb-border); }
+.sub-title { letter-spacing: 0; text-transform: none; font-size: 13px; color: var(--rb-text-primary); }
+
+/* Methods: their own colours, as on Payments. */
+.meter-row { --tone-rgb: var(--rb-primary-rgb); }
+.meter-row--cash { --tone-rgb: var(--rb-success-rgb); }
+.meter-row--card { --tone-rgb: var(--rb-purple-rgb, 124, 58, 237); }
+.meter-row--bank_transfer { --tone-rgb: var(--rb-warning-rgb); }
+.meter-label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.meter-icon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: rgba(var(--tone-rgb), .12); color: rgb(var(--tone-rgb)); }
+.meter-fill { background: rgb(var(--tone-rgb)); opacity: 1; }
+.meter-row--none { opacity: .6; }
+.voids { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(var(--rb-accent-rgb), .06); color: var(--rb-accent-text); }
+.voids strong { color: var(--rb-accent-text); }
+.voids__amount { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.voids--none { background: var(--rb-surface-alt); color: var(--rb-text-muted); }
+.voids--none strong { color: var(--rb-text-secondary); }
+
+/* Receivables: how old, as one bar, and each row its colour. */
+.owed-block { gap: 10px; padding: 16px 18px; }
+.owed-title { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+.owed-title :deep(.asset-icon) { color: var(--rb-text-secondary); }
+.owed-total { font-size: 20px; font-variant-numeric: tabular-nums; }
+.age-bar { display: flex; gap: 3px; height: 10px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
+.age-bar__seg { flex-basis: 0; min-width: 0; }
+.age--week { background: var(--rb-success); }
+.age--month { background: var(--rb-warning); }
+.age--older { background: var(--rb-accent); }
+.age-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; vertical-align: 1px; }
+.ages th, .ages td { padding: 7px 0; }
+
+/* Tables: a bar of each row's share, settled in green. */
+.row-name { display: block; }
+.row-bar { display: block; height: 4px; max-width: 220px; margin-top: 6px; border-radius: 999px; background: var(--rb-surface-alt); overflow: hidden; }
+.row-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--rb-primary); opacity: .75; }
+.fr-table td { padding: 11px 14px; }
+.fr-table tbody tr:hover td { background: var(--rb-surface-hover); }
+.fr-table td.owing { color: var(--rb-warning-text); }
+.fr-table td.settled { font-weight: 700; color: var(--rb-success-text); }
+
+@media (max-width: 1280px) {
+  .figure:nth-child(n) { border-left: 1px solid var(--rb-border); border-top: 1px solid var(--rb-border); }
+  .methods { padding-left: 0; border-left: 0; }
+}
+
+/* An empty period: the tiles keep their colours; one tinted line instead of rows of ₱0.00. */
+.figure--amber.figure--zero dd { color: var(--rb-text-primary); }
+.owed-total--zero { color: var(--rb-success-text); }
+.none-line { display: flex; align-items: center; gap: 8px; margin: 0; padding: 11px 12px; border: 1px solid rgba(var(--rb-primary-rgb), .18); border-radius: 10px; background: rgba(var(--rb-primary-rgb), .06); font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); }
+.none-line--ok { border-color: rgba(var(--rb-success-rgb), .22); background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); }
+
+/* The tables, empty: an icon in its tone and what will show there. */
+.empty-row td { padding: 28px 16px; }
+.table-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+.table-empty strong { font-size: 13.5px; color: var(--rb-text-primary); }
+.table-empty__icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 13px; background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); box-shadow: 0 0 0 6px rgba(var(--rb-accent-rgb), .05); }
+.table-empty__icon--purple { background: rgba(var(--rb-purple-rgb, 124, 58, 237), .1); color: rgb(var(--rb-purple-rgb, 124, 58, 237)); box-shadow: 0 0 0 6px rgba(var(--rb-purple-rgb, 124, 58, 237), .05); }
 </style>
