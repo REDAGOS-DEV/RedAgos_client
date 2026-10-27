@@ -7,10 +7,9 @@
     -->
     <!-- No icon, steps or card of Testing's outcome (project owner, 2026-10-22). -->
     <header class="laboratory__header">
-      <h1 class="laboratory__title">Processing</h1>
+      <h1 class="laboratory__title">Component Processing</h1>
       <p class="laboratory__subtitle">
-        Record component separation and prepare units for issuance. A processed unit moves to the Processed list,
-        where it is handed over to Issuance.
+        Separate each unit into its component bags. Processed units go to the Processed list for hand-over.
       </p>
     </header>
 
@@ -36,6 +35,22 @@
           </button>
         </div>
 
+        <!-- Scan a bag's barcode to open its unit; typing narrows the list (2026-10-28). -->
+        <form class="scan" role="search" @submit.prevent="scanOpen">
+          <AssetIcon name="scan-line" :size="16" class="scan__icon" />
+          <input
+            ref="scanInput"
+            v-model.trim="scanQuery"
+            type="search"
+            class="scan__input"
+            placeholder="Scan or type a barcode"
+            aria-label="Scan or type a donation barcode"
+            autocomplete="off"
+          >
+          <kbd v-if="!scanQuery" class="scan__kbd" aria-hidden="true">/</kbd>
+        </form>
+        <p v-if="scanMiss" class="scan__miss" role="status">No unit with barcode {{ scanMiss }}.</p>
+
         <!-- The status filter as chips, each with how many units it holds. -->
         <div class="status-chips" role="group" aria-label="Show">
           <button
@@ -60,20 +75,25 @@
           </li>
         </ul>
 
-        <div v-else-if="!queue.length" class="queue-empty">
-          <BagIcon class="queue-empty__icon" />
-          <p class="queue-empty__title">{{ statusFilter ? 'Nothing matches this filter' : 'No units awaiting processing' }}</p>
+        <div v-else-if="!queue.length" class="queue-empty" :class="{ 'queue-empty--clear': !statusFilter }">
+          <span v-if="!statusFilter" class="queue-empty__badge" aria-hidden="true"><AssetIcon name="check-check" :size="26" /></span>
+          <BagIcon v-else class="queue-empty__icon" />
+          <p class="queue-empty__title">{{ statusFilter ? 'Nothing matches this filter' : 'All caught up' }}</p>
           <p class="queue-empty__text">
             <template v-if="statusFilter">Units show here once they reach this stage. Pick another filter or check back later.</template>
             <template v-else>
-              Donations appear here once the counter records a collection. Processed ones are on the
+              No unit is waiting to be separated. New donations appear here once the counter records a collection. Processed ones are on the
               <NuxtLink to="/blood-center/processed" class="queue-empty__link">Processed list</NuxtLink>.
             </template>
           </p>
         </div>
 
+        <p v-else-if="!shownQueue.length" class="queue-empty queue-empty--search">
+          No unit on this list matches “{{ scanQuery }}”. Press Enter to look it up by barcode.
+        </p>
+
         <ul v-else class="qlist">
-          <li v-for="row in queue" :key="row.id">
+          <li v-for="row in shownQueue" :key="row.id">
             <button
               type="button"
               class="qitem"
@@ -84,10 +104,24 @@
             >
               <span class="qitem__top">
                 <span class="qitem__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
-                <span class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
+                <span v-if="!['completed', 'rejected'].includes(row.status)" class="age" :class="`age--${ageTone(row)}`" :title="`Drawn ${formatDate(drawnAt(row))}`">
+                  <AssetIcon name="clock" :size="11" />
+                  {{ ageText(row) }}
+                </span>
+                <span v-else class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
               </span>
               <span class="qitem__meta">
                 #{{ row.id }} · {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} · {{ formatDate(row.donation_date) }}
+              </span>
+              <span v-if="!['completed', 'rejected'].includes(row.status)" class="checks">
+                <span class="check" :class="`check--${row.components?.length ? 'done' : 'todo'}`">
+                  <AssetIcon :name="row.components?.length ? 'check' : 'circle'" :size="11" />
+                  Separated
+                </span>
+                <span class="check" :class="`check--${testingState(row)}`">
+                  <AssetIcon :name="testingState(row) === 'done' ? 'check' : testingState(row) === 'fail' ? 'x' : 'clock'" :size="11" />
+                  Testing
+                </span>
               </span>
               <span class="qitem__next">
                 <AssetIcon name="arrow-right" :size="12" />
@@ -99,15 +133,15 @@
       </aside>
 
       <section class="bench" aria-live="polite">
-        <!-- COMPONENT SEPARATION -->
-        <section class="card">
+        <!-- COMPONENT SEPARATION. Ctrl+Enter records the bags added (2026-10-28). -->
+        <section class="card" @keydown.ctrl.enter.prevent="recordByKey" @keydown.meta.enter.prevent="recordByKey">
           <div class="sep__head">
             <h2 class="card__title">Component separation</h2>
 
-            <div class="picked">
+            <div class="picked" :class="{ 'picked--empty': !selected }">
               <span class="picked__icon"><BagIcon class="picked__bag" /></span>
               <div class="picked__text">
-                <span class="picked__label">Selected unit</span>
+                <span class="picked__label">{{ selected ? 'Selected unit' : 'No unit open' }}</span>
                 <span class="picked__value">
                   {{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}
                   <span v-if="selected" class="picked__meta">
@@ -129,6 +163,23 @@
               </button>
             </div>
           </div>
+
+          <!-- Where this unit is on the bench, in the dashboard's order (2026-10-28). -->
+          <ol v-if="selected && selected.status !== 'rejected'" class="unit-steps" aria-label="This unit's steps">
+            <li
+              v-for="(step, i) in unitSteps"
+              :key="step.key"
+              class="unit-step"
+              :class="`unit-step--${step.state}`"
+              :aria-current="step.state === 'now' ? 'step' : undefined"
+            >
+              <span class="unit-step__dot" aria-hidden="true">
+                <AssetIcon v-if="step.state === 'done'" name="check" :size="12" />
+                <template v-else>{{ i + 1 }}</template>
+              </span>
+              <span class="unit-step__label">{{ step.label }}</span>
+            </li>
+          </ol>
 
           <!-- Terminal: nothing left to record -->
           <div v-if="isFinal" class="outcome" :class="selected.status === 'completed' ? 'outcome--success' : 'outcome--rejected'">
@@ -238,6 +289,22 @@
             before one is picked.
           -->
           <fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">
+            <!-- The usual components one click away; the list holds them all. -->
+            <div v-if="components.length" class="quick" role="group" aria-label="Pick a component">
+              <button
+                v-for="c in components"
+                :key="c.id"
+                type="button"
+                class="quick__chip"
+                :class="[`comp--${componentTone(c.name)}`, { 'quick__chip--on': draft.component_id === c.id }]"
+                :aria-pressed="draft.component_id === c.id"
+                @click="pickComponent(c.id)"
+              >
+                <span class="quick__swatch" aria-hidden="true" />
+                {{ c.name }}
+              </button>
+            </div>
+
             <div class="entry">
               <label class="field">
                 <span class="field__label">Component <span class="req" aria-hidden="true">*</span></span>
@@ -251,6 +318,7 @@
               <label class="field">
                 <span class="field__label">Volume (mL) <span class="req" aria-hidden="true">*</span></span>
                 <input
+                  ref="volumeInput"
                   v-model.number="draft.volume_ml"
                   type="number"
                   min="1"
@@ -313,10 +381,15 @@
             </div>
 
             <!-- Information only: nothing here decides what a bag should hold. -->
-            <p v-if="declaredVolume > 0" class="card__hint">
-              {{ declaredVolume }} mL across {{ componentRows.length }} bag(s)<template v-if="selected?.volume_ml">.
-                {{ selected.volume_ml }} mL was collected</template>.
-            </p>
+            <div v-if="declaredVolume > 0" class="meter">
+              <p class="card__hint">
+                {{ declaredVolume }} mL across {{ componentRows.length }} bag(s)<template v-if="selected?.volume_ml">.
+                  {{ selected.volume_ml }} mL was collected</template>.
+              </p>
+              <span v-if="selected?.volume_ml" class="meter__track" aria-hidden="true">
+                <span class="meter__fill" :style="{ width: `${Math.min(100, (declaredVolume / selected.volume_ml) * 100)}%` }" />
+              </span>
+            </div>
 
             <button
               type="button"
@@ -326,8 +399,20 @@
             >
               <AssetIcon name="file-text" :size="16" />
               Record components
+              <kbd class="btn-kbd" aria-hidden="true">Ctrl ↵</kbd>
             </button>
           </fieldset>
+
+          <!-- What comes next, one click away (2026-10-28). -->
+          <div v-if="selected && nextUnit" class="up-next">
+            <span class="up-next__label">Up next</span>
+            <span class="up-next__name">{{ donorTitle(nextUnit.donor, nextUnit.collection?.donation_barcode, nextUnit.id) }}</span>
+            <span class="age" :class="`age--${ageTone(nextUnit)}`"><AssetIcon name="clock" :size="11" />{{ ageText(nextUnit) }}</span>
+            <button type="button" class="btn btn--sm up-next__btn" :class="{ 'btn--primary': hasComponents && !isFinal }" :disabled="busy" @click="openNext">
+              Next unit
+              <AssetIcon name="arrow-right" :size="14" />
+            </button>
+          </div>
         </section>
 
         <!--
@@ -339,33 +424,42 @@
           A unit that cannot be separated never reaches the Processed list, so
           it is rejected here.
         -->
-        <section v-if="!hasComponents && canUpdateStatus && !isFinal" class="card reject">
-          <span class="reject__icon"><AssetIcon name="triangle-alert" :size="22" /></span>
-          <div class="reject__body">
-            <h2 class="reject__title">Cannot process this unit?</h2>
-            <p class="reject__text">
-              If the unit is damaged, hemolyzed or clotted, it cannot be separated.<br>
-              It is marked as rejected and can never become stock.
-            </p>
-
-            <div v-if="rejecting" class="defer">
-              <label class="field">
-                <span class="field__label">Why is this unit not being issued?</span>
-                <input v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation" >
-              </label>
-              <div class="actions">
-                <button type="button" class="btn btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
-                  {{ busy ? 'Saving…' : 'Confirm rejection' }}
-                </button>
-                <button type="button" class="btn" :disabled="busy" @click="rejecting = false">Cancel</button>
-              </div>
+        <section v-if="!hasComponents && canUpdateStatus && !isFinal" class="reject" :class="{ 'reject--open': rejecting }">
+          <div class="reject__row">
+            <AssetIcon name="triangle-alert" :size="16" class="reject__icon" />
+            <div class="reject__body">
+              <h2 class="reject__title">Cannot process this unit?</h2>
+              <p class="reject__text">A damaged, hemolyzed or clotted unit cannot be separated. Rejected, it can never become stock.</p>
             </div>
+            <button v-if="!rejecting" type="button" class="btn btn--danger-outline" :disabled="busy || !selected" @click="startReject">
+              <AssetIcon name="trash-2" :size="15" />
+              Reject unit
+            </button>
+          </div>
 
-            <div v-else class="actions">
-              <button type="button" class="btn btn--danger" :disabled="busy || !selected" @click="rejecting = true">
-                <AssetIcon name="trash-2" :size="15" />
-                Reject unit
+          <div v-if="rejecting" class="defer">
+            <div class="reasons" role="group" aria-label="Common reasons">
+              <button
+                v-for="reason in REJECT_REASONS"
+                :key="reason"
+                type="button"
+                class="reasons__chip"
+                :class="{ 'reasons__chip--on': rejectReason === reason }"
+                :aria-pressed="rejectReason === reason"
+                @click="rejectReason = reason"
+              >
+                {{ reason }}
               </button>
+            </div>
+            <label class="field">
+              <span class="field__label">Why is this unit not being issued?</span>
+              <input ref="rejectInput" v-model="rejectReason" type="text" class="field__input" placeholder="Recorded on the donation">
+            </label>
+            <div class="actions">
+              <button type="button" class="btn btn--danger" :disabled="busy || !rejectReason.trim()" @click="submitReject">
+                {{ busy ? 'Saving…' : 'Confirm rejection' }}
+              </button>
+              <button type="button" class="btn" :disabled="busy" @click="rejecting = false">Cancel</button>
             </div>
           </div>
         </section>
@@ -377,7 +471,7 @@
 </template>
 
 <script setup>
-import { h } from 'vue'
+import { h, nextTick, onBeforeUnmount } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
@@ -470,6 +564,135 @@ const error = ref(null)
 const notice = ref(null)
 const rejecting = ref(false)
 const rejectReason = ref('')
+const rejectInput = ref(null)
+
+// The usual reasons, one click away; the field still takes any other.
+const REJECT_REASONS = ['Damaged bag', 'Hemolyzed', 'Clotted', 'Underweight unit']
+
+function startReject() {
+  rejecting.value = true
+  nextTick(() => rejectInput.value?.focus())
+}
+
+// ── Scan or search the queue (2026-10-28) ──
+const scanQuery = ref('')
+const scanMiss = ref('')
+const scanInput = ref(null)
+
+const shownQueue = computed(() => {
+  const q = scanQuery.value.toLowerCase()
+  if (!q) return queue.value
+  return queue.value.filter((row) => String(row.collection?.donation_barcode ?? '').toLowerCase().includes(q) || String(row.id) === q)
+})
+
+/** Enter: one match on the list opens it; otherwise the barcode is looked up at any stage. */
+async function scanOpen() {
+  const q = scanQuery.value
+  scanMiss.value = ''
+  if (!q) return
+  if (shownQueue.value.length === 1) {
+    await openDonation(shownQueue.value[0].id)
+    scanQuery.value = ''
+    return
+  }
+  const res = await run(() => service.laboratoryQueue({ barcode: q, per_page: 1 }))
+  const hit = res?.data?.[0]
+  if (hit) {
+    await openDonation(hit.id)
+    scanQuery.value = ''
+  } else if (res) {
+    scanMiss.value = q
+  }
+}
+
+// "/" puts the cursor in the scan box, as at the Billing Counter.
+function onSlash(e) {
+  const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
+  if (e.key === '/' && !typing) {
+    e.preventDefault()
+    scanInput.value?.focus()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onSlash))
+onBeforeUnmount(() => window.removeEventListener('keydown', onSlash))
+
+// ── How long a unit has waited since its draw ──
+const drawnAt = (row) => row.collection?.ended_at || row.collection?.started_at || row.donation_date
+function ageHours(row) {
+  const at = new Date(drawnAt(row))
+  return Number.isNaN(at.getTime()) ? null : (Date.now() - at.getTime()) / 3600000
+}
+function ageText(row) {
+  const h = ageHours(row)
+  if (h === null) return '—'
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`
+  if (h < 48) return `${Math.floor(h)} h`
+  return `${Math.floor(h / 24)} d`
+}
+/** Unseparated past 6 h reads amber, past 24 h red; a separated unit stays quiet. */
+function ageTone(row) {
+  const h = ageHours(row)
+  if (h === null || row.components?.length) return 'calm'
+  return h >= 24 ? 'late' : h >= 6 ? 'warn' : 'calm'
+}
+
+/** Testing's side, as the list can tell it: cleared, failed, or still with Testing. */
+function testingState(row) {
+  if (row.clearances?.tti && row.clearances?.immunohematology) return 'done'
+  if (row.test_result && !row.test_result.clears_for_issue) return 'fail'
+  return 'todo'
+}
+
+// ── The open unit's steps ──
+const unitSteps = computed(() => {
+  const u = selected.value
+  if (!u) return []
+  const separated = Boolean(u.components?.length)
+  const clearedNow = Boolean(u.clearances?.tti && u.clearances?.immunohematology)
+  const labelled = Boolean(u.labelled_at)
+  const handed = u.status === 'completed'
+  const done = [separated, clearedNow, labelled || handed, handed]
+  const now = done.findIndex((d) => !d)
+  return ['Separate', 'Testing clears', 'Final labels', 'Hand over'].map((label, i) => ({
+    key: label,
+    label,
+    state: done[i] ? 'done' : i === now ? 'now' : 'later',
+  }))
+})
+
+// ── The next unit on the list, opened without going back to it (2026-10-28) ──
+// After a breakdown the bench stays on the unit, for its Phase 1 labels; after
+// a rejection the next unit opens by itself.
+const nextUnit = computed(() => {
+  const open = selected.value?.id
+  const waiting = queue.value.filter((row) => row.id !== open && !['completed', 'rejected'].includes(row.status))
+  const here = queue.value.findIndex((row) => row.id === open)
+  return waiting.find((row) => queue.value.indexOf(row) > here) ?? waiting[0] ?? null
+})
+
+async function openNext() {
+  if (nextUnit.value) await openDonation(nextUnit.value.id)
+}
+
+function recordByKey() {
+  if (validComponents.value && !busy.value) submitComponents()
+}
+
+// ── Component chips ──
+const volumeInput = ref(null)
+function pickComponent(id) {
+  draft.component_id = id
+  nextTick(() => volumeInput.value?.focus())
+}
+/** Each component's colour, as on the Processing dashboard. */
+function componentTone(name) {
+  const n = String(name).toLowerCase()
+  if (n.includes('red') || n.includes('rbc') || n.includes('whole')) return 'red'
+  if (n.includes('cryo')) return 'blue'
+  if (n.includes('plasma')) return 'amber'
+  if (n.includes('platelet')) return 'purple'
+  return 'grey'
+}
 
 // The bag being entered, and the bags added so far: one row per bag, with its
 // volume. Two bags of the same component are two rows; inventory books in
@@ -731,6 +954,7 @@ async function submitComponents() {
 }
 
 async function submitReject() {
+  const next = nextUnit.value
   const res = await run(() => service.updateLaboratoryStatus(selected.value.id, {
     status: 'rejected',
     rejection_reason: rejectReason.value.trim(),
@@ -741,6 +965,13 @@ async function submitReject() {
   adopt(res.data)
   notice.value = res.message ?? null
   loadQueue()
+
+  // Nothing more to do with a rejected unit: the next one opens (2026-10-28).
+  if (next) {
+    const message = notice.value
+    await openDonation(next.id)
+    notice.value = message
+  }
 }
 
 onMounted(async () => {
@@ -1214,4 +1445,101 @@ onMounted(async () => {
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }
 }
+
+/* ===== Refresh (project owner, 2026-10-28) ===== */
+/* Scan or search. */
+.scan { position: relative; margin: 0 16px 10px; }
+.scan__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
+.scan__input { box-sizing: border-box; width: 100%; height: 40px; padding: 0 36px 0 38px; border: 1px solid var(--rb-border-strong); border-radius: 12px; background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13px; }
+.scan__input::placeholder { color: var(--rb-placeholder); }
+.scan__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.scan__kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); min-width: 20px; padding: 1px 6px; border: 1px solid var(--rb-border-strong); border-radius: 6px; background: var(--rb-surface-alt); font-family: var(--rb-font-mono); font-size: 11px; text-align: center; color: var(--rb-text-muted); }
+.scan__miss { margin: -4px 16px 10px; font-size: 12px; font-weight: 600; color: var(--rb-warning-text); }
+.queue-empty--search { padding: 24px 18px; font-size: 13px; text-align: center; color: var(--rb-text-secondary); }
+
+/* Status chips: tighter, so they sit in two even rows at most. */
+.status-chips { gap: 6px !important; }
+.status-chip { padding: 4px 5px 4px 11px !important; font-size: 12.5px; }
+
+/* Queue rows: age and the two checks. */
+.age { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.age--calm { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.age--warn { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
+.age--late { background: rgba(var(--rb-accent-rgb), .12); color: var(--rb-accent-text); }
+.checks { display: flex; gap: 6px; margin-top: 2px; }
+.check { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 7px; font-size: 11.5px; font-weight: 600; }
+.check--done { background: rgba(var(--rb-success-rgb), .1); color: var(--rb-success-text); }
+.check--todo { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.check--fail { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
+
+/* The open unit's steps. */
+.unit-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0 0 4px; padding: 0; list-style: none; }
+.unit-step { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; font-size: 12.5px; font-weight: 600; color: var(--rb-text-muted); }
+.unit-step + .unit-step::before { content: ''; position: absolute; left: -14px; right: calc(100% + 4px); top: 50%; width: 10px; height: 2px; border-radius: 1px; background: var(--rb-border-strong); }
+.unit-step__dot { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border: 2px solid var(--rb-border-strong); border-radius: 50%; background: var(--rb-surface); font-size: 11.5px; font-weight: 800; }
+.unit-step__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unit-step--done { color: var(--rb-success-text); }
+.unit-step--done .unit-step__dot { border-color: var(--rb-success); background: var(--rb-success); color: #fff; }
+.unit-step--now { color: var(--rb-text-primary); }
+.unit-step--now .unit-step__dot { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; box-shadow: 0 0 0 4px rgba(var(--rb-primary-rgb), .14); }
+
+/* Component chips. */
+.quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.quick__chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 13px; border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+.quick__chip:hover { border-color: var(--comp); }
+.quick__chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.quick__chip--on, .quick__chip--on:hover { border-color: var(--comp); background: color-mix(in srgb, var(--comp) 10%, var(--rb-surface)); box-shadow: inset 0 0 0 1px var(--comp); }
+.quick__swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--comp); }
+.comp--red { --comp: rgb(var(--rb-accent-rgb)); }
+.comp--amber { --comp: rgb(var(--rb-warning-rgb)); }
+.comp--purple { --comp: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.comp--blue { --comp: rgb(var(--rb-primary-rgb)); }
+.comp--grey { --comp: var(--rb-text-muted); }
+
+/* Volume meter. */
+.meter { display: flex; flex-direction: column; gap: 6px; }
+.meter__track { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: var(--rb-surface-alt); }
+.meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--rb-primary); transition: width .2s ease; }
+
+/* A quieter reject: one line, opened when needed. */
+.reject { display: flex !important; flex-direction: column; gap: 14px; padding: 14px 18px !important; border: 1px solid var(--rb-border) !important; border-radius: 16px; background: var(--rb-surface) !important; box-shadow: none !important; }
+.reject--open { border-color: rgba(var(--rb-accent-rgb), .35) !important; }
+.reject__row { display: flex; align-items: center; gap: 12px; }
+.reject__icon { display: block !important; flex: none; width: auto !important; height: auto !important; border-radius: 0 !important; background: none !important; color: var(--rb-accent-text); }
+.reject__body { display: block !important; flex: 1; min-width: 0; }
+.reject .defer { padding: 0 !important; border: 0 !important; background: none !important; }
+.reject__title { margin: 0 !important; font-size: 13.5px !important; font-weight: 700; }
+.reject__text { margin: 2px 0 0 !important; font-size: 12.5px !important; color: var(--rb-text-secondary); }
+.btn--danger-outline { border-color: rgba(var(--rb-accent-rgb), .4) !important; background: var(--rb-surface) !important; color: var(--rb-accent-text) !important; }
+.btn--danger-outline:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), .06) !important; }
+.reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.reasons__chip { height: 30px; padding: 0 12px; border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; }
+.reasons__chip:hover { border-color: rgba(var(--rb-accent-rgb), .4); color: var(--rb-text-primary); }
+.reasons__chip--on { border-color: rgba(var(--rb-accent-rgb), .5); background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); }
+.reasons__chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+@media (prefers-reduced-motion: reduce) {
+  .meter__fill, .quick__chip { transition: none; }
+}
+
+/* Nothing open: a form that reads as locked. */
+.picked--empty { border-style: dashed !important; background: transparent !important; }
+.picked--empty .picked__value { display: none; }
+.bags:disabled .quick, .bags:disabled .entry { opacity: .5; }
+.bags:disabled .quick__chip { cursor: not-allowed; }
+
+/* Chips a little smaller, so seven sit in fewer rows. */
+.quick { gap: 6px; }
+.quick__chip { height: 30px; padding: 0 11px; font-size: 12px; }
+
+/* Nothing waiting: a calm, green "all caught up". */
+.queue-empty__badge { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 14px; border-radius: 20px; background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); box-shadow: 0 0 0 8px rgba(var(--rb-success-rgb), .05); }
+
+/* Up next, at the foot of the bench. */
+.up-next { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 12px 14px; border-radius: 12px; background: var(--rb-surface-alt); font-size: 13px; }
+.up-next__label { font-size: 12px; font-weight: 700; color: var(--rb-text-muted); }
+.up-next__name { flex: 1; min-width: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-primary); }
+.up-next__btn { flex: none; gap: 6px; }
+.btn-kbd { margin-left: 8px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .2); font-family: var(--rb-font-mono); font-size: 11px; font-weight: 600; }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
 </style>
