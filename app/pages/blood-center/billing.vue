@@ -3,14 +3,46 @@
     <div class="bl-inner">
       <!-- Invoices only (project owner, 2026-10-25): one per billable request.
            A hospital's period summary is Statements; payments are Receipts. -->
-      <PageHeader title="Invoices">
+      <PageHeader title="Invoices" subtitle="One per billable request: what each patient and hospital still owes.">
         <template #actions>
+          <NuxtLink v-if="canSeeReports" to="/blood-center/financial-reports" class="ui-btn">
+            <AssetIcon name="chart" :size="15" />
+            Financial reports
+          </NuxtLink>
+          <NuxtLink v-if="canSeePayments" to="/blood-center/billing-transactions" class="ui-btn">
+            <AssetIcon name="list" :size="15" />
+            Transactions
+          </NuxtLink>
           <button class="ui-btn btn-icon-only" :disabled="loading" aria-label="Refresh" title="Refresh" @click="refreshAll">
             <AssetIcon name="refresh-cw" :size="15" :class="{ spinning: loading }" />
             <span class="btn-label">Refresh</span>
           </button>
         </template>
       </PageHeader>
+
+      <!--
+        The invoices at a glance, each a filter on the list below (2026-10-27).
+        What the counter collected is on the Billing dashboard.
+      -->
+      <div class="overview" role="group" aria-label="Show invoices" :aria-busy="!summary">
+        <button
+          v-for="card in overviewCards"
+          :key="card.key"
+          type="button"
+          class="overview-card"
+          :class="[`overview-card--${card.tone}`, { 'overview-card--on': isShowing(card), 'overview-card--zero': summary && !card.count }]"
+          :aria-pressed="isShowing(card)"
+          @click="show(card)"
+        >
+          <span class="overview-top">
+            <span class="overview-icon" :class="`overview-icon--${card.tone}`"><AssetIcon :name="card.icon" :size="17" /></span>
+            <span class="overview-label">{{ card.label }}</span>
+            <AssetIcon name="arrow-right" :size="14" class="overview-go" />
+          </span>
+          <span class="overview-value">{{ summary ? card.value : '—' }}</span>
+          <span class="overview-note">{{ summary ? card.note : '' }}</span>
+        </button>
+      </div>
 
       <section class="card list-card" aria-label="Invoices">
         <div class="list-head">
@@ -60,9 +92,19 @@
 
         <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton" /></div>
 
-        <div v-else-if="!statements.length && !error" class="empty">
-          <span class="empty-icon" aria-hidden="true"><AssetIcon name="inbox" :size="26" /></span>
-          <h2>{{ search.trim() ? 'Nothing matches that search' : category === 'weekly' ? 'No hospital invoices here' : 'No patient invoices here' }}</h2>
+        <!-- Says what an empty tab means: good news, nothing yet, or no match (2026-10-27). -->
+        <div v-else-if="!statements.length && !error" class="inv-empty" :class="{ 'inv-empty--good': emptyState.good }">
+          <span class="inv-empty__icon" aria-hidden="true"><AssetIcon :name="emptyState.icon" :size="24" /></span>
+          <h2 class="inv-empty__title">{{ emptyState.title }}</h2>
+          <p v-if="emptyState.text" class="inv-empty__text">{{ emptyState.text }}</p>
+          <button v-if="search.trim()" type="button" class="ui-btn" @click="clearSearch">
+            <AssetIcon name="x" :size="14" />
+            Clear search
+          </button>
+          <NuxtLink v-else-if="emptyState.to" :to="emptyState.to" class="ui-btn">
+            <AssetIcon :name="emptyState.actionIcon" :size="15" />
+            {{ emptyState.action }}
+          </NuxtLink>
         </div>
 
         <div v-else-if="statements.length" class="table-scroll">
@@ -170,6 +212,7 @@ const { can } = useUser()
 // Taking money, and the counter and receipts that go with it, are the Billing
 // department's; billing.view alone reads the invoices.
 const canSeePayments = computed(() => can('billing.record_payment'))
+const canSeeReports = computed(() => can('reports.financial'))
 
 const CATEGORIES = [
   { value: 'patient', label: 'Patient invoices' },
@@ -218,6 +261,65 @@ function balanceOf(statement) {
 
 function initialsOf(name) {
   return (name || 'P').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+}
+
+// ── The invoices at a glance, each a filter ──
+const overviewCards = computed(() => {
+  const sm = summary.value ?? {}
+  const month = sm.patient_bills_this_month ?? {}
+  const outstanding = sm.outstanding?.count ?? 0
+  const awaiting = sm.weekly_awaiting_settlement?.count ?? 0
+  const subsidised = sm.subsidised_this_month?.count ?? 0
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+  return [
+    { key: 'outstanding', category: 'patient', tab: 'outstanding', tone: 'amber', icon: 'receipt', label: 'Patient balances',
+      count: outstanding, value: pesos(sm.outstanding?.amount),
+      note: outstanding ? `${plural(outstanding, 'invoice', 'invoices')} still to be paid` : 'Every patient invoice is paid' },
+    { key: 'awaiting', category: 'weekly', tab: 'statement_only', tone: 'purple', icon: 'building-2', label: 'Awaiting hospital settlement',
+      count: awaiting, value: pesos(sm.weekly_awaiting_settlement?.amount),
+      note: awaiting ? `${plural(awaiting, 'hospital invoice', 'hospital invoices')} to settle` : 'No hospital invoice waiting' },
+    { key: 'paid', category: 'patient', tab: 'paid', tone: 'green', icon: 'check-circle', label: 'Paid this month',
+      count: month.paid ?? 0, value: String(month.paid ?? 0),
+      note: month.partial ? `${plural(month.partial, 'more', 'more')} partly paid` : 'Patient invoices paid in full' },
+    { key: 'subsidised', category: 'patient', tab: 'subsidised', tone: 'blue', icon: 'heart', label: 'Subsidised this month',
+      count: subsidised, value: pesos(sm.subsidised_this_month?.amount),
+      note: plural(subsidised, 'invoice met by the subsidy', 'invoices met by the subsidy') },
+  ]
+})
+
+const isShowing = card => category.value === card.category && activeTab.value === card.tab
+
+/** Opens the list on what a card counts. */
+async function show(card) {
+  if (category.value !== card.category) {
+    category.value = card.category
+    // The category watcher resets the tab; set it once that has run.
+    await nextTick()
+  }
+  activeTab.value = card.tab
+  document.querySelector('.list-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// ── An empty tab, said for what it is ──
+const EMPTY = {
+  'patient:outstanding': { good: true, icon: 'check-check', title: 'Every patient invoice is paid', text: 'Nothing is waiting to be collected. A new invoice appears here once Issuance reserves units for a request.', to: '/blood-center/pos', action: 'Open billing counter', actionIcon: 'philippine-peso' },
+  'patient:paid': { icon: 'receipt', title: 'No paid invoices yet', text: 'Invoices paid in full at the billing counter appear here.' },
+  'patient:subsidised': { icon: 'heart', title: 'No subsidised invoices', text: 'Invoices met by the government subsidy appear here, applied at the billing counter.' },
+  'patient:all': { icon: 'file-text', title: 'No patient invoices yet', text: 'An invoice is raised for each patient request once Issuance reserves units for it.' },
+  'weekly:statement_only': { good: true, icon: 'check-check', title: 'No hospital invoice awaiting settlement', text: 'Every released weekly order has been settled.', to: '/blood-center/statements', action: 'View statements', actionIcon: 'clipboard' },
+  'weekly:settled_outside': { icon: 'building-2', title: 'No settled hospital invoices yet', text: "Once a hospital pays a weekly invoice, its settlement is recorded at the billing counter and it moves here." },
+  'weekly:all': { icon: 'building-2', title: 'No hospital invoices yet', text: "A hospital's weekly replenishment order is invoiced once Issuance releases it." },
+}
+const emptyState = computed(() => {
+  if (search.value.trim()) {
+    return { icon: 'search-x', title: `Nothing matches “${search.value.trim()}”`, text: category.value === 'weekly' ? 'Check the invoice or request number.' : "Check the number, or search by the patient's name." }
+  }
+  return EMPTY[`${category.value}:${activeTab.value}`] ?? { icon: 'inbox', title: 'No invoices here', text: '' }
+})
+
+function clearSearch() {
+  search.value = ''
+  load()
 }
 
 // Beside each category tab: what is still waiting in it.
@@ -285,6 +387,48 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .bl-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .bl-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
+/* Four filter cards: each its own tile, its colour on the icon, the one showing outlined in blue. */
+.overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.overview-card {
+  --tone-rgb: var(--rb-primary-rgb);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+.overview-card--amber { --tone-rgb: var(--rb-warning-rgb); }
+.overview-card--purple { --tone-rgb: var(--rb-purple-rgb); }
+.overview-card--green { --tone-rgb: var(--rb-success-rgb); }
+.overview-card:hover { border-color: rgba(var(--tone-rgb), 0.5); background: rgba(var(--tone-rgb), 0.04); }
+.overview-card:active { transform: translateY(1px); }
+.overview-card:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.overview-card--on, .overview-card--on:hover { border-color: var(--rb-primary); box-shadow: 0 0 0 1px var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.04); }
+.overview-card--zero .overview-value { color: var(--rb-text-muted); }
+.overview-top { display: flex; align-items: center; gap: 8px; }
+.overview-label { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.overview-go { flex: none; color: var(--rb-text-muted); opacity: 0; transition: opacity 0.15s ease; }
+.overview-card:hover .overview-go, .overview-card--on .overview-go { opacity: 1; color: var(--rb-primary-text); }
+.overview-value { font-size: 24px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.overview-note { min-height: 16px; font-size: 12px; color: var(--rb-text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .overview-card, .overview-go { transition: none; }
+}
+.overview-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.overview-icon--green { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .1); }
+.overview-icon--blue { color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .09); }
+.overview-icon--amber { color: var(--rb-warning-text); background: rgba(var(--rb-warning-rgb), .13); }
+.overview-icon--purple { color: var(--rb-purple-text); background: rgba(var(--rb-purple-rgb), .1); }
+
 /* Text | actions. The actions column never wraps under the text, so the
    buttons stay on the right at every width; only the text column shrinks. */
 .page-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
@@ -294,6 +438,8 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .header-actions { display: flex; gap: 8px; justify-content: flex-end; align-self: start; }
 
 /* Category tabs on top, with search and status beneath them. */
+/* The list is one white card, its tabs, filters and rows inside it, as on Payments. */
+.list-card { overflow: hidden; background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
 .list-head { display: flex; flex-direction: column; border-bottom: 1px solid var(--rb-border); }
 .categories { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--rb-border); }
 .category {
@@ -310,8 +456,8 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .category--on::after { background: var(--rb-primary); }
 .category--on .category-count { color: #fff; background: var(--rb-primary); border-color: var(--rb-primary); }
 
-.filters { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 16px; background: var(--rb-surface-alt); }
-.search { position: relative; width: 320px; max-width: 100%; }
+.filters { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 16px; background: var(--rb-surface); }
+.search { position: relative; flex: 1 1 320px; min-width: 0; }
 .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
 .search .search-input { padding-left: 36px; }
 .pills { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--rb-surface); border: 1px solid var(--rb-border); }
@@ -361,6 +507,14 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 .empty-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--rb-text-secondary); background: var(--rb-surface-alt); border: 1px solid var(--rb-border); margin-bottom: 4px; }
 .empty { text-align: center; padding: 56px 20px; color: var(--rb-text-secondary); display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .empty h2 { font-size: 15px; color: var(--rb-text-primary); margin: 4px 0 0; }
+/* An empty tab, laid out as Statements' empty state: the same icon, type and wrap. */
+.inv-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; text-align: center; }
+.inv-empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.inv-empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.inv-empty__text { max-width: 520px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
+.inv-empty .ui-btn { margin-top: 6px; text-decoration: none; }
+/* Good news: nothing waiting. */
+.inv-empty--good .inv-empty__icon { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); box-shadow: 0 0 0 6px rgba(var(--rb-success-rgb), 0.05); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -395,11 +549,14 @@ onMounted(() => Promise.all([load(), loadSummary()]))
 
 /* Narrow: the subtitle gives way and Refresh becomes an icon, but the actions stay right. */
 @media (max-width: 900px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .btn-icon-only .btn-label { display: none; }
   .btn-icon-only { width: 38px; padding: 0; }
 }
 
 @media (max-width: 640px) {
+  .overview-card { padding: 13px; }
+  .overview-value { font-size: 20px; }
   .search { width: 100%; }
 }
 </style>

@@ -153,7 +153,9 @@ export interface HospitalUnit {
 export interface HospitalInventorySummary {
   totals: Record<HospitalUnitStatus, number>
   by_blood_type: Array<{ blood_type_id: number; code: string; available: number }>
-  near_expiry: { within_3_days: number }
+  near_expiry: { within_3_days: number; within_7_days: number }
+  /** Bags stocked in over the last 7 days. */
+  stocked_last_7_days: number
   /** Active tags past their deadline. Above zero for more than a minute means the sweep is down. */
   overdue_active_tags: number
   /** Suggestions for the stock-in form: configured fridges and freezers, and places already used. */
@@ -162,14 +164,101 @@ export interface HospitalInventorySummary {
 }
 
 export interface HospitalInventoryFilters {
-  status?: HospitalUnitStatus
+  /** A status, or `tagged` for both tag stages at once. */
+  status?: HospitalUnitStatus | 'tagged'
   blood_type_id?: number
   component_id?: number
   transfusion_request_id?: number
   expiring_within_days?: number
   search?: string
+  /** First-expiring-first (the default), or the newest arrivals first. */
+  sort?: 'fefo' | 'recent'
   per_page?: number
   page?: number
+}
+
+/** One bag on the Inventory Sheet: its number, type and expiry. */
+export interface InventorySheetCell {
+  bag_number: string
+  blood_type: string | null
+  expiry_date: string | null
+  /** Tagged to a patient and still waiting for its crossmatch. */
+  tagged: boolean
+}
+
+export interface InventorySheetColumn {
+  label: string
+  /** One per row of the form; an empty row is null. */
+  cells: Array<InventorySheetCell | null>
+}
+
+/** One printed page of the Inventory Sheet. */
+export interface InventorySheetPage {
+  /** The paper form (Whole Blood and Packed RBC), or a page of the other components, a column each. */
+  kind: 'form' | 'other'
+  /** The sheet's blood type, or null when every type shares it. */
+  blood_type: string | null
+  page: number
+  pages: number
+  crossmatched: InventorySheetColumn[]
+  uncrossmatched: InventorySheetColumn[]
+}
+
+/** The blood bank's paper inventory form, filled from its shelf. */
+export interface HospitalInventorySheet {
+  facility: { name: string }
+  by: 'type' | 'all'
+  rows: number
+  as_of: string
+  as_of_date: string
+  as_of_time: string
+  totals: { crossmatched: number; uncrossmatched: number }
+  sheets: InventorySheetPage[]
+  /** What it was configured to cover: component codes and blood type codes. */
+  components: string[]
+  blood_types: string[]
+  prepared_by: string
+  footer: { form_code: string; effectivity: string; revision: string }
+}
+
+/** One generated Inventory Report, kept as the PDF it was printed as. */
+export interface HospitalInventoryReportRecord {
+  id: number
+  generated_at: string
+  generated_by: string | null
+  layout: 'type' | 'all'
+  /** Component and blood type codes it covered. */
+  components: string[]
+  blood_types: string[]
+  totals: { crossmatched: number; uncrossmatched: number }
+  pages: number
+  file_size: number
+  filename: string
+}
+
+/** What happened to a bag at the hospital, as the activity feed lists it. */
+export type HospitalActivityKind =
+  | 'received'
+  | 'stocked'
+  | 'tagged'
+  | 'crossmatched'
+  | 'transfused'
+  | 'untagged'
+  | 'returned'
+  | 'discarded'
+  | 'expired'
+
+export interface HospitalInventoryActivity {
+  id: number
+  kind: HospitalActivityKind
+  unit_id: string
+  /** The number staff see: the sender's own for a bag from outside RedAgos. */
+  bag_number: string
+  blood_type: string | null
+  component: string | null
+  /** Null for the sweeps, which have no one behind them. */
+  actor: string | null
+  at: string
 }
 
 export interface TagEventFilters {

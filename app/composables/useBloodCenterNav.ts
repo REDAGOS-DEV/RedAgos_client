@@ -29,6 +29,8 @@ export interface BloodCenterNavItem {
    * breadcrumb: a page reached only from another page's links.
    */
   hidden?: boolean
+  /** Other pages that light this link up as the current one (tabs of one page). */
+  alsoActiveOn?: readonly string[]
 }
 
 export interface BloodCenterNavGroup {
@@ -97,8 +99,8 @@ const ROLE_HOME: Record<string, string> = {
   inventory_control_officer: '/blood-center/storage',
   dispatch_coordinator: '/blood-center/fulfillment',
   it_data_clerk: '/blood-center/inventory',
-  billing_clerk: '/blood-center/billing',
-  billing_supervisor: '/blood-center/billing',
+  billing_clerk: '/blood-center/billing-dashboard',
+  billing_supervisor: '/blood-center/billing-dashboard',
 }
 
 /**
@@ -115,7 +117,7 @@ const DEPARTMENT_HOME: Record<string, string> = {
   testing: '/blood-center/testing',
   processing: '/blood-center/laboratory',
   issuance: '/blood-center/storage',
-  billing: '/blood-center/billing',
+  billing: '/blood-center/billing-dashboard',
 }
 
 export const BLOOD_CENTER_OVERVIEW = '/blood-center/dashboard'
@@ -167,6 +169,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Processing's own (project owner, 2026-10-22): the department that records breakdowns.
       { label: 'Processing Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
+      // Billing's own (project owner, 2026-10-27): the counter's day, what is owed, collections.
+      { label: 'Billing Dashboard', path: '/blood-center/billing-dashboard', icon: 'layout-dashboard', requires: 'billing.record_payment', keywords: 'home billing counter collected today owed outstanding aging collections method hospitals settle payments forecast' },
     ],
   },
   {
@@ -242,12 +246,19 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // The project owner's terms (2026-10-25): an invoice is one billable
       // request; a Statement of Account sums up a hospital's invoices,
       // payments and balance over a period; a receipt proves a payment.
-      { label: 'Invoices', path: '/blood-center/billing', icon: 'file-text', requires: 'billing.view', keywords: 'invoice inv bill billing request patient weekly hospital settlement subsidy balance' },
+      // The badge counts invoices still to be paid (the billing summary).
+      { label: 'Invoices', path: '/blood-center/billing', icon: 'file-text', badge: 'invoices', requires: 'billing.view', keywords: 'invoice inv bill billing request patient weekly hospital settlement subsidy balance' },
       { label: 'Statements', path: '/blood-center/statements', icon: 'clipboard', requires: 'billing.view', keywords: 'statement of account soa hospital period invoices payments balance opening closing' },
-      { label: 'Receipts', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', keywords: 'receipt acknowledgement ar reprint print 80mm pdf void' },
-      { label: 'Billing Transactions', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', keywords: 'transactions journal ledger history export csv void correction' },
-      // Price configuration is Billing's alone (the Billing Supervisor).
+      // Receipts and Transactions are one list of payments seen two ways
+      // (2026-10-27): one link, two tabs on the pages (PaymentsTabs).
+      { label: 'Payments', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', alsoActiveOn: ['/blood-center/billing-transactions'], keywords: 'payments receipt acknowledgement ar reprint print 80mm pdf void transactions journal ledger history export csv correction' },
+      { label: 'Payments', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', hidden: true },
+      // Last, together: the prices and the programs that change them, the
+      // Billing Supervisor's alone (billing.prices).
       { label: 'Component Prices', path: '/blood-center/component-prices', icon: 'sliders-horizontal', requires: 'billing.prices', keywords: 'price pricing component fee charge unit cost peso settings' },
+      // Scheduled subsidies, discounts and promos, beside the prices they
+      // change (2026-10-27; they were under Management).
+      { label: 'Billing Programs', path: '/blood-center/billing-programs', icon: 'tags', requires: 'billing.prices', keywords: 'subsidy discount promo effective date schedule billing relief' },
     ],
     // Not Issuance's (project owner, 2026-10-19). Its officer and dispatch
     // coordinator keep billing.view, read-only, because Fulfillment reads each
@@ -273,9 +284,6 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // inventory.thresholds, the sheet is read with inventory.stock_report.
       { label: 'Stock Thresholds', path: '/blood-center/stock-thresholds', icon: 'sliders-horizontal', requires: 'inventory.view', keywords: 'threshold minimum low stock alert shortage reorder level notification' },
       { label: 'Daily Stock Report', path: '/blood-center/stock-report', icon: 'clipboard-list', requires: 'inventory.stock_report', keywords: 'daily stock inventory report pdf print rh expiry sheet' },
-      // Billing's scheduled subsidies, discounts and promos. Kept in
-      // Management because date windows are policy, not a counter action.
-      { label: 'Billing Programs', path: '/blood-center/billing-programs', icon: 'tags', requires: 'billing.prices', keywords: 'subsidy discount promo effective date schedule billing relief' },
       // The codes every deferral is recorded under (project owner,
       // 2026-10-24), under Management rather than Donor (owner, same day).
       // Kept by the Screening Physician, read by the clinical record's holders.
@@ -286,9 +294,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
   {
     label: 'Account',
     items: [
-      // For everyone; Settings stays last.
-      { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
+      // For everyone; Settings first, then Help Center (2026-10-27).
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
+      { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
     ],
   },
 ]

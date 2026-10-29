@@ -11,7 +11,7 @@
       </div>
 
       <!-- Statements of Account only (project owner, 2026-10-25). -->
-      <PageHeader title="Statements">
+      <PageHeader title="Statements" subtitle="A hospital's weekly invoices, settlements and balance over a period.">
         <template #actions>
           <button class="ui-btn" :disabled="!statement || printing" @click="print">
             <AssetIcon name="printer" :size="15" />
@@ -59,8 +59,31 @@
         <button class="ui-btn ui-btn--sm" @click="load">Retry</button>
       </p>
 
-      <!-- The statement keeps its layout before a hospital is chosen, empty, and fills in place. -->
-      <article class="card soa" :class="{ 'soa--empty': !statement }" aria-labelledby="soa-to" :aria-busy="loading">
+      <!--
+        No hospital invoiced yet: said plainly, with the way to its invoices,
+        rather than a statement of ₱0.00 that reads like real figures
+        (2026-10-27).
+      -->
+      <section v-if="!hospitalsLoading && !hospitals.length" class="card soa-empty" aria-labelledby="soa-empty-title">
+        <span class="soa-empty__icon"><AssetIcon name="clipboard" :size="24" /></span>
+        <h2 id="soa-empty-title" class="soa-empty__title">No hospital statements yet</h2>
+        <p class="soa-empty__text">
+          A statement sums up one hospital's weekly invoices, the settlements it made and what it still owes over a
+          period. It appears here once a hospital's weekly order is released and invoiced.
+        </p>
+        <ol class="soa-empty__steps">
+          <li><span>1</span> A hospital sends a weekly replenishment order</li>
+          <li><span>2</span> Issuance releases it, and its invoice is raised</li>
+          <li><span>3</span> Pick the hospital here to print or download its statement</li>
+        </ol>
+        <NuxtLink to="/blood-center/billing?category=weekly" class="ui-btn">
+          <AssetIcon name="file-text" :size="15" />
+          View hospital invoices
+        </NuxtLink>
+      </section>
+
+      <!-- The statement keeps its layout while a hospital's is loading, and fills in place. -->
+      <article v-else class="card soa" :class="{ 'soa--empty': !statement }" aria-labelledby="soa-to" :aria-busy="loading">
         <header class="soa-head">
           <div class="soa-party">
             <span class="soa-cap">Bill to</span>
@@ -416,4 +439,14 @@ onMounted(loadHospitals)
   .field, .field--hospital { width: 100%; }
   .field--date { width: calc(50% - 6px); }
 }
+
+/* No hospital invoiced yet */
+.soa-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; text-align: center; }
+.soa-empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.soa-empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.soa-empty__text { max-width: 520px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); }
+.soa-empty__steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin: 8px 0 6px; padding: 0; list-style: none; }
+.soa-empty__steps li { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--rb-text-secondary); }
+.soa-empty__steps span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--rb-surface-alt); font-size: 11.5px; font-weight: 800; color: var(--rb-text-primary); }
+.soa-empty .ui-btn { text-decoration: none; }
 </style>

@@ -545,7 +545,7 @@
           {{ busy ? 'Saving…' : correcting === 'collection' ? 'Request correction' : 'Complete donation' }}
         </button>
 
-        <button v-if="canClose && correcting !== 'collection'" type="button" class="btn btn--danger" :disabled="busy" @click="abandonCollection">
+        <button v-if="canClose && correcting !== 'collection'" type="button" class="btn btn--danger" :disabled="busy" @click="openAbandon">
           Collection unsuccessful
         </button>
 
@@ -618,6 +618,55 @@
       @close="correction = null"
       @submitted="onCorrectionSent"
     />
+
+    <!-- Collection unsuccessful: the page's own dialog, as Donations closes a visit. -->
+    <Transition name="modal">
+      <div v-if="abandoning.open" class="modal-overlay" @click.self="cancelAbandon">
+        <div
+          v-focus-trap
+          class="modal-card"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="abandon-title"
+          aria-describedby="abandon-text"
+          @dialog-escape="cancelAbandon"
+        >
+          <div class="modal-card__header">
+            <h2 id="abandon-title" class="modal-card__title">
+              <AssetIcon name="triangle-alert" :size="17" />
+              Collection unsuccessful?
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" :disabled="busy" @click="cancelAbandon">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+          <div class="modal-card__body">
+            <p id="abandon-text" class="modal-text">
+              The visit<template v-if="donor?.full_name"> for <strong>{{ donor.full_name }}</strong></template>
+              closes without a unit. The reason stays on the donation record.
+            </p>
+            <label class="field">
+              <span class="field__label">Why was the collection unsuccessful?</span>
+              <textarea
+                ref="abandonReason"
+                v-model="abandoning.reason"
+                class="field__input"
+                rows="3"
+                maxlength="255"
+                placeholder="e.g. Vein collapsed before the bag filled"
+              />
+            </label>
+            <p v-if="abandoning.error" class="modal-error" role="alert">{{ abandoning.error }}</p>
+          </div>
+          <div class="modal-card__footer">
+            <button type="button" class="btn" :disabled="busy" @click="cancelAbandon">Back</button>
+            <button type="button" class="btn btn--danger" :disabled="busy || !abandoning.reason.trim()" @click="abandonCollection">
+              {{ busy ? 'Closing…' : 'Close visit' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1127,20 +1176,42 @@ function onCorrectionSent(response) {
   notice.value = response?.message ?? 'Correction requested.'
 }
 
+// "Collection unsuccessful" asks for its reason in a dialog of the page's own,
+// not the browser's prompt (project owner, 2026-10-26).
+const abandoning = reactive({ open: false, reason: '', error: '' })
+const abandonReason = ref(null)
+
+function openAbandon() {
+  Object.assign(abandoning, { open: true, reason: '', error: '' })
+  // A task later, not nextTick: v-focus-trap moves focus to the dialog's
+  // first button on its own nextTick, and the reason is what is typed first.
+  setTimeout(() => abandonReason.value?.focus())
+}
+
+function cancelAbandon() {
+  if (busy.value) return
+  abandoning.open = false
+}
+
 async function abandonCollection() {
-  const reason = window.prompt('Why was the collection unsuccessful?')
+  const reason = abandoning.reason.trim()
+  if (!reason) return
 
-  if (!reason?.trim()) return
+  busy.value = true
+  abandoning.error = ''
 
-  const result = await service.updateDonationStatus(donation.value.id, {
-    status: 'rejected',
-    rejection_reason: reason.trim(),
-  }).catch((err) => {
-    error.value = err?.message || 'The donation could not be closed.'
-    return null
-  })
-
-  if (result) donation.value = result.data
+  try {
+    const result = await service.updateDonationStatus(donation.value.id, {
+      status: 'rejected',
+      rejection_reason: reason,
+    })
+    donation.value = result.data
+    abandoning.open = false
+  } catch (err) {
+    abandoning.error = err?.message || 'The donation could not be closed.'
+  } finally {
+    busy.value = false
+  }
 }
 
 /**
@@ -1726,6 +1797,89 @@ function finishVisit() {
 
 @media (max-width: 480px) {
   .bags { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- collection unsuccessful: the same dialog as Donations' "Close this visit?" ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--rb-overlay);
+}
+
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 40px);
+  background: var(--rb-surface);
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
+}
+
+.modal-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.modal-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; color: var(--rb-text-primary); }
+.modal-card__title :deep(.asset-icon) { color: var(--rb-accent-text); }
+
+.modal-card__close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rb-border);
+  border-radius: 8px;
+  background: none;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.modal-card__close:hover:not(:disabled) { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.modal-card__close:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.modal-card__body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; overflow-y: auto; min-height: 0; }
+
+.modal-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--rb-border);
+}
+
+.modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--rb-text-primary); }
+
+.modal-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.35);
+  border-radius: 8px;
+  color: var(--rb-accent-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.modal-enter-active,
+.modal-leave-active { transition: opacity 0.18s ease; }
+
+.modal-enter-from,
+.modal-leave-to { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-enter-active,
+  .modal-leave-active { transition: none; }
 }
 
 </style>

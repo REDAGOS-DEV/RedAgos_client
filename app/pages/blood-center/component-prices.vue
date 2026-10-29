@@ -1,20 +1,42 @@
 <template>
   <div class="prices-page">
-    <header class="prices-page__header">
-      <h1 class="prices-page__title">Component Prices</h1>
+    <PageHeader
+      title="Component Prices"
+      subtitle="What a patient pays per unit of each component. Any price above ₱0 is paid for before the units are released."
+    >
+      <template #actions>
+        <div class="header-actions">
+          <span v-if="dirtyCount" class="unsaved">{{ dirtyCount }} unsaved</span>
+          <button type="button" class="btn btn--ghost" :disabled="busy || saving" @click="load">
+            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+            {{ busy ? 'Loading…' : 'Refresh' }}
+          </button>
+          <button type="button" class="btn btn--primary" :disabled="busy || saving || !rows.length" @click="saveAll">
+            <AssetIcon name="check" :size="14" />
+            {{ saving ? 'Saving…' : 'Save All Prices' }}
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
-      <div class="header-actions">
-        <span v-if="dirtyCount" class="unsaved">{{ dirtyCount }} unsaved</span>
-        <button type="button" class="btn btn--ghost" :disabled="busy || saving" @click="load">
-          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-          {{ busy ? 'Loading…' : 'Refresh' }}
-        </button>
-        <button type="button" class="btn btn--primary" :disabled="busy || saving || !rows.length" @click="saveAll">
-          <AssetIcon name="check" :size="14" />
-          {{ saving ? 'Saving…' : 'Save All Prices' }}
-        </button>
-      </div>
-    </header>
+    <!-- 2. Where the list stands; each chip a filter (2026-10-27). -->
+    <div v-if="rows.length" class="tally" role="group" aria-label="Show components">
+      <button
+        v-for="t in tally"
+        :key="t.key"
+        type="button"
+        class="tally__chip"
+        :class="[`tally__chip--${t.key}`, { 'tally__chip--on': filter === t.key }]"
+        :aria-pressed="filter === t.key"
+        :disabled="!t.count && filter !== t.key"
+        @click="toggleFilter(t.key)"
+      >
+        <AssetIcon :name="t.icon" :size="14" />
+        <span class="tally__label">{{ t.label }}</span>
+        <span class="tally__count">{{ t.count }}</span>
+      </button>
+      <button v-if="filter" type="button" class="tally__clear" @click="filter = ''">Show all</button>
+    </div>
 
     <div
       v-if="shownBanner"
@@ -26,40 +48,71 @@
       <span>{{ shownBanner }}</span>
     </div>
 
-    <section class="card">
-      <table class="prices">
+    <section class="card" aria-label="Component prices">
+      <table v-if="busy || rows.length" class="prices">
         <thead>
           <tr>
             <th>Component</th>
-            <th>Bag code</th>
+            <th>Charging</th>
             <th>Price per unit</th>
-            <th>No charge</th>
           </tr>
         </thead>
         <tbody>
           <template v-if="busy && !rows.length">
             <tr v-for="n in 4" :key="`sk-${n}`">
-              <td><span class="skeleton skeleton--name" /></td>
-              <td><span class="skeleton skeleton--code" /></td>
+              <td><span class="skeleton skeleton--name" /><span class="skeleton skeleton--code" /></td>
+              <td><span class="skeleton skeleton--seg" /></td>
               <td><span class="skeleton skeleton--input" /></td>
-              <td><span class="skeleton skeleton--check" /></td>
             </tr>
           </template>
-          <tr v-else-if="!rows.length">
-            <td colspan="4" class="empty">No blood components are defined.</td>
+          <tr v-else-if="!visibleRows.length">
+            <td colspan="3" class="empty-filter">
+              Nothing left here.
+              <button type="button" class="link-btn" @click="filter = ''">Show all components</button>
+            </td>
           </tr>
           <tr
-            v-for="row in rows"
+            v-for="row in visibleRows"
             v-else
             :key="row.id"
             :class="{ 'row--dirty': isDirty(row), 'row--invalid': errors[row.id] }"
           >
-            <td class="name">{{ row.name }}</td>
-            <td><span class="code">{{ row.code }}</span></td>
+            <td>
+              <span class="name">{{ row.name }}</span>
+              <span class="code">{{ row.code }}</span>
+            </td>
+            <td>
+              <!-- One choice per component: charge for it, or not (was a No charge checkbox). -->
+              <div class="seg" role="radiogroup" :aria-label="`Charging for ${row.name}`">
+                <button
+                  type="button"
+                  role="radio"
+                  class="seg__btn"
+                  :class="{ 'seg__btn--on': !drafts[row.id].noCharge }"
+                  :aria-checked="!drafts[row.id].noCharge"
+                  :disabled="saving"
+                  @click="drafts[row.id].noCharge && setNoCharge(row, false)"
+                >
+                  Charge
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  class="seg__btn"
+                  :class="{ 'seg__btn--on': drafts[row.id].noCharge }"
+                  :aria-checked="drafts[row.id].noCharge"
+                  :disabled="saving"
+                  @click="!drafts[row.id].noCharge && setNoCharge(row, true)"
+                >
+                  No charge
+                </button>
+              </div>
+            </td>
             <td>
               <label
+                v-if="!drafts[row.id].noCharge"
                 class="input-group"
-                :class="{ 'input-group--invalid': errors[row.id], 'input-group--off': drafts[row.id].noCharge }"
+                :class="{ 'input-group--invalid': errors[row.id] }"
               >
                 <span class="input-group__prefix">₱</span>
                 <span class="sr-only">{{ row.name }} price per unit</span>
@@ -71,38 +124,68 @@
                   max="1000000"
                   step="0.01"
                   inputmode="decimal"
-                  :placeholder="drafts[row.id].noCharge ? 'No charge' : 'Enter price'"
-                  :disabled="drafts[row.id].noCharge || saving"
+                  placeholder="Enter price"
+                  :disabled="saving"
                   :aria-invalid="errors[row.id] ? 'true' : undefined"
                   :aria-describedby="errors[row.id] ? `price-error-${row.id}` : undefined"
                   class="cell-input"
                   @input="recheck(row)"
                 >
               </label>
+              <span v-else class="free">
+                <AssetIcon name="heart" :size="14" />
+                Free to the patient
+              </span>
               <p v-if="errors[row.id]" :id="`price-error-${row.id}`" class="field-error">
                 {{ errors[row.id].message }}
               </p>
-            </td>
-            <td>
-              <label class="no-charge">
-                <input
-                  type="checkbox"
-                  :checked="drafts[row.id].noCharge"
-                  :disabled="saving"
-                  @change="setNoCharge(row, $event.target.checked)"
-                >
-                <span>No charge<span class="sr-only"> for {{ row.name }}</span></span>
-              </label>
+              <!-- 5. What it was, while the change is not saved. -->
+              <p v-else-if="isDirty(row)" class="was">Was {{ savedLabel(row) }}</p>
             </td>
           </tr>
         </tbody>
       </table>
+
+      <div v-else class="cp-empty">
+        <span class="cp-empty__icon" aria-hidden="true"><AssetIcon name="flask-conical" :size="24" /></span>
+        <h2 class="cp-empty__title">No components to price yet</h2>
+        <p class="cp-empty__text">
+          Processing adds the blood components your centre makes. Each one appears here to be given a price, or marked No charge.
+        </p>
+        <NuxtLink v-if="canConfigureComponents" to="/blood-center/blood-components" class="btn">
+          <AssetIcon name="flask-conical" :size="15" />
+          Blood Components
+        </NuxtLink>
+      </div>
     </section>
+
+    <!-- 8. Subsidies and discounts live beside the prices. -->
+    <p v-if="rows.length" class="aside-note">
+      <AssetIcon name="badge-check" :size="14" />
+      A subsidy or discount on these prices is set up in
+      <NuxtLink to="/blood-center/billing-programs">Billing Programs</NuxtLink>.
+    </p>
+
+    <!-- 6. Save within reach while changes are pending. -->
+    <Transition name="savebar">
+      <div v-if="dirtyCount" class="savebar" role="region" aria-label="Unsaved changes">
+        <span class="savebar__text">
+          <AssetIcon name="pencil" :size="14" />
+          {{ dirtyCount }} {{ dirtyCount === 1 ? 'change' : 'changes' }} not saved
+        </span>
+        <button type="button" class="btn btn--ghost" :disabled="saving" @click="discard">Discard</button>
+        <button type="button" class="btn btn--primary" :disabled="busy || saving" @click="saveAll">
+          <AssetIcon name="check" :size="14" />
+          {{ saving ? 'Saving…' : 'Save All Prices' }}
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 /**
@@ -143,6 +226,66 @@ const bannerKind = ref('notice')
 const attempted = ref(false)
 
 const dirtyCount = computed(() => rows.value.filter(isDirty).length)
+
+const { can } = useUser()
+const canConfigureComponents = computed(() => can('components.configure'))
+
+// ── Where the list stands, by what is typed (2026-10-27) ──
+function standing(row) {
+  const draft = drafts[row.id]
+
+  if (!draft) return 'unset'
+  if (draft.noCharge) return 'free'
+
+  return draftPrice(row) === null ? 'unset' : 'priced'
+}
+
+const tally = computed(() => {
+  const count = (key) => rows.value.filter((row) => standing(row) === key).length
+
+  return [
+    { key: 'priced', label: 'Priced', icon: 'philippine-peso', count: count('priced') },
+    { key: 'free', label: 'No charge', icon: 'heart', count: count('free') },
+    { key: 'unset', label: 'Not set', icon: 'circle-alert', count: count('unset') },
+  ]
+})
+
+/**
+ * The chip picked, and the rows it matched then: a row being fixed stays in
+ * view until another chip is picked, rather than vanishing mid-typing.
+ */
+const filter = ref('')
+const filterIds = ref([])
+
+function toggleFilter(key) {
+  if (filter.value === key) {
+    filter.value = ''
+
+    return
+  }
+
+  filter.value = key
+  filterIds.value = rows.value.filter((row) => standing(row) === key).map((row) => row.id)
+}
+
+const visibleRows = computed(() => (filter.value ? rows.value.filter((row) => filterIds.value.includes(row.id)) : rows.value))
+
+const peso = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' })
+
+/** What the server holds for a row, said in words. */
+function savedLabel(row) {
+  if (row.no_charge) return 'no charge'
+
+  return row.price === null ? 'not set' : peso.format(row.price)
+}
+
+/** Put every row back to what the server holds. */
+function discard() {
+  rows.value.forEach(seedDraft)
+  attempted.value = false
+  clearErrors()
+  banner.value = ''
+}
 
 /**
  * The message for what is still blocking the save, in the order of the list.
@@ -238,6 +381,7 @@ function scrollBehavior() {
 
 /** Bring the first field still in error into view, in list order, and put the cursor in it. */
 async function focusFirstError() {
+  filter.value = ''
   await nextTick()
 
   const first = rows.value.find((row) => errors[row.id])
@@ -275,6 +419,8 @@ async function load() {
     const res = await bloodCenterService.componentPrices()
 
     applyRows(res?.data ?? [])
+    filter.value = ''
+
   } catch (err) {
     bannerKind.value = 'error'
     banner.value = firstError(err, 'The prices could not be loaded.')
@@ -567,5 +713,83 @@ onMounted(load)
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spin { animation: none; }
+}
+
+/* ===== Refresh (project owner, 2026-10-27) ===== */
+.prices-page { padding-bottom: 96px; }
+.prices-page > .card, .tally, .aside-note, .alert { width: 100%; }
+.card { border-radius: 16px; }
+
+/* Where the list stands. */
+.tally { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tally__chip {
+  --tone-rgb: var(--rb-success-rgb);
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 12px;
+  border: 1px solid var(--rb-border); border-radius: 999px;
+  background: var(--rb-surface); font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--rb-text-secondary); cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.tally__chip :deep(.asset-icon) { color: rgb(var(--tone-rgb)); }
+.tally__chip--free { --tone-rgb: var(--rb-primary-rgb); }
+.tally__chip--unset { --tone-rgb: var(--rb-warning-rgb); }
+.tally__chip:hover:not(:disabled) { border-color: rgba(var(--tone-rgb), 0.5); background: rgba(var(--tone-rgb), 0.05); }
+.tally__chip:disabled { opacity: 0.55; cursor: default; }
+.tally__chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.tally__chip--on, .tally__chip--on:hover:not(:disabled) { border-color: rgb(var(--tone-rgb)); background: rgba(var(--tone-rgb), 0.08); color: var(--rb-text-primary); }
+.tally__count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.tally__chip--unset:not(:disabled) .tally__count { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
+.tally__clear { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
+
+/* The rows. */
+.prices td { padding: 12px 16px; }
+.prices th:first-child, .prices td:first-child { width: 36%; }
+.prices th:nth-child(2), .prices td:nth-child(2) { width: 28%; }
+.prices tbody tr.row--dirty { box-shadow: inset 3px 0 0 var(--rb-primary); }
+.prices tbody tr.row--invalid { box-shadow: inset 3px 0 0 var(--rb-accent); }
+.name { display: block; font-size: 13.5px; }
+.code { margin-top: 4px; }
+.skeleton--name { margin-bottom: 6px; }
+.skeleton--seg { width: 172px; height: 34px; border-radius: 10px; }
+
+/* Charge | No charge. */
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border); }
+.seg__btn { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; white-space: nowrap; }
+.seg__btn:hover:not(:disabled):not(.seg__btn--on) { color: var(--rb-text-primary); }
+.seg__btn--on { background: var(--rb-surface); font-weight: 700; color: var(--rb-primary-text); box-shadow: 0 0 0 1px rgba(var(--rb-primary-rgb), 0.35), 0 1px 2px rgba(var(--rb-shadow-rgb), 0.12); }
+.seg__btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.seg__btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.free { display: inline-flex; align-items: center; gap: 6px; height: 36px; font-size: 13px; font-weight: 600; color: var(--rb-primary-text); }
+.was { margin: 5px 0 0; font-size: 11.5px; color: var(--rb-text-muted); }
+.empty-filter { padding: 28px 16px; text-align: center; color: var(--rb-text-secondary); }
+.link-btn { margin-left: 6px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
+
+/* Empty: as on Invoices and Payments. */
+.cp-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; text-align: center; }
+.cp-empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), 0.04); }
+.cp-empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--rb-text-primary); }
+.cp-empty__text { max-width: 480px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
+.cp-empty .btn { margin-top: 6px; text-decoration: none; }
+
+.aside-note { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.aside-note a { font-weight: 600; color: var(--rb-primary-text); }
+.aside-note :deep(.asset-icon) { margin-right: 4px; vertical-align: -2px; }
+
+/* Save within reach. */
+.savebar {
+  position: sticky; bottom: 16px; z-index: 5;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 10px 10px 16px;
+  border: 1px solid var(--rb-border); border-radius: 14px;
+  background: var(--rb-surface);
+  box-shadow: 0 8px 24px rgba(var(--rb-shadow-rgb), 0.14);
+}
+.savebar__text { display: inline-flex; flex: 1; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--rb-primary-text); }
+.savebar-enter-active, .savebar-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.savebar-enter-from, .savebar-leave-to { opacity: 0; transform: translateY(8px); }
+@media (prefers-reduced-motion: reduce) {
+  .savebar-enter-active, .savebar-leave-active, .tally__chip { transition: none; }
 }
 </style>

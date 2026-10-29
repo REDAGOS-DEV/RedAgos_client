@@ -42,32 +42,57 @@
 
       <template v-if="data">
         <!-- ============ WITH PROCESSING NOW ============ -->
-        <section aria-labelledby="bench-title" class="section">
-          <div class="section-head">
-            <h2 id="bench-title" class="section-title">With Processing now</h2>
-            <span class="section-meta">
-              {{ plural(data.queue.total, 'unit') }} not yet handed over<template v-if="data.queue.oldest_unseparated_at">
-                · oldest unseparated drawn {{ ageLabel(data.queue.oldest_unseparated_at) }} ago</template>
-              <NuxtLink to="/blood-center/laboratory" class="card__link section-meta__link">
+        <!--
+          The bench as one line, in its order (2026-10-27): separate, wait for
+          Testing, label, hand over. The bar shows where the units sit; each
+          stage opens the list it is worked from.
+        -->
+        <section aria-labelledby="bench-title" class="card pipeline">
+          <div class="card__head">
+            <div>
+              <h2 id="bench-title" class="card__label card__label--title">With Processing now</h2>
+              <p class="card__sub">
+                <strong class="figure">{{ plural(data.queue.total, 'unit') }}</strong> not yet handed over, in bench order.
+              </p>
+            </div>
+            <div class="pipeline__tools">
+              <span v-if="data.queue.oldest_unseparated_at" class="oldest">
+                <AssetIcon name="clock" :size="13" />
+                Oldest unseparated drawn {{ ageLabel(data.queue.oldest_unseparated_at) }} ago
+              </span>
+              <NuxtLink to="/blood-center/laboratory" class="card__link">
                 Component Processing
                 <AssetIcon name="arrow-right" :size="13" />
               </NuxtLink>
-              <NuxtLink to="/blood-center/processed?status=awaiting_handover" class="card__link section-meta__link">
+              <NuxtLink to="/blood-center/processed?status=awaiting_handover" class="card__link">
                 Processed list
                 <AssetIcon name="arrow-right" :size="13" />
               </NuxtLink>
-            </span>
+            </div>
           </div>
 
-          <!-- In bench order: separate, wait for Testing, label, hand over (2026-10-22). -->
-          <ol class="kpi-row" aria-label="Units by stage">
-            <li v-for="kpi in queueKpis" :key="kpi.key" class="kpi">
-              <p class="kpi__label">
-                <span class="dot" :class="`dot--${kpi.tone}`" aria-hidden="true" />
-                {{ kpi.label }}
-              </p>
-              <p class="kpi__value">{{ kpi.value }}</p>
-              <p class="kpi__hint">{{ kpi.hint }}</p>
+          <div v-if="data.queue.total" class="pipeline__bar" aria-hidden="true">
+            <span
+              v-for="kpi in queueKpis"
+              :key="kpi.key"
+              class="pipeline__seg"
+              :class="`tone--${kpi.tone}`"
+              :style="{ flexGrow: kpi.value }"
+            />
+          </div>
+
+          <ol class="flow" aria-label="Units by stage">
+            <li v-for="(kpi, i) in queueKpis" :key="kpi.key" class="flow__item">
+              <NuxtLink :to="kpi.to" class="flow__stage" :class="[`tone--${kpi.tone}`, { 'flow__stage--zero': !kpi.value }]">
+                <span class="flow__top">
+                  <span class="flow__icon" aria-hidden="true"><AssetIcon :name="kpi.icon" :size="17" /></span>
+                  <span class="flow__step">Step {{ i + 1 }}</span>
+                </span>
+                <span class="flow__label">{{ kpi.label }}</span>
+                <span class="flow__value">{{ kpi.value }}</span>
+                <span class="flow__hint">{{ kpi.hint }}</span>
+              </NuxtLink>
+              <span v-if="i < queueKpis.length - 1" class="flow__arrow" aria-hidden="true"><AssetIcon name="chevron-right" :size="16" /></span>
             </li>
           </ol>
         </section>
@@ -82,12 +107,10 @@
               </div>
             </div>
             <ol class="stages" aria-label="Today's work">
-              <li v-for="stage in todayRows" :key="stage.key" class="stage">
+              <li v-for="stage in todayRows" :key="stage.key" class="stage" :class="`tone--${stage.tone}`">
+                <span class="stage__icon" aria-hidden="true"><AssetIcon :name="stage.icon" :size="16" /></span>
                 <span class="stage__value">{{ stage.value }}</span>
-                <span class="stage__label">
-                  <span class="dot" :class="`dot--${stage.tone}`" aria-hidden="true" />
-                  {{ stage.label }}
-                </span>
+                <span class="stage__label">{{ stage.label }}</span>
               </li>
             </ol>
             <p class="card__note">A unit whose final labels were reprinted today counts once.</p>
@@ -96,27 +119,38 @@
           <article class="card">
             <div class="card__head">
               <div>
-                <p class="card__label">Time to separate</p>
-                <p class="card__value">{{ durationLabel(data.separation.median_hours) }}</p>
+                <p class="card__label">How long it takes</p>
+                <p class="card__sub">Medians over the last 30 days.</p>
               </div>
             </div>
-            <p class="card__sub">
-              The median time from the draw to the recorded breakdown, over the last 30 days<template v-if="data.separation.units">,
-                across <strong class="figure">{{ plural(data.separation.units, 'unit') }}</strong></template>.
-            </p>
-            <ul class="stat-list">
-              <li class="stat-list__row">
-                <span class="stat-list__label">
-                  <span class="dot dot--ok" aria-hidden="true" />
-                  Cleared to handed over (median)
+            <!-- The two waits Processing owns, each on its line (2026-10-27). -->
+            <ol class="waits">
+              <li class="wait tone--info">
+                <span class="wait__node">Drawn</span>
+                <span class="wait__line" aria-hidden="true" />
+                <span class="wait__value">
+                  <span class="sr-only">Time to separate: </span>{{ durationLabel(data.separation.median_hours) }}
                 </span>
-                <span class="stat-list__value">{{ durationLabel(data.handover.median_hours) }}</span>
+                <span class="wait__line" aria-hidden="true" />
+                <span class="wait__node">Separated</span>
               </li>
-            </ul>
-            <p class="card__note">
-              <template v-if="data.handover.units">How long cleared bags waited for their final labels and the hand-over, across {{ plural(data.handover.units, 'unit') }}.</template>
-              <template v-else>No unit has been handed over after clearing in the last 30 days.</template>
-            </p>
+              <li class="wait__note">
+                Draw to recorded breakdown<template v-if="data.separation.units">, across <strong class="figure">{{ plural(data.separation.units, 'unit') }}</strong></template>.
+              </li>
+              <li class="wait tone--ok">
+                <span class="wait__node">Cleared</span>
+                <span class="wait__line" aria-hidden="true" />
+                <span class="wait__value">
+                  <span class="sr-only">Cleared to handed over: </span>{{ durationLabel(data.handover.median_hours) }}
+                </span>
+                <span class="wait__line" aria-hidden="true" />
+                <span class="wait__node">Handed over</span>
+              </li>
+              <li class="wait__note">
+                <template v-if="data.handover.units">How long cleared bags waited for their final labels and the hand-over, across {{ plural(data.handover.units, 'unit') }}.</template>
+                <template v-else>No unit has been handed over after clearing in the last 30 days.</template>
+              </li>
+            </ol>
           </article>
         </div>
 
@@ -160,13 +194,25 @@
                   </g>
                 </g>
 
-                <g
-                  v-for="(col, i) in chart.columns"
-                  :key="col.date"
-                  class="chart__col"
-                  :class="{ 'chart__col--dim': activeIndex !== null && activeIndex !== i }"
-                >
-                  <path v-if="col.path" :d="col.path" class="chart__s1" />
+                <defs>
+                  <linearGradient :id="fillId" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" class="chart__stop chart__stop--top" />
+                    <stop offset="100%" class="chart__stop chart__stop--bottom" />
+                  </linearGradient>
+                </defs>
+                <path v-if="chart.area" :d="chart.area" :fill="`url(#${fillId})`" />
+                <path v-if="chart.line" :d="chart.line" class="chart__line" />
+                <line
+                  v-if="activeColumn"
+                  :x1="activeColumn.center"
+                  :x2="activeColumn.center"
+                  :y1="chart.top"
+                  :y2="chart.top + chart.plotHeight"
+                  class="chart__guide"
+                />
+                <circle v-if="activeColumn" :cx="activeColumn.center" :cy="activeColumn.top" r="5" class="chart__dot" />
+
+                <g v-for="(col, i) in chart.columns" :key="col.date" class="chart__col">
                   <rect
                     :x="col.bandX"
                     :y="chart.top"
@@ -228,12 +274,15 @@
               </div>
 
               <ul v-if="data.by_component.length" class="bars">
-                <li v-for="row in data.by_component" :key="row.component" class="bar">
-                  <span class="bar__name" :title="row.component">{{ row.component }}</span>
+                <li v-for="row in data.by_component" :key="row.component" class="bar" :class="`comp--${componentTone(row.component)}`">
+                  <span class="bar__name" :title="row.component">
+                    <span class="bar__swatch" aria-hidden="true" />
+                    {{ row.component }}
+                  </span>
+                  <span class="bar__count">{{ row.bags }} <span class="bar__share">{{ componentShare(row.bags) }}</span></span>
                   <span class="bar__track">
                     <span class="bar__fill" :style="{ width: componentWidth(row.bags) }" />
                   </span>
-                  <span class="bar__count">{{ row.bags }}</span>
                 </li>
               </ul>
               <p v-else class="card__note">Nothing separated in the last 30 days.</p>
@@ -252,11 +301,11 @@
               <ul class="stat-list">
                 <li v-for="row in technologistRows" :key="row.key" class="stat-list__row">
                   <NuxtLink v-if="row.to" :to="row.to" class="stat-list__label stat-list__label--link">
-                    <span class="dot" :class="`dot--${row.tone}`" aria-hidden="true" />
+                    <span class="task-icon" :class="`tone--${row.tone}`" aria-hidden="true"><AssetIcon :name="row.icon" :size="15" /></span>
                     {{ row.label }}
                   </NuxtLink>
                   <span v-else class="stat-list__label">
-                    <span class="dot" :class="`dot--${row.tone}`" aria-hidden="true" />
+                    <span class="task-icon" :class="`tone--${row.tone}`" aria-hidden="true"><AssetIcon :name="row.icon" :size="15" /></span>
                     {{ row.label }}
                   </span>
                   <span class="stat-list__value">{{ row.value }}</span>
@@ -274,9 +323,10 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { columnPath, dayMonth, longDate, niceScale, plural, weekday } from '~/utils/collectionDashboard'
+import { dayMonth, longDate, niceScale, plural, weekday } from '~/utils/collectionDashboard'
 import { ageLabel, durationLabel } from '~/utils/testingDashboard'
 import { bagPeak, bagTotals, bagsPerUnit } from '~/utils/processingDashboard'
+import { smoothPath } from '~/utils/smoothPath'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 /**
@@ -342,10 +392,10 @@ async function load() {
 const queueKpis = computed(() => {
   const q = data.value?.queue ?? {}
   return [
-    { key: 'separate', label: 'To separate', value: q.to_separate ?? 0, tone: 'info', hint: 'Drawn, no breakdown yet' },
-    { key: 'testing', label: 'Awaiting testing', value: q.awaiting_testing ?? 0, tone: 'neutral', hint: 'Separated; Testing has not cleared both' },
-    { key: 'label', label: 'Ready to label', value: q.to_label ?? 0, tone: 'warn', hint: 'Cleared; print the final labels' },
-    { key: 'handover', label: 'Ready to hand over', value: q.to_hand_over ?? 0, tone: 'ok', hint: 'Labelled; hand over to Issuance' },
+    { key: 'separate', icon: 'droplets', to: '/blood-center/laboratory', label: 'To separate', value: q.to_separate ?? 0, tone: 'info', hint: 'Drawn, no breakdown yet' },
+    { key: 'testing', icon: 'flask-conical', to: '/blood-center/laboratory', label: 'Awaiting testing', value: q.awaiting_testing ?? 0, tone: 'neutral', hint: 'Separated; Testing has not cleared both' },
+    { key: 'label', icon: 'printer', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to label', value: q.to_label ?? 0, tone: 'warn', hint: 'Cleared; print the final labels' },
+    { key: 'handover', icon: 'package-check', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to hand over', value: q.to_hand_over ?? 0, tone: 'ok', hint: 'Labelled; hand over to Issuance' },
   ]
 })
 
@@ -354,10 +404,10 @@ const queueKpis = computed(() => {
 const todayRows = computed(() => {
   const t = data.value?.today ?? {}
   return [
-    { key: 'separated', label: 'Units separated', value: t.separated ?? 0, tone: 'neutral' },
-    { key: 'bags', label: 'Bags', value: t.bags ?? 0, tone: 'neutral' },
-    { key: 'labelled', label: 'Units labelled', value: t.labelled ?? 0, tone: 'warn' },
-    { key: 'handed_over', label: 'Handed over', value: t.handed_over ?? 0, tone: 'ok' },
+    { key: 'separated', icon: 'droplets', label: 'Units separated', value: t.separated ?? 0, tone: 'info' },
+    { key: 'bags', icon: 'package', label: 'Bags', value: t.bags ?? 0, tone: 'neutral' },
+    { key: 'labelled', icon: 'printer', label: 'Units labelled', value: t.labelled ?? 0, tone: 'warn' },
+    { key: 'handed_over', icon: 'package-check', label: 'Handed over', value: t.handed_over ?? 0, tone: 'ok' },
   ]
 })
 
@@ -369,6 +419,21 @@ function componentWidth(bags) {
   return `${(bags / componentMax.value) * 100}%`
 }
 
+const componentTotal = computed(() => (data.value?.by_component ?? []).reduce((sum, r) => sum + (r.bags || 0), 0))
+function componentShare(bags) {
+  return componentTotal.value ? `${Math.round((bags / componentTotal.value) * 100)}%` : ''
+}
+
+/** Each component's colour, by what it is: red cells red, plasma amber, platelets purple, cryo blue. */
+function componentTone(name) {
+  const n = String(name).toLowerCase()
+  if (n.includes('red') || n.includes('whole')) return 'red'
+  if (n.includes('cryo')) return 'blue'
+  if (n.includes('plasma')) return 'amber'
+  if (n.includes('platelet')) return 'purple'
+  return 'grey'
+}
+
 /* ---------- component technologist ---------- */
 
 const technologistRows = computed(() => {
@@ -376,9 +441,9 @@ const technologistRows = computed(() => {
   if (!t) return []
 
   return [
-    { key: 'corrections', label: 'Breakdown corrections to decide', value: t.corrections, tone: 'warn', to: '/blood-center/processed?status=correction_pending' },
-    { key: 'handover', label: 'Ready to hand over', value: data.value.queue.to_hand_over, tone: 'ok', to: '/blood-center/processed?status=awaiting_handover' },
-    { key: 'rejected', label: 'Rejected by Processing, last 30 days', value: t.rejected_recently, tone: 'crit', to: null },
+    { key: 'corrections', icon: 'pencil', label: 'Breakdown corrections to decide', value: t.corrections, tone: 'warn', to: '/blood-center/processed?status=correction_pending' },
+    { key: 'handover', icon: 'package-check', label: 'Ready to hand over', value: data.value.queue.to_hand_over, tone: 'ok', to: '/blood-center/processed?status=awaiting_handover' },
+    { key: 'rejected', icon: 'circle-x', label: 'Rejected by Processing, last 30 days', value: t.rejected_recently, tone: 'crit', to: null },
   ]
 })
 
@@ -400,11 +465,13 @@ function measure() {
   if (chartBox.value) chartWidth.value = chartBox.value.clientWidth
 }
 
-const CHART_HEIGHT = 220
+const CHART_HEIGHT = 240
+const fillId = `pd-fill-${useId()}`
 
 /**
- * One column per day, drawn as the Collection and Testing dashboards draw
- * theirs: the rounded end on top, a date every 7 days counted back from today.
+ * One point per day on a smooth curve over a soft fill (2026-10-27; was
+ * columns), as the Billing dashboard draws its own; a date every 7 days
+ * counted back from today.
  */
 const chart = computed(() => {
   const width = chartWidth.value
@@ -419,13 +486,10 @@ const chart = computed(() => {
   const plotHeight = CHART_HEIGHT - top - bottom
   const scale = niceScale(peak.value)
   const band = plotWidth / days.length
-  const barWidth = Math.max(3, Math.min(24, band * 0.62))
   const y = (v) => top + plotHeight - (v / scale.max) * plotHeight
 
   const columns = days.map((day, i) => {
     const bandX = left + i * band
-    const x = bandX + (band - barWidth) / 2
-    const height = (day.bags / scale.max) * plotHeight
 
     return {
       ...day,
@@ -433,9 +497,13 @@ const chart = computed(() => {
       bandWidth: band,
       center: bandX + band / 2,
       top: y(day.bags),
-      path: columnPath(x, top + plotHeight - height, barWidth, height, true),
     }
   })
+
+  // One smooth line through the days, never overshooting a day's count.
+  const points = columns.map((col) => ({ x: col.center, y: col.top }))
+  const line = smoothPath(points)
+  const area = points.length > 1 ? `${line} L${points[points.length - 1].x},${top + plotHeight} L${points[0].x},${top + plotHeight} Z` : ''
 
   const xLabels = columns
     .map((col, i) => ({ col, i }))
@@ -455,6 +523,8 @@ const chart = computed(() => {
     top,
     plotHeight,
     columns,
+    line,
+    area,
     xLabels,
     ticks: scale.ticks.map((value) => ({ value, y: y(value) })),
   }
@@ -869,5 +939,91 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
   .chart__col { transition: none; }
+}
+
+/* ===== Refresh (project owner, 2026-10-27) ===== */
+.tone--info { --tone-rgb: var(--rb-primary-rgb); }
+.tone--neutral { --tone-rgb: var(--rb-purple-rgb, 124, 58, 237); }
+.tone--warn { --tone-rgb: var(--rb-warning-rgb); }
+.tone--ok { --tone-rgb: var(--rb-success-rgb); }
+.tone--crit { --tone-rgb: var(--rb-accent-rgb); }
+
+/* The bench as one pipeline. */
+.pipeline { display: flex; flex-direction: column; gap: 16px; }
+.pipeline__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 16px; }
+.oldest { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(var(--rb-warning-rgb), .12); font-size: 12px; font-weight: 600; color: var(--rb-warning-text); }
+.pipeline__bar { display: flex; gap: 3px; height: 10px; overflow: hidden; border-radius: 999px; background: var(--rb-surface-alt); }
+.pipeline__seg { flex-basis: 0; min-width: 0; background: rgb(var(--tone-rgb)); }
+.pipeline__seg:first-child { border-radius: 999px 0 0 999px; }
+.pipeline__seg:last-child { border-radius: 0 999px 999px 0; }
+
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; padding: 0; list-style: none; }
+.flow__item { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.flow__item + .flow__item { padding-left: 22px; }
+.flow__arrow { position: absolute; top: 50%; right: -19px; z-index: 1; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--rb-border); border-radius: 50%; background: var(--rb-surface); color: var(--rb-text-muted); transform: translateY(-50%); }
+.flow__stage {
+  display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; padding: 14px 16px;
+  border: 1px solid var(--rb-border); border-radius: 14px;
+  background: var(--rb-surface);
+  text-decoration: none; color: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.flow__stage:hover { border-color: rgba(var(--tone-rgb), .5); box-shadow: 0 6px 16px -8px rgba(var(--tone-rgb), .45); }
+.flow__stage:active { transform: translateY(1px); }
+.flow__stage:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.flow__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.flow__icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(var(--tone-rgb), .14); color: rgb(var(--tone-rgb)); }
+.flow__step { font-size: 11px; font-weight: 700; color: var(--rb-text-muted); }
+.flow__label { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
+.flow__value { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.flow__hint { font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
+.flow__stage--zero .flow__value { color: var(--rb-text-muted); }
+
+/* Today: each figure with its icon. */
+.stage { display: flex; flex-direction: column; gap: 2px; }
+.stage__icon { display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 6px; border-radius: 9px; background: rgba(var(--tone-rgb), .12); color: rgb(var(--tone-rgb)); }
+
+/* How long it takes: the two waits on a line. */
+.waits { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.wait { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(var(--tone-rgb), .06); }
+.wait__node { flex: none; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); }
+.wait__node::before { content: ''; width: 10px; height: 10px; border: 2px solid rgb(var(--tone-rgb)); border-radius: 50%; background: var(--rb-surface); }
+.wait__node:last-child { flex-direction: row-reverse; }
+.wait__line { flex: 1; min-width: 12px; height: 2px; border-radius: 1px; background: rgba(var(--tone-rgb), .45); }
+.wait__value { flex: none; padding: 4px 12px; border-radius: 999px; background: rgb(var(--tone-rgb)); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fff; }
+.wait__note { margin: 0 0 8px 4px; font-size: 12px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* The trend as a curve. */
+.chart__stop--top { stop-color: var(--series-1); stop-opacity: .24; }
+.chart__stop--bottom { stop-color: var(--series-1); stop-opacity: 0; }
+.chart__line { fill: none; stroke: var(--series-1); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart__guide { stroke: var(--rb-border-strong); stroke-dasharray: 3 3; }
+.chart__dot { fill: var(--series-1); stroke: var(--rb-surface); stroke-width: 2.5; }
+
+/* Bags by component: each its colour and share. */
+.bar { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name count" "track track"; gap: 6px 10px; }
+.bar__name { grid-area: name; display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.bar__swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--comp); }
+.bar__count { grid-area: count; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar__share { margin-left: 4px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-muted); }
+.bar__track { grid-area: track; height: 8px !important; }
+.bar__fill { background: var(--comp) !important; }
+.comp--red { --comp: rgb(var(--rb-accent-rgb)); }
+.comp--amber { --comp: rgb(var(--rb-warning-rgb)); }
+.comp--purple { --comp: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.comp--blue { --comp: rgb(var(--rb-primary-rgb)); }
+.comp--grey { --comp: var(--rb-text-muted); }
+
+/* For the component technologist: rows with their icons. */
+.task-icon { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: rgba(var(--tone-rgb), .12); color: rgb(var(--tone-rgb)); }
+.stat-list__label { gap: 10px !important; }
+
+@media (max-width: 1100px) {
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .flow__item:nth-child(3) { padding-left: 0; }
+  .flow__item:nth-child(2) .flow__arrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow__stage { transition: none; }
 }
 </style>

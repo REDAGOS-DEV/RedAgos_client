@@ -84,6 +84,48 @@
         ],
         "createdAt": "2026-10-19T03:30:01.615Z",
         "reason": "Print-only stylesheet for a 100x150 mm black-and-white thermal waybill: a system font is guaranteed present at print time, with no web font that may not have loaded before window.print(). Deliberate, not a UI typeface choice."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/components/Hospital/Sidebar.vue"
+        ],
+        "createdAt": "2026-10-28T10:34:39.762Z",
+        "reason": "Claude: pre-existing intentional rail collapse; code comments (L8-12, L458) say only the width animates, in step with the layout's 200ms; not part of the Requests-label change"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/layouts/hospitaldashboard.vue"
+        ],
+        "createdAt": "2026-10-28T10:44:18.204Z",
+        "reason": "Claude: pre-existing intentional shell motion; content padding-left follows the sidebar rail's 200ms width change (Hospital/Sidebar.vue); not part of the Receiving/breadcrumb edit"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/components/Hospital/BloodTypeAvailability.vue"
+        ],
+        "createdAt": "2026-10-28T11:17:56.409Z",
+        "reason": "Claude: 3px top edge on a low/critical blood-type card, copied from blood-center/inventory.vue, which the owner asked the hospital inventory to match (2026-10-28); the cards moved from hospital/inventory.vue to this component for the dashboard the same day; owner's quieter rule allows a 3px edge marker for state"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/components/Hospital/BloodTypeAvailability.vue"
+        ],
+        "createdAt": "2026-10-28T11:17:56.520Z",
+        "reason": "Claude: width transition on the absolutely positioned 6px component-meter fill (no reflow of other content), copied from blood-center/inventory.vue, which the owner asked the hospital inventory to match (2026-10-28); moved with the type cards from hospital/inventory.vue to this component"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-10-28T19:02:25.199Z",
+        "reason": "Claude, from code evidence: the nuxt.config.ts head comment names Inter as the donor portal's deliberate UI font (Plus Jakarta Sans for headings); the line predates the deploy-prep edit that triggered the hook, and the global font is outside this work"
       }
     ]
   }

@@ -166,3 +166,18 @@ describe('Donor Management across the blood centres', () => {
     expect(donors).toContain(`title="Export your centre's donors (CSV)"`)
   })
 })
+
+describe('Collection unsuccessful', () => {
+  const page = source('app/pages/blood-center/donation.vue')
+
+  it("asks its reason in the page's own dialog, never the browser's prompt (2026-10-26)", () => {
+    expect(page).not.toMatch(/window\.(prompt|alert|confirm)\(/)
+    expect(page).toContain('@click="openAbandon"')
+    expect(page).toContain('aria-labelledby="abandon-title"')
+    expect(page).toContain(":disabled=\"busy || !abandoning.reason.trim()\"")
+  })
+
+  it('closes the visit as rejected, with the reason typed', () => {
+    expect(page).toContain("status: 'rejected',\n      rejection_reason: reason,")
+  })
+})

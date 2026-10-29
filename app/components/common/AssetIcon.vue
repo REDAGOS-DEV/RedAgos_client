@@ -114,7 +114,9 @@ import pill from '~/assets/icons/pill.svg?raw'
 import plane from '~/assets/icons/plane.svg?raw'
 import stethoscope from '~/assets/icons/stethoscope.svg?raw'
 import syringe from '~/assets/icons/syringe.svg?raw'
+import snowflake from '~/assets/icons/snowflake.svg?raw'
 import sun from '~/assets/icons/sun.svg?raw'
+import thermometer from '~/assets/icons/thermometer.svg?raw'
 import trash from '~/assets/icons/trash-2.svg?raw'
 import trendingDown from '~/assets/icons/trending-down.svg?raw'
 import trendingUp from '~/assets/icons/trending-up.svg?raw'
@@ -128,6 +130,8 @@ import userCheck from '~/assets/icons/user-check.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
 import userX from '~/assets/icons/user-x.svg?raw'
 import warehouse from '~/assets/icons/warehouse.svg?raw'
+import layers from '~/assets/icons/layers.svg?raw'
+import layoutGrid from '~/assets/icons/layout-grid.svg?raw'
 import x from '~/assets/icons/x.svg?raw'
 const icons = {
   activity,
@@ -239,7 +243,9 @@ const icons = {
   'trending-down': trendingDown,
   'trending-up': trendingUp,
   truck,
+  snowflake,
   sun,
+  thermometer,
   'trash-2': trash,
   'undo-2': undo2,
   unlock,
@@ -249,6 +255,8 @@ const icons = {
   'user-check' : userCheck,
   'user-circle': userCircle,
   warehouse,
+  layers,
+  'layout-grid': layoutGrid,
   'user-x' : userX,
   x
 }

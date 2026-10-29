@@ -154,6 +154,28 @@
           </footer>
         </form>
       </section>
+
+      <!-- Closing with answers given: the questionnaire's own confirm, over it. -->
+      <div v-if="discarding" class="onsite-confirm" @click.self="discarding = false">
+        <div
+          v-focus-trap
+          class="onsite-confirm__card"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="onsite-discard-title"
+          aria-describedby="onsite-discard-text"
+          @dialog-escape="discarding = false"
+        >
+          <h3 id="onsite-discard-title" class="onsite-confirm__title">Discard the answers given so far?</h3>
+          <p id="onsite-discard-text" class="onsite-confirm__text">
+            The questionnaire closes and nothing is recorded.
+          </p>
+          <div class="onsite-confirm__actions">
+            <button type="button" class="onsite__btn" @click="discarding = false">Keep answering</button>
+            <button type="button" class="onsite__btn onsite__btn--danger" @click="discard">Discard answers</button>
+          </div>
+        </div>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -322,8 +344,20 @@ function requestClose() {
     return
   }
 
-  if (dirty.value && !window.confirm('Discard the answers given so far?')) return
+  if (dirty.value) {
+    discarding.value = true
+    return
+  }
 
+  discard()
+}
+
+// Closing with answers given asks first, in a confirm of the questionnaire's
+// own rather than the browser's (project owner, 2026-10-26).
+const discarding = ref(false)
+
+function discard() {
+  discarding.value = false
   clearAnswers()
   emit('close')
 }
@@ -616,6 +650,35 @@ onBeforeUnmount(() => {
 
 .onsite__done-title { margin: 0.4rem 0 0; font-size: 18px; font-weight: 700; color: var(--rb-text-primary); }
 .onsite__done-text { margin: 0 0 0.6rem; font-size: 14px; color: var(--rb-text-secondary); }
+
+.onsite__btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
+.onsite__btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
+
+/* The discard confirm, over the questionnaire (the overlay is its containing block). */
+.onsite-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--rb-overlay);
+}
+
+.onsite-confirm__card {
+  width: min(26rem, 100%);
+  padding: 1.25rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
+  font-family: var(--rb-font-sans);
+}
+
+.onsite-confirm__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.onsite-confirm__text { margin: 0.4rem 0 1.1rem; font-size: 14px; line-height: 1.5; color: var(--rb-text-secondary); }
+.onsite-confirm__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.6rem; }
 
 @media (max-width: 640px) {
   .onsite__header { padding: 0.85rem 1rem; }

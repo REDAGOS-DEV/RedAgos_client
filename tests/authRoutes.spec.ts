@@ -177,7 +177,7 @@ describe('departmentHome', () => {
     ['testing', '/blood-center/testing'],
     ['processing', '/blood-center/laboratory'],
     ['issuance', '/blood-center/storage'],
-    ['billing', '/blood-center/billing'],
+    ['billing', '/blood-center/billing-dashboard'],
   ])('sends %s staff to %s', (department, home) => {
     expect(departmentHome({ department })).toBe(home)
   })
@@ -203,8 +203,8 @@ describe('departmentHome', () => {
     expect(departmentHome({ staff_role: 'dispatch_coordinator', department: 'issuance' })).toBe('/blood-center/fulfillment')
   })
 
-  it('sends the billing supervisor, the Billing head, to the billing page', () => {
-    expect(departmentHome({ staff_role: 'billing_supervisor', department: 'billing' })).toBe('/blood-center/billing')
+  it('sends the billing supervisor, the Billing head, to the billing dashboard', () => {
+    expect(departmentHome({ staff_role: 'billing_supervisor', department: 'billing' })).toBe('/blood-center/billing-dashboard')
   })
 
   it('lets the role win over the department', () => {
