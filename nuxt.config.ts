@@ -33,6 +33,12 @@ export default defineNuxtConfig({
   app: {
     head: {
       link: [
+        // The RedAgos drop, from assets/images/RedAgosLogo.png. The tab icon is
+        // cropped to the solid shape so it stays crisp at 16-32 px; the home-screen
+        // icon keeps the whole logo on black, which iOS would otherwise add itself.
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/icon-192.png' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
         // Preconnect sa duha ka origin: ang googleapis nagserve sa CSS, ang
         // gstatic sa mismong font files. Ang crossorigin kinahanglan sa gstatic
         // kay CORS ang font fetch — kung wala, mausik ang preconnect.

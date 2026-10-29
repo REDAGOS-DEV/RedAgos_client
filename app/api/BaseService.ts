@@ -10,9 +10,14 @@ import { reportUnauthorized } from "./unauthorized";
  * Usa ra ni ka kopya: ang useUser kaniadto naggamit sa apiBaseURL nga walay
  * fallback, so ang /user moadto sa Nuxt server, mapakyas, ug mahimong null
  * ang user (walay permissions, walay ngalan) bisan molihok ang ubang API.
+ *
+ * Trimmed, because a value pasted into a host's dashboard can carry a trailing
+ * newline (Cloudflare Pages, 2026-10-29). With `…/api\n` as the base, every
+ * request with a query lost its path: `/blood-center/donations?page=1` went
+ * out as `/api?page=1`, so each list page showed a generic error.
  */
 export function resolveApiBaseURL(): string {
-  const configured = useRuntimeConfig().public.apiBaseURL as string;
+  const configured = String(useRuntimeConfig().public.apiBaseURL ?? "").trim();
 
   return configured || (import.meta.client
     ? `${window.location.protocol}//${window.location.hostname}:8000/api`
