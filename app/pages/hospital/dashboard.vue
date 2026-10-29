@@ -40,6 +40,9 @@
         <StatItem label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
       </StatStrip>
 
+      <!-- The shelf by blood type, from Blood Bank Inventory (project owner, 2026-10-28). -->
+      <HospitalBloodTypeAvailability v-if="thresholds" :thresholds="thresholds" />
+
       <!-- Main content -->
       <div class="main-grid">
         <!-- Left column -->
@@ -150,28 +153,6 @@
 
         <!-- Right column -->
         <div class="col-right">
-          <!-- Blood availability -->
-          <SectionCard title="Blood Availability" flush>
-            <template #actions>
-              <NuxtLink to="/hospital/bloodavailability" class="panel-link">View Availability</NuxtLink>
-            </template>
-
-            <div v-if="bloodAvailability.length" class="availability-list">
-              <div v-for="(item, i) in bloodAvailability" :key="item.blood_type" class="availability-row">
-                <div class="availability-row__top">
-                  <span class="availability-row__type">{{ item.blood_type }}</span>
-                  <span class="availability-row__units">{{ item.units }} units</span>
-                  <StatusBadge :tone="availabilityTone[item.status] || 'neutral'">{{ statusLabel[item.status] }}</StatusBadge>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" :class="`progress-fill--${item.status}`"
-                    :style="{ width: (progressReady ? availabilityPercent(item) : 0) + '%', transitionDelay: (i * 60) + 'ms' }" />
-                </div>
-              </div>
-            </div>
-            <EmptyState v-else icon="blood-drop" title="No blood availability data available." description="Stock levels from the Blood Center will show here." compact />
-          </SectionCard>
-
           <!-- Today's activities -->
           <SectionCard title="Today's Activities" flush>
             <div v-if="activities.length" class="timeline">
@@ -230,6 +211,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import HospitalBloodTypeAvailability from '~/components/Hospital/BloodTypeAvailability.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
@@ -246,7 +228,6 @@ const router = useRouter()
 const goTo = (path) => router.push(path)
 
 const loading = ref(true)
-const progressReady = ref(false)
 const chartAnimateKey = ref(false)
 
 // Core KPI data (populated via animated counters)
@@ -257,7 +238,6 @@ const completedToday = ref(0)
 
 // Widgets data
 const recentRequests = ref([])
-const bloodAvailability = ref([])
 const activities = ref([])
 const notifications = ref([])
 const weeklyTrend = ref([])
@@ -301,23 +281,6 @@ const statusMap = {
   completed: { label: 'Completed', tone: 'success' },
   rejected: { label: 'Rejected', tone: 'danger' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },
-}
-
-const availabilityTone = {
-  healthy: 'success',
-  low: 'warning',
-  critical: 'danger',
-}
-
-const statusLabel = {
-  healthy: 'Healthy',
-  low: 'Low',
-  critical: 'Critical',
-}
-
-function availabilityPercent(item) {
-  if (!item.max) return 0
-  return Math.min(100, Math.round((item.units / item.max) * 100))
 }
 
 // ---------- Trend chart ----------
@@ -446,13 +409,14 @@ const quickActions = [
   },
 ]
 
-// Loaded on its own so the banner does not depend on the dashboard call below.
-// Supplementary: a failure leaves no banner.
-const lowStock = ref([])
+// Loaded on its own so the banner and the type cards do not depend on the
+// dashboard call below. Supplementary: a failure leaves neither.
+const thresholds = ref(null)
+const lowStock = computed(() => thresholds.value?.low ?? [])
 
 onMounted(async () => {
   try {
-    lowStock.value = (await hospitalService.stockThresholds()).low ?? []
+    thresholds.value = await hospitalService.stockThresholds()
   } catch (err) {
     console.error('Failed to load stock thresholds:', err)
   }
@@ -470,7 +434,6 @@ onMounted(async () => {
     const data = await hospitalService.dashboard()
 
     recentRequests.value = data.recent_requests ?? []
-    bloodAvailability.value = data.blood_availability ?? []
     activities.value = data.activities ?? []
     notifications.value = data.notifications ?? []
     weeklyTrend.value = data.weekly_trend ?? []
@@ -486,7 +449,6 @@ onMounted(async () => {
     animateCounter(pendingCount, data.pending_requests ?? 0)
     animateCounter(approvedCount, data.approved_requests ?? 0)
     animateCounter(completedToday, data.completed_today ?? 0)
-    requestAnimationFrame(() => { progressReady.value = true })
   } catch (err) {
     console.error('Failed to load hospital dashboard data:', err)
 
@@ -532,7 +494,6 @@ onMounted(async () => {
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .trend-line--animate, .trend-area--animate { animation: none !important; }
   .trend-line--animate { stroke-dashoffset: 0; }
-  .progress-fill { transition: none; }
 }
 
 .low-stock-banner:empty { display: none; }
@@ -745,47 +706,6 @@ onMounted(async () => {
   text-decoration: none;
 }
 .row-link:hover { text-decoration: underline; }
-
-/* Blood availability */
-.availability-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px 20px 20px;
-}
-.availability-row__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.availability-row__type {
-  min-width: 32px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--rb-text-primary);
-}
-.availability-row__units {
-  flex: 1;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
-
-.progress-track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--rb-surface-alt);
-}
-.progress-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.progress-fill--healthy { background: var(--rb-success); }
-.progress-fill--low { background: var(--rb-warning); }
-.progress-fill--critical { background: var(--rb-accent); }
 
 /* Timeline */
 .timeline {

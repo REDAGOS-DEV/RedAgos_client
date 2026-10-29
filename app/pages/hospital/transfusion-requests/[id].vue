@@ -148,7 +148,7 @@
                 <AssetIcon name="truck" :size="15" />
                 Receive units
               </NuxtLink>
-              <NuxtLink to="/hospital/inventory?tab=tagged" class="ui-btn">
+              <NuxtLink to="/hospital/inventory?status=tagged" class="ui-btn">
                 <AssetIcon name="package" :size="15" />
                 Blood Bank Inventory
               </NuxtLink>

@@ -17,7 +17,7 @@
           <label v-if="editingProfile" class="id-banner__camera" title="Change photo">
             <AssetIcon name="camera" :size="14" />
             <span class="sr-only">Change photo</span>
-            <input type="file" accept="image/*" class="avatar-upload-input" @change="onAvatarChange" />
+            <input type="file" accept="image/jpeg,image/png,image/webp" class="avatar-upload-input" @change="onAvatarChange" />
           </label>
         </div>
 
@@ -392,6 +392,7 @@
 
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { resolveApiAssetURL } from '~/api/BaseService'
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
 import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import ComboInput from '~/components/common/ComboInput.vue'
@@ -453,6 +454,7 @@ const api = {
   getSettings: () => bloodCenterService.profile(),
   updateProfile: (body) => bloodCenterService.updateProfile(body),
   updatePassword: (body) => bloodCenterService.updatePassword(body),
+  uploadAvatar: (form) => bloodCenterService.uploadAvatar(form),
 
   // `/logout-all` mo-revoke sa TANAN nga token — apil ang gigamit karon — so
   // ma-sign-out pod ang device nga nag-klik. Mao nay tinuod nga buhat sa
@@ -466,7 +468,7 @@ const api = {
 
 const loading = ref(true)
 
-const { can: canDo, user: sessionUser, fetchUser, logout } = useUser()
+const { can: canDo, user: sessionUser, fetchUser, updateAvatar, logout } = useUser()
 
 // The Blood Center tab holds the centre's logo, which only center.configure
 // may change (the card checks the same ability), so only they see the tab.
@@ -543,17 +545,44 @@ function startEditProfile() {
 }
 
 function cancelEditProfile() {
+  dropPendingAvatar()
   Object.assign(profileForm, profile)
   editingProfile.value = false
   profileError.value = ''
 }
 
+// The photo picked while editing, shown as a preview and uploaded on Save;
+// Cancel drops it. The server checks the same type and size again.
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+const pendingAvatar = ref(null)
+
+function dropPendingAvatar() {
+  if (pendingAvatar.value && profileForm.avatarUrl?.startsWith('blob:')) {
+    URL.revokeObjectURL(profileForm.avatarUrl)
+  }
+  pendingAvatar.value = null
+}
+
 function onAvatarChange(e) {
   const file = e.target.files?.[0]
+  // Cleared so picking the same file again still fires a change.
+  e.target.value = ''
   if (!file) return
+
+  profileError.value = ''
+  if (!AVATAR_TYPES.includes(file.type)) {
+    profileError.value = 'Profile photos must be a JPEG, PNG or WebP image.'
+    return
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    profileError.value = 'Profile photos must be 2 MB or smaller.'
+    return
+  }
+
+  dropPendingAvatar()
+  pendingAvatar.value = file
   profileForm.avatarUrl = URL.createObjectURL(file)
-  // local preview ra ni; actual upload kay i-attach sa saveProfile() payload
-  // once ang backend endpoint mo-accept ug multipart/form-data.
 }
 
 async function saveProfile() {
@@ -561,6 +590,19 @@ async function saveProfile() {
   profileError.value = ''
   profileSuccess.value = ''
   try {
+    if (pendingAvatar.value) {
+      const form = new FormData()
+      form.append('avatar', pendingAvatar.value)
+      const res = await api.uploadAvatar(form)
+      const uploaded = resolveApiAssetURL(res?.avatar_url)
+      dropPendingAvatar()
+      profile.avatarUrl = uploaded ?? ''
+      profileForm.avatarUrl = profile.avatarUrl
+      // The header reads the session's photo; swap it in now rather than
+      // waiting for fetchUser() below.
+      updateAvatar(uploaded)
+    }
+
     // The fields PATCH /blood-center/profile accepts, in its names. Email and
     // employee ID are not changed from here.
     const updated = await api.updateProfile({
@@ -741,7 +783,7 @@ function applyServerData(data) {
     email: p.email ?? '',
     contactNumber: p.phone ?? '',
     bloodCenter: data?.facility?.name ?? '',
-    avatarUrl: sessionUser.value?.avatar ?? profile.avatarUrl ?? '',
+    avatarUrl: resolveApiAssetURL(p.avatar_url) ?? sessionUser.value?.avatar ?? '',
   }
   Object.assign(profile, mapped)
   Object.assign(profileForm, mapped)

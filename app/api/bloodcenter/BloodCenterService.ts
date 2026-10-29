@@ -7,7 +7,6 @@ import type {
   CounterBill,
   CreateWalkInPayload,
   DuplicateMatch,
-  PaymentAttempt,
   PaymentReceiptSummary,
   RequestEvent,
   StatementRevision,
@@ -54,6 +53,14 @@ class BloodCenterService extends BaseService {
 
   async updatePassword(payload: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/password`, 'POST', payload)
+  }
+
+  /**
+   * The staff member's own profile photo: FormData with an `avatar` file.
+   * Answers { message, avatar_url }, a 30-minute signed path to the photo.
+   */
+  async uploadAvatar(form: FormData): Promise<{ message: string; avatar_url: string | null }> {
+    return this.request(`${this.resource}/profile/avatar`, 'POST', form)
   }
 
   /** The centre's reports for a period (reports.view_all): centre, staff, activity. */
@@ -1196,35 +1203,6 @@ class BloodCenterService extends BaseService {
   /** One patient bill as the counter takes it. */
   async counterBill(requestId: number | string): Promise<{ bill: CounterBill }> {
     return this.request(`/blood-center/pos/bills/${requestId}`, 'GET')
-  }
-
-  /**
-   * Open a GCash checkout for the watcher at the counter. Only the payer's
-   * name is sent; the amount comes from the statement on the server, never
-   * from here. Returns the open checkout if one already exists.
-   */
-  async startCheckout(requestId: number | string, payerName: string): Promise<{ message: string; created: boolean; attempt: PaymentAttempt }> {
-    return this.request(`/blood-center/billings/${requestId}/checkout`, 'POST', { payer_name: payerName })
-  }
-
-  /** Every GCash checkout opened against one statement, newest first. */
-  async checkoutAttempts(requestId: number | string): Promise<{ attempts: PaymentAttempt[] }> {
-    return this.request(`/blood-center/billings/${requestId}/attempts`, 'GET')
-  }
-
-  /** Close an open checkout so the payment can be taken another way. */
-  async supersedeCheckout(requestId: number | string, attemptId: number, reason: string): Promise<{ message: string; attempt: PaymentAttempt }> {
-    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/supersede`, 'POST', { reason })
-  }
-
-  /** Ask the provider again about a checkout flagged for review (Billing Supervisor). */
-  async reverifyCheckout(requestId: number | string, attemptId: number): Promise<{ message: string; attempt: PaymentAttempt }> {
-    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/reverify`, 'POST')
-  }
-
-  /** Close a checkout once the provider confirms nothing was paid on it (Billing Supervisor). */
-  async closeCheckout(requestId: number | string, attemptId: number, reason: string): Promise<{ message: string; attempt: PaymentAttempt }> {
-    return this.request(`/blood-center/billings/${requestId}/attempts/${attemptId}/close`, 'POST', { reason })
   }
 
   /**

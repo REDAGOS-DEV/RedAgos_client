@@ -22,6 +22,7 @@ This is the client only. It is a pure API consumer and does **not** run without 
   - [Styling](#styling)
 - [User Roles & Routes](#user-roles--routes)
 - [Development Workflow](#development-workflow)
+- [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -52,7 +53,7 @@ Each role gets its own authentication flow, dashboard layout, and route namespac
 
 ## Prerequisites
 
-- **Node.js** `^22.12.0 || ^24.11.0 || >=26.0.0` (the repo pins `24.11.0` in [.nvmrc](.nvmrc) — run `nvm use` if you use nvm)
+- **Node.js** `^22.22.2 || ^24.15.0 || >=26.0.0` (the repo pins `24.15.0` in [.nvmrc](.nvmrc) — run `nvm use` if you use nvm)
 - **npm** (ships with Node)
 - A running **RedAgos backend API** — see [Backend API](#backend-api)
 
@@ -243,6 +244,28 @@ Some composables (`useMockFulfillmentApi`, and other mock-data helpers) still re
 - Prefer TypeScript (`.ts`) for new composables and services. Existing `.js` composables are legacy and can be migrated opportunistically.
 - Component folders are grouped by role (`Donor/`, `Hospital/`, `BloodCenter/`); anything reused across roles belongs in `common/`.
 - Add any new environment variable to both `nuxt.config.ts` and `.env.example`.
+
+## Deployment
+
+The client is deployed to **Cloudflare Pages**, and the API runs separately. Pages builds the app itself on every push. Nuxt detects the Pages builder and switches to its `cloudflare_pages` preset, so pages are rendered by a Pages Function while `/_nuxt/*` and `public/` are served as static files.
+
+| Pages setting | Value |
+| --- | --- |
+| Framework preset | Nuxt.js |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Production branch | `main` |
+| Node version | read from [.nvmrc](.nvmrc) |
+
+Environment variables, set for both Production and Preview:
+
+| Variable | Value |
+| --- | --- |
+| `API_BASE_URL` | The API's https address, `/api` included, e.g. `https://<app>.koyeb.app/api`. Read at build time; the build fails without it. |
+
+Leave `HOSPITAL_PORTAL_ENABLED` and `USE_MOCKS` unset: their defaults are the shipped behaviour.
+
+On the server, the Pages address must be in `FRONTEND_URL` (or `CORS_ALLOWED_ORIGINS`), or the browser blocks every request with a CORS error. Each preview deployment has its own `*.pages.dev` address and needs listing as well.
 
 ## Troubleshooting
 

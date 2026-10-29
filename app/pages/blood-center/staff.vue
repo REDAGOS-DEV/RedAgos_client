@@ -161,7 +161,7 @@
                   <AssetIcon name="pencil" :size="13" />
                   Edit
                 </button>
-                <button v-if="!row.deleted_at" type="button" class="ghost-btn ghost-btn--danger" @click="remove(row)">
+                <button v-if="!row.deleted_at" type="button" class="ghost-btn ghost-btn--danger" @click="askRemove(row)">
                   Remove
                 </button>
                 <button v-else type="button" class="ghost-btn" @click="restore(row)">
@@ -385,6 +385,44 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Remove: the page's own confirm, not the browser's -->
+    <Transition name="modal-fade">
+      <div v-if="removing.row" class="modal-backdrop" @click.self="cancelRemove">
+        <div
+          v-focus-trap
+          class="modal modal--sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="remove-modal-title"
+          aria-describedby="remove-modal-text"
+          @dialog-escape="cancelRemove"
+        >
+          <div class="modal__head">
+            <div>
+              <h2 id="remove-modal-title" class="modal__title">Remove {{ removing.row.full_name }}?</h2>
+              <p v-if="removing.row.email" class="modal__sub">{{ removing.row.email }}</p>
+            </div>
+            <button type="button" class="icon-btn" aria-label="Close" :disabled="removing.busy" @click="cancelRemove">
+              <AssetIcon name="x" :size="16" />
+            </button>
+          </div>
+
+          <p id="remove-modal-text" class="modal__text">
+            They will be signed out immediately. The account can be restored later: tick
+            <strong>Show removed</strong> to find it.
+          </p>
+          <p v-if="removing.error" class="form__error modal__error" role="alert">{{ removing.error }}</p>
+
+          <div class="modal__actions">
+            <button type="button" class="ghost-btn" :disabled="removing.busy" @click="cancelRemove">Cancel</button>
+            <button type="button" class="btn-primary btn-primary--danger" :disabled="removing.busy" @click="confirmRemove">
+              {{ removing.busy ? 'Removing…' : 'Remove account' }}
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -683,15 +721,32 @@ async function submit() {
   }
 }
 
-async function remove(row) {
-  if (!confirm(`Remove ${row.full_name}? They will be signed out immediately.`)) return
+// Removing asks first, in the page's own confirm rather than the browser's
+// (project owner, 2026-10-26). A refusal stays in the dialog.
+const removing = reactive({ row: null, busy: false, error: '' })
+
+function askRemove(row) {
+  Object.assign(removing, { row, busy: false, error: '' })
+}
+
+function cancelRemove() {
+  if (removing.busy) return
+  removing.row = null
+}
+
+async function confirmRemove() {
+  removing.busy = true
+  removing.error = ''
 
   try {
-    await bloodCenterService.deleteStaff(row.uuid)
+    await bloodCenterService.deleteStaff(removing.row.uuid)
+    removing.busy = false
+    removing.row = null
     showBanner('Account removed.', 'success')
     await load()
   } catch (error) {
-    showBanner(error?.message || 'Could not remove that account.', 'error')
+    removing.error = error?.message || 'Could not remove that account.'
+    removing.busy = false
   }
 }
 
@@ -963,6 +1018,9 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
 
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
+.btn-primary--danger { background: var(--rb-accent); }
+.btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
+
 .ghost-btn {
   display: inline-flex;
   align-items: center;
@@ -1199,6 +1257,11 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
 }
 
 .modal__sub { margin: 3px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+
+/* The remove confirm: the same card, narrower, with a line of text for a body. */
+.modal--sm { max-width: 440px; }
+.modal__text { margin: 16px 0; font-size: 13.5px; line-height: 1.55; color: var(--rb-text-primary); }
+.modal .modal__error { margin-bottom: 14px; }
 
 .icon-btn {
   display: grid;

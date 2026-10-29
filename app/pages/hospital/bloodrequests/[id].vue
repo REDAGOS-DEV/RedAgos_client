@@ -577,8 +577,8 @@
             <p class="receipt-sub">
               {{ awaitingReceipt.length }} unit(s) have been dispatched. Confirm receipt once
               they physically arrive — only your facility can assert it, and it completes the
-              chain of custody for each unit. Inventory staff then stock them in from Blood Bank
-              Inventory, choosing where each is stored.
+              chain of custody for each unit. Inventory staff then stock them in at Stock Intake,
+              choosing where each is stored.
             </p>
           </div>
         </div>
@@ -801,7 +801,7 @@ async function handleConfirmReceipt() {
     // Receipt takes the bags into custody; inventory staff then stock them in.
     const arrived = response?.awaiting_stock_in ?? response?.stocked_count ?? 0
     showToast(arrived > 0
-      ? `Receipt confirmed. ${arrived} bag${arrived === 1 ? ' waits' : 's wait'} in Blood Bank Inventory for stock-in.`
+      ? `Receipt confirmed. ${arrived} bag${arrived === 1 ? ' waits' : 's wait'} at Stock Intake.`
       : 'Receipt confirmed. Thank you.')
   } catch (err) {
     receiptError.value = err?.message || 'Could not confirm receipt. Please try again.'

@@ -116,17 +116,6 @@ export type TransactionType =
   | 'opening_balance'
 export type TransactionChannel = 'counter' | 'gateway' | 'outside' | 'system'
 
-/** payment_attempts.status — one GCash checkout's state. */
-export type PaymentAttemptStatus =
-  | 'creating'
-  | 'active'
-  | 'awaiting_verification'
-  | 'completed'
-  | 'expired'
-  | 'canceled'
-  | 'failed'
-  | 'superseded'
-
 export interface FacilityStub {
   id: number
   /** False for a hospital known only from a walk-in: no accounts, nobody notified. */
@@ -633,8 +622,6 @@ export interface CounterBill {
   /** Only on GET /pos/bills/{id}. */
   lines?: StatementLine[]
   billing?: Billing
-  checkout?: CheckoutAvailability
-  open_attempt?: PaymentAttempt | null
 }
 
 /** One frozen line of an issued statement. Amounts are decimal strings. */
@@ -739,32 +726,6 @@ export interface ReceiptTender {
   /** The cash part only: what was handed over, and the change given back. */
   amount_tendered: string | null
   change_given: string | null
-}
-
-/**
- * One GCash checkout opened at the counter. The payer's name is never sent
- * back. `checkout_url` is present only while the checkout can still be paid.
- */
-export interface PaymentAttempt {
-  id: number
-  status: PaymentAttemptStatus
-  status_label: string
-  amount: string
-  currency: string
-  checkout_url: string | null
-  expires_at: string | null
-  statement_document_number: string | null
-  failure_code: string | null
-  review_required: boolean
-  review_reason: string | null
-  created_at: string | null
-  completed_at: string | null
-}
-
-/** Why a checkout cannot be opened right now, from GET /blood-center/billings/{id}. */
-export interface CheckoutAvailability {
-  available: boolean
-  reason: string | null
 }
 
 /** GET /blood-center/billings/{id}: one statement with its request and live lines. */

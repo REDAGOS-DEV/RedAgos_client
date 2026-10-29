@@ -1,4 +1,18 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// Cloudflare Pages builds the app itself and has no dev proxy, so a missing or
+// relative API base sends every call to the Pages site, or to :8000 on it.
+// Fail the Pages build instead of shipping a portal where every request fails.
+// CF_PAGES is set by Cloudflare's builder only; local and CI builds skip this.
+const pagesApiBase = process.env.NUXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || ''
+
+if (process.env.CF_PAGES && !/^https:\/\/[^/]+/i.test(pagesApiBase)) {
+  throw new Error(
+    'Cloudflare Pages build: set API_BASE_URL in the Pages project to the API\'s '
+    + `https address, /api included (e.g. https://<app>.koyeb.app/api). Got "${pagesApiBase}".`,
+  )
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },

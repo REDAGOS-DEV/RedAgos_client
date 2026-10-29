@@ -340,17 +340,13 @@
                 <div v-if="lastPayment.additional_information"><dt>Additional information</dt><dd>{{ lastPayment.additional_information }}</dd></div>
               </dl>
 
-              <!-- Patient bill: take the money at the counter, by QR, or waive it. -->
+              <!-- Patient bill: take the money at the counter, or waive it. -->
               <template v-if="!weekly && canSeePayments && takes">
                 <div class="pay-actions">
                   <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary btn-block">
                     <AssetIcon name="credit-card" :size="15" />
                     Take payment at the counter
                   </NuxtLink>
-                  <button class="ui-btn btn-block" @click="checkoutOpen = true">
-                    <AssetIcon name="qr-code" :size="15" />
-                    GCash QR
-                  </button>
                   <button v-if="!subsidyOpen" class="ui-btn ui-btn--ghost btn-block" @click="openSubsidy">
                     Apply government subsidy
                   </button>
@@ -477,17 +473,6 @@
       </template>
     </div>
 
-    <GcashCheckoutDialog
-      v-if="checkoutOpen && statement"
-      :request-id="requestId"
-      :heading="`${statement.request?.reference_number ?? ''} · ${statement.request?.patient_name || 'Patient'}`"
-      :total="statement.total_amount"
-      :collected="statement.collected"
-      @close="checkoutOpen = false"
-      @changed="loadAll"
-      @notify="(n) => toast(n.title, n.variant, n.message)"
-    />
-
     <BloodCenterCorrectionRequestDialog
       v-if="paymentCorrection"
       subject="payment"
@@ -513,16 +498,17 @@
  *
  * The page reads the live bill; the issued invoices are its frozen revisions,
  * shown as they print and downloaded as the server's PDF.
- * Taking money happens at the counter (or by GCash QR from here); everything
- * else that changes the bill — a subsidy, a weekly bill's settlement, a void
- * or a correction of a payment — is filed here and decided by the server.
+ * Taking money happens at the counter; everything else that changes the bill
+ * — a subsidy, a weekly bill's settlement, a void or a correction of a
+ * payment — is filed here and decided by the server. There is no GCash
+ * checkout QR (project owner, 2026-10-26): GCash is keyed in at the counter
+ * from the payer's reference, like card and bank transfer.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import BillingLines from '~/components/BloodCenter/BillingLines.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
-import GcashCheckoutDialog from '~/components/BloodCenter/GcashCheckoutDialog.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -1021,9 +1007,6 @@ async function submitSettlement() {
     saving.value = false
   }
 }
-
-/* GCASH CHECKOUT: the shared dialog polls the server and reports back */
-const checkoutOpen = ref(false)
 
 async function loadIssuerFallback() {
   try {

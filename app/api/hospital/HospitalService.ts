@@ -18,7 +18,10 @@ import type { HospitalNotificationList } from '~/types/hospitalNotification'
 import type { HospitalRoleOption, HospitalStaffMember } from '~/types/hospitalStaff'
 import type { SaveStockThresholdsPayload, StockThresholdStatus } from '~/types/stockThreshold'
 import type {
+  HospitalInventoryActivity,
   HospitalInventoryFilters,
+  HospitalInventoryReportRecord,
+  HospitalInventorySheet,
   HospitalInventorySummary,
   HospitalUnit,
   TagEventFilters,
@@ -50,6 +53,24 @@ import type {
 
 export type { BloodRequestFilters, TransfusionRequestFilters }
 
+/** What an Inventory Report is configured to cover. */
+export interface InventorySheetOptions {
+  by?: 'type' | 'all'
+  /** Component ids; every component when left out. */
+  components?: number[]
+  /** Blood type ids; every type when left out. */
+  bloodTypes?: number[]
+}
+
+/** A report's settings in the server's names; a list left out covers everything. */
+export function inventoryReportPayload(options: InventorySheetOptions): { by: 'type' | 'all'; components?: number[]; blood_types?: number[] } {
+  return {
+    by: options.by ?? 'type',
+    ...(options.components ? { components: [...options.components] } : {}),
+    ...(options.bloodTypes ? { blood_types: [...options.bloodTypes] } : {}),
+  }
+}
+
 export interface Paginated<T> {
   data: T[]
   current_page: number
@@ -64,6 +85,31 @@ class HospitalService extends BaseService {
   static getInstance() {
     if (!HospitalService.instance) HospitalService.instance = new HospitalService()
     return HospitalService.instance
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The signed-in staff member's own account (Settings): the same staff
+   * profile the centre's staff use, under /hospital.
+   * ---------------------------------------------------------------- */
+
+  /** { profile, facility, account }, in the server's names. */
+  profile() {
+    return this.request<any>('/hospital/profile')
+  }
+
+  /** first_name, last_name, phone and credentials; email and role are not changed here. */
+  updateProfile(payload: { first_name?: string; last_name?: string; phone?: string; credentials?: string | null }) {
+    return this.request<any>('/hospital/profile', 'PATCH', payload)
+  }
+
+  /** FormData with an `avatar` file; answers { message, avatar_url }. */
+  uploadAvatar(form: FormData) {
+    return this.request<{ message: string; avatar_url: string | null }>('/hospital/profile/avatar', 'POST', form)
+  }
+
+  /** Ends every session, this one included: sign in again afterwards. */
+  updatePassword(payload: { current_password: string; password: string; password_confirmation: string }) {
+    return this.request<{ message: string }>('/hospital/password', 'POST', payload)
   }
 
   /**
@@ -319,6 +365,35 @@ class HospitalService extends BaseService {
   /** Tags that ended — untagged or transfused — newest first. */
   tagEvents(params: TagEventFilters = {}) {
     return this.request<Paginated<UnitTagEvent>>('/hospital/inventory/tag-events', 'GET', params)
+  }
+
+  /**
+   * Generate an Inventory Report: the paper form, filled from the shelf, for
+   * the components and blood types chosen (each list all of them when left
+   * out), one sheet per type or all types together. The server keeps it as
+   * its PDF and answers with the kept report and its sheets.
+   */
+  generateInventoryReport(options: InventorySheetOptions = {}) {
+    return this.request<{ report: HospitalInventoryReportRecord; sheet: HospitalInventorySheet }>(
+      '/hospital/inventory/reports',
+      'POST',
+      inventoryReportPayload(options),
+    )
+  }
+
+  /** The blood bank's generated reports, newest first. */
+  inventoryReports(params: { page?: number; per_page?: number } = {}) {
+    return this.request<Paginated<HospitalInventoryReportRecord>>('/hospital/inventory/reports', 'GET', params)
+  }
+
+  /** A kept report's PDF, exactly as it was printed. */
+  downloadInventoryReport(id: number) {
+    return this.requestBlob(`/hospital/inventory/reports/${encodeURIComponent(String(id))}/pdf`)
+  }
+
+  /** What happened to the blood bank's bags, newest first; one bag's own with `unit_id`. */
+  inventoryActivity(params: { unit_id?: string; page?: number; per_page?: number } = {}) {
+    return this.request<Paginated<HospitalInventoryActivity>>('/hospital/inventory/activity', 'GET', params)
   }
 
   /** Tag an available bag to a patient: Tag Assigned, 24 hours to crossmatch. */

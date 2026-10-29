@@ -128,6 +128,8 @@ import userCheck from '~/assets/icons/user-check.svg?raw'
 import userCircle from '~/assets/icons/user-circle.svg?raw'
 import userX from '~/assets/icons/user-x.svg?raw'
 import warehouse from '~/assets/icons/warehouse.svg?raw'
+import layers from '~/assets/icons/layers.svg?raw'
+import layoutGrid from '~/assets/icons/layout-grid.svg?raw'
 import x from '~/assets/icons/x.svg?raw'
 const icons = {
   activity,
@@ -249,6 +251,8 @@ const icons = {
   'user-check' : userCheck,
   'user-circle': userCircle,
   warehouse,
+  layers,
+  'layout-grid': layoutGrid,
   'user-x' : userX,
   x
 }

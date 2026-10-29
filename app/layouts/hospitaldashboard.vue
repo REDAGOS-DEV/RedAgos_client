@@ -1,92 +1,131 @@
 <template>
-  <div class="staff-shell">
-    <!--
-      The blood center's shell: the landing hero's glow behind everything, a
-      frosted layer over it beside the rail and under the bar, and the glass
-      sidebar and top bar on top, so all three read as one frame.
-    -->
-    <div class="staff-backdrop" aria-hidden="true" />
-    <div class="staff-frost staff-glass" :class="railExpanded ? 'lg:left-64' : 'lg:left-[72px]'" aria-hidden="true" />
+  <!--
+    The blood center's shell (project owner, 2026-10-28): its palette (main.css,
+    html.portal-bc), its page finish (bc-ui.css, .bc-shell), and its frame — a
+    plain canvas under solid chrome, the full-width top bar above the rail.
+    Pages paint their own background.
+  -->
+  <div class="bc-shell">
+    <div class="bc-backdrop" aria-hidden="true" />
     <HospitalSidebar />
 
     <!-- At the very top of the document: once it is out of view, the page has scrolled. -->
     <div ref="scrollSentinel" class="absolute top-0 left-0 h-px w-px pointer-events-none" aria-hidden="true" />
 
-    <!-- The content column follows the rail's width, so the widened rail sits beside the page. -->
+    <!--
+      The content column tracks the rail's width. Padding — not a margin or a
+      transform — because it both reserves the space and reflows the children
+      inside it, which keeps the widened sidebar beside the page.
+    -->
     <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'">
+      <!--
+        Desktop: the bar runs the full width above the sidebar: menu button
+        and brand at its left edge on the rail's icon axis, the search in the
+        middle, the account on the right.
+      -->
       <header
-        class="topbar staff-topbar staff-glass fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 border-b"
-        :class="[railExpanded ? 'lg:left-64' : 'lg:left-[72px]', { 'staff-topbar--scrolled': isScrolled }]"
+        class="topbar fixed top-0 left-0 right-0 z-30 lg:z-[60] h-14 sm:h-16 border-b"
         :style="{ boxShadow: isScrolled ? headerShadow : 'none' }">
-        <div class="relative flex h-full w-full items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6">
+        <div class="topbar-inner relative mx-auto flex h-full w-full max-w-[var(--rb-content-max)] lg:max-w-none items-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-4">
 
-          <!-- Left cluster: mobile menu toggle + titles -->
+          <!-- Left cluster: menu toggle, logo, wordmark and where this page sits -->
           <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0 lg:max-w-[calc(50%-13rem)] xl:max-w-[calc(50%-15rem)]">
+            <!--
+              The menu button: on desktop it opens the rail (so does hovering
+              the rail), which closes again when the pointer leaves it; below
+              1024px it opens the drawer. On the rail's 36px icon axis.
+            -->
             <button
-              class="icon-btn flex lg:hidden"
-              aria-label="Open menu"
-              @click="openMobile">
+              type="button"
+              class="rail-toggle"
+              data-rail-toggle
+              :aria-expanded="railExpanded || mobileOpen"
+              aria-controls="hospital-sidebar"
+              :aria-label="railExpanded ? 'Close menu' : 'Open menu'"
+              @click="toggleMenu">
               <AssetIcon name="menu" :size="20" />
             </button>
 
-            <!-- Page title (mobile only) -->
-            <span class="sm:hidden font-bold text-sm text-[color:var(--rb-text-primary)] truncate">
-              {{ pageLabels[route.path] || 'Dashboard' }}
-            </span>
+            <NuxtLink to="/hospital/dashboard" class="bc-logo" aria-label="RedAgos, go to the dashboard">
+              <img :src="logo" alt="" class="bc-logo__img">
+            </NuxtLink>
 
-            <!-- Breadcrumb + greeting (tablet & desktop) -->
-            <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink" :title="breadcrumb">
-              <span class="hidden lg:block text-[11px] text-[color:var(--rb-text-muted)] leading-tight truncate">
-                {{ breadcrumb }}
-              </span>
-              <span class="text-xs sm:text-sm font-semibold text-[color:var(--rb-text-primary)] leading-tight truncate">
-                {{ greeting }}
-              </span>
+            <!--
+              The wordmark, and beneath it where this page sits: the hospital,
+              its section and the page on desktop; the hospital alone below that.
+            -->
+            <div class="brand-word">
+              <NuxtLink to="/hospital/dashboard" class="brand-word__name" tabindex="-1" aria-hidden="true">
+                Red<span class="brand-word__accent">Agos</span>
+              </NuxtLink>
+              <span class="brand-word__tag lg:hidden">{{ facilityName || 'Hospital Portal' }}</span>
+              <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="breadcrumb">
+                <ol>
+                  <li v-for="(crumb, i) in crumbs" :key="i" :aria-current="i === crumbs.length - 1 ? 'page' : null">
+                    {{ crumb }}
+                  </li>
+                </ol>
+              </nav>
             </div>
           </div>
 
-          <!-- Search bar -->
+          <!-- Search -->
           <div
             v-show="searchOpenMobile || true"
             v-click-outside="closeSearchResults"
-            class="search relative items-center gap-2 px-3 py-2"
+            class="items-center gap-2 rounded-xl bg-white dark:bg-[color:var(--ink-surface,#1E293B)] border border-[#E2E8F0] dark:border-[color:var(--ink-border,#334155)] hover:border-[#CBD5E1] dark:hover:border-[color:var(--ink-border-hover,#475569)] focus-within:border-[color:rgba(var(--rb-primary-rgb),0.4)] focus-within:ring-2 focus-within:ring-[color:rgba(var(--rb-primary-rgb),0.1)] transition-colors px-3 py-2 relative"
             :class="[
               searchOpenMobile ? 'flex flex-1 z-40' : 'hidden sm:flex sm:flex-1',
               'lg:flex-none lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-sm xl:max-w-md lg:top-1/2 lg:-translate-y-1/2'
             ]">
-            <AssetIcon name="search" :size="16" class="search__icon flex-shrink-0" />
+            <AssetIcon name="search" :size="16" class="text-[#94a3b8] dark:text-slate-500 flex-shrink-0" />
             <input
               ref="searchInput"
               v-model="searchQuery"
               type="text"
-              placeholder="Search requests, pages..."
-              class="search__input text-sm flex-1 min-w-0 bg-transparent outline-none"
+              placeholder="Search pages..."
+              class="text-sm flex-1 min-w-0 bg-transparent outline-none placeholder:text-[#64748b] dark:placeholder:text-[#94a3b8] text-gray-800 dark:text-slate-100"
               @focus="showSearchResults = true"
               @keydown.enter="goToTopResult"
               @keydown.esc="handleEscSearch"
               @keydown.down.prevent="moveHighlight(1)"
               @keydown.up.prevent="moveHighlight(-1)">
-            <span v-if="!searchQuery" class="search__kbd hidden md:inline-block flex-shrink-0">{{ shortcutLabel }}</span>
-            <button v-else class="search__clear flex-shrink-0" aria-label="Clear search" @click="clearSearch">
+            <span
+              v-if="!searchQuery"
+              class="text-[10px] px-1.5 py-0.5 rounded-md font-mono hidden md:inline-block bg-white dark:bg-[color:var(--ink-hover,#334155)] text-[#94a3b8] dark:text-[color:var(--ink-text-3,#CBD5E1)] border border-[#eef1f5] dark:border-[color:var(--ink-border-hover,#475569)] flex-shrink-0">
+              {{ shortcutLabel }}
+            </span>
+            <button
+              v-else
+              class="text-[#94a3b8] dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 flex-shrink-0"
+              aria-label="Clear search"
+              @click="clearSearch">
               <AssetIcon name="x" :size="14" />
             </button>
 
-            <!-- Results dropdown -->
             <Transition name="popup">
-              <div v-if="showSearchResults && searchQuery && filteredResults.length" class="search-panel">
+              <div
+                v-if="showSearchResults && searchQuery && filteredResults.length"
+                class="search-panel absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-surface,#0F172A)] border dark:border-[color:var(--ink-border,#334155)] shadow-lg z-40"
+                :style="{ borderColor: headerBorderColor }">
                 <NuxtLink
                   v-for="(item, i) in filteredResults"
                   :key="item.path"
                   :to="item.path"
-                  class="search-panel__row"
-                  :class="{ 'search-panel__row--on': i === highlightIndex }"
+                  class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                  :class="i === highlightIndex
+                    ? 'bg-gray-50 dark:bg-[color:var(--ink-hover,#1E293B)] text-gray-900 dark:text-slate-100'
+                    : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-[color:var(--ink-hover,#1E293B)]'"
                   @click="closeSearchResults(); searchOpenMobile = false">
-                  <AssetIcon :name="item.icon" :size="16" class="search-panel__icon" />
+                  <AssetIcon :name="item.icon" :size="16" class="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                   <span class="truncate">{{ item.label }}</span>
                 </NuxtLink>
               </div>
 
-              <div v-else-if="showSearchResults && searchQuery && !filteredResults.length" class="search-panel search-panel--empty">
+              <div
+                v-else-if="showSearchResults && searchQuery && !filteredResults.length"
+                class="absolute left-0 right-0 top-full mt-2 rounded-xl overflow-hidden bg-white dark:bg-[color:var(--ink-surface,#0F172A)] border dark:border-[color:var(--ink-border,#334155)] shadow-lg z-40 px-4 py-3 text-sm text-gray-500 dark:text-slate-400"
+                :style="{ borderColor: headerBorderColor }">
                 No matches for "{{ searchQuery }}"
               </div>
             </Transition>
@@ -94,70 +133,75 @@
 
           <!-- Right cluster -->
           <div v-show="!searchOpenMobile" class="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-auto">
-            <button class="icon-btn flex sm:hidden" aria-label="Open search" @click="openMobileSearch">
-              <AssetIcon name="search" :size="18" />
-            </button>
-
             <button
-              class="icon-btn flex"
-              :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-              @click="toggleTheme">
-              <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" />
+              class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+              aria-label="Open search"
+              @click="openMobileSearch">
+              <AssetIcon name="search" :size="18" class="text-[#64748b] dark:text-slate-300" />
             </button>
 
-            <NuxtLink to="/hospital/notifications" class="icon-btn flex relative" aria-label="Notifications">
-              <AssetIcon name="bell" :size="18" />
-              <span v-if="unreadCount > 0" class="bell-badge">
-                {{ unreadCount > 9 ? '9+' : unreadCount }}
-              </span>
-            </NuxtLink>
+            <!-- Theme lives in the account menu (Light / Dark / System), as at the centre. -->
+            <HospitalNotificationBell />
 
-            <!-- Divider -->
-            <div class="hidden sm:block w-px h-5 mx-0.5 bg-[color:var(--rb-border)]" />
+            <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-[color:var(--ink-border,#334155)]" />
 
             <!--
               Opens on hover with a mouse (closing after a short delay, so
-              crossing the gap to the menu does not shut it), like the blood
-              center. Click, tap and the keyboard still toggle it.
+              crossing the gap to the menu does not shut it). Click, tap and
+              the keyboard still toggle it.
             -->
             <div class="relative" @mouseenter="openMenuOnHover" @mouseleave="closeMenuOnHover">
               <button
-                class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[color:var(--rb-surface-hover)]"
+                ref="userMenuTrigger"
+                class="flex items-center gap-1 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
                 :aria-expanded="showUserMenu"
                 aria-haspopup="menu"
                 aria-label="Account menu"
-                @click="showUserMenu = !showUserMenu">
-                <div class="avatar avatar--sm">
-                  <img v-if="user?.avatar" :src="user.avatar" alt="">
+                @click="toggleUserMenu">
+                <div
+                  class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] tracking-wide text-white overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-[color:var(--rb-chrome,#0F172A)]"
+                  style="background: var(--rb-primary)">
+                  <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="">
                   <span v-else>{{ initials }}</span>
                 </div>
                 <!-- Who is signed in, and in what role -->
                 <span class="hidden xl:flex flex-col items-start min-w-0 max-w-[160px] pl-1.5 text-left leading-tight">
-                  <span class="text-[13px] font-semibold text-[color:var(--rb-text-primary)] truncate max-w-full capitalize">
+                  <span class="text-[13px] font-semibold text-gray-800 dark:text-slate-100 truncate max-w-full capitalize">
                     {{ displayName }}
                   </span>
-                  <span class="text-[11px] text-[color:var(--rb-text-muted)] truncate max-w-full">
+                  <span v-if="roleLabel" class="text-[11px] text-[#64748b] dark:text-slate-400 truncate max-w-full">
                     {{ roleLabel }}
                   </span>
                 </span>
                 <AssetIcon
                   name="chevron-down"
                   :size="14"
-                  class="text-[color:var(--rb-text-muted)] hidden sm:block transition-transform duration-150"
+                  class="text-[#94a3b8] dark:text-slate-500 hidden sm:block transition-transform duration-150"
                   :class="{ 'rotate-180': showUserMenu }" />
               </button>
 
               <Transition name="popup">
-                <div v-if="showUserMenu" v-click-outside="closeUserMenu" class="acct" role="menu" aria-label="Account">
+                <div
+                  v-if="showUserMenu"
+                  ref="userMenuEl"
+                  v-click-outside="closeUserMenu"
+                  class="acct"
+                  role="menu"
+                  aria-label="Account"
+                  @keydown.esc.prevent="closeUserMenu(true)"
+                  @keydown.down.prevent="moveMenuFocus(1)"
+                  @keydown.up.prevent="moveMenuFocus(-1)">
                   <div class="acct__head">
-                    <div class="avatar avatar--lg">
+                    <div class="acct__avatar">
                       <img v-if="user?.avatar" :src="user.avatar" alt="">
                       <span v-else>{{ initials }}</span>
                     </div>
                     <div class="acct__who">
-                      <p class="acct__name">{{ user?.full_name || 'Hospital Staff' }}</p>
-                      <p class="acct__email">{{ user?.facility?.facility_name || user?.email }}</p>
-                      <p class="acct__role">{{ roleLabel }}</p>
+                      <p class="acct__name">{{ displayName }}</p>
+                      <p class="acct__email">{{ user?.email }}</p>
+                      <p v-if="roleLabel || facilityName" class="acct__role">
+                        {{ [roleLabel, facilityName].filter(Boolean).join(' · ') }}
+                      </p>
                     </div>
                   </div>
 
@@ -167,34 +211,62 @@
                       :key="item.path"
                       :to="item.path"
                       role="menuitem"
-                      class="acct__item"
-                      @click="closeUserMenu">
+                      class="account-menu__item acct__item"
+                      @click="closeUserMenu()">
                       <AssetIcon :name="item.icon" :size="16" class="acct__item-icon" />
-                      <span>{{ item.label }}</span>
+                      <span class="acct__item-label">{{ item.label }}</span>
                     </NuxtLink>
                   </div>
 
-                  <div class="acct__foot">
-                    <button type="button" role="menuitem" class="acct__logout" @click="handleLogout">
-                      <AssetIcon name="log-out" :size="15" />
-                      <span>Log Out</span>
-                    </button>
+                  <!-- Theme: Light / Dark / System (same as the browser) -->
+                  <div class="acct__theme">
+                    <div class="acct__theme-row">
+                      <span class="acct__theme-label">
+                        <AssetIcon :name="isDark ? 'moon' : 'sun'" :size="15" />
+                        Theme
+                      </span>
+                      <div class="acct__seg" role="group" aria-label="Theme">
+                        <button
+                          v-for="option in THEME_OPTIONS"
+                          :key="option.value"
+                          type="button"
+                          role="menuitemradio"
+                          :aria-checked="themeMode === option.value"
+                          :aria-label="option.label"
+                          :title="option.label"
+                          class="account-menu__item acct__seg-btn"
+                          :class="{ 'acct__seg-btn--on': themeMode === option.value }"
+                          @click="setThemeMode(option.value)">
+                          <AssetIcon :name="option.icon" :size="14" />
+                        </button>
+                      </div>
+                    </div>
+                    <p class="acct__theme-hint">{{ themeHint }}</p>
                   </div>
 
-                  <p class="acct__version">v1.0.0 · Terms & Conditions</p>
+                  <div class="acct__foot">
+                    <!-- Neutral: signing out is routine, not destructive. Red only on hover. -->
+                    <button type="button" role="menuitem" class="account-menu__item acct__logout" @click="handleLogout">
+                      <AssetIcon name="log-out" :size="15" />
+                      <span>Log out</span>
+                    </button>
+                  </div>
                 </div>
               </Transition>
             </div>
           </div>
 
-          <!-- Mobile search close button -->
-          <button v-if="searchOpenMobile" class="icon-btn flex sm:hidden ml-1" aria-label="Close search" @click="closeMobileSearch">
-            <AssetIcon name="x" :size="18" />
+          <button
+            v-if="searchOpenMobile"
+            class="sm:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-1 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+            aria-label="Close search"
+            @click="closeMobileSearch">
+            <AssetIcon name="x" :size="18" class="text-[#64748b] dark:text-slate-300" />
           </button>
         </div>
       </header>
 
-      <!-- Transparent: the glow shows through the glass bar and around each page. -->
+      <!-- Every page paints its own --rb-page-bg, see-through inside .bc-shell. -->
       <main class="min-h-screen pt-14 sm:pt-16">
         <slot />
       </main>
@@ -203,21 +275,50 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
+import HospitalNotificationBell from '~/components/Hospital/NotificationBell.vue'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useAccentTheme } from '~/composables/useAccentTheme'
+import { accentSurfaces, accentTheme } from '~/utils/accentThemes'
+import logo from '~/assets/images/RedAgosLogo.png'
+// The blood centre's shared finish for its pages (scoped to html.portal-bc .bc-shell).
+import '~/assets/css/bc-ui.css'
 
-const { railExpanded, openMobile } = useSidebar('hospital')
 const router = useRouter()
 const route = useRoute()
 const { user, ensureUser, logout, can } = useUser()
-const { isDark, toggleTheme } = useDarkMode()
+const { isDark, themeMode, setThemeMode } = useDarkMode()
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+  { value: 'system', label: 'System (same as your browser)', icon: 'monitor' },
+]
+
+const { railExpanded, mobileOpen, openMobile, expandOnHover, collapseOnHover } = useSidebar('hospital')
+
+// One button for both: the rail on desktop, the drawer below 1024px.
+function toggleMenu() {
+  if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (railExpanded.value) collapseOnHover()
+    else expandOnHover()
+  } else {
+    openMobile()
+  }
+}
+
+// The blood centre's palette (main.css): the canvas, chrome and every surface
+// take the colour theme's tint, light and dark.
+onMounted(() => document.documentElement.classList.add('portal-bc'))
+onUnmounted(() => document.documentElement.classList.remove('portal-bc'))
+
+const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 // Bound, not a :global(.dark) rule: this build's scoped transform drops the
 // descendant half of `:global(.dark) .x` (see the blood center layout).
 const headerShadow = computed(() => (
@@ -229,7 +330,7 @@ const headerShadow = computed(() => (
 // The bell's count belongs to a signed-in hospital account, so polling starts
 // only once the user is known, runs at once and then every minute, and stops
 // with the layout.
-const { count: unreadCount, start: startUnreadPolling, stop: stopUnreadPolling } = useHospitalUnreadCount()
+const { start: startUnreadPolling, stop: stopUnreadPolling } = useHospitalUnreadCount()
 
 onMounted(async () => {
   const signedIn = user.value ?? await ensureUser()
@@ -237,23 +338,45 @@ onMounted(async () => {
 })
 onUnmounted(stopUnreadPolling)
 
-// The colour picked in Settings → Appearance (shared by the staff and donor
-// portals on this device). Removed on the way out, like the blood center.
+// The colour picked in Settings → Appearance (shared by every portal on this
+// device). Removed on the way out, like the blood center.
 const accent = useAccentTheme()
 onMounted(() => accent.init())
 onUnmounted(() => accent.clear())
 
-// --- Breadcrumb + greeting ---
+// The browser's own bar takes the header's colour, tinted by the colour
+// theme, as at the centre. Set on the one tag by hand: useHead left the
+// server-rendered tag beside the client's, and browsers read the first.
+let themeColorMeta = null
+function applyThemeColor() {
+  if (!themeColorMeta) {
+    themeColorMeta = document.querySelector('meta[name="theme-color"]') ?? document.createElement('meta')
+    themeColorMeta.setAttribute('name', 'theme-color')
+    if (!themeColorMeta.isConnected) document.head.appendChild(themeColorMeta)
+  }
+  const { light, dark } = accentSurfaces(accentTheme(accent.current.value))
+  themeColorMeta.setAttribute('content', isDark.value ? dark.chrome : light.chrome)
+}
+onMounted(applyThemeColor)
+watch([isDark, accent.current], () => { if (themeColorMeta) applyThemeColor() })
+onUnmounted(() => {
+  themeColorMeta?.remove()
+  themeColorMeta = null
+})
+
+// --- Breadcrumb ---
 const pageLabels = {
   '/hospital/dashboard': 'Dashboard',
-  '/hospital/bloodrequests': 'Blood Requests',
-  '/hospital/bloodrequests/newrequest' : 'Blood Requests / New Request',
-  '/hospital/bloodrequests/newrequest/[id]' : 'Blood Requests / New Request / ',
-  '/hospital/bloodrequests/edit' : 'Blood Requests / Edit / ',
+  '/hospital/bloodrequests': 'Receiving / Blood Requests',
+  '/hospital/bloodrequests/newrequest' : 'Receiving / Blood Requests / New Request',
+  '/hospital/bloodrequests/newrequest/[id]' : 'Receiving / Blood Requests / New Request / ',
+  '/hospital/bloodrequests/edit' : 'Receiving / Blood Requests / Edit / ',
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
   '/hospital/inventory': 'Blood Bank Inventory',
+  '/hospital/stock-intake': 'Stock Intake',
   '/hospital/stock-thresholds': 'Stock Thresholds',
+  '/hospital/inventory-report': 'Reports / Inventory Report',
   '/hospital/receiving/weekly': 'Receiving / Weekly Request',
   '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
   '/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution',
@@ -261,20 +384,34 @@ const pageLabels = {
   '/hospital/staff': 'Staff',
   '/hospital/settings': 'Settings',
 }
+
 // A detail page (/receiving/weekly/12) falls back to the deepest section it sits under.
-const breadcrumb = computed(() => {
+const pageLabel = computed(() => {
   const exact = pageLabels[route.path]
-  if (exact) return `Hospital Portal / ${exact}`
+  if (exact) return exact
 
   const parent = Object.keys(pageLabels)
     .filter((path) => route.path.startsWith(`${path}/`))
     .sort((a, b) => b.length - a.length)[0]
 
-  return `Hospital Portal / ${parent ? pageLabels[parent] : ''}`
+  return parent ? pageLabels[parent] : ''
 })
 
-const nameParts = computed(() => (user.value?.full_name || '').trim().split(/\s+/).filter(Boolean))
-const displayName = computed(() => user.value?.full_name?.trim() || 'Hospital Staff')
+const facilityName = computed(() => user.value?.facility?.facility_name || user.value?.facility?.name || '')
+
+// Desktop: "Hospital › Section › Page", as at the centre. When the bar runs
+// short the hospital's name gives way first, so the page always reads in full.
+const crumbs = computed(() => [
+  facilityName.value || 'Hospital Portal',
+  ...pageLabel.value.split(' / ').map((part) => part.trim()).filter(Boolean),
+])
+const breadcrumb = computed(() => crumbs.value.join(' / '))
+
+const nameParts = computed(() => {
+  const parts = [user.value?.first_name, user.value?.last_name].map((v) => (v || '').trim()).filter(Boolean)
+  return parts.length ? parts : (user.value?.full_name || '').trim().split(/\s+/).filter(Boolean)
+})
+const displayName = computed(() => user.value?.full_name?.trim() || nameParts.value.join(' ') || 'Hospital Staff')
 const initials = computed(() => {
   const parts = nameParts.value
   if (!parts.length) return 'H'
@@ -284,26 +421,45 @@ const initials = computed(() => {
 // The hospital role (Blood Bank Head, Inventory Staff, Requesting Staff).
 const roleLabel = computed(() => user.value?.hospital_role_label || 'Hospital Staff')
 
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  const time = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-  const first = nameParts.value[0] || 'there'
-  return `${time}, ${first}!`
-})
-
 // Set after mount so the server render and the first client render agree.
 const shortcutLabel = ref('Ctrl F')
 onMounted(() => {
   if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) shortcutLabel.value = '⌘F'
 })
 
-// --- Profile dropdown ---
-const showUserMenu = ref(false)
-const userMenuItems = [
-  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list' },
-  { label: 'Notification Settings', path: '/hospital/settings', icon: 'bell' }
+// --- Account menu: account settings, then the pages reached for most ---
+const USER_MENU = [
+  { label: 'Account settings', path: '/hospital/settings', icon: 'settings' },
+  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', requires: 'hospital.requests.view' },
+  { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
 ]
-const closeUserMenu = () => { showUserMenu.value = false }
+const userMenuItems = computed(() => USER_MENU.filter((item) => !item.requires || can(item.requires)))
+
+const userMenuEl = ref(null)
+const userMenuTrigger = ref(null)
+const showUserMenu = ref(false)
+
+/** Open, then put focus on the first item so the keyboard can carry on. */
+async function toggleUserMenu() {
+  showUserMenu.value = !showUserMenu.value
+  if (showUserMenu.value) {
+    await nextTick()
+    userMenuEl.value?.querySelector('.account-menu__item')?.focus()
+  }
+}
+
+/** Arrow keys walk the menu's items, wrapping at either end. */
+function moveMenuFocus(step) {
+  const items = [...(userMenuEl.value?.querySelectorAll('.account-menu__item') ?? [])]
+  if (!items.length) return
+  const index = items.indexOf(document.activeElement)
+  items[(index + step + items.length) % items.length]?.focus()
+}
+
+const closeUserMenu = (returnFocus = false) => {
+  if (returnFocus === true) nextTick(() => userMenuTrigger.value?.focus())
+  showUserMenu.value = false
+}
 
 // Hover only where hovering exists; on touch screens the tap toggles it.
 let menuTimer = null
@@ -316,9 +472,15 @@ function openMenuOnHover() {
 function closeMenuOnHover() {
   if (!canHover()) return
   clearTimeout(menuTimer)
-  menuTimer = setTimeout(closeUserMenu, 220)
+  menuTimer = setTimeout(() => closeUserMenu(), 220)
 }
 onUnmounted(() => clearTimeout(menuTimer))
+
+const themeHint = computed(() => (
+  themeMode.value === 'system'
+    ? `Following your browser (${isDark.value ? 'dark' : 'light'})`
+    : `Always ${themeMode.value}`
+))
 
 // --- Mobile search overlay ---
 const searchOpenMobile = ref(false)
@@ -345,16 +507,18 @@ function handleEscSearch() {
 // Each page names the hospital ability it needs; a role without it is not offered the page.
 const searchablePages = [
   { label: 'Dashboard', path: '/hospital/dashboard', icon: 'layout-dashboard', keywords: 'dashboard home overview' },
-  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'requests pending processing', requires: 'hospital.requests.view' },
+  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'receiving requests pending processing', requires: 'hospital.requests.view' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood', requires: 'hospital.requests.manage' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units', requires: 'hospital.requests.view' },
-  { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock tag crossmatch transfusion patient bags stock in storage location receive', requires: 'hospital.inventory.view' },
-  { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock alert shortage notification', requires: 'hospital.inventory.view' },
+  { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock supply tag crossmatch transfusion patient bags expiry activity', requires: 'hospital.inventory.view' },
+  { label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', keywords: 'stock in intake shelve scan arrived bags storage location fridge receive', requires: 'hospital.inventory.stock_in' },
+  { label: 'Inventory Report', path: '/hospital/inventory-report', icon: 'clipboard-list', keywords: 'report reports inventory sheet crossmatched uncrossmatched print pdf form wb prbc', requires: 'hospital.inventory.view' },
+  { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock supply alert shortage notification', requires: 'hospital.inventory.view' },
   { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan', requires: 'hospital.requests.view' },
   { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number', requires: 'hospital.receiving.direct' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Staff', path: '/hospital/staff', icon: 'id-card', keywords: 'staff accounts roles head inventory requesting team users', requires: 'hospital.staff.manage' },
-  { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password' },
+  { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password profile photo appearance theme colour' },
 ]
 
 const searchQuery = ref('')
@@ -442,135 +606,20 @@ const vClickOutside = {
 }
 
 const handleLogout = async () => {
-  try {
-    showUserMenu.value = false
-    await logout('/auth/login')
-  } catch (err) {
-    console.error(err)
-  }
+  showUserMenu.value = false
+  await logout('/auth/login')
 }
 </script>
 
 <style scoped>
 /*
- * The blood center's shell (2026-10-15), so the staff portals read as one
- * product: the same tokens, glow, glass and account menu.
+ * The blood center layout's styles (layouts/blood-centerdashboard.vue). The
+ * content column carries the sidebar's own 200ms/ease-out, so the rail and
+ * the page arrive together.
  */
 .content-shift { transition: padding-left 200ms ease-out; }
 
-.topbar {
-  transition: left 200ms ease-out, background-color 150ms ease, box-shadow 200ms ease;
-  will-change: left;
-}
-
-main { background: transparent; }
-
-/* ── Top bar controls ── */
-.icon-btn {
-  /* No display here: the template's flex / lg:hidden decide it. */
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  color: var(--rb-text-secondary);
-  transition: background-color 150ms ease, color 150ms ease;
-}
-.icon-btn:hover { background: var(--rb-surface-hover, #F1F5F9); color: var(--rb-text-primary); }
-.icon-btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
-
-/* On the bell's top-right corner only, so the count never covers the icon. */
-.bell-badge {
-  position: absolute;
-  top: 3px;
-  left: calc(50% + 3px);
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  border: 2px solid var(--rb-surface);
-  background: var(--rb-accent, #D32F2F);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 12px;
-  text-align: center;
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-.search {
-  border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  background: var(--rb-surface);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-.search:hover { border-color: var(--rb-border-strong); }
-.search:focus-within {
-  border-color: rgba(var(--rb-primary-rgb), 0.4);
-  box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.1);
-}
-.search__icon { color: var(--rb-text-muted); }
-.search__input { color: var(--rb-text-primary); }
-.search__input:focus { outline: none; }
-.search__kbd {
-  padding: 2px 6px;
-  border: 1px solid var(--rb-border);
-  border-radius: 6px;
-  background: var(--rb-surface-alt, #F1F5F9);
-  color: var(--rb-text-muted);
-  font-family: var(--rb-font-mono, ui-monospace, monospace);
-  font-size: 10px;
-}
-.search__clear { color: var(--rb-text-muted); }
-.search__clear:hover { color: var(--rb-text-primary); }
-
-.search-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 40;
-  max-height: 320px;
-  overflow-y: auto;
-  border: 1px solid var(--rb-border);
-  border-radius: 12px;
-  background: var(--rb-surface);
-  box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.3);
-  scrollbar-width: thin;
-}
-.search-panel--empty { padding: 12px 16px; font-size: 14px; color: var(--rb-text-secondary); }
-.search-panel__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  font-size: 14px;
-  color: var(--rb-text-primary);
-  text-decoration: none;
-  transition: background-color 150ms ease;
-}
-.search-panel__row:hover,
-.search-panel__row--on { background: var(--rb-surface-hover, #F1F5F9); }
-.search-panel__icon { flex-shrink: 0; color: var(--rb-text-muted); }
-
-.avatar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 50%;
-  background: var(--rb-primary);
-  color: #fff;
-  font-weight: 700;
-}
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar--sm { width: 32px; height: 32px; font-size: 11px; letter-spacing: 0.02em; box-shadow: 0 0 0 2px var(--rb-surface); }
-.avatar--lg { width: 38px; height: 38px; font-size: 13px; }
-
-/* ── Account menu: the blood center's ── */
+/* ── Account menu: plain and quiet ── */
 .acct {
   position: absolute;
   right: 0;
@@ -578,7 +627,7 @@ main { background: transparent; }
   z-index: 40;
   width: 280px;
   overflow: hidden;
-  border: 1px solid var(--rb-border);
+  border: 1px solid var(--rb-border, #E5EAF0);
   border-radius: 16px;
   background: var(--rb-surface, #FFFFFF);
   box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.3);
@@ -597,14 +646,29 @@ main { background: transparent; }
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--rb-border);
+  border-bottom: 1px solid var(--rb-border, #E5EAF0);
 }
+.acct__avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--rb-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.acct__avatar img { width: 100%; height: 100%; object-fit: cover; }
 .acct__who { min-width: 0; }
 .acct__name,
 .acct__email,
 .acct__role { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acct__name { font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
-.acct__email { font-size: 12px; color: var(--rb-text-secondary); }
+.acct__name { font-size: 14px; font-weight: 700; color: var(--rb-text-primary, #1F2937); text-transform: capitalize; }
+.acct__email { font-size: 12px; color: var(--rb-text-secondary, #64748B); }
 .acct__role { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); }
 
 .acct__list { display: flex; flex-direction: column; padding: 6px; }
@@ -614,18 +678,48 @@ main { background: transparent; }
   gap: 12px;
   padding: 9px 10px;
   border-radius: 10px;
-  color: var(--rb-text-primary);
+  color: var(--rb-text-primary, #1F2937);
   font-size: 13.5px;
   text-decoration: none;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.acct__item-icon { flex-shrink: 0; color: var(--rb-text-secondary); transition: color 0.15s ease; }
+.acct__item-icon { flex-shrink: 0; color: var(--rb-text-secondary, #94A3B8); transition: color 0.15s ease; }
+.acct__item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acct__item:hover,
 .acct__item:focus-visible { background: var(--rb-surface-hover, #F1F5F9); color: var(--rb-primary-text); outline: none; }
 .acct__item:hover .acct__item-icon,
 .acct__item:focus-visible .acct__item-icon { color: var(--rb-primary-text); }
 
-.acct__foot { padding: 6px; border-top: 1px solid var(--rb-border); }
+.acct__theme { padding: 8px 16px 10px; border-top: 1px solid var(--rb-border, #E5EAF0); }
+.acct__theme-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.acct__theme-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--rb-text-primary, #1F2937);
+}
+.acct__theme-label :deep(svg) { color: var(--rb-text-secondary, #94A3B8); }
+.acct__seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--rb-surface-alt, #F1F5F9); }
+.acct__seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--rb-text-secondary, #64748B);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.acct__seg-btn:hover:not(.acct__seg-btn--on) { color: var(--rb-text-primary, #1F2937); }
+.acct__seg-btn--on { background: var(--rb-surface, #FFFFFF); color: var(--rb-primary-text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
+.acct__seg-btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
+.acct__theme-hint { margin: 2px 0 0 28px; font-size: 11.5px; color: var(--rb-text-secondary, #94A3B8); }
+
+.acct__foot { padding: 6px; border-top: 1px solid var(--rb-border, #E5EAF0); }
 .acct__logout {
   display: flex;
   align-items: center;
@@ -635,7 +729,7 @@ main { background: transparent; }
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: var(--rb-text-primary);
+  color: var(--rb-text-primary, #1F2937);
   font: inherit;
   font-size: 13.5px;
   cursor: pointer;
@@ -643,19 +737,130 @@ main { background: transparent; }
 }
 .acct__logout:hover,
 .acct__logout:focus-visible { background: rgba(198, 40, 40, 0.08); color: #C62828; outline: none; }
-.acct__version {
-  margin: 0;
-  padding: 8px 16px;
-  border-top: 1px solid var(--rb-border);
-  font-size: 11px;
-  text-align: center;
-  color: var(--rb-text-muted);
+
+@media (prefers-reduced-motion: reduce) {
+  .acct__item, .acct__item-icon, .acct__seg-btn, .acct__logout { transition: none; }
 }
 
-:global(.dark .staff-shell .acct),
-:global(.dark .staff-shell .search-panel) { box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7); }
-:global(.dark .staff-shell .acct__logout:hover),
-:global(.dark .staff-shell .acct__logout:focus-visible) { background: rgba(239, 83, 80, 0.14); color: #EF9A9A; }
+:global(.dark .bc-shell .acct) { box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7); }
+:global(.dark .bc-shell .acct__logout:hover),
+:global(.dark .bc-shell .acct__logout:focus-visible) { background: rgba(239, 83, 80, 0.14); color: #EF9A9A; }
+
+/*
+ * Every page paints its root with --rb-page-bg. Inside this shell that is
+ * see-through, so the pages sit on the same canvas as the chrome. Cards keep
+ * --rb-surface. Teleported modals are outside .bc-shell and keep the normal
+ * value. The work-screen text and edge colours are the centre's (2026-10-15).
+ */
+.bc-shell {
+  --rb-page-bg: transparent;
+  --rb-text-secondary: #526075;
+  --rb-text-muted: #64748B;
+  --rb-placeholder: #64748B;
+  --rb-border: #E4E9F0;
+  --rb-border-strong: #D5DCE6;
+}
+:global(.bc-shell input::placeholder),
+:global(.bc-shell textarea::placeholder) {
+  color: var(--rb-placeholder);
+  opacity: 1;
+}
+:global(.dark .bc-shell) {
+  --rb-text-secondary: var(--ink-text-2, #94A3B8);
+  --rb-text-muted: var(--ink-muted, #8391A6);
+  --rb-placeholder: var(--ink-text-2, #8391A6);
+  --rb-border: var(--ink-border, #334155);
+  --rb-border-strong: var(--ink-border, #3E4C63);
+}
+
+/* ── Backdrop: a plain canvas ── */
+.bc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--accent-canvas-light, #F5F6F8);
+}
+:global(.dark .bc-shell .bc-backdrop) { background: var(--ink-page, #0B1220); }
+
+/* Solid chrome, shared with the sidebar: --rb-chrome (main.css, html.portal-bc). */
+.topbar {
+  /* The token, not a bound colour: a bound one keeps the server's light value after hydration. */
+  border-color: var(--rb-border);
+  background-color: var(--rb-chrome, #FFFFFF);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease;
+}
+
+main { background: transparent; }
+
+/* ── Brand: menu button, logo, wordmark and breadcrumb ── */
+.rail-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rb-text-primary, #1E293B);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.rail-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+:global(.dark .bc-shell .rail-toggle:hover) { background: rgba(255, 255, 255, 0.08); }
+.rail-toggle:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.rail-toggle:active { transform: scale(0.95); }
+
+/* The logo stands on its own: no tile to swallow its red and blue. */
+.bc-logo { display: flex; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; }
+.bc-logo__img { width: 100%; height: 100%; object-fit: contain; }
+.bc-logo:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+@media (min-width: 1024px) {
+  .bc-logo { width: 48px; height: 48px; }
+}
+
+.brand-word { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
+.brand-word__name {
+  font-family: var(--rb-font-sans);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rb-text-primary);
+  text-decoration: none;
+}
+.brand-word__accent { color: #D32F2F; }
+.brand-word__tag {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--rb-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Hospital › Section › Page; the page keeps its room, the rest give way. */
+.brand-crumb { margin-top: 2px; min-width: 0; }
+.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
+.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
+.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
+.brand-crumb li:first-child:not(:last-child) { flex-shrink: 1; }
+.brand-crumb li[aria-current] { flex-shrink: 0; max-width: 100%; color: var(--rb-text-primary); font-weight: 600; }
+
+.search-panel {
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rb-border-hover) transparent;
+}
+.search-panel::-webkit-scrollbar { width: 5px; }
+.search-panel::-webkit-scrollbar-thumb {
+  background-color: var(--rb-border-hover);
+  border-radius: 999px;
+}
 
 .popup-enter-active,
 .popup-leave-active {
@@ -667,8 +872,14 @@ main { background: transparent; }
   transform: translateY(6px) scale(0.98);
 }
 
+input:focus { outline: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  .content-shift, .topbar, .icon-btn, .acct__item, .acct__logout { transition: none; }
+  .content-shift,
+  .topbar,
+  .rail-toggle {
+    transition: none;
+  }
 }
 
 a, button { touch-action: manipulation; }

@@ -573,8 +573,8 @@ const CATEGORIES = [
   { value: 'weekly', label: 'Hospital Billing / Restocking', short: 'Hospital / restock' },
 ]
 
-// Card and bank transfer are recorded from their reference, as GCash is. A
-// GCash checkout (QR) is opened from the statement's own page, not here.
+// Card and bank transfer are recorded from their reference, as GCash is. There
+// is no GCash checkout QR (project owner, 2026-10-26).
 const METHODS = [
   { value: 'cash', label: 'Cash', icon: 'philippine-peso', placeholder: 'Not needed for cash' },
   { value: 'card', label: 'Card', icon: 'credit-card', placeholder: 'From the card terminal slip' },
