@@ -4,23 +4,37 @@
       <div>
         <h1 class="page-title">Processed</h1>
         <p class="page-subtitle">
-          Every unit Processing has recorded a component breakdown for, newest first. Label each one and hand it over
-          to Issuance from here; a unit still to be separated is on Component Processing.
+          Units with a recorded breakdown: print their final labels and hand them over to Issuance.
         </p>
+        <!-- What waits at each step, under the title rather than crowding the toolbar (2026-10-28). -->
+      <p v-if="waiting" class="waiting" aria-label="Units waiting at each step">
+        <span class="waiting__item"><span class="waiting__dot waiting__dot--testing" aria-hidden="true" /><strong>{{ waiting.testing }}</strong> awaiting testing</span>
+        <span class="waiting__item"><span class="waiting__dot waiting__dot--label" aria-hidden="true" /><strong>{{ waiting.label }}</strong> to label</span>
+        <span class="waiting__item"><span class="waiting__dot waiting__dot--handover" aria-hidden="true" /><strong>{{ waiting.handover }}</strong> to hand over</span>
+      </p>
       </div>
-      <NuxtLink to="/blood-center/laboratory" class="btn-outline">
-        <AssetIcon name="package-check" :size="14" />
-        Component Processing
-      </NuxtLink>
+      <div class="header-actions">
+        <button v-if="!noteOpen" type="button" class="note-link" @click="setNote(true)">
+          <AssetIcon name="help-circle" :size="14" />
+          How labelling works
+        </button>
+        <NuxtLink to="/blood-center/laboratory" class="btn-outline">
+          <AssetIcon name="package-check" :size="14" />
+          Component Processing
+        </NuxtLink>
+      </div>
     </header>
 
-    <div class="note" role="note">
+    <div v-if="noteOpen" class="note" role="note">
       <AssetIcon name="info" :size="15" />
       <p>
         A unit's bags stay with Processing until TTI Testing and Immunohematology have both cleared the donation.
         Then print and affix their final labels here and hand them over: Issuance books labelled bags straight into
         stock.
       </p>
+      <button type="button" class="note__close" aria-label="Hide this note" @click="setNote(false)">
+        <AssetIcon name="x" :size="14" />
+      </button>
     </div>
 
     <div v-if="loadError" class="banner banner--error" role="alert">
@@ -132,7 +146,8 @@
               <td class="c-components">
                 <!-- By the code on each bag's label; the full name is the tooltip, and the dialog lists every bag. -->
                 <span class="chips" :aria-label="breakdownSummary(row.components)">
-                  <span v-for="chip in componentChips(row.components)" :key="chip.code" class="chip" :title="chip.name">
+                  <span v-for="chip in componentChips(row.components)" :key="chip.code" class="chip" :class="`comp--${componentTone(chip.name)}`" :title="chip.name">
+                    <span class="chip__swatch" aria-hidden="true" />
                     {{ chip.code }}<span v-if="chip.count > 1" class="chip__count">×{{ chip.count }}</span>
                   </span>
                 </span>
@@ -158,6 +173,9 @@
               </td>
               <td class="c-status">
                 <span class="state" :class="`state--${row.label_state || row.status}`">{{ row.status_label }}</span>
+                <span v-if="row.status !== 'rejected'" class="trail" :aria-label="`Step ${stepOf(row)} of 4`">
+                  <span v-for="n in 4" :key="n" class="trail__dot" :class="{ 'trail__dot--done': n <= stepOf(row) }" />
+                </span>
                 <span v-if="row.status === 'rejected' && row.rejection_reason" class="sub" :title="row.rejection_reason">{{ row.rejection_reason }}</span>
                 <span v-else-if="bookedText(row)" class="sub">{{ bookedText(row) }}</span>
                 <span v-if="row.correction_pending" class="sub sub--pending">Correction pending</span>
@@ -212,6 +230,7 @@
                     @click="printFinalLabels(row)"
                   >
                     <AssetIcon :name="labelling === row.donation_id ? 'loader' : 'printer'" :size="15" :class="{ spin: labelling === row.donation_id }" />
+                    <span v-if="row.label_state === 'awaiting_labels'" class="icon-btn__text">Print</span>
                   </button>
                   <!-- The hand-over to Issuance (it was the last card on Component Processing). -->
                   <template v-if="row.status === 'awaiting_handover'">
@@ -720,7 +739,35 @@ function formatDateTime(iso) {
   return `${formatShortDate(iso)} · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
 }
 
+/** How far a unit has got: 1 testing, 2 labels, 3 hand over, 4 handed over. */
+function stepOf(row) {
+  if (row.status === 'handed_over') return 4
+  return { awaiting_testing: 1, awaiting_labels: 2, labelled: 3 }[row.label_state] ?? 1
+}
+
+/** Each component's colour, as on the Processing dashboard and bench. */
+function componentTone(name) {
+  const n = String(name).toLowerCase()
+  if (n.includes('red') || n.includes('rbc') || n.includes('whole')) return 'red'
+  if (n.includes('cryo')) return 'blue'
+  if (n.includes('plasma')) return 'amber'
+  if (n.includes('platelet')) return 'purple'
+  return 'grey'
+}
+
+// The labelling rule, put away once read and remembered on this browser.
+const NOTE_KEY = 'rb.processed.note'
+const noteOpen = ref(true)
+function setNote(open) {
+  noteOpen.value = open
+  try { localStorage.setItem(NOTE_KEY, open ? '1' : '0') } catch { /* private window: shown again next time */ }
+}
+onMounted(() => {
+  try { noteOpen.value = localStorage.getItem(NOTE_KEY) !== '0' } catch { /* keep it shown */ }
+})
+
 async function load(page = 1) {
+  loadWaiting()
   loading.value = true
   loadError.value = ''
   try {
@@ -746,6 +793,19 @@ function clearFilters() {
   search.value = ''
   status.value = ''
   load()
+}
+
+// ── What waits at each step, said once in the toolbar (2026-10-28) ──
+// Information only, from the Processing dashboard; the list's own filter is
+// the hand-over select.
+const waiting = ref(null)
+async function loadWaiting() {
+  try {
+    const d = await bloodCenterService.processingDashboard()
+    waiting.value = d?.queue ? { testing: d.queue.awaiting_testing ?? 0, label: d.queue.to_label ?? 0, handover: d.queue.to_hand_over ?? 0 } : null
+  } catch {
+    waiting.value = null
+  }
 }
 
 function toggleSort() {
@@ -1713,4 +1773,85 @@ onBeforeUnmount(() => {
 <style scoped>
 /* The system dropdown in a toolbar: a fixed width rather than the row's. */
 .sel-filter { width: 180px; flex: none; }
+
+/* ===== Refresh (project owner, 2026-10-28) ===== */
+
+.note { position: relative; padding-right: 44px !important; }
+.note__close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
+.note__close:hover { background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-text-primary); }
+.header-actions { display: flex; align-items: center; gap: 14px; }
+.note-link { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
+
+/* Rows: the step trail, coloured chips, quieter waiting hand-overs. */
+.trail { display: flex; gap: 3px; margin-top: 6px; }
+.trail__dot { width: 14px; height: 4px; border-radius: 2px; background: var(--rb-border-strong); }
+.trail__dot--done { background: var(--rb-success); }
+.chip { display: inline-flex !important; align-items: center; gap: 5px; }
+.chip__swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--comp); }
+.comp--red { --comp: rgb(var(--rb-accent-rgb)); }
+.comp--amber { --comp: rgb(var(--rb-warning-rgb)); }
+.comp--purple { --comp: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.comp--blue { --comp: rgb(var(--rb-primary-rgb)); }
+.comp--grey { --comp: var(--rb-text-muted); }
+.icon-btn__text { margin-left: 6px; font-size: 12.5px; font-weight: 700; }
+.icon-btn--due { display: inline-flex !important; align-items: center; width: auto !important; padding: 0 10px !important; border-color: var(--rb-primary) !important; background: var(--rb-primary) !important; color: #fff !important; }
+.icon-btn--due:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000) !important; }
+/* A hand-over that cannot happen yet waits quietly, not as a faded blue button. */
+.btn-handover:disabled { border: 1px solid var(--rb-border); background: var(--rb-surface); color: var(--rb-text-muted); opacity: 1; }
+.processed-row:hover td { background: var(--rb-surface-hover); }
+.row-actions { flex-wrap: nowrap; }
+.icon-btn__text { margin-left: 5px !important; }
+/* Room for "Print" beside the hand-over: the ID column gives a little. */
+.c-id { width: 88px; }
+.c-actions { width: 320px; }
+
+/* What waits, one quiet line in the toolbar. */
+.waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.waiting__item { padding: 4px 10px; border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface); line-height: 1.3; }
+.waiting__item { display: inline-flex; align-items: center; gap: 6px; }
+.waiting__item strong { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.waiting__dot { width: 8px; height: 8px; border-radius: 50%; }
+.waiting__dot--testing { background: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.waiting__dot--label { background: var(--rb-warning); }
+.waiting__dot--handover { background: var(--rb-primary); }
+/* A narrower bench (the sidebar open): the table keeps room for its components
+   and scrolls sideways rather than squeezing a column to nothing (2026-10-28). */
+.processed-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container (max-width: 1120px) {
+  .c-status { width: 140px; }
+  .processed-table { min-width: 1040px; }
+}
+/* More room between the columns. */
+.processed-table thead th { padding: 11px 16px; }
+.processed-table tbody td { padding: 12px 16px; }
+.processed-table th:first-child, .processed-table td:first-child { padding-left: 20px; }
+.processed-table th:last-child, .processed-table td:last-child { padding-right: 20px; }
+/* Widths grown by the extra padding, so no column loses its content. */
+.c-id { width: 100px; }
+.c-bag { width: 150px; }
+.c-donor { width: 84px; }
+.c-testing { width: 162px; }
+.c-processed { width: 140px; }
+.c-status { width: 168px; }
+.c-actions { width: 340px; }
+
+/*
+  Most screens, and the sidebar open (2026-10-28): the table shares the room
+  out by what each column holds instead of fixed widths, so no column is
+  squeezed to "COMPO…"; the ID keeps its column, and a hand-over that
+  cannot happen yet shows its icon alone (its title still says why).
+*/
+@container (max-width: 1300px) {
+  .processed-table { table-layout: auto; min-width: 900px; }
+  .processed-table th { width: auto !important; }
+  .processed-table thead th { padding: 11px 12px; text-overflow: clip; }
+  .processed-table tbody td { padding: 12px 12px; }
+  .processed-table th:first-child, .processed-table td:first-child { padding-left: 16px; }
+  .processed-table th:last-child, .processed-table td:last-child { padding-right: 16px; }
+  /* The ID keeps its column here too (it was folded away below 1120px). */
+  .c-id { display: table-cell; }
+  .c-id, .c-bag, .c-processed, .c-actions { white-space: nowrap; }
+  .c-components { min-width: 150px; }
+  .btn-handover:disabled { gap: 0; padding: 0 9px; font-size: 0; }
+}
 </style>

@@ -45,6 +45,7 @@ const TASKS: TaskDef[] = [
   { key: 'urgent', requires: 'requests.release', label: ['emergency requests open', 'emergency request open'], detail: 'Release blood for these first.', to: '/blood-center/fulfillment', action: 'Release', icon: 'circle-alert', tone: 'urgent' },
   { key: 'verification', requires: 'lab.verify_serology', label: ['results to verify', 'result to verify'], detail: 'Reactive results and corrections waiting for you.', to: '/blood-center/serology-results', action: 'Verify', icon: 'clipboard-list', tone: 'urgent' },
   { key: 'pending', requires: 'requests.view', label: ['hospital requests waiting', 'hospital request waiting'], detail: 'Requests not yet decided.', to: '/blood-center/bloodrequests', action: 'Review', icon: 'clipboard-check', tone: 'warning' },
+  { key: 'invoices', requires: 'billing.record_payment', label: ['invoices still to be paid', 'invoice still to be paid'], detail: 'Patient invoices with a balance.', to: '/blood-center/billing', action: 'View invoices', icon: 'file-text', tone: 'warning' },
   { key: 'corrections', requires: 'corrections.approve', label: ['corrections to approve', 'correction to approve'], detail: 'Filed in your department.', to: '/blood-center/corrections', action: 'Review', icon: 'pencil', tone: 'warning' },
   { key: 'referrals', requires: 'lab.referrals', label: ['referrals not acted on', 'referral not acted on'], detail: 'Donors still to contact for counselling.', to: '/blood-center/counselling-referrals', action: 'Contact', icon: 'life-buoy', tone: 'warning' },
   { key: 'handover', requires: 'lab.update_status', label: ['units to hand over', 'unit to hand over'], detail: 'Processed and waiting for Issuance.', to: '/blood-center/processed?status=awaiting_handover', action: 'Hand over', icon: 'check-check', tone: 'info' },
@@ -76,6 +77,12 @@ export function useBloodCenterTasks() {
       jobs.push(bloodCenterService.incomingRequestsSummary().then((summary) => {
         next.pending = summary?.totals?.pending ?? 0
         next.urgent = summary?.open_emergencies ?? 0
+      }))
+    }
+    // The sidebar's Invoices badge: invoices still to be paid.
+    if (can('billing.record_payment')) {
+      jobs.push(bloodCenterService.billingSummary().then((summary) => {
+        next.invoices = summary?.outstanding?.count ?? 0
       }))
     }
     if (can('corrections.approve')) {

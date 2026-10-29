@@ -6,45 +6,60 @@
       </template>
     </PageHeader>
 
-    <!-- The full rules, one click away instead of a four-line subtitle. -->
-    <details class="how">
-      <summary class="how__summary">How corrections work</summary>
-      <ul class="how__list">
-        <li>Whoever entered a record requests a correction, and the department's head decides.</li>
-        <li>The head's own correction is applied as soon as it is sent.</li>
-        <li>An approved correction is applied under the same rules as the original.</li>
-        <li>
-          A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
-          directly, and everyone else files a correction.
-        </li>
-      </ul>
-    </details>
+    <!-- The full rules, in a small card that can be put away (2026-10-27). -->
+    <aside v-if="howOpen" class="how" aria-labelledby="how-title">
+      <span class="how__icon" aria-hidden="true"><AssetIcon name="info" :size="16" /></span>
+      <div class="how__body">
+        <p id="how-title" class="how__title">How corrections work</p>
+        <ul class="how__list">
+          <li>Whoever entered a record requests a correction, and the department's head decides.</li>
+          <li>The head's own correction is applied as soon as it is sent.</li>
+          <li>An approved correction is applied under the same rules as the original.</li>
+          <li>
+            A unit's storage location and expiry date are the exception: the Inventory Control Officer edits them
+            directly, and everyone else files a correction.
+          </li>
+        </ul>
+      </div>
+      <button type="button" class="icon-btn" aria-label="Hide how corrections work" @click="setHow(false)">
+        <AssetIcon name="x" :size="15" />
+      </button>
+    </aside>
 
     <div class="toolbar">
-      <div class="tabs" role="tablist" aria-label="Corrections">
-        <button
-          v-if="canApprove"
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ 'tab--on': scope === 'review' }"
-          :aria-selected="scope === 'review'"
-          @click="switchScope('review')"
-        >
-          To review
-          <span v-if="pendingReview" class="tab__badge">{{ pendingReview }}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ 'tab--on': scope === 'mine' }"
-          :aria-selected="scope === 'mine'"
-          @click="switchScope('mine')"
-        >
-          My requests
-        </button>
-      </div>
+      <!--
+        In the browser only: the server renders before the user (and so
+        canApprove) is known, and hydrating that left both tabs looking chosen.
+      -->
+      <ClientOnly>
+        <div class="seg" role="tablist" aria-label="Corrections">
+          <button
+            v-if="canApprove"
+            type="button"
+            role="tab"
+            class="seg__btn"
+            :class="{ 'seg__btn--on': scope === 'review' }"
+            :aria-selected="scope === 'review'"
+            @click="switchScope('review')"
+          >
+            To review
+            <span v-if="pendingReview" class="seg__badge">{{ pendingReview }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="seg__btn"
+            :class="{ 'seg__btn--on': scope === 'mine' }"
+            :aria-selected="scope === 'mine'"
+            @click="switchScope('mine')"
+          >
+            My requests
+          </button>
+        </div>
+        <template #fallback>
+          <div class="seg seg--placeholder" aria-hidden="true" />
+        </template>
+      </ClientOnly>
 
       <!-- Status as chips: the current choice is visible without opening anything. -->
       <div class="chips" role="group" aria-label="Status">
@@ -60,6 +75,11 @@
           {{ option.label }}
         </button>
       </div>
+
+      <button v-if="!howOpen" type="button" class="how-link" @click="setHow(true)">
+        <AssetIcon name="help-circle" :size="14" />
+        How corrections work
+      </button>
     </div>
 
     <div v-if="error" class="alert alert--error" role="alert">
@@ -71,76 +91,120 @@
       <span>{{ notice }}</span>
     </div>
 
-    <!-- Loading: cards shaped like the real ones -->
-    <ul v-if="loading" class="list" aria-busy="true">
-      <li v-for="n in 3" :key="n" class="item item--skeleton">
+    <!-- Loading: shaped like the list and the detail -->
+    <div v-if="loading && !items.length" class="review" aria-busy="true">
+      <ul class="queue">
+        <li v-for="n in 4" :key="n" class="q-skeleton">
+          <span class="skeleton skeleton--icon" />
+          <span class="q-skeleton__lines"><span class="skeleton skeleton--title" /><span class="skeleton skeleton--line" /></span>
+        </li>
+      </ul>
+      <div class="detail">
         <span class="skeleton skeleton--title" />
         <span class="skeleton skeleton--line" />
         <span class="skeleton skeleton--block" />
-      </li>
-    </ul>
+      </div>
+    </div>
 
     <div v-else-if="!items.length" class="empty">
       <span class="empty__icon">
-        <AssetIcon :name="scope === 'review' ? 'circle-check-big' : 'pencil'" :size="20" />
+        <AssetIcon :name="scope === 'review' ? 'circle-check-big' : 'pencil'" :size="24" />
       </span>
       <p class="empty__title">{{ emptyCopy.title }}</p>
       <p class="empty__text">{{ emptyCopy.text }}</p>
     </div>
 
-    <ul v-else class="list">
-      <li v-for="item in items" :key="item.id" class="item" :class="`item--${item.status}`">
-        <div class="item__head">
-          <div class="item__heading">
-            <p class="item__title">{{ item.subject_label }} <span class="item__ref">{{ item.target_label || ('Donation #' + item.donation_id) }}</span></p>
-            <p class="item__meta">
-              <template v-if="item.donation_barcode">Barcode <span class="mono">{{ item.donation_barcode }}</span> · </template>
-              Requested by {{ item.requested_by || 'Unknown' }} · {{ formatDate(item.requested_at) }}
+    <!--
+      Master and detail (2026-10-27): the requests on the left, the one picked
+      on the right with its changes and the decision. After a decision the
+      next request is picked, so a queue is reviewed in one sitting.
+    -->
+    <div v-else class="review">
+      <ul class="queue" role="listbox" aria-label="Correction requests">
+        <li v-for="item in items" :key="item.id">
+          <button
+            type="button"
+            role="option"
+            class="q-item"
+            :class="{ 'q-item--on': selected?.id === item.id }"
+            :aria-selected="selected?.id === item.id"
+            @click="select(item)"
+          >
+            <span class="kind-icon" :class="`kind--${kindOf(item).tone}`" aria-hidden="true"><AssetIcon :name="kindOf(item).icon" :size="16" /></span>
+            <span class="q-item__body">
+              <span class="q-item__title">{{ item.subject_label }}</span>
+              <span class="q-item__ref">{{ item.target_label || ('Donation #' + item.donation_id) }}</span>
+              <span class="q-item__meta">{{ item.requested_by || 'Unknown' }}</span>
+            </span>
+            <span class="q-item__side">
+              <span v-if="item.status === 'pending'" class="age" :class="{ 'age--late': ageDays(item.requested_at) >= 2 }">{{ age(item.requested_at) }}</span>
+              <span v-else class="pill" :class="`pill--${item.status}`">{{ statusLabel(item.status) }}</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+
+      <article v-if="selected" :key="selected.id" class="detail" :aria-labelledby="`cr-title-${selected.id}`">
+        <header class="detail__head">
+          <span class="kind-icon kind-icon--lg" :class="`kind--${kindOf(selected).tone}`" aria-hidden="true"><AssetIcon :name="kindOf(selected).icon" :size="20" /></span>
+          <div class="detail__heading">
+            <h2 :id="`cr-title-${selected.id}`" class="detail__title">
+              {{ selected.subject_label }}
+              <span class="detail__ref">{{ selected.target_label || ('Donation #' + selected.donation_id) }}</span>
+            </h2>
+            <p class="detail__meta">
+              <template v-if="selected.donation_barcode">Barcode <span class="mono">{{ selected.donation_barcode }}</span> · </template>
+              Requested by {{ selected.requested_by || 'Unknown' }} · {{ formatDate(selected.requested_at) }}
             </p>
           </div>
-          <span class="pill" :class="`pill--${item.status}`">{{ statusLabel(item.status) }}</span>
-        </div>
+          <span class="pill" :class="`pill--${selected.status}`">{{ statusLabel(selected.status) }}</span>
+        </header>
 
         <div class="reason">
-          <p class="reason__label">Reason</p>
-          <p class="reason__text">{{ item.reason }}</p>
-        </div>
-
-        <div v-if="item.changed_fields.length" class="diff" role="table" aria-label="Changes">
-          <div class="diff__row diff__row--head" role="row">
-            <span role="columnheader">Field</span>
-            <span role="columnheader">Saved</span>
-            <span aria-hidden="true" />
-            <span role="columnheader">Corrected</span>
-          </div>
-          <div v-for="field in item.changed_fields" :key="field" class="diff__row" role="row">
-            <span class="diff__field" role="cell">{{ fieldName(field) }}</span>
-            <span class="diff__before" role="cell">
-              <template v-if="isEmpty(item.previous?.[field])"><i class="diff__empty">empty</i></template>
-              <template v-else>{{ display(item.previous?.[field]) }}</template>
-            </span>
-            <AssetIcon name="arrow-right" :size="14" class="diff__arrow" aria-hidden="true" />
-            <span class="diff__after" role="cell">
-              <template v-if="isEmpty(item.changes?.[field])"><i class="diff__empty">empty</i></template>
-              <template v-else>{{ display(item.changes?.[field]) }}</template>
-            </span>
+          <AssetIcon name="file-text" :size="15" class="reason__icon" />
+          <div>
+            <p class="reason__label">Reason</p>
+            <p class="reason__text">{{ selected.reason }}</p>
           </div>
         </div>
-        <p v-else class="item__meta">No field differs from the saved record.</p>
 
-        <p v-if="item.reviewed_by" class="decision">
-          <AssetIcon :name="item.status === 'approved' ? 'circle-check-big' : 'circle-x'" :size="14" />
+        <section class="changes" aria-label="Changes">
+          <p class="section-label">{{ selected.changed_fields.length === 1 ? '1 change' : `${selected.changed_fields.length} changes` }}</p>
+          <ul v-if="selected.changed_fields.length" class="diff">
+            <li v-for="field in selected.changed_fields" :key="field" class="diff__row">
+              <span class="diff__field">{{ fieldName(field) }}</span>
+              <span class="diff__values">
+                <span class="val val--before" :class="{ 'val--none': isEmpty(selected.previous?.[field]) }">
+                  <span class="sr-only">Saved: </span>
+                  <template v-if="isEmpty(selected.previous?.[field])"><i class="diff__empty">empty</i></template>
+                  <template v-else>{{ display(selected.previous?.[field]) }}</template>
+                </span>
+                <AssetIcon name="arrow-right" :size="14" class="diff__arrow" aria-hidden="true" />
+                <span class="val val--after" :class="{ 'val--none': isEmpty(selected.changes?.[field]) }">
+                  <span class="sr-only">Corrected: </span>
+                  <template v-if="isEmpty(selected.changes?.[field])"><i class="diff__empty">empty</i></template>
+                  <template v-else>{{ display(selected.changes?.[field]) }}</template>
+                </span>
+              </span>
+            </li>
+          </ul>
+          <p v-else class="detail__meta">No field differs from the saved record.</p>
+        </section>
+
+        <p v-if="selected.reviewed_by" class="decision" :class="`decision--${selected.status}`">
+          <AssetIcon :name="selected.status === 'approved' ? 'circle-check-big' : 'circle-x'" :size="16" />
           <span>
-            {{ item.status === 'approved' ? 'Approved' : 'Rejected' }} by {{ item.reviewed_by }} · {{ formatDate(item.reviewed_at) }}
-            <template v-if="item.review_note"><br><span class="decision__note">Note: {{ item.review_note }}</span></template>
+            <strong>{{ selected.status === 'approved' ? 'Approved' : 'Rejected' }}</strong> by {{ selected.reviewed_by }} · {{ formatDate(selected.reviewed_at) }}
+            <template v-if="selected.review_note"><br><span class="decision__note">Note: {{ selected.review_note }}</span></template>
           </span>
         </p>
 
-        <div v-if="item.can_decide" class="item__decide">
-          <label class="field">
+        <div v-if="selected.can_decide" class="decide">
+          <label v-if="noteOpen[selected.id]" class="field">
             <span class="field__label">Note <span class="field__optional">optional to approve, required to reject</span></span>
             <textarea
-              v-model="notes[item.id]"
+              :ref="(el) => { noteInputs[selected.id] = el }"
+              v-model="notes[selected.id]"
               class="field__input"
               rows="2"
               maxlength="1000"
@@ -148,22 +212,29 @@
             />
           </label>
           <div class="actions">
-            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy === item.id" @click="decide(item, 'approve')">
-              {{ busy === item.id ? 'Working…' : 'Approve and apply' }}
+            <button v-if="!noteOpen[selected.id]" type="button" class="link-btn" @click="openNote(selected)">
+              <AssetIcon name="plus" :size="14" />
+              Add note
             </button>
+            <span v-else-if="!(notes[selected.id] || '').trim()" class="actions__hint">Add a note to reject.</span>
+            <span class="actions__spacer" />
             <button
               type="button"
               class="ui-btn ui-btn--danger"
-              :disabled="busy === item.id || !(notes[item.id] || '').trim()"
-              @click="decide(item, 'reject')"
+              :disabled="busy === selected.id"
+              @click="rejectClicked(selected)"
             >
+              <AssetIcon name="circle-x" :size="15" />
               Reject
             </button>
-            <span v-if="!(notes[item.id] || '').trim()" class="actions__hint">Add a note to reject.</span>
+            <button type="button" class="ui-btn ui-btn--primary" :disabled="busy === selected.id" @click="decide(selected, 'approve')">
+              <AssetIcon name="check" :size="15" />
+              {{ busy === selected.id ? 'Working…' : 'Approve and apply' }}
+            </button>
           </div>
         </div>
-      </li>
-    </ul>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -171,6 +242,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import { correctionKind } from '~/utils/correctionKinds'
 
 /**
  * Correction requests: the caller's own, and — for a department's head —
@@ -202,6 +274,63 @@ const busy = ref(null)
 const error = ref(null)
 const notice = ref(null)
 const notes = reactive({})
+const noteOpen = reactive({})
+const noteInputs = {}
+
+// ── The request picked, shown beside the list (2026-10-27) ──
+const selectedId = ref(null)
+const selected = computed(() => items.value.find((item) => item.id === selectedId.value) ?? items.value[0] ?? null)
+let selectedIndex = 0
+
+function select(item) {
+  selectedId.value = item.id
+  selectedIndex = items.value.indexOf(item)
+}
+
+// After a reload, keep the one picked; when it has gone (decided), the next in its place.
+watch(items, (list) => {
+  if (list.some((item) => item.id === selectedId.value)) return
+  const next = list[Math.min(selectedIndex, list.length - 1)]
+  selectedId.value = next?.id ?? null
+})
+
+// What each kind of record is, by its icon and colour (shared with the filing dialog).
+const kindOf = (item) => correctionKind(item.subject)
+
+// ── How long a request has waited ──
+function ageDays(value) {
+  const at = new Date(value)
+  if (Number.isNaN(at.getTime())) return 0
+  return Math.floor((Date.now() - at.getTime()) / 86400000)
+}
+function age(value) {
+  const days = ageDays(value)
+  return days <= 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`
+}
+
+// ── The note: opened when wanted, and always before a reject ──
+function openNote(item) {
+  noteOpen[item.id] = true
+  nextTick(() => noteInputs[item.id]?.focus())
+}
+function rejectClicked(item) {
+  if (!(notes[item.id] || '').trim()) {
+    openNote(item)
+    return
+  }
+  decide(item, 'reject')
+}
+
+// ── How corrections work: put away once read, remembered on this browser ──
+const HOW_KEY = 'rb.corrections.how'
+const howOpen = ref(true)
+function setHow(open) {
+  howOpen.value = open
+  try { localStorage.setItem(HOW_KEY, open ? '1' : '0') } catch { /* private window: shown again next time */ }
+}
+onMounted(() => {
+  try { howOpen.value = localStorage.getItem(HOW_KEY) !== '0' } catch { /* keep it shown */ }
+})
 const pendingReview = ref(0)
 
 const STATUS = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }
@@ -216,6 +345,8 @@ const STATUS_FILTERS = [
 function setStatus(value) {
   if (statusFilter.value === value) return
   statusFilter.value = value
+  selectedId.value = null
+  selectedIndex = 0
   notice.value = null
   load()
 }
@@ -285,6 +416,8 @@ async function load() {
 
 function switchScope(next) {
   scope.value = next
+  selectedId.value = null
+  selectedIndex = 0
   notice.value = null
   load()
 }
@@ -342,430 +475,141 @@ onMounted(load)
   color: var(--rb-text-primary);
 }
 
-.corrections__title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
+/* How corrections work: a small card, put away once read. */
+.how { display: flex; align-items: flex-start; gap: 12px; padding: 14px 14px 14px 16px; border: 1px solid rgba(var(--rb-primary-rgb), .2); border-radius: 14px; background: rgba(var(--rb-primary-rgb), .05); }
+.how__icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
+.how__body { flex: 1; min-width: 0; }
+.how__title { margin: 4px 0 0; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
+.how__list { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--rb-text-secondary); }
+.how__list li + li { margin-top: 2px; }
+.icon-btn { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
+.icon-btn:hover { background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-text-primary); }
+.how-link { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
 
-.corrections__subtitle {
-  margin: 4px 0 0;
-  max-width: 76ch;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--rb-text-secondary);
-}
+/* Tabs as one control, then the status chips. */
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; padding: 3px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface); }
+.seg__btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer; }
+.seg__btn:hover:not(.seg__btn--on) { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.seg__btn--on { background: var(--rb-primary); color: #fff; }
+.seg__badge { min-width: 20px; padding: 1px 7px; border-radius: 999px; background: rgba(var(--rb-warning-rgb), .18); color: var(--rb-warning-text); font-size: 11px; font-weight: 800; text-align: center; }
+.seg__btn--on .seg__badge { background: rgba(255, 255, 255, .22); color: #fff; }
 
-/* How corrections work */
-.how {
-  margin: -6px 0 16px;
-  max-width: 76ch;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-}
-.how__summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--rb-primary);
-  list-style: none;
-}
-.how__summary::-webkit-details-marker { display: none; }
-.how__summary::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 0.15s ease;
-}
-.how[open] .how__summary::before { transform: rotate(45deg); }
-.how__summary:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 3px; border-radius: 4px; }
-.how__list {
-  margin: 10px 0 0;
-  padding: 12px 16px 12px 30px;
-  border-left: 3px solid var(--rb-primary);
-  border-radius: 0 12px 12px 0;
-  background: rgba(var(--rb-primary-rgb), 0.05);
-  line-height: 1.6;
-}
-.how__list li + li { margin-top: 4px; }
-@media (prefers-reduced-motion: reduce) {
-  .how__summary::before { transition: none; }
-}
-
-/* Tabs + status chips */
-.toolbar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--rb-border-strong);
-}
-
-.tabs { display: flex; gap: 4px; }
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  margin-bottom: -1px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--rb-text-secondary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.tab:hover { color: var(--rb-text-primary); }
-
-.tab--on {
-  border-bottom-color: var(--rb-primary);
-  color: var(--rb-primary-text);
-}
-
-.tab__badge {
-  min-width: 20px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: rgba(var(--rb-warning-rgb), 0.16);
-  color: var(--rb-warning-text);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.chips { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
-
-.chip {
-  padding: 5px 12px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 999px;
-  background: var(--rb-surface);
-  color: var(--rb-text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.chip:hover { border-color: var(--rb-border-hover); color: var(--rb-text-primary); }
-
-.chip--on {
-  border-color: rgba(var(--rb-primary-rgb), 0.35);
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-}
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { height: 32px; padding: 0 13px; border: 1px solid var(--rb-border); border-radius: 999px; background: var(--rb-surface); color: var(--rb-text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.chip:hover { border-color: var(--rb-border-strong); color: var(--rb-text-primary); }
+.chip--on, .chip--on:hover { border-color: rgba(var(--rb-primary-rgb), .4); background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-primary-text); }
+.seg__btn:focus-visible, .chip:focus-visible, .q-item:focus-visible, .how-link:focus-visible, .link-btn:focus-visible, .icon-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 
 /* Alerts */
-.alert {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 11px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
+.alert { display: flex; align-items: center; gap: 8px; margin: 0; padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; }
+.alert--error { background: rgba(var(--rb-accent-rgb), .08); color: var(--rb-accent-text); }
+.alert--notice { background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); }
 
-.alert--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
-.alert--notice { background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+/* Empty: as on Invoices and Payments. */
+.empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface); text-align: center; }
+.empty__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), .08); color: var(--rb-primary-text); box-shadow: 0 0 0 6px rgba(var(--rb-primary-rgb), .04); }
+.empty__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; }
+.empty__text { margin: 0; max-width: 480px; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
 
-/* Empty */
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 40px 24px;
-  border: 1px dashed var(--rb-border-strong);
-  border-radius: 14px;
-  background: var(--rb-surface);
-  text-align: center;
-}
+/* ── Master and detail ── */
+.review { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.queue { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 2px; max-height: calc(100dvh - 120px); margin: 0; padding: 6px; overflow-y: auto; list-style: none; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface); }
+.q-item { display: flex; align-items: flex-start; gap: 11px; width: 100%; padding: 11px 12px; border: 0; border-radius: 11px; background: transparent; font: inherit; text-align: left; color: inherit; cursor: pointer; transition: background-color .12s ease; }
+.q-item:hover { background: var(--rb-surface-hover); }
+.q-item--on, .q-item--on:hover { background: rgba(var(--rb-primary-rgb), .08); box-shadow: inset 0 0 0 1px rgba(var(--rb-primary-rgb), .3); }
+.q-item__body { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.q-item__title { font-size: 13.5px; font-weight: 700; }
+.q-item__ref { overflow: hidden; font-family: var(--rb-font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); }
+.q-item__meta { font-size: 12px; color: var(--rb-text-muted); }
+.q-item__side { flex: none; padding-top: 2px; }
 
-.empty__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-}
+.kind-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; }
+.kind-icon--lg { width: 44px; height: 44px; border-radius: 13px; }
+.kind--red { background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); }
+.kind--purple { background: rgba(var(--rb-purple-rgb, 124, 58, 237), .1); color: rgb(var(--rb-purple-rgb, 124, 58, 237)); }
+.kind--blue { background: rgba(var(--rb-primary-rgb), .1); color: var(--rb-primary-text); }
+.kind--green { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
+.kind--amber { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
 
-.empty__title { margin: 4px 0 0; font-size: 14px; font-weight: 700; }
-.empty__text { margin: 0; max-width: 46ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+.age { padding: 2px 8px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 11.5px; font-weight: 700; white-space: nowrap; color: var(--rb-text-secondary); }
+.age--late { background: rgba(var(--rb-warning-rgb), .16); color: var(--rb-warning-text); }
 
-/* List */
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+.detail { display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: 20px 22px; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface); }
+.detail__head { display: flex; align-items: flex-start; gap: 14px; }
+.detail__heading { flex: 1; min-width: 0; }
+.detail__title { margin: 0; font-size: 17px; font-weight: 800; }
+.detail__ref { margin-left: 6px; font-family: var(--rb-font-mono); font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); }
+.detail__meta { margin: 4px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
-.item {
-  padding: 16px 18px;
-  border: 1px solid var(--rb-border);
-  border-radius: 14px;
-  background: var(--rb-surface);
-  box-shadow: inset 3px 0 0 var(--item-accent, transparent), 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+.reason { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--rb-surface-alt); }
+.reason__icon { flex: none; margin-top: 2px; color: var(--rb-text-muted); }
+.reason__label, .section-label { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); }
+.reason__text { margin: 3px 0 0; font-size: 14px; line-height: 1.55; }
 
-.item--pending { --item-accent: var(--rb-warning); }
-.item--approved { --item-accent: var(--rb-success); }
-.item--rejected { --item-accent: var(--rb-accent); }
-
-.item__head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.item__heading { min-width: 0; }
-
-.item__title { margin: 0; font-size: 14px; font-weight: 700; }
-
-.item__ref {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-}
-
-.item__meta {
-  margin: 3px 0 0;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
-
-.reason {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.reason__label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-
-.reason__text { margin: 3px 0 0; font-size: 13px; line-height: 1.5; }
-
-/* Saved -> Corrected */
-.diff {
-  border: 1px solid var(--rb-border);
-  border-radius: 10px;
-  overflow: hidden;
-  font-size: 13px;
-}
-
-.diff__row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.4fr) 20px minmax(0, 1.4fr);
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-top: 1px solid var(--rb-border);
-}
-
+/* Saved → corrected: each change on one line. */
+.changes { display: flex; flex-direction: column; gap: 8px; }
+.diff { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--rb-border); border-radius: 12px; }
+.diff__row { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--rb-border); }
 .diff__row:first-child { border-top: 0; }
+.diff__field { font-size: 13px; font-weight: 600; text-transform: capitalize; color: var(--rb-text-secondary); }
+.diff__values { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.val { padding: 3px 10px; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.val--before { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); text-decoration: line-through; text-decoration-color: rgba(var(--rb-accent-rgb), .5); }
+.val--after { background: rgba(var(--rb-success-rgb), .1); font-weight: 700; color: var(--rb-success-text); }
+.diff__arrow { flex: none; color: var(--rb-text-muted); }
+.diff__empty { font-style: italic; font-weight: 500; }
 
-.diff__row--head {
-  padding: 7px 12px;
-  background: var(--rb-surface-alt);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-
-.diff__field { font-weight: 600; text-transform: capitalize; }
-
-.diff__before {
-  color: var(--rb-text-secondary);
-  text-decoration: line-through;
-  overflow-wrap: anywhere;
-}
-
-.diff__after {
-  font-weight: 600;
-  color: var(--rb-success-text);
-  overflow-wrap: anywhere;
-}
-
-.diff__arrow { color: var(--rb-text-secondary); }
-
-.diff__empty {
-  font-style: normal;
-  font-weight: 500;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-
-.decision {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
-
+.decision { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 11px 14px; border-radius: 12px; font-size: 13px; }
+.decision--approved { background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); }
+.decision--rejected { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); }
 .decision :deep(svg) { flex-shrink: 0; margin-top: 1px; }
 .decision__note { color: var(--rb-text-primary); }
 
-/* Decide */
-.item__decide {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--rb-border);
-}
-
+/* The decision, at the foot of the detail. */
+.decide { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--rb-border); }
 .field { display: flex; flex-direction: column; gap: 6px; }
-
-.field__label { font-size: 12px; font-weight: 600; }
-
-.field__optional {
-  margin-left: 4px;
-  font-weight: 500;
-  color: var(--rb-text-secondary);
-}
-
-.field__input {
-  padding: 9px 12px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 13px;
-  resize: vertical;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
+.field__label { font-size: 12.5px; font-weight: 600; }
+.field__optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
+.field__input { padding: 10px 12px; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13px; resize: vertical; }
 .field__input::placeholder { color: var(--rb-placeholder); }
+.field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions__spacer { flex: 1; }
+.actions__hint { font-size: 12.5px; color: var(--rb-text-secondary); }
+.link-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 4px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
 
-.field__input:focus {
-  outline: none;
-  border-color: var(--rb-primary);
-  box-shadow: var(--rb-focus-ring);
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.actions__hint { font-size: 12px; color: var(--rb-text-secondary); }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 9px 16px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.btn--primary { border-color: transparent; background: var(--rb-primary); color: #fff; }
-.btn--primary:hover:not(:disabled) { background: #0D47A1; }
-
-.btn--danger { border-color: rgba(var(--rb-accent-rgb), 0.35); color: var(--rb-accent-text); }
-.btn--danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.06); }
-
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn:focus-visible,
-.tab:focus-visible,
-.chip:focus-visible {
-  outline: 2px solid var(--rb-primary-text);
-  outline-offset: 2px;
-}
-
-.pill {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.pill--pending { background: rgba(var(--rb-warning-rgb), 0.14); color: var(--rb-warning-text); }
-.pill--approved { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
+.pill { padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.pill--pending { background: rgba(var(--rb-warning-rgb), .14); color: var(--rb-warning-text); }
+.pill--approved { background: rgba(var(--rb-success-rgb), .12); color: var(--rb-success-text); }
+.pill--rejected { background: rgba(var(--rb-accent-rgb), .12); color: var(--rb-accent-text); }
 
 .mono { font-family: var(--rb-font-mono); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 /* Skeleton */
-.item--skeleton { gap: 10px; }
-
-.skeleton {
-  display: block;
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
-  background-size: 400% 100%;
-  animation: corrections-shimmer 1.4s ease infinite;
-}
-
+.q-skeleton { display: flex; gap: 11px; padding: 11px 12px; }
+.q-skeleton__lines { display: flex; flex: 1; flex-direction: column; gap: 6px; }
+.skeleton { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%); background-size: 400% 100%; animation: corrections-shimmer 1.4s ease infinite; }
+.skeleton--icon { flex: none; width: 34px; height: 34px; border-radius: 10px; }
 .skeleton--title { width: 40%; height: 14px; }
 .skeleton--line { width: 65%; }
-.skeleton--block { height: 56px; border-radius: 10px; }
-
-@keyframes corrections-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
-}
+.skeleton--block { height: 120px; border-radius: 12px; }
+@keyframes corrections-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
+  .chip, .q-item { transition: none; }
 }
 
-@media (max-width: 640px) {
-  .corrections { padding: 16px; }
-  .toolbar { align-items: stretch; }
-  .item__head { flex-direction: column-reverse; gap: 8px; }
-
-  /* Each change stacks: field, then saved over corrected */
-  .diff__row--head { display: none; }
-  .diff__row { grid-template-columns: 1fr; gap: 2px; }
-  .diff__arrow { display: none; }
-  .diff__before::before { content: 'Saved: '; text-decoration: none; display: inline-block; margin-right: 4px; font-weight: 600; }
-  .diff__after::before { content: 'Corrected: '; font-weight: 600; color: var(--rb-text-secondary); margin-right: 4px; }
+@media (max-width: 900px) {
+  .review { grid-template-columns: 1fr; }
+  .queue { position: static; max-height: none; }
+  .diff__row { grid-template-columns: 1fr; gap: 6px; }
 }
+.seg--placeholder { width: 220px; height: 40px; }
+/* Reject as an outline beside the one filled action, Approve. */
+.actions .ui-btn--danger { border: 1px solid rgba(var(--rb-accent-rgb), .4); background: var(--rb-surface); color: var(--rb-accent-text); }
+.actions .ui-btn--danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), .06); }
+.val--none, .val--none.val--before { background: var(--rb-surface-alt); font-weight: 500; color: var(--rb-text-muted); text-decoration: none; }
 </style>

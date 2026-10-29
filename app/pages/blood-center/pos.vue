@@ -9,6 +9,8 @@
       </transition-group>
     </div>
 
+    <PageHeader class="pos-head" title="Billing Counter" :subtitle="headSubtitle" />
+
     <!-- SHIFT BAR: only when the counter works in cash shifts (off by default) -->
     <section v-if="shiftsEnabled" class="shift-bar" :class="{ 'shift-bar--open': shift }" aria-label="Cash shift">
       <template v-if="shift">
@@ -29,16 +31,48 @@
       </form>
     </section>
 
-    <!-- The counter, left to right: who is waiting, their bill, the payment. -->
-    <div class="counter">
+    <!--
+      One step at a time (project owner, 2026-10-27): find the bill, review
+      it, take the payment, hand over the receipt. A step already passed can
+      be gone back to; the counter's logic is unchanged.
+    -->
+    <nav class="steps" aria-label="Billing counter steps">
+      <ol>
+        <li
+          v-for="(s, i) in STEPS"
+          :key="s.key"
+          class="steps__item"
+          :class="{ 'steps__item--done': i + 1 < step, 'steps__item--now': i + 1 === step }"
+          :aria-current="i + 1 === step ? 'step' : undefined"
+        >
+          <button
+            type="button"
+            class="steps__btn"
+            :disabled="!canGoTo(i + 1)"
+            @click="goTo(i + 1)"
+          >
+            <span class="steps__num" aria-hidden="true">
+              <AssetIcon v-if="i + 1 < step" name="check" :size="13" />
+              <template v-else>{{ i + 1 }}</template>
+            </span>
+            <span class="steps__text">
+              <span class="steps__label">{{ s.label }}</span>
+              <span class="steps__hint">{{ s.hint }}</span>
+            </span>
+          </button>
+        </li>
+      </ol>
+    </nav>
+
+    <!-- The counter: one step shown at a time. -->
+    <div class="counter" :class="`counter--step-${step}`">
       <!-- 1. WAITING: the queue is always in view; typing turns it into results -->
-      <section class="card queue" aria-labelledby="queue-title">
+      <section v-show="step === 1" class="card queue" aria-labelledby="queue-title">
         <div class="queue-head">
           <h2 id="queue-title" class="card-title">
             {{ scanQuery.trim().length >= 2 ? 'Results' : 'Waiting' }}
-            <span v-if="!queueLoading && scanQuery.trim().length < 2" class="count-chip">{{ queue.length }}</span>
+            <span v-if="!queueLoading && scanQuery.trim().length < 2 && queue.length" class="count-chip">{{ queue.length }}</span>
           </h2>
-          <kbd class="kbd" title="Press / or F2 to scan">/</kbd>
         </div>
 
         <!-- Owed by different people: a patient at this counter, or a hospital by statement. -->
@@ -70,6 +104,7 @@
             @keydown.esc="scanQuery = ''"
             @input="onQuery('scan')"
           >
+          <span v-if="!scanQuery" class="search-hint" aria-hidden="true">press <kbd class="kbd">/</kbd> to scan</span>
           <button type="button" class="scan-btn" aria-label="Ready the scanner" title="Ready the scanner" @click="focusScanner">
             <AssetIcon name="scan-line" :size="16" />
           </button>
@@ -80,10 +115,26 @@
           <template v-if="listLoading">
             <div v-for="n in 4" :key="n" class="skeleton skeleton--row" />
           </template>
-          <p v-else-if="!listRows.length" class="queue-empty">
-            <AssetIcon :name="scanQuery.trim().length >= 2 ? 'search-x' : 'check-check'" :size="20" />
-            {{ listEmpty }}
-          </p>
+          <div v-else-if="!listRows.length" class="queue-empty">
+            <span class="queue-empty__icon"><AssetIcon :name="typing ? 'search-x' : 'check-check'" :size="22" /></span>
+            <p class="queue-empty__title">{{ listEmpty }}</p>
+            <p v-if="!typing" class="queue-empty__text">
+              {{ category === 'patient'
+                ? 'A bill appears here once Issuance reserves units for a request. Scan a reference above to open one now.'
+                : 'A hospital invoice appears here once its weekly order is released and waiting for settlement.' }}
+            </p>
+            <p v-else class="queue-empty__text">Check the reference, or search by the patient's name.</p>
+            <div v-if="!typing" class="queue-empty__links">
+              <NuxtLink to="/blood-center/billing" class="btn btn-outline btn-sm">
+                <AssetIcon name="file-text" :size="14" />
+                View invoices
+              </NuxtLink>
+              <NuxtLink to="/blood-center/receipts" class="btn btn-outline btn-sm">
+                <AssetIcon name="receipt" :size="14" />
+                Payments
+              </NuxtLink>
+            </div>
+          </div>
           <button
             v-for="b in listRows"
             v-else
@@ -110,7 +161,7 @@
 
       <!-- 2. THE BILL, step one: the request and what is held for it. Its one
            action opens the payment in its place (project owner, 2026-10-25). -->
-      <section v-if="!bill || !paymentReady" class="card billcard" aria-labelledby="bill-title">
+      <section v-if="step === 2" class="card billcard" aria-labelledby="bill-title">
         <h2 id="bill-title" class="sr-only">Bill</h2>
 
         <div v-if="billLoading" class="bill-loading" aria-busy="true">
@@ -132,6 +183,10 @@
               <p v-if="recipientExtra" class="bill-head__extra">{{ recipientExtra }}</p>
             </div>
             <div v-if="bill" class="bill-head__actions">
+              <button type="button" class="link-btn" @click="nextCustomer">
+                <AssetIcon name="arrow-left" :size="14" />
+                Waiting list
+              </button>
               <NuxtLink :to="`/blood-center/invoice/${bill.request_id}`" class="link-btn">View details</NuxtLink>
               <button type="button" class="icon-btn" title="Clear (Esc)" aria-label="Clear this bill" @click="nextCustomer">
                 <AssetIcon name="x" :size="15" />
@@ -210,7 +265,7 @@
 
       <!-- 3. THE PAYMENT, step two: replaces the bill. What is due on the left,
            how it is paid on the right; stacked when the panel is narrow. -->
-      <aside v-else class="card pay" aria-labelledby="pay-title">
+      <aside v-else-if="step >= 3" class="card pay" aria-labelledby="pay-title">
         <div class="pay-layout">
           <section class="pay-due" aria-label="Amount due">
             <div class="pay-hero">
@@ -547,6 +602,7 @@
  * one billing staff member, the default — a payment is taken straight away.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PageHeader from '~/components/ui/PageHeader.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
@@ -794,6 +850,35 @@ const billLoading = ref(false)
 // The step: false shows the request and its lines, true the payment in their
 // place (project owner, 2026-10-25). A newly picked bill always starts on the request.
 const paymentReady = ref(false)
+
+// ── One step at a time ──
+const STEPS = [
+  { key: 'find', label: 'Find bill', hint: 'Scan or pick from the list' },
+  { key: 'review', label: 'Review', hint: 'The request and its units' },
+  { key: 'pay', label: 'Payment', hint: 'Method and amount' },
+  { key: 'receipt', label: 'Receipt', hint: 'Print and hand over' },
+]
+const step = computed(() => {
+  if (done.value) return 4
+  if (bill.value && paymentReady.value) return 3
+  if (bill.value || billLoading.value) return 2
+  return 1
+})
+// What the counter is doing now, under its title.
+const headSubtitle = computed(() => ({
+  1: "Take a patient's payment or record a hospital's settlement, one step at a time.",
+  2: 'Check the request and the units held for it before payment.',
+  3: weekly.value ? "Record the hospital's settlement of this invoice." : 'Choose how it is paid and enter the amount received.',
+  4: 'Print the receipt and hand it over.',
+})[step.value])
+
+/** Only a step already passed can be gone back to; the receipt never. */
+const canGoTo = n => n < step.value && step.value < 4
+function goTo(n) {
+  if (!canGoTo(n)) return
+  if (n === 1) nextCustomer()
+  else if (n === 2) backToDetails()
+}
 const proceedBtn = ref(null)
 const weekly = computed(() => Boolean(bill.value?.is_statement_only) || category.value === 'weekly')
 const takes = computed(() => (bill.value ? takesPayment(bill.value) : false))
@@ -1161,7 +1246,9 @@ function onCounterKeys(e) {
   const typingInField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
   if ((e.key === '/' && !typingInField) || e.key === 'F2') {
     e.preventDefault()
-    focusScanner()
+    // The scanner lives on the first step; leave a bill not yet paid for it.
+    if (step.value !== 1 && !done.value) nextCustomer()
+    nextTick(focusScanner)
   } else if (e.key === 'Escape' && !typingInField && bill.value && !closingShift.value) {
     nextCustomer()
   }
@@ -1576,21 +1663,20 @@ onBeforeUnmount(() => {
   .pos {
     display: grid;
     height: max(calc(100dvh - 4rem), 588px);
-    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
-    grid-template-rows: auto minmax(560px, 1fr);
-    grid-template-areas:
-      "shift shift"
-      "queue main";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(440px, 1fr);
+    grid-template-areas: "head" "shift" "steps" "main";
   }
   /* No shift bar (the usual case): no empty first row. */
   .pos:not(:has(> .shift-bar)) {
-    grid-template-rows: minmax(560px, 1fr);
-    grid-template-areas: "queue main";
+    grid-template-rows: auto auto minmax(440px, 1fr);
+    grid-template-areas: "head" "steps" "main";
   }
   .counter { display: contents; }
   .shift-bar { grid-area: shift; }
-  .queue { grid-area: queue; }
-  .billcard, .pay { grid-area: main; }
+  .steps { grid-area: steps; }
+  .pos-head { grid-area: head; }
+  .queue, .billcard, .pay { grid-area: main; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1608,5 +1694,63 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .pair, .refs--split, .facts { grid-template-columns: 1fr; }
+}
+
+/* ── One step at a time (2026-10-27) ── */
+.counter { grid-template-columns: minmax(0, 1fr); }
+.steps ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface); }
+.steps__item { position: relative; min-width: 0; }
+/* The line between two steps. */
+.steps__item + .steps__item::before { content: ''; position: absolute; top: 50%; left: -10px; width: 20px; height: 2px; border-radius: 1px; background: var(--rb-border-strong, var(--rb-border)); }
+.steps__item--done + .steps__item::before { background: var(--rb-success); }
+.steps__btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; border: 0; border-radius: 12px; background: transparent; font: inherit; text-align: left; color: var(--rb-text-secondary); cursor: default; }
+.steps__item--done .steps__btn:not(:disabled) { cursor: pointer; }
+.steps__item--done .steps__btn:not(:disabled):hover { background: var(--rb-surface-hover); }
+.steps__btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.steps__item--now .steps__btn { background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-text-primary); }
+.steps__num { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border: 2px solid var(--rb-border-strong, var(--rb-border)); border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--rb-text-muted); background: var(--rb-surface); }
+.steps__item--now .steps__num { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
+.steps__item--done .steps__num { border-color: var(--rb-success); background: var(--rb-success); color: #fff; }
+.steps__text { display: flex; flex-direction: column; min-width: 0; }
+.steps__label { font-size: 13.5px; font-weight: 700; }
+.steps__hint { overflow: hidden; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-muted); }
+
+/* Step 1: the list takes the counter. The bill kind and the search share one
+   row, the search taking the width; the bills in columns below. */
+.counter--step-1 .queue {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  align-content: start;
+  column-gap: 12px;
+  padding: 16px 18px;
+}
+.counter--step-1 .queue > .queue-head,
+.counter--step-1 .queue > .field-error,
+.counter--step-1 .queue > .queue-list { grid-column: 1 / -1; }
+.counter--step-1 .queue .seg { align-self: center; }
+.counter--step-1 .queue-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-content: start; gap: 10px; margin-top: 4px; }
+/* Nothing waiting: said in the middle of the counter, with what comes next. */
+.counter--step-1 .queue-empty { grid-column: 1 / -1; min-height: 260px; justify-content: center; gap: 8px; }
+.queue-empty__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
+.queue-empty__title { margin: 4px 0 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.queue-empty__text { max-width: 420px; margin: 0; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+.queue-empty__links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+.queue-empty__links .btn { text-decoration: none; }
+
+/* The scan shortcut, said inside the search until something is typed. */
+.search-hint { position: absolute; right: 46px; top: 50%; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--rb-text-muted); pointer-events: none; transform: translateY(-50%); }
+@media (max-width: 760px) { .search-hint { display: none; } }
+
+/* 4. A slimmer stepper: the hints a line of small type. */
+.steps__btn { padding: 6px 12px; }
+.steps__num { width: 26px; height: 26px; font-size: 12.5px; }
+.steps__label { font-size: 13px; }
+.steps__hint { font-size: 11px; }
+.pos-head { margin-bottom: 4px; }
+
+@media (max-width: 760px) {
+  .steps__hint { display: none; }
+  .steps__btn { padding: 8px; gap: 8px; }
 }
 </style>

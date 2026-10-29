@@ -1,21 +1,9 @@
 <template>
   <div>
-    <!--
-      Mobile overlay. The trigger that opens the drawer lives in the layout
-      header, not floating over the page.
-    -->
     <Transition name="scrim">
       <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-slate-900/50" @click="closeMobile" />
     </Transition>
 
-    <!--
-      The donor portal's rail. Desktop: 72px of icons under the full-width top
-      bar, opened by the menu button in the bar or by hovering it, and closed
-      when the pointer leaves it (or a click lands outside, or Escape). The layout moves the
-      content column over with it, so nothing is covered. Opened, each
-      department folder shows its pages on a thin "agos" line that fills up to
-      the current page. Below 1024px it is the drawer.
-    -->
     <aside
       id="blood-center-sidebar"
       ref="asideEl"
@@ -48,10 +36,6 @@
         <AssetIcon name="x" :size="18" />
       </button>
 
-      <!--
-        Height-matched to the topbar (h-14 / sm:h-16) so the dividers line up.
-        px-4 + a 40px mark puts the logo's centre on the 36px axis.
-      -->
       <div
         class="brand px-4 h-14 sm:h-16 flex lg:hidden items-center gap-3 border-b flex-shrink-0 cursor-pointer select-none overflow-hidden"
         :style="{ borderColor: SIDEBAR_BORDER }"
@@ -76,11 +60,6 @@
         </div>
       </div>
 
-      <!--
-        Desktop rail: icon rows whose labels show when it opens, and each
-        department's pages beneath its folder. A folder still opens and closes
-        on a click, as in the drawer.
-      -->
       <nav v-if="!isMobile" class="rail flex-1 overflow-y-auto overflow-x-hidden" aria-label="Blood center pages">
         <NuxtLink
           v-for="item in topItems"
@@ -563,9 +542,22 @@ const hoveredPath = ref(null)
 // case-insensitive ni tungod sa Dashboard.vue → /blood-center/Dashboard.
 // A nav path may carry a query: the link is active only when the route has
 // that query too. A path without one is active whatever the query.
+// Pages that light up another link (a page's other tabs): nav alsoActiveOn.
+const activeAliases = computed(() => {
+  const map = {}
+  for (const group of navGroups.value) {
+    for (const item of group.items) {
+      if (item.alsoActiveOn?.length) map[item.path] = item.alsoActiveOn
+    }
+  }
+  return map
+})
+
 const isActive = (path) => {
+  const here = route.path.replace(/\/$/, '')
+  if ((activeAliases.value[path] ?? []).some((alias) => alias.replace(/\/$/, '') === here)) return true
   const [base, query] = path.split('?')
-  if (route.path.replace(/\/$/, '') !== base.replace(/\/$/, '')) return false
+  if (here !== base.replace(/\/$/, '')) return false
   if (!query) return true
   for (const [key, value] of new URLSearchParams(query)) {
     if (route.query[key] !== value) return false
@@ -938,4 +930,5 @@ a, button {
    their size and the nav scrolls; without this, a long list squeezes them. */
 .sidebar nav > * { flex-shrink: 0; }
 .account-group { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; }
+
 </style>
