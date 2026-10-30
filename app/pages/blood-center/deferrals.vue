@@ -12,7 +12,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Deferrals</h1>
-          <p class="page-subtitle">{{ listSummary }}</p>
         </div>
       </header>
 
@@ -284,9 +283,6 @@ const statusFilter = ref('')
 
 const hasFilters = computed(() => Boolean(search.value.trim() || statusFilter.value))
 const updatedAtLabel = computed(() => updatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
-const listSummary = computed(() => (hasFilters.value
-  ? `${pager.total} deferral${pager.total === 1 ? '' : 's'} match the filters`
-  : 'Every deferral this centre recorded, at the counter, from paper records or here, newest first.'))
 
 /** Where a deferral on this list was decided. */
 const DEFERRAL_SOURCES = { manual: 'Recorded here', counter: 'Counter screening', paper: 'Paper record' }
@@ -473,7 +469,6 @@ onBeforeUnmount(() => {
 /* ---------- Header and buttons ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 .btn-primary,
 .btn-outline {

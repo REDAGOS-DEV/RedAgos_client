@@ -16,7 +16,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Collection dashboard</h1>
-          <p class="page-subtitle">Donor &amp; Collection{{ data ? ` · ${longDate(data.today.date)}` : '' }}</p>
         </div>
         <div class="header-actions">
           <span v-if="updatedAt" class="updated">
@@ -191,7 +190,6 @@
               <div class="card__head">
                 <div>
                   <p class="card__label">Eligible donors by blood group</p>
-                  <p class="card__sub">Active donors who can give today: who to call in when a group runs low.</p>
                 </div>
                 <NuxtLink v-if="can('donors.view_contact')" to="/blood-center/donors" class="card__link">
                   {{ can('donors.manage') ? 'Remind eligible' : 'Donor Management' }}
@@ -331,7 +329,6 @@
             <div class="card__head">
               <div>
                 <h2 id="upcoming-title" class="card__label card__label--title">Coming up</h2>
-                <p class="card__sub">Booked appointments, next 7 days</p>
               </div>
             </div>
 
@@ -377,7 +374,6 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import {
   bloodGroupRows,
   dayMonth,
-  longDate,
   niceScale,
   plural,
   trendPeak,
@@ -749,7 +745,6 @@ onBeforeUnmount(() => {
 /* ---------- Header ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 
 .updated {

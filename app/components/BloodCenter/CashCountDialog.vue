@@ -3,9 +3,6 @@
     <div class="modal-overlay" @click.self="$emit('close')">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="count-title">
         <h2 id="count-title" class="modal-title">Close Shift {{ shift.session_number }}</h2>
-        <p class="modal-sub">
-          Count the drawer note by note. What it should hold is worked out from this shift's own payments.
-        </p>
 
         <div class="count-grid">
           <label v-for="d in CASH_DENOMINATIONS" :key="d" class="count-row">
@@ -103,7 +100,6 @@ function confirm() {
   max-height: 92vh; overflow-y: auto;
 }
 .modal-title { font-size: 17px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 3px; }
-.modal-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
 
 .count-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; margin-bottom: 14px; }

@@ -1,4 +1,5 @@
 import { reportUnauthorized } from "./unauthorized";
+import { trackRequest } from "./activity";
 
 /**
  * Ang base URL sa Laravel API.
@@ -92,7 +93,9 @@ export class BaseService {
     }
  
     try {
-      return await $fetch<T>(url, config);
+      // Counted on the client so the "Launching Workspace" screen knows when
+      // the portal's first data is in (api/activity.ts).
+      return await (import.meta.client ? trackRequest($fetch<T>(url, config)) : $fetch<T>(url, config));
     } catch (error: any) {
       const status = error?.response?.status;
       const responseData = error?.response?._data || error?.data || {};

@@ -166,9 +166,12 @@ export const HELP_GUIDES: HelpGuide[] = [
     steps: [
       'Open a request to see the patient, the units asked for and the priority.',
       'Choose Approve and reserve to hold the units, or reject it with a reason.',
+      'On Inventory Replenishment, choose Confirm first: how many units of each line you can supply, pick-up or delivery, and when. Then reserve.',
       'For a watcher at the counter, use New Walk-in Request.',
     ],
     questions: [
+      { q: 'Why can\'t I reserve units for a replenishment order?', a: 'A hospital\'s restocking order is confirmed before anything is reserved. Choose Confirm, say what you will supply and when it is picked up or delivered, and the hospital is told. You can then reserve up to what you committed. Anything you leave out is closed as not supplied when the order is dispatched.' },
+      { q: 'Can I change the pick-up or delivery time?', a: 'Yes, until units are dispatched. Open the order and choose Edit under Supply Plan; the hospital is told of the change. A line cannot go below what is already reserved for it.' },
       { q: 'A watcher brought a request. What do I do?', a: 'Choose New Walk-in Request. You call the patient\'s hospital blood bank to confirm it; if the hospital does not confirm, nothing is recorded.' },
       { q: 'Where do approved requests go?', a: 'Approving reserves the selected units and moves the request to Request Fulfillment, where they are released.' },
     ],
@@ -555,7 +558,7 @@ export const ROLE_HELP: Record<string, { summary: string, start: string[] }> = {
 
 /** Terms staff meet across RedAgos. */
 export const HELP_GLOSSARY: { term: string; meaning: string }[] = [
-  { term: 'PTR', meaning: 'Patient Transfusion Request: a patient\'s need for blood, which one or more centres may supply.' },
+  { term: 'PTR', meaning: 'Blood Request: a patient\'s need for blood, which one or more centres may supply.' },
   { term: 'Invoice', meaning: 'What one billable request is charged (INV-…). Not a BIR-registered invoice and not an official receipt.' },
   { term: 'SOA', meaning: 'Statement of Account: a hospital\'s invoices, payments and remaining balance over a period.' },
   { term: 'AR', meaning: 'Payment Acknowledgement Receipt: issued for each payment taken.' },

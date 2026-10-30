@@ -5,7 +5,7 @@
       Processing hands over only cleared, labelled bags, so nothing waits in
       quarantine for Issuance to release.
     -->
-    <PageHeader title="Stock Intake" subtitle="Book the labelled bags Processing hands over into stock, each onto its shelf." />
+    <PageHeader title="Stock Intake" />
 
     <div v-if="error" class="alert alert--error" role="alert">
       <AssetIcon name="circle-alert" :size="16" />

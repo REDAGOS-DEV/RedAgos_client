@@ -132,7 +132,6 @@
           <section class="card" aria-labelledby="items-title">
             <div class="card-head">
               <h2 id="items-title" class="card-title">Items</h2>
-              <p class="card-hint">As billed on {{ receipt.statement?.document_number || 'the invoice' }} when the payment was taken.</p>
             </div>
             <BillingLines
               :lines="receipt.lines || []"
@@ -325,7 +324,6 @@ onMounted(load)
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; padding: 18px; min-width: 0; }
 .card-head { margin-bottom: 14px; }
 .card-title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.card-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .summary { margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }

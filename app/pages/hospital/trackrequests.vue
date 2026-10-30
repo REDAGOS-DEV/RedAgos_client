@@ -155,7 +155,7 @@
 
       <!-- WHERE IT CAME FROM, AND WHAT IT IS A SHARE OF -->
       <section v-if="request.is_walk_in || request.transfusion_request" class="card">
-        <h2 class="section-title">Source &amp; Patient Transfusion Request</h2>
+        <h2 class="section-title">Source &amp; Blood Request</h2>
         <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
           A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
           it<template v-if="request.walk_in?.verification"> after your blood bank confirmed it by phone</template><template v-else> on your behalf</template>.

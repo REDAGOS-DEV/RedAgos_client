@@ -65,7 +65,7 @@ describe('patient requests and replenishment orders', () => {
 
 describe('a row', () => {
   it('reserves only what is still needed, and only for whoever allocates', () => {
-    expect(page).toContain('canReserve: isOpen && outstanding > 0,')
+    expect(page).toContain('canReserve: isOpen && outstanding > 0 && !needsPlan,')
     expect(page).toMatch(/<template v-if="r\.canReserve">\s*<button\s+v-if="canAllocate"/)
   })
 
@@ -101,7 +101,7 @@ describe('the review', () => {
   })
 
   it('offers to reserve only what is still needed, and to issue once all of it is held', () => {
-    expect(page).toMatch(/<template v-if="activeRequest\.canReserve">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" to="\/blood-center\/fulfillment"/)
+    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canReserve">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" to="\/blood-center\/fulfillment"/)
   })
 
   it('rejects only while nothing is held or sent', () => {
@@ -187,5 +187,56 @@ describe('the composable', () => {
     const composable = source('app/composables/useIncomingRequests.js')
     expect(composable).toContain('incomingRequests({ ...activeFilters(), page, per_page: PER_PAGE })')
     expect(composable).toMatch(/open: undefined,[\s\S]*from: undefined,\s*to: undefined,/)
+  })
+})
+
+describe('a replenishment order (project owner, 2026-10-29)', () => {
+  const dialog = source('app/components/BloodCenter/SupplyPlanDialog.vue')
+
+  it('is confirmed before anything is reserved, by whoever decides', () => {
+    expect(page).toContain("const needsPlan = isOpen && isReplenishment && !plan")
+    expect(page).toMatch(/<template v-if="r\.needsPlan">\s*<button\s+v-if="canDecide"[\s\S]*?@click="openPlan\(r\)"/)
+    expect(page).toMatch(/<template v-if="activeRequest\.needsPlan">\s*<button v-if="canDecide"[^>]*@click="openPlan\(activeRequest\)"/)
+  })
+
+  it('can be changed until units go out', () => {
+    expect(page).toContain('canPlan: isOpen && isReplenishment && issued === 0,')
+    expect(page).toMatch(/<template v-if="activeRequest\.canPlan">\s*<button v-if="canDecide"/)
+  })
+
+  it('says how many of each line, pick-up or delivery, and when', () => {
+    expect(dialog).toContain("{ value: 'pickup', label: 'Hospital picks up'")
+    expect(dialog).toContain("{ value: 'delivery', label: 'We deliver'")
+    expect(dialog).toContain('scheduled_at: new Date(scheduledAt.value).toISOString(),')
+    expect(dialog).toContain('lines: openRows.value.map((line) => ({ request_item_id: line.id, committed_quantity: Number(committed[line.id]) })),')
+  })
+
+  it('never commits a line below what is already reserved, nor above what was asked', () => {
+    expect(dialog).toContain(':min="line.held"')
+    expect(dialog).toContain(':max="line.requested"')
+    expect(dialog).toContain("if (totalCommitted.value < 1) found.lines = 'Commit at least one unit. If you can supply none of this order, reject it instead.'")
+  })
+
+  it('places the server\'s refusals against the line or field they name', () => {
+    expect(dialog).toContain('const server = props.serverErrors?.[`lines.${index}.committed_quantity`]')
+    expect(page).toContain('planErrors.value = err?.data?.errors ?? {}')
+  })
+
+  it('keeps Escape for the dialog, not the review behind it', () => {
+    expect(dialog).toContain('@dialog-escape="emitClose"')
+    expect(page).toContain('lineToClose.value || showWalkIn.value || planFor.value) return')
+  })
+
+  it('is saved with PUT to the request\'s supply plan', () => {
+    expect(source('app/composables/useIncomingRequests.js')).toContain('bloodCenterService.saveSupplyPlan(id, payload)')
+    expect(source('app/api/bloodcenter/BloodCenterService.ts')).toContain("this.request(`/blood-center/blood-requests/${id}/supply-plan`, 'PUT', payload)")
+  })
+
+  it('names who takes the units at dispatch by how it was confirmed', () => {
+    const fulfillment = source('app/pages/blood-center/fulfillment.vue')
+    expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'pickup') return 'Collected by'")
+    expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'delivery') return 'Driver or courier'")
+    // What lay beyond the commitment is closed with the rest.
+    expect(fulfillment).toContain('dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity')
   })
 })

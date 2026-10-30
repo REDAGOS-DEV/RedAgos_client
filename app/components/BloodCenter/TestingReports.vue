@@ -9,7 +9,6 @@
     <header class="tr__head">
       <div>
         <h1 class="tr__title">Reports &amp; Analytics</h1>
-        <p class="tr__sub">Testing · {{ periodLabel }}</p>
       </div>
       <div class="tr__tools">
         <SelectField
@@ -82,8 +81,7 @@
             <div>
               <h2 id="tr-daily" class="card__title">Serology panels, day by day</h2>
               <p class="card__sub">
-                <strong>{{ data.serology.tested }}</strong> panels · <strong>{{ data.serology.reactive }}</strong> reactive.
-                A red mark is a day with a reactive panel.
+                <strong>{{ data.serology.tested }}</strong> panels · <strong>{{ data.serology.reactive }}</strong> reactive
               </p>
             </div>
             <div class="view-toggle" role="radiogroup" aria-label="View">
@@ -147,7 +145,6 @@
           <header class="card__head">
             <div>
               <h2 id="tr-markers" class="card__title">Reactive by marker</h2>
-              <p class="card__sub">Every panel reads all five. A panel reactive for two markers counts under both.</p>
             </div>
           </header>
           <!-- Each marker on two lines: its name and its counts, then the bar. -->
@@ -171,7 +168,6 @@
         <header class="card__head">
           <div>
             <h2 id="tr-months" class="card__title">Testing record, month by month</h2>
-            <p class="card__sub">Panels tested and found reactive, marker by marker, as the record sheet lists them.</p>
           </div>
         </header>
         <div class="table-wrap">
@@ -205,7 +201,6 @@
           <header class="card__head">
             <div>
               <h2 class="card__title">{{ group.title }}</h2>
-              <p class="card__sub">Tested, and how many were reactive.</p>
             </div>
           </header>
           <ul class="prows">
@@ -269,7 +264,6 @@
           <header class="card__head">
             <div>
               <h2 id="tr-referrals" class="card__title">Counselling referrals</h2>
-              <p class="card__sub">Moved in the period, each counted when it happened.</p>
             </div>
           </header>
           <!-- From opened to closed, each step as wide as its count. -->
@@ -371,7 +365,6 @@ onMounted(load)
 const fmtDay = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const fmtWeekday = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 const fmtMonth = m => new Date(`${m}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-const periodLabel = computed(() => (data.value ? `${fmtDay(data.value.period.from)} to ${fmtDay(data.value.period.to)}, ${data.value.period.days} days` : ''))
 const pct = (n, max) => Math.round(((n || 0) / Math.max(1, max)) * 100)
 
 /** The change against the period before, as long. */
@@ -482,7 +475,6 @@ function exportCsv() {
 .tr { display: flex; flex-direction: column; gap: 18px; max-width: var(--rb-content-max, 1600px); margin: 0 auto; padding: 24px var(--rb-gutter, 24px) 40px; font-family: var(--rb-font-sans); color: var(--rb-text-primary); }
 .tr__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; }
 .tr__title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-.tr__sub { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 .tr__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .tool-period { width: 190px; flex: none; }
 .tool-date { width: 150px; }

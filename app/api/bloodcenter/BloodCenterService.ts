@@ -9,6 +9,7 @@ import type {
   DuplicateMatch,
   PaymentReceiptSummary,
   RequestEvent,
+  SaveSupplyPlanPayload,
   StatementRevision,
   WalkInReference,
 } from '~/types/bloodRequest'
@@ -911,6 +912,15 @@ class BloodCenterService extends BaseService {
     if (unitIds?.length) payload.unit_ids = unitIds
 
     return this.request(`/blood-center/blood-requests/${id}/allocate`, 'POST', payload)
+  }
+
+  /**
+   * Confirm a replenishment order, or change how it will be met (project
+   * owner, 2026-10-29): what each line gets, pick-up or delivery, and when.
+   * Required before anything is reserved for it; the hospital is told.
+   */
+  async saveSupplyPlan(id: number | string, payload: SaveSupplyPlanPayload): Promise<{ message: string; request: BloodRequest }> {
+    return this.request(`/blood-center/blood-requests/${id}/supply-plan`, 'PUT', payload)
   }
 
   /**

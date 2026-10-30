@@ -14,7 +14,6 @@
     <header class="header-row">
       <div>
         <h1 class="page-title">Incoming Requests</h1>
-        <p class="page-subtitle">{{ listSummary }}</p>
       </div>
     </header>
 
@@ -158,7 +157,7 @@
                   class="chip"
                   :title="`Weekly request ${r.weeklyReference}: supply what you can — it is dispatched in one delivery, and whatever is not supplied is closed`"
                 >Weekly</span>
-                <span v-else-if="r.ptrReference" class="chip" :title="`One facility's share of Patient Transfusion Request ${r.ptrReference}`">Share</span>
+                <span v-else-if="r.ptrReference" class="chip" :title="`One facility's share of blood request ${r.ptrReference}`">Share</span>
               </td>
               <td class="c-date nowrap">
                 {{ r.date }}
@@ -203,6 +202,17 @@
                   <span class="badge__dot" aria-hidden="true" />
                   <span class="badge__text">{{ r.status }}</span>
                 </span>
+                <!-- A restock's hand-over once confirmed, or that it still needs confirming. -->
+                <span
+                  v-if="r.plan"
+                  class="handover"
+                  :title="`${r.plan.handover_label}${r.plan.handover_address ? ` · ${r.plan.handover_address}` : ''}: ${r.committed} of ${r.units} units`"
+                >
+                  <AssetIcon :name="r.plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="11" /> {{ r.planSummary }}
+                </span>
+                <span v-else-if="r.needsPlan" class="handover handover--todo">
+                  <AssetIcon name="circle-alert" :size="11" /> Not confirmed
+                </span>
                 <span v-if="r.isOpen && waitingLabel(r)" class="waiting" :class="{ 'waiting--crit': r.emergency }">
                   <AssetIcon name="clock" :size="11" /> {{ waitingLabel(r) }}
                 </span>
@@ -212,20 +222,38 @@
                   <button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">
                     <AssetIcon name="eye" :size="15" />
                   </button>
+                  <!-- A replenishment order is confirmed before anything is
+                       reserved: what is supplied, and how and when it goes
+                       (project owner, 2026-10-29). -->
+                  <template v-if="r.needsPlan">
+                    <button
+                      v-if="canDecide"
+                      type="button"
+                      class="btn-approve"
+                      :disabled="isMutating(r.id)"
+                      :aria-label="`Confirm order ${r.code}: what you will supply, and when`"
+                      title="Confirm what you will supply, and when it is picked up or delivered"
+                      @click="openPlan(r)"
+                    >
+                      <AssetIcon name="truck" :size="14" />
+                      Confirm
+                    </button>
+                  </template>
                   <!-- Reserve stock for what it still needs: approving a new
-                       request, or topping up one part held. -->
+                       request, or topping up one part held. A confirmed
+                       order is reserved, never more than was committed. -->
                   <template v-if="r.canReserve">
                     <button
                       v-if="canAllocate"
                       type="button"
                       class="btn-approve"
                       :disabled="isMutating(r.id)"
-                      :aria-label="`${r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest of'} ${r.code}`"
-                      :title="r.statusValue === 'pending' ? 'Approve and reserve' : 'Reserve the rest'"
+                      :aria-label="`${r.statusValue === 'pending' && !r.isReplenishment ? 'Approve and reserve' : 'Reserve units for'} ${r.code}`"
+                      :title="r.statusValue === 'pending' && !r.isReplenishment ? 'Approve and reserve' : 'Reserve units'"
                       @click="requestApprove(r)"
                     >
                       <AssetIcon name="check" :size="14" />
-                      {{ r.statusValue === 'pending' ? 'Approve' : 'Reserve' }}
+                      {{ r.statusValue === 'pending' && !r.isReplenishment ? 'Approve' : 'Reserve' }}
                     </button>
                   </template>
                   <!-- Only while nothing is held or sent: the server refuses
@@ -361,7 +389,7 @@
 
               <dl class="facts">
                 <div class="fact"><dt>Submitted by</dt><dd>{{ activeRequest.requestedBy || 'Not recorded' }}</dd></div>
-                <div class="fact"><dt>Needed by</dt><dd>{{ activeRequest.neededBy }}</dd></div>
+                <div class="fact"><dt>{{ activeRequest.isReplenishment ? 'Hand-over' : 'Needed by' }}</dt><dd>{{ activeRequest.neededBy }}</dd></div>
                 <div class="fact">
                   <dt>Units</dt>
                   <dd>
@@ -376,11 +404,21 @@
                     <span v-if="!activeRequest.bloodTypes.length">—</span>
                   </dd>
                 </div>
-                <div class="fact fact--wide">
+                <div v-if="!activeRequest.isReplenishment" class="fact fact--wide">
                   <dt>Patient</dt>
                   <dd>
                     {{ activeRequest.patient || activeRequest.patientFallback }}
                     <span v-if="activeRequest.patientDetails" class="fact__sub">{{ activeRequest.patientDetails }}</span>
+                  </dd>
+                </div>
+                <!-- A restock names no patient: the weekly order it came in on. -->
+                <div v-else class="fact fact--wide">
+                  <dt>Weekly request</dt>
+                  <dd>
+                    <span :class="{ mono: activeRequest.weeklyReference }">{{ activeRequest.weeklyReference || 'Not part of one' }}</span>
+                    <span v-if="activeRequest.raw?.weekly_request?.request_day" class="fact__sub">
+                      Request day {{ formatShortDate(activeRequest.raw.weekly_request.request_day) }}
+                    </span>
                   </dd>
                 </div>
                 <div class="fact fact--wide"><dt>Component</dt><dd>{{ activeRequest.component }}</dd></div>
@@ -408,13 +446,12 @@
               <section v-if="activeRequest.raw?.transfusion_request" class="sub-section">
                 <h3 class="sub-section__title">
                   <AssetIcon name="users" :size="14" />
-                  Patient Transfusion Request
+                  Blood Request
                 </h3>
                 <p class="share-note">
                   This request is this center's share of
                   <strong class="mono">{{ activeRequest.raw.transfusion_request.reference_number }}</strong>.
-                  The patient needs {{ shareSummary(activeRequest.raw) }} in all; other facilities may be supplying the rest.
-                  Approve what you can reserve, or close the rest as unavailable so the hospital can ask elsewhere.
+                  The patient needs {{ shareSummary(activeRequest.raw) }} in all.
                 </p>
                 <!-- Once something here is closed as unavailable, the watcher can
                      carry the rest to another centre (project owner, 2026-10-19). -->
@@ -423,7 +460,74 @@
                     <AssetIcon name="printer" :size="13" />
                     {{ printingSlip ? 'Preparing…' : 'Referral slip for the watcher' }}
                   </button>
-                  <span class="share-actions__hint">What is still needed, for the next blood center.</span>
+                </div>
+              </section>
+
+              <!--
+                A replenishment order is confirmed before it is reserved
+                (project owner, 2026-10-29): how many units of each line, pick-up
+                or delivery, and when. The hospital is told each time it changes.
+              -->
+              <section v-if="activeRequest.isReplenishment" class="sub-section">
+                <h3 class="sub-section__title">
+                  <AssetIcon name="truck" :size="14" />
+                  Supply Plan
+                </h3>
+
+                <div v-if="activeRequest.plan" class="plan-card">
+                  <dl class="plan-card__facts">
+                    <div class="plan-fact">
+                      <dt>{{ activeRequest.plan.handover_method === 'delivery' ? 'Delivered on' : 'Ready for pick-up on' }}</dt>
+                      <dd>
+                        <AssetIcon :name="activeRequest.plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="13" />
+                        {{ handoverWhen(activeRequest.plan.scheduled_at) }}
+                      </dd>
+                    </div>
+                    <div class="plan-fact">
+                      <dt>Will supply</dt>
+                      <dd>{{ activeRequest.committed }} of {{ activeRequest.units }} units</dd>
+                    </div>
+                    <div class="plan-fact plan-fact--wide">
+                      <dt>{{ activeRequest.plan.handover_method === 'delivery' ? 'Deliver to' : 'Pick-up point' }}</dt>
+                      <dd>{{ activeRequest.plan.handover_address || 'This center' }}</dd>
+                    </div>
+                    <div class="plan-fact plan-fact--wide">
+                      <dt>Contact</dt>
+                      <dd>{{ [activeRequest.plan.contact_name, activeRequest.plan.contact_phone].filter(Boolean).join(' · ') || 'Not given' }}</dd>
+                    </div>
+                    <div v-if="activeRequest.plan.notes" class="plan-fact plan-fact--full">
+                      <dt>Notes for the hospital</dt>
+                      <dd class="fact__notes">{{ activeRequest.plan.notes }}</dd>
+                    </div>
+                  </dl>
+                  <div class="plan-card__foot">
+                    <span class="plan-card__meta">
+                      Confirmed<template v-if="activeRequest.plan.planned_by"> by {{ activeRequest.plan.planned_by }}</template>
+                      <template v-if="activeRequest.plan.updated_by && activeRequest.plan.updated_at !== activeRequest.plan.planned_at">
+                        · last changed by {{ activeRequest.plan.updated_by }}
+                      </template>
+                    </span>
+                    <!-- Changeable until units go out. -->
+                    <template v-if="activeRequest.canPlan">
+                      <button v-if="canDecide" type="button" class="btn btn-outline btn-sm" :disabled="drawerMutating" @click="openPlan(activeRequest)">
+                        <AssetIcon name="pencil" :size="13" />
+                        Edit
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <div v-else class="plan-empty">
+                  <p class="plan-empty__text">
+                    <strong>Not confirmed yet.</strong>
+                    Say how many units of each line you can supply, and when the hospital picks the order up or you
+                    deliver it. Units are reserved once it is confirmed, never more than you commit.
+                  </p>
+                  <template v-if="activeRequest.isOpen">
+                    <button v-if="canDecide" type="button" class="btn btn-primary btn-sm" :disabled="drawerMutating" @click="openPlan(activeRequest)">
+                      Confirm Order
+                    </button>
+                  </template>
                 </div>
               </section>
 
@@ -443,7 +547,8 @@
                       <tr>
                         <th scope="col">Component</th>
                         <th scope="col" class="num">Requested</th>
-                        <th scope="col" class="num">Outstanding</th>
+                        <th v-if="activeRequest.plan" scope="col" class="num">Will supply</th>
+                        <th scope="col" class="num">{{ activeRequest.plan ? 'To reserve' : 'Outstanding' }}</th>
                         <th scope="col" class="num">Available</th>
                         <th scope="col">Status</th>
                       </tr>
@@ -452,6 +557,7 @@
                       <tr v-for="line in activeRequest.lines" :key="line.request_item_id">
                         <td>{{ line.component?.name ? requestLineLabel(activeRequest.raw, line) : 'Not recorded' }}</td>
                         <td class="num">{{ line.requested ?? '—' }}</td>
+                        <td v-if="activeRequest.plan" class="num">{{ line.committed ?? '—' }}</td>
                         <td class="num">{{ line.outstanding }}</td>
                         <td class="num">{{ line.available }}</td>
                         <td>
@@ -527,9 +633,17 @@
                   Reject Request
                 </button>
               </template>
+              <!-- A replenishment order is confirmed first: what it gets, and
+                   how and when it goes. -->
+              <template v-if="activeRequest.needsPlan">
+                <button v-if="canDecide" class="btn btn-primary" :disabled="drawerMutating" @click="openPlan(activeRequest)">
+                  <AssetIcon name="truck" :size="14" />
+                  Confirm Order
+                </button>
+              </template>
               <!-- Reserving only while something is still needed; once all of
                    it is held, the next step is issuing it. -->
-              <template v-if="activeRequest.canReserve">
+              <template v-else-if="activeRequest.canReserve">
                 <button
                   v-if="availabilityLevel(activeRequest) === 'insufficient'"
                   class="btn btn-outline"
@@ -543,7 +657,7 @@
                   :disabled="drawerMutating"
                   @click="requestApprove(activeRequest)"
                 >
-                  {{ drawerMutating ? 'Processing…' : 'Approve & Reserve' }}
+                  {{ drawerMutating ? 'Processing…' : activeRequest.isReplenishment ? 'Reserve Units' : 'Approve & Reserve' }}
                 </button>
               </template>
               <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" to="/blood-center/fulfillment" class="btn btn-primary">
@@ -569,6 +683,21 @@
       :unit-errors="unitErrors"
       @close="closeApproveModal"
       @confirm="confirmApprove"
+    />
+
+    <!--
+      CONFIRM A REPLENISHMENT ORDER (project owner, 2026-10-29): what each line
+      gets, pick-up or delivery, and when. Opens over the review, whose
+      availability it reads.
+    -->
+    <SupplyPlanDialog
+      v-if="planFor"
+      :request="planFor"
+      :busy="savingPlan"
+      :error="planError"
+      :server-errors="planErrors"
+      @close="closePlan"
+      @confirm="confirmPlan"
     />
 
     <!-- REJECTION MODAL -->
@@ -633,6 +762,7 @@ import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.v
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vue'
 import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
+import SupplyPlanDialog from '~/components/BloodCenter/SupplyPlanDialog.vue'
 import ReferralSlipSheet from '~/components/BloodCenter/ReferralSlipSheet.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
@@ -640,9 +770,11 @@ import {
   bloodTypeCodes,
   bloodTypeSummary,
   componentSummary,
+  handoverWhen,
   hasMixedBloodTypes,
   requestLineLabel,
   requestStatusLabel,
+  supplyPlanSummary,
 } from '~/types/bloodRequest'
 import { formatShortDate } from '~/utils/donorRecords'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -687,6 +819,7 @@ const {
   allocate,
   reject,
   closeLine,
+  saveSupplyPlan,
 } = useIncomingRequests()
 
 /* ------------------------------------------------------------------ *
@@ -767,6 +900,11 @@ function mapRequest(r) {
   const units = r.quantity ?? 0
   const outstanding = r.outstanding_quantity ?? Math.max(0, units - allocated)
   const isOpen = r.is_open !== false
+  // A restock is confirmed before it is reserved (project owner, 2026-10-29):
+  // what it gets, and how and when it reaches the hospital.
+  const isReplenishment = r.request_purpose === 'replenishment'
+  const plan = r.supply_plan ?? null
+  const needsPlan = isOpen && isReplenishment && !plan
 
   return {
     id: r.id,
@@ -812,10 +950,17 @@ function mapRequest(r) {
     statusValue: r.status,
     isOpen,
     // What the row offers, before the abilities are asked. Reserving needs
-    // something still to find; rejecting needs nothing held or sent, which
-    // is what the server checks.
-    canReserve: isOpen && outstanding > 0,
+    // something still to find, and a restock confirmed first; rejecting
+    // needs nothing held or sent, which is what the server checks.
+    canReserve: isOpen && outstanding > 0 && !needsPlan,
     canReject: isOpen && allocated === 0,
+    isReplenishment,
+    plan,
+    planSummary: supplyPlanSummary(plan),
+    needsPlan,
+    // The plan may change until units go out.
+    canPlan: isOpen && isReplenishment && issued === 0,
+    committed: r.committed_quantity ?? null,
     // The API shape, for the shared fulfilment and walk-in components.
     raw: r,
     urgency: r.urgency_level,
@@ -829,7 +974,9 @@ function mapRequest(r) {
     // A restocking order names no patient.
     patientFallback: r.request_purpose === 'replenishment' ? 'Replenishment' : '—',
     requestDate: formatDateTime(r.request_date),
-    neededBy: r.is_emergency ? 'Immediate' : 'Routine',
+    neededBy: isReplenishment
+      ? (plan ? supplyPlanSummary(plan) : 'Not confirmed yet')
+      : r.is_emergency ? 'Immediate' : 'Routine',
     reason: r.rejection_reason ?? '',
     reference_number: r.reference_number,
   }
@@ -946,14 +1093,6 @@ const fromDate = ref('')
 const toDate = ref('')
 
 const hasFilters = computed(() => Boolean(searchQuery.value.trim() || statusFilter.value || urgencyFilter.value || fromDate.value || toDate.value))
-
-const listSummary = computed(() => {
-  if (hasFilters.value) return `${meta.value.total} request${meta.value.total === 1 ? '' : 's'} match the filters`
-
-  return isPatientTab.value
-    ? 'Blood for a named patient, walk-ins included: open ones first, emergencies at the top.'
-    : 'Hospital blood banks restocking their own shelves, weekly orders included: open ones first.'
-})
 
 const lastUpdatedAt = ref(null)
 const lastUpdatedLabel = computed(() => lastUpdatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
@@ -1199,7 +1338,7 @@ function handleReviewInventory() {
  */
 function onKeydown(event) {
   if (event.key !== 'Escape' || !drawerOpen.value) return
-  if (showApproveModal.value || showRejectModal.value || lineToClose.value || showWalkIn.value) return
+  if (showApproveModal.value || showRejectModal.value || lineToClose.value || showWalkIn.value || planFor.value) return
   closeDrawer()
 }
 
@@ -1268,6 +1407,62 @@ async function confirmApprove(unitIds) {
     pickerRef.value?.reload()
   } finally {
     approving.value = false
+    mutatingId.value = null
+  }
+}
+
+/*
+ * SUPPLY PLAN — a replenishment order is confirmed before it is reserved
+ * (project owner, 2026-10-29): "Inventory Replenishment is not the same process
+ * like how patient request behave." Staff say how many units of each line the
+ * centre can supply, pick-up or delivery, and when; the hospital is told.
+ */
+const planFor = ref(null)
+const savingPlan = ref(false)
+const planError = ref('')
+// The server's validation errors, by field, for the dialog to place.
+const planErrors = ref({})
+
+/**
+ * Open the plan over the review, whose per-line availability it reads; from
+ * a row, the review opens first.
+ */
+async function openPlan(request) {
+  if (!request) return
+  if (!drawerOpen.value || activeRequest.value?.id !== request.id) await openReview(request)
+  if (!activeRequest.value?.raw) return
+
+  planError.value = ''
+  planErrors.value = {}
+  planFor.value = activeRequest.value
+}
+
+function closePlan() {
+  if (savingPlan.value) return
+  planFor.value = null
+}
+
+async function confirmPlan(payload) {
+  if (!planFor.value) return
+  const request = planFor.value
+
+  savingPlan.value = true
+  planError.value = ''
+  planErrors.value = {}
+  mutatingId.value = request.id
+
+  try {
+    // The composable refreshes the list, the counts and the open review.
+    const result = await saveSupplyPlan(request.id, payload)
+    toast(request.plan ? `${request.code} updated` : `${request.code} confirmed`, 'success', result?.message || '')
+    planFor.value = null
+  } catch (err) {
+    planErrors.value = err?.data?.errors ?? {}
+    planError.value = Object.keys(planErrors.value).length
+      ? 'Nothing was saved. Check the fields marked above.'
+      : err?.message || 'The order could not be confirmed. Please try again in a moment.'
+  } finally {
+    savingPlan.value = false
     mutatingId.value = null
   }
 }
@@ -1472,7 +1667,6 @@ onBeforeUnmount(() => {
 /* HEADER */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; max-width: 80ch; }
 
 /* BUTTONS: the list pages' set, shared by the toolbar, the drawer and the dialogs. */
 .btn {
@@ -1941,6 +2135,9 @@ onBeforeUnmount(() => {
 
 .waiting { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; color: var(--rb-text-secondary); white-space: nowrap; }
 .waiting--crit { font-weight: 700; color: var(--rb-accent-text); }
+/* A restock's hand-over under its status, or that it still needs confirming. */
+.handover { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; font-weight: 600; color: var(--rb-primary-text); white-space: nowrap; }
+.handover--todo { color: var(--rb-warning-text); }
 
 /* The next step, in words. */
 .btn-approve {
@@ -2039,7 +2236,6 @@ onBeforeUnmount(() => {
 .share-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
 .share-note .mono { font-size: 12.5px; color: var(--text); }
 .share-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
-.share-actions__hint { font-size: 12px; color: var(--rb-text-secondary); }
 
 .drawer-closed-note {
   margin: 0;
@@ -2178,6 +2374,26 @@ onBeforeUnmount(() => {
 
 .sub-section__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
 .sub-section__note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* A replenishment order's supply plan: what is coming, how, and when. */
+.plan-card { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 10px; background: var(--rb-surface-alt); }
+.plan-card__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 18px; margin: 0; }
+.plan-fact { min-width: 0; }
+.plan-fact--wide { grid-column: span 2; }
+.plan-fact--full { grid-column: 1 / -1; }
+.plan-fact dt { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); }
+.plan-fact dd { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.plan-fact dd :deep(.asset-icon) { flex-shrink: 0; color: var(--rb-primary-text); }
+.plan-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.plan-card__meta { font-size: 12px; color: var(--rb-text-secondary); }
+
+.plan-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px dashed rgba(var(--rb-warning-rgb), 0.55); border-radius: 10px; background: rgba(var(--rb-warning-rgb), 0.06); }
+.plan-empty__text { flex: 1 1 320px; margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--rb-text-secondary); }
+.plan-empty__text strong { color: var(--rb-warning-text); }
+
+@media (max-width: 640px) {
+  .plan-card__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .table-box { position: relative; overflow-x: auto; padding: 8px 4px 2px; border: 1px solid var(--rb-border); border-radius: 10px; }
 

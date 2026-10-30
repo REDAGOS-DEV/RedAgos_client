@@ -419,12 +419,13 @@ const NAV_GROUPS = [
   {
     label: 'Receiving',
     items: [
-      // Blood Requests sits under Receiving; there is no "Requests" folder.
+      // Patient Request sits under Receiving; there is no "Requests" folder.
       // Blood Availability and Track Requests are off the menu; their pages
-      // are still reached from the dashboard and the request list.
-      { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
-      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' },
-      { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', requires: 'hospital.receiving.direct' }
+      // are still reached from the dashboard and the request list. Direct
+      // Distribution is gone: outside blood is added on Stock Intake
+      // (project owner, 2026-10-30).
+      { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
+      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' }
     ]
   },
   {
@@ -442,6 +443,14 @@ const NAV_GROUPS = [
     label: 'Reports',
     items: [
       { label: 'Inventory Report', path: '/hospital/inventory-report', icon: 'clipboard-list', requires: 'hospital.inventory.view' }
+    ]
+  },
+  {
+    // How the blood bank is set up, starting with the days each center gets
+    // its weekly request, off the Weekly Request page (project owner, 2026-10-30).
+    label: 'Facility Settings',
+    items: [
+      { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', requires: 'hospital.requests.view' }
     ]
   },
   // Ang Finance group (billing, transactions) ug ang Help & Support kay
@@ -474,6 +483,7 @@ const FOLDER_ICONS = {
   Receiving: 'truck',
   'Stock and Supply': 'warehouse',
   Reports: 'file-text',
+  'Facility Settings': 'building-2',
 }
 
 const topItems = computed(() => navGroups.value.find((group) => group.label === 'Main')?.items ?? [])

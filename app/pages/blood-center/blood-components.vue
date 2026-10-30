@@ -3,9 +3,6 @@
     <header class="components-page__header">
       <div>
         <h1 class="components-page__title">Blood Components</h1>
-        <p class="components-page__subtitle">
-          The components this centre prepares, and how long each keeps once drawn.
-        </p>
       </div>
 
       <div class="header-actions">
@@ -585,7 +582,6 @@ onMounted(load)
 
 .components-page__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .components-page__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.components-page__subtitle { margin: 4px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 
 /* scope + progress */

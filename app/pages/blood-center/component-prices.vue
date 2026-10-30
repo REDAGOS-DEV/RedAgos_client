@@ -2,7 +2,6 @@
   <div class="prices-page">
     <PageHeader
       title="Component Prices"
-      subtitle="What a patient pays per unit of each component. Any price above ₱0 is paid for before the units are released."
     >
       <template #actions>
         <div class="header-actions">

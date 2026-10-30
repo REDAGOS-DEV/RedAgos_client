@@ -19,7 +19,6 @@
       <header class="page-head">
         <div>
           <h1 class="page-title">Blood Inventory</h1>
-          <p class="page-subtitle">Monitor and manage {{ facilityLabel }}'s blood units in real time.</p>
         </div>
         <div class="page-head__meta">
           <span v-if="lastUpdatedLabel" class="live-note">
@@ -74,9 +73,6 @@
           <header class="panel-head">
             <div>
               <h2 id="types-title" class="panel-title">Blood Type Availability</h2>
-              <p class="panel-subtitle">
-                Issuable units against the critical level: the ring for the type, the tick on each bar for a component.
-              </p>
             </div>
             <ul class="legend" aria-label="Legend">
               <li class="tone--success"><span class="legend__dot" />Healthy</li>
@@ -209,7 +205,6 @@
           <header class="panel-head">
             <div>
               <h2 id="list-title" class="panel-title">Inventory List</h2>
-              <p class="panel-subtitle">Scan and manage blood units.</p>
             </div>
             <NuxtLink v-if="canRegisterUnits" to="/blood-center/inventory-intake" class="btn-primary">
               <AssetIcon name="plus" :size="15" />
@@ -585,13 +580,6 @@
             <h3 id="edit-unit-title" class="modal-title">
               {{ canEditUnit ? 'Edit unit' : 'Request a correction to unit' }} {{ editingBatchId }}
             </h3>
-            <p class="modal-subtitle">
-              Only where a unit is kept and when it expires can be changed. Its blood type, component and
-              donation are facts about the donation it came from, so they are fixed here.
-              <template v-if="!canEditUnit">
-                Your change goes to the Inventory Control Officer to approve.
-              </template>
-            </p>
 
             <form class="batch-form" @submit.prevent="submitBatchForm">
               <div class="form-row">
@@ -631,8 +619,7 @@
             </button>
             <h3 id="discard-title" class="modal-title">Discard unit {{ discardTarget.id }}</h3>
             <p class="modal-subtitle">
-              {{ displayType(discardTarget.blood_type) }} {{ discardTarget.component }}. A discarded unit leaves stock for good;
-              the reason is kept in the audit trail.
+              {{ displayType(discardTarget.blood_type) }} {{ discardTarget.component }}
             </p>
             <form class="batch-form" @submit.prevent="submitDiscard">
               <label class="form-field">
@@ -1515,7 +1502,6 @@ onBeforeUnmount(() => {
 /* Header */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--inv-text); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--inv-muted); margin: 4px 0 0; }
 .page-head__meta { display: flex; align-items: center; gap: 12px; }
 .live-note { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--inv-muted); }
 .live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok); }
@@ -1598,7 +1584,6 @@ onBeforeUnmount(() => {
 }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 600; color: var(--inv-text); margin: 0; }
-.panel-subtitle { font-size: 12.5px; color: var(--inv-muted); margin: 3px 0 0; }
 
 /* Legend */
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 2px 0 0; padding: 0; list-style: none; }

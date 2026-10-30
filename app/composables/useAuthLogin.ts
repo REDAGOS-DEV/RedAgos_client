@@ -119,6 +119,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   // Follows the key, so one screen can switch between User and Admin.
   const config = computed(() => PORTALS[toValue(portalKey)])
   const route = useRoute()
+  const workspace = useWorkspaceLaunch()
 
   useHead({ title: () => config.value.title })
 
@@ -254,8 +255,13 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
         return
       }
 
+      // Signed in: "Launching Workspace" covers loading the profile, the
+      // portal and its first data, and fades out once that is done.
+      workspace.begin()
       await navigateTo(safeRedirect() ?? await portal.resolveHome(response))
+      workspace.settle()
     } catch (error: any) {
+      workspace.cancel()
       needsVerification.value = error?.data?.code === 'email_not_verified'
       if (needsVerification.value) verificationEmail.value = email.value.trim()
 

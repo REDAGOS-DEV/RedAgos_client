@@ -1,6 +1,6 @@
 <template>
   <div class="stock">
-    <PageHeader title="Daily Stock Report" subtitle="Issuable stock right now, on the DOH Daily Blood Stock Inventory sheet.">
+    <PageHeader title="Daily Stock Report">
       <template #actions>
         <span v-if="report" class="stock__stamp">
           As of {{ report.as_of_time }}<template v-if="updatedAgo"> · updated {{ updatedAgo }}</template>

@@ -13,7 +13,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Donor Management</h1>
-          <p class="page-subtitle">{{ listSummary }}</p>
         </div>
       </header>
 
@@ -961,14 +960,6 @@ const updatedAtLabel = computed(() => updatedAt.value
   ? updatedAt.value.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   : '')
 
-// Every donor in RedAgos, whichever centre they gave at (project owner,
-// 2026-10-25). Export and Remind Eligible stay with this centre's own.
-const listSummary = computed(() => {
-  if (!pager.total && !hasFilters.value) return 'Every donor in RedAgos, at any blood centre.'
-  if (hasFilters.value) return `${pager.total} donor${pager.total === 1 ? '' : 's'} match the filters`
-  return `${pager.total} donor${pager.total === 1 ? '' : 's'} in RedAgos, at any blood centre`
-})
-
 /** Why a donor cannot be emailed from here, or ''. */
 function emailBlock(donor) {
   if (donor.otherCentre) return 'Emails go only to donors who have booked, registered or donated at your centre'
@@ -1640,7 +1631,6 @@ onBeforeUnmount(() => {
 }
 
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 /* ---------- Buttons ---------- */
 .btn-primary,

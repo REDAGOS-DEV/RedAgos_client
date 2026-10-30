@@ -182,11 +182,15 @@ export interface BloodRequestItem {
   closure_reason?: LineClosureReason | null
   closure_reason_label?: string | null
   closure_note?: string | null
+  /** What the centre will supply of the line, once it confirmed a replenishment order. Never changes `quantity`. */
+  committed_quantity?: number | null
   reserved_quantity?: number
   fulfilled_quantity?: number
   received_quantity?: number
   remaining_quantity?: number
-  /** What this facility may still hold for the line. */
+  /** Asked for and not yet held or sent, whatever was committed: what a weekly dispatch closes. */
+  unclaimed_quantity?: number
+  /** What this facility may still hold for the line: never beyond what it committed. */
   allocatable_quantity?: number
   line_status?: LineFulfilmentStatus
   line_status_label?: string
@@ -236,6 +240,42 @@ export interface WalkInDetails {
   duplicate_acknowledgement: string | null
 }
 
+/** The hospital collects a replenishment order, or the centre brings it. */
+export type HandoverMethod = 'pickup' | 'delivery'
+
+/**
+ * How a blood centre will meet a replenishment order (project owner,
+ * 2026-10-29). Set before anything is reserved; each line's own
+ * committed_quantity says how much of it is coming.
+ */
+export interface SupplyPlan {
+  handover_method: HandoverMethod
+  handover_label: string
+  /** When the hospital collects it, or when the centre arrives with it. */
+  scheduled_at: string
+  /** Where it is delivered to, or where at the centre it is collected. */
+  handover_address: string | null
+  contact_name: string | null
+  contact_phone: string | null
+  notes: string | null
+  planned_by: string | null
+  planned_at: string | null
+  updated_by: string | null
+  updated_at: string | null
+}
+
+export interface SaveSupplyPlanPayload {
+  handover_method: HandoverMethod
+  /** ISO 8601. */
+  scheduled_at: string
+  handover_address: string | null
+  contact_name: string | null
+  contact_phone: string | null
+  notes: string | null
+  /** Every open line of the order. */
+  lines: Array<{ request_item_id: number; committed_quantity: number }>
+}
+
 /** Null on a replenishment request, which has no patient. */
 export interface PatientDetails {
   surname: string | null
@@ -282,8 +322,12 @@ export interface BloodRequest {
   /** Held units that still lay claim to stock. Counted in SQL, not derived here. */
   allocated_count: number
   received_count: number
-  /** What this facility still has to find. */
+  /** What this facility still has to find: against its commitment, once it confirmed a replenishment order. */
   outstanding_quantity: number
+  /** Not yet held or sent, whatever was committed: what a weekly dispatch closes as not supplied. */
+  unclaimed_quantity?: number
+  /** What the centre committed to supply; null until it confirmed the order. */
+  committed_quantity?: number | null
   /** Released units — fulfilment is counted at dispatch. */
   fulfilled_quantity: number
   /** Requested less fulfilled. */
@@ -300,6 +344,8 @@ export interface BloodRequest {
    * unavailable when it goes.
    */
   weekly_request?: { id: number; reference_number: string | null; request_day: string | null } | null
+  /** How the centre will meet a replenishment order, once it confirmed it. */
+  supply_plan?: SupplyPlan | null
   walk_in: WalkInDetails | null
   allocations?: RequestAllocation[]
 }
@@ -816,6 +862,8 @@ export interface TransfusionTotals {
   approved: number
   fulfilled: number
   received: number
+  /** Dispatched and not yet received, across every centre asked. */
+  awaiting_receipt: number
   remaining: number
   unallocated: number
 }
@@ -1168,7 +1216,12 @@ export function requestStatusLabel(request: { status: BloodRequestStatus; status
 export function requestStage(request: BloodRequest): string {
   if (request.status === 'rejected') return 'Rejected'
   if (request.status === 'cancelled') return 'Cancelled'
-  if (request.status === 'pending') return request.is_walk_in ? 'Recorded at blood center' : 'Submitted'
+  if (request.status === 'pending') {
+    // A replenishment order the centre has answered: what is coming, and when.
+    if (request.supply_plan) return 'Order confirmed'
+
+    return request.is_walk_in ? 'Recorded at blood center' : 'Submitted'
+  }
 
   const fulfilled = request.fulfilled_quantity ?? 0
   const receivedAll = fulfilled > 0 && (request.received_count ?? 0) >= fulfilled
@@ -1184,4 +1237,38 @@ export function requestStage(request: BloodRequest): string {
   if (request.allocated_count > 0) return 'Stock reserved'
 
   return 'Under review'
+}
+
+export const HANDOVER_METHOD_LABELS: Record<HandoverMethod, string> = {
+  pickup: 'Pick-up',
+  delivery: 'Delivery',
+}
+
+/**
+ * When a replenishment order changes hands: "Fri, Oct 30, 9:00 AM", with the
+ * year when it is not this one. Read in the browser's own zone, which
+ * at a Philippine centre or hospital is Manila.
+ */
+export function handoverWhen(scheduledAt: string | null | undefined): string {
+  if (!scheduledAt) return '—'
+
+  const at = new Date(scheduledAt)
+  if (Number.isNaN(at.getTime())) return scheduledAt
+
+  const day = at.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...(at.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {}),
+  })
+  const time = at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
+  return `${day}, ${time}`
+}
+
+/** "Delivery · Fri, Oct 30, 9:00 AM": a replenishment order's hand-over in one phrase. */
+export function supplyPlanSummary(plan: Pick<SupplyPlan, 'handover_method' | 'scheduled_at'> | null | undefined): string {
+  if (!plan) return ''
+
+  return `${HANDOVER_METHOD_LABELS[plan.handover_method] ?? plan.handover_method} · ${handoverWhen(plan.scheduled_at)}`
 }

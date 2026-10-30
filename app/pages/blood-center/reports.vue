@@ -20,7 +20,7 @@
 
         <div v-else class="reports-inner">
             <!-- Header -->
-            <PageHeader title="Reports &amp; Analytics" subtitle="Projected demand, shortage risks and generated reports.">
+            <PageHeader title="Reports &amp; Analytics">
                 <template #actions>
                     <div class="select-wrap">
                         <SelectField
@@ -180,7 +180,6 @@
                     <div class="forecast-toolbar">
                         <div>
                             <p class="section-label">Stock vs. Predicted Demand by Blood Type</p>
-                            <p class="section-sub">Current inventory against projected demand for the next {{ horizonFilter }} days.</p>
                         </div>
                         <div class="forecast-toolbar__filters">
                             <div class="view-toggle" role="group" aria-label="Show as">
@@ -302,7 +301,6 @@
 
                     <!-- Emergency demand analysis -->
                     <p class="section-label">Emergency Demand Analysis</p>
-                    <p class="section-sub">Monitor emergency request spikes and blood types approaching critical shortage levels.</p>
 
                     <div v-if="errors.alerts" class="error-banner error-banner--inline">
                         <AssetIcon name="alert" :size="15" />
@@ -1595,13 +1593,6 @@ onMounted(async () => {
 }
 
 .section-label:first-child { margin-top: 0; }
-
-.section-sub {
-    font-size: 12.5px;
-    color: var(--rf-text-secondary);
-    margin: 0 0 12px;
-    padding-left: 13px;
-}
 
 /* Quick forecast controls */
 

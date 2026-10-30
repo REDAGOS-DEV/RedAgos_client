@@ -9,7 +9,7 @@
       </transition-group>
     </div>
 
-    <PageHeader class="pos-head" title="Billing Counter" :subtitle="headSubtitle" />
+    <PageHeader class="pos-head" title="Billing Counter" />
 
     <!-- SHIFT BAR: only when the counter works in cash shifts (off by default) -->
     <section v-if="shiftsEnabled" class="shift-bar" :class="{ 'shift-bar--open': shift }" aria-label="Cash shift">
@@ -55,10 +55,7 @@
               <AssetIcon v-if="i + 1 < step" name="check" :size="13" />
               <template v-else>{{ i + 1 }}</template>
             </span>
-            <span class="steps__text">
-              <span class="steps__label">{{ s.label }}</span>
-              <span class="steps__hint">{{ s.hint }}</span>
-            </span>
+            <span class="steps__label">{{ s.label }}</span>
           </button>
         </li>
       </ol>
@@ -853,10 +850,10 @@ const paymentReady = ref(false)
 
 // ── One step at a time ──
 const STEPS = [
-  { key: 'find', label: 'Find bill', hint: 'Scan or pick from the list' },
-  { key: 'review', label: 'Review', hint: 'The request and its units' },
-  { key: 'pay', label: 'Payment', hint: 'Method and amount' },
-  { key: 'receipt', label: 'Receipt', hint: 'Print and hand over' },
+  { key: 'find', label: 'Find bill' },
+  { key: 'review', label: 'Review' },
+  { key: 'pay', label: 'Payment' },
+  { key: 'receipt', label: 'Receipt' },
 ]
 const step = computed(() => {
   if (done.value) return 4
@@ -864,13 +861,6 @@ const step = computed(() => {
   if (bill.value || billLoading.value) return 2
   return 1
 })
-// What the counter is doing now, under its title.
-const headSubtitle = computed(() => ({
-  1: "Take a patient's payment or record a hospital's settlement, one step at a time.",
-  2: 'Check the request and the units held for it before payment.',
-  3: weekly.value ? "Record the hospital's settlement of this invoice." : 'Choose how it is paid and enter the amount received.',
-  4: 'Print the receipt and hand it over.',
-})[step.value])
 
 /** Only a step already passed can be gone back to; the receipt never. */
 const canGoTo = n => n < step.value && step.value < 4
@@ -1711,9 +1701,7 @@ onBeforeUnmount(() => {
 .steps__num { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border: 2px solid var(--rb-border-strong, var(--rb-border)); border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--rb-text-muted); background: var(--rb-surface); }
 .steps__item--now .steps__num { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
 .steps__item--done .steps__num { border-color: var(--rb-success); background: var(--rb-success); color: #fff; }
-.steps__text { display: flex; flex-direction: column; min-width: 0; }
 .steps__label { font-size: 13.5px; font-weight: 700; }
-.steps__hint { overflow: hidden; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-muted); }
 
 /* Step 1: the list takes the counter. The bill kind and the search share one
    row, the search taking the width; the bills in columns below. */
@@ -1742,15 +1730,13 @@ onBeforeUnmount(() => {
 .search-hint { position: absolute; right: 46px; top: 50%; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--rb-text-muted); pointer-events: none; transform: translateY(-50%); }
 @media (max-width: 760px) { .search-hint { display: none; } }
 
-/* 4. A slimmer stepper: the hints a line of small type. */
+/* 4. A slimmer stepper. */
 .steps__btn { padding: 6px 12px; }
 .steps__num { width: 26px; height: 26px; font-size: 12.5px; }
 .steps__label { font-size: 13px; }
-.steps__hint { font-size: 11px; }
 .pos-head { margin-bottom: 4px; }
 
 @media (max-width: 760px) {
-  .steps__hint { display: none; }
   .steps__btn { padding: 8px; gap: 8px; }
 }
 </style>

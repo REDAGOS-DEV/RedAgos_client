@@ -12,14 +12,7 @@
 
     <div v-else class="page-inner">
       <!-- Page header -->
-      <PageHeader title="Blood Requests" subtitle="Create, monitor, and manage blood requests submitted to the Blood Center.">
-        <template #actions>
-          <button type="button" class="ui-btn ui-btn--primary" @click="openNewRequest">
-            <AssetIcon name="plus" :size="15" />
-            New Blood Request
-          </button>
-        </template>
-      </PageHeader>
+      <PageHeader title="Patient Request" subtitle="Create, monitor, and manage blood requests submitted to the Blood Center." />
 
       <!-- Summary figures -->
       <StatStrip>
@@ -63,195 +56,227 @@
 
       <!-- Restocking the blood bank is not requested here: it is the weekly request. -->
       <p class="restock-note fade-in" style="--delay:80ms">
-        Patient transfusion requests. To restock your blood bank, send your
+        Blood requests for your patients. To restock your blood bank, send your
         <NuxtLink to="/hospital/receiving/weekly">weekly request</NuxtLink> under Receiving.
       </p>
 
-      <!-- Search + Filters -->
-      <section class="toolbar fade-in" style="--delay:100ms">
-        <div class="search-bar">
-          <AssetIcon name="search" :size="17" class="search-bar__icon" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            class="search-bar__input"
-            placeholder="Search by reference number, patient ID, blood type, or component..."
-            aria-label="Search blood requests"
-          />
-          <button v-if="searchQuery" type="button" class="search-bar__clear" @click="searchQuery = ''" aria-label="Clear search">
-            <AssetIcon name="x" :size="14" />
-          </button>
-          <button type="button" class="filter-toggle" @click="filtersOpen = !filtersOpen" :aria-expanded="filtersOpen">
-            <AssetIcon name="sliders-horizontal" :size="15" />
-            Filters
-            <span v-if="activeFilterCount" class="filter-toggle__badge">{{ activeFilterCount }}</span>
-          </button>
-        </div>
-
-        <div v-show="filtersOpen" class="filter-panel">
-          <div class="filter-field">
-            <label class="filter-field__label" for="hbr-status">Status</label>
-            <SelectField id="hbr-status" v-model="filters.status" :options="[{ value: '', label: 'All statuses' }, ...Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
-          </div>
-          <div class="filter-field">
-            <label class="filter-field__label" for="hbr-source">Source</label>
-            <SelectField id="hbr-source" v-model="filters.source" :options="[{ value: '', label: 'All sources' }, ...Object.entries(REQUEST_SOURCE_LABELS).map(([value, label]) => ({ value, label }))]" size="sm" />
-          </div>
-          <div class="filter-field">
-            <label class="filter-field__label" for="hbr-blood-type">Blood Type</label>
-            <SelectField id="hbr-blood-type" v-model="filters.bloodType" :options="[{ value: '', label: 'All types' }, ...bloodTypes.map((bt) => ({ value: bt, label: bt }))]" size="sm" />
-          </div>
-          <div class="filter-field">
-            <label class="filter-field__label" for="hbr-component">Blood Component</label>
-            <SelectField id="hbr-component" v-model="filters.component" :options="[{ value: '', label: 'All components' }, ...components.map((c) => ({ value: c, label: c }))]" size="sm" />
-          </div>
-          <div class="filter-field">
-            <label class="filter-field__label" for="hbr-priority">Priority</label>
-            <SelectField id="hbr-priority" v-model="filters.priority" :options="[{ value: '', label: 'All priorities' }, ...Object.entries(priorityMap).map(([k, v]) => ({ value: k, label: v.label }))]" size="sm" />
-          </div>
-          <div class="filter-field">
-            <label class="filter-field__label">Date Range</label>
-            <div class="filter-field__range">
-              <DatePicker id="hbr-from" v-model="filters.dateFrom" :max="filters.dateTo || undefined" aria-label="From" size="sm" />
-              <span class="filter-field__range-sep">–</span>
-              <DatePicker id="hbr-to" v-model="filters.dateTo" :min="filters.dateFrom || undefined" aria-label="To" size="sm" />
-            </div>
-          </div>
-          <div class="filter-actions">
-            <button type="button" class="ui-btn" @click="resetFilters">Reset Filters</button>
-            <button type="button" class="ui-btn ui-btn--primary" @click="filtersOpen = false">Apply Filters</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Export row -->
-      <div class="export-row fade-in" style="--delay:130ms">
-        <p class="export-row__count">{{ filteredRequests.length }} request{{ filteredRequests.length === 1 ? '' : 's' }} found</p>
-        <div class="export-row__actions">
-          <button type="button" class="ui-btn ui-btn--sm" @click="exportCsv">
-            <AssetIcon name="file-down" :size="14" /> Export CSV
-          </button>
-          <button type="button" class="ui-btn ui-btn--sm" @click="printPage">
-            <AssetIcon name="file-text" :size="14" /> Export PDF
-          </button>
-          <button type="button" class="ui-btn ui-btn--sm" @click="printPage">
-            <AssetIcon name="printer" :size="14" /> Print
-          </button>
-        </div>
+      <!-- The list, as the centre's Donor Management draws it (project owner, 2026-10-30). -->
+      <div v-if="loadError" class="banner banner--error" role="alert">
+        <AssetIcon name="circle-alert" :size="16" />
+        <p class="banner__text">Your requests could not be loaded.</p>
+        <button type="button" class="btn-link" @click="refresh">Retry</button>
       </div>
 
-      <!-- Table / Card list -->
-      <section class="panel fade-in" style="--delay:160ms">
-        <div v-if="pagedRequests.length">
-          <div class="req-table">
-            <div class="req-table__head">
-              <span>Reference</span>
-              <span>Date</span>
-              <span>Blood Type</span>
-              <span>Component</span>
-              <span>Units</span>
-              <span>Priority</span>
-              <span>Status</span>
-              <span>Progress</span>
-              <span class="sr-only">Actions</span>
-            </div>
+      <section class="panel fade-in" style="--delay:100ms" aria-labelledby="requests-title">
+        <h2 id="requests-title" class="sr-only">Your patient transfusion requests</h2>
 
-            <div v-for="req in pagedRequests" :key="req.id" class="req-row" @click="openDrawer(req)">
-              <span class="req-row__ref" data-label="Reference">
-                {{ req.reference_number }}
-                <span v-if="req.is_walk_in" class="source-chip" title="Brought to the blood center by a watcher and confirmed by your blood bank by phone">Walk-in</span>
-                <span v-if="req.needs_allocation" class="source-chip source-chip--alert" title="Some units have not been asked of any facility">{{ req.unallocated }} unallocated</span>
-              </span>
-              <span class="req-row__date" data-label="Date">{{ formatDate(req.request_date) }}</span>
-              <span data-label="Blood Type"><span class="type-chip">{{ req.blood_type }}</span></span>
-              <span class="req-row__component" data-label="Component">{{ req.component }}</span>
-              <span data-label="Units">{{ req.units }}</span>
-              <span data-label="Priority">
-                <StatusBadge :tone="priorityOf(req.priority).tone" :dot="false">{{ priorityOf(req.priority).label }}</StatusBadge>
-              </span>
-              <span data-label="Status">
-                <StatusBadge :tone="statusOf(req.status).tone">{{ req.status_text }}</StatusBadge>
-              </span>
-              <span class="req-row__progress" data-label="Progress">
-                <span class="step-dots" :title="progressLabel(req.status)">
-                  <span v-for="(s, i) in progressSteps" :key="s"
-                    class="step-dot"
-                    :class="{
-                      'step-dot--done': stepIndex(req.status) > i,
-                      'step-dot--current': stepIndex(req.status) === i,
-                      'step-dot--halted': isHalted(req.status)
-                    }" />
-                </span>
-              </span>
-              <span class="req-row__actions" @click.stop>
-                <div class="action-menu">
-                  <button type="button" class="action-menu__btn" @click.stop="toggleMenu(req.id)" aria-label="Row actions" :aria-expanded="activeMenuId === req.id">
-                    <AssetIcon name="move-vertical" :size="16" />
-                  </button>
-                  <div v-if="activeMenuId === req.id" class="action-menu__dropdown" @click.stop>
-                    <button type="button" class="action-menu__item" @click="openDrawer(req)">
-                      <AssetIcon name="eye" :size="14" /> Quick View
-                    </button>
-                    <button type="button" class="action-menu__item" @click="viewDetails(req)">
-                      <AssetIcon name="file-text" :size="14" /> Full Details &amp; Fulfilment
-                    </button>
-                    <button type="button" class="action-menu__item" @click="trackRequest(req)">
-                      <AssetIcon name="route" :size="14" /> Track Request
-                    </button>
-                    <button type="button" class="action-menu__item" @click="printPage">
-                      <AssetIcon name="printer" :size="14" /> Print
-                    </button>
-                    <button v-if="canCancel(req)" type="button" class="action-menu__item action-menu__item--danger" @click="cancelRequest(req)">
-                      <AssetIcon name="circle-x" :size="14" /> Cancel Request
-                    </button>
-                  </div>
-                </div>
-              </span>
-            </div>
+        <div class="toolbar">
+          <div class="toolbar__filters">
+            <label class="search">
+              <AssetIcon name="search" :size="15" class="search__icon" />
+              <input
+                v-model="searchQuery"
+                type="search"
+                class="search__input"
+                placeholder="Search reference / type / component"
+                aria-label="Search requests by reference number, blood type or component"
+              >
+            </label>
+            <DateRangeFilter v-model:from="filters.dateFrom" v-model:to="filters.dateTo" aria-label="Requested between" />
+            <SelectField v-model="filters.status" class="sel-filter" size="sm" aria-label="Filter by status"
+              :options="[{ value: '', label: 'All statuses' }, ...Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v.label }))]" />
+            <SelectField v-model="filters.priority" class="sel-filter" size="sm" aria-label="Filter by priority"
+              :options="[{ value: '', label: 'All priorities' }, ...Object.entries(priorityMap).map(([k, v]) => ({ value: k, label: v.label }))]" />
+            <SelectField v-model="filters.component" class="sel-filter" size="sm" aria-label="Filter by component"
+              :options="[{ value: '', label: 'All components' }, ...components.map((c) => ({ value: c, label: c }))]" />
           </div>
 
-          <!-- Pagination -->
-          <div class="pagination">
-            <div class="pagination__rows">
-              <label for="rowsPerPage">Rows per page</label>
-              <div class="rows-select">
-                <SelectField id="rowsPerPage" v-model="rowsPerPage" :options="[10, 25, 50].map((n) => ({ value: n, label: String(n) }))" size="sm" />
-              </div>
-            </div>
-            <div class="pagination__nav">
-              <button type="button" class="pagination__btn" :disabled="currentPage === 1" @click="currentPage--">
-                <AssetIcon name="chevron-left" :size="15" /> Previous
-              </button>
-              <button v-for="p in visiblePages" :key="p" type="button"
-                class="pagination__page" :class="{ 'pagination__page--active': p === currentPage }"
-                @click="currentPage = p">{{ p }}</button>
-              <button type="button" class="pagination__btn" :disabled="currentPage === totalPages" @click="currentPage++">
-                Next <AssetIcon name="chevron-right" :size="15" />
-              </button>
-            </div>
+          <div class="toolbar__actions">
+            <span v-if="updatedAt" class="updated" :title="`List loaded at ${updatedAtLabel}`">
+              <AssetIcon name="clock" :size="13" />
+              Updated {{ updatedAtLabel }}
+            </span>
+
+            <button
+              type="button"
+              class="btn-outline btn-outline--squeeze"
+              :disabled="!filteredRequests.length"
+              title="Export the listed requests (CSV)"
+              @click="exportCsv"
+            >
+              <AssetIcon name="download" :size="14" />
+              <span class="btn-text">Export</span>
+            </button>
+
+            <button
+              type="button"
+              class="btn-outline btn-outline--squeeze"
+              :disabled="refreshing"
+              aria-label="Refresh the list"
+              :title="updatedAt ? `Refresh · updated ${updatedAtLabel}` : 'Refresh'"
+              @click="refresh"
+            >
+              <AssetIcon name="refresh-cw" :size="14" :class="{ spin: refreshing }" />
+              <span class="btn-text">Refresh</span>
+            </button>
+
+            <button v-if="canCreate" type="button" class="btn-primary" @click="openNewRequest">
+              <AssetIcon name="plus" :size="15" />
+              New Request
+            </button>
           </div>
         </div>
 
-        <!-- Error state -->
-        <EmptyState v-else-if="loadError" icon="triangle-alert" title="Couldn't Load Blood Requests" description="Something went wrong while fetching your requests. Please try again.">
-          <button type="button" class="ui-btn" @click="loadRequests">Retry</button>
-        </EmptyState>
+        <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && allRequests.length }">
+          <table class="list-table">
+            <caption class="sr-only">Your patient transfusion requests, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col">Reference</th>
+                <th scope="col">Date</th>
+                <th scope="col">Group</th>
+                <th scope="col">Component</th>
+                <th scope="col" class="num">Units</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Status</th>
+                <th scope="col">Progress</th>
+                <th scope="col" class="c-actions">Actions</th>
+              </tr>
+            </thead>
 
-        <!-- Empty state -->
-        <EmptyState
-          v-else
-          icon="droplets"
-          title="No Blood Requests Found"
-          :description="hasActiveFilters
-            ? 'No requests match your search or filters. Try adjusting them.'
-            : 'You haven\'t submitted any blood requests yet. Create a new blood request to begin.'">
-          <button v-if="hasActiveFilters" type="button" class="ui-btn" @click="resetFilters">Reset Filters</button>
-          <button v-else type="button" class="ui-btn ui-btn--primary" @click="openNewRequest">
-            <AssetIcon name="plus" :size="15" /> Create Blood Request
-          </button>
-        </EmptyState>
+            <tbody v-if="!pageItems.length">
+              <tr>
+                <td colspan="9" class="empty-cell">
+                  <div class="empty-state">
+                    <span class="empty-state__icon"><AssetIcon :name="hasActiveFilters ? 'search-x' : 'droplets'" :size="20" /></span>
+                    <p class="empty-state__title">{{ hasActiveFilters ? 'No requests match' : 'No blood requests yet' }}</p>
+                    <p class="empty-state__text">
+                      {{ hasActiveFilters
+                        ? 'Try another reference, type or component, or clear the filters.'
+                        : 'Requests you raise for your patients appear here, with what each blood center supplied.' }}
+                    </p>
+                    <button v-if="hasActiveFilters" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
+                    <button v-else-if="canCreate" type="button" class="btn-primary" @click="openNewRequest">
+                      <AssetIcon name="plus" :size="15" />
+                      New Request
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <tbody v-else>
+              <tr v-for="req in pageItems" :key="req.id" class="list-row">
+                <td>
+                  <div class="cell">
+                    <button type="button" class="code code-btn" :title="`Quick view of ${req.reference_number}`" @click="openDrawer(req)">{{ req.reference_number }}</button>
+                    <span v-if="req.is_walk_in" class="tag" title="Brought to the blood center by a watcher and confirmed by your blood bank by phone">Walk-in</span>
+                    <span v-if="req.needs_allocation" class="tag tag--alert" title="Some units have not been asked of any facility">{{ req.unallocated }} unallocated</span>
+                    <span v-if="req.awaiting_receipt" class="tag tag--alert" title="Dispatched by the blood center, not yet received">{{ req.awaiting_receipt }} to receive</span>
+                  </div>
+                </td>
+                <td class="nowrap">{{ formatDate(req.request_date) }}</td>
+                <td><span v-if="req.blood_type" class="blood">{{ req.blood_type }}</span><span v-else class="muted">—</span></td>
+                <td>{{ req.component || '—' }}</td>
+                <td class="num">{{ req.units }}</td>
+                <td>
+                  <!-- Only STAT is coloured; routine is the rule. -->
+                  <span class="badge" :class="badgeClass(req.priority === 'emergency' ? 'danger' : 'muted')">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ priorityOf(req.priority).label }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" :class="badgeClass(statusOf(req.status).tone)">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ req.status_text }}
+                  </span>
+                </td>
+                <td>
+                  <span class="step-dots" :title="progressLabel(req.status)" :aria-label="`Progress: ${progressLabel(req.status)}`">
+                    <span v-for="(s, i) in progressSteps" :key="s"
+                      class="step-dot"
+                      :class="{
+                        'step-dot--done': stepIndex(req.status) > i,
+                        'step-dot--current': stepIndex(req.status) === i,
+                        'step-dot--halted': isHalted(req.status)
+                      }" />
+                  </span>
+                </td>
+                <td class="c-actions">
+                  <div class="row-actions">
+                    <!-- Dispatched or picked up: the whole delivery into Stock Intake from here (project owner, 2026-10-30). -->
+                    <button
+                      v-if="canReceive && req.awaiting_receipt"
+                      type="button"
+                      class="btn-outline btn-outline--sm btn-receive"
+                      :aria-label="`Receive ${req.awaiting_receipt} unit${req.awaiting_receipt === 1 ? '' : 's'} for ${req.reference_number}`"
+                      @click="receiving = req"
+                    >
+                      <AssetIcon name="package-check" :size="14" />
+                      Receive
+                    </button>
+                    <button type="button" class="icon-btn" :aria-label="`Quick view of ${req.reference_number}`" title="Quick view" @click="openDrawer(req)">
+                      <AssetIcon name="eye" :size="15" />
+                    </button>
+                    <button type="button" class="icon-btn" :aria-label="`Full details and fulfilment of ${req.reference_number}`" title="Full details & fulfilment" @click="viewDetails(req)">
+                      <AssetIcon name="file-text" :size="15" />
+                    </button>
+                    <button type="button" class="icon-btn" :aria-label="`Track ${req.reference_number}`" title="Track request" @click="trackRequest(req)">
+                      <AssetIcon name="route" :size="15" />
+                    </button>
+                    <button
+                      v-if="canCancel(req)"
+                      type="button"
+                      class="icon-btn icon-btn--danger"
+                      :aria-label="`Cancel ${req.reference_number}`"
+                      title="Cancel request"
+                      @click="askCancel(req)"
+                    >
+                      <AssetIcon name="circle-x" :size="15" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" @go="go" />
       </section>
     </div>
+
+    <!-- CANCEL: confirmed here rather than in the browser's own box -->
+    <div v-if="cancelling" class="confirm-backdrop" @click.self="cancelling = null">
+      <div
+        class="confirm"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="cancel-title"
+        aria-describedby="cancel-desc"
+        v-focus-trap
+        @dialog-escape="cancelling = null"
+      >
+        <h2 id="cancel-title" class="confirm__title">
+          <AssetIcon name="circle-x" :size="17" />
+          Cancel {{ cancelling.reference_number }}?
+        </h2>
+        <p id="cancel-desc" class="confirm__text">The blood centers stop working on it. This cannot be undone.</p>
+        <div class="confirm__actions">
+          <button type="button" class="btn-outline" @click="cancelling = null">Keep request</button>
+          <button type="button" class="btn-primary btn-primary--danger" @click="confirmCancel">Cancel Request</button>
+        </div>
+      </div>
+    </div>
+
+    <HospitalReceiveDeliveryDialog
+      v-if="receiving"
+      kind="transfusion"
+      :request-id="receiving.id"
+      :reference="receiving.reference_number"
+      @received="refresh"
+      @close="receiving = null"
+    />
 
     <!-- Slide-over drawer -->
     <Transition name="drawer-fade">
@@ -351,7 +376,7 @@
           <button type="button" class="ui-btn ui-btn--primary" @click="viewDetails(selectedRequest)">
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
-          <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="cancelRequest(selectedRequest)">
+          <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="askCancel(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
         </div>
@@ -365,21 +390,34 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
 import StatusBadge from '~/components/ui/StatusBadge.vue'
-import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { componentSummary, REQUEST_SOURCE_LABELS, requestStatusLabel } from '~/types/bloodRequest'
+import ListPager from '~/components/common/ListPager.vue'
+import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
+import { useListPager } from '~/composables/useListPager'
+import { badgeClass } from '~/utils/listBadge'
+import { componentSummary, requestStatusLabel } from '~/types/bloodRequest'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
 import SelectField from '~/components/common/SelectField.vue'
-import DatePicker from '~/components/common/DatePicker.vue'
+import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
 const router = useRouter()
 const route = useRoute()
 const loading = ref(true)
+const refreshing = ref(false)
+const updatedAt = ref(null)
+
+const { can } = useUser()
+// Raising a request is Requesting Staff's and the Head's; the form's page needs it too.
+const canCreate = computed(() => can('hospital.requests.manage'))
+// Receiving is confirmed by whoever holds that ability; the server checks it too.
+const canReceive = computed(() => can('hospital.receipt.confirm'))
+// The row whose delivery is being received, in ReceiveDeliveryDialog.
+const receiving = ref(null)
 
 /*
  * A patient's need is a Patient Transfusion Request, possibly split across
@@ -389,8 +427,7 @@ const loading = ref(true)
 const kind = ref('transfusion')
 
 // ---------- Reference data ----------
-const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const components = ['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelet Concentrate', 'Cryoprecipitate']
+const components =['Packed RBC', 'Whole Blood', 'Fresh Frozen Plasma', 'Platelet Concentrate', 'Cryoprecipitate']
 
 /*
  * Keyed on the six statuses the API actually sends. This map used to carry
@@ -467,6 +504,7 @@ function normalizeTransfusion(r) {
     is_walk_in: Boolean(r.is_walk_in),
     needs_allocation: Boolean(r.is_open && r.needs_allocation),
     unallocated: r.totals?.unallocated ?? 0,
+    awaiting_receipt: r.totals?.awaiting_receipt ?? 0,
     status_text: transfusionProgressLabel(r),
     fulfilled: r.totals?.fulfilled ?? 0,
     blood_type: r.blood_type?.code ?? '',
@@ -484,27 +522,23 @@ function normalizeTransfusion(r) {
 }
 
 // ---------- Search & filters ----------
+// The donors page's toolbar (project owner, 2026-10-30): search, dates, status,
+// priority and component. The type is found through the search.
 const searchQuery = ref('')
-const filtersOpen = ref(false)
 const filters = reactive({
   status: '',
-  source: '',
-  bloodType: '',
   component: '',
   priority: '',
   dateFrom: '',
   dateTo: '',
 })
 
-const activeFilterCount = computed(() =>
-  Object.values(filters).filter(v => v !== '').length
+const hasActiveFilters = computed(() =>
+  Object.values(filters).some(v => v !== '') || searchQuery.value.trim() !== ''
 )
-const hasActiveFilters = computed(() => activeFilterCount.value > 0 || searchQuery.value.trim() !== '')
 
 function resetFilters() {
   filters.status = ''
-  filters.source = ''
-  filters.bloodType = ''
   filters.component = ''
   filters.priority = ''
   filters.dateFrom = ''
@@ -520,8 +554,6 @@ const filteredRequests = computed(() => {
       if (!haystack.includes(q)) return false
     }
     if (filters.status && r.status !== filters.status) return false
-    if (filters.source && r.source !== filters.source) return false
-    if (filters.bloodType && r.blood_type !== filters.bloodType) return false
     if (filters.component && r.component !== filters.component) return false
     if (filters.priority && r.priority !== filters.priority) return false
     if (filters.dateFrom && r.request_date < new Date(filters.dateFrom)) return false
@@ -531,31 +563,10 @@ const filteredRequests = computed(() => {
 })
 
 // ---------- Pagination ----------
-const currentPage = ref(1)
-const rowsPerPage = ref(10)
+const { page, total, lastPage, from, to, pageItems, go } = useListPager(filteredRequests)
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequests.value.length / rowsPerPage.value)))
-
-const pagedRequests = computed(() => {
-  const start = (currentPage.value - 1) * rowsPerPage.value
-  return filteredRequests.value.slice(start, start + rowsPerPage.value)
-})
-
-const visiblePages = computed(() => {
-  const total = totalPages.value
-  const cur = currentPage.value
-  const span = 2
-  const pages = []
-  for (let p = Math.max(1, cur - span); p <= Math.min(total, cur + span); p++) pages.push(p)
-  return pages
-})
-
-// Reset to page 1 whenever the filtered result set changes
-watch([filteredRequests, rowsPerPage], () => { currentPage.value = 1 })
-watch(currentPage, (p) => {
-  if (p < 1) currentPage.value = 1
-  else if (p > totalPages.value) currentPage.value = totalPages.value
-})
+// A new search or filter starts from the first page.
+watch([searchQuery, () => ({ ...filters })], () => go(1))
 
 // ---------- KPI counts (animated) ----------
 // The card keys are historical; each now counts a status the API really sends.
@@ -626,22 +637,12 @@ function animateCounter(key, endValue, duration = 800) {
   requestAnimationFrame(tick)
 }
 
-// ---------- Action menu ----------
-const activeMenuId = ref(null)
-function toggleMenu(id) {
-  activeMenuId.value = activeMenuId.value === id ? null : id
-}
-function closeMenu() {
-  activeMenuId.value = null
-}
-
 // ---------- Drawer ----------
 const drawerOpen = ref(false)
 const selectedRequest = ref(null)
 function openDrawer(req) {
   selectedRequest.value = req
   drawerOpen.value = true
-  closeMenu()
 }
 function closeDrawer() {
   drawerOpen.value = false
@@ -652,24 +653,30 @@ function openNewRequest() {
   router.push('/hospital/bloodrequests/newrequest')
 }
 function trackRequest(req) {
-  closeMenu()
   // The page is /hospital/trackrequests; the hyphenated path this pushed to
   // has never existed, so "Track Request" landed on a 404.
   router.push(`/hospital/trackrequests?ref=${req.reference_number}`)
 }
 function viewDetails(req) {
-  closeMenu()
   router.push(req.kind === 'transfusion' ? `/hospital/transfusion-requests/${req.id}` : `/hospital/bloodrequests/${req.id}`)
 }
-function printPage() {
-  window.print()
+
+// A row's cancel is one click away, so it asks first, in the page's own dialog.
+const cancelling = ref(null)
+function askCancel(req) {
+  cancelling.value = req
 }
+function confirmCancel() {
+  const req = cancelling.value
+  cancelling.value = null
+  if (req) cancelRequest(req)
+}
+
 async function cancelRequest(req) {
   const previousStatus = req.status
   const previousText = req.status_text
   req.status = 'cancelled' // optimistic update
   req.status_text = statusOf('cancelled').label
-  closeMenu()
   if (selectedRequest.value?.id === req.id) drawerOpen.value = false
   try {
     if (req.kind === 'transfusion') {
@@ -712,27 +719,37 @@ function formatDate(date, withTime = false) {
 }
 
 function handleGlobalKeydown(e) {
-  if (e.key === 'Escape') {
-    if (drawerOpen.value) closeDrawer()
-    else if (activeMenuId.value !== null) closeMenu()
-  }
-}
-function handleGlobalClick() {
-  if (activeMenuId.value !== null) closeMenu()
+  // The cancel and receive dialogs close on their own Escape.
+  if (e.key === 'Escape' && drawerOpen.value && !cancelling.value && !receiving.value) closeDrawer()
 }
 
-async function loadRequests() {
-  loading.value = true
+const updatedAtLabel = computed(() => (updatedAt.value
+  ? updatedAt.value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  : ''))
+
+/** Reload the list in place, without the page's first-load skeleton. */
+async function refresh() {
+  refreshing.value = true
+  try {
+    await loadRequests({ quiet: true })
+  } finally {
+    refreshing.value = false
+  }
+}
+
+async function loadRequests({ quiet = false } = {}) {
+  if (!quiet) loading.value = true
   loadError.value = null
   try {
     // Filtered and paged here on the client, so take the most one page may
     // hold rather than the API's default of fifteen.
     const res = await hospitalService.listTransfusionRequests({ per_page: 100 })
     allRequests.value = (res?.data ?? []).map(normalizeTransfusion)
+    updatedAt.value = new Date()
   } catch (err) {
     console.error('Failed to load blood requests:', err)
     loadError.value = err
-    allRequests.value = []
+    if (!quiet) allRequests.value = []
   } finally {
     loading.value = false
     requestAnimationFrame(() => {
@@ -748,44 +765,35 @@ async function loadRequests() {
 onMounted(() => {
   loadRequests()
   window.addEventListener('keydown', handleGlobalKeydown)
-  window.addEventListener('click', handleGlobalClick)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
-  window.removeEventListener('click', handleGlobalClick)
 })
 </script>
+
+<!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->
+<style scoped src="~/assets/css/list-ui.css"></style>
 
 <style scoped>
 .requests-page {
   --primary: var(--rb-primary);
-  --primary-hover: color-mix(in srgb, var(--rb-primary) 88%, #000);
-  --bg: var(--rb-page-bg);
   --surface: var(--rb-surface);
   --border: var(--rb-border);
-  --border-dark: var(--rb-border-strong);
   --text-primary: var(--rb-text-primary);
   --text-secondary: var(--rb-text-secondary);
   --text-muted: var(--rb-text-muted);
   --danger: var(--rb-accent);
-  --warning: var(--rb-warning);
   --success: var(--rb-success);
-  --purple: var(--rb-purple, #7c3aed);
   font-family: var(--rb-font-sans);
   max-width: var(--rb-content-max, 1600px);
-  background: var(--bg);
+  background: var(--rb-page-bg);
   margin: 0 auto;
   padding: 24px var(--rb-gutter, 24px) 40px;
 }
 
-.sr-only {
-  position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip: rect(0 0 0 0); white-space: nowrap;
-}
+.page-inner { display: flex; flex-direction: column; gap: 16px; }
 
-.page-inner { display: flex; flex-direction: column; gap: 24px; }
-
-/* Skeleton */
+/* First-load skeleton */
 .skeleton {
   background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
   background-size: 400% 100%;
@@ -797,184 +805,23 @@ onUnmounted(() => {
 .skeleton--card { height: 140px; }
 .skeleton--panel { border-radius: 18px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
 .fade-in { animation: fadeInUp 0.4s ease both; animation-delay: var(--delay, 0ms); }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .fade-in, .skeleton { animation: none !important; } }
 
-/* Page header */
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.page-title { font-size: 30px; font-weight: 700; color: var(--text-primary); margin: 0; letter-spacing: -0.01em; }
-.page-subtitle { font-size: 15px; font-weight: 400; color: var(--text-secondary); margin: 6px 0 0; }
-
-.btn-primary {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 48px; padding: 0 20px; border-radius: 14px;
-  font-family: inherit; font-size: 15px; font-weight: 600; color: #fff;
-  background: var(--primary); border: none; cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.06);
-  transition: background 0.15s ease, transform 0.15s ease;
-  flex-shrink: 0; white-space: nowrap;
-}
-.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-.btn-primary--sm { height: 40px; padding: 0 16px; font-size: 13.5px; border-radius: 10px; }
-
-.btn-ghost {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 40px; padding: 0 16px; border-radius: 10px;
-  font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
-  background: var(--surface); border: 1px solid var(--border); cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
-  white-space: nowrap;
-}
-.btn-ghost:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); transform: translateY(-1px); }
-.btn-ghost--sm { height: 36px; padding: 0 12px; font-size: 12.5px; }
-
-.btn-danger {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 44px; padding: 0 18px; border-radius: 12px;
-  font-family: inherit; font-size: 14px; font-weight: 600; color: #fff;
-  background: var(--danger); border: none; cursor: pointer;
-  transition: background 0.15s ease;
-}
-.btn-danger:hover { background: color-mix(in srgb, var(--rb-accent) 85%, #000); }
-
-.icon-btn {
-  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text-secondary);
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.icon-btn:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); }
-
-/* Stat cards */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.stat-card {
-  background: var(--surface); border-radius: 18px; padding: 24px;
-  box-shadow: 0 4px 20px rgba(15,23,42,0.05); border: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 4px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(15,23,42,0.08); }
-.stat-card__top { display: flex; align-items: center; gap: 10px; }
-.stat-card__icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.stat-card__title { font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
-.stat-card__value { font-size: 40px; font-weight: 800; color: var(--text-primary); margin: 14px 0 0; line-height: 1; font-variant-numeric: tabular-nums; }
-.stat-card__helper { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 0; }
-.stat-card__trend {
-  display: inline-flex; align-items: center; gap: 3px; align-self: flex-start;
-  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
-  margin-top: 12px;
-}
-.stat-card__trend.up { color: var(--success); background: rgba(var(--rb-success-rgb), 0.1); }
-.stat-card__trend.down { color: var(--danger); background: rgba(var(--rb-accent-rgb), 0.09); }
-
-/* Toolbar: search + filters */
-.toolbar { display: flex; flex-direction: column; gap: 12px; }
-.search-bar {
-  display: flex; align-items: center; gap: 10px;
-  height: 46px; padding: 0 8px 0 16px; border-radius: 12px;
-  background: var(--surface); border: 1px solid var(--border);
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-.search-bar:focus-within { border-color: rgba(var(--rb-primary-rgb), 0.4); background: var(--surface); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.1); }
-.search-bar__icon { color: var(--text-muted); flex-shrink: 0; }
-.search-bar__input {
-  flex: 1; min-width: 0; height: 100%; border: none; background: transparent; outline: none;
-  font-family: inherit; font-size: 14px; color: var(--text-primary);
-}
-.search-bar__input::placeholder { color: var(--text-muted); }
-.search-bar__clear { color: var(--text-muted); background: none; border: none; cursor: pointer; display: flex; flex-shrink: 0; }
-.search-bar__clear:hover { color: var(--text-secondary); }
-
-.filter-toggle {
-  display: inline-flex; align-items: center; gap: 7px;
-  height: 34px; padding: 0 14px; border-radius: 10px;
-  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-secondary);
-  background: var(--surface); border: 1px solid var(--border); cursor: pointer; flex-shrink: 0;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.filter-toggle:hover { color: var(--rb-primary-text); border-color: var(--rb-primary-text); }
-.filter-toggle__badge {
-  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
-  background: var(--primary); color: #fff; font-size: 10px; font-weight: 700;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-
-.filter-panel {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm);
-  padding: 18px 20px; display: grid;
-  grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: end;
-}
-.filter-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.filter-field--full { grid-column: 1 / -1; }
-.filter-field__label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-.filter-field__range { display: flex; align-items: center; gap: 6px; }
-.filter-field__range-sep { color: var(--text-muted); font-size: 12px; }
-.filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
-
-/* Export row */
-.export-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.export-row__count { font-size: 13px; color: var(--text-secondary); margin: 0; }
-.export-row__actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* Panel */
-.panel {
-  background: var(--surface); border-radius: var(--rb-radius-lg); border: 1px solid var(--border);
-  box-shadow: var(--rb-shadow-sm); overflow: hidden;
-}
-
-/* Table */
-.req-table { padding: 0; }
-.req-table__head {
-  display: grid; grid-template-columns: 1.1fr 0.9fr 0.7fr 1.1fr 0.5fr 0.9fr 1.1fr 1fr 0.5fr;
-  gap: 10px; padding: 11px 24px; font-size: 12px; font-weight: 600;
-  color: var(--text-secondary); background: var(--rb-surface-alt);
-  border-bottom: 1px solid var(--border);
-}
-.req-row {
-  display: grid; grid-template-columns: 1.1fr 0.9fr 0.7fr 1.1fr 0.5fr 0.9fr 1.1fr 1fr 0.5fr;
-  gap: 10px; align-items: center; padding: 14px 24px;
-  border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-primary);
-  cursor: pointer; transition: background 0.15s ease;
-}
-.req-row:last-child { border-bottom: none; }
-.req-row:hover { background: var(--rb-surface-alt); }
-.req-row__ref { font-weight: 600; }
-.source-chip {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: rgba(var(--rb-purple-rgb), .12);
-  color: var(--rb-purple-text);
-  font-size: 10.5px;
-  font-weight: 700;
-  vertical-align: middle;
-}
-.source-chip--alert {
-  background: rgba(var(--rb-accent-rgb), .12);
-  color: var(--rb-accent-text);
-}
-
 .restock-note { margin: 0; font-size: 13px; color: var(--rb-text-secondary); }
 .restock-note a { color: var(--rb-primary-text); font-weight: 600; }
-.req-row__component, .req-row__date { color: var(--text-secondary); }
 
-.type-chip {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 36px;
-  padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
-}
-.priority-chip {
-  display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 600;
-}
-.priority-chip--lg { font-size: 13px; padding: 6px 14px; }
+/* The reference opens the quick view, as the eye does. */
+.code-btn { align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer; }
+.code-btn:hover { text-decoration: underline; }
+.code-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 4px; }
 
-.badge { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: inline-block; transition: transform 0.1s ease; }
-.badge--lg { font-size: 13px; padding: 7px 16px; }
-.req-row:hover .badge { transform: translateY(-1px); }
+/* Receive: the row's one call to action, while units are on their way. */
+.btn-receive { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06); }
+.btn-receive:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.12); }
 
 .step-dots { display: inline-flex; align-items: center; gap: 3px; }
 .step-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--rb-border-strong); transition: background 0.2s ease, transform 0.2s ease; }
@@ -982,65 +829,27 @@ onUnmounted(() => {
 .step-dot--current { background: var(--primary); transform: scale(1.3); }
 .step-dot--halted { background: var(--danger); }
 
-.req-row__actions { display: flex; justify-content: flex-end; position: relative; }
-.action-menu { position: relative; }
-.action-menu__btn {
-  width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent;
-  background: transparent; color: var(--text-secondary); cursor: pointer;
-  display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, border-color 0.15s ease;
+/* ---------- Cancel confirmation ---------- */
+.confirm-backdrop {
+  position: fixed; inset: 0; z-index: 320;
+  display: grid; place-items: center; padding: 16px;
+  background: var(--rb-overlay);
 }
-.action-menu__btn:hover { background: var(--rb-surface-alt); border-color: var(--border); }
-.action-menu__dropdown {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
-  width: 190px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,42,0.14);
-  padding: 6px; display: flex; flex-direction: column;
+.confirm {
+  width: min(440px, 100%);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px; border-radius: 14px;
+  background: var(--rb-surface); border: 1px solid var(--rb-border);
+  color: var(--rb-text-primary);
 }
-.action-menu__item {
-  display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px;
-  font-family: inherit; font-size: 13px; font-weight: 500; color: var(--text-primary);
-  background: none; border: none; cursor: pointer; text-align: left; transition: background 0.12s ease;
-}
-.action-menu__item:hover { background: var(--rb-surface-alt); }
-.action-menu__item--danger { color: var(--danger); }
-.action-menu__item--danger:hover { background: rgba(var(--rb-accent-rgb), 0.07); }
+.confirm:focus { outline: none; }
+.confirm__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; font-weight: 700; }
+.confirm__text { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+.confirm__actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-primary--danger { background: var(--rb-accent); border-color: var(--rb-accent); }
+.btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
-/* Empty state */
-.empty-state {
-  display: flex; flex-direction: column; align-items: center; text-align: center;
-  padding: 64px 24px; gap: 6px;
-}
-.empty-state__icon {
-  width: 76px; height: 76px; border-radius: 999px; background: var(--rb-surface-alt);
-  display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
-}
-.empty-state__title { font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.empty-state__desc { font-size: 13.5px; color: var(--text-secondary); max-width: 340px; margin: 0 0 14px; line-height: 1.5; }
-
-/* Pagination */
-.pagination {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 16px 24px; border-top: 1px solid var(--border); flex-wrap: wrap;
-}
-.pagination__rows { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); }
-.pagination__nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.pagination__btn {
-  display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px;
-  border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
-  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.pagination__btn:hover:not(:disabled) { border-color: var(--rb-primary-text); color: var(--rb-primary-text); }
-.pagination__btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.pagination__page {
-  width: 34px; height: 34px; border-radius: 9px; border: 1px solid transparent;
-  background: transparent; font-family: inherit; font-size: 12.5px; font-weight: 600;
-  color: var(--text-secondary); cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
-}
-.pagination__page:hover { background: var(--rb-surface-alt); }
-.pagination__page--active { background: var(--primary); color: #fff; }
-
-/* Drawer */
+/* ---------- Drawer ---------- */
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 50; }
 .drawer {
   position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 100vw;
@@ -1086,36 +895,16 @@ onUnmounted(() => {
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
-@media (max-width: 1180px) {
-  .filter-panel { grid-template-columns: repeat(3, 1fr); }
-}
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .req-table__head { display: none; }
-  .req-row {
-    grid-template-columns: 1fr 1fr; row-gap: 10px; position: relative; padding: 16px 20px 44px;
-  }
-  .req-row > span::before {
-    content: attr(data-label);
-    display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.03em; color: var(--text-muted); margin-bottom: 3px;
-  }
-  .req-row__actions { position: absolute; bottom: 10px; right: 16px; }
-  .req-row__actions::before { display: none; }
-}
-@media (max-width: 720px) {
-  .filter-panel { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
   .requests-page { padding: 20px 16px 32px; }
-  .page-header { flex-direction: column; align-items: stretch; }
   .stats-grid { grid-template-columns: 1fr; }
-  .filter-panel { grid-template-columns: 1fr; }
   .drawer { width: 100vw; }
-  .page-title { font-size: 24px; }
+  .confirm__actions { flex-direction: column-reverse; }
+  .confirm__actions > * { width: 100%; }
 }
-
-.rows-select { width: 84px; }
 
 /* The trend under a figure, beside its note. */
 .stat-trend {

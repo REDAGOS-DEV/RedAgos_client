@@ -11,7 +11,6 @@
     <header class="cr__head">
       <div>
         <h1 class="cr__title">Reports &amp; Analytics</h1>
-        <p class="cr__sub">{{ kind === 'collection' ? 'Donor & Collection' : facilityName }} · {{ periodLabel }}</p>
       </div>
       <!-- One toolbar, one height: the period, its dates when custom, the export. -->
       <div class="cr__tools">
@@ -178,7 +177,6 @@
             <section class="card" aria-labelledby="age-title">
               <header class="card__head">
                 <h2 id="age-title" class="card__title">Donors by age</h2>
-                <span class="card__note">Donations collected</span>
               </header>
               <div v-if="profile.total.total" class="ages" role="img" :aria-label="agesLabel">
                 <div v-for="a in ageBars" :key="a.key" class="ages__col" :class="{ 'ages__col--top': a.top }">
@@ -234,7 +232,7 @@
           <section class="card" aria-labelledby="busy-title">
             <header class="card__head">
               <h2 id="busy-title" class="card__title">Busiest hours at the counter</h2>
-              <span class="card__note">{{ busy.openLabel ? `Open ${busy.openLabel}` : 'Every arrival, by weekday and hour' }}</span>
+              <span v-if="busy.openLabel" class="card__note">Open {{ busy.openLabel }}</span>
             </header>
             <template v-if="busy.max">
               <div class="heat" :style="{ '--cols': busy.hours.length }">
@@ -337,7 +335,6 @@
           <section class="card" aria-labelledby="group-title">
             <header class="card__head">
               <h2 id="group-title" class="card__title">Donations by blood group</h2>
-              <span class="card__note">From the donor's record</span>
             </header>
             <ul v-if="data.donations.by_blood_group.length" class="hbars">
               <li v-for="g in data.donations.by_blood_group" :key="g.code" class="hbar">
@@ -397,7 +394,6 @@
           <header class="card__head">
             <div>
               <h2 id="profile-title" class="card__title">Collection record</h2>
-              <span class="card__note">Donations collected, by donor</span>
             </div>
             <!-- The same figures, laid out as the centre's SNBC sheet, ready to submit. -->
             <button type="button" class="snbc-download" :disabled="snbcBusy" @click="downloadSnbc">
@@ -583,7 +579,6 @@ onMounted(load)
 
 const fmtDay = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const fmtWhen = at => (at ? new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-const periodLabel = computed(() => (data.value ? `${fmtDay(data.value.period.from)} to ${fmtDay(data.value.period.to)}, ${data.value.period.days} days` : ''))
 
 // ── The day-by-day chart ──
 const SERIES = [
@@ -917,7 +912,6 @@ function exportCsv() {
 .cr { display: flex; flex-direction: column; gap: 16px; max-width: var(--rb-content-max, 1400px); margin: 0 auto; padding: 24px 32px 40px; }
 .cr__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .cr__title { margin: 0; font-size: var(--rb-fs-title, 24px); font-weight: 800; color: var(--rb-text-primary); }
-.cr__sub { margin: 4px 0 0; font-size: 13.5px; color: var(--rb-text-secondary); }
 .cr__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .cr__error { margin: 0; padding: 10px 14px; border-radius: 12px; background: rgba(211, 47, 47, 0.08); font-size: 13px; color: var(--rb-accent-text, #C62828); }
 .link { border: 0; background: none; font: inherit; font-weight: 700; color: inherit; text-decoration: underline; cursor: pointer; }

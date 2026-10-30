@@ -4,7 +4,7 @@
     <div class="page-header">
       <button class="back-link" type="button" @click="goBack">
         <AssetIcon name="arrow-left" />
-        <span>Back to Blood Requests</span>
+        <span>Back to Patient Request</span>
       </button>
 <!--
     <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -53,7 +53,7 @@
     <!-- ============== EMPTY STATE (not found) ============== -->
     <section v-else-if="!request" class="card">
       <EmptyState icon="search-x" title="Request not found" description="This blood request may have been removed, or the link is incorrect.">
-        <button class="ui-btn ui-btn--primary" type="button" @click="goBack">Back to Blood Requests</button>
+        <button class="ui-btn ui-btn--primary" type="button" @click="goBack">Back to Patient Request</button>
       </EmptyState>
     </section>
 
@@ -167,7 +167,7 @@
             on the Patient Transfusion Request.
           -->
           <section v-if="request.transfusion_request" class="card part-of">
-            <h2 class="section-title">Patient Transfusion Request</h2>
+            <h2 class="section-title">Blood Request</h2>
             <p class="part-of__text">
               This is {{ request.target_facility?.name || 'this facility' }}'s share of
               <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="part-of__ref">{{ request.transfusion_request.reference_number }}</NuxtLink>
@@ -175,7 +175,7 @@
               facilities may be asked for the rest.
             </p>
             <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="ui-btn ui-btn--sm">
-              <span>Open the Patient Transfusion Request</span>
+              <span>Open the blood request</span>
             </NuxtLink>
           </section>
 
@@ -191,6 +191,20 @@
               <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="part-of__ref">{{ request.weekly_request.reference_number || 'WR' }}</NuxtLink>.
               The center supplies what it can in one delivery; anything it does not is closed as not supplied when it
               dispatches.
+            </p>
+            <!-- How the center will meet it, once it confirmed the order (project owner, 2026-10-29). -->
+            <p v-if="request.supply_plan" class="part-of__text">
+              <strong>Confirmed by {{ request.target_facility?.name || 'the center' }}:</strong>
+              {{ request.committed_quantity ?? 0 }} of {{ request.quantity }} units,
+              {{ request.supply_plan.handover_method === 'delivery' ? 'delivered' : 'ready for pick-up' }}
+              on {{ handoverWhen(request.supply_plan.scheduled_at) }}<template v-if="request.supply_plan.handover_address">,
+                {{ request.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ request.supply_plan.handover_address }}</template>.
+              <template v-if="request.supply_plan.contact_name || request.supply_plan.contact_phone">
+                Contact: {{ [request.supply_plan.contact_name, request.supply_plan.contact_phone].filter(Boolean).join(' · ') }}.
+              </template>
+            </p>
+            <p v-else-if="request.is_open" class="part-of__text">
+              Waiting for the center to confirm how many units it can supply, and when.
             </p>
             <NuxtLink :to="`/hospital/receiving/weekly/${request.weekly_request.id}`" class="ui-btn ui-btn--sm">
               <span>Open the weekly request</span>
@@ -641,7 +655,7 @@
 
       <!-- ============== BOTTOM ACTIONS ============== -->
       <div class="bottom-actions">
-        <button class="ui-btn" type="button" @click="goBack">Back to Blood Requests</button>
+        <button class="ui-btn" type="button" @click="goBack">Back to Patient Request</button>
         <button class="ui-btn" type="button" @click="scrollToTimeline">Track Request</button>
         <button class="ui-btn" type="button" @click="handleDownloadPdf">Download PDF</button>
         <button class="ui-btn" type="button" @click="handlePrint">Print</button>
@@ -672,7 +686,7 @@
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, handoverWhen, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'

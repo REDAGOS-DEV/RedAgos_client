@@ -14,7 +14,7 @@
 
     <div v-else class="drives-inner">
       <!-- Header -->
-      <PageHeader title="Donation Drives" :subtitle="headerSummary">
+      <PageHeader title="Donation Drives">
         <template #actions>
           <button type="button" class="ui-btn ui-btn--primary" @click="openCreateModal">
             <AssetIcon name="plus" :size="15" />
@@ -35,7 +35,6 @@
         <div class="panel-header">
           <div>
             <h2 class="panel-title">Drives</h2>
-            <p class="panel-subtitle">Every drive this centre has scheduled.</p>
           </div>
 
           <div class="seg" role="tablist" aria-label="Show drives">
@@ -169,11 +168,6 @@
           <div class="modal-card__header">
             <div>
               <h2 id="create-drive-title" class="modal-card__title">{{ editingDrive ? 'Edit drive' : 'Create drive' }}</h2>
-              <p class="modal-card__subtitle">
-                {{ editingDrive
-                  ? 'Registered donors keep their place; tell them if the date or venue changes.'
-                  : 'Donors see the name, venue, date and time when they book.' }}
-              </p>
             </div>
             <button type="button" class="modal-card__close" aria-label="Close" @click="closeCreateModal">
               <AssetIcon name="x" :size="18" />
@@ -498,12 +492,6 @@ const nextDriveLabel = computed(() => {
   return `Next on ${month.charAt(0)}${month.slice(1).toLowerCase()} ${day}`
 })
 
-const headerSummary = computed(() => {
-  const upcoming = countFor('upcoming')
-  if (!drives.value.length) return 'Schedule mobile drives and let donors register in the portal.'
-  return `${upcoming} upcoming drive${upcoming === 1 ? '' : 's'} · ${totalRegistered.value} donor${totalRegistered.value === 1 ? '' : 's'} registered`
-})
-
 function dateParts(value) {
   const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
   if (Number.isNaN(d.getTime())) return { month: '', day: '—', weekday: '' }
@@ -750,7 +738,6 @@ a.btn-small { text-decoration: none; }
 }
 
 .panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
-.panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 /* Segmented view switch */
 .seg {

@@ -11,7 +11,7 @@
       </div>
 
       <!-- Payments, the Receipts tab (2026-10-27). -->
-      <PageHeader title="Payments" subtitle="Every payment, as the receipts issued for it." />
+      <PageHeader title="Payments" />
       <BloodCenterPaymentsTabs class="pay-tabs-row" />
 
       <section class="card" aria-label="Receipts">

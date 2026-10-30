@@ -12,9 +12,6 @@
 
       <PageHeader
         title="Cash Shifts"
-        :subtitle="mayOversee
-          ? 'Every cashier\'s shifts: the float, what was taken, what the drawer should hold, and what was counted.'
-          : 'Your shifts at the counter: the float, what you took, what the drawer should hold, and what you counted.'"
       >
         <template #actions>
           <NuxtLink to="/blood-center/pos" class="ui-btn ui-btn--primary">

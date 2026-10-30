@@ -3,10 +3,6 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">Serology Results</h1>
-        <p class="page-subtitle">
-          Every five-marker panel recorded at this centre, newest first. New panels are recorded from the testing queue;
-          a saved one changes only through an approved correction.
-        </p>
       </div>
       <NuxtLink to="/blood-center/testing?test=serology" class="btn-outline">
         <AssetIcon name="flask-conical" :size="14" />
@@ -86,7 +82,6 @@ onMounted(async () => {
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 3px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .btn-outline {
   display: inline-flex;

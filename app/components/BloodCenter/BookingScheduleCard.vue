@@ -8,10 +8,6 @@
     <!-- Its own heading, unless the page around it already gives one. -->
     <div v-if="!embedded">
       <h2 id="bk-title" class="bk__title">Booking schedule</h2>
-      <p class="bk__hint">
-        When donors can book a visit to the centre in the Donor Portal, and how many each time slot takes. Mobile drives
-        keep their own hours and capacity.
-      </p>
     </div>
 
     <p v-if="loading" class="bk__hint">Loading the schedule…</p>

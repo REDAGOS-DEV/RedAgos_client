@@ -3,10 +3,6 @@
     <header class="codes-page__header">
       <div>
         <h1 class="codes-page__title">Deferral Codes</h1>
-        <p class="codes-page__subtitle">
-          Every deferral is recorded under one of these codes. Screens, printouts and the donor's own deferral notice show
-          the code only; what it stands for stays with staff allowed the donor's clinical record.
-        </p>
       </div>
 
       <div class="header-actions">
@@ -413,7 +409,6 @@ onMounted(load)
 
 .codes-page__header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .codes-page__title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.codes-page__subtitle { margin: 4px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 
 .scope { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

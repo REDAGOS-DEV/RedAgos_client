@@ -239,7 +239,9 @@ describe('the inbox page and its layout', () => {
   it('reads the server\'s payload and no longer the imagined one', () => {
     expect(page).toContain('res?.notifications')
     expect(page).toContain('normalizeHospitalNotification')
-    expect(page).toContain('hasMorePages(res?.meta)')
+    // Paged as the centre's lists are (project owner, 2026-10-30), by the server's meta.
+    expect(page).toContain('...(res?.meta ?? {})')
+    expect(page).toContain('<ListPager')
 
     expect(page).not.toContain('res?.data')
     expect(page).not.toContain('has_more')
@@ -251,7 +253,7 @@ describe('the inbox page and its layout', () => {
     expect(page).not.toContain('toggleRead')
   })
 
-  it('uses the server\'s category names, and has a chip for stock alerts', () => {
+  it('uses the server\'s category names, and filters stock alerts', () => {
     expect(page).toContain("{ key: 'request', label: 'Blood Requests' }")
     expect(page).toContain("{ key: 'inventory', label: 'Stock Alerts' }")
     expect(page).not.toContain("key: 'blood_request'")

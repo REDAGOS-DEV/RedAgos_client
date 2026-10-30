@@ -2,7 +2,6 @@
   <div class="programs-page">
     <PageHeader
       title="Billing Programs"
-      subtitle="Subsidies and discounts that come off a patient's invoice while they are in effect."
     >
       <template #actions>
         <button class="ui-btn ui-btn--primary" @click="startNew">
@@ -21,7 +20,6 @@
         <span class="editor__icon" :class="`mark--${form.kind}`" aria-hidden="true"><AssetIcon :name="iconFor(form.kind)" :size="18" /></span>
         <div class="editor__titles">
           <h2 id="editor-title">{{ editingId ? 'Edit billing program' : 'New billing program' }}</h2>
-          <p>{{ editingId ? 'Changes apply to invoices made from now on.' : 'It applies to invoices made between its dates, while enabled.' }}</p>
         </div>
         <button class="icon-btn" aria-label="Close program form" @click="closeEditor"><AssetIcon name="x" :size="17" /></button>
       </div>
@@ -275,7 +273,6 @@ onMounted(load)
 .editor__icon { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 11px; }
 .editor__titles { flex: 1; min-width: 0; }
 .editor h2 { margin: 0; font-size: 15px; font-weight: 750; }
-.editor__titles p { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .icon-btn { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border: 0; border-radius: 9px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
 .icon-btn:hover { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 .editor__body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "form preview" "error error" "actions actions"; gap: 18px 24px; padding: 18px; }

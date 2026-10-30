@@ -85,11 +85,16 @@ export function matchScannedBag(awaiting: AwaitingBag[], scanned: Set<number>, i
   return scanned.has(bag.allocation_id) ? { kind: 'already_scanned', bag } : { kind: 'matched', bag }
 }
 
-/** The parts of a Patient Transfusion Request's facility allocation this needs. */
-interface AllocationLike {
+/** The parts of a blood request, as a detail view sends it, that receiving reads. */
+interface DispatchedRequestLike {
   id: number
-  items?: Array<{ id: number; component?: { name?: string | null } | null }>
+  target_facility?: { name?: string | null } | null
   blood_type?: { code?: string | null } | null
+  items?: Array<{
+    id: number
+    blood_type?: { code?: string | null } | null
+    component?: { name?: string | null } | null
+  }>
   allocations?: Array<{
     id: number
     request_item_id: number | null
@@ -104,32 +109,39 @@ interface AllocationLike {
 export interface AwaitingBagDetail extends AwaitingBag {
   blood_type: string | null
   component: string | null
+  /** The center that dispatched it. */
+  centre: string | null
   expiry_date: string | null
   released_at: string | null
 }
 
 /**
- * The bags a Patient Transfusion Request's centres have dispatched and the blood bank has not received.
+ * The bags dispatched on these blood requests and not yet received.
  *
- * Direct Distribution matches a scan against these first: a RedAgos bag
- * dispatched for the patient is confirmed received through its own request,
- * never booked a second time as an external one.
+ * The requests are a weekly request's, or a patient's blood request's shares
+ * at each center. A line names its own blood type on a weekly request that
+ * restocks several; otherwise the request's is the bag's.
  */
-export function awaitingBagsFor(facilityAllocations: AllocationLike[] | null | undefined): AwaitingBagDetail[] {
-  return (facilityAllocations ?? []).flatMap((request) => {
-    const components = new Map((request.items ?? []).map((item) => [item.id, item.component?.name ?? null]))
+export function awaitingBagsFor(requests: DispatchedRequestLike[] | null | undefined): AwaitingBagDetail[] {
+  return (requests ?? []).flatMap((request) => {
+    const lines = new Map((request.items ?? []).map((item) => [item.id, item]))
 
     return (request.allocations ?? [])
-      .filter((hold) => hold.status === 'released' && !hold.received_at)
-      .map((hold) => ({
-        allocation_id: hold.id,
-        request_id: request.id,
-        unit_id: hold.unit_id,
-        blood_type: request.blood_type?.code ?? null,
-        component: hold.request_item_id === null ? null : (components.get(hold.request_item_id) ?? null),
-        expiry_date: hold.expiry_date ?? null,
-        released_at: hold.released_at ?? null,
-      }))
+      .filter((allocation) => allocation.status === 'released' && !allocation.received_at)
+      .map((allocation) => {
+        const line = allocation.request_item_id === null ? undefined : lines.get(allocation.request_item_id)
+
+        return {
+          allocation_id: allocation.id,
+          request_id: request.id,
+          unit_id: allocation.unit_id,
+          blood_type: line?.blood_type?.code ?? request.blood_type?.code ?? null,
+          component: line?.component?.name ?? null,
+          centre: request.target_facility?.name ?? null,
+          expiry_date: allocation.expiry_date ?? null,
+          released_at: allocation.released_at ?? null,
+        }
+      })
   })
 }
 

@@ -3,7 +3,6 @@
     <header class="iss__header">
       <div>
         <h1 class="iss__title">Issuance dashboard</h1>
-        <p class="iss__subtitle">Issuance · {{ todayLabel }}</p>
       </div>
       <NuxtLink to="/blood-center/inventory-intake" class="btn-primary">
         <AssetIcon name="package-check" :size="15" />
@@ -72,7 +71,6 @@
           <AssetIcon name="blood-drop" :size="20" class="panel__icon" />
           <div>
             <h2 id="inventory-title" class="panel__title">Blood Inventory</h2>
-            <p class="panel__sub">Stock levels by blood type (units). Open a type to see its units, oldest expiry first.</p>
           </div>
         </div>
         <div class="panel__aside">
@@ -279,7 +277,6 @@
             <AssetIcon name="bar-chart" :size="20" class="panel__icon" />
             <div>
               <h2 id="trend-title" class="panel__title">Stock, last 8 days</h2>
-              <p class="panel__sub">How the shelf has moved: units available, expiring within 7 days, and reserved.</p>
             </div>
           </div>
           <div class="panel__aside panel__aside--row">
@@ -523,9 +520,6 @@ function formatReceived(value) {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-// ---- Header ----
-const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-
 // ---- Type tiles: each type's level against the fullest shelf ----
 const vialMax = computed(() => Math.max(1, ...typeCards.value.map(card => card.available)))
 const vialLevel = available => (available ? Math.max(6, (available / vialMax.value) * 100) : 0)
@@ -654,7 +648,6 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 }
 
 .iss__title { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; color: var(--rb-text-primary); }
-.iss__subtitle { margin: 4px 0 0; font-size: 13px; color: var(--rb-text-secondary); max-width: 70ch; }
 
 /* The primary action: solid blue. */
 .btn-primary {
@@ -817,7 +810,6 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 .panel__titles { display: flex; flex: 1 1 auto; align-items: flex-start; gap: 10px; min-width: 0; }
 .panel__icon { flex-shrink: 0; margin-top: 1px; color: var(--rb-accent-text); }
 .panel__title { margin: 0; font-size: 15px; font-weight: 650; color: var(--rb-text-primary); }
-.panel__sub { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .panel__aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 

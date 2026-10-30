@@ -204,6 +204,11 @@ export const useIncomingRequests = () => {
     return act(() => bloodCenterService.closeRequestLine(id, itemId, note))
   }
 
+  /** Confirm a replenishment order: what each line gets, pick-up or delivery, and when. */
+  function saveSupplyPlan(id, payload) {
+    return act(() => bloodCenterService.saveSupplyPlan(id, payload))
+  }
+
   async function refresh() {
     await Promise.all([fetchRequests(), fetchSummary()])
   }
@@ -237,6 +242,7 @@ export const useIncomingRequests = () => {
     releaseHolds,
     release,
     closeLine,
+    saveSupplyPlan,
     refresh,
   }
 }

@@ -19,8 +19,7 @@
     <div v-else class="dashboard-inner">
       <!-- ============ HEADER ============ -->
       <PageHeader
-        title="Blood Center Dashboard"
-        :subtitle="dashboardSubtitle">
+        title="Blood Center Dashboard">
         <template #actions>
           <button type="button" class="ui-btn" :disabled="exporting" @click="exportReport">
             <AssetIcon name="download" :size="14" />
@@ -104,7 +103,6 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Needs attention</h2>
-                <p class="panel-subtitle">Stock, expiry and requests that need action today.</p>
               </div>
             </div>
 
@@ -175,7 +173,6 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Stock by blood type</h2>
-                <p class="panel-subtitle">Total units across components.</p>
               </div>
               <NuxtLink v-if="canViewInventory" to="/blood-center/inventory" class="panel-link">Full inventory</NuxtLink>
             </div>
@@ -209,7 +206,6 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Inventory Trends</h2>
-                <p class="panel-subtitle">Monitor inventory changes over time.</p>
               </div>
               <div class="segmented-control">
                 <button
@@ -297,7 +293,6 @@
             <div class="panel-header">
               <div>
                 <h2 class="panel-title">Blood Component Distribution</h2>
-                <p class="panel-subtitle">Visualize current inventory composition.</p>
               </div>
             </div>
 
@@ -351,7 +346,6 @@
           <div class="panel-header">
             <div>
               <h2 class="panel-title">Recent donations</h2>
-              <p class="panel-subtitle">Latest donations recorded at this center.</p>
             </div>
             <!--
               "View History" pointed at /blood-center/donations, which has no
@@ -395,7 +389,6 @@
           <div class="panel-header">
             <div>
               <h2 class="panel-title">System activity</h2>
-              <p class="panel-subtitle">Audit trail of actions across the system.</p>
             </div>
           </div>
 
@@ -480,9 +473,6 @@ definePageMeta({
 const { user, can } = useUser()
 // The Admin keeps the staff accounts; the Supervisor, who reads this too, does not.
 const isCenterAdmin = computed(() => user.value?.management_level === 'admin' || can('staff.manage'))
-const dashboardSubtitle = computed(() => (isCenterAdmin.value
-  ? "Your team, the centre's setup and what changed."
-  : 'What needs attention today, and how stock is moving.'))
 
 // The overview is read by the Admin and the Supervisor, who record and decide
 // nothing, and the Admin sees no department page at all: its shortcuts into
@@ -1054,7 +1044,6 @@ a.stat-card:focus-visible { outline: 2px solid var(--rb-primary-text); outline-o
   flex-wrap: wrap;
 }
 .panel-title { font-weight: 700; font-size: 14px; color: var(--rb-text-primary); margin: 0; }
-.panel-subtitle { font-size: 12px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 .panel-link { font-size: 12px; font-weight: 600; color: var(--rb-primary-text); text-decoration: none; flex-shrink: 0; }
 .panel-link:hover { text-decoration: underline; }
 

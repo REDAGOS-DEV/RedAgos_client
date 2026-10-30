@@ -12,7 +12,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Audit Log</h1>
-          <p class="page-subtitle">{{ listSummary }}</p>
         </div>
       </header>
 
@@ -179,9 +178,6 @@ const typeOptions = ref([])
 
 const hasFilters = computed(() => Boolean(search.value.trim() || moduleFilter.value || typeFilter.value || fromDate.value || toDate.value))
 const updatedAtLabel = computed(() => updatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
-const listSummary = computed(() => (hasFilters.value
-  ? `${pager.total} entr${pager.total === 1 ? 'y matches' : 'ies match'} the filters`
-  : 'Sign-ins and everything your staff did, newest first.'))
 
 function filterParams() {
   const params = {}
@@ -287,7 +283,6 @@ onBeforeUnmount(() => {
 /* ---------- Header and buttons ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 .btn-outline {
   display: inline-flex;

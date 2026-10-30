@@ -4,7 +4,7 @@
       <!-- HEADER -->
       <NuxtLink to="/hospital/bloodrequests" class="back-link">
         <AssetIcon name="arrow-left" :size="14" />
-        Back to Blood Requests
+        Back to Patient Request
       </NuxtLink>
       <PageHeader
         class="page-header"
@@ -21,7 +21,7 @@
       <!-- SUCCESS: PATIENT TRANSFUSION -->
       <section v-else-if="submitted" class="panel panel--success fade-in">
         <div class="success-icon"><AssetIcon name="check" :size="26" /></div>
-        <h2 class="success-title">Patient Transfusion Request sent</h2>
+        <h2 class="success-title">Blood Request sent</h2>
         <p class="success-text">
           Reference <strong>{{ submitted.request.reference_number }}</strong>. Each facility below reviews its own share
           and approves or rejects it.
@@ -69,7 +69,7 @@
         <template v-if="step === 'details'">
           <!-- WHAT THIS IS -->
           <section class="panel fade-in" style="--delay:40ms">
-            <h2 class="panel-title">Patient transfusion request</h2>
+            <h2 class="panel-title">Blood request</h2>
             <p class="panel-hint">
               Blood for a named patient, which may be split across several blood centers. Restocking your blood bank
               is not requested here: it is your

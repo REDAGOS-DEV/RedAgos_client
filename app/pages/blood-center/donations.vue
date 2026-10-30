@@ -12,7 +12,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Donations</h1>
-          <p class="page-subtitle">{{ listSummary }}</p>
         </div>
         <div v-if="canRecordPaper || canStartVisit" class="header-actions">
           <!-- A remote drive's paper records, typed in after the drive. Up here
@@ -399,9 +398,6 @@ const bloodTypeOptions = ref([])
 
 const hasFilters = computed(() => Boolean(search.value.trim() || statusFilter.value || bloodTypeId.value || fromDate.value || toDate.value))
 const updatedAtLabel = computed(() => updatedAt.value?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) ?? '')
-const listSummary = computed(() => (hasFilters.value
-  ? `${pager.total} donation${pager.total === 1 ? '' : 's'} match the filters`
-  : "Every visit at the Donation Counter or typed from a drive's paper records, newest first."))
 
 function filterParams() {
   const params = {}
@@ -593,7 +589,6 @@ onBeforeUnmount(() => {
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 
 .btn-primary,
 .btn-outline {

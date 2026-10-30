@@ -3,10 +3,6 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">Counselling Referrals</h1>
-        <p class="page-subtitle">
-          Donors whose verified serology was reactive. Ask each to get in touch, refer them to a doctor, and record how
-          it ended. Closing a referral does not lift the donor's deferral.
-        </p>
       </div>
     </header>
 
@@ -420,7 +416,6 @@ onMounted(loadReferrals)
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 3px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .card {
   display: flex;

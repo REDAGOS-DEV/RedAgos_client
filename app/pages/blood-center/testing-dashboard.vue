@@ -17,7 +17,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Testing dashboard</h1>
-          <p class="page-subtitle">Testing{{ data ? ` · ${longDate(data.today.date)}` : '' }}</p>
         </div>
         <div class="header-actions">
           <span v-if="updatedAt" class="updated">
@@ -76,7 +75,6 @@
               <li v-for="kpi in queueKpis" :key="kpi.key" class="stage-cell" :class="`stage-cell--${kpi.tone}`">
                 <span class="stage-cell__label"><span class="dot" :class="`dot--${kpi.tone}`" aria-hidden="true" />{{ kpi.label }}</span>
                 <span class="stage-cell__value">{{ kpi.value }}</span>
-                <span class="stage-cell__hint">{{ kpi.hint }}</span>
               </li>
             </ul>
 
@@ -100,11 +98,6 @@
                   <small>median</small>
                 </span>
               </div>
-              <p class="card__sub">
-                From the draw to both sections cleared, over the last 30 days<template v-if="data.turnaround.units">,
-                  across <strong class="figure">{{ plural(data.turnaround.units, 'unit') }}</strong></template>.
-                The ring is the share of a day.
-              </p>
             </div>
             <p v-if="!data.turnaround.units" class="card__note">No unit has been cleared at the bench in the last 30 days.</p>
           </section>
@@ -114,7 +107,6 @@
             <div class="card__head">
               <div>
                 <h2 id="today-title" class="card__label card__label--title">Today at the bench</h2>
-                <p class="card__sub">Recorded since the start of the day. A saved typing that was corrected today counts again.</p>
               </div>
             </div>
             <ol class="today" aria-label="Today's work">
@@ -208,7 +200,6 @@
             <div class="card__head">
               <div>
                 <h2 id="markers-title" class="card__label card__label--title">Reactive by marker</h2>
-                <p class="card__sub">Last 30 days. A panel reactive for two markers counts under both.</p>
               </div>
               <NuxtLink to="/blood-center/serology-results" class="card__link">
                 Results
@@ -239,7 +230,6 @@
             <div class="card__head">
               <div>
                 <h2 id="supervisor-title" class="card__label card__label--title">For the Laboratory Supervisor</h2>
-                <p class="card__sub">What waits for you to move it on.</p>
               </div>
             </div>
 
@@ -267,7 +257,7 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { dayMonth, longDate, niceScale, plural, weekday } from '~/utils/collectionDashboard'
+import { dayMonth, niceScale, weekday } from '~/utils/collectionDashboard'
 import { ageLabel, durationLabel, panelPeak, panelTotals } from '~/utils/testingDashboard'
 import { smoothPath } from '~/utils/smoothPath'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
@@ -336,10 +326,10 @@ async function load() {
 const queueKpis = computed(() => {
   const q = data.value?.queue ?? {}
   return [
-    { key: 'typing', label: 'Waiting for typing', value: q.awaiting_typing ?? 0, tone: 'info', hint: 'No ABO/Rh recorded yet' },
-    { key: 'serology', label: 'Waiting for serology', value: q.awaiting_serology ?? 0, tone: 'info', hint: 'No panel recorded yet' },
-    { key: 'verify', label: 'Reactive to verify', value: q.awaiting_verification ?? 0, tone: 'crit', hint: 'Held for the Laboratory Supervisor' },
-    { key: 'held', label: 'Typing held', value: q.typing_held ?? 0, tone: 'warn', hint: 'Saved but not cleared' },
+    { key: 'typing', label: 'Waiting for typing', value: q.awaiting_typing ?? 0, tone: 'info' },
+    { key: 'serology', label: 'Waiting for serology', value: q.awaiting_serology ?? 0, tone: 'info' },
+    { key: 'verify', label: 'Reactive to verify', value: q.awaiting_verification ?? 0, tone: 'crit' },
+    { key: 'held', label: 'Typing held', value: q.typing_held ?? 0, tone: 'warn' },
   ]
 })
 
@@ -503,7 +493,6 @@ onBeforeUnmount(() => {
 /* ---------- Header ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 
 .updated {
@@ -700,7 +689,6 @@ onBeforeUnmount(() => {
 .stage-cell--crit:not(:has(.stage-cell__value:empty)) { border-color: rgba(var(--rb-accent-rgb), 0.3); background: rgba(var(--rb-accent-rgb), 0.05); }
 .stage-cell__label { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
 .stage-cell__value { font-size: 26px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
-.stage-cell__hint { font-size: 11.5px; color: var(--rb-text-muted); }
 .age { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; margin: 0; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; }
 .age--ok { background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
 .age--warn { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }

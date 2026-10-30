@@ -3,10 +3,6 @@
     <header class="collection__header">
       <div>
         <h1 class="collection__title">Donation counter</h1>
-        <p class="collection__subtitle">
-          The visit carries on here once the donor is identified: a booked donor's QR is scanned on Donations, and
-          a walk-in is started from Donor Management.
-        </p>
       </div>
     </header>
 
@@ -463,10 +459,6 @@
         <AssetIcon name="pencil" :size="14" />
         This record is already saved. Change what was entered wrongly; the corrected record goes to the Donor
         Screening Physician to approve.
-      </p>
-      <p class="card__hint">
-        The phlebotomist's box on the form. Recording it finishes the donor's visit and hands the donation to the
-        Testing department.
       </p>
 
       <fieldset class="exam">
@@ -1282,13 +1274,6 @@ function finishVisit() {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--rb-text-primary);
-}
-
-.collection__subtitle {
-  margin: 0.3rem 0 0;
-  max-width: 62ch;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
 }
 
 

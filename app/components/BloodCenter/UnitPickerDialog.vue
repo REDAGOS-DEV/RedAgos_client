@@ -2,16 +2,10 @@
   <div class="picker-overlay" @click.self="emitClose">
     <div ref="dialogRef" class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" tabindex="-1" @keydown.esc.stop="emitClose">
       <div class="picker__header">
-        <div>
-          <h2 id="picker-title" class="picker__title">
-            <AssetIcon name="package-check" :size="17" />
-            Reserve units — <span class="mono">{{ request.code }}</span>
-          </h2>
-          <p class="picker__sub">
-            {{ request.hospital }}<template v-if="request.patient"> · {{ request.patient }}</template>.
-            Pick the bags to hold for this request; nothing else is reserved.
-          </p>
-        </div>
+        <h2 id="picker-title" class="picker__title">
+          <AssetIcon name="package-check" :size="17" />
+          Reserve units — <span class="mono">{{ request.code }}</span>
+        </h2>
         <button type="button" class="picker__close" aria-label="Close" :disabled="busy" @click="emitClose">
           <AssetIcon name="x" :size="18" />
         </button>
@@ -446,7 +440,7 @@ onMounted(() => {
 
 .picker__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
@@ -455,7 +449,6 @@ onMounted(() => {
 
 .picker__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; }
 .picker__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
-.picker__sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .picker__close {
   display: grid;

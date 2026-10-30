@@ -65,7 +65,6 @@
         <section class="panel" aria-labelledby="rows-title">
           <div class="panel__head">
             <h2 id="rows-title" class="panel__title">On this sheet</h2>
-            <span class="panel__hint">Newest first. A record can be taken back until the laboratory starts on it.</span>
           </div>
 
           <div class="table-wrap">
@@ -487,7 +486,6 @@ onBeforeUnmount(() => {
 
 .panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--rb-border); }
 .panel__title { margin: 0; font-size: 14px; font-weight: 700; }
-.panel__hint { font-size: 12px; color: var(--rb-text-secondary); }
 
 .table-wrap { overflow-x: auto; }
 .row-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }

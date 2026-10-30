@@ -2,9 +2,6 @@
   <form class="qd" aria-labelledby="qd-title" @submit.prevent="submit">
     <div class="qd__head">
       <h3 id="qd-title" class="qd__title">Register a donor from the paper</h3>
-      <p class="qd__hint">
-        Only for someone not in RedAgos yet. Their valid ID number is what keeps them from being registered twice.
-      </p>
     </div>
 
     <div class="qd__grid">
@@ -157,7 +154,6 @@ onMounted(() => {
 
 .qd__head { display: flex; flex-direction: column; gap: 3px; }
 .qd__title { margin: 0; font-size: 14px; font-weight: 700; }
-.qd__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
 
 .qd__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .qd__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
