@@ -172,3 +172,84 @@ html.portal-bc .bc-shell .section-title {
   html.portal-bc .bc-shell :is(.search__input, .search .search-input, .search-field__input),
   html.portal-bc .bc-shell .table-wrap tbody tr { transition: none; }
 }
+
+/* ===== Toasts (2026-10-31) =====
+   One design for every page's toast-stack (Issuance and Billing each keep
+   their own markup: .toast, .toast--<variant>, .toast-title, .toast-message).
+   A light card under the top bar, the kind told by a drop-shaped badge (the
+   RedAgos drop) with its icon, and a thin line along the foot that runs out
+   with the toast's 3.6 seconds. */
+html.portal-bc .bc-shell .toast-stack {
+  top: 76px;
+  right: 20px;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  max-width: none;
+}
+html.portal-bc .bc-shell .toast {
+  --toast-rgb: var(--rb-success-rgb);
+  position: relative;
+  overflow: hidden;
+  padding: 13px 16px 15px 58px;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  box-shadow: 0 14px 34px -14px rgba(var(--rb-shadow-rgb), 0.45), 0 2px 6px rgba(var(--rb-shadow-rgb), 0.08);
+}
+html.portal-bc .bc-shell .toast--danger { --toast-rgb: var(--rb-accent-rgb); }
+html.portal-bc .bc-shell .toast--warning { --toast-rgb: var(--rb-warning-rgb); }
+html.portal-bc .bc-shell .toast--info { --toast-rgb: var(--rb-primary-rgb); }
+
+/* The drop: a rounded square turned so one corner points up. */
+html.portal-bc .bc-shell .toast::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 0 50% 50% 50%;
+  background: rgba(var(--toast-rgb), 0.14);
+  transform: rotate(45deg);
+}
+/* Its icon, drawn upright on the drop. */
+html.portal-bc .bc-shell .toast-title::before {
+  content: '';
+  position: absolute;
+  top: 21px;
+  left: 23px;
+  width: 15px;
+  height: 15px;
+  background: rgb(var(--toast-rgb));
+  -webkit-mask: var(--toast-icon) center / contain no-repeat;
+  mask: var(--toast-icon) center / contain no-repeat;
+}
+html.portal-bc .bc-shell .toast { --toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+html.portal-bc .bc-shell .toast--danger { --toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E"); }
+html.portal-bc .bc-shell .toast--warning { --toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17.5v.5'/%3E%3C/svg%3E"); }
+html.portal-bc .bc-shell .toast--info { --toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 11v6M12 6.5v.5'/%3E%3C/svg%3E"); }
+
+/* The time left, running out along the foot. */
+html.portal-bc .bc-shell .toast::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgb(var(--toast-rgb));
+  transform-origin: left center;
+  animation: bc-toast-time 3.6s linear forwards;
+}
+@keyframes bc-toast-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+html.portal-bc .bc-shell .toast-title { font-size: 13.5px; font-weight: 750; line-height: 1.35; color: var(--rb-text-primary); }
+html.portal-bc .bc-shell .toast-message { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
+html.portal-bc .bc-shell .toast-enter-from,
+html.portal-bc .bc-shell .toast-leave-to { opacity: 0; transform: translateX(24px) scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  html.portal-bc .bc-shell .toast::after { animation: none; }
+  html.portal-bc .bc-shell .toast-enter-active,
+  html.portal-bc .bc-shell .toast-leave-active { transition: opacity 0.2s ease; }
+}

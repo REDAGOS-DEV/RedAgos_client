@@ -461,7 +461,7 @@ describe('corrections', () => {
     expect(inventory).toContain("canFile('unit_details')")
     expect(inventory).toContain('subject="unit_details"')
 
-    const fulfillment = source('app/pages/blood-center/fulfillment.vue')
+    const fulfillment = source('app/components/BloodCenter/FulfillmentBoard.vue')
     expect(fulfillment).toContain("can('corrections.request') && canFile('dispatch')")
     expect(fulfillment).toContain('subject="dispatch"')
 

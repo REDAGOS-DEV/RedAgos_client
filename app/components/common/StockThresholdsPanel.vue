@@ -17,11 +17,15 @@
             <AssetIcon name="eye" :size="14" />
             {{ readOnlyNote }}
           </span>
-          <button type="button" class="refresh" :disabled="busy || savingLevel !== null" @click="loadStatus(false)">
-            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-            {{ busy ? 'Loading…' : 'Refresh' }}
-          </button>
         </div>
+      </div>
+
+      <!-- Refresh at the top right, as on the other pages (2026-10-31). -->
+      <div class="page-head__actions">
+        <button type="button" class="refresh" :disabled="busy || savingLevel !== null" @click="loadStatus(false)">
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+          {{ busy ? 'Loading…' : 'Refresh' }}
+        </button>
       </div>
 
       <aside class="guide" aria-label="What the levels mean">
@@ -42,6 +46,7 @@
     <div v-if="loadError" class="alert" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
       <span>{{ loadError }}</span>
+      <button type="button" class="alert__retry" :disabled="busy" @click="loadStatus(false)">Try again</button>
     </div>
 
     <template v-if="status">
@@ -562,4 +567,9 @@ onBeforeUnmount(() => {
   .skeleton, .spin { animation: none; }
   .refresh { transition: none; }
 }
+
+/* Refresh at the top right of the heading. */
+.page-head__actions { flex: none; display: flex; align-items: center; }
+.page-head__actions .refresh { height: 38px; padding: 0 14px; }
+.alert__retry { margin-left: auto; border: 0; background: none; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
 </style>

@@ -59,7 +59,7 @@
             </button>
             <NuxtLink v-if="canSeePayments && takes" :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary">
               <AssetIcon name="credit-card" :size="15" />
-              Take payment
+              Record payment
             </NuxtLink>
           </div>
         </header>
@@ -334,12 +334,13 @@
                 <div v-if="lastPayment.additional_information"><dt>Additional information</dt><dd>{{ lastPayment.additional_information }}</dd></div>
               </dl>
 
-              <!-- Patient bill: take the money at the counter, or waive it. -->
+              <!-- Patient bill: record the payment on the Billing Counter, or apply the subsidy.
+                   RedAgos is the counter, so the words name the action, not a desk (2026-10-31). -->
               <template v-if="!weekly && canSeePayments && takes">
                 <div class="pay-actions">
                   <NuxtLink :to="`/blood-center/pos?request=${requestId}`" class="ui-btn ui-btn--primary btn-block">
                     <AssetIcon name="credit-card" :size="15" />
-                    Take payment at the counter
+                    Record payment
                   </NuxtLink>
                   <button v-if="!subsidyOpen" class="ui-btn ui-btn--ghost btn-block" @click="openSubsidy">
                     Apply government subsidy
@@ -761,7 +762,7 @@ const dueLabel = computed(() => {
 const dueNote = computed(() => {
   const s = statement.value
   if (weekly.value) return s?.is_settled_outside ? `Reference ${s.settlement?.reference ?? '—'}` : 'Settled outside RedAgos'
-  if (s?.is_subsidised) return 'Nothing is collected at the counter'
+  if (s?.is_subsidised) return 'Nothing to collect: the subsidy covers it'
   if (totals.value.balance > 0) return s?.clears_release ? 'Units already released' : 'Blood is held until it is paid'
   return s?.clears_release ? 'Cleared for release' : ''
 })
@@ -1069,7 +1070,9 @@ onMounted(loadAll)
 .kv-row dd.mono { font-size: 12.5px; }
 
 .issuer-strip { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
-.issuer-logo { width: 34px; height: 34px; object-fit: contain; border-radius: 8px; flex: none; }
+/* The centre's logo at a size it can be read at, on a white tile so a dark or
+   transparent logo holds up in either theme (2026-10-31; was 34px). */
+.issuer-logo { width: 56px; height: 56px; padding: 4px; object-fit: contain; border: 1px solid var(--rb-border); border-radius: 12px; background: #fff; flex: none; }
 .monogram {
   width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none;
   font-weight: 800; font-size: 12.5px; color: #fff; background: var(--rb-primary);

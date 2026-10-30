@@ -65,7 +65,25 @@
     <template v-else-if="data">
       <section class="stack" :aria-label="currentTab.label">
         <div v-if="kpis.length" class="grid4">
-          <div v-for="k in kpis" :key="k.label" class="kpi">
+          <!-- Each figure with its icon and a small picture, as on Testing's reports (2026-10-30). -->
+          <div v-for="k in shownKpis" :key="k.label" class="kpi" :class="`kpi--${k.tone}`">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon :name="k.icon" :size="18" /></span>
+              <!-- The period day by day, as a small curve. -->
+              <svg v-if="k.spark" class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="k.spark.area" class="kpi__spark-area" />
+                <path :d="k.spark.line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+              <!-- A rate, as a ring. -->
+              <!-- Several kinds, each as a small bar. -->
+              <span v-else-if="k.bars" class="kpi__steps" aria-hidden="true">
+                <span v-for="(h, i) in k.bars" :key="i" class="kpi__step" :style="{ height: `${h}%` }" />
+              </span>
+              <svg v-else-if="k.ring !== null" class="kpi__ring" viewBox="0 0 40 40" aria-hidden="true">
+                <circle class="kpi__ring-base" cx="20" cy="20" r="15" />
+                <circle v-if="k.ring" class="kpi__ring-arc" cx="20" cy="20" r="15" :stroke-dasharray="`${(k.ring * RING15).toFixed(1)} ${RING15.toFixed(1)}`" />
+              </svg>
+            </span>
             <span class="kpi__label">{{ k.label }}</span>
             <span class="kpi__value" :class="k.warn && k.value ? 'kpi__value--warn' : ''">{{ k.value }}</span>
             <span v-if="k.delta" class="kpi__foot">
@@ -784,6 +802,68 @@ function change(now, before, { points = false, goodWhenUp = true } = {}) {
   return { text: `${up ? '+' : ''}${diff}${points ? ' pts' : '%'}`, tone: up === goodWhenUp ? 'good' : 'bad', up }
 }
 
+// ── Each figure's icon, tone and small picture (2026-10-30) ──
+// By its label, so every tab and both kinds read the same way. A count drawn
+// from a daily series gets that series' curve; a rate gets a ring.
+const KPI_LOOK = {
+  'Donations collected': { icon: 'droplets', tone: 'info', series: 'donations' },
+  'Donors deferred': { icon: 'ban', tone: 'warn', series: 'deferrals' },
+  'Deferral rate': { icon: 'activity', tone: 'warn', ring: true },
+  'Drives held': { icon: 'route', tone: 'info' },
+  'Appointments booked': { icon: 'calendar', tone: 'info', series: 'appointments' },
+  'Came and donated': { icon: 'check-circle', tone: 'ok' },
+  'No-shows': { icon: 'user-x', tone: 'crit' },
+  'Show rate': { icon: 'user-check', tone: 'ok', ring: true },
+  'Kinds of deferral': { icon: 'list', tone: 'muted' },
+  'Reasons recorded': { icon: 'clipboard-list', tone: 'muted' },
+  'Lapsed donors': { icon: 'history', tone: 'warn' },
+  'First-time donors': { icon: 'user', tone: 'info' },
+  'Repeat donors': { icon: 'users', tone: 'ok' },
+  'Requests received': { icon: 'inbox', tone: 'info', series: 'requests' },
+  'Fulfilment rate': { icon: 'check-check', tone: 'ok', ring: true },
+  'Units released': { icon: 'package-check', tone: 'info' },
+  'New accounts': { icon: 'users', tone: 'info' },
+  'Role changes': { icon: 'shield', tone: 'muted' },
+  'Status changes': { icon: 'user-x', tone: 'warn' },
+  'Sign-ins': { icon: 'log-in', tone: 'info' },
+}
+const RING15 = 2 * Math.PI * 15
+
+/** Small bars, each as tall as its share of the largest. */
+function barsOf(values) {
+  const top = Math.max(1, ...values)
+  return values.slice(0, 8).map(v => Math.max(8, Math.round(((v || 0) / top) * 100)))
+}
+
+/** A small curve of the period's days, for a headline. */
+function sparkOf(values) {
+  const n = values.length
+  if (n < 2) return null
+  const top = Math.max(1, ...values)
+  const points = values.map((v, i) => ({ x: (i / (n - 1)) * 120, y: 36 - ((v || 0) / top) * 32 }))
+  const line = smoothPath(points)
+  return { line, area: `${line} L120,40 L0,40 Z` }
+}
+
+const shownKpis = computed(() => kpis.value.map((k) => {
+  const look = KPI_LOOK[k.label] ?? { icon: 'bar-chart', tone: 'info' }
+  const hasSeries = look.series && daily.value.some(d => d[look.series] !== undefined)
+  const rate = typeof k.value === 'string' && k.value.endsWith('%') ? Math.min(1, Number.parseFloat(k.value) / 100) : null
+  return {
+    ...k,
+    icon: look.icon,
+    // A count that is not zero but flagged keeps its warning colour.
+    tone: k.warn && k.value ? 'warn' : look.tone,
+    spark: hasSeries ? sparkOf(daily.value.map(d => d[look.series] ?? 0)) : null,
+    // A rate, or a part of a whole, shows its ring even before there is one to fill, as Testing's does.
+    ring: k.share !== undefined ? k.share : (look.ring ? (Number.isFinite(rate) ? rate : 0) : null),
+    bars: k.bars?.length ? barsOf(k.bars) : null,
+  }
+}))
+
+/** A part of a whole, 0 to 1; 0 when there is no whole yet (the ring still shows). */
+const of = (part, whole) => (whole ? Math.min(1, (part || 0) / whole) : 0)
+
 // The figures above each tab.
 const kpis = computed(() => {
   if (!data.value) return []
@@ -800,15 +880,15 @@ const kpis = computed(() => {
     ]
     case 'appointments': return [
       { label: 'Appointments booked', value: d.appointments.booked, note: `${d.appointments.from_drives} at drives` },
-      { label: 'Came and donated', value: d.appointments.completed, note: 'Completed' },
-      { label: 'No-shows', value: d.appointments.no_show, note: `${d.appointments.cancelled} cancelled`, warn: true },
+      { label: 'Came and donated', value: d.appointments.completed, note: 'Completed', share: of(d.appointments.completed, d.appointments.booked) },
+      { label: 'No-shows', value: d.appointments.no_show, note: `${d.appointments.cancelled} cancelled`, warn: true, share: of(d.appointments.no_show, d.appointments.booked) },
       { label: 'Show rate', value: pct(d.appointments.show_rate), note: 'Came, of those due' },
     ]
     case 'deferrals': return [
       { label: 'Donors deferred', value: d.donations.deferred, note: 'At screening' },
       { label: 'Deferral rate', value: pct(d.donations.deferral_rate), note: 'Of everyone screened' },
-      { label: 'Kinds of deferral', value: d.deferrals.by_type.length, note: 'Temporary, permanent, indefinite' },
-      { label: 'Reasons recorded', value: d.deferrals.top_reasons.length, note: 'Most common shown' },
+      { label: 'Kinds of deferral', value: d.deferrals.by_type.length, note: 'Temporary, permanent, indefinite', bars: d.deferrals.by_type.map(t => t.count) },
+      { label: 'Reasons recorded', value: d.deferrals.top_reasons.length, note: 'Most common shown', bars: d.deferrals.top_reasons.map(r => r.count) },
     ]
     case 'overview': {
       const p = d.previous ?? {}
@@ -816,16 +896,16 @@ const kpis = computed(() => {
         { label: 'Donations collected', value: d.donations.collected, note: `${d.donations.by_blood_group.length} blood groups`, delta: change(d.donations.collected, p.collected) },
         { label: 'Deferral rate', value: pct(d.donations.deferral_rate), note: 'Of everyone screened', delta: change(d.donations.deferral_rate, p.deferral_rate, { points: true, goodWhenUp: false }) },
         { label: 'Show rate', value: pct(d.appointments.show_rate), note: 'Came, of those due', delta: change(d.appointments.show_rate, p.show_rate, { points: true }) },
-        { label: 'Lapsed donors', value: d.donor_profile.lapsed_donors, note: 'No donation in over a year', warn: true },
+        { label: 'Lapsed donors', value: d.donor_profile.lapsed_donors, note: 'No donation in over a year', warn: true, share: of(d.donor_profile.lapsed_donors, d.donor_profile.donors_here) },
       ]
     }
     case 'profile': {
       const t = d.donor_profile.total
       return [
         { label: 'Donations collected', value: t.total, note: `${t.sex.female} female, ${t.sex.male} male` },
-        { label: 'First-time donors', value: t.type.first_time, note: `${t.type.new_to_centre} new to this centre` },
-        { label: 'Repeat donors', value: t.type.repeat_retained, note: `${t.type.lapsed} came back after lapsing` },
-        { label: 'Lapsed donors', value: d.donor_profile.lapsed_donors, note: 'No donation in over a year', warn: true },
+        { label: 'First-time donors', value: t.type.first_time, note: `${t.type.new_to_centre} new to this centre`, share: of(t.type.first_time, t.total) },
+        { label: 'Repeat donors', value: t.type.repeat_retained, note: `${t.type.lapsed} came back after lapsing`, share: of(t.type.repeat_retained, t.total) },
+        { label: 'Lapsed donors', value: d.donor_profile.lapsed_donors, note: 'No donation in over a year', warn: true, share: of(d.donor_profile.lapsed_donors, d.donor_profile.donors_here) },
       ]
     }
     default: return []
@@ -1245,4 +1325,21 @@ html.dark .series__btn--appointments, html.dark .plot--appointments { --series: 
   .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid2 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ===== The tiles, as on Testing's reports (2026-10-30) ===== */
+.kpi { --tone-rgb: var(--rb-primary-rgb); min-height: 140px; }
+.kpi--crit { --tone-rgb: var(--rb-accent-rgb); }
+.kpi--warn { --tone-rgb: var(--rb-warning-rgb); }
+.kpi--ok { --tone-rgb: var(--rb-success-rgb); }
+.kpi--muted { --tone-rgb: 148, 163, 184; }
+.kpi__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.kpi__icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(var(--tone-rgb), 0.12); color: rgb(var(--tone-rgb)); }
+.kpi__spark { width: 96px; height: 34px; overflow: visible; }
+.kpi__spark-area { fill: rgba(var(--tone-rgb), 0.14); }
+.kpi__spark-line { fill: none; stroke: rgb(var(--tone-rgb)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.kpi__ring { width: 38px; height: 38px; transform: rotate(-90deg); }
+.kpi__ring-base { fill: none; stroke: rgba(var(--tone-rgb), 0.14); stroke-width: 5; }
+.kpi__ring-arc { fill: none; stroke: rgb(var(--tone-rgb)); stroke-width: 5; stroke-linecap: round; }
+.kpi__steps { display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.kpi__step { width: 10px; border-radius: 3px 3px 1px 1px; background: rgb(var(--tone-rgb)); opacity: 0.8; }
 </style>

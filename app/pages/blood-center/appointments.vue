@@ -13,6 +13,12 @@
         <div>
           <h1 class="page-title">Appointments</h1>
         </div>
+        <!-- The page's one main action, beside its title, so the toolbar keeps to one row
+             with the sidebar open (2026-10-30). -->
+        <button v-if="canManage" type="button" class="btn-primary" @click="openBooking">
+          <AssetIcon name="plus" :size="15" />
+          New Appointment
+        </button>
       </header>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -58,10 +64,6 @@
             <button type="button" class="btn-outline" :disabled="loading" @click="load(pager.page)">
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
               Refresh
-            </button>
-            <button v-if="canManage" type="button" class="btn-primary" @click="openBooking">
-              <AssetIcon name="plus" :size="15" />
-              New Appointment
             </button>
           </div>
         </div>
@@ -1334,4 +1336,6 @@ onBeforeUnmount(() => {
 <style scoped>
 /* The system dropdown in a toolbar: a fixed width rather than the row's. */
 .sel-filter { width: 180px; flex: none; }
+/* The search gives way first, so filters and actions share one row on a narrower bench. */
+.toolbar__filters .search { flex: 1 1 200px; min-width: 160px; }
 </style>

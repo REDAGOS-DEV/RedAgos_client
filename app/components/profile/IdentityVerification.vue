@@ -57,9 +57,12 @@
               v-model="form.validIdNumber"
               type="text"
               class="form-input"
-              placeholder="As printed on the card"
+              :placeholder="idFormat.placeholder"
               :disabled="submitting"
+              aria-describedby="identity-number-hint"
             >
+            <!-- How this ID's number reads and where it is on the card (2026-10-30). -->
+            <p v-if="idFormat.hint" id="identity-number-hint" class="form-hint">{{ idFormat.hint }}</p>
           </div>
 
           <div class="form-field form-field--full">
@@ -176,6 +179,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import IdCameraCapture from '~/components/profile/IdCameraCapture.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import { validIdFormat } from '~/utils/validIdTypes'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
 const props = defineProps({
@@ -198,6 +202,9 @@ const form = reactive({
   validIdType: '',
   validIdNumber: '',
 })
+
+// The chosen ID's sample number and where to find it.
+const idFormat = computed(() => validIdFormat(form.validIdType))
 
 const status = computed(() => props.identity?.status || 'unsubmitted')
 
@@ -606,4 +613,7 @@ onUnmounted(() => {
   background-position: right 12px center;
   background-size: 16px;
 }
+
+/* The chosen ID's sample and where its number is. */
+.identity .form-hint { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 </style>

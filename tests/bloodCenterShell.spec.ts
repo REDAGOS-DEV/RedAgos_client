@@ -212,11 +212,16 @@ describe('page gutters', () => {
     'processed', 'storage', 'testing-dashboard', 'processing-dashboard',
   ]
 
+  // A page whose body is a shared component: its styles live there (2026-10-31).
+  const PAGE_SOURCE: Record<string, string> = {
+    fulfillment: 'app/components/BloodCenter/FulfillmentBoard.vue',
+  }
+
   for (const page of PAGES) {
     // The column width and gutter are shared tokens (main.css), so every page
     // reads the same values rather than repeating a number.
     it(`${page}.vue sits in the shared content column`, () => {
-      const css = source(`app/pages/blood-center/${page}.vue`)
+      const css = source(PAGE_SOURCE[page] ?? `app/pages/blood-center/${page}.vue`)
       expect(css).toContain('max-width: var(--rb-content-max')
       expect(css).toMatch(/padding:\s*24px var\(--rb-gutter, 24px\) 40px/)
     })
@@ -229,7 +234,7 @@ describe('page gutters', () => {
    */
   it('leaves the full-height guarantee to the layout', () => {
     for (const page of PAGES) {
-      const css = source(`app/pages/blood-center/${page}.vue`).replace(/\/\*[\s\S]*?\*\//g, '')
+      const css = source(PAGE_SOURCE[page] ?? `app/pages/blood-center/${page}.vue`).replace(/\/\*[\s\S]*?\*\//g, '')
       expect(css, `${page}.vue`).not.toMatch(/min-height:\s*100vh/)
     }
   })

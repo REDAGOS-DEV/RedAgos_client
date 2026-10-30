@@ -1,4 +1,5 @@
 import { donorService } from '~/api/donor/DonorService'
+import { VALID_ID_TYPES } from '~/utils/validIdTypes'
 
 /**
  * Ang mga ID nga naay kinahanglanon sa luyo nga bahin.
@@ -139,15 +140,7 @@ export function useIdentityDocument() {
     loadingImage,
     imageUrl,
     releaseImage,
-    idTypeOptions: [
-      { value: 'philsys', label: 'PhilSys (National ID)' },
-      { value: 'umid', label: 'UMID' },
-      { value: 'drivers_license', label: "Driver's License" },
-      { value: 'passport', label: 'Passport' },
-      { value: 'postal_id', label: 'Postal ID' },
-      { value: 'prc_id', label: 'PRC ID' },
-      { value: 'voters_id', label: "Voter's ID" },
-      { value: 'sss_id', label: 'SSS ID' },
-    ],
+    // One list with the register form, each with its number's sample (utils/validIdTypes).
+    idTypeOptions: VALID_ID_TYPES.map(({ value, label }) => ({ value, label })),
   }
 }

@@ -156,19 +156,20 @@
   --rb-purple-text: #A78BFA;
   --rb-teal-text: #4DB6AC;
 
-  --rb-text-primary: #F1F5F9;
-  --rb-text-secondary: #94A3B8;
-  --rb-text-muted: #64748B;
-  --rb-placeholder: #94A3B8;
-  --rb-border: #334155;
-  --rb-border-strong: #334155;
-  --rb-border-hover: #475569;
-  --rb-surface: #1E293B;
-  --rb-surface-alt: #182234;
-  --rb-surface-hover: #263449;
-  --rb-page-bg: #0F172A;
-  --rb-skeleton-a: #1E293B;
-  --rb-skeleton-b: #263449;
+  /* Chrome's dark greys and text (2026-10-31; was a navy slate). */
+  --rb-text-primary: #E8EAED;
+  --rb-text-secondary: #BDC1C6;
+  --rb-text-muted: #9AA0A6;
+  --rb-placeholder: #9AA0A6;
+  --rb-border: #3C4043;
+  --rb-border-strong: #3C4043;
+  --rb-border-hover: #5F6368;
+  --rb-surface: #292A2D;
+  --rb-surface-alt: #252629;
+  --rb-surface-hover: #3C3D41;
+  --rb-page-bg: #202124;
+  --rb-skeleton-a: #292A2D;
+  --rb-skeleton-b: #3C3D41;
 }
 
 
@@ -189,7 +190,7 @@ html {
   background-color: #F6F8FB;
 }
 html.dark {
-  background-color: #0B1220;
+  background-color: #1A1B1E;
 }
 
 /*
@@ -217,26 +218,28 @@ html.dark.portal-bc {
   /* Blue slate, after the browser's own dark chrome: the tab strip, the
      address bar and the toolbar. Text levels re-checked on the cards (#2B3445)
      and the chrome (#333C4D): text-2 is 5.8:1 on the chrome. */
-  --ink-base: var(--accent-ink-base, #172030);
-  --ink-base-rgb: var(--accent-ink-base-rgb, 23, 32, 48);
-  --ink-page: var(--accent-ink-page, #1D2636);
-  --ink-page-rgb: var(--accent-ink-page-rgb, 29, 38, 54);
-  --ink-surface: var(--accent-ink-surface, #2B3445);
-  --ink-surface-rgb: var(--accent-ink-surface-rgb, 43, 52, 69);
-  --ink-chrome: var(--accent-ink-chrome, #333C4D);
-  --ink-surface-alt: var(--accent-ink-surface-alt, #252E3E);
-  --ink-hover: var(--accent-ink-hover, #364053);
-  --ink-border: var(--accent-ink-border, #3D4759);
-  --ink-border-rgb: var(--accent-ink-border-rgb, 61, 71, 89);
-  --ink-border-hover: var(--accent-ink-border-hover, #525D72);
-  --ink-text: #EEF1F5;
-  --ink-text-2: #B4BCC9;
-  --ink-text-3: #D0D6E0;
-  --ink-text-4: #E3E7EE;
-  --ink-muted: #97A0AF;
-  --ink-inset: var(--accent-ink-inset, #242C3B);
-  --ink-field-border: #46506A;
-  --ink-hover-border: #5D6880;
+  /* Chrome's dark greys (2026-10-31), set by useAccentTheme from CHROME_DARK;
+     these are the same values for before it runs. */
+  --ink-base: var(--accent-ink-base, #1A1B1E);
+  --ink-base-rgb: var(--accent-ink-base-rgb, 26, 27, 30);
+  --ink-page: var(--accent-ink-page, #202124);
+  --ink-page-rgb: var(--accent-ink-page-rgb, 32, 33, 36);
+  --ink-surface: var(--accent-ink-surface, #292A2D);
+  --ink-surface-rgb: var(--accent-ink-surface-rgb, 41, 42, 45);
+  --ink-chrome: var(--accent-ink-chrome, #2D2E31);
+  --ink-surface-alt: var(--accent-ink-surface-alt, #252629);
+  --ink-hover: var(--accent-ink-hover, #3C3D41);
+  --ink-border: var(--accent-ink-border, #3C4043);
+  --ink-border-rgb: var(--accent-ink-border-rgb, 60, 64, 67);
+  --ink-border-hover: var(--accent-ink-border-hover, #5F6368);
+  --ink-text: #E8EAED;
+  --ink-text-2: #BDC1C6;
+  --ink-text-3: #D2D5D9;
+  --ink-text-4: #E1E3E6;
+  --ink-muted: #9AA0A6;
+  --ink-inset: var(--accent-ink-inset, #1F2023);
+  --ink-field-border: #5F6368;
+  --ink-hover-border: #80868B;
 
   /* Lifted to keep 4.5:1 on the lighter slate surfaces. */
   --rb-accent-text: #FF8A8A;
