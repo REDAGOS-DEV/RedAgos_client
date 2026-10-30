@@ -20,6 +20,11 @@ class AuthService extends BaseService {
         return await this.request('/login', 'POST', payload);
     }
 
+    /** Sign in with the ID token Google Identity Services gave the browser. */
+    async loginWithGoogle(credential: string): Promise<any> {
+        return await this.request('/login/google', 'POST', { credential });
+    }
+
     async forgotPassword(payload: { email: string }): Promise<any> {
         return await this.request('/forgot-password', 'POST', payload);
     }
