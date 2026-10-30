@@ -38,27 +38,57 @@
           </div>
         </div>
 
+        <!-- Each figure with its icon and a small picture, as Testing's (2026-10-31). -->
         <div class="fc__kpis">
           <div class="kpi kpi--icon">
-            <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+              <!-- The twelve weeks behind, as a small curve. -->
+              <svg class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.demand.total.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.demand.total.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Units requested a week</span>
             <span class="kpi__value">{{ num(data.demand.total.per_week) }}</span>
             <span class="kpi__note">Range {{ data.demand.total.low }} to {{ data.demand.total.high }} <TrendChip :value="data.demand.total.trend" /></span>
           </div>
           <div class="kpi kpi--icon" :class="{ 'kpi--bad': data.demand.short }">
-            <span class="kpi__icon"><AssetIcon name="octagon-alert" :size="18" /></span>
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="octagon-alert" :size="18" /></span>
+              <!-- Demand blood type by blood type, red where it runs short. -->
+              <span v-if="demandBars.length" class="kpi__days" aria-hidden="true">
+                <span v-for="b in demandBars" :key="b.type" class="kpi__day" :title="`${b.type}: ${num(b.perWeek)} a week, ${STATUS[b.status]}`">
+                  <span class="kpi__day-exp" :class="{ 'kpi__day-exp--short': b.status === 'short' }" :style="{ height: `${Math.max(6, pct(b.perWeek, demandTop))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Short within a week</span>
             <span class="kpi__value">{{ data.demand.short }}</span>
             <span class="kpi__note">Blood type and component pairs</span>
           </div>
           <div class="kpi kpi--icon" :class="{ 'kpi--warn': data.demand.watch }">
-            <span class="kpi__icon"><AssetIcon name="eye" :size="18" /></span>
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="eye" :size="18" /></span>
+              <!-- The same, amber where under two weeks are left. -->
+              <span v-if="demandBars.length" class="kpi__days" aria-hidden="true">
+                <span v-for="b in demandBars" :key="b.type" class="kpi__day" :title="`${b.type}: ${num(b.perWeek)} a week, ${STATUS[b.status]}`">
+                  <span class="kpi__day-exp" :class="{ 'kpi__day-exp--watch': b.status === 'watch' }" :style="{ height: `${Math.max(6, pct(b.perWeek, demandTop))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">To watch</span>
             <span class="kpi__value">{{ data.demand.watch }}</span>
             <span class="kpi__note">Under two weeks of stock</span>
           </div>
           <div class="kpi kpi--icon" :class="{ 'kpi--alert': data.demand.emergency.requests }">
-            <span class="kpi__icon"><AssetIcon name="circle-alert" :size="18" /></span>
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="circle-alert" :size="18" /></span>
+              <svg class="kpi__spark" :class="{ 'kpi__spark--alert': data.demand.emergency.requests }" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.demand.emergency.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.demand.emergency.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Emergency requests a week</span>
             <span class="kpi__value">{{ num(data.demand.emergency.per_week) }}</span>
             <span class="kpi__note">{{ data.demand.emergency.share === null ? 'None in 12 weeks' : `${data.demand.emergency.share}% of requests` }}</span>
@@ -231,18 +261,51 @@
       <!-- ── Processing ── -->
       <section v-if="data.processing" class="fc__part" aria-labelledby="fc-processing">
         <h2 id="fc-processing" class="fc__title">Donations to process</h2>
+
+        <div class="outlook outlook--calm" role="status">
+          <span class="outlook__icon"><AssetIcon name="package-check" :size="20" /></span>
+          <div class="outlook__body">
+            <p class="outlook__title">{{ processingOutlook.title }}</p>
+            <p class="outlook__text">{{ processingOutlook.text }}</p>
+          </div>
+        </div>
+
         <div class="fc__kpis fc__kpis--3">
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+              <svg class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.processing.donations.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.processing.donations.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Donations a week</span>
             <span class="kpi__value">{{ num(data.processing.donations.per_week) }}</span>
             <span class="kpi__note">Range {{ data.processing.donations.low }} to {{ data.processing.donations.high }} <TrendChip :value="data.processing.donations.trend" /></span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="calendar" :size="18" /></span>
+              <!-- Booked, against the donations a week usually brings. -->
+              <svg class="kpi__ring" viewBox="0 0 40 40" aria-hidden="true">
+                <circle class="kpi__ring-base" cx="20" cy="20" r="15" />
+                <circle v-if="bookedShare" class="kpi__ring-arc" cx="20" cy="20" r="15" :stroke-dasharray="`${(bookedShare * RING).toFixed(1)} ${RING.toFixed(1)}`" />
+              </svg>
+            </span>
             <span class="kpi__label">Booked, next 7 days</span>
             <span class="kpi__value">{{ data.processing.booked_next_week }}</span>
             <span class="kpi__note">Donors with appointments</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="flask-conical" :size="18" /></span>
+              <!-- Each component asked for, the first picked out. -->
+              <span v-if="data.processing.components.length" class="kpi__days" aria-hidden="true">
+                <span v-for="(c, i) in data.processing.components.slice(0, 8)" :key="c.component" class="kpi__day" :class="{ 'kpi__day--top': i === 0 }" :title="`${c.component}: ${num(c.per_week)} a week`">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(c.per_week, maxOf(data.processing.components, 'per_week')))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Most asked-for component</span>
             <span class="kpi__value kpi__value--text">{{ data.processing.components[0]?.component ?? '—' }}</span>
             <span class="kpi__note">{{ data.processing.components[0] ? `${num(data.processing.components[0].per_week)} units a week` : 'No requests yet' }}</span>
@@ -380,23 +443,66 @@
       <!-- ── Billing ── -->
       <section v-if="data.billing" class="fc__part" aria-labelledby="fc-billing">
         <h2 id="fc-billing" class="fc__title">Billing ahead</h2>
+
+        <div class="outlook outlook--calm" role="status">
+          <span class="outlook__icon"><AssetIcon name="receipt" :size="20" /></span>
+          <div class="outlook__body">
+            <p class="outlook__title">{{ billingOutlook.title }}</p>
+            <p class="outlook__text">{{ billingOutlook.text }}</p>
+          </div>
+        </div>
+
         <div class="fc__kpis">
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="file-text" :size="18" /></span>
+              <svg class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.billing.requests.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.billing.requests.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Requests a week</span>
             <span class="kpi__value">{{ num(data.billing.requests.per_week) }}</span>
             <span class="kpi__note">Range {{ data.billing.requests.low }} to {{ data.billing.requests.high }} <TrendChip :value="data.billing.requests.trend" /></span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+              <!-- Units a week, component by component. -->
+              <span v-if="data.billing.components.length" class="kpi__days" aria-hidden="true">
+                <span v-for="c in data.billing.components.slice(0, 8)" :key="c.component" class="kpi__day" :title="`${c.component}: ${num(c.units_per_week)} a week`">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(c.units_per_week, maxOf(data.billing.components, 'units_per_week')))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Units a week</span>
             <span class="kpi__value">{{ num(data.billing.units_per_week) }}</span>
             <span class="kpi__note">Across every component</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="philippine-peso" :size="18" /></span>
+              <!-- The amount, component by component, the largest picked out. -->
+              <span v-if="data.billing.components.length" class="kpi__days" aria-hidden="true">
+                <span v-for="c in data.billing.components.slice(0, 8)" :key="c.component" class="kpi__day" :class="{ 'kpi__day--top': c.amount_per_week === maxOf(data.billing.components, 'amount_per_week') }" :title="`${c.component}: ${peso(c.amount_per_week)} a week`">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(c.amount_per_week, maxOf(data.billing.components, 'amount_per_week')))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">To bill a week</span>
             <span class="kpi__value">{{ peso(data.billing.amount_per_week) }}</span>
             <span class="kpi__note">At today's prices</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="calendar" :size="18" /></span>
+              <!-- The last weeks' requests, then the weeks ahead picked out. -->
+              <span class="kpi__days" aria-hidden="true">
+                <span v-for="(b, i) in billingAhead" :key="i" class="kpi__day" :class="{ 'kpi__day--top': b.ahead }">
+                  <span class="kpi__day-exp" :style="{ height: `${b.h}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Next {{ data.method.horizon_weeks }} weeks</span>
             <span class="kpi__value">{{ peso(data.billing.amount_horizon) }}</span>
             <span class="kpi__note">Before discounts and waivers</span>
@@ -500,6 +606,64 @@ const weekdayOf = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { w
 const weekBooked = computed(() => (data.value?.testing?.days ?? []).reduce((n, d) => n + d.booked, 0))
 // One scale for the expected and the booked, so a day booked past its average shows it.
 const dayTop = computed(() => Math.max(0.0001, ...(data.value?.testing?.days ?? []).flatMap(d => [d.expected, d.booked])))
+
+// Demand blood type by blood type, with its worst status, for the small bars.
+const STATUS_RANK = { short: 2, watch: 1, ok: 0 }
+const demandBars = computed(() => {
+  const byType = new Map()
+  for (const r of data.value?.demand?.rows ?? []) {
+    const b = byType.get(r.blood_type) ?? { type: r.blood_type, perWeek: 0, status: 'ok' }
+    b.perWeek += r.per_week || 0
+    if ((STATUS_RANK[r.status] ?? 0) > STATUS_RANK[b.status]) b.status = r.status
+    byType.set(r.blood_type, b)
+  }
+  return [...byType.values()].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type))
+})
+const demandTop = computed(() => Math.max(0.0001, ...demandBars.value.map(b => b.perWeek)))
+
+// Booked against the donations a week, for the ring.
+const RING = 2 * Math.PI * 15
+const bookedShare = computed(() => {
+  const p = data.value?.processing
+  return p?.donations?.per_week ? Math.min(1, (p.booked_next_week || 0) / p.donations.per_week) : 0
+})
+
+// The last eight weeks' requests, then the weeks ahead at the forecast.
+const billingAhead = computed(() => {
+  const r = data.value?.billing?.requests
+  if (!r) return []
+  const past = (r.series ?? []).slice(-8)
+  const ahead = Array(data.value.method?.horizon_weeks ?? 4).fill(r.per_week || 0)
+  const top = Math.max(0.0001, ...past, ...ahead)
+  return [...past.map(v => ({ h: Math.max(6, pct(v, top)), ahead: false })), ...ahead.map(v => ({ h: Math.max(6, pct(v, top)), ahead: true }))]
+})
+
+// Processing and Billing, each said in one line, as Testing is.
+const processingOutlook = computed(() => {
+  const p = data.value?.processing
+  if (!p) return { title: '', text: '' }
+  if (!p.donations.per_week && !p.components.length) {
+    return { title: 'Nothing to forecast from yet', text: 'No donations or requests in the last 12 weeks. The forecast fills in as they come.' }
+  }
+  const top = p.components[0]
+  return {
+    title: `About ${num(p.donations.per_week)} donations a week to process`,
+    text: top
+      ? `${p.booked_next_week} donors booked in the next 7 days. ${top.component} is asked for most, about ${num(top.per_week)} units a week.`
+      : `${p.booked_next_week} donors booked in the next 7 days. No component requests in the last 12 weeks.`,
+  }
+})
+const billingOutlook = computed(() => {
+  const b = data.value?.billing
+  if (!b) return { title: '', text: '' }
+  if (!b.requests.per_week) {
+    return { title: 'Nothing to forecast from yet', text: 'No requests reached this centre in the last 12 weeks. The forecast fills in as they come.' }
+  }
+  return {
+    title: `About ${peso(b.amount_per_week)} to bill a week`,
+    text: `${peso(b.amount_horizon)} over the next ${data.value.method.horizon_weeks} weeks, from about ${num(b.requests.per_week)} requests a week at today's prices.`,
+  }
+})
 
 // Testing, said in one line: what comes in, and what may be found.
 const testingOutlook = computed(() => {
@@ -718,4 +882,8 @@ html.dark .pill--ok { color: #4ADE80; }
 /* The gap bars: short in red, keeping up in green. */
 .kpi__day-exp--short { background: rgba(var(--rb-accent-rgb), 0.75); }
 .kpi__day-exp--ok { background: rgba(var(--rb-success-rgb), 0.55); }
+.kpi__day-exp--watch { background: rgba(var(--rb-warning-rgb), 0.8); }
+.kpi__ring { width: 34px; height: 34px; transform: rotate(-90deg); }
+.kpi__ring-base { fill: none; stroke: rgba(var(--rb-primary-rgb), 0.14); stroke-width: 5; }
+.kpi__ring-arc { fill: none; stroke: var(--rb-primary); stroke-width: 5; stroke-linecap: round; }
 </style>
