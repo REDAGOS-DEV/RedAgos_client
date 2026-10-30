@@ -167,7 +167,7 @@
                 <td class="row-actions" @click.stop>
                   <!-- Write actions only for whoever may record money; billing.view alone reads. -->
                   <NuxtLink v-if="canSeePayments && takesPayment(s)" :to="`/blood-center/pos?request=${requestIdOf(s)}`" class="ui-btn ui-btn--primary ui-btn--sm">
-                    Take payment
+                    Record payment
                   </NuxtLink>
                   <NuxtLink :to="`/blood-center/invoice/${requestIdOf(s)}`" class="ui-btn ui-btn--sm">Open</NuxtLink>
                 </td>

@@ -45,6 +45,7 @@
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { logoProblem } from '~/utils/stockReport'
+import { trimImageFile } from '~/utils/trimImage'
 
 /**
  * The Blood Center Admin's upload of their own facility's logos.
@@ -140,12 +141,13 @@ async function onFileChosen(event) {
     return
   }
 
-  const form = new FormData()
-  form.append('logo', file)
-
   busy.value = true
 
   try {
+    // The empty margin off, so it prints as large as the logo opposite (2026-10-31).
+    const form = new FormData()
+    form.append('logo', await trimImageFile(file))
+
     const res = await copy.value.upload(form)
 
     previewUrl.value = res?.[copy.value.field] ?? null

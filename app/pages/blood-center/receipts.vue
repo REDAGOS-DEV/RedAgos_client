@@ -51,7 +51,7 @@
           <p class="pay-empty__text">
             {{ filtered
               ? 'Try another number or name, widen the dates, or show every status.'
-              : 'Every payment taken at the billing counter is given a receipt, listed here to reopen, reprint or download.' }}
+              : 'Every payment recorded on the Billing Counter is given a receipt, listed here to reopen, reprint or download.' }}
           </p>
           <button v-if="filtered" type="button" class="ui-btn" @click="clearFilters">
             <AssetIcon name="x" :size="14" />

@@ -138,23 +138,59 @@
       <!-- ── Collection: Donor & Collection ── -->
       <section v-if="data.collection" class="fc__part" aria-labelledby="fc-collection">
         <h2 id="fc-collection" class="fc__title">Donors to recruit</h2>
+        <!-- Each figure with its icon and a small picture of what is behind it (2026-10-30). -->
         <div class="fc__kpis">
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="users" :size="18" /></span>
+              <!-- Needed a week, blood type by blood type. -->
+              <span v-if="typeBars.length" class="kpi__days" aria-hidden="true">
+                <span v-for="b in typeBars" :key="b.type" class="kpi__day" :title="`${b.type}: ${num(b.needed)} a week`">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(b.needed, typeTop.needed))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Donors needed a week</span>
             <span class="kpi__value">{{ num(data.collection.needed_per_week) }}</span>
             <span class="kpi__note">To meet the demand forecast</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="droplets" :size="18" /></span>
+              <!-- The twelve weeks behind, as a small curve. -->
+              <svg class="kpi__spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+                <path :d="sparkOf(data.collection.donations.series).area" class="kpi__spark-area" />
+                <path :d="sparkOf(data.collection.donations.series).line" class="kpi__spark-line" vector-effect="non-scaling-stroke" />
+              </svg>
+            </span>
             <span class="kpi__label">Donations a week</span>
             <span class="kpi__value">{{ num(data.collection.donations.per_week) }}</span>
             <span class="kpi__note">Range {{ data.collection.donations.low }} to {{ data.collection.donations.high }} <TrendChip :value="data.collection.donations.trend" /></span>
           </div>
-          <div class="kpi" :class="gapClass(collectionGap)">
+          <div class="kpi kpi--icon" :class="gapClass(collectionGap)">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon :name="collectionGap > 0 ? 'trending-up' : 'check-circle'" :size="18" /></span>
+              <!-- Each type's gap: red where it falls short, green where collection keeps up. -->
+              <span v-if="typeBars.length" class="kpi__days" aria-hidden="true">
+                <span v-for="b in typeBars" :key="b.type" class="kpi__day" :title="`${b.type}: ${b.gap > 0 ? '+' : ''}${num(b.gap)} a week`">
+                  <span class="kpi__day-exp" :class="b.gap > 0.5 ? 'kpi__day-exp--short' : 'kpi__day-exp--ok'" :style="{ height: `${Math.max(6, pct(Math.abs(b.gap), typeTop.gap))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Gap a week</span>
             <span class="kpi__value">{{ collectionGap > 0 ? `+${num(collectionGap)}` : num(collectionGap) }}</span>
             <span class="kpi__note">{{ collectionGap > 0 ? 'More donors needed than come' : 'Collection keeps up' }}</span>
           </div>
-          <div class="kpi">
+          <div class="kpi kpi--icon">
+            <span class="kpi__top">
+              <span class="kpi__icon"><AssetIcon name="calendar" :size="18" /></span>
+              <!-- Who is booked, blood type by blood type. -->
+              <span v-if="typeBars.length" class="kpi__days" aria-hidden="true">
+                <span v-for="b in typeBars" :key="b.type" class="kpi__day" :title="`${b.type}: ${b.booked} booked`">
+                  <span class="kpi__day-exp" :style="{ height: `${Math.max(6, pct(b.booked, typeTop.booked))}%` }" />
+                </span>
+              </span>
+            </span>
             <span class="kpi__label">Booked, next 4 weeks</span>
             <span class="kpi__value">{{ data.collection.booked }}</span>
             <span class="kpi__note">{{ data.collection.booked_untyped ? `${data.collection.booked_untyped} not yet typed` : 'Appointments still to come' }}</span>
@@ -439,6 +475,17 @@ const busiestDay = computed(() => {
   return top && top.expected > 0 ? top : null
 })
 const weekExpected = computed(() => (data.value?.testing?.days ?? []).reduce((n, d) => n + d.expected, 0))
+// Donors to recruit, blood type by blood type, in the usual order, for the small bars.
+const TYPE_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const typeBars = computed(() => [...(data.value?.collection?.rows ?? [])]
+  .sort((a, b) => TYPE_ORDER.indexOf(a.blood_type) - TYPE_ORDER.indexOf(b.blood_type))
+  .map(r => ({ type: r.blood_type, needed: r.needed_per_week, gap: r.gap_per_week, booked: r.booked })))
+const typeTop = computed(() => ({
+  needed: Math.max(0.0001, ...typeBars.value.map(b => b.needed)),
+  gap: Math.max(0.0001, ...typeBars.value.map(b => Math.abs(b.gap))),
+  booked: Math.max(0.0001, ...typeBars.value.map(b => b.booked)),
+}))
+
 /** A small curve of a week-by-week series, for a headline. */
 function sparkOf(series = []) {
   const n = series.length
@@ -668,4 +715,7 @@ html.dark .pill--ok { color: #4ADE80; }
 .fc__skeleton { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .fc__skel-card { height: 104px; border-radius: 16px; background: var(--rb-skeleton-a, #EEF1F5); }
 .fc__skel-chart { grid-column: 1 / -1; height: 240px; border-radius: 18px; background: var(--rb-skeleton-a, #EEF1F5); }
+/* The gap bars: short in red, keeping up in green. */
+.kpi__day-exp--short { background: rgba(var(--rb-accent-rgb), 0.75); }
+.kpi__day-exp--ok { background: rgba(var(--rb-success-rgb), 0.55); }
 </style>

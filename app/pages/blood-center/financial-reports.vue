@@ -39,10 +39,22 @@
       <!-- The period in five figures, counted on the server. -->
       <dl class="figures" :aria-busy="loading">
         <div v-for="f in figures" :key="f.label" class="figure" :class="[`figure--${f.tone}`, { 'figure--zero': report && !(f.raw > 0) }]">
-          <dt>
-            <span class="figure__icon" aria-hidden="true"><AssetIcon :name="f.icon" :size="16" /></span>
-            {{ f.label }}
-          </dt>
+          <!-- Icon and a small picture on top, then the label, as on the other reports (2026-10-31). -->
+          <span class="figure__top" aria-hidden="true">
+            <span class="figure__icon"><AssetIcon :name="f.icon" :size="16" /></span>
+            <svg v-if="f.spark" class="figure__spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+              <path :d="f.spark.area" class="figure__spark-area" />
+              <path :d="f.spark.line" class="figure__spark-line" vector-effect="non-scaling-stroke" />
+            </svg>
+            <span v-else-if="f.bars" class="figure__bars">
+              <span v-for="(b, i) in f.bars" :key="i" class="figure__bar" :class="b.tone ? `figure__bar--${b.tone}` : ''" :style="{ height: `${b.h}%` }" />
+            </span>
+            <svg v-else-if="f.ring !== undefined" class="figure__ring" viewBox="0 0 40 40">
+              <circle class="figure__ring-base" cx="20" cy="20" r="15" />
+              <circle v-if="f.ring" class="figure__ring-arc" cx="20" cy="20" r="15" :stroke-dasharray="`${(f.ring * RING15).toFixed(1)} ${RING15.toFixed(1)}`" />
+            </svg>
+          </span>
+          <dt>{{ f.label }}</dt>
           <dd>{{ f.value }}</dd>
           <span class="figure__note">{{ f.note }}</span>
         </div>
@@ -231,6 +243,7 @@ import CollectionsChart from '~/components/BloodCenter/CollectionsChart.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import { PERIOD_PRESETS, periodFor, periodLabel } from '~/utils/reportPeriod'
+import { smoothPath } from '~/utils/smoothPath'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -292,16 +305,47 @@ async function downloadPdf() {
 watch([from, to], load)
 onMounted(load)
 
+// -- Each figure's small picture (2026-10-31) --
+const RING15 = 2 * Math.PI * 15
+const partOf = (part, whole) => (Number(whole) > 0 ? Math.min(1, (Number(part) || 0) / Number(whole)) : 0)
+function sparkOf(values) {
+  const n = values.length
+  if (n < 2) return null
+  const top = Math.max(1, ...values)
+  const points = values.map((v, i) => ({ x: (i / (n - 1)) * 120, y: 36 - ((v || 0) / top) * 32 }))
+  const line = smoothPath(points)
+  return { line, area: `${line} L120,40 L0,40 Z` }
+}
+function barsOf(values, tones = []) {
+  const top = Math.max(1, ...values)
+  return values.slice(0, 8).map((v, i) => ({ h: Math.max(8, Math.round(((v || 0) / top) * 100)), tone: tones[i] ?? '' }))
+}
+
 const figures = computed(() => {
   const s = report.value?.summary
   const count = (n, one, many) => `${n ?? 0} ${(n ?? 0) === 1 ? one : many}`
+  const r = report.value
+  // What is still owed, by how old: patients and hospitals together.
+  const ages = ['week', 'month', 'older'].map(key => ['patients', 'hospitals']
+    .reduce((sum, who) => sum + Number(r?.receivables?.[who]?.by_age?.find(a => a.key === key)?.amount ?? 0), 0))
+  const hospitalsOwe = Number(r?.receivables?.hospitals?.amount ?? 0)
 
   return [
-    { label: 'Invoiced', raw: Number(s?.invoiced), icon: 'file-text', tone: 'neutral', value: pesos(s?.invoiced), note: count(s?.invoices, 'invoice', 'invoices') },
-    { label: 'Collected', raw: Number(s?.collected), icon: 'philippine-peso', tone: 'blue', value: pesos(s?.collected), note: count(report.value?.collections?.payments, 'payment', 'payments') },
-    { label: 'Subsidised', raw: Number(s?.subsidised), icon: 'shield-check', tone: 'green', value: pesos(s?.subsidised), note: count(report.value?.subsidies?.count, 'request', 'requests') },
-    { label: 'Settled by hospitals', raw: Number(s?.settled_by_hospitals), icon: 'building-2', tone: 'purple', value: pesos(s?.settled_by_hospitals), note: count(report.value?.receivables?.settlements?.count, 'settlement', 'settlements') },
-    { label: 'Outstanding', raw: Number(s?.outstanding), icon: 'clock', tone: 'amber', value: pesos(s?.outstanding), note: 'As of today' },
+    // By component: what each was billed.
+    { label: 'Invoiced', raw: Number(s?.invoiced), icon: 'file-text', tone: 'neutral', value: pesos(s?.invoiced), note: count(s?.invoices, 'invoice', 'invoices'),
+      bars: barsOf((r?.by_component ?? []).map(c => Number(c.amount) || 0)) },
+    // Day by day, as the Collections chart below.
+    { label: 'Collected', raw: Number(s?.collected), icon: 'philippine-peso', tone: 'blue', value: pesos(s?.collected), note: count(r?.collections?.payments, 'payment', 'payments'),
+      spark: sparkOf((r?.collections?.series ?? []).map(p => Number(p.amount) || 0)) },
+    // The part of what was invoiced that the subsidy met.
+    { label: 'Subsidised', raw: Number(s?.subsidised), icon: 'shield-check', tone: 'green', value: pesos(s?.subsidised), note: count(r?.subsidies?.count, 'request', 'requests'),
+      ring: partOf(s?.subsidised, s?.invoiced) },
+    // Settled, of what hospitals were asked for (settled plus still owed).
+    { label: 'Settled by hospitals', raw: Number(s?.settled_by_hospitals), icon: 'building-2', tone: 'purple', value: pesos(s?.settled_by_hospitals), note: count(r?.receivables?.settlements?.count, 'settlement', 'settlements'),
+      ring: partOf(s?.settled_by_hospitals, Number(s?.settled_by_hospitals ?? 0) + hospitalsOwe) },
+    // How old: 0-7 days, 8-30, over 30.
+    { label: 'Outstanding', raw: Number(s?.outstanding), icon: 'clock', tone: 'amber', value: pesos(s?.outstanding), note: 'As of today',
+      bars: barsOf(ages, ['ok', 'warn', 'crit']) },
   ]
 })
 
@@ -509,4 +553,19 @@ function share(amount, max) {
 .table-empty strong { font-size: 13.5px; color: var(--rb-text-primary); }
 .table-empty__icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 13px; background: rgba(var(--rb-accent-rgb), .1); color: var(--rb-accent-text); box-shadow: 0 0 0 6px rgba(var(--rb-accent-rgb), .05); }
 .table-empty__icon--purple { background: rgba(var(--rb-purple-rgb, 124, 58, 237), .1); color: rgb(var(--rb-purple-rgb, 124, 58, 237)); box-shadow: 0 0 0 6px rgba(var(--rb-purple-rgb, 124, 58, 237), .05); }
+
+/* Icon and picture on top, as on the other reports (2026-10-31). */
+.figure__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; min-height: 38px; margin-bottom: 6px; }
+.figure__spark { width: 96px; height: 34px; overflow: visible; }
+.figure__spark-area { fill: rgba(var(--tone-rgb), 0.14); }
+.figure__spark-line { fill: none; stroke: rgb(var(--tone-rgb)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.figure__bars { display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.figure__bar { width: 10px; border-radius: 3px 3px 1px 1px; background: rgb(var(--tone-rgb)); opacity: 0.8; }
+.figure--neutral .figure__bar { background: var(--rb-text-muted); }
+.figure__bar--ok { background: var(--rb-success) !important; }
+.figure__bar--warn { background: var(--rb-warning) !important; }
+.figure__bar--crit { background: var(--rb-accent) !important; }
+.figure__ring { width: 38px; height: 38px; transform: rotate(-90deg); }
+.figure__ring-base { fill: none; stroke: rgba(var(--tone-rgb), 0.14); stroke-width: 5; }
+.figure__ring-arc { fill: none; stroke: rgb(var(--tone-rgb)); stroke-width: 5; stroke-linecap: round; }
 </style>

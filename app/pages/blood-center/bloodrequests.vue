@@ -2515,4 +2515,20 @@ onBeforeUnmount(() => {
 <style scoped>
 /* The system dropdown in a toolbar: a fixed width rather than the row's. */
 .sel-filter { width: 180px; flex: none; }
+
+/*
+  The width shared out by what each column holds (2026-10-31): Actions takes
+  only its buttons (the 1% of an auto table), so the room it held empty goes
+  to the reference, hospital and patient, whose text no longer cuts off.
+*/
+.req-table { table-layout: auto; }
+.req-table th { width: auto !important; }
+.req-table th.c-actions, .req-table td.c-actions { width: 1% !important; white-space: nowrap; }
+.req-table .c-id .sub, .req-table .c-hospital .sub { white-space: normal; overflow: visible; text-overflow: clip; }
+.req-table td.c-date, .req-table td.c-units, .req-table td.c-status { white-space: nowrap; }
+/* The date under the ID only where the Date column is folded away; it was showing twice. */
+.req-table .sub.id-date { display: none; }
+@container (max-width: 1199px) {
+  .req-table .sub.id-date { display: block; }
+}
 </style>

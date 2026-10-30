@@ -18,7 +18,7 @@ export interface ValidIdType {
 export const VALID_ID_TYPES: ValidIdType[] = [
   { value: 'philsys', label: 'PhilSys (National ID)', sample: '1234-5678-9012-3456', hint: 'The 16-digit PhilSys Card Number (PCN) on the front of the card.' },
   { value: 'umid', label: 'UMID', sample: '0111-2345678-9', hint: 'The 12-digit Common Reference Number (CRN) on the front.' },
-  { value: 'drivers_license', label: "Driver's License", sample: 'N01-23-456789', hint: 'The license number on the front, beside your photo.' },
+  { value: 'drivers_license', label: "Driver's License", sample: 'N01-23-456789', hint: 'The license number on the front, beside the photo.' },
   { value: 'passport', label: 'Passport', sample: 'P1234567A', hint: 'The passport number at the top right of the photo page.' },
   { value: 'postal_id', label: 'Postal ID', sample: '1234 5678 9012', hint: 'The Postal Reference Number (PRN) on the front.' },
   { value: 'prc_id', label: 'PRC ID', sample: '0123456', hint: 'The registration number on the front.' },

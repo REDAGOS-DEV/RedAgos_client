@@ -39,7 +39,7 @@
         <!-- ============ TODAY AT THE COUNTER ============ -->
         <section class="card today bento__today" aria-labelledby="today-title">
           <div class="card__head">
-            <h2 id="today-title" class="card__label">Today at the counter</h2>
+            <h2 id="today-title" class="card__label">Collected today</h2>
           </div>
           <p class="today__amount">{{ peso(t.collected_today) }}</p>
           <p class="today__sub">

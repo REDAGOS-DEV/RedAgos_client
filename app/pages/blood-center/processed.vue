@@ -1848,6 +1848,11 @@ onBeforeUnmount(() => {
   .c-id { display: table-cell; }
   .c-id, .c-bag, .c-processed, .c-actions { white-space: nowrap; }
   .c-components { min-width: 150px; }
+  /* Actions and ID take only what their content needs (the 1% width of an
+     auto table), so the rest of the width spreads between the other columns
+     instead of pooling after the buttons (2026-10-31). */
+  .processed-table th.c-actions, .processed-table td.c-actions,
+  .processed-table th.c-id, .processed-table td.c-id { width: 1% !important; }
   .btn-handover:disabled { gap: 0; padding: 0 9px; font-size: 0; }
 }
 </style>

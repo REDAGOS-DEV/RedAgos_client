@@ -296,6 +296,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       // For everyone; Settings first, then Help Center (2026-10-27).
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
+      // Reached from the bell's "View all"; named here for the breadcrumb and search (2026-10-31).
+      { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', hidden: true, keywords: 'notifications alerts inbox unread emergency messages' },
       { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
     ],
   },
