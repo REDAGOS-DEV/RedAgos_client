@@ -1,7 +1,6 @@
 <template>
   <div class="forecast-page">
     <PageHeader title="Demand Forecast">
-      <template #subtitle>{{ subtitle }}</template>
       <template v-if="can(REPORTS_ABILITIES)" #actions>
         <!-- Looking back lives on its own page. -->
         <NuxtLink to="/blood-center/reports" class="aside-link">
@@ -22,7 +21,6 @@
  * 2026-10-24). What it shows depends on the viewer's department; the server
  * decides (DemandForecastService), and ForecastPanel draws each part.
  */
-import { computed } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import ForecastPanel from '~/components/BloodCenter/ForecastPanel.vue'
@@ -35,14 +33,7 @@ definePageMeta({
   requires: ['inventory.view', 'donations.view', 'lab.record_components', 'lab.record_serology', 'billing.record_payment'],
 })
 
-const { user, can } = useUser()
-
-const subtitle = computed(() => {
-  const who = user.value?.management_level === 'supervisor'
-    ? 'Every department'
-    : user.value?.department_label || 'Your department'
-  return `${who} · what to plan for in the weeks ahead`
-})
+const { can } = useUser()
 </script>
 
 <style scoped>

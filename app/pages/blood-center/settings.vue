@@ -58,7 +58,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Profile</h2>
-            <p class="card__sub">Your details as they appear across RedAgos.</p>
           </div>
           <span v-if="editingProfile" class="editing-pill"><AssetIcon name="pencil" :size="12" /> Editing</span>
         </header>
@@ -133,7 +132,6 @@
         <div class="card__aside">
           <span class="aside-icon"><AssetIcon name="lock" :size="20" /></span>
           <h2 class="card__title">Password</h2>
-          <p class="card__sub">You'll stay signed in on this device after changing it.</p>
           <ul class="checklist" aria-label="Password requirements">
             <li :class="{ 'checklist--ok': passwordForm.new.length >= 8 }">
               <AssetIcon :name="passwordForm.new.length >= 8 ? 'check' : 'circle'" :size="13" /> At least 8 characters
@@ -192,7 +190,6 @@
         <section class="card card--split card--appearance">
           <div class="card__main">
             <h2 class="card__title">Appearance</h2>
-            <p class="card__sub">Make RedAgos yours. Saved on this device and used in every RedAgos portal.</p>
             <!-- The donor portal's picker: mode, colour and custom colour. -->
             <AppearancePicker class="card__picker" />
           </div>
@@ -243,7 +240,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Notifications</h2>
-            <p class="card__sub">What RedAgos tells you about, from your role. Shown in the bell at the top.</p>
           </div>
         </header>
         <!--
@@ -258,7 +254,6 @@
           <label v-for="pref in notificationPrefs" :key="pref.key" class="toggle-row" :class="{ 'toggle-row--locked': pref.locked }">
             <span class="toggle-row__text">
               <span class="toggle-row__label">{{ pref.label }}</span>
-              <span class="toggle-row__desc">{{ pref.description }}</span>
               <span class="toggle-row__reason"><AssetIcon name="user-check" :size="12" /> {{ pref.reason }}</span>
             </span>
             <!-- On and held there: a switch, so it reads as a preference, but one that cannot be turned off. -->
@@ -287,7 +282,6 @@
           <header class="card__head">
             <div>
               <h2 class="card__title">Signed-in devices</h2>
-              <p class="card__sub">Where your account is open right now.</p>
             </div>
           </header>
 
@@ -314,7 +308,6 @@
           <header class="card__head">
             <div>
               <h2 class="card__title">Account information</h2>
-              <p class="card__sub">Read-only details about your account.</p>
             </div>
           </header>
           <dl class="info-grid">
@@ -336,7 +329,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Blood Center</h2>
-            <p class="card__sub">Settings that belong to your centre, not to your account.</p>
           </div>
         </header>
         <BloodCenterFacilityLogoCard />
@@ -350,10 +342,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Booking</h2>
-            <p class="card__sub">
-              The days and times donors can book a visit to the centre in the Donor Portal, and how many each slot takes.
-              Mobile drives keep their own hours and capacity.
-            </p>
           </div>
         </header>
         <BloodCenterBookingScheduleCard embedded />
@@ -374,9 +362,6 @@
             </button>
           </div>
           <div class="modal-form">
-            <p class="modal-subtitle">
-              This signs you out everywhere, including this device. You'll need to sign in again on each one.
-            </p>
             <div class="modal-actions">
               <button type="button" class="ui-btn ui-btn--ghost" @click="confirmLogoutOthers = false">Cancel</button>
               <button type="button" class="btn-danger-soft" :disabled="loggingOutOthers" @click="logoutOtherDevices">
@@ -998,7 +983,6 @@ onMounted(async () => {
 }
 
 .card__title { margin: 0; font-size: var(--rb-fs-section, 15px); font-weight: 700; color: var(--text-primary); }
-.card__sub { margin: 3px 0 0; font-size: var(--rb-fs-small, 13px); line-height: 1.5; color: var(--text-secondary); }
 
 .card__foot {
   display: flex;
@@ -1413,7 +1397,6 @@ onMounted(async () => {
 
 .toggle-row__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .toggle-row__label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.toggle-row__desc { font-size: 12.5px; color: var(--text-secondary); }
 .toggle-row__reason { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--rb-primary-text); }
 .toggle-row--locked { cursor: default; }
 .always-on { display: inline-flex; flex-shrink: 0; align-items: center; gap: 10px; }
@@ -1604,7 +1587,6 @@ onMounted(async () => {
 }
 
 .modal-card__close:hover { background: var(--rb-surface-hover); }
-.modal-subtitle { margin: 14px 0 18px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 .modal-enter-active,

@@ -106,6 +106,43 @@ describe('the hospital Stock Intake page', () => {
     expect(page).toContain('hospitalService.discardUnit(')
     expect(page).toContain('UNIT_REFUSAL_MESSAGES[code]')
   })
+
+  it('picks every bag\'s storage location from the list, never optional (project owner, 2026-10-30)', () => {
+    const template = page.slice(0, page.indexOf('<script'))
+
+    expect(template).toContain('placeholder="Select a location"')
+    expect(template).toContain(':options="locationOptions"')
+    expect(template).not.toContain('Optional')
+    expect(template).not.toContain('<datalist')
+    expect(template).toContain(':disabled="!canStockIn"')
+    expect(page).toContain('storage_location: locations[id],')
+    expect(page).not.toContain('|| null')
+  })
+
+  it('adds a blood unit from outside RedAgos through Direct Distribution\'s receipt (project owner, 2026-10-30)', () => {
+    expect(page).toContain("const canAdd = computed(() => can('hospital.receiving.direct'))")
+    // The toolbar's primary action, as New Donor is on the centre's Donor Management (project owner, 2026-10-30).
+    expect(page).toContain('<button v-if="canAdd" type="button" class="btn-primary" @click="addingUnit = true">')
+    expect(page).toContain('<HospitalAddBloodUnitDialog v-if="addingUnit" @added="onUnitAdded" @close="addingUnit = false" />')
+
+    const dialog = source('app/components/Hospital/AddBloodUnitDialog.vue')
+    expect(dialog).toContain('v-focus-trap')
+    expect(dialog).toContain('@dialog-escape="!busy && $emit(\'close\')"')
+    expect(dialog).toContain('hospitalService.receiveDirectDistribution({')
+    expect(dialog).not.toContain('transfusion_request_id')
+
+    // Only what the bag says: no source, requester, volume or time received (project owner, 2026-10-30).
+    const template = dialog.slice(0, dialog.indexOf('<script'))
+    for (const removed of ['Source facility', 'Requested by', 'Volume (mL)', 'Date / time received']) {
+      expect(template).not.toContain(removed)
+    }
+    for (const field of ['external_blood_source_id', 'requested_for', 'volume_ml', 'received_at']) {
+      expect(dialog).not.toContain(field)
+    }
+
+    // A bag with no source still says where it came from.
+    expect(page).toContain("source_name || 'outside RedAgos'")
+  })
 })
 
 describe('the hospital Inventory Report', () => {

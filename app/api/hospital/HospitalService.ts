@@ -34,7 +34,6 @@ import type {
   ReceiveDirectDistributionPayload,
   CreateWeeklyRequestPayload,
   DirectDistribution,
-  ExternalBloodSource,
   IsoWeekday,
   ReplenishmentSchedule,
   WeeklyRequest,
@@ -428,9 +427,9 @@ class HospitalService extends BaseService {
 
   /**
    * Stock in arrived bags (inventory staff): each becomes available, stored
-   * where staff said. The location is optional. All or nothing.
+   * where staff said. Every bag needs a location. All or nothing.
    */
-  stockIn(units: Array<{ unit_id: string; storage_location?: string | null }>) {
+  stockIn(units: Array<{ unit_id: string; storage_location: string }>) {
     return this.request<{ message: string; stocked_count: number; units: HospitalUnit[] }>(
       '/hospital/inventory/stock-in',
       'POST',
@@ -512,11 +511,7 @@ class HospitalService extends BaseService {
     return this.request<{ weekly_request: WeeklyRequest }>(`/hospital/weekly-requests/${id}`)
   }
 
-  directDistributions(params: { transfusion_request_id?: number; search?: string; per_page?: number; page?: number } = {}) {
-    return this.request<Paginated<DirectDistribution>>('/hospital/direct-distributions', 'GET', params)
-  }
-
-  /** Receive one external bag for a Patient Transfusion Request; it goes straight into the blood bank's stock. */
+  /** Add blood from outside RedAgos; it arrives awaiting stock-in (Stock Intake's Add blood unit). */
   receiveDirectDistribution(payload: ReceiveDirectDistributionPayload) {
     return this.request<{ message: string; direct_distribution: DirectDistribution }>(
       '/hospital/direct-distributions',
@@ -532,15 +527,6 @@ class HospitalService extends BaseService {
 
   saveStockThresholds(payload: SaveStockThresholdsPayload) {
     return this.request<StockThresholdStatus>('/hospital/inventory/thresholds', 'PUT', payload)
-  }
-
-  /** The blood services a bag can be received from. */
-  externalBloodSources() {
-    return this.request<{ sources: ExternalBloodSource[] }>('/hospital/external-blood-sources')
-  }
-
-  addExternalBloodSource(payload: { name: string; code?: string | null }) {
-    return this.request<{ message: string; source: ExternalBloodSource }>('/hospital/external-blood-sources', 'POST', payload)
   }
 
   listNotifications(params: { category?: string; read?: boolean; per_page?: number; page?: number } = {}) {

@@ -141,30 +141,40 @@
       <div v-show="tab === 'history'" id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="history">
         <p v-if="historyError" class="history__error" role="alert">{{ historyError }}</p>
 
-        <div v-if="historyLoading && !reports.length" class="history__state" aria-busy="true">
-          <span class="skeleton skeleton--line" style="width: 70%" />
-          <span class="skeleton skeleton--line" style="width: 55%" />
-        </div>
-
-        <div v-else-if="!reports.length" class="empty empty--flat">
-          <span class="empty__icon"><AssetIcon name="history" :size="22" /></span>
-          <p class="empty__title">No reports generated yet</p>
-          <p class="empty__desc">Every report you generate is kept here as its PDF, to download again exactly as it was printed.</p>
-        </div>
-
-        <div v-else class="table-wrap">
+        <!-- The centre's Donor Management list (project owner, 2026-10-30). -->
+        <div class="table-wrap" :class="{ 'table-wrap--busy': historyLoading && reports.length }">
           <table class="reports">
+            <caption class="sr-only">Generated reports, newest first</caption>
             <thead>
               <tr>
-                <th>Generated</th>
-                <th>By</th>
-                <th>Covers</th>
-                <th>Sheets</th>
-                <th class="num">Pages</th>
-                <th><span class="sr-only">Actions</span></th>
+                <th scope="col">Generated</th>
+                <th scope="col">By</th>
+                <th scope="col">Covers</th>
+                <th scope="col">Sheets</th>
+                <th scope="col" class="num">Pages</th>
+                <th scope="col" class="reports__actions">Actions</th>
               </tr>
             </thead>
-            <tbody>
+
+            <tbody v-if="historyLoading && !reports.length">
+              <tr v-for="n in 3" :key="'skr-' + n">
+                <td colspan="6"><span class="skeleton skeleton--line" /></td>
+              </tr>
+            </tbody>
+
+            <tbody v-else-if="!reports.length">
+              <tr>
+                <td colspan="6" class="reports__empty">
+                  <div class="list-empty">
+                    <span class="list-empty__icon"><AssetIcon name="history" :size="20" /></span>
+                    <p class="list-empty__title">No reports generated yet</p>
+                    <p class="list-empty__text">Every report you generate is kept here as its PDF, to download again exactly as it was printed.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <tbody v-else>
               <tr v-for="item in reports" :key="item.id" :class="{ 'reports__row--new': item.id === current?.id }">
                 <td>
                   <span class="reports__date">{{ formatDate(item.generated_at) }}</span>
@@ -178,23 +188,43 @@
                 <td>{{ item.layout === 'type' ? 'One per type' : 'All on one' }}</td>
                 <td class="num">{{ item.pages }}</td>
                 <td class="reports__actions">
-                  <button type="button" class="btn-ghost" :disabled="busyReport === item.id" @click="viewReport(item)">
-                    <AssetIcon name="eye" :size="14" /> View
-                  </button>
-                  <button type="button" class="btn-ghost" :disabled="busyReport === item.id" @click="downloadReport(item)">
-                    <AssetIcon name="download" :size="14" /> Download
-                  </button>
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="row-btn"
+                      :disabled="busyReport === item.id"
+                      :aria-label="`View the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
+                      title="View"
+                      @click="viewReport(item)"
+                    >
+                      <AssetIcon name="eye" :size="15" />
+                    </button>
+                    <button
+                      type="button"
+                      class="row-btn"
+                      :disabled="busyReport === item.id"
+                      :aria-label="`Download the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
+                      title="Download PDF"
+                      @click="downloadReport(item)"
+                    >
+                      <AssetIcon name="download" :size="15" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div v-if="historyPage < historyLastPage" class="history__more">
-          <button type="button" class="btn-ghost" :disabled="historyLoading" @click="loadHistory(historyPage + 1)">
-            {{ historyLoading ? 'Loading…' : 'Load more' }}
-          </button>
-        </div>
+        <ListPager
+          :page="historyPage || 1"
+          :last-page="historyLastPage"
+          :from="historyFrom"
+          :to="historyTo"
+          :total="historyTotal"
+          :busy="historyLoading"
+          @go="loadHistory"
+        />
       </div>
     </section>
 
@@ -367,6 +397,7 @@
  */
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { orderDashboardTypes } from '~/utils/inventoryDashboard'
 
@@ -509,14 +540,16 @@ const historyTotal = ref(0)
 const historyLoading = ref(false)
 const historyError = ref('')
 const busyReport = ref(null)
+const historyFrom = computed(() => (historyTotal.value ? ((historyPage.value || 1) - 1) * 10 + 1 : 0))
+const historyTo = computed(() => Math.min((historyPage.value || 1) * 10, historyTotal.value))
 
 async function loadHistory(page = 1) {
   historyLoading.value = true
   historyError.value = ''
   try {
     const response = await hospitalService.inventoryReports({ page, per_page: 10 })
-    const rows = response?.data ?? []
-    reports.value = page === 1 ? rows : [...reports.value, ...rows.filter((row) => !reports.value.some((r) => r.id === row.id))]
+    // One page at a time, under the pager, as the centre's lists are.
+    reports.value = response?.data ?? []
     historyPage.value = response?.current_page ?? page
     historyLastPage.value = response?.last_page ?? page
     historyTotal.value = response?.total ?? reports.value.length
@@ -801,27 +834,47 @@ function formatTime(value) {
 /* ── Generated reports ── */
 .history { min-height: 120px; }
 .history__error { margin: 16px 24px 0; font-size: 13px; color: var(--rb-accent-text); }
-.history__state { display: flex; flex-direction: column; gap: 10px; padding: 24px; }
-.history__more { display: flex; justify-content: center; padding: 14px; border-top: 1px solid var(--rb-border); }
-.table-wrap { overflow-x: auto; }
+/* The table, as the centre's Donor Management list draws it (project owner, 2026-10-30). */
+.table-wrap { position: relative; overflow-x: auto; transition: opacity 0.15s ease; }
+.table-wrap--busy { opacity: 0.55; }
 .reports { width: 100%; border-collapse: collapse; font-size: 13px; }
-.reports th {
-  padding: 11px 14px; text-align: left; white-space: nowrap;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-text-muted, var(--rb-text-secondary));
-  border-bottom: 1px solid var(--rb-border);
+.reports thead th {
+  padding: 10px; text-align: left; white-space: nowrap;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary);
+  background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border);
 }
-.reports th:first-child, .reports td:first-child { padding-left: 24px; }
-.reports th:last-child, .reports td:last-child { padding-right: 24px; }
-.reports td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
+.reports th:first-child, .reports td:first-child { padding-left: 16px; }
+.reports th:last-child, .reports td:last-child { padding-right: 16px; }
+.reports tbody td { padding: 11px 10px; border-bottom: 1px solid var(--rb-border); color: var(--rb-text-primary); vertical-align: middle; }
 .reports tbody tr:last-child td { border-bottom: 0; }
+.reports tbody tr { transition: background 0.12s ease; }
 .reports tbody tr:hover { background: var(--rb-surface-hover); }
 .reports__row--new td:first-child { box-shadow: inset 3px 0 0 var(--rb-primary); }
-.reports__date { display: block; font-weight: 600; white-space: nowrap; }
-.reports__sub { display: block; margin-top: 2px; font-size: 12px; color: var(--rb-text-secondary); }
+.reports__date { display: block; font-weight: 700; white-space: nowrap; }
+.reports__sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
 .reports__covers { min-width: 180px; }
-.reports__actions { text-align: right; white-space: nowrap; }
-.reports__actions .btn-ghost + .btn-ghost { margin-left: 6px; }
+.reports .reports__actions { text-align: right; white-space: nowrap; }
 .reports .num { text-align: right; font-variant-numeric: tabular-nums; }
+.reports .reports__empty { padding: 0; }
+
+.row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.row-btn {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border: 1px solid var(--rb-border-strong); border-radius: 8px;
+  background: var(--rb-surface); color: var(--rb-text-secondary); cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.row-btn:hover:not(:disabled) { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.row-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.row-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+
+.list-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 24px; text-align: center; }
+.list-empty__icon {
+  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 12px;
+  background: var(--rb-surface-alt); border: 1px solid var(--rb-border); color: var(--rb-text-secondary);
+}
+.list-empty__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
+.list-empty__text { margin: 0; max-width: 44ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 /* ── The report ── */
 .preview { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 80px; }

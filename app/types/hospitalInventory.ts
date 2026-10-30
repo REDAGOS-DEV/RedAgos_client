@@ -353,8 +353,8 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
   bag_expired: 'This bag is past its expiry date and cannot be issued to a patient or stocked in. Discard it instead.',
   not_awaiting_stock_in: 'One of those bags has already been stocked in. The list has been refreshed.',
   unit_not_discardable: 'This bag cannot be discarded as it stands. Release its tag first.',
-  transfusion_request_not_found: 'That Patient Transfusion Request was not found.',
-  transfusion_request_closed: 'That Patient Transfusion Request was cancelled. Tag the bag to the patient directly instead.',
+  transfusion_request_not_found: 'That blood request was not found.',
+  transfusion_request_closed: 'That blood request was cancelled. Tag the bag to the patient directly instead.',
 }
 
 /** Status filter options, in lifecycle order. */

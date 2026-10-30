@@ -13,7 +13,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Billing dashboard</h1>
-          <p class="page-subtitle">Billing · {{ todayLabel }}</p>
         </div>
         <div class="header-actions">
           <span v-if="updatedAt" class="updated">
@@ -266,7 +265,6 @@ const initialLoading = ref(true)
 const error = ref('')
 const updatedAt = ref(null)
 
-const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 const updatedAtLabel = computed(() => (updatedAt.value ? updatedAt.value.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''))
 
 async function load() {
@@ -381,7 +379,6 @@ const forecast = computed(() => {
 
 .header-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 3px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .updated { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--rb-text-secondary); }
 .btn-outline { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--rb-border-strong, var(--rb-border)); border-radius: 10px; background: var(--rb-surface); font: inherit; font-size: 13px; font-weight: 600; color: var(--rb-text-primary); cursor: pointer; }

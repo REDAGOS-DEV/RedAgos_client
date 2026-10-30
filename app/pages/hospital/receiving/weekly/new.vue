@@ -25,7 +25,7 @@
         <AssetIcon name="calendar" :size="36" />
         <p class="empty-state__title">No weekly request is due today</p>
         <p class="empty-state__desc">
-          <template v-if="!schedules.length">Set your request days first, on the Weekly Request page.</template>
+          <template v-if="!schedules.length">Set your request days first, on the <NuxtLink to="/hospital/request-days">Request Days</NuxtLink> page.</template>
           <template v-else>
             A weekly request can only be sent on one of your request days, once a day.
             <span v-for="entry in schedules" :key="entry.schedule.id" class="next-line">
@@ -36,7 +36,7 @@
         </p>
         <div class="empty-state__actions">
           <NuxtLink to="/hospital/receiving/weekly" class="ui-btn">Back to Weekly Request</NuxtLink>
-          <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn">New patient transfusion request</NuxtLink>
+          <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn">New blood request</NuxtLink>
         </div>
       </section>
 

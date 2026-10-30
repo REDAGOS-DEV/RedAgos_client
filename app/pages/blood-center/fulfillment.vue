@@ -12,7 +12,7 @@
       </div>
 
       <!-- HEADER -->
-      <PageHeader title="Fulfillment" subtitle="Dispatch the units held for each request; the hospital then confirms each one arrived.">
+      <PageHeader title="Fulfillment">
         <template #actions>
           <button class="ui-btn" :disabled="loading" @click="load">
             <AssetIcon name="refresh-cw" :size="16" :class="{ spinning: loading }" />
@@ -97,7 +97,15 @@
               <p class="request-sub">
                 <span class="request-facility">{{ request.requesting_facility?.name || 'Hospital not recorded' }}</span>
                 <span v-for="code in (bloodTypeCodes(request).length ? bloodTypeCodes(request) : ['?'])" :key="code" class="blood-pill">{{ code }}</span>
-                <span>{{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested</span>
+                <span>
+                  {{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested<template v-if="request.committed_quantity != null">, {{ request.committed_quantity }} committed</template>
+                </span>
+              </p>
+              <!-- A replenishment order's hand-over, as the center confirmed it (project owner, 2026-10-29). -->
+              <p v-if="request.supply_plan" class="handover">
+                <AssetIcon :name="request.supply_plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="14" />
+                <strong>{{ request.supply_plan.handover_method === 'delivery' ? 'Deliver' : 'Pick-up' }} · {{ handoverWhen(request.supply_plan.scheduled_at) }}</strong>
+                <span v-if="request.supply_plan.handover_address">{{ request.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ request.supply_plan.handover_address }}</span>
               </p>
             </div>
 
@@ -254,18 +262,20 @@
           <h2 id="dispatch-title" class="modal-title">Dispatch Units</h2>
           <p class="modal-sub">{{ dispatchFor.reference_number }} · {{ dispatchFor.requesting_facility?.name }}</p>
 
-          <p class="modal-desc">
-            This issues {{ dispatchCount }} unit{{ dispatchCount === 1 ? '' : 's' }}. They leave your inventory now and
-            count as fulfilled on the request. The hospital still confirms each unit's arrival.
-          </p>
-
           <p v-if="dispatchFor.weekly_request" class="modal-warning" role="note">
             <strong>Weekly request {{ dispatchFor.weekly_request.reference_number }}</strong> goes out in one delivery.
-            <template v-if="dispatchFor.outstanding_quantity > 0">
-              The {{ dispatchFor.outstanding_quantity }} unit(s) you have not reserved will be closed as not supplied —
-              the hospital's next request day replaces them.
+            <!-- Unclaimed counts what lay beyond the commitment too. -->
+            <template v-if="(dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity) > 0">
+              The {{ dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity }} unit(s) not reserved will be
+              closed as not supplied — the hospital's next request day replaces them.
             </template>
             <template v-else>Everything requested is reserved, so nothing will be closed.</template>
+          </p>
+
+          <p v-if="dispatchFor.supply_plan" class="modal-desc">
+            Confirmed for <strong>{{ dispatchFor.supply_plan.handover_method === 'delivery' ? 'delivery' : 'pick-up' }}
+              on {{ handoverWhen(dispatchFor.supply_plan.scheduled_at) }}</strong><template v-if="dispatchFor.supply_plan.handover_address">,
+              {{ dispatchFor.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ dispatchFor.supply_plan.handover_address }}</template>.
           </p>
 
           <ul class="modal-units">
@@ -276,8 +286,8 @@
 
           <div class="field">
             <label for="handed-to" class="field-label">
-              Handed to
-              <span v-if="!dispatchFor.is_walk_in" class="field-optional">optional: courier or transport</span>
+              {{ handedToLabel(dispatchFor) }}
+              <span v-if="!dispatchFor.is_walk_in" class="field-optional">optional</span>
             </label>
             <input
               id="handed-to"
@@ -285,7 +295,7 @@
               type="text"
               class="input"
               maxlength="150"
-              :placeholder="dispatchFor.is_walk_in ? 'The watcher collecting the units' : 'Who is taking the units'"
+              :placeholder="handedToPlaceholder(dispatchFor)"
             >
             <p v-if="dispatchFor.is_walk_in" class="field-hint">
               A walk-in's units usually leave with the watcher who presented the request.
@@ -311,11 +321,6 @@
           <h2 id="correct-title" class="modal-title">Correct Dispatch Record</h2>
           <p class="modal-sub">
             <span class="mono">{{ correctFor.allocation.unit_id }}</span> · {{ correctFor.request.reference_number }}
-          </p>
-
-          <p class="modal-desc">
-            Only when the unit left and who took it can change. Nothing else about the unit or the request is
-            touched, and receipt stays the hospital's to confirm. Your change is applied once it is approved.
           </p>
 
           <div class="field">
@@ -357,11 +362,6 @@
           <h2 id="return-title" class="modal-title">Return Units to Stock</h2>
           <p class="modal-sub">{{ returnFor.reference_number }} · {{ returnFor.requesting_facility?.name }}</p>
 
-          <p class="modal-desc">
-            This gives up the hold and makes {{ returnCount }} unit{{ returnCount === 1 ? '' : 's' }} available to
-            other requests. If nothing is left held, the request returns to Pending for review.
-          </p>
-
           <div class="field">
             <label for="return-reason" class="field-label">Reason <span class="req">*</span></label>
             <input
@@ -393,7 +393,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { bloodTypeCodes, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeCodes, handoverWhen, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
 import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
@@ -588,6 +588,25 @@ function openDispatch(request) {
 function closeDispatch() {
   if (busyId.value) return
   dispatchFor.value = null
+}
+
+/*
+ * Who the units leave with depends on how the order was confirmed: the
+ * hospital's own staff on a pick-up, this centre's driver or courier on a
+ * delivery, the watcher on a walk-in.
+ */
+function handedToLabel(request) {
+  if (request.is_walk_in) return 'Handed to'
+  if (request.supply_plan?.handover_method === 'pickup') return 'Collected by'
+  if (request.supply_plan?.handover_method === 'delivery') return 'Driver or courier'
+  return 'Handed to'
+}
+
+function handedToPlaceholder(request) {
+  if (request.is_walk_in) return 'The watcher collecting the units'
+  if (request.supply_plan?.handover_method === 'pickup') return "The hospital's staff member collecting the order"
+  if (request.supply_plan?.handover_method === 'delivery') return 'Who is taking the order to the hospital'
+  return 'Who is taking the units: courier or transport'
 }
 
 async function confirmDispatch() {
@@ -803,6 +822,10 @@ onMounted(load)
 .tag--stat { background: var(--rb-accent); color: #fff; }
 .tag--walk-in { background: rgba(var(--rb-purple-rgb), .12); color: var(--rb-purple-text); }
 .tag--weekly { background: rgba(var(--rb-primary-rgb), .12); color: var(--rb-primary-text); }
+/* A replenishment order's confirmed hand-over. */
+.handover { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.handover strong { color: var(--rb-primary-text); font-weight: 700; }
+.handover :deep(.asset-icon) { color: var(--rb-primary-text); }
 .modal-warning {
   font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; padding: 10px 12px; border-radius: 9px;
   background: rgba(var(--rb-warning-rgb), .12); color: var(--rb-warning-text); border: 1px solid rgba(var(--rb-warning-rgb), .3);

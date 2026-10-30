@@ -13,11 +13,6 @@
         </div>
 
         <div class="modal-card__body">
-          <p class="modal-text">
-            For donors who booked through the Donor Portal. The scan checks them in and opens the Donation Counter with
-            their booking and the health questionnaire they completed.
-          </p>
-
           <p v-if="error" class="form-error" role="alert">{{ error }}</p>
 
           <BloodCenterQrScanner ref="scannerRef" :busy="busy" :show-manual="false" @scanned="onScanned" />
@@ -164,7 +159,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   flex-shrink: 0;
 }
 
-.modal-text { margin: 0; font-size: 13px; line-height: 1.55; color: var(--rb-text-secondary); }
 .form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 .text-link { color: var(--rb-primary-text); font-weight: 600; text-decoration: none; }
 .text-link:hover { text-decoration: underline; }

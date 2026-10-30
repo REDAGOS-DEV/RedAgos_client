@@ -22,7 +22,7 @@
       </div>
 
       <label class="field">
-        <span class="field__label">Patient Transfusion Request (optional)</span>
+        <span class="field__label">Blood Request (optional)</span>
         <SelectField
           v-model="requirementId"
           :options="[

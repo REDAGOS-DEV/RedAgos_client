@@ -15,9 +15,6 @@
             <AssetIcon name="clipboard-plus" :size="18" />
             New walk-in request
           </h2>
-          <p class="dialog__subtitle">
-            A watcher brought a patient's blood request here instead of the hospital blood bank.
-          </p>
         </div>
         <button type="button" class="icon-btn" aria-label="Close" :disabled="saving" @click="requestClose">
           <AssetIcon name="x" :size="18" />
@@ -43,11 +40,6 @@
       <template v-else-if="reference">
         <!-- STEP 1: WHO IS THIS FOR — AND DO THEY ALREADY HAVE A REQUEST? -->
         <section v-show="step === 1" class="step">
-          <p class="step__intro">
-            Start with who the blood is for. RedAgos checks whether the hospital already has a request open for this
-            patient — sent here, part-filled at another center, or elsewhere.
-          </p>
-
           <div class="grid">
             <label class="field field--wide">
               <span class="field__label">Patient's hospital blood bank *</span>
@@ -627,12 +619,6 @@ function formatDate(value) {
   font-size: 16px;
 }
 
-.dialog__subtitle {
-  margin: 0.25rem 0 0;
-  font-size: 13.5px;
-  color: var(--rb-text-secondary);
-}
-
 .dialog__loading {
   font-size: 14px;
   color: var(--rb-text-secondary);
@@ -718,13 +704,6 @@ function formatDate(value) {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-}
-
-.step__intro {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
 }
 
 .step__heading {

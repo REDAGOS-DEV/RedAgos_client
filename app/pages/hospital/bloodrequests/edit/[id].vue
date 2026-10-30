@@ -31,7 +31,7 @@
     <!-- ======== EMPTY ====== -->
     <div v-else-if="!originalRequest" class="eb-card">
       <EmptyState icon="droplets" title="This blood request could not be found.">
-        <NuxtLink to="/hospital/bloodrequests" class="ui-btn">Back to Blood Requests</NuxtLink>
+        <NuxtLink to="/hospital/bloodrequests" class="ui-btn">Back to Patient Request</NuxtLink>
       </EmptyState>
     </div>
 

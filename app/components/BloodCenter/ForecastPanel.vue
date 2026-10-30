@@ -96,7 +96,6 @@
         <article class="card">
           <header class="card__head">
             <h3 class="card__title">By blood type and component</h3>
-            <span class="card__note">Against the units available now</span>
           </header>
           <div v-if="data.demand.rows.length" class="table-wrap">
             <table class="table">
@@ -165,7 +164,6 @@
           <article class="card">
             <header class="card__head">
               <h3 class="card__title">By blood type</h3>
-              <span class="card__note">A donation gives one unit of each component</span>
             </header>
             <div v-if="data.collection.rows.length" class="table-wrap">
               <table class="table">

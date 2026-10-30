@@ -8,9 +8,6 @@
     <!-- No icon, steps or card of Testing's outcome (project owner, 2026-10-22). -->
     <header class="laboratory__header">
       <h1 class="laboratory__title">Component Processing</h1>
-      <p class="laboratory__subtitle">
-        Separate each unit into its component bags. Processed units go to the Processed list for hand-over.
-      </p>
     </header>
 
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
@@ -429,7 +426,6 @@
             <AssetIcon name="triangle-alert" :size="16" class="reject__icon" />
             <div class="reject__body">
               <h2 class="reject__title">Cannot process this unit?</h2>
-              <p class="reject__text">A damaged, hemolyzed or clotted unit cannot be separated. Rejected, it can never become stock.</p>
             </div>
             <button v-if="!rejecting" type="button" class="btn btn--danger-outline" :disabled="busy || !selected" @click="startReject">
               <AssetIcon name="trash-2" :size="15" />
@@ -1005,13 +1001,6 @@ onMounted(async () => {
   color: var(--rb-text-primary);
 }
 
-.laboratory__subtitle {
-  margin: 4px 0 0;
-  max-width: 68ch;
-  font-size: 13.5px;
-  color: var(--rb-text-secondary);
-}
-
 /* ---------- workspace: the list as tall as the bench ---------- */
 .workspace {
   display: grid;
@@ -1257,7 +1246,6 @@ onMounted(async () => {
 }
 .reject__body { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex: 1; }
 .reject__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
-.reject__text { margin: -6px 0 0; max-width: 80ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .defer {
   display: flex;
@@ -1509,7 +1497,6 @@ onMounted(async () => {
 .reject__body { display: block !important; flex: 1; min-width: 0; }
 .reject .defer { padding: 0 !important; border: 0 !important; background: none !important; }
 .reject__title { margin: 0 !important; font-size: 13.5px !important; font-weight: 700; }
-.reject__text { margin: 2px 0 0 !important; font-size: 12.5px !important; color: var(--rb-text-secondary); }
 .btn--danger-outline { border-color: rgba(var(--rb-accent-rgb), .4) !important; background: var(--rb-surface) !important; color: var(--rb-accent-text) !important; }
 .btn--danger-outline:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), .06) !important; }
 .reasons { display: flex; flex-wrap: wrap; gap: 6px; }

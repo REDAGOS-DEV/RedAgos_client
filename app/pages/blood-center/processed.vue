@@ -3,9 +3,6 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">Processed</h1>
-        <p class="page-subtitle">
-          Units with a recorded breakdown: print their final labels and hand them over to Issuance.
-        </p>
         <!-- What waits at each step, under the title rather than crowding the toolbar (2026-10-28). -->
       <p v-if="waiting" class="waiting" aria-label="Units waiting at each step">
         <span class="waiting__item"><span class="waiting__dot waiting__dot--testing" aria-hidden="true" /><strong>{{ waiting.testing }}</strong> awaiting testing</span>
@@ -1070,7 +1067,6 @@ onBeforeUnmount(() => {
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 3px 0 0; max-width: 72ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .sr-only {
   position: absolute;

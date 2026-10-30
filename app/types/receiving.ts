@@ -66,10 +66,13 @@ export interface WeeklyStatus {
   schedules: ScheduleStatus[]
 }
 
-export type WeeklyRequestStatus = 'submitted' | 'in_progress' | 'fulfilled' | 'partial' | 'not_supplied'
+/** `confirmed`: the center has said what it will supply and when, and reserved nothing yet. */
+export type WeeklyRequestStatus = 'submitted' | 'confirmed' | 'in_progress' | 'fulfilled' | 'partial' | 'not_supplied'
 
 export interface WeeklyTotals {
   requested: number
+  /** What the center committed to supply; null until it confirmed the order. */
+  committed: number | null
   fulfilled: number
   received: number
   awaiting_receipt: number
@@ -156,11 +159,12 @@ export interface DirectDistribution {
 export interface ReceiveDirectDistributionPayload {
   /** Set for a bag received for a patient's request; then quantity is 1. */
   transfusion_request_id?: number | null
-  /** Set instead of a request: who asked for the blood. */
+  /** Who asked for blood received without a request. Left out by Stock Intake's Add blood unit. */
   requested_for?: string | null
   /** How many bags arrived under the identifier, 1–100. Only without a request. */
   quantity?: number | null
-  external_blood_source_id: number
+  /** The blood service that sent it. Left out by Stock Intake's Add blood unit. */
+  external_blood_source_id?: number | null
   external_unit_number: string
   blood_type_id: number
   component_id: number
@@ -185,6 +189,7 @@ export const WEEKDAYS: IsoWeekday[] = [1, 2, 3, 4, 5, 6, 7]
 
 export const WEEKLY_STATUS_TONES: Record<WeeklyRequestStatus, 'info' | 'progress' | 'warning' | 'success' | 'danger' | 'muted'> = {
   submitted: 'info',
+  confirmed: 'info',
   in_progress: 'progress',
   fulfilled: 'success',
   partial: 'warning',
@@ -200,7 +205,7 @@ export const RECEIVING_REFUSAL_MESSAGES: Record<string, string> = {
   schedule_not_found: 'You keep no request days for that blood center.',
   external_unit_already_received: 'Blood under this identifier has already been received from that blood service.',
   redagos_unit: 'This is a RedAgos bag. Receive it from the request it was dispatched for.',
-  transfusion_request_not_found: 'That Patient Transfusion Request was not found.',
-  transfusion_request_closed: 'That Patient Transfusion Request was cancelled.',
+  transfusion_request_not_found: 'That blood request was not found.',
+  transfusion_request_closed: 'That blood request was cancelled.',
   nothing_to_confirm: 'Nothing on this request is waiting to be received.',
 }

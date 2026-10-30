@@ -3,7 +3,6 @@
     <div class="hc-inner">
       <PageHeader
         title="Help Center"
-        subtitle="How each part of the blood center works. To find something fast, type it in the search at the top; help guides show there too."
       />
 
       <!--

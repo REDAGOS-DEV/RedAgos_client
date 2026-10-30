@@ -160,7 +160,6 @@
             <section class="card" aria-labelledby="lines-title">
               <div class="card-head">
                 <h2 id="lines-title" class="card-title">Blood components</h2>
-                <p class="card-hint">The units held for this request, at this centre's prices.</p>
               </div>
               <BillingLines :lines="statement.lines" :totals="totalRows" />
             </section>
@@ -169,7 +168,6 @@
             <section class="card" aria-labelledby="history-title">
               <div class="card-head">
                 <h2 id="history-title" class="card-title">{{ weekly ? 'Settlement' : 'Payment history' }}</h2>
-                <p v-if="!weekly" class="card-hint">Every payment stays on record. A mistake is corrected or voided on approval, never deleted.</p>
               </div>
 
               <template v-if="weekly">
@@ -289,10 +287,6 @@
                           <td colspan="7">
                             <div class="inline-form">
                               <p class="inline-title">Request a void</p>
-                              <p class="inline-hint">
-                                For a payment recorded in error, or money handed straight back, on the day it was taken.
-                                After that, money given back is a refund, settled outside RedAgos.
-                              </p>
                               <label class="field">
                                 <span class="field-label">Why is it being voided?</span>
                                 <input v-model.trim="voidReason" type="text" maxlength="1000" class="input" placeholder="e.g. Charged to the wrong patient">
@@ -354,12 +348,6 @@
 
                 <div v-if="subsidyOpen" class="inline-form">
                   <p class="inline-title">Apply the government subsidy</p>
-                  <p class="inline-hint">
-                    Waives the whole {{ pesos(statement.total_amount) }} and clears the request for release. No payment is recorded.
-                    <template v-if="Number(statement.collected) > 0">
-                      The {{ pesos(statement.collected) }} already collected stays on record; any refund is settled outside RedAgos.
-                    </template>
-                  </p>
                   <label class="field">
                     <span class="field-label">Reason <span class="optional">(optional)</span></span>
                     <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="e.g. DOH allocation">
@@ -384,7 +372,6 @@
                 </div>
                 <div v-if="removeSubsidyOpen" class="inline-form">
                   <p class="inline-title">Remove government subsidy</p>
-                  <p class="inline-hint">This restores the invoice balance and blocks release until it is settled. The original subsidy remains in the billing journal.</p>
                   <label class="field">
                     <span class="field-label">Reason</span>
                     <input v-model.trim="removeSubsidyReason" type="text" minlength="3" maxlength="255" class="input" placeholder="e.g. Applied to the wrong request" required>
@@ -431,7 +418,6 @@
             <section class="card" aria-labelledby="rev-title">
               <div class="card-head">
                 <h2 id="rev-title" class="card-title">Issued invoices</h2>
-                <p class="card-hint">Each invoice is frozen when it is issued. Issuing again after the bill changes adds a revision; earlier ones stay as they were.</p>
               </div>
               <div v-if="revisionsLoading" class="skeleton skeleton--row" />
               <p v-else-if="!revisions.length" class="quiet">
@@ -1066,7 +1052,6 @@ onMounted(loadAll)
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; padding: 18px; min-width: 0; }
 .card-head { margin-bottom: 14px; }
 .card-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0; }
-.card-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 3px 0 0; max-width: 75ch; }
 .cap { margin: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--rb-text-secondary); }
 
 /* Summary: who owes it as the headline, the details beneath, the issuer as a quiet footer. */
@@ -1108,7 +1093,6 @@ onMounted(loadAll)
 .inline-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--rb-border-strong); background: var(--rb-surface); }
 .inline-form--flat { padding: 0; border: 0; }
 .inline-title { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
-.inline-hint { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 70ch; }
 .inline-fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .inline-fields .field { min-width: 160px; }
 .inline-actions { display: flex; justify-content: flex-end; gap: 8px; }

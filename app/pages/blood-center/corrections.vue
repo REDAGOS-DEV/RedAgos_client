@@ -1,10 +1,6 @@
 <template>
   <div class="corrections">
-    <PageHeader title="Corrections">
-      <template #subtitle>
-        Saved records are never edited directly; a change goes through a correction.
-      </template>
-    </PageHeader>
+    <PageHeader title="Corrections" />
 
     <!-- The full rules, in a small card that can be put away (2026-10-27). -->
     <aside v-if="howOpen" class="how" aria-labelledby="how-title">

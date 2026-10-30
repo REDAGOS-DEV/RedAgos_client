@@ -21,7 +21,7 @@
               <path :d="qr.path" fill="#000" />
             </svg>
             <div class="rs__id-text">
-              <p class="rs__caption">PATIENT TRANSFUSION REQUEST</p>
+              <p class="rs__caption">BLOOD REQUEST</p>
               <p class="rs__ref">{{ slip.reference_number }}</p>
               <p v-if="slip.hospital" class="rs__small">{{ slip.hospital }}</p>
             </div>

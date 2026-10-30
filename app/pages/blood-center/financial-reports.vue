@@ -2,7 +2,7 @@
   <div class="fr-page">
     <div class="fr-inner">
       <!-- Financial Reports only, in Demand Forecast's place (project owner, 2026-10-25). -->
-      <PageHeader title="Financial Reports" subtitle="Review collections, subsidies, receivables and invoices for a selected period.">
+      <PageHeader title="Financial Reports">
         <template #actions>
           <div class="report-actions">
             <div class="period">

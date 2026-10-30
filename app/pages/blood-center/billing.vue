@@ -3,7 +3,7 @@
     <div class="bl-inner">
       <!-- Invoices only (project owner, 2026-10-25): one per billable request.
            A hospital's period summary is Statements; payments are Receipts. -->
-      <PageHeader title="Invoices" subtitle="One per billable request: what each patient and hospital still owes.">
+      <PageHeader title="Invoices">
         <template #actions>
           <NuxtLink v-if="canSeeReports" to="/blood-center/financial-reports" class="ui-btn">
             <AssetIcon name="chart" :size="15" />

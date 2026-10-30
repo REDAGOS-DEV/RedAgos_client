@@ -2,10 +2,6 @@
   <section v-if="canConfigure" class="tpl-card" aria-labelledby="donor-email-title">
     <div>
       <h2 id="donor-email-title" class="tpl-card__title">Donor emails</h2>
-      <p class="tpl-card__hint">
-        The wording of the emails staff send from the Donors page. They go out in your centre's name, and replies come
-        to your centre's email address. Plain text: leave a blank line between paragraphs.
-      </p>
     </div>
 
     <p v-if="loading" class="tpl-card__hint">Loading templates…</p>

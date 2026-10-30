@@ -17,7 +17,6 @@
       <header class="header-row">
         <div>
           <h1 class="page-title">Processing dashboard</h1>
-          <p class="page-subtitle">Processing{{ data ? ` · ${longDate(data.today.date)}` : '' }}</p>
         </div>
         <div class="header-actions">
           <span v-if="updatedAt" class="updated">
@@ -90,7 +89,6 @@
                 </span>
                 <span class="flow__label">{{ kpi.label }}</span>
                 <span class="flow__value">{{ kpi.value }}</span>
-                <span class="flow__hint">{{ kpi.hint }}</span>
               </NuxtLink>
               <span v-if="i < queueKpis.length - 1" class="flow__arrow" aria-hidden="true"><AssetIcon name="chevron-right" :size="16" /></span>
             </li>
@@ -103,7 +101,6 @@
             <div class="card__head">
               <div>
                 <p class="card__label">Today</p>
-                <p class="card__sub">Since the start of the day</p>
               </div>
             </div>
             <ol class="stages" aria-label="Today's work">
@@ -120,7 +117,6 @@
             <div class="card__head">
               <div>
                 <p class="card__label">How long it takes</p>
-                <p class="card__sub">Medians over the last 30 days.</p>
               </div>
             </div>
             <!-- The two waits Processing owns, each on its line (2026-10-27). -->
@@ -265,7 +261,6 @@
               <div class="card__head">
                 <div>
                   <h2 id="components-title" class="card__label card__label--title">Bags by component</h2>
-                  <p class="card__sub">Last 30 days, by the breakdown as it stands.</p>
                 </div>
                 <NuxtLink to="/blood-center/processed" class="card__link">
                   Processed
@@ -294,7 +289,6 @@
               <div class="card__head">
                 <div>
                   <h2 id="technologist-title" class="card__label card__label--title">For the component technologist</h2>
-                  <p class="card__sub">What waits for you to move it on.</p>
                 </div>
               </div>
 
@@ -323,7 +317,7 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
-import { dayMonth, longDate, niceScale, plural, weekday } from '~/utils/collectionDashboard'
+import { dayMonth, niceScale, plural, weekday } from '~/utils/collectionDashboard'
 import { ageLabel, durationLabel } from '~/utils/testingDashboard'
 import { bagPeak, bagTotals, bagsPerUnit } from '~/utils/processingDashboard'
 import { smoothPath } from '~/utils/smoothPath'
@@ -392,10 +386,10 @@ async function load() {
 const queueKpis = computed(() => {
   const q = data.value?.queue ?? {}
   return [
-    { key: 'separate', icon: 'droplets', to: '/blood-center/laboratory', label: 'To separate', value: q.to_separate ?? 0, tone: 'info', hint: 'Drawn, no breakdown yet' },
-    { key: 'testing', icon: 'flask-conical', to: '/blood-center/laboratory', label: 'Awaiting testing', value: q.awaiting_testing ?? 0, tone: 'neutral', hint: 'Separated; Testing has not cleared both' },
-    { key: 'label', icon: 'printer', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to label', value: q.to_label ?? 0, tone: 'warn', hint: 'Cleared; print the final labels' },
-    { key: 'handover', icon: 'package-check', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to hand over', value: q.to_hand_over ?? 0, tone: 'ok', hint: 'Labelled; hand over to Issuance' },
+    { key: 'separate', icon: 'droplets', to: '/blood-center/laboratory', label: 'To separate', value: q.to_separate ?? 0, tone: 'info' },
+    { key: 'testing', icon: 'flask-conical', to: '/blood-center/laboratory', label: 'Awaiting testing', value: q.awaiting_testing ?? 0, tone: 'neutral' },
+    { key: 'label', icon: 'printer', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to label', value: q.to_label ?? 0, tone: 'warn' },
+    { key: 'handover', icon: 'package-check', to: '/blood-center/processed?status=awaiting_handover', label: 'Ready to hand over', value: q.to_hand_over ?? 0, tone: 'ok' },
   ]
 })
 
@@ -653,7 +647,6 @@ onBeforeUnmount(() => {
 /* ---------- Header ---------- */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--rb-text-primary); }
-.page-subtitle { font-size: 13px; color: var(--rb-text-secondary); margin: 3px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 
 .updated {
@@ -976,7 +969,6 @@ onBeforeUnmount(() => {
 .flow__step { font-size: 11px; font-weight: 700; color: var(--rb-text-muted); }
 .flow__label { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
 .flow__value { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
-.flow__hint { font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
 .flow__stage--zero .flow__value { color: var(--rb-text-muted); }
 
 /* Today: each figure with its icon. */

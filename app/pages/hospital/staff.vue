@@ -1,14 +1,13 @@
 <template>
-  <div class="staff-page">
-    <div class="staff-inner">
-      <PageHeader title="Staff" subtitle="Your blood bank's accounts and what each person may do.">
-        <template #actions>
-          <button type="button" class="ui-btn ui-btn--primary" @click="openAdd">
-            <AssetIcon name="user-check" :size="15" />
-            Add staff
-          </button>
-        </template>
-      </PageHeader>
+  <div class="list-page">
+    <div class="list-inner">
+      <PageHeader title="Staff" subtitle="Your blood bank's accounts and what each person may do." />
+
+      <div v-if="loadError" class="banner banner--error" role="alert">
+        <AssetIcon name="circle-alert" :size="16" />
+        <p class="banner__text">{{ loadError }}</p>
+        <button type="button" class="btn-link" @click="refresh">Retry</button>
+      </div>
 
       <!-- What each role covers, from the server. -->
       <section class="roles" aria-label="Roles">
@@ -27,86 +26,150 @@
       <section class="panel" aria-labelledby="roster-title">
         <h2 id="roster-title" class="sr-only">Staff accounts</h2>
 
-        <div v-if="loading" class="list-state" aria-busy="true">
-          <div class="skeleton" style="width:70%" />
-          <div class="skeleton" style="width:55%" />
+        <!-- The donors page's toolbar (project owner, 2026-10-30): filters left, actions right. -->
+        <div class="toolbar">
+          <div class="toolbar__filters">
+            <label class="search">
+              <AssetIcon name="search" :size="15" class="search__icon" />
+              <input
+                v-model="search"
+                type="search"
+                class="search__input"
+                placeholder="Search name / email / title"
+                aria-label="Search staff by name, email or title"
+              >
+            </label>
+
+            <SelectField v-model="roleFilter" class="sel-filter" size="sm" aria-label="Filter by role"
+              :options="[{ value: '', label: 'All roles' }, ...roles.map((role) => ({ value: role.value, label: role.label }))]" />
+
+            <SelectField v-model="accountFilter" class="sel-filter" size="sm" aria-label="Filter by account"
+              :options="ACCOUNT_FILTERS" />
+          </div>
+
+          <div class="toolbar__actions">
+            <span v-if="updatedAt" class="updated" :title="`List loaded at ${updatedAtLabel}`">
+              <AssetIcon name="clock" :size="13" />
+              Updated {{ updatedAtLabel }}
+            </span>
+
+            <button
+              type="button"
+              class="btn-outline btn-outline--squeeze"
+              :disabled="refreshing"
+              aria-label="Refresh the list"
+              :title="updatedAt ? `Refresh · updated ${updatedAtLabel}` : 'Refresh'"
+              @click="refresh"
+            >
+              <AssetIcon name="refresh-cw" :size="14" :class="{ spin: refreshing }" />
+              <span class="btn-text">Refresh</span>
+            </button>
+
+            <button type="button" class="btn-primary" @click="openAdd">
+              <AssetIcon name="plus" :size="15" />
+              Add Staff
+            </button>
+          </div>
         </div>
 
-        <div v-else-if="loadError" class="list-state list-state--error" role="alert">
-          <p>{{ loadError }}</p>
-          <button type="button" class="ui-btn" @click="load">Try again</button>
-        </div>
-
-        <div v-else class="table-wrap">
-          <table class="staff-table">
+        <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && staff.length }">
+          <table class="list-table">
+            <caption class="sr-only">Your blood bank's staff accounts</caption>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Title</th>
-                <th>Account</th>
-                <th class="actions-col">Actions</th>
+                <th scope="col">Name</th>
+                <th scope="col">Role</th>
+                <th scope="col">Title</th>
+                <th scope="col">Account</th>
+                <th scope="col" class="c-actions">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="member in staff" :key="member.uuid" :class="{ 'row--removed': member.deleted_at }">
-                <td>
-                  {{ member.full_name }}
-                  <span v-if="member.is_you" class="you-pill">You</span>
-                  <span class="cell-sub">{{ member.email }}</span>
-                </td>
-                <td>
-                  <div v-if="!member.deleted_at" class="role-select">
-                    <SelectField
-                      :model-value="member.hospital_role"
-                      :options="roles.map((role) => ({ value: role.value, label: role.label }))"
-                      :disabled="busy === member.uuid"
-                      :aria-label="`Role of ${member.full_name}`"
-                      size="sm"
-                      @change="(value) => changeRole(member, value)"
-                    />
+
+            <tbody v-if="loading">
+              <tr v-for="n in 4" :key="'skr-' + n">
+                <td colspan="5"><span class="skeleton skeleton--line" /></td>
+              </tr>
+            </tbody>
+
+            <tbody v-else-if="!visible.length">
+              <tr>
+                <td colspan="5" class="empty-cell">
+                  <div class="empty-state">
+                    <span class="empty-state__icon"><AssetIcon :name="hasFilters ? 'search-x' : 'users'" :size="20" /></span>
+                    <p class="empty-state__title">{{ hasFilters ? 'No staff match' : 'No staff yet' }}</p>
+                    <p class="empty-state__text">
+                      {{ hasFilters ? 'Try another name, email or title, or clear the filters.' : 'Add your colleagues with the role their work needs.' }}
+                    </p>
+                    <button v-if="hasFilters" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
+                    <button v-else type="button" class="btn-primary" @click="openAdd">
+                      <AssetIcon name="plus" :size="15" />
+                      Add Staff
+                    </button>
                   </div>
-                  <span v-else class="muted">{{ member.hospital_role_label }}</span>
                 </td>
+              </tr>
+            </tbody>
+
+            <tbody v-else>
+              <tr v-for="member in pageItems" :key="member.uuid" class="list-row" :class="{ 'row--removed': member.deleted_at }">
+                <td>
+                  <div class="cell">
+                    <span class="cell__main">{{ member.full_name }}</span>
+                    <span v-if="member.is_you" class="tag">You</span>
+                    <span class="cell__sub">{{ member.email }}</span>
+                  </div>
+                </td>
+                <td class="nowrap">{{ member.hospital_role_label || '—' }}</td>
                 <td>{{ member.position || '—' }}</td>
                 <td>
-                  <span class="pill" :class="accountTone(member)">{{ accountLabel(member) }}</span>
+                  <span class="badge" :class="accountBadge(member)">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ accountLabel(member) }}
+                  </span>
                 </td>
-                <td class="actions-col">
-                  <button
-                    v-if="member.deleted_at"
-                    type="button"
-                    class="ui-btn ui-btn--sm"
-                    :disabled="busy === member.uuid"
-                    @click="restore(member)"
-                  >
-                    Restore
-                  </button>
-                  <button
-                    v-if="!member.deleted_at"
-                    type="button"
-                    class="ui-btn ui-btn--sm"
-                    :disabled="busy === member.uuid"
-                    @click="openEdit(member)"
-                  >
-                    <AssetIcon name="pencil" :size="13" />
-                    Edit
-                  </button>
-                  <button
-                    v-if="!member.deleted_at"
-                    type="button"
-                    class="ui-btn ui-btn--sm btn-remove"
-                    :disabled="busy === member.uuid || member.is_you"
-                    :title="member.is_you ? 'Another Head can remove your account' : null"
-                    @click="remove(member)"
-                  >
-                    Remove
-                  </button>
+                <td class="c-actions">
+                  <div class="row-actions">
+                    <button
+                      v-if="member.deleted_at"
+                      type="button"
+                      class="icon-btn"
+                      :disabled="busy === member.uuid"
+                      :aria-label="`Restore ${member.full_name}'s account`"
+                      title="Restore"
+                      @click="restore(member)"
+                    >
+                      <AssetIcon name="undo-2" :size="15" />
+                    </button>
+                    <template v-else>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        :disabled="busy === member.uuid"
+                        :aria-label="`Edit ${member.full_name}`"
+                        title="Edit role and title"
+                        @click="openEdit(member)"
+                      >
+                        <AssetIcon name="pencil" :size="15" />
+                      </button>
+                      <button
+                        type="button"
+                        class="icon-btn icon-btn--danger"
+                        :disabled="busy === member.uuid || member.is_you"
+                        :aria-label="member.is_you ? 'Another Head can remove your account' : `Remove ${member.full_name}'s account`"
+                        :title="member.is_you ? 'Another Head can remove your account' : 'Remove'"
+                        @click="remove(member)"
+                      >
+                        <AssetIcon name="user-x" :size="15" />
+                      </button>
+                    </template>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <ListPager :page="page" :last-page="lastPage" :from="from" :to="to" :total="total" @go="go" />
       </section>
     </div>
 
@@ -262,8 +325,10 @@ import PageHeader from '~/components/ui/PageHeader.vue'
  * anything else; this page shows what it says.
  */
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import SelectField from '~/components/common/SelectField.vue'
+import { useListPager } from '~/composables/useListPager'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
 
@@ -272,8 +337,58 @@ useHead({ title: 'Staff' })
 const staff = ref([])
 const roles = ref([])
 const loading = ref(true)
+const refreshing = ref(false)
 const loadError = ref('')
 const busy = ref(null)
+const updatedAt = ref(null)
+
+// ── The list: searched and filtered here, since the server returns it whole ──
+const ACCOUNT_FILTERS = [
+  { value: '', label: 'All accounts' },
+  { value: 'active', label: 'Active' },
+  { value: 'unverified', label: 'Awaiting verification' },
+  { value: 'removed', label: 'Removed' },
+]
+
+const search = ref('')
+const roleFilter = ref('')
+const accountFilter = ref('')
+
+const hasFilters = computed(() => Boolean(search.value.trim() || roleFilter.value || accountFilter.value))
+
+const visible = computed(() => {
+  const term = search.value.trim().toLowerCase()
+
+  return staff.value.filter((member) => {
+    if (roleFilter.value && member.hospital_role !== roleFilter.value) return false
+    if (accountFilter.value && accountKey(member) !== accountFilter.value) return false
+    if (!term) return true
+
+    return [member.full_name, member.email, member.position].some((value) => String(value || '').toLowerCase().includes(term))
+  })
+})
+
+const { page, total, lastPage, from, to, pageItems, go } = useListPager(visible)
+
+function clearFilters() {
+  search.value = ''
+  roleFilter.value = ''
+  accountFilter.value = ''
+}
+
+const updatedAtLabel = computed(() => (updatedAt.value
+  ? updatedAt.value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  : ''))
+
+async function refresh() {
+  refreshing.value = true
+
+  try {
+    await load()
+  } finally {
+    refreshing.value = false
+  }
+}
 
 const toast = ref('')
 let toastTimer = null
@@ -297,6 +412,7 @@ async function load() {
     const response = await hospitalService.staff()
     staff.value = response?.data ?? []
     roles.value = response?.roles ?? []
+    updatedAt.value = new Date()
   } catch (err) {
     loadError.value = err?.message || 'Could not load your staff.'
   } finally {
@@ -304,37 +420,18 @@ async function load() {
   }
 }
 
+function accountKey(member) {
+  if (member.deleted_at) return 'removed'
+
+  return member.email_verified ? 'active' : 'unverified'
+}
+
 function accountLabel(member) {
-  if (member.deleted_at) return 'Removed'
-  if (!member.email_verified) return 'Awaiting email verification'
-
-  return 'Active'
+  return { removed: 'Removed', unverified: 'Awaiting email verification', active: 'Active' }[accountKey(member)]
 }
 
-function accountTone(member) {
-  if (member.deleted_at) return 'tone--muted'
-
-  return member.email_verified ? 'tone--success' : 'tone--warning'
-}
-
-// A role change is saved at once; a refusal (the last Head) puts the old one back.
-async function changeRole(member, role) {
-  if (role === member.hospital_role) return
-
-  busy.value = member.uuid
-  const before = member.hospital_role
-  member.hospital_role = role
-
-  try {
-    const response = await hospitalService.updateStaff(member.uuid, { hospital_role: role })
-    Object.assign(member, response.data)
-    showToast(response.message)
-  } catch (err) {
-    member.hospital_role = before
-    showToast(firstError(err))
-  } finally {
-    busy.value = null
-  }
+function accountBadge(member) {
+  return { removed: 'badge--neutral', unverified: 'badge--warn', active: 'badge--ok' }[accountKey(member)]
 }
 
 // ── Role cards ──
@@ -355,7 +452,7 @@ function initialsOf(name) {
   return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0][0]).toUpperCase()
 }
 
-// ── Edit: role and title, through the same PATCH the role menu uses ──
+// ── Edit: role and title, in one PATCH ──
 const editing = ref(null)
 const editForm = reactive({ hospital_role: '', position: '' })
 const editErrors = reactive({})
@@ -504,15 +601,10 @@ onMounted(load)
 onUnmounted(() => clearTimeout(toastTimer))
 </script>
 
+<!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->
+<style scoped src="~/assets/css/list-ui.css"></style>
+
 <style scoped>
-/* The same frame as Blood Bank Inventory. */
-.staff-page { min-height: 100%; padding: 24px var(--rb-gutter, 24px) 40px; background: var(--rb-page-bg); font-family: var(--rb-font-sans); color: var(--rb-text-primary); }
-.staff-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.page-title { margin: 0; font-size: 24px; font-weight: 700; }
-.page-subtitle { margin: 4px 0 0; font-size: 13.5px; color: var(--rb-text-secondary); max-width: 70ch; }
-
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .role-card { padding: 14px 16px; border-radius: var(--rb-radius-lg); border: 1px solid var(--rb-border); background: var(--rb-surface); box-shadow: var(--rb-shadow-sm); }
 .role-card__top { display: flex; align-items: center; gap: 10px; }
@@ -530,8 +622,6 @@ onUnmounted(() => clearTimeout(toastTimer))
 }
 .role-card__desc { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
-.actions-col .ui-btn + .ui-btn { margin-left: 6px; }
-
 .edit-who {
   display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;
   background: var(--rb-surface-alt);
@@ -544,30 +634,7 @@ onUnmounted(() => clearTimeout(toastTimer))
 .edit-who__text { display: flex; flex-direction: column; min-width: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .edit-who__text strong { font-size: 14px; color: var(--rb-text-primary); }
 
-.panel { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: var(--rb-radius-lg); box-shadow: var(--rb-shadow-sm); overflow: hidden; }
-.table-wrap { overflow-x: auto; }
-.staff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.staff-table th {
-  text-align: left; padding: 10px 14px; font-size: 11.5px; font-weight: 600; color: var(--rb-text-secondary);
-  background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); white-space: nowrap;
-}
-.staff-table td { padding: 10px 14px; border-bottom: 1px solid var(--rb-border); vertical-align: middle; }
-.staff-table tbody tr:last-child td { border-bottom: 0; }
 .row--removed td { color: var(--rb-text-muted); }
-.cell-sub { display: block; font-size: 12px; color: var(--rb-text-secondary); }
-.muted { color: var(--rb-text-secondary); }
-.actions-col { text-align: right; white-space: nowrap; }
-.you-pill { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1); }
-
-.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.tone--success { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .12); }
-.tone--warning { color: var(--rb-warning-text); background: rgba(var(--rb-warning-rgb), .14); }
-.tone--muted { color: var(--rb-text-secondary); background: var(--rb-surface-alt); }
-
-.list-state { padding: 18px 16px; }
-.list-state--error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--rb-accent-text); font-size: 13px; }
-.skeleton { height: 14px; border-radius: 6px; margin: 8px 0; background: var(--rb-skeleton-a); }
-
 
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 0; margin: 0; padding: 0; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -578,7 +645,6 @@ onUnmounted(() => clearTimeout(toastTimer))
   font: inherit; font-size: 13px; color: var(--rb-text-primary); background: var(--rb-surface);
 }
 .field-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
-.role-select { min-width: 170px; }
 .field-error, .form-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 .hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
 
@@ -595,8 +661,6 @@ onUnmounted(() => clearTimeout(toastTimer))
 .dialog__title { margin: 0; font-size: 16px; font-weight: 700; }
 .dialog__body { padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .dialog__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--rb-border); }
-.icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
-.icon-btn:hover { background: var(--rb-surface-hover); }
 
 .toast {
   position: fixed; right: 18px; bottom: 18px; z-index: 70; max-width: 360px; padding: 10px 14px; border-radius: 10px;
@@ -606,15 +670,9 @@ onUnmounted(() => clearTimeout(toastTimer))
 .toast-enter-active, .toast-leave-active { transition: opacity .2s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; }
 
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
 @media (max-width: 640px) {
   .field-pair { grid-template-columns: 1fr; }
 }
-
-/* Remove sits in red text until confirmed in the dialog. */
-.btn-remove { color: var(--rb-accent-text); }
-.btn-remove:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.08); }
 
 .dialog--sm { width: min(420px, 100%); }
 .dialog__body--confirm { align-items: flex-start; gap: 6px; padding: 20px 20px 16px; }

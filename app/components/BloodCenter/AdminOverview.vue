@@ -74,7 +74,6 @@
             <header class="card__head">
               <div>
                 <h2 id="coverage-title" class="card__title">Role coverage</h2>
-                <p class="card__sub">The posts each department needs to keep its work moving.</p>
               </div>
               <span class="pill" :class="gaps ? 'pill--bad' : 'pill--ok'">
                 <AssetIcon :name="gaps ? 'circle-alert' : 'check'" :size="12" />
@@ -155,7 +154,6 @@
             <header class="card__head">
               <div>
                 <h2 id="setup-title" class="card__title">Centre setup</h2>
-                <p class="card__sub">Printed on receipts, statements and the stock report.</p>
               </div>
             </header>
             <ul class="checks">
@@ -301,7 +299,6 @@ html.dark .tile__icon--violet { color: #C4B5FD; }
 }
 .card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .card__title { margin: 0; font-size: var(--rb-fs-section, 16px); font-weight: 700; color: var(--rb-text-primary); }
-.card__sub { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 .card__link { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--rb-primary-text); text-decoration: none; }
 .card__link:hover { text-decoration: underline; }
 

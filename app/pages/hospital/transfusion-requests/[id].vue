@@ -4,12 +4,12 @@
       <header class="page-header">
         <NuxtLink to="/hospital/bloodrequests" class="back-link">
           <AssetIcon name="arrow-left" :size="14" />
-          Back to Blood Requests
+          Back to Patient Request
         </NuxtLink>
 
         <div v-if="request" class="page-header__row">
           <div>
-            <p class="eyebrow">Patient Transfusion Request</p>
+            <p class="eyebrow">Blood Request</p>
             <h1 class="page-title mono">{{ request.reference_number }}</h1>
             <p class="page-subtitle">
               {{ request.patient?.full_name || '—' }}
@@ -20,7 +20,7 @@
           </div>
           <span class="status-chip" :class="`tone--${statusTone}`">{{ transfusionProgressLabel(request) }}</span>
         </div>
-        <h1 v-else class="page-title">Patient Transfusion Request</h1>
+        <h1 v-else class="page-title">Blood Request</h1>
       </header>
 
       <div v-if="loading" class="panel" aria-busy="true">
@@ -144,10 +144,6 @@
               </p>
             </div>
             <div class="panel-head__actions">
-              <NuxtLink :to="`/hospital/receiving/direct-distribution?ptr=${requestId}`" class="ui-btn">
-                <AssetIcon name="truck" :size="15" />
-                Receive units
-              </NuxtLink>
               <NuxtLink to="/hospital/inventory?status=tagged" class="ui-btn">
                 <AssetIcon name="package" :size="15" />
                 Blood Bank Inventory
@@ -373,7 +369,7 @@ async function load() {
     loadBags()
   } catch (err) {
     loadError.value = err?.status === 404
-      ? 'This Patient Transfusion Request could not be found.'
+      ? 'This blood request could not be found.'
       : (err?.message || 'Could not load this request. Please try again.')
   } finally {
     loading.value = false

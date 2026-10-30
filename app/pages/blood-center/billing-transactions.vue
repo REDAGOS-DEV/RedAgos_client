@@ -2,7 +2,7 @@
   <div class="tx-page">
     <div class="tx-inner">
       <!-- Payments, the Transactions tab (2026-10-27). -->
-      <PageHeader title="Payments" subtitle="Every payment, refund and void, as the billing journal records it.">
+      <PageHeader title="Payments">
         <template #actions>
           <button class="ui-btn ui-btn--download" :disabled="exporting" @click="exportCsv">
             <AssetIcon name="download" :size="15" />

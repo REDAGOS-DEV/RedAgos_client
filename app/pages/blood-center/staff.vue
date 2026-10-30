@@ -3,9 +3,6 @@
     <header class="staff__header">
       <div>
         <h1 class="staff__title">Staff Accounts</h1>
-        <p class="staff__subtitle">
-          Add colleagues, place them in a department and set what they can do.
-        </p>
       </div>
 
       <button type="button" class="btn-primary" @click="openCreate">
@@ -863,13 +860,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   letter-spacing: -0.02em;
   font-weight: 700;
   color: var(--rb-text-primary);
-}
-
-.staff__subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-  max-width: 68ch;
 }
 
 .summary {

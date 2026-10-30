@@ -2,9 +2,6 @@
   <section class="pdf" aria-labelledby="pdf-title">
     <header class="pdf__head">
       <h2 id="pdf-title" class="pdf__title">Add a donor from the sheet</h2>
-      <p class="pdf__hint">
-        Type what the paper says. Times are on {{ dayLabel }}; the donor answered the paper DHQ.
-      </p>
     </header>
 
     <!-- 1. DONOR -->
@@ -298,7 +295,6 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import type { BloodTypeOption } from '~/utils/bloodType'
 import { OTHER_DEFERRAL, deferralCodeOptions, type DeferralCode } from '~/utils/deferralCodes'
-import { formatShortDate } from '~/utils/donorRecords'
 import {
   PAPER_OUTCOMES,
   blankPaperRow,
@@ -338,7 +334,6 @@ const EXAM_FIELDS = [
   { key: 'allergies', label: 'Allergies' },
 ] as const
 
-const dayLabel = computed(() => formatShortDate(props.sheet.held_on))
 
 const form = reactive(blankPaperRow(props.sheet))
 const donor = ref<Record<string, any> | null>(null)
@@ -546,7 +541,6 @@ defineExpose({ reset })
 
 .pdf__head { display: flex; flex-direction: column; gap: 3px; }
 .pdf__title { margin: 0; font-size: 15px; font-weight: 700; }
-.pdf__hint { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 /* Numbered steps down a rule, the order the paper form prints them. */
 .pdf__step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; }

@@ -228,7 +228,7 @@
                   <td>
                     <span class="mono">{{ bagLabel(row) }}</span>
                     <span v-if="row.source?.transfusion_reference" class="cell-sub">for {{ row.source.transfusion_reference }}</span>
-                    <span v-else-if="row.source?.direct_distribution" class="cell-sub">from {{ row.source.direct_distribution.source_name }}</span>
+                    <span v-else-if="row.source?.direct_distribution" class="cell-sub">from {{ row.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
                   </td>
                   <td><span class="type-chip type-chip--cell">{{ displayType(row.blood_type?.code) }}</span></td>
                   <td class="wrap-cell">{{ row.component?.name || '—' }}</td>
@@ -1436,7 +1436,7 @@ const bagLabel = (unit) => unit.bag_number || unit.unit_id
 function sourceLabel(unit) {
   const delivery = unit.source?.direct_distribution
   if (delivery) {
-    return [`Direct distribution from ${delivery.source_name || 'an outside blood service'}`, delivery.requested_for && `for ${delivery.requested_for}`]
+    return [`Received from ${delivery.source_name || 'an outside blood service'}`, delivery.requested_for && `for ${delivery.requested_for}`]
       .filter(Boolean).join(' ')
   }
   if (unit.source?.reference_number) {

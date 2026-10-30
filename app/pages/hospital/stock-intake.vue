@@ -1,29 +1,13 @@
 <template>
-  <div class="si-page inv-tones">
-    <div class="si-inner">
-      <!-- ============ HEADER ============ -->
-      <header class="page-head">
-        <div>
-          <h1 class="page-title">Stock Intake</h1>
-          <p class="page-subtitle">Put the bags that arrived onto a shelf: scan each one, give it its storage location, and stock it in.</p>
-        </div>
-        <div class="page-head__meta">
-          <span v-if="lastUpdatedLabel" class="live-note">
-            <span class="live-note__dot" aria-hidden="true" />
-            Updated {{ lastUpdatedLabel }}
-          </span>
-          <button type="button" class="btn-outline btn-outline--sm" :disabled="refreshing" @click="refresh()">
-            <AssetIcon name="refresh-cw" :size="13" :class="{ 'spin-icon': refreshing }" />
-            Refresh
-          </button>
-        </div>
-      </header>
+  <div class="list-page inv-tones">
+    <div class="list-inner">
+      <PageHeader title="Stock Intake" subtitle="Put the bags that arrived onto a shelf: scan each one, give it its storage location, and stock it in." />
 
-      <p v-if="loadError" class="load-error" role="alert">
-        <AssetIcon name="circle-alert" :size="15" />
-        <span>{{ loadError }}</span>
-        <button type="button" class="link-btn" @click="refresh()">Try again</button>
-      </p>
+      <div v-if="loadError" class="banner banner--error" role="alert">
+        <AssetIcon name="circle-alert" :size="16" />
+        <p class="banner__text">{{ loadError }}</p>
+        <button type="button" class="btn-link" @click="refresh()">Retry</button>
+      </div>
 
       <!-- ============ KPI ROW ============ -->
       <section class="kpi-row" aria-label="Stock intake at a glance">
@@ -45,88 +29,129 @@
            until inventory staff put them on a shelf. They are not stock until
            then. Its own page since 2026-10-28, apart from Blood Bank Inventory. -->
       <section class="panel" aria-labelledby="arrived-title">
-        <header class="panel-head">
-          <div>
-            <h2 id="arrived-title" class="panel-title">Awaiting Stock-in</h2>
-            <p class="panel-subtitle">Scan a fridge's bags, give them its location, stock them in; then the next fridge. A bag cannot be tagged until it is stocked in.</p>
+        <h2 id="arrived-title" class="sr-only">Awaiting Stock-in</h2>
+
+        <!-- The donors page's toolbar (project owner, 2026-10-30): scan and the
+             scanned bags' location at the left, the page's actions at the right. -->
+        <div class="toolbar">
+          <div class="toolbar__filters">
+            <form class="search" @submit.prevent="scanBag">
+              <AssetIcon name="scan-line" :size="15" class="search__icon" />
+              <input
+                ref="scanInput"
+                v-model="scanEntry"
+                type="text"
+                class="search__input mono"
+                placeholder="Scan or type a bag number"
+                aria-label="Scan a bag to stock in"
+                autocomplete="off"
+                spellcheck="false"
+                autocapitalize="characters"
+                maxlength="50"
+              />
+            </form>
+
+            <form class="bulk-field" @submit.prevent="applyBulkLocation">
+              <SelectField
+                v-model="bulkLocation"
+                class="bulk-field__select"
+                :options="locationOptions"
+                placeholder="Location for the scanned bags"
+                aria-label="Storage location for the scanned bags"
+                empty-text="No storage locations loaded"
+                size="sm"
+              />
+              <button type="submit" class="btn-outline" :disabled="!bulkLocation || !ticked.length">Apply</button>
+            </form>
           </div>
-          <NuxtLink to="/hospital/inventory" class="btn-outline btn-outline--sm">
-            <AssetIcon name="package" :size="13" />
-            Blood Bank Inventory
-          </NuxtLink>
-        </header>
 
-        <div v-if="arrived.length" class="tools">
-          <form class="scan-field" @submit.prevent="scanBag">
-            <AssetIcon name="scan-line" :size="15" class="scan-field__icon" />
-            <input
-              ref="scanInput"
-              v-model="scanEntry"
-              type="text"
-              class="text-input text-input--scan mono"
-              placeholder="Scan or type a bag number"
-              aria-label="Scan a bag to stock in"
-              autocomplete="off"
-              spellcheck="false"
-              autocapitalize="characters"
-              maxlength="50"
-            />
-          </form>
-          <p class="scan-note" :class="{ 'scan-note--alert': scanAlert }" aria-live="polite">
-            {{ scanNote || `${ticked.length} of ${tickable.length} scanned` }}
-          </p>
-          <form class="bulk-field" @submit.prevent="applyBulkLocation">
-            <input
-              v-model="bulkLocation"
-              list="si-storage-locations"
-              maxlength="100"
-              class="text-input"
-              placeholder="Location for the scanned bags"
-              aria-label="Storage location for the scanned bags"
-            />
-            <button type="submit" class="btn-outline" :disabled="!bulkLocation.trim() || !ticked.length">Apply</button>
-          </form>
+          <div class="toolbar__actions">
+            <span v-if="lastUpdatedLabel" class="updated" :title="`List loaded at ${lastUpdatedLabel}`">
+              <AssetIcon name="clock" :size="13" />
+              Updated {{ lastUpdatedLabel }}
+            </span>
+
+            <button
+              type="button"
+              class="btn-outline btn-outline--squeeze"
+              :disabled="refreshing"
+              aria-label="Refresh the list"
+              :title="lastUpdatedLabel ? `Refresh · updated ${lastUpdatedLabel}` : 'Refresh'"
+              @click="refresh()"
+            >
+              <AssetIcon name="refresh-cw" :size="14" :class="{ spin: refreshing }" />
+              <span class="btn-text">Refresh</span>
+            </button>
+
+            <NuxtLink to="/hospital/inventory" class="btn-outline btn-outline--squeeze" title="Blood Bank Inventory">
+              <AssetIcon name="package" :size="14" />
+              <span class="btn-text">Blood Bank Inventory</span>
+            </NuxtLink>
+
+            <!-- Blood from outside RedAgos is added here (project owner, 2026-10-30). -->
+            <button v-if="canAdd" type="button" class="btn-primary" @click="addingUnit = true">
+              <AssetIcon name="plus" :size="15" />
+              Add Blood Unit
+            </button>
+          </div>
         </div>
 
-        <div v-if="loading" class="list-state" aria-busy="true">
-          <div class="skeleton skeleton--line" style="width:70%" />
-          <div class="skeleton skeleton--line" style="width:90%" />
-          <div class="skeleton skeleton--line" style="width:55%" />
-        </div>
+        <p v-if="arrived.length" class="scan-note" :class="{ 'scan-note--alert': scanAlert }" aria-live="polite">
+          {{ scanNote || `${ticked.length} of ${tickable.length} scanned` }}
+        </p>
 
-        <div v-else-if="!arrived.length" class="empty-state">
-          <AssetIcon name="package-check" :size="36" />
-          <p class="empty-state__title">Nothing awaiting stock-in</p>
-          <p class="empty-state__desc">
-            Bags appear here once their arrival is confirmed on a blood request, or they are recorded by direct distribution.
-          </p>
-        </div>
-
-        <div v-else class="table-wrap">
-          <table class="unit-table">
+        <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && arrived.length }">
+          <table class="list-table">
+            <caption class="sr-only">Bags that arrived and wait to be stocked in</caption>
             <thead>
               <tr>
-                <th class="check-col">
+                <th scope="col" class="check-col">
                   <input
                     type="checkbox"
                     :checked="allTicked"
                     :indeterminate.prop="ticked.length > 0 && !allTicked"
+                    :disabled="!tickable.length"
                     aria-label="Mark every bag in date, without scanning"
                     @change="toggleAllTicked"
                   />
                 </th>
-                <th>Bag</th>
-                <th>Blood Type</th>
-                <th>Component</th>
-                <th>Expiry Date</th>
-                <th>Remaining Days</th>
-                <th>Arrived</th>
-                <th>Storage Location</th>
-                <th v-if="canDiscard" class="actions-col"><span class="sr-only">Actions</span></th>
+                <th scope="col">Bag</th>
+                <th scope="col">Group</th>
+                <th scope="col">Component</th>
+                <th scope="col">Expiry</th>
+                <th scope="col">Remaining</th>
+                <th scope="col">Arrived</th>
+                <th scope="col">Storage location</th>
+                <th v-if="canDiscard" scope="col" class="c-actions">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="unit in arrived" :key="unit.id" :class="{ 'row--expired': unit.bag_expired, 'row--scanned': ticked.includes(unit.unit_id) }">
+
+            <tbody v-if="loading">
+              <tr v-for="n in 5" :key="'skr-' + n">
+                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
+              </tr>
+            </tbody>
+
+            <tbody v-else-if="!arrived.length">
+              <tr>
+                <td :colspan="columnCount" class="empty-cell">
+                  <div class="empty-state">
+                    <span class="empty-state__icon"><AssetIcon name="package-check" :size="20" /></span>
+                    <p class="empty-state__title">Nothing awaiting stock-in</p>
+                    <p class="empty-state__text">
+                      Bags appear here once their arrival is confirmed on a blood request, or they are added with Add Blood Unit.
+                    </p>
+                    <button v-if="canAdd" type="button" class="btn-primary" @click="addingUnit = true">
+                      <AssetIcon name="plus" :size="15" />
+                      Add Blood Unit
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <tbody v-else>
+              <tr v-for="unit in arrived" :key="unit.id" class="list-row" :class="{ 'row--expired': unit.bag_expired, 'row--scanned': ticked.includes(unit.unit_id) }">
                 <td class="check-col">
                   <input
                     v-model="ticked"
@@ -137,54 +162,70 @@
                   />
                 </td>
                 <td>
-                  <span class="mono">{{ bagLabel(unit) }}</span>
-                  <span v-if="unit.source?.reference_number" class="cell-sub">from {{ unit.source.reference_number }}</span>
-                  <span v-else-if="unit.source?.direct_distribution" class="cell-sub">from {{ unit.source.direct_distribution.source_name }}</span>
+                  <div class="cell">
+                    <span class="code">{{ bagLabel(unit) }}</span>
+                    <span v-if="unit.source?.reference_number" class="cell__sub">from {{ unit.source.reference_number }}</span>
+                    <span v-else-if="unit.source?.direct_distribution" class="cell__sub">from {{ unit.source.direct_distribution.source_name || 'outside RedAgos' }}</span>
+                  </div>
                 </td>
-                <td><span class="type-chip">{{ displayType(unit.blood_type?.code) }}</span></td>
-                <td class="wrap-cell">
-                  {{ unit.component?.name || '—' }}
-                  <span v-if="unit.volume_ml" class="cell-sub">{{ unit.volume_ml }} mL</span>
-                </td>
-                <td class="num" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</td>
+                <td><span class="blood">{{ displayType(unit.blood_type?.code) }}</span></td>
                 <td>
-                  <span class="days" :class="[`tone--${remaining(unit).tone}`, { 'days--pill': remaining(unit).tone === 'warning' || remaining(unit).tone === 'danger' }]">{{ remaining(unit).label }}</span>
+                  <div class="cell">
+                    <span>{{ unit.component?.name || '—' }}</span>
+                    <span v-if="unit.volume_ml" class="cell__sub">{{ unit.volume_ml }} mL</span>
+                  </div>
                 </td>
-                <td class="num">{{ formatDateTime(unit.received_at) }}</td>
+                <td class="nowrap" :class="{ 'ink-danger': unit.bag_expired }">{{ unit.expiry_date || '—' }}</td>
                 <td>
-                  <input
-                    v-if="!unit.bag_expired"
-                    v-model="locations[unit.unit_id]"
-                    list="si-storage-locations"
-                    maxlength="100"
-                    class="text-input text-input--cell"
-                    placeholder="Optional"
-                    :aria-label="`Storage location for ${bagLabel(unit)}`"
-                  />
+                  <span class="badge" :class="badgeClass(remaining(unit).tone)">
+                    <span class="badge__dot" aria-hidden="true" />
+                    {{ remaining(unit).label }}
+                  </span>
+                </td>
+                <td class="nowrap">{{ formatDateTime(unit.received_at) }}</td>
+                <td>
+                  <!-- Every bag goes onto a shelf, picked from the list as at the centre's Stock Intake (project owner, 2026-10-30). -->
+                  <div v-if="!unit.bag_expired" class="location-cell">
+                    <SelectField
+                      v-model="locations[unit.unit_id]"
+                      :options="locationOptions"
+                      placeholder="Select a location"
+                      :aria-label="`Storage location for ${bagLabel(unit)}`"
+                      empty-text="No storage locations loaded"
+                      size="sm"
+                    />
+                  </div>
                   <span v-else class="ink-danger">Past its date — discard it</span>
                 </td>
-                <td v-if="canDiscard" class="actions-col">
-                  <button
-                    type="button"
-                    class="btn-outline btn-outline--sm btn-outline--danger"
-                    :disabled="dialogBusy"
-                    @click="startDiscard(unit)"
-                  >
-                    Discard
-                  </button>
+                <td v-if="canDiscard" class="c-actions">
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="icon-btn icon-btn--danger"
+                      :disabled="dialogBusy"
+                      :aria-label="`Discard ${bagLabel(unit)}`"
+                      title="Discard"
+                      @click="startDiscard(unit)"
+                    >
+                      <AssetIcon name="trash-2" :size="15" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
-          <datalist id="si-storage-locations">
-            <option v-for="location in storageLocations" :key="location" :value="location" />
-          </datalist>
         </div>
 
         <footer v-if="arrived.length" class="list-foot">
           <p v-if="stockInError" class="list-foot__error" role="alert">{{ stockInError }}</p>
+          <ul v-else-if="blockers.length" class="blockers">
+            <li v-for="blocker in blockers" :key="blocker">
+              <AssetIcon name="circle-alert" :size="14" />
+              {{ blocker }}
+            </li>
+          </ul>
           <p v-else class="list-foot__summary">{{ arrived.length }} bag{{ arrived.length === 1 ? '' : 's' }} awaiting stock-in</p>
-          <button type="button" class="btn-primary" :disabled="!ticked.length || stockingIn" @click="stockInTicked">
+          <button type="button" class="btn-primary" :disabled="!canStockIn" @click="stockInTicked">
             <AssetIcon name="package-check" :size="14" />
             {{ stockingIn ? 'Stocking in…' : `Stock in ${ticked.length} scanned bag${ticked.length === 1 ? '' : 's'}` }}
           </button>
@@ -205,6 +246,8 @@
     >
       The bag leaves your stock for good. This cannot be undone.
     </HospitalUnitReasonDialog>
+
+    <HospitalAddBloodUnitDialog v-if="addingUnit" @added="onUnitAdded" @close="addingUnit = false" />
 
     <Teleport to="body">
       <Transition name="toast-fade">
@@ -232,11 +275,15 @@
  * owner, 2026-10-28), as the centre's Stock Intake is.
  */
 
+import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import SelectField from '~/components/common/SelectField.vue'
+import HospitalAddBloodUnitDialog from '~/components/Hospital/AddBloodUnitDialog.vue'
 import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { UNIT_REFUSAL_MESSAGES } from '~/types/hospitalInventory'
 import { hospitalRemainingDaysTag } from '~/utils/hospitalInventoryDashboard'
+import { badgeClass } from '~/utils/listBadge'
 import { matchStockInScan } from '~/utils/stockIn'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in' })
@@ -248,6 +295,9 @@ definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashb
  */
 const { can } = useUser()
 const canDiscard = computed(() => can('hospital.inventory.discard'))
+// Adding a bag is a direct-distribution receipt on the server, so it needs that ability.
+const canAdd = computed(() => can('hospital.receiving.direct'))
+const columnCount = computed(() => (canDiscard.value ? 9 : 8))
 
 const loading = ref(true)
 const loadError = ref('')
@@ -257,14 +307,33 @@ const lastUpdated = ref(null)
 const arrived = ref([])
 const ticked = ref([])
 const locations = reactive({})
-const bulkLocation = ref('')
+const bulkLocation = ref(null)
 const stockingIn = ref(false)
 const stockInError = ref('')
 const storageLocations = ref([])
 
+const locationOptions = computed(() => storageLocations.value.map((location) => ({ value: location, label: location })))
+
 const tickable = computed(() => arrived.value.filter((unit) => !unit.bag_expired).map((unit) => unit.unit_id))
 const allTicked = computed(() => tickable.value.length > 0 && tickable.value.every((id) => ticked.value.includes(id)))
 const pastDate = computed(() => arrived.value.filter((unit) => unit.bag_expired).length)
+
+/**
+ * Refuse here for the reasons the server would, as the centre's Stock Intake
+ * does: every bag goes onto a shelf (project owner, 2026-10-30).
+ */
+const blockers = computed(() => {
+  if (!ticked.value.length) return []
+  if (!storageLocations.value.length) return ['The storage locations could not be loaded. Reload the page to stock bags in.']
+
+  const missing = ticked.value.filter((id) => !locations[id]).length
+
+  return missing
+    ? [`${missing} scanned bag${missing === 1 ? ' needs' : 's need'} a storage location.`]
+    : []
+})
+
+const canStockIn = computed(() => ticked.value.length > 0 && !stockingIn.value && !blockers.value.length)
 
 const kpis = computed(() => [
   {
@@ -303,8 +372,9 @@ async function loadArrived() {
   ticked.value = ticked.value.filter((id) => waiting.has(id))
 }
 
-// Suggestions for the location fields: the configured fridges and freezers,
-// and places already used. A convenience; the page works without them.
+// What the location fields pick from: the configured fridges and freezers, and
+// places already used. Every bag needs one, so without the list nothing can be
+// stocked in; the blockers say so.
 async function loadLocations() {
   try {
     storageLocations.value = (await hospitalService.inventorySummary())?.storage_locations ?? []
@@ -360,15 +430,15 @@ function toggleAllTicked() {
 }
 
 function applyBulkLocation() {
-  const location = bulkLocation.value.trim()
+  const location = bulkLocation.value
   if (!location) return
 
   for (const id of ticked.value) locations[id] = location
-  bulkLocation.value = ''
+  bulkLocation.value = null
 }
 
 async function stockInTicked() {
-  if (!ticked.value.length) return
+  if (!canStockIn.value) return
 
   stockingIn.value = true
   stockInError.value = ''
@@ -376,7 +446,7 @@ async function stockInTicked() {
   try {
     const response = await hospitalService.stockIn(ticked.value.map((id) => ({
       unit_id: id,
-      storage_location: (locations[id] || '').trim() || null,
+      storage_location: locations[id],
     })))
 
     for (const id of ticked.value) delete locations[id]
@@ -396,6 +466,26 @@ async function stockInTicked() {
   } finally {
     stockingIn.value = false
   }
+}
+
+/* ADD: blood from outside RedAgos, typed in; it arrives awaiting stock-in like any other bag. */
+const addingUnit = ref(false)
+
+async function onUnitAdded(response) {
+  addingUnit.value = false
+
+  const delivery = response?.direct_distribution
+  const ids = (delivery?.units ?? []).map((unit) => unit.unit_id)
+  const count = ids.length || delivery?.quantity || 1
+
+  await refresh()
+
+  // The bags are in hand, so they come marked, ready for their location.
+  const waiting = new Set(tickable.value)
+  ticked.value = [...new Set([...ticked.value, ...ids.filter((id) => waiting.has(id))])]
+  scanNote.value = ''
+  scanAlert.value = false
+  notice.value = `${count === 1 ? `${delivery?.external_unit_number ?? 'Bag'} added` : `${count} bags under ${delivery?.external_unit_number} added`}. Choose a storage location, then stock ${count === 1 ? 'it' : 'them'} in.`
 }
 
 /* DISCARD: a bag that arrived past its date leaves without being stocked. */
@@ -502,18 +592,17 @@ onBeforeUnmount(() => {
 })
 </script>
 
+<!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->
+<style scoped src="~/assets/css/list-ui.css"></style>
+
 <style scoped>
-/* Blood Bank Inventory's quiet look (2026-10-28), itself the centre's Blood
-   Inventory's: one surface set apart by hairlines, three greys of ink, and
-   green, amber and red for state alone. The dark selector sits whole inside
-   :global(), so the tokens never land on <html>. */
+/* Blood Bank Inventory's quiet look (2026-10-28), kept for the summary cards
+   above the list. The dark selector sits whole inside :global(), so the
+   tokens never land on <html>. */
 .inv-tones {
-  --inv-page: var(--rb-page-bg);
   --inv-surface: var(--rb-surface);
   --inv-elevated: var(--rb-surface-alt);
-  --inv-hover: var(--rb-surface-hover);
   --inv-border: var(--rb-border-strong);
-  --inv-border-soft: var(--rb-border);
   --inv-text: var(--rb-text-primary);
   --inv-muted: var(--rb-text-secondary);
   --inv-faint: var(--rb-text-muted);
@@ -523,14 +612,11 @@ onBeforeUnmount(() => {
   --inv-ok-fill: #1BAF7A;
   --inv-warn-fill: #EDA100;
   --inv-crit-fill: #DC2626;
-  --inv-action: var(--rb-primary);
-  --inv-action-hover: var(--rb-primary-hover);
   --inv-action-text: var(--rb-primary-text);
   --tone: var(--inv-muted);
   --tone-fill: var(--inv-faint);
 }
 :global(.dark .inv-tones) {
-  --inv-border-soft: var(--ink-hover, #263345);
   --inv-ok: #4ADE80;
   --inv-warn: #FBBF24;
   --inv-crit: #F87171;
@@ -545,63 +631,7 @@ onBeforeUnmount(() => {
 .tone--neutral { --tone: var(--inv-muted); --tone-fill: var(--inv-muted); }
 .tone--muted { --tone: var(--inv-faint); --tone-fill: var(--inv-faint); }
 
-.si-page {
-  font-family: var(--rb-font-sans);
-  max-width: var(--rb-content-max, 1600px);
-  margin: 0 auto;
-  background: var(--inv-page);
-  box-shadow: 0 0 0 100vmax var(--inv-page);
-  color: var(--inv-text);
-  padding: 24px var(--rb-gutter, 24px) 40px;
-}
-.si-inner { display: flex; flex-direction: column; gap: 16px; container-type: inline-size; container-name: si; }
-
-.inv-tones :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--inv-action-text); outline-offset: 2px; }
-
-/* Header */
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--inv-text); margin: 0; }
-.page-subtitle { font-size: 13px; color: var(--inv-muted); margin: 4px 0 0; }
-.page-head__meta { display: flex; align-items: center; gap: 12px; }
-.live-note { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--inv-muted); }
-.live-note__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--inv-ok-fill); box-shadow: 0 0 0 3px color-mix(in srgb, var(--inv-ok-fill) 22%, transparent); }
-.spin-icon { animation: spin 0.9s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.load-error {
-  display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 10px;
-  background: var(--inv-surface); border: 1px solid var(--inv-border); color: var(--inv-text); font-size: 13px;
-}
-.load-error :deep(svg) { color: var(--inv-crit); }
-.load-error span { flex: 1; }
-
-/* Buttons: the app's blue for the one action, the rest outlined. */
-.btn-primary {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2;
-  color: #fff; background: var(--inv-action); border: 1px solid var(--inv-action);
-  box-shadow: 0 1px 2px rgba(var(--rb-primary-rgb), 0.25);
-  cursor: pointer; text-decoration: none; font-family: inherit; transition: background 0.15s ease, box-shadow 0.15s ease;
-}
-.btn-primary:hover:not(:disabled) { background: var(--inv-action-hover); border-color: var(--inv-action-hover); box-shadow: 0 4px 12px rgba(var(--rb-primary-rgb), 0.28); }
-.btn-primary:active:not(:disabled) { transform: translateY(1px); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-outline {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2;
-  color: var(--inv-text); background: var(--inv-surface); border: 1px solid var(--inv-border);
-  cursor: pointer; font-family: inherit; text-decoration: none; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease;
-}
-.btn-outline:hover:not(:disabled) { background: var(--inv-hover); border-color: var(--rb-border-hover); }
-.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-outline--sm { padding: 6px 11px; font-size: 12px; }
-.btn-outline--danger { color: var(--inv-crit); border-color: color-mix(in srgb, var(--inv-crit) 35%, var(--inv-border)); }
-.btn-outline--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--inv-crit) 8%, transparent); border-color: var(--inv-crit); }
-.link-btn {
-  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: none; background: none;
-  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--inv-action-text); cursor: pointer; text-decoration: none;
-}
-.link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+.list-inner { container-type: inline-size; container-name: si; }
 
 /* Summary cards: one surface, the state in the icon alone. */
 .kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -620,76 +650,35 @@ onBeforeUnmount(() => {
 .kpi__value { font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-text); font-variant-numeric: tabular-nums; }
 .kpi__sub { font-size: 12px; color: var(--inv-muted); }
 
-/* Panel */
-.panel { background: var(--inv-surface); border: 1px solid var(--inv-border); border-radius: 12px; min-width: 0; display: flex; flex-direction: column; }
-.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; flex-wrap: wrap; }
-.panel-title { font-size: 15px; font-weight: 600; color: var(--inv-text); margin: 0; }
-.panel-subtitle { font-size: 12.5px; color: var(--inv-muted); margin: 3px 0 0; max-width: 72ch; }
-
-/* Scan, then location */
-.tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 18px 14px; }
-.scan-field { position: relative; flex: 1 1 260px; max-width: 360px; }
-.scan-field__icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--inv-muted); pointer-events: none; }
-.scan-note { margin: 0; flex: 1 1 auto; font-size: 12.5px; color: var(--inv-muted); }
-.scan-note--alert { color: var(--inv-crit); font-weight: 600; }
-.bulk-field { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.bulk-field .text-input { width: 230px; }
-.text-input {
-  width: 100%; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--inv-border);
-  background: var(--inv-elevated); color: var(--inv-text); font: inherit; font-size: 12.5px; transition: border-color 0.15s ease;
+/* Scan, then the scanned bags' location, in the toolbar's filters. */
+.bulk-field { display: flex; flex: none; align-items: center; gap: 8px; }
+.bulk-field__select { width: 230px; }
+.scan-note {
+  margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--rb-border);
+  font-size: 12.5px; color: var(--rb-text-secondary);
 }
-.text-input::placeholder { color: var(--inv-muted); }
-.text-input:focus { outline: none; border-color: var(--inv-action); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.12); }
-.text-input--scan { padding-left: 34px; }
-.text-input--cell { height: 32px; max-width: 220px; min-width: 140px; }
+.scan-note--alert { color: var(--rb-accent-text); font-weight: 600; }
 
-/* Table */
-.list-state { padding: 18px; }
-.table-wrap { position: relative; overflow-x: auto; }
-.unit-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.unit-table thead th {
-  text-align: left; font-size: 11.5px; font-weight: 500; color: var(--inv-muted); padding: 9px 8px;
-  border-top: 1px solid var(--inv-border); border-bottom: 1px solid var(--inv-border); white-space: nowrap;
-}
-.unit-table tbody td { padding: 10px 8px; border-bottom: 1px solid var(--inv-border-soft); color: var(--inv-text); white-space: nowrap; vertical-align: middle; }
-.unit-table th:first-child, .unit-table td:first-child { padding-left: 18px; }
-.unit-table th:last-child, .unit-table td:last-child { padding-right: 18px; }
-.unit-table .wrap-cell { white-space: normal; min-width: 120px; }
-.unit-table tbody tr:hover { background: var(--inv-hover); }
 .check-col { width: 36px; }
-.actions-col { text-align: right; }
-.cell-sub { display: block; margin-top: 3px; font-size: 11.5px; color: var(--inv-muted); }
-.mono { font-family: var(--rb-font-mono); font-size: 11.5px; }
-.num { font-variant-numeric: tabular-nums; }
-.ink-danger { color: var(--inv-crit) !important; font-weight: 600; }
-.type-chip {
-  display: inline-flex; min-width: 32px; justify-content: center; padding: 1px 7px; border-radius: 6px;
-  border: 1px solid var(--inv-border); background: var(--inv-elevated); font-size: 12px; font-weight: 600; line-height: 1.6; color: var(--inv-text);
-}
-.days { font-variant-numeric: tabular-nums; color: var(--tone); }
-.days.tone--warning, .days.tone--danger { font-weight: 600; }
-.days.tone--neutral { color: var(--inv-text); }
-.days--pill { display: inline-flex; padding: 1px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tone-fill) 14%, transparent); }
+.location-cell { width: 200px; }
+.ink-danger { color: var(--rb-accent-text) !important; font-weight: 600; }
 /* A scanned bag is marked along its edge; one past its date in red. */
 .row--scanned td:first-child { box-shadow: inset 3px 0 0 var(--inv-ok-fill); }
 .row--expired td:first-child { box-shadow: inset 3px 0 0 var(--inv-crit-fill); }
 
-.list-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 18px; }
-.list-foot__summary { margin: 0; font-size: 12px; color: var(--inv-muted); }
-.list-foot__error { margin: 0; font-size: 12.5px; color: var(--inv-crit); }
-
-.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 24px; text-align: center; font-size: 13px; color: var(--inv-muted); }
-.empty-state__title { font-size: 14px; font-weight: 600; color: var(--inv-text); margin: 4px 0 0; }
-.empty-state__desc { font-size: 12.5px; margin: 0; max-width: 48ch; }
-
-.skeleton {
-  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
-  background-size: 400% 100%; border-radius: 6px; animation: shimmer 1.4s ease infinite;
+/* Where the pager sits on the donors page: what stops the stock-in, and the button. */
+.list-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-top: 1px solid var(--rb-border);
 }
-.skeleton--line { height: 13px; margin-bottom: 10px; }
-@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
-
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.list-foot__summary { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.list-foot__error { margin: 0; font-size: 12.5px; color: var(--rb-accent-text); }
+/* What still stops the stock-in, as on the centre's Stock Intake. */
+.blockers {
+  margin: 0; padding: 8px 12px; list-style: none; display: flex; flex-direction: column; gap: 6px;
+  border-radius: 10px; background: rgba(var(--rb-warning-rgb), 0.08); font-size: 12.5px; color: var(--rb-warning-text);
+}
+.blockers li { display: flex; align-items: center; gap: 7px; }
 
 .inventory-toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1100;
@@ -702,18 +691,12 @@ onBeforeUnmount(() => {
 .toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .spin-icon { animation: none !important; }
   .toast-fade-enter-active, .toast-fade-leave-active { transition: none; }
 }
 
 @container si (max-width: 760px) {
   .kpi-row { grid-template-columns: minmax(0, 1fr); }
-  .scan-field { max-width: none; }
-  .bulk-field { width: 100%; margin-left: 0; }
-  .bulk-field .text-input { width: 100%; }
-}
-
-@media (max-width: 640px) {
-  .si-page { padding: 16px 16px 32px; }
+  .bulk-field { width: 100%; }
+  .bulk-field__select { flex: 1; width: auto; min-width: 0; }
 }
 </style>

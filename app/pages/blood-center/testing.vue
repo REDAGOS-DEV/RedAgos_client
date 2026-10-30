@@ -3,7 +3,6 @@
     <header class="testing__header">
       <div>
         <h1 class="testing__title">{{ viewCopy.title }}</h1>
-        <p class="testing__subtitle">{{ viewCopy.subtitle }}</p>
         <p class="testing__note">
           <AssetIcon name="info" :size="13" />
           A passing result clears its section; a saved result changes only through an approved correction. RedAgos
@@ -227,9 +226,6 @@
                 <span v-if="selected?.clearances?.immunohematology" class="pill pill--collected">Cleared</span>
                 <span v-else-if="typingHold" class="pill pill--rejected">{{ typingHoldLabel }}</span>
               </div>
-              <p class="card__hint">
-                The confirmatory ABO group and Rh type read at the bench. It clears when saved.
-              </p>
               <p v-if="typingHold" class="card__hint card__hint--warn">{{ typingHoldText }}</p>
 
               <fieldset class="exam" :disabled="locked || busy">
@@ -293,9 +289,6 @@
                 </NuxtLink>
               </div>
               <div class="panel-head">
-                <p class="card__hint">
-                  The final reading for each marker, after any repeat testing at the bench. Every marker is required.
-                </p>
                 <span class="panel-head__count" :class="{ 'panel-head__count--done': readCount === markers.length }">
                   {{ readCount }} of {{ markers.length }} read
                 </span>
@@ -525,19 +518,16 @@ function setTestView(view) {
 const VIEW_COPY = {
   typing: {
     title: 'Immunohematology',
-    subtitle: 'Record each drawn unit\'s confirmatory ABO/Rh typing.',
     queueTitle: 'Waiting for typing',
     noun: 'typing',
   },
   serology: {
     title: 'Serology (TTI)',
-    subtitle: 'Record each drawn unit\'s five-marker serology panel.',
     queueTitle: 'Waiting for serology',
     noun: 'serology',
   },
   all: {
     title: 'Testing',
-    subtitle: 'Record each drawn unit\'s confirmatory blood typing and its five-marker serology panel.',
     queueTitle: 'Units awaiting testing',
     noun: 'testing',
   },
@@ -1035,13 +1025,6 @@ onMounted(async () => {
   color: var(--rb-text-primary);
 }
 
-.testing__subtitle {
-  margin: 0.3rem 0 0;
-  max-width: 64ch;
-  font-size: 13px;
-  color: var(--rb-text-secondary);
-}
-
 .testing__facility {
   display: inline-flex;
   align-items: center;
@@ -1179,8 +1162,7 @@ onMounted(async () => {
 .qitem--done { box-shadow: inset 3px 0 0 var(--rb-success); }
 
 /* Serology head: the hint, how much is read, the shortcut. */
-.panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.panel-head .card__hint { flex: 1 1 320px; margin: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; }
 .panel-head__count { padding: 3px 10px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
 .panel-head__count--done { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .btn--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }

@@ -3,7 +3,7 @@
     <div class="logo-card__head">
       <div>
         <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
-        <p class="logo-card__hint">{{ copy.hint }} PNG or JPG, 2 MB or smaller. A square image prints best.</p>
+        <p class="logo-card__hint">PNG or JPG, 2 MB or smaller.</p>
       </div>
     </div>
 
@@ -71,7 +71,6 @@ const DOH_SEAL_SRC = '/images/doh-seal.png'
 const SLOTS = {
   logo: {
     title: 'Facility logo',
-    hint: 'Printed on the right of this centre\'s reports, such as the Daily Blood Stock Inventory.',
     alt: 'Current facility logo',
     field: 'logo_url',
     upload: (form) => bloodCenterService.uploadFacilityLogo(form),
@@ -81,7 +80,6 @@ const SLOTS = {
   },
   seal: {
     title: 'Left logo',
-    hint: 'Printed on the left of the Daily Blood Stock Inventory. Without one, the Department of Health seal is printed.',
     alt: 'Current left logo',
     field: 'seal_url',
     upload: (form) => bloodCenterService.uploadFacilitySeal(form),

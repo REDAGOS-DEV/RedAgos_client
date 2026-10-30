@@ -11,7 +11,7 @@
       </div>
 
       <!-- Statements of Account only (project owner, 2026-10-25). -->
-      <PageHeader title="Statements" subtitle="A hospital's weekly invoices, settlements and balance over a period.">
+      <PageHeader title="Statements">
         <template #actions>
           <button class="ui-btn" :disabled="!statement || printing" @click="print">
             <AssetIcon name="printer" :size="15" />

@@ -367,10 +367,10 @@ onUnmounted(() => {
 // --- Breadcrumb ---
 const pageLabels = {
   '/hospital/dashboard': 'Dashboard',
-  '/hospital/bloodrequests': 'Receiving / Blood Requests',
-  '/hospital/bloodrequests/newrequest' : 'Receiving / Blood Requests / New Request',
-  '/hospital/bloodrequests/newrequest/[id]' : 'Receiving / Blood Requests / New Request / ',
-  '/hospital/bloodrequests/edit' : 'Receiving / Blood Requests / Edit / ',
+  '/hospital/bloodrequests': 'Receiving / Patient Request',
+  '/hospital/bloodrequests/newrequest' : 'Receiving / Patient Request / New Request',
+  '/hospital/bloodrequests/newrequest/[id]' : 'Receiving / Patient Request / New Request / ',
+  '/hospital/bloodrequests/edit' : 'Receiving / Patient Request / Edit / ',
   '/hospital/trackrequests': 'Track Requests',
   '/hospital/bloodavailability': 'Search Availability',
   '/hospital/inventory': 'Blood Bank Inventory',
@@ -379,7 +379,7 @@ const pageLabels = {
   '/hospital/inventory-report': 'Reports / Inventory Report',
   '/hospital/receiving/weekly': 'Receiving / Weekly Request',
   '/hospital/receiving/weekly/new': 'Receiving / Weekly Request / New',
-  '/hospital/receiving/direct-distribution': 'Receiving / Direct Distribution',
+  '/hospital/request-days': 'Facility Settings / Request Days',
   '/hospital/notifications': 'Notifications',
   '/hospital/staff': 'Staff',
   '/hospital/settings': 'Settings',
@@ -430,7 +430,7 @@ onMounted(() => {
 // --- Account menu: account settings, then the pages reached for most ---
 const USER_MENU = [
   { label: 'Account settings', path: '/hospital/settings', icon: 'settings' },
-  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', requires: 'hospital.requests.view' },
+  { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', requires: 'hospital.requests.view' },
   { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
 ]
 const userMenuItems = computed(() => USER_MENU.filter((item) => !item.requires || can(item.requires)))
@@ -507,15 +507,15 @@ function handleEscSearch() {
 // Each page names the hospital ability it needs; a role without it is not offered the page.
 const searchablePages = [
   { label: 'Dashboard', path: '/hospital/dashboard', icon: 'layout-dashboard', keywords: 'dashboard home overview' },
-  { label: 'Blood Requests', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'receiving requests pending processing', requires: 'hospital.requests.view' },
+  { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'receiving patient blood requests pending processing', requires: 'hospital.requests.view' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood', requires: 'hospital.requests.manage' },
   { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units', requires: 'hospital.requests.view' },
   { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock supply tag crossmatch transfusion patient bags expiry activity', requires: 'hospital.inventory.view' },
   { label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', keywords: 'stock in intake shelve scan arrived bags storage location fridge receive', requires: 'hospital.inventory.stock_in' },
   { label: 'Inventory Report', path: '/hospital/inventory-report', icon: 'clipboard-list', keywords: 'report reports inventory sheet crossmatched uncrossmatched print pdf form wb prbc', requires: 'hospital.inventory.view' },
   { label: 'Stock Thresholds', path: '/hospital/stock-thresholds', icon: 'sliders-horizontal', keywords: 'threshold minimum low stock supply alert shortage notification', requires: 'hospital.inventory.view' },
-  { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request schedule restock replenishment request days receive scan', requires: 'hospital.requests.view' },
-  { label: 'Direct Distribution', path: '/hospital/receiving/direct-distribution', icon: 'truck', keywords: 'receiving direct distribution red cross prc delivery outside bags type bag number', requires: 'hospital.receiving.direct' },
+  { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', keywords: 'receiving weekly request restock replenishment due today missed receive scan', requires: 'hospital.requests.view' },
+  { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', keywords: 'facility settings request days schedule weekly restock blood center add center edit days', requires: 'hospital.requests.view' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Staff', path: '/hospital/staff', icon: 'id-card', keywords: 'staff accounts roles head inventory requesting team users', requires: 'hospital.staff.manage' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password profile photo appearance theme colour' },

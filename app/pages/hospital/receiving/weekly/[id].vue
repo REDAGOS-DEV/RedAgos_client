@@ -47,6 +47,39 @@
           </div>
         </section>
 
+        <!--
+          How the center will meet this order, once it confirmed it (project
+          owner, 2026-10-29): how many units, pick-up or delivery, and when.
+        -->
+        <section v-for="request in planned" :key="`plan-${request.id}`" class="panel handover" aria-label="How the order reaches you">
+          <div class="handover__icon" aria-hidden="true">
+            <AssetIcon :name="request.supply_plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="20" />
+          </div>
+          <div class="handover__body">
+            <p class="handover__eyebrow">
+              {{ request.supply_plan.handover_method === 'delivery' ? 'Delivery' : 'Pick-up at the center' }}
+              <template v-if="planned.length > 1"> · {{ request.reference_number }}</template>
+            </p>
+            <p class="handover__when">{{ handoverWhen(request.supply_plan.scheduled_at) }}</p>
+            <p class="handover__what">
+              {{ weekly.target_facility?.name || 'The center' }} will supply
+              <strong>{{ request.committed_quantity ?? 0 }} of {{ request.quantity }}</strong> units<template v-if="request.supply_plan.handover_address">,
+                {{ request.supply_plan.handover_method === 'delivery' ? 'delivered to' : 'collected at' }} {{ request.supply_plan.handover_address }}</template>.
+            </p>
+            <p v-if="request.supply_plan.contact_name || request.supply_plan.contact_phone" class="handover__contact">
+              <AssetIcon name="phone" :size="13" />
+              {{ [request.supply_plan.contact_name, request.supply_plan.contact_phone].filter(Boolean).join(' · ') }}
+            </p>
+            <p v-if="request.supply_plan.notes" class="handover__notes">{{ request.supply_plan.notes }}</p>
+          </div>
+        </section>
+
+        <p v-if="weekly.is_open && !planned.length" class="note">
+          <AssetIcon name="clock" :size="14" />
+          Waiting for {{ weekly.target_facility?.name || 'the center' }} to confirm how many units it can supply, and when
+          you pick them up or it delivers them.
+        </p>
+
         <p v-if="weekly.is_open" class="note">
           <AssetIcon name="info" :size="14" />
           The center supplies what it can. When it dispatches, anything it did not reserve is closed as not supplied —
@@ -83,6 +116,7 @@
                   <th scope="col">Component</th>
                   <th scope="col">Blood type</th>
                   <th scope="col" class="num">Requested</th>
+                  <th scope="col" class="num" title="What the center confirmed it will supply">Will supply</th>
                   <th scope="col" class="num">Supplied</th>
                   <th scope="col" class="num">Received</th>
                   <th scope="col" class="num">Not supplied</th>
@@ -95,6 +129,7 @@
                   <th scope="row" class="lines-table__component">{{ row.component }}</th>
                   <td><span class="type-pill">{{ row.bloodType }}</span></td>
                   <td class="num">{{ row.requested }}</td>
+                  <td class="num" :class="{ muted: row.committed === null }">{{ row.committed ?? '—' }}</td>
                   <td class="num strong">{{ row.supplied }}</td>
                   <td class="num">{{ row.received }}</td>
                   <td class="num" :class="{ 'cell--short': row.notSupplied }">{{ row.notSupplied }}</td>
@@ -108,6 +143,7 @@
                 <tr>
                   <th scope="row" colspan="2">Total</th>
                   <td class="num">{{ totals.requested }}</td>
+                  <td class="num">{{ totals.committed ?? '—' }}</td>
                   <td class="num strong">{{ totals.fulfilled }}</td>
                   <td class="num">{{ totals.received }}</td>
                   <td class="num">{{ totals.not_supplied }}</td>
@@ -143,9 +179,9 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalScanReceivePanel from '~/components/Hospital/ScanReceivePanel.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
-import { bloodTypeSummary, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
+import { bloodTypeSummary, handoverWhen, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKLY_STATUS_TONES } from '~/types/receiving'
-import { receiptsByRequest } from '~/utils/receiving'
+import { awaitingBagsFor, receiptsByRequest } from '~/utils/receiving'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -166,6 +202,11 @@ const totals = computed(() => weekly.value?.totals ?? {})
 
 const cards = computed(() => [
   { label: 'Requested', value: totals.value.requested ?? 0, hint: 'Across every blood type' },
+  {
+    label: 'Will supply',
+    value: totals.value.committed ?? '—',
+    hint: totals.value.committed === null || totals.value.committed === undefined ? 'Not confirmed yet' : 'Confirmed by the center',
+  },
   { label: 'Supplied', value: totals.value.fulfilled ?? 0, hint: 'Dispatched by the center', class: 'stat-card__value--strong' },
   { label: 'Received', value: totals.value.received ?? 0, hint: 'Confirmed into your stock' },
   { label: 'To receive', value: totals.value.awaiting_receipt ?? 0, hint: 'Dispatched, not yet confirmed', class: totals.value.awaiting_receipt ? 'stat-card__value--warning' : '' },
@@ -194,6 +235,8 @@ const lineRows = computed(() => (weekly.value?.requests ?? []).flatMap((request)
       component: item.component?.name ?? '—',
       bloodType: item.blood_type?.code ?? request.blood_type?.code ?? '—',
       requested: item.quantity,
+      // What the center confirmed it will supply; null until it does.
+      committed: item.committed_quantity ?? null,
       supplied,
       received: item.received_quantity ?? 0,
       notSupplied: closed ? Math.max(0, item.quantity - supplied) : 0,
@@ -207,22 +250,11 @@ const lineRows = computed(() => (weekly.value?.requests ?? []).flatMap((request)
 
 const rejected = computed(() => (weekly.value?.requests ?? []).filter((request) => request.status === 'rejected'))
 
-/** Bags dispatched for this weekly request and not yet received, across its blood types. */
-const awaiting = computed(() => (weekly.value?.requests ?? []).flatMap((request) => {
-  const lines = new Map((request.items ?? []).map((item) => [item.id, item]))
+/** The requests the center has confirmed: what it will supply, and how and when it arrives. */
+const planned = computed(() => (weekly.value?.requests ?? []).filter((request) => request.supply_plan && !['rejected', 'cancelled'].includes(request.status)))
 
-  return (request.allocations ?? [])
-    .filter((allocation) => allocation.status === 'released' && !allocation.received_at)
-    .map((allocation) => ({
-      allocation_id: allocation.id,
-      request_id: request.id,
-      unit_id: allocation.unit_id,
-      blood_type: lines.get(allocation.request_item_id)?.blood_type?.code ?? request.blood_type?.code ?? null,
-      component: lines.get(allocation.request_item_id)?.component?.name ?? null,
-      expiry_date: allocation.expiry_date,
-      released_at: allocation.released_at,
-    }))
-}))
+/** Bags dispatched for this weekly request and not yet received, across its blood types. */
+const awaiting = computed(() => awaitingBagsFor(weekly.value?.requests))
 
 onMounted(async () => {
   await load()
@@ -320,6 +352,18 @@ function formatDay(value) {
 .banner { display: flex; align-items: center; gap: 8px; margin: 0; padding: 11px 14px; border-radius: 10px; font-size: 13px; }
 .banner--error { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25); }
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+
+/* The center's confirmed hand-over: when, how many, where, and who to call. */
+.handover { display: flex; align-items: flex-start; gap: 14px; padding: 16px; }
+.handover__icon { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.handover__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.handover__eyebrow { margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rb-primary-text); }
+.handover__when { margin: 0; font-size: 18px; font-weight: 800; color: var(--rb-text-primary); }
+.handover__what { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
+.handover__what strong { color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.handover__contact { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
+.handover__notes { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--rb-surface-alt); font-size: 12.5px; line-height: 1.5; color: var(--rb-text-primary); white-space: pre-line; }
+.muted { color: var(--rb-text-secondary); }
 
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .stat-card {
