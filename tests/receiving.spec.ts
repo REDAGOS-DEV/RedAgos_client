@@ -300,7 +300,7 @@ describe('replenishment lives only in the weekly request', () => {
   })
 
   it('dispatches a weekly request whole', () => {
-    expect(source('app/pages/blood-center/fulfillment.vue'))
+    expect(source('app/components/BloodCenter/FulfillmentBoard.vue'))
       .toContain('request.selected.length && !request.weekly_request ? request.selected : undefined')
   })
 })

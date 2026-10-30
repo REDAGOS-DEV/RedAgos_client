@@ -25,8 +25,32 @@ export const NOTIFICATION_TABS = [
   { key: 'laboratory', label: 'Laboratory', icon: 'flask-conical' },
   { key: 'collection', label: 'Collection', icon: 'droplets' },
   { key: 'correction', label: 'Corrections', icon: 'pencil' },
-  { key: 'reminder', label: 'Reminders', icon: 'clock' },
 ] as const
+
+/**
+ * Which kind of notification each topic sends (the server's
+ * StaffNotificationTopics keys and the categories its notifications carry).
+ */
+export const TOPIC_CATEGORY: Record<string, string> = {
+  blood_requests: 'request',
+  serology_verification: 'laboratory',
+  referrals: 'laboratory',
+  corrections: 'correction',
+  low_stock: 'inventory',
+  expiring_units: 'inventory',
+  morning_briefing: 'collection',
+  drive_reminders: 'collection',
+  deferrals_ending: 'collection',
+}
+
+/**
+ * The tabs for this person (2026-10-31): All, then only the kinds their role
+ * and department receive, from the topics the server says are theirs.
+ */
+export function tabsFor(topicKeys: string[]): typeof NOTIFICATION_TABS[number][] {
+  const kinds = new Set(topicKeys.map(k => TOPIC_CATEGORY[k]).filter(Boolean))
+  return NOTIFICATION_TABS.filter(t => t.key === '' || kinds.has(t.key))
+}
 
 /** What each department's inbox is for, said when it is empty. */
 export const EMPTY_BY_DEPARTMENT: Record<string, string> = {

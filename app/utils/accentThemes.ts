@@ -276,11 +276,22 @@ export interface AccentSurfaces {
   }
 }
 
+/** Chrome's dark greys: its tab strip, toolbar, menus and dividers. */
+export const CHROME_DARK = {
+  base: '#1A1B1E',
+  page: '#202124',
+  surface: '#292A2D',
+  surfaceAlt: '#252629',
+  hover: '#3C3D41',
+  chrome: '#2D2E31',
+  border: '#3C4043',
+  borderHover: '#5F6368',
+  inset: '#1F2023',
+} as const
+
 // The text each set of surfaces has to carry: the portal's secondary grey on
-// the light ones, its secondary and primary text on the dark ones.
+// the light ones. The dark ones are Chrome's own greys (CHROME_DARK).
 const LIGHT_TEXT_MUTED: Rgb = [100, 116, 139] // #64748B
-const DARK_TEXT: Rgb = [238, 241, 245] // #EEF1F5
-const DARK_TEXT_2: Rgb = [180, 188, 201] // #B4BCC9
 
 /** The tinted surfaces for a theme, from its button colour's hue. */
 export function accentSurfaces(theme: AccentTheme): AccentSurfaces {
@@ -299,20 +310,12 @@ export function accentSurfaces(theme: AccentTheme): AccentSurfaces {
   let up = 0
   while (up < 0.025 && contrast(LIGHT_TEXT_MUTED, at(0.5, 0.975 + up)) < MIN_CONTRAST) up += 0.0025
 
-  // Dark: likewise lower every surface together until the secondary text
-  // passes on the lightest of them and the primary text clears 7:1.
-  const DARK = {
-    base: [0.35, 0.13], page: [0.3, 0.165], surface: [0.23, 0.22], surfaceAlt: [0.24, 0.195],
-    hover: [0.2, 0.27], chrome: [0.2, 0.25], border: [0.18, 0.3], borderHover: [0.15, 0.38], inset: [0.24, 0.18],
-  } as const
-  let down = 0
-  const lightest = () => at(DARK.hover[0], DARK.hover[1] - down)
-  while (down < 0.1 && (contrast(DARK_TEXT_2, lightest()) < MIN_CONTRAST || contrast(DARK_TEXT, lightest()) < 7)) down += 0.005
-
+  // Dark: Chrome's own dark greys (project owner, 2026-10-31), the same for
+  // every theme, so the portal sits with the browser's toolbar; the theme
+  // colours only the buttons, links and highlights. Was a slate tinted by
+  // the theme's hue.
   const hex = (rgb: Rgb) => toHex(rgb.map(Math.round) as Rgb)
-  const dark = Object.fromEntries(
-    Object.entries(DARK).map(([k, [cap, l]]) => [k, hex(at(cap, l - down))]),
-  ) as AccentSurfaces['dark']
+  const dark: AccentSurfaces['dark'] = { ...CHROME_DARK }
 
   return {
     light: {

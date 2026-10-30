@@ -230,7 +230,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       { label: 'Blood Inventory', path: '/blood-center/inventory', icon: 'droplets', requires: 'inventory.view', keywords: 'stock units expiry fefo' },
       { label: 'Stock Intake', path: '/blood-center/inventory-intake', icon: 'package-check', requires: 'inventory.create', keywords: 'intake shelve book in units donation cleared' },
       { label: 'Incoming Requests', path: '/blood-center/bloodrequests', icon: 'clipboard-check', badge: 'pending', requires: 'requests.view', keywords: 'hospital requests walk-in watcher follow-up partial fulfilment' },
-      { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate release dispatch transport' },
+      // Split on the invoice (2026-10-31): still owing, then cleared to go out.
+      { label: 'Request Fulfillment', path: '/blood-center/fulfillment', icon: 'building-2', badge: 'urgent', requires: 'requests.release', keywords: 'allocate issue invoice balance unpaid' },
+      { label: 'For Dispatch', path: '/blood-center/dispatch', icon: 'truck', requires: 'requests.release', keywords: 'release dispatch transport paid cleared confirmation' },
     ],
     // Not Billing's (project owner, 2026-10-20). Its clerk and supervisor keep
     // requests.view, read-only, because a statement reads the request it bills

@@ -21,7 +21,7 @@
     <div class="nt__bar">
       <div class="nt__tabs" role="tablist" aria-label="Show">
         <button
-          v-for="t in NOTIFICATION_TABS"
+          v-for="t in tabs"
           :key="t.key"
           type="button"
           role="tab"
@@ -81,7 +81,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import NotificationItem from '~/components/BloodCenter/NotificationItem.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
-import { EMPTY_BY_DEPARTMENT, NOTIFICATION_TABS, groupByDay, safeRoute } from '~/utils/staffNotifications'
+import { EMPTY_BY_DEPARTMENT, groupByDay, safeRoute, tabsFor } from '~/utils/staffNotifications'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -102,6 +102,18 @@ const markingAll = ref(false)
 const error = ref('')
 
 const groups = computed(() => groupByDay(items.value))
+
+// Only the kinds this person's role and department receive (2026-10-31).
+const topicKeys = ref([])
+const tabs = computed(() => tabsFor(topicKeys.value))
+async function loadTopics() {
+  try {
+    const res = await bloodCenterService.notificationPreferences()
+    topicKeys.value = (res?.topics ?? []).map(t => t.key)
+  } catch {
+    // All alone still lists everything they have had.
+  }
+}
 const { user } = useUser()
 const emptyText = computed(() => EMPTY_BY_DEPARTMENT[user.value?.department] ?? 'New requests and updates for your centre appear here.')
 
@@ -162,7 +174,10 @@ async function markAll() {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+  loadTopics()
+})
 </script>
 
 <style scoped>

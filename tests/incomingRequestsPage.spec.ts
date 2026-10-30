@@ -77,7 +77,8 @@ describe('a row', () => {
   it('issues on Request Fulfillment once units are reserved, for whoever releases', () => {
     expect(page).toContain("const canRelease = computed(() => can('requests.release'))")
     expect(page).toContain('<template v-if="r.isOpen && canRelease">')
-    expect(page).toContain('<NuxtLink v-if="r.held > 0" to="/blood-center/fulfillment" class="btn-issue"')
+    // Issue opens that request alone (2026-10-31).
+    expect(page).toContain('<NuxtLink v-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue"')
     expect(page).toContain('held: Math.max(0, allocated - issued),')
   })
 
@@ -101,7 +102,7 @@ describe('the review', () => {
   })
 
   it('offers to reserve only what is still needed, and to issue once all of it is held', () => {
-    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canReserve">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" to="\/blood-center\/fulfillment"/)
+    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canReserve">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" :to="`\/blood-center\/fulfillment\?request=\$\{activeRequest\.id\}`"/)
   })
 
   it('rejects only while nothing is held or sent', () => {
@@ -233,7 +234,7 @@ describe('a replenishment order (project owner, 2026-10-29)', () => {
   })
 
   it('names who takes the units at dispatch by how it was confirmed', () => {
-    const fulfillment = source('app/pages/blood-center/fulfillment.vue')
+    const fulfillment = source('app/components/BloodCenter/FulfillmentBoard.vue')
     expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'pickup') return 'Collected by'")
     expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'delivery') return 'Driver or courier'")
     // What lay beyond the commitment is closed with the rest.

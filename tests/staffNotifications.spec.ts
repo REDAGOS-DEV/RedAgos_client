@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDay, inboxOrder, safeRoute, type StaffNotification } from '~/utils/staffNotifications'
+import { groupByDay, inboxOrder, safeRoute, tabsFor, type StaffNotification } from '~/utils/staffNotifications'
 
 const note = (id: string, created_at: string, extra: Partial<StaffNotification> = {}): StaffNotification => ({
   id, category: 'request', title: id, desc: null, meta: null, icon: null, tone: null,
@@ -26,6 +26,14 @@ describe('the blood-centre inbox', () => {
       note('c', '2026-10-30T07:00:00', { urgent: true }),
     ], now).map(g => `${g.label}:${g.items.length}`)
     expect(labels).toEqual(['Needs attention:1', 'Today:1', 'Yesterday:1'])
+  })
+
+  it('offers only the kinds a role receives', () => {
+    // A Lab Supervisor: results to verify, referrals, corrections.
+    expect(tabsFor(['serology_verification', 'referrals', 'corrections']).map(t => t.label)).toEqual(['All', 'Laboratory', 'Corrections'])
+    // The Inventory Control Officer: requests and stock.
+    expect(tabsFor(['blood_requests', 'low_stock', 'expiring_units']).map(t => t.label)).toEqual(['All', 'Requests', 'Stock'])
+    expect(tabsFor([]).map(t => t.label)).toEqual(['All'])
   })
 
   it('follows only a route inside the app', () => {

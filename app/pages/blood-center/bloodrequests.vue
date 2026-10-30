@@ -277,7 +277,7 @@
                   <!-- Issue is dispatch, on Request Fulfillment: open once units
                        are reserved, and says why not before then. -->
                   <template v-if="r.isOpen && canRelease">
-                    <NuxtLink v-if="r.held > 0" to="/blood-center/fulfillment" class="btn-issue" :aria-label="`Issue ${r.code}`">
+                    <NuxtLink v-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
                       <AssetIcon name="send" :size="13" />
                       Issue
                     </NuxtLink>
@@ -660,7 +660,7 @@
                   {{ drawerMutating ? 'Processing…' : activeRequest.isReplenishment ? 'Reserve Units' : 'Approve & Reserve' }}
                 </button>
               </template>
-              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" to="/blood-center/fulfillment" class="btn btn-primary">
+              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" :to="`/blood-center/fulfillment?request=${activeRequest.id}`" class="btn btn-primary">
                 <AssetIcon name="send" :size="14" />
                 Issue
               </NuxtLink>
