@@ -31,9 +31,9 @@
           <!-- Left cluster: menu toggle, logo, wordmark and where this page sits -->
           <div v-show="!searchOpenMobile" class="flex items-center gap-2 min-w-0 lg:max-w-[calc(50%-13rem)] xl:max-w-[calc(50%-15rem)]">
             <!--
-              The menu button: on desktop it opens the rail (so does hovering
-              the rail), which closes again when the pointer leaves it; below
-              1024px it opens the drawer. On the rail's 36px icon axis.
+              The menu button: on desktop it opens the rail, which closes again
+              when the pointer leaves it; below 1024px it opens the drawer. On
+              the rail's 36px icon axis.
             -->
             <button
               type="button"
