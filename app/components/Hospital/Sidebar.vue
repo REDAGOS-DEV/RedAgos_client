@@ -437,13 +437,14 @@ const NAV_GROUPS = [
       { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', requires: 'hospital.requests.view' }
     ]
   },
-  // Ang Finance group (billing, transactions) ug ang Help & Support kay
-  // gitangtang: walay page files para nila, so 404 ang tanan. Ibalik ni kung
-  // naa nay backend + page — tan-awa ang Phase P sa audit plan.
+  // Ang Finance group (billing, transactions) kay gitangtang: walay page files
+  // para niini, so 404 ang tanan. Ibalik ni kung naa nay backend + page — tan-awa
+  // ang Phase P sa audit plan. Help Center came back on 2026-11-02, with its page.
   {
     label: 'System',
     items: [
       { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
+      { label: 'Help Center', path: '/hospital/help', icon: 'help-circle' },
       { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
     ]
   }

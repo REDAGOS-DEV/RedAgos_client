@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import type { HospitalNotification } from '~/types/hospitalNotification'
-import { hasMorePages, normalizeHospitalNotification } from '~/utils/hospitalNotifications'
+import { groupNotifications, hasMorePages, normalizeHospitalNotification, notificationLook, notificationTime, urgentFirst } from '~/utils/hospitalNotifications'
 
 /**
  * The hospital inbox, read the way the server actually sends it.
@@ -229,6 +229,59 @@ describe('the bell\'s unread count', () => {
 
     set(-2)
     expect(count.value).toBe(0)
+  })
+})
+
+describe('the inbox sections', () => {
+  const now = new Date(2026, 10, 2, 15, 0).getTime()
+  const view = (id: string, createdAt: Date | null, more: object = {}) => normalizeHospitalNotification({
+    id, category: 'request', title: id, desc: null, meta: null, icon: null, tone: null, action_label: null, action_route: null,
+    read: false, created_at: createdAt?.toISOString() ?? null, ...more,
+  })
+
+  it('puts unread urgent ones under Needs Action, then the rest by day', () => {
+    const groups = groupNotifications([
+      view('urgent', new Date(2026, 9, 1), { urgent: true }),
+      view('today', new Date(2026, 10, 2, 9, 0)),
+      view('yesterday', new Date(2026, 10, 1, 23, 0)),
+      view('earlier', new Date(2026, 9, 20)),
+      view('undated', null),
+    ], now)
+
+    expect(groups.map((group) => [group.key, group.items.map((n) => n.id)])).toEqual([
+      ['action', ['urgent']],
+      ['today', ['today']],
+      ['yesterday', ['yesterday']],
+      ['earlier', ['earlier', 'undated']],
+    ])
+  })
+
+  it('sends an urgent one back to its day once it is read', () => {
+    const groups = groupNotifications([view('urgent', new Date(2026, 10, 2, 9, 0), { urgent: true, read: true })], now)
+    expect(groups.map((group) => group.key)).toEqual(['today'])
+  })
+
+  it('leaves out a section with nothing in it', () => {
+    expect(groupNotifications([], now)).toEqual([])
+  })
+
+  it('lifts an unread urgent one to the top of the bell, keeping the rest in order', () => {
+    const list = [view('a', null), view('b', null, { urgent: true }), view('c', null), view('d', null, { urgent: true, read: true })]
+    expect(urgentFirst(list).map((n) => n.id)).toEqual(['b', 'a', 'c', 'd'])
+  })
+
+  it('draws urgent in the danger colour, whatever tone it came with', () => {
+    expect(notificationLook({ category: 'request', tone: 'success', urgent: true }).tone).toBe('danger')
+    expect(notificationLook({ category: 'request', tone: 'success' }).tone).toBe('success')
+    expect(notificationLook({ category: 'inventory' })).toEqual({ icon: 'triangle-alert', tone: 'warning' })
+    expect(notificationLook({ category: 'unknown' })).toEqual({ icon: 'bell', tone: 'neutral' })
+  })
+
+  it('says how long ago, then the date', () => {
+    expect(notificationTime(new Date(now - 30_000).toISOString(), now)).toBe('Just now')
+    expect(notificationTime(new Date(now - 5 * 60_000).toISOString(), now)).toBe('5 min ago')
+    expect(notificationTime(new Date(now - 2 * 3_600_000).toISOString(), now)).toBe('2 hours ago')
+    expect(notificationTime(null, now)).toBe('')
   })
 })
 

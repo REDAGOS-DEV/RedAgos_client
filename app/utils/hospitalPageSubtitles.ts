@@ -44,6 +44,7 @@ const LINES: Record<string, (can: Can) => string> = {
     : 'The days your blood bank sends each blood center its weekly request. Requesting staff set them.'),
   staff: () => 'Your blood bank\'s staff accounts, and the role each one holds.',
   notifications: () => 'What has changed on your blood bank\'s requests and stock.',
+  help: () => 'Step-by-step guides for the work your role does here, and the terms RedAgos uses.',
 }
 
 export function hospitalPageSubtitle(page: keyof typeof LINES, can: Can): string {

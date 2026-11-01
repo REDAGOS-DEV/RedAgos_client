@@ -23,7 +23,7 @@
           </NuxtLink>
           <!-- Not "Sign In": the navbar already has it. This gives donors who
                are not ready to register a lighter first step. -->
-          <a href="#drives" class="lp-btn lp-btn--secondary" @click.prevent="goToDrives">
+          <a href="drives" class="lp-btn lp-btn--secondary" @click.prevent="goToDrives">
             <AssetIcon name="calendar" :size="16" />
             Find a donation drive
           </a>
@@ -112,7 +112,7 @@
              Drives section. Hidden when nothing is scheduled. -->
         <a
           v-if="nextDrive"
-          href="#drives"
+          href="drives"
           class="drive-card"
           :aria-label="`Next donation drive: ${nextDrive.title}, ${nextDrive.weekday}. See all drives`"
           @click.prevent="goToDrives"
@@ -187,7 +187,7 @@ const nextDrive = computed(() => upcomingDrives()[0] ?? null)
 // (there is no /drives route).
 function goToDrives() {
   document.getElementById('drives')?.scrollIntoView({ behavior: 'smooth' })
-  window.history.replaceState(null, '', '#drives')
+  window.history.replaceState(null, '', 'drives')
 }
 
 const stats = [

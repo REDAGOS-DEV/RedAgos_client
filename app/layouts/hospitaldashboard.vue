@@ -284,6 +284,7 @@ import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
 import HospitalNotificationBell from '~/components/Hospital/NotificationBell.vue'
+import { hospitalGuidesFor, searchHospitalGuides } from '~/utils/hospitalHelp'
 import { useSidebar } from '~/composables/useSidebar.js'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { accentSurfaces, accentTheme } from '~/utils/accentThemes'
@@ -384,6 +385,7 @@ const pageLabels = {
   '/hospital/request-days': 'Facility Settings / Request Days',
   '/hospital/notifications': 'Notifications',
   '/hospital/staff': 'Staff',
+  '/hospital/help': 'Help Center',
   '/hospital/settings': 'Settings',
 }
 
@@ -537,6 +539,7 @@ const searchablePages = [
   { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', keywords: 'facility settings request days schedule weekly restock blood center add center edit days', requires: 'hospital.requests.view' },
   { label: 'Notifications', path: '/hospital/notifications', icon: 'bell', keywords: 'notifications alerts reminders' },
   { label: 'Staff', path: '/hospital/staff', icon: 'id-card', keywords: 'staff accounts roles head inventory requesting team users', requires: 'hospital.staff.manage' },
+  { label: 'Help Center', path: '/hospital/help', icon: 'help-circle', keywords: 'help center guides how to questions terms support' },
   { label: 'Settings', path: '/hospital/settings', icon: 'settings', keywords: 'settings preferences password profile photo appearance theme colour' },
 ]
 
@@ -548,9 +551,16 @@ const searchInput = ref(null)
 const filteredResults = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return []
-  return searchablePages.filter(p =>
+  const pages = searchablePages.filter(p =>
     (!p.requires || can(p.requires)) && (p.label.toLowerCase().includes(q) || p.keywords.includes(q))
   )
+  // The guides this account can use, after the pages: "how do I…" is answered here too.
+  const guides = searchHospitalGuides(q, hospitalGuidesFor(can)).slice(0, 4).map((guide) => ({
+    label: guide.title,
+    path: `/hospital/help?guide=${guide.id}`,
+    icon: 'help-circle',
+  }))
+  return [...pages, ...guides]
 })
 
 function closeSearchResults() {
