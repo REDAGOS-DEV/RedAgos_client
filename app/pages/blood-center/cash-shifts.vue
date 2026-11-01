@@ -38,7 +38,7 @@
       <div class="cs-grid">
         <!-- LIST -->
         <section class="card list-card" aria-label="Shifts">
-          <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton skeleton--row" /></div>
+          <div v-if="loading" class="skeleton-wrap"><SkeletonList :rows="5" /></div>
           <EmptyState v-else-if="!shifts.length" icon="clock" title="No shifts" description="A shift is opened at the counter before the first payment." compact />
           <ul v-else class="shift-list">
             <li v-for="s in shifts" :key="s.id">
@@ -62,7 +62,7 @@
 
         <!-- READING -->
         <section class="card detail-card" aria-label="Shift reading">
-          <div v-if="detailLoading" class="skeleton skeleton--doc" />
+          <SkeletonList v-if="detailLoading" :rows="5" />
           <EmptyState v-else-if="!selected" icon="receipt" title="Pick a shift" description="Its reading shows the drawer and every payment taken in it." />
           <template v-else>
             <header class="detail-head">
@@ -159,6 +159,7 @@
  * counting the drawer themselves. The figures are the server's, worked out
  * from each shift's journal and frozen at close.
  */
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import CashCountDialog from '~/components/BloodCenter/CashCountDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'

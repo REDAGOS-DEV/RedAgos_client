@@ -2,11 +2,7 @@
   <div class="donors-page">
     <!-- Skeleton loading state, the same as the other pages -->
     <div v-if="initialLoading" class="donors-inner" aria-busy="true" aria-label="Loading donors">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Donor Management" toolbar :sections="[['table']]" :columns="7" />
     </div>
 
     <div v-else class="donors-inner">
@@ -123,9 +119,7 @@
             </thead>
 
             <tbody v-if="loadingDonors && !donors.length">
-              <tr v-for="n in 6" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!donors.length">
@@ -823,6 +817,8 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

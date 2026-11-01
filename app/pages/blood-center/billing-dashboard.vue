@@ -1,12 +1,7 @@
 <template>
   <div class="bdash">
     <div v-if="initialLoading" class="bdash-inner" aria-busy="true" aria-label="Loading the dashboard">
-      <div class="skeleton skeleton--header" />
-      <div class="bento">
-        <div class="skeleton skeleton--card bento__today" />
-        <div class="skeleton skeleton--card bento__owed" />
-        <div class="skeleton skeleton--panel bento__trend" />
-      </div>
+      <PageSkeleton title="Billing dashboard" :sections="[['list', 'list'], ['chart', 'list'], ['list', 'list']]" />
     </div>
 
     <div v-else class="bdash-inner">
@@ -235,6 +230,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

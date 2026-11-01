@@ -33,7 +33,12 @@
         </button>
       </div>
 
-      <p v-if="loadingReferrals" class="card__hint">Loading referrals…</p>
+      <ul v-if="loadingReferrals" class="referrals" aria-busy="true">
+        <li v-for="n in 4" :key="n" class="referral referral--skeleton">
+          <span class="sk sk--line" style="width: 42%" />
+          <span class="sk sk--line" style="width: 68%" />
+        </li>
+      </ul>
 
       <div v-else-if="!referrals.length" class="empty">
         <AssetIcon name="life-buoy" :size="28" />
@@ -243,7 +248,7 @@ const notice = ref(null)
 
 const referrals = ref([])
 const pendingReferrals = ref(0)
-const loadingReferrals = ref(false)
+const loadingReferrals = ref(true)
 const referralFilter = ref('open')
 const editing = ref(null)
 
@@ -712,4 +717,5 @@ onMounted(loadReferrals)
 
 .btn--ghost { border-color: transparent; background: transparent; color: var(--rb-text-secondary); }
 .btn--ghost:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.referral--skeleton { display: flex; flex-direction: column; gap: 10px; }
 </style>

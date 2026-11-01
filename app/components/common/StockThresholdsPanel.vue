@@ -122,9 +122,7 @@
     </template>
 
     <!-- First load -->
-    <div v-else-if="busy" class="skeletons" aria-hidden="true">
-      <span v-for="n in 2" :key="n" class="skeleton" />
-    </div>
+    <PageSkeleton v-else-if="busy" :sections="[['table'], ['table']]" :columns="5" :rows="4" />
   </div>
 </template>
 
@@ -143,6 +141,7 @@
  * save in one table re-seeds only that table's side: unsaved edits in the
  * other survive it.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import StockLevelCard from '~/components/common/StockLevelCard.vue'
@@ -207,7 +206,7 @@ const props = withDefaults(defineProps<{
 
 const status = ref<StockThresholdStatus | null>(null)
 const drafts = reactive<Record<string, StockThresholdDraft>>({})
-const busy = ref(false)
+const busy = ref(true)
 const loadError = ref('')
 const savingLevel = ref<ThresholdLevel | null>(null)
 const feedback = reactive<Record<ThresholdLevel, Feedback | null>>({ par: null, critical: null })

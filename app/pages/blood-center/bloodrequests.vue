@@ -348,7 +348,7 @@
 
           <div class="review-card__body">
             <div v-if="drawerLoading" class="drawer-loading">
-              <div v-for="n in 4" :key="n" class="skeleton-row" />
+              <SkeletonList />
             </div>
 
             <template v-else-if="activeRequest">
@@ -753,6 +753,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'

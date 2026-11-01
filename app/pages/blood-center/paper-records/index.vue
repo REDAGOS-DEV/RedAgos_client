@@ -1,11 +1,7 @@
 <template>
   <div class="paper-page">
     <div v-if="initialLoading" class="paper-inner" aria-busy="true" aria-label="Loading paper records">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Paper Records" :sections="[['table']]" :columns="6" />
     </div>
 
     <div v-else class="paper-inner">
@@ -51,9 +47,7 @@
             </thead>
 
             <tbody v-if="loading && !sheets.length">
-              <tr v-for="n in 4" :key="'sk-' + n">
-                <td colspan="6"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="6" :rows="4" />
             </tbody>
 
             <tbody v-else-if="!sheets.length">
@@ -264,6 +258,8 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

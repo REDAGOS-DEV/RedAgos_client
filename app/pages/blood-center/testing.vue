@@ -574,7 +574,7 @@ const viewOptions = computed(() => [
   { value: 'serology', label: 'Serology', count: queue.value.filter(needsSerology).length },
   { value: 'all', label: 'All', count: queue.value.length },
 ])
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const barcodeSearch = ref('')
 const activeBarcode = ref('')
 

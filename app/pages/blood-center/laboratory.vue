@@ -554,7 +554,7 @@ function setStatusFilter(value) {
   statusFilter.value = value
   loadQueue()
 }
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)

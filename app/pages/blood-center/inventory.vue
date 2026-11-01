@@ -2,16 +2,7 @@
   <div class="inv-page inv-tones">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="inv-inner" aria-busy="true">
-      <div class="skeleton skeleton--header" />
-      <div class="kpi-row">
-        <div v-for="n in 5" :key="n" class="skeleton skeleton--kpi" />
-      </div>
-      <div class="inv-grid">
-        <div class="skeleton skeleton--panel" style="grid-area: types; height: 380px" />
-        <div class="skeleton skeleton--panel" style="grid-area: expiring; height: 380px" />
-        <div class="skeleton skeleton--panel" style="grid-area: list; height: 520px" />
-        <div class="skeleton skeleton--panel" style="grid-area: activity; height: 520px" />
-      </div>
+      <PageSkeleton title="Blood Inventory" :tiles="5" :sections="[['list', 'list'], ['table', 'list']]" />
     </div>
 
     <div v-else class="inv-inner">
@@ -674,6 +665,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

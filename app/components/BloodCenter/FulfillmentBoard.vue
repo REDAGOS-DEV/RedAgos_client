@@ -69,7 +69,7 @@
       <!-- LIST -->
       <div v-if="loading" class="card">
         <div class="skeleton-wrap">
-          <div v-for="n in 3" :key="n" class="skeleton skeleton--row" />
+          <SkeletonList :rows="3" />
         </div>
       </div>
 
@@ -406,6 +406,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'

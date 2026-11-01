@@ -6,10 +6,7 @@
     ForecastWeekChart draws the history and, dashed, the weeks forecast.
   -->
   <div class="fc">
-    <div v-if="loading" class="fc__skeleton" aria-busy="true">
-      <div v-for="n in 4" :key="n" class="fc__skel-card" />
-      <div class="fc__skel-chart" />
-    </div>
+    <PageSkeleton v-if="loading" :tiles="4" :sections="[['chart', 'list']]" />
 
     <div v-else-if="error" class="fc__error" role="alert">
       {{ error }} <button type="button" class="link" @click="load">Try again</button>
@@ -537,6 +534,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'

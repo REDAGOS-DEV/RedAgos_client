@@ -111,7 +111,7 @@
 
     <section class="program-list" aria-label="Billing programs">
       <template v-if="loading && !programs.length">
-        <div v-for="n in 3" :key="n" class="skeleton" />
+        <div v-for="n in 3" :key="n" class="sk-card"><span class="sk sk--icon" /><span class="sk sk--line" style="width: 55%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 72%" /></div>
       </template>
       <div v-else-if="!programs.length" class="bp-empty">
         <span class="bp-empty__icon" aria-hidden="true"><AssetIcon name="badge-check" :size="24" /></span>

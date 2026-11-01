@@ -39,7 +39,8 @@
             <span class="overview-label">{{ card.label }}</span>
             <AssetIcon name="arrow-right" :size="14" class="overview-go" />
           </span>
-          <span class="overview-value">{{ summary ? card.value : '—' }}</span>
+          <span v-if="!summary && loading" class="sk sk--value" />
+          <span v-else class="overview-value">{{ summary ? card.value : '—' }}</span>
           <span class="overview-note">{{ summary ? card.note : '' }}</span>
         </button>
       </div>
@@ -90,7 +91,7 @@
           <button class="ui-btn ui-btn--sm" @click="load()">Retry</button>
         </div>
 
-        <div v-if="loading" class="skeleton-wrap"><div v-for="n in 5" :key="n" class="skeleton" /></div>
+        <div v-if="loading" class="skeleton-wrap"><SkeletonList :rows="5" /></div>
 
         <!-- Says what an empty tab means: good news, nothing yet, or no match (2026-10-27). -->
         <div v-else-if="!statements.length && !error" class="inv-empty" :class="{ 'inv-empty--good': emptyState.good }">
@@ -195,6 +196,7 @@
  * everything about it is done. Kept at /blood-center/billing, the Billing
  * department's home; the page was "Statements" until 2026-10-25.
  */
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'

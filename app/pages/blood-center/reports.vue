@@ -11,11 +11,7 @@
     <BloodCenterTestingReports v-else-if="canViewTesting" />
     <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
-            <div class="skeleton-block page-skeleton__title" />
-            <div class="stats-row">
-                <div v-for="n in 4" :key="'pk-' + n" class="stat-card stat-card--skeleton skeleton-block" />
-            </div>
-            <div class="skeleton-block page-skeleton__panel" />
+          <PageSkeleton title="Reports &amp; Analytics" :tiles="4" :sections="[['chart', 'list']]" />
         </div>
 
         <div v-else class="reports-inner">
@@ -527,6 +523,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'

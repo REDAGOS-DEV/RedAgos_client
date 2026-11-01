@@ -46,7 +46,7 @@
 
     <section class="nt__card" aria-label="Notifications">
       <div v-if="loading && !items.length" class="nt__skeletons" aria-busy="true">
-        <span v-for="n in 5" :key="n" class="nt__skeleton" />
+        <SkeletonList :rows="5" />
       </div>
 
       <div v-else-if="!items.length" class="nt__empty">
@@ -77,6 +77,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import NotificationItem from '~/components/BloodCenter/NotificationItem.vue'
@@ -97,7 +98,7 @@ const page = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
 const unread = ref(0)
-const loading = ref(false)
+const loading = ref(true)
 const markingAll = ref(false)
 const error = ref('')
 

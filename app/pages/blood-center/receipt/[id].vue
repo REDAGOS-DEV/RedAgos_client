@@ -17,9 +17,7 @@
       </nav>
 
       <div v-if="loading" class="skeleton-stack">
-        <div class="skeleton skeleton--head" />
-        <div class="skeleton skeleton--facts" />
-        <div class="skeleton skeleton--doc" />
+        <PageSkeleton :sections="[['form'], ['table']]" />
       </div>
 
       <div v-else-if="loadError" class="empty card">
@@ -163,6 +161,7 @@
  * payer was handed even if the bill has changed since. The PDF from the
  * server is the official copy; the 80mm print is the counter's slip.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'

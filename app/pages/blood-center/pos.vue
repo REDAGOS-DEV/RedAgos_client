@@ -110,7 +110,7 @@
 
         <div class="queue-list" role="listbox" :aria-label="listHeading">
           <template v-if="listLoading">
-            <div v-for="n in 4" :key="n" class="skeleton skeleton--row" />
+            <div v-for="n in 4" :key="n" class="sk-card"><span class="sk sk--line" style="width: 62%" /><span class="sk sk--line" style="width: 84%" /><span class="sk sk--line" style="width: 40%" /></div>
           </template>
           <div v-else-if="!listRows.length" class="queue-empty">
             <span class="queue-empty__icon"><AssetIcon :name="typing ? 'search-x' : 'check-check'" :size="22" /></span>

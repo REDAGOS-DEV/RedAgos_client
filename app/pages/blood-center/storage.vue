@@ -16,7 +16,7 @@
     <!-- ============ HEADLINE LEVELS ============ -->
     <section class="kpis" aria-label="Stock at a glance" :aria-busy="loading">
       <template v-if="loading">
-        <div v-for="n in 3" :key="n" class="kpi skeleton" />
+        <div v-for="n in 3" :key="n" class="kpi"><span class="sk sk--icon" /><span class="sk sk--line" style="width: 55%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 72%" /></div>
       </template>
       <template v-else>
         <component
@@ -88,7 +88,7 @@
       </header>
 
       <div v-if="loading" class="types">
-        <div v-for="n in 8" :key="n" class="tcard tcard--skeleton skeleton" />
+        <div v-for="n in 8" :key="n" class="tcard tcard--skeleton"><span class="sk sk--line" style="width: 40%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 76%" /></div>
       </div>
 
       <div v-else-if="!summary" class="empty">
@@ -178,7 +178,7 @@
           </NuxtLink>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonList v-if="loading" />
         <div v-else-if="!canSeeRequests" class="empty">
           <AssetIcon name="clipboard-check" :size="22" />
           <p class="empty__title">Not part of your role</p>
@@ -233,7 +233,7 @@
           </NuxtLink>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonList v-if="loading" />
         <div v-else-if="!canSeeRequests" class="empty">
           <AssetIcon name="building-2" :size="22" />
           <p class="empty__title">Not part of your role</p>
@@ -293,7 +293,7 @@
           </div>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonChart v-if="loading" />
         <div v-else-if="trend.length < 2" class="empty">
           <AssetIcon name="bar-chart" :size="22" />
           <p class="empty__title">{{ summary ? 'Not enough days yet' : 'Stock could not be loaded' }}</p>
@@ -371,6 +371,8 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import SkeletonChart from '~/components/ui/SkeletonChart.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
@@ -1267,4 +1269,6 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 @media (max-width: 640px) {
   .iss { padding: 20px 16px 32px; }
 }
+/* A figure while it loads: stacked, as the other portals' tiles. */
+.kpi:has(> .sk) { flex-direction: column; align-items: stretch; gap: 10px; }
 </style>

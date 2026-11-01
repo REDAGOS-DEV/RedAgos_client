@@ -224,7 +224,7 @@ useHead({ title: 'Deferral Codes · RedAgos' })
 
 const rows = ref([])
 const canManage = ref(false)
-const busy = ref(false)
+const busy = ref(true)
 const showRetired = ref(false)
 const banner = ref('')
 const bannerKind = ref('notice')

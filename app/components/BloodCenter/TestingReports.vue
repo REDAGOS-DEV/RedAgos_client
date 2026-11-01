@@ -40,9 +40,7 @@
       {{ error }} <button type="button" class="link" @click="load">Try again</button>
     </p>
 
-    <div v-if="loading && !data" class="kpis" aria-busy="true">
-      <span v-for="n in 5" :key="n" class="kpi kpi--skeleton" />
-    </div>
+    <PageSkeleton v-if="loading && !data" :tiles="5" :sections="[['chart', 'list'], ['list', 'list']]" />
 
     <template v-else-if="data">
       <!-- ============ HEADLINES ============ -->
@@ -284,6 +282,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

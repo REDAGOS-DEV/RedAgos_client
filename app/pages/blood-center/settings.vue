@@ -1,9 +1,7 @@
 <template>
   <div class="settings-page scope-blood-center-settings">
     <div v-if="loading" class="settings-skeleton" aria-busy="true">
-      <div class="skeleton skeleton--banner" />
-      <div class="skeleton skeleton--tabs" />
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton :sections="[['banner'], ['form']]" />
     </div>
 
     <div v-else class="settings-inner">
@@ -376,6 +374,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AppearancePicker from '~/components/common/AppearancePicker.vue'

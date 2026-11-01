@@ -17,9 +17,7 @@
       </nav>
 
       <div v-if="loading" class="skeleton-stack">
-        <div class="skeleton skeleton--head" />
-        <div class="skeleton skeleton--facts" />
-        <div class="skeleton skeleton--doc" />
+        <PageSkeleton :sections="[['form', 'list'], ['table']]" />
       </div>
 
       <div v-else-if="loadError" class="empty card">
@@ -491,6 +489,7 @@
  * checkout QR (project owner, 2026-10-26): GCash is keyed in at the counter
  * from the payer's reference, like card and bank transfer.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'

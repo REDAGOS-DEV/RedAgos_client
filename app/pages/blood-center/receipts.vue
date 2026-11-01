@@ -39,7 +39,7 @@
             </button>
           </div>
         </div>
-        <div v-if="loading" class="skeleton-wrap"><div v-for="n in 6" :key="n" class="skeleton" /></div>
+        <div v-if="loading" class="skeleton-wrap"><SkeletonList :rows="6" /></div>
 
         <EmptyState v-else-if="error" icon="triangle-alert" title="The receipts could not be loaded" :description="error">
           <button class="ui-btn" @click="load()">Try again</button>
@@ -141,6 +141,7 @@
  * Receipts carry payment details, so the page sits behind the ability to
  * record payments, as the payments list does.
  */
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'

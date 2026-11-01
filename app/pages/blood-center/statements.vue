@@ -64,7 +64,9 @@
         rather than a statement of ₱0.00 that reads like real figures
         (2026-10-27).
       -->
-      <section v-if="!hospitalsLoading && !hospitals.length" class="card soa-empty" aria-labelledby="soa-empty-title">
+      <PageSkeleton v-if="hospitalsLoading" :tiles="4" :sections="[['table'], ['table']]" :columns="6" :rows="3" />
+
+      <section v-else-if="!hospitals.length" class="card soa-empty" aria-labelledby="soa-empty-title">
         <span class="soa-empty__icon"><AssetIcon name="clipboard" :size="24" /></span>
         <h2 id="soa-empty-title" class="soa-empty__title">No hospital statements yet</h2>
         <p class="soa-empty__text">
@@ -205,6 +207,7 @@
  * server from the billing journal each time it is asked, never stored or
  * numbered, and printed from the same figures as its PDF.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

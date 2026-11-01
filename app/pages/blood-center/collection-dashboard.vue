@@ -1,15 +1,7 @@
 <template>
   <div class="cdash">
     <div v-if="initialLoading" class="cdash-inner" aria-busy="true" aria-label="Loading the dashboard">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="grid-2">
-        <div class="skeleton skeleton--card" />
-        <div class="skeleton skeleton--card" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Collection dashboard" :sections="[['list', 'list'], ['list', 'list'], ['chart']]" />
     </div>
 
     <div v-else class="cdash-inner">
@@ -369,6 +361,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import {

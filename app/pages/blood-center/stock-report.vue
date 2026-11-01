@@ -23,17 +23,7 @@
 
     <!-- Loading: a summary row and a sheet-shaped page -->
     <template v-if="loading && !report">
-      <div class="summary" aria-busy="true">
-        <div v-for="n in 4" :key="n" class="summary__item summary__item--skeleton" />
-      </div>
-      <div class="canvas">
-        <div class="paper paper--skeleton">
-          <span class="skeleton skeleton--head" />
-          <span class="skeleton skeleton--title" />
-          <span class="skeleton skeleton--table" />
-          <span class="skeleton skeleton--table" />
-        </div>
-      </div>
+      <PageSkeleton :tiles="4" :sections="[['table']]" :columns="7" :rows="8" />
     </template>
 
     <template v-if="report">
@@ -225,6 +215,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import {
@@ -310,7 +301,7 @@ function showSoon() {
     setTimeout(() => { flashSoon.value = false }, 2400)
   })
 }
-const loading = ref(false)
+const loading = ref(true)
 const downloading = ref(false)
 const error = ref('')
 

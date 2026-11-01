@@ -1,11 +1,7 @@
 <template>
   <div class="appointments-page">
     <div v-if="initialLoading" class="appointments-inner" aria-busy="true" aria-label="Loading appointments">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Appointments" toolbar :sections="[['table']]" :columns="7" />
     </div>
 
     <div v-else class="appointments-inner">
@@ -84,9 +80,7 @@
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <tr v-for="n in 6" :key="'sk-' + n">
-                <td colspan="7"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="7" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -378,6 +372,8 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'

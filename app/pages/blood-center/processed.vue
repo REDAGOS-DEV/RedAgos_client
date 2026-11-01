@@ -102,9 +102,7 @@
           </thead>
 
           <tbody v-if="loading && !rows.length">
-            <tr v-for="n in 6" :key="'sk-' + n">
-              <td :colspan="COLUMN_COUNT"><span class="skeleton skeleton--line" /></td>
-            </tr>
+            <SkeletonRows :columns="COLUMN_COUNT" :rows="6" />
           </tbody>
 
           <tbody v-else-if="!rows.length">
@@ -618,6 +616,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
@@ -707,7 +706,7 @@ const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 const PER_PAGE = 25
 const COLUMN_COUNT = 8
 
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
 const updatedAt = ref(null)

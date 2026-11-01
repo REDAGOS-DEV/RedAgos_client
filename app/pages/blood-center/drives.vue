@@ -2,14 +2,7 @@
   <div class="drives-page">
     <!-- Skeleton loading state, the same as the other pages -->
     <div v-if="loading" class="drives-inner" aria-busy="true" aria-label="Loading drives">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="stats-row">
-        <div v-for="n in 3" :key="'skc-' + n" class="skeleton skeleton--card" />
-      </div>
-      <div class="skeleton skeleton--panel" style="height: 420px" />
+      <PageSkeleton title="Donation Drives" :tiles="3" toolbar :sections="[['table']]" :columns="6" />
     </div>
 
     <div v-else class="drives-inner">
@@ -307,6 +300,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 

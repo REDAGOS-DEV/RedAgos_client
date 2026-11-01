@@ -37,6 +37,9 @@
       </p>
 
       <!-- The period in five figures, counted on the server. -->
+      <PageSkeleton v-if="loading && !report" :tiles="5" :sections="[['chart', 'list'], ['list', 'list']]" />
+
+      <template v-else>
       <dl class="figures" :aria-busy="loading">
         <div v-for="f in figures" :key="f.label" class="figure" :class="[`figure--${f.tone}`, { 'figure--zero': report && !(f.raw > 0) }]">
           <!-- Icon and a small picture on top, then the label, as on the other reports (2026-10-31). -->
@@ -221,6 +224,7 @@
           </div>
         </section>
       </div>
+      </template>
     </div>
   </div>
 </template>
@@ -235,6 +239,7 @@
  * The Billing Supervisor's and both management levels' (reports.financial).
  * Every figure is the server's (FinancialReportService); the page adds nothing up.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -269,7 +274,7 @@ function choose(value) {
 }
 
 const report = ref(null)
-const loading = ref(false)
+const loading = ref(true)
 const exporting = ref(false)
 const error = ref('')
 
