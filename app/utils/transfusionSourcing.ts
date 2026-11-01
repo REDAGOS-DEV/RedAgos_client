@@ -198,6 +198,8 @@ export function buildAllocationShares(plan: SourcingPlan | null | undefined, spl
 export interface TransfusionDraft {
   bloodTypeId: number | null
   urgency: UrgencyLevel
+  /** 'YYYY-MM-DDTHH:mm' on this device's clock, or empty. */
+  neededBy?: string
   patient: {
     surname: string
     firstName: string
@@ -220,6 +222,7 @@ export function buildTransfusionPayload(
     internal_stock_confirmed: true,
     blood_type_id: Number(draft.bloodTypeId),
     urgency_level: draft.urgency,
+    ...(draft.neededBy ? { needed_by: new Date(draft.neededBy).toISOString() } : {}),
     patient_surname: draft.patient.surname.trim(),
     patient_first_name: draft.patient.firstName.trim(),
     patient_middle_name: middle === '' ? null : middle,

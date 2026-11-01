@@ -2,7 +2,7 @@
   <div class="request-details-page">
     <!-- ============== PAGE HEADER ============== -->
     <div class="page-header">
-      <button class="back-link" type="button" @click="goBack">
+      <button class="back-link back-link--narrow" type="button" @click="goBack">
         <AssetIcon name="arrow-left" />
         <span>Back to Patient Request</span>
       </button>
@@ -15,7 +15,7 @@
         <span class="crumb-current">Request Details</span>
       </nav> -->
 
-      <PageHeader title="Blood Request Details">
+      <PageHeader title="Blood Request Details" :subtitle="hospitalPageSubtitle('requestDetails', can)">
         <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="ui-btn" type="button" @click="handleDownloadPdf">
@@ -561,13 +561,6 @@
         </aside>
       </div>
 
-      <!-- ============== PAYMENT TOAST ============== -->
-      <Transition name="toast">
-        <div v-if="toastMessage" class="toast" role="status">
-          <AssetIcon name="check-circle" :size="16" style="color: var(--rb-success-text)" />
-          {{ toastMessage }}
-        </div>
-      </Transition>
 
       <!-- ============== AWAITING RECEIPT ============== -->
       <!--
@@ -685,6 +678,7 @@ import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -762,8 +756,7 @@ function formatCurrency(value) {
   return `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-const toastMessage = ref('')
-let toastTimer = null
+const { notify } = useToast()
 /*
  * Confirming receipt of dispatched units.
  *
@@ -822,10 +815,8 @@ const priorityLabel = computed(() =>
   request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—',
 )
 
-function showToast(msg) {
-  toastMessage.value = msg
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMessage.value = '' }, 3000)
+function showToast(msg, tone = 'success') {
+  notify(msg, tone)
 }
 
 /*
@@ -954,7 +945,7 @@ async function handleDownloadPdf() {
     URL.revokeObjectURL(url)
   } catch (err) {
     console.error('Failed to download request form:', err)
-    showToast(err?.message || 'Could not download the request form.')
+    showToast(err?.message || 'Could not download the request form.', 'error')
   } finally {
     downloadingForm.value = false
   }

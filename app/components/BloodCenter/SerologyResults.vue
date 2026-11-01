@@ -535,6 +535,7 @@ const PER_PAGE = 25
 const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })

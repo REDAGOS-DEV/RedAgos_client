@@ -221,7 +221,7 @@ describe('pages and navigation', () => {
   })
 
   it('uses the renamed platelet component everywhere the hospital picks one', () => {
-    for (const file of ['app/pages/hospital/bloodavailability.vue', 'app/pages/hospital/bloodrequests/index.vue']) {
+    for (const file of ['app/pages/hospital/bloodrequests/index.vue']) {
       expect(source(file), file).toContain("'Platelet Concentrate'")
       expect(source(file), file).not.toContain("'Platelets'")
     }

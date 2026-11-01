@@ -403,12 +403,13 @@ const NAV_GROUPS = [
     label: 'Receiving',
     items: [
       // Patient Request sits under Receiving; there is no "Requests" folder.
-      // Blood Availability and Track Requests are off the menu; their pages
-      // are still reached from the dashboard and the request list. Direct
+      // Track Requests is off the menu; its page is still reached from the
+      // dashboard. Blood Availability came back on 2026-11-01, rebuilt. Direct
       // Distribution is gone: outside blood is added on Stock Intake
       // (project owner, 2026-10-30).
       { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
-      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' }
+      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' },
+      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'search', requires: 'hospital.requests.view' }
     ]
   },
   {

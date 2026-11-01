@@ -948,6 +948,8 @@ export interface CreateTransfusionRequestPayload {
   internal_stock_confirmed: true
   blood_type_id: number
   urgency_level: UrgencyLevel
+  /** When the blood is needed, if there is a set time. */
+  needed_by?: string | null
   patient_surname: string
   patient_first_name: string
   patient_middle_name?: string | null

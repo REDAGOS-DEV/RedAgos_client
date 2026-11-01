@@ -62,7 +62,8 @@
               <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="breadcrumb">
                 <ol>
                   <li v-for="(crumb, i) in crumbs" :key="i" :aria-current="i === crumbs.length - 1 ? 'page' : null">
-                    {{ crumb }}
+                    <NuxtLink v-if="crumb.to" :to="crumb.to" class="brand-crumb__link">{{ crumb.label }}</NuxtLink>
+                    <template v-else>{{ crumb.label }}</template>
                   </li>
                 </ol>
               </nav>
@@ -371,8 +372,9 @@ const pageLabels = {
   '/hospital/bloodrequests/newrequest' : 'Receiving / Patient Request / New Request',
   '/hospital/bloodrequests/newrequest/[id]' : 'Receiving / Patient Request / New Request / ',
   '/hospital/bloodrequests/edit' : 'Receiving / Patient Request / Edit / ',
+  '/hospital/transfusion-requests': 'Receiving / Patient Request',
   '/hospital/trackrequests': 'Track Requests',
-  '/hospital/bloodavailability': 'Search Availability',
+  '/hospital/bloodavailability': 'Receiving / Blood Availability',
   '/hospital/inventory': 'Blood Bank Inventory',
   '/hospital/stock-intake': 'Stock Intake',
   '/hospital/stock-thresholds': 'Stock Thresholds',
@@ -401,11 +403,28 @@ const facilityName = computed(() => user.value?.facility?.facility_name || user.
 
 // Desktop: "Hospital › Section › Page", as at the centre. When the bar runs
 // short the hospital's name gives way first, so the page always reads in full.
-const crumbs = computed(() => [
-  facilityName.value || 'Hospital Portal',
-  ...pageLabel.value.split(' / ').map((part) => part.trim()).filter(Boolean),
-])
-const breadcrumb = computed(() => crumbs.value.join(' / '))
+//
+// Each crumb with a page of its own is a link (project owner, 2026-11-01), so a
+// detail page needs no "Back to…" of its own. A section ("Receiving") has no
+// page, so it stays text; the page open now is the last, and stays text too.
+const splitLabel = label => label.split(' / ').map((part) => part.trim()).filter(Boolean)
+const pathOfLabel = (parts) => {
+  const label = parts.join(' / ')
+  return Object.keys(pageLabels).find(path => splitLabel(pageLabels[path]).join(' / ') === label) ?? null
+}
+const crumbs = computed(() => {
+  const parts = splitLabel(pageLabel.value)
+  // A record under a list: the list is its parent, so it links back to it.
+  if (parts.length && !pageLabels[route.path] && !pageLabel.value.trim().endsWith('/')) parts.push('Details')
+  return [
+    { label: facilityName.value || 'Hospital Portal', to: parts.length ? '/hospital/dashboard' : null },
+    ...parts.map((label, i) => ({
+      label,
+      to: i < parts.length - 1 ? pathOfLabel(parts.slice(0, i + 1)) : null,
+    })),
+  ]
+})
+const breadcrumb = computed(() => crumbs.value.map(crumb => crumb.label).join(' / '))
 
 const nameParts = computed(() => {
   const parts = [user.value?.first_name, user.value?.last_name].map((v) => (v || '').trim()).filter(Boolean)
@@ -509,7 +528,7 @@ const searchablePages = [
   { label: 'Dashboard', path: '/hospital/dashboard', icon: 'layout-dashboard', keywords: 'dashboard home overview' },
   { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', keywords: 'receiving patient blood requests pending processing', requires: 'hospital.requests.view' },
   { label: 'New Request', path: '/hospital/bloodrequests/newrequest', icon: 'file-plus', keywords: 'new request create blood', requires: 'hospital.requests.manage' },
-  { label: 'Search Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units', requires: 'hospital.requests.view' },
+  { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'search', keywords: 'availability search blood units', requires: 'hospital.requests.view' },
   { label: 'Blood Bank Inventory', path: '/hospital/inventory', icon: 'package', keywords: 'inventory stock supply tag crossmatch transfusion patient bags expiry activity', requires: 'hospital.inventory.view' },
   { label: 'Stock Intake', path: '/hospital/stock-intake', icon: 'package-check', keywords: 'stock in intake shelve scan arrived bags storage location fridge receive', requires: 'hospital.inventory.stock_in' },
   { label: 'Inventory Report', path: '/hospital/inventory-report', icon: 'clipboard-list', keywords: 'report reports inventory sheet crossmatched uncrossmatched print pdf form wb prbc', requires: 'hospital.inventory.view' },
@@ -849,6 +868,9 @@ main { background: transparent; }
 .brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
 .brand-crumb li:first-child:not(:last-child) { flex-shrink: 1; }
 .brand-crumb li[aria-current] { flex-shrink: 0; max-width: 100%; color: var(--rb-text-primary); font-weight: 600; }
+.brand-crumb__link { color: inherit; text-decoration: none; border-radius: 3px; }
+.brand-crumb__link:hover { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 2px; }
+.brand-crumb__link:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 
 .search-panel {
   max-height: 320px;

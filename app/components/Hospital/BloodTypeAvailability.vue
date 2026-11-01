@@ -2,13 +2,13 @@
   <!--
     The blood bank's shelf by blood type: a ring for how much of each type's
     critical level is on the shelf, a bar per component with a tick at its
-    level. Each card opens Blood Bank Inventory on that type. Moved from the
-    inventory page to the dashboard (project owner, 2026-10-28).
+    level. On the dashboard each card opens Blood Bank Inventory on that type;
+    on that page (filterable) it filters the list, as the centre's cards do.
   -->
   <SectionCard
     class="bta"
     title="Blood Type Availability"
-    subtitle="Bags free to tag against the critical level: the ring for the type, the tick on each bar for a component."
+    :subtitle="filterable ? undefined : 'Bags free to tag against the critical level: the ring for the type, the tick on each bar for a component.'"
   >
     <template #actions>
       <ul class="legend" aria-label="Legend">
@@ -25,27 +25,43 @@
       <NuxtLink to="/hospital/stock-thresholds" class="link-btn">Set levels</NuxtLink>
     </p>
 
+    <p v-else-if="!thresholds && levelsUnset" class="types-hint types-hint--sk" aria-hidden="true">
+      <span class="sk sk--line" style="width: min(360px, 70%)" />
+    </p>
+
     <div class="type-grid">
       <template v-if="!thresholds">
         <div v-for="n in 8" :key="n" class="type-card" aria-hidden="true">
-          <span class="sk sk--line" style="width: 28%" />
+          <span class="type-card__head">
+            <span class="type-card__code sk sk--line" style="width: 28%" />
+          </span>
           <span class="type-card__body">
-            <span class="sk sk--ring" />
-            <span class="sk-lines">
-              <span class="sk sk--line" style="width: 92%" />
-              <span class="sk sk--line" style="width: 78%" />
-              <span class="sk sk--line" style="width: 86%" />
+            <span class="type-card__summary">
+              <span class="sk gauge" />
+              <span class="sk sk--line sk-units" />
+              <span class="sk sk--line sk-badge" />
+            </span>
+            <span class="type-card__components">
+              <span v-for="c in 4" :key="c" class="comp">
+                <span class="sk sk--line" />
+                <span class="sk comp__meter" />
+                <span class="sk sk--line" />
+              </span>
             </span>
           </span>
         </div>
       </template>
-      <NuxtLink
+      <component
+        :is="filterable ? 'button' : NuxtLinkComponent"
         v-for="card in typeCards"
         :key="card.code"
-        :to="`/hospital/inventory?blood_type_id=${card.id}`"
+        v-bind="filterable
+          ? { type: 'button', 'aria-pressed': selectedId === card.id }
+          : { to: `/hospital/inventory?blood_type_id=${card.id}` }"
         class="type-card"
-        :class="[`tone--${levelTone(card.level)}`, `type-card--${card.level}`]"
+        :class="[`tone--${levelTone(card.level)}`, `type-card--${card.level}`, { 'type-card--active': filterable && selectedId === card.id }]"
         :aria-label="typeCardLabel(card)"
+        @click="filterable ? $emit('select', card) : undefined"
       >
         <span class="type-card__head">
           <span class="type-card__code">{{ displayType(card.code) }}</span>
@@ -93,12 +109,13 @@
             </span>
           </span>
         </span>
-      </NuxtLink>
+      </component>
     </div>
   </SectionCard>
 </template>
 
 <script setup>
+import { resolveComponent } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SectionCard from '~/components/ui/SectionCard.vue'
 import { typeHealthByCode } from '~/utils/stockThreshold'
@@ -107,11 +124,41 @@ import { isRareBloodType, orderDashboardTypes, typeCoverage } from '~/utils/inve
 const props = defineProps({
   /** The blood bank's threshold status (`hospitalService.stockThresholds()`); null until it loads. */
   thresholds: { type: Object, default: null },
+  /** The cards filter a list on the page instead of opening the inventory. */
+  filterable: { type: Boolean, default: false },
+  /** The blood type that list is showing, when filterable. */
+  selectedId: { type: [Number, String], default: '' },
 })
+
+defineEmits(['select'])
+
+const NuxtLinkComponent = resolveComponent('NuxtLink')
 
 const cells = computed(() => props.thresholds?.cells ?? [])
 
 const anyMinimumSet = computed(() => cells.value.some((cell) => cell.minimum_units !== null))
+
+// Whether the "no critical level" line was showing last time, so the loading
+// cards leave room for it and the page does not move when it appears.
+const LEVELS_KEY = 'hospital_levels_unset'
+const levelsUnset = ref(false)
+
+onMounted(() => {
+  try {
+    levelsUnset.value = localStorage.getItem(LEVELS_KEY) === '1'
+  } catch {
+    // Blocked storage: no room is left for the line.
+  }
+})
+
+watch(() => props.thresholds, (thresholds) => {
+  if (!thresholds) return
+  try {
+    localStorage.setItem(LEVELS_KEY, anyMinimumSet.value ? '0' : '1')
+  } catch {
+    // Blocked storage: the next load leaves no room for the line.
+  }
+}, { immediate: true })
 
 const typeCards = computed(() => {
   const types = orderDashboardTypes(props.thresholds?.blood_types ?? [])
@@ -188,7 +235,12 @@ function componentTitle(comp) {
 
 function typeCardLabel(card) {
   const coverage = card.coverage === null ? 'no critical level set' : `${card.coverage}% of critical level on the shelf`
-  return `${card.code}${card.rare ? ', rare' : ''}: ${card.total} unit${card.total === 1 ? '' : 's'} free to tag, ${levelLabel(card.level)}, ${coverage}. Open its bags in Blood Bank Inventory.`
+  const action = !props.filterable
+    ? 'Open its bags in Blood Bank Inventory.'
+    : props.selectedId === card.id
+      ? 'Showing only this type below; press to show all.'
+      : 'Press to show only this type below.'
+  return `${card.code}${card.rare ? ', rare' : ''}: ${card.total} unit${card.total === 1 ? '' : 's'} free to tag, ${levelLabel(card.level)}, ${coverage}. ${action}`
 }
 
 function displayType(code) {
@@ -264,6 +316,8 @@ function formatCount(value) {
 }
 .type-card:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
 .type-card:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+button.type-card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.type-card--active { border-color: var(--rb-primary); box-shadow: inset 0 0 0 1px var(--rb-primary); }
 /* A short type is marked along its top edge: the exception, not the rule. */
 .type-card--low::before, .type-card--critical::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tone-fill); }
 .type-card__head { display: flex; align-items: center; gap: 8px; }
@@ -316,5 +370,12 @@ function formatCount(value) {
 @container bta (max-width: 440px) {
   .type-grid { grid-template-columns: minmax(0, 1fr); }
 }
-.sk-lines { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; }
+.types-hint--sk { min-height: 39px; }
+.type-card__code.sk { margin-block: 6px; }
+/* The ring's box is wider than the circle drawn in it. */
+.gauge.sk { border-radius: 50%; transform: scale(0.92); }
+.type-card .sk-units { width: 52px; margin-block: 3px 2px; }
+.type-card .sk-badge { width: 92px; height: 25px; margin-top: 2px; border-radius: 999px; }
+.comp .sk--line { height: 8px; }
+.comp { min-height: 15.5px; }
 </style>

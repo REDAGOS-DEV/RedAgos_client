@@ -4,8 +4,10 @@
       <div class="page-head__text">
         <h1 class="page-head__title">Stock Thresholds</h1>
         <p class="page-head__subtitle">
-          Set the PAR and critical levels for each blood type and component the {{ facilityNoun }} keeps. They help
-          restock on time and warn staff before a shelf runs out.
+          <slot name="subtitle">
+            Set the PAR and critical levels for each blood type and component the {{ facilityNoun }} keeps. They help
+            restock on time and warn staff before a shelf runs out.
+          </slot>
         </p>
 
         <div class="scope">

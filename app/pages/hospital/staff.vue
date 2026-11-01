@@ -1,7 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Staff" />
+      <PageHeader title="Staff" :subtitle="hospitalPageSubtitle('staff', can)" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -307,9 +307,6 @@
       </div>
     </div>
 
-    <transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </transition>
   </div>
 </template>
 
@@ -328,6 +325,9 @@ import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import SelectField from '~/components/common/SelectField.vue'
 import { useListPager } from '~/composables/useListPager'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+
+const { can } = useUser()
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
 
@@ -389,13 +389,10 @@ async function refresh() {
   }
 }
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4000)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 function firstError(err) {
@@ -522,7 +519,7 @@ async function confirmRemove() {
     showToast(response.message)
     await load()
   } catch (err) {
-    showToast(firstError(err))
+    showToast(firstError(err), 'error')
   } finally {
     busy.value = null
   }
@@ -536,7 +533,7 @@ async function restore(member) {
     showToast(response.message)
     await load()
   } catch (err) {
-    showToast(firstError(err))
+    showToast(firstError(err), 'error')
   } finally {
     busy.value = null
   }
@@ -597,7 +594,6 @@ async function submitAdd() {
 
 onMounted(load)
 
-onUnmounted(() => clearTimeout(toastTimer))
 </script>
 
 <!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->

@@ -245,6 +245,7 @@ const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 const referrals = ref([])
 const pendingReferrals = ref(0)

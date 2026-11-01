@@ -539,6 +539,7 @@ const service = bloodCenterService
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 // --- reference data ---------------------------------------------------------
 

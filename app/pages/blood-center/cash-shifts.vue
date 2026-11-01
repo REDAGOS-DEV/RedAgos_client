@@ -1,14 +1,6 @@
 <template>
   <div class="cs-page">
     <div class="cs-inner">
-      <div class="toast-stack" aria-live="polite">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
 
       <PageHeader
         title="Cash Shifts"
@@ -183,15 +175,7 @@ const STATUSES = [
   { value: 'closed', label: 'Closed' },
 ]
 
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 const shifts = ref([])
 const meta = reactive({ current_page: 1, last_page: 1 })

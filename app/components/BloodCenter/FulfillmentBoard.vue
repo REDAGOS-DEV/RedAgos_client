@@ -1,15 +1,6 @@
 <template>
   <div class="fx-page">
     <div class="fx-inner">
-      <!-- TOASTS -->
-      <div class="toast-stack">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
 
       <!-- Request Fulfillment (invoice still owing) or For Dispatch (cleared), 2026-10-31. -->
       <PageHeader
@@ -452,15 +443,7 @@ const tabs = [
 ]
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 // ?request=ID: the request its Issue button sent here, marked and scrolled to.
 const route = useRoute()

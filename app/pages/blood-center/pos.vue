@@ -1,13 +1,5 @@
 <template>
   <div class="pos">
-    <div class="toast-stack" aria-live="polite">
-      <transition-group name="toast">
-        <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-          <div class="toast-title">{{ t.title }}</div>
-          <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-        </div>
-      </transition-group>
-    </div>
 
     <PageHeader class="pos-head" title="Billing Counter" />
 
@@ -639,15 +631,7 @@ const METHODS = [
 const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 function formatTime(iso) {
   return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'

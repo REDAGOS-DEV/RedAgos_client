@@ -1,7 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Notifications" />
+      <PageHeader title="Notifications" :subtitle="hospitalPageSubtitle('notifications', can)" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -163,6 +163,9 @@ import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import { normalizeHospitalNotification } from '~/utils/hospitalNotifications'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+
+const { can } = useUser()
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 

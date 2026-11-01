@@ -1,7 +1,7 @@
 <template>
   <div class="list-page inv-tones">
     <div class="list-inner">
-      <PageHeader title="Stock Intake" />
+      <PageHeader title="Stock Intake" :subtitle="hospitalPageSubtitle('stockIntake', can)" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -284,6 +284,7 @@ import { UNIT_REFUSAL_MESSAGES } from '~/types/hospitalInventory'
 import { hospitalRemainingDaysTag } from '~/utils/hospitalInventoryDashboard'
 import { badgeClass } from '~/utils/listBadge'
 import { matchStockInScan } from '~/utils/stockIn'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in' })
 
@@ -518,7 +519,7 @@ async function runDiscard(reason) {
   } catch (err) {
     if (err?.status === 409 || err?.status === 404) {
       discardTarget.value = null
-      notice.value = refusalMessage(err)
+      notice.value = { tone: 'error', text: refusalMessage(err) }
       await refresh()
     } else {
       dialogError.value = err?.status === 422 ? firstError(err) : (err?.message || 'That could not be done. Please try again.')
@@ -546,6 +547,7 @@ function firstError(err) {
 
 // --- Toast ---
 const notice = ref('')
+useNoticeToast(notice)
 let noticeTimer = null
 watch(notice, (message) => {
   clearTimeout(noticeTimer)

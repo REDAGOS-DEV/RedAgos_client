@@ -895,6 +895,7 @@ const PER_PAGE = 25
 const loadError = ref('')
 // { tone: 'success' | 'error', text }
 const notice = ref(null)
+useNoticeToast(notice)
 
 const todayIso = computed(() => {
   const d = new Date()

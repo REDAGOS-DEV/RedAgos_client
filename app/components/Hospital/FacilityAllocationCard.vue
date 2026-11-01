@@ -105,6 +105,7 @@ const awaitingReceipt = computed(() =>
 
 .allocation__who {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;

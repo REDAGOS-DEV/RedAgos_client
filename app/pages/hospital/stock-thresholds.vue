@@ -4,7 +4,9 @@
     :save-status="(payload) => hospitalService.saveStockThresholds(payload)"
     :editable="can('hospital.inventory.thresholds')"
     facility-noun="blood bank"
-  />
+  >
+    <template #subtitle>{{ hospitalPageSubtitle('thresholds', can) }}</template>
+  </StockThresholdsPanel>
 </template>
 
 <script setup lang="ts">
@@ -18,6 +20,7 @@
  */
 import { hospitalService } from '~/api/hospital/HospitalService'
 import StockThresholdsPanel from '~/components/common/StockThresholdsPanel.vue'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 const { can } = useUser()
 

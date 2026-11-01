@@ -394,6 +394,7 @@ const loadingQueue = ref(true)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 const unitRows = ref([])
 

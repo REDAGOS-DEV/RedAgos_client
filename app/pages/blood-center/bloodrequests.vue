@@ -1,14 +1,5 @@
 <template>
   <div class="page scope-blood-center-bloodrequests">
-    <!-- TOASTS -->
-    <div class="toast-stack">
-      <transition-group name="toast">
-        <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-          <div class="toast-title">{{ t.title }}</div>
-          <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-        </div>
-      </transition-group>
-    </div>
 
     <!-- HEADER -->
     <header class="header-row">
@@ -148,6 +139,9 @@
                 <button type="button" class="code-link" :title="`Review ${r.code}`" @click="openReview(r)">{{ r.code }}</button>
                 <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
                 <!-- Priority: only an emergency is marked; routine is the rule. -->
+                <span v-if="r.dueBy" class="chip" :title="`The hospital needs this by ${r.dueBy}`">
+                  <AssetIcon name="clock" :size="11" /> By {{ r.dueBy }}
+                </span>
                 <span v-if="r.emergency" class="chip chip--crit" :title="`${r.priority} priority`">
                   <AssetIcon name="circle-alert" :size="11" /> {{ r.priority }}
                 </span>
@@ -965,6 +959,8 @@ function mapRequest(r) {
     // The API shape, for the shared fulfilment and walk-in components.
     raw: r,
     urgency: r.urgency_level,
+    // When the hospital needs it, if it set a time (2026-11-01).
+    dueBy: dueByLabel(r),
     purpose: r.purpose_label ?? '',
     patient: r.patient?.full_name ?? '',
     // Age and sex as the form records them, for the review.
@@ -977,7 +973,7 @@ function mapRequest(r) {
     requestDate: formatDateTime(r.request_date),
     neededBy: isReplenishment
       ? (plan ? supplyPlanSummary(plan) : 'Not confirmed yet')
-      : r.is_emergency ? 'Immediate' : 'Routine',
+      : dueByLabel(r) || (r.is_emergency ? 'Immediate' : 'Routine'),
     reason: r.rejection_reason ?? '',
     reference_number: r.reference_number,
   }
@@ -986,15 +982,7 @@ function mapRequest(r) {
 const rows = computed(() => (apiRequests.value ?? []).map(mapRequest))
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 /* FILTERS */
 // "Open" is every request still being worked; the rest are the statuses the
@@ -1044,6 +1032,12 @@ function selectTab(purpose) {
 const searchQuery = ref('')
 const statusFilter = ref('')
 // Set by the Emergency quick filter; the list's other filters still apply.
+// The time the hospital asked for, when it set one.
+function dueByLabel(r) {
+  const at = r.transfusion_request?.needed_by
+  return at ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
+}
+
 const urgencyFilter = ref('')
 
 /** This tab's own counts, for the quick filters. */

@@ -1,8 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Request Days">
-        <template #subtitle>The days you send each blood center your weekly request. A weekly request can only be sent on one of them, once a day.</template>
+      <PageHeader title="Request Days" :subtitle="hospitalPageSubtitle('requestDays', can)">
       </PageHeader>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -223,9 +222,6 @@
       </div>
     </div>
 
-    <Transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </Transition>
   </div>
 </template>
 
@@ -248,6 +244,7 @@ import SelectField from '~/components/common/SelectField.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useListPager } from '~/composables/useListPager'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS } from '~/types/receiving'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -288,15 +285,13 @@ const updatedAtLabel = computed(() => (updatedAt.value
   ? updatedAt.value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   : ''))
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
 onMounted(() => {
   loadSchedules()
   loadFacilities()
 })
 
-onUnmounted(() => clearTimeout(toastTimer))
 
 async function loadSchedules() {
   loadError.value = ''
@@ -411,10 +406,8 @@ function firstError(err) {
   return (Array.isArray(first) ? first[0] : first) || err?.message || ''
 }
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4000)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 /** An ISO timestamp as a date: "Oct 28, 2026". */

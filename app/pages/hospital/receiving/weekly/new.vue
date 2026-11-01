@@ -1,7 +1,7 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <NuxtLink to="/hospital/receiving/weekly" class="back-link">
+      <NuxtLink to="/hospital/receiving/weekly" class="back-link back-link--narrow">
         <AssetIcon name="arrow-left" :size="14" />
         Weekly Request
       </NuxtLink>

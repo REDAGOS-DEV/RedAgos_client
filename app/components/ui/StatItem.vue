@@ -73,7 +73,7 @@ withDefaults(defineProps<{
 .si__go { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: var(--rb-text-muted); opacity: 0; transition: opacity .15s ease; }
 .si--link:hover .si__go, .si--link:focus-visible .si__go { opacity: 1; }
 .si__hint { display: inline-flex; align-items: center; gap: 4px; font-size: var(--rb-fs-caption); color: var(--rb-text-secondary); }
-.si--pressable { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.si--pressable { width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; }
 .si--pressed { background: rgba(var(--rb-primary-rgb), .07); box-shadow: inset 0 0 0 1.5px rgba(var(--rb-primary-rgb), .55); }
 .si--pressed:hover { background: rgba(var(--rb-primary-rgb), .1); }
 </style>

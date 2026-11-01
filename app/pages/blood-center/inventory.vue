@@ -1323,6 +1323,7 @@ async function submitDiscard() {
 
 // --- Toast ---
 const notice = ref('')
+useNoticeToast(notice)
 let noticeTimer = null
 watch(notice, (message) => {
   clearTimeout(noticeTimer)

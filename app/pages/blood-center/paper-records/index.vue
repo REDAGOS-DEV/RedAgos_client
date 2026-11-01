@@ -291,6 +291,7 @@ const canDelete = computed(() => can('donations.close'))
 const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const sheets = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
 

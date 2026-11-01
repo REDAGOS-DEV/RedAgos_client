@@ -2,7 +2,7 @@
   <div class="requests-page">
     <div class="page-inner">
       <!-- Page header -->
-      <PageHeader title="Patient Request">
+      <PageHeader title="Patient Request" :subtitle="hospitalPageSubtitle('patientRequests', can)">
         <template #actions>
           <!-- A patient's need is raised here; restocking the shelf is the weekly request. -->
           <NuxtLink to="/hospital/receiving/weekly" class="ui-btn" title="To restock your blood bank, send your weekly request">
@@ -75,7 +75,7 @@
                 v-model="searchQuery"
                 type="search"
                 class="search__input"
-                placeholder="Search patient, reference, type or component"
+                placeholder="Search patient or reference"
                 aria-label="Search requests by patient, reference number, blood type or component"
               >
             </label>
@@ -194,10 +194,6 @@
                         : 'Requests you raise for your patients appear here, with what each blood center supplied.' }}
                     </p>
                     <button v-if="hasActiveFilters" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
-                    <button v-else-if="canCreate" type="button" class="btn-primary" @click="openNewRequest">
-                      <AssetIcon name="plus" :size="15" />
-                      New Request
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -326,23 +322,14 @@
       @close="receiving = null"
     />
 
-    <!-- Slide-over drawer -->
-    <Transition name="drawer-fade">
-      <div v-if="drawerOpen" class="drawer-backdrop" @click="closeDrawer" />
-    </Transition>
-    <Transition name="drawer-slide">
-      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" v-focus-trap aria-label="Request details">
-        <div class="drawer__header">
-          <div>
-            <p class="drawer__eyebrow">Request Details</p>
-            <h2 class="drawer__title">{{ selectedRequest.reference_number }}</h2>
-          </div>
-          <button type="button" class="ui-btn ui-btn--icon" @click="closeDrawer" aria-label="Close details">
-            <AssetIcon name="x" :size="18" />
-          </button>
-        </div>
-
-        <div class="drawer__body">
+    <!-- Quick view, in the middle of the screen (2026-11-01). -->
+    <CenterModal
+      v-if="drawerOpen && selectedRequest"
+      :title="selectedRequest.reference_number"
+      eyebrow="Request details"
+      @close="closeDrawer"
+    >
+      <div class="quick-view">
           <div class="drawer__status-row">
             <StatusBadge :tone="statusOf(selectedRequest.status).tone">{{ selectedRequest.status_text }}</StatusBadge>
             <StatusBadge :tone="priorityOf(selectedRequest.priority).tone" :dot="false">{{ priorityOf(selectedRequest.priority).label }} Priority</StatusBadge>
@@ -389,11 +376,15 @@
               <dt>Requested By</dt>
               <dd>{{ selectedRequest.requested_by }}</dd>
             </div>
+            <div v-if="selectedRequest.raw?.needed_by" class="drawer__field">
+              <dt>Needed by</dt>
+              <dd>{{ formatDate(new Date(selectedRequest.raw.needed_by), true) }}</dd>
+            </div>
             <div class="drawer__field">
               <dt>Date Submitted</dt>
               <dd>{{ formatDate(selectedRequest.request_date, true) }}</dd>
             </div>
-            <div class="drawer__field drawer__field--full">
+            <div v-if="selectedRequest.reason" class="drawer__field drawer__field--full">
               <dt>Reason</dt>
               <dd>{{ selectedRequest.reason }}</dd>
             </div>
@@ -420,21 +411,46 @@
           </div>
         </div>
 
-        <div class="drawer__footer">
+      <template #actions>
           <button type="button" class="ui-btn ui-btn--primary" @click="viewDetails(selectedRequest)">
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
           <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="askCancel(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
-        </div>
-      </aside>
-    </Transition>
+      </template>
+    </CenterModal>
+
+    <!-- Full Details and Track, in the same place. -->
+    <CenterModal
+      v-if="detailsFor"
+      :title="detailsFor.reference_number"
+      eyebrow="Full details and fulfilment"
+      size="lg"
+      @close="detailsFor = null"
+    >
+      <template #meta>
+        <span>{{ detailsFor.patient || 'Patient not recorded' }}</span>
+        <StatusBadge :tone="statusOf(detailsFor.status).tone">{{ detailsFor.status_text }}</StatusBadge>
+      </template>
+      <HospitalTransfusionRequestDetail :request-id="detailsFor.id" embedded @changed="refresh" />
+    </CenterModal>
+
+    <HospitalTransfusionTrackDialog
+      v-if="trackingFor"
+      :request-id="trackingFor.id"
+      :reference="trackingFor.reference_number"
+      @close="trackingFor = null"
+      @details="openDetailsFromTrack"
+    />
   </div>
 </template>
 
 <script setup>
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import HospitalTransfusionRequestDetail from '~/components/Hospital/TransfusionRequestDetail.vue'
+import HospitalTransfusionTrackDialog from '~/components/Hospital/TransfusionTrackDialog.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
@@ -451,6 +467,7 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
 import SelectField from '~/components/common/SelectField.vue'
 import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -686,7 +703,7 @@ function buildTrend(status) {
   return {
     up,
     hasData: true,
-    label: `${up ? '↑' : '↓'} ${Math.abs(percent)}% this week`,
+    label: `${Math.abs(percent)}% this week`,
   }
 }
 
@@ -710,6 +727,13 @@ function animateCounter(key, endValue, duration = 800) {
 }
 
 // ---------- Drawer ----------
+const detailsFor = ref(null)
+const trackingFor = ref(null)
+function openDetailsFromTrack() {
+  detailsFor.value = trackingFor.value
+  trackingFor.value = null
+}
+
 const drawerOpen = ref(false)
 const selectedRequest = ref(null)
 function openDrawer(req) {
@@ -725,11 +749,21 @@ function openNewRequest() {
   router.push('/hospital/bloodrequests/newrequest')
 }
 function trackRequest(req) {
+  drawerOpen.value = false
+  if (req.kind === 'transfusion') {
+    trackingFor.value = req
+    return
+  }
   // The page is /hospital/trackrequests; the hyphenated path this pushed to
   // has never existed, so "Track Request" landed on a 404.
   router.push(`/hospital/trackrequests?ref=${req.reference_number}`)
 }
 function viewDetails(req) {
+  drawerOpen.value = false
+  if (req.kind === 'transfusion') {
+    detailsFor.value = req
+    return
+  }
   router.push(req.kind === 'transfusion' ? `/hospital/transfusion-requests/${req.id}` : `/hospital/bloodrequests/${req.id}`)
 }
 
@@ -920,19 +954,6 @@ onUnmounted(() => {
 .btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
 /* ---------- Drawer ---------- */
-.drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 50; }
-.drawer {
-  position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 100vw;
-  background: var(--surface); z-index: 51; display: flex; flex-direction: column;
-  box-shadow: -12px 0 40px rgba(15,23,42,0.18);
-}
-.drawer__header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 22px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.drawer__eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 4px; }
-.drawer__title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.drawer__body { flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 26px; }
 .drawer__status-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .drawer__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0; }
@@ -957,12 +978,7 @@ onUnmounted(() => {
 .v-timeline__label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0; }
 .v-timeline__label--muted { color: var(--text-muted); font-weight: 500; }
 
-.drawer__footer { display: flex; gap: 10px; padding: 18px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
 
-.drawer-slide-enter-active, .drawer-slide-leave-active { transition: transform 0.28s cubic-bezier(0.22,1,0.36,1); }
-.drawer-slide-enter-from, .drawer-slide-leave-to { transform: translateX(100%); }
-.drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.2s ease; }
-.drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
 @media (max-width: 1024px) {
@@ -985,7 +1001,9 @@ onUnmounted(() => {
 .stat-trend.down { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), 0.09); }
 
 /* What waits, one click away (2026-11-01). */
-.quick-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 16px 14px; }
+.quick-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rb-border); }
+.stat-trend { white-space: nowrap; }
+:deep(.si__hint) { flex-wrap: wrap; }
 .quick {
   display: inline-flex;
   align-items: center;
@@ -1021,4 +1039,25 @@ onUnmounted(() => {
 .progress__step--done { background: var(--rb-success); }
 .progress__step--current { background: var(--rb-primary); }
 .progress__step--halted { background: var(--rb-border-hover); }
+
+/* Quick view: its fields beside its timeline. */
+/* The dialog sits on the body, outside .requests-page and the tokens it sets. */
+.quick-view {
+  --primary: var(--rb-primary);
+  --surface: var(--rb-surface);
+  --border: var(--rb-border);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
+  --text-muted: var(--rb-text-muted);
+  --danger: var(--rb-accent);
+  --success: var(--rb-success);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 28px;
+}
+.quick-view .drawer__status-row { grid-column: 1 / -1; }
+.quick-view .drawer__grid { grid-column: 2; grid-row: 2; }
+.quick-view .drawer__timeline-section { grid-column: 1; grid-row: 2; padding-right: 24px; border-right: 1px solid var(--rb-border); }
+@media (max-width: 640px) {
+  .quick-view { grid-template-columns: minmax(0, 1fr); }
+  .quick-view .drawer__grid, .quick-view .drawer__timeline-section { grid-column: 1; grid-row: auto; border-right: 0; padding-right: 0; }
+}
 </style>

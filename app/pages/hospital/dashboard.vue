@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard scope-hospital-dashboard">
     <div class="dashboard-inner">
-      <PageHeader title="Blood Bank Dashboard">
+      <PageHeader title="Blood Bank Dashboard" :subtitle="hospitalPageSubtitle('dashboard', can)">
         <template #actions>
           <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn ui-btn--primary">
             <AssetIcon name="plus" :size="15" />
@@ -220,6 +220,9 @@ import EmptyState from '~/components/ui/EmptyState.vue'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+
+const { can } = useUser()
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
 
@@ -415,7 +418,7 @@ const quickActions = [
     path: '/hospital/bloodavailability',
     icon: 'search',
     title: 'Search Blood Availability',
-    description: 'Check current stock by blood type',
+    description: 'See which blood centers hold what you need',
   },
   {
     path: '/hospital/trackrequests',

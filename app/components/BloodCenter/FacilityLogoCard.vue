@@ -103,6 +103,7 @@ const defaultSealVisible = ref(true)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
+useNoticeToast(notice)
 const fileInput = ref(null)
 
 // What the preview shows: the upload, else (left logo only) the DOH seal.

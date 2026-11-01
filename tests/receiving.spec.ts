@@ -211,7 +211,7 @@ describe('the receiving routes and pages', () => {
     for (const file of [
       'app/components/Hospital/Sidebar.vue',
       'app/layouts/hospitaldashboard.vue',
-      'app/pages/hospital/transfusion-requests/[id].vue',
+      'app/components/Hospital/TransfusionRequestDetail.vue',
     ]) {
       expect(source(file)).not.toContain('/hospital/receiving/direct-distribution')
     }

@@ -270,6 +270,7 @@ const loading = ref(true)
 const busy = ref(null)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 const notes = reactive({})
 const noteOpen = reactive({})
 const noteInputs = {}
