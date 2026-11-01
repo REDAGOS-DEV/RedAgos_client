@@ -1,7 +1,7 @@
 <template>
   <div class="list-page inv-tones">
     <div class="list-inner">
-      <PageHeader title="Stock Intake" subtitle="Put the bags that arrived onto a shelf: scan each one, give it its storage location, and stock it in." />
+      <PageHeader title="Stock Intake" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -127,9 +127,7 @@
             </thead>
 
             <tbody v-if="loading">
-              <tr v-for="n in 5" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="5" />
             </tbody>
 
             <tbody v-else-if="!arrived.length">
@@ -274,6 +272,7 @@
  * to tag. Moved out of Blood Bank Inventory to a page of its own (project
  * owner, 2026-10-28), as the centre's Stock Intake is.
  */
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 
 import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

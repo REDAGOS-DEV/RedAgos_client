@@ -50,7 +50,7 @@ describe('the hospital inventory page', () => {
     expect(page).toContain('Number(route.query.blood_type_id)')
 
     const dashboard = source('app/pages/hospital/dashboard.vue')
-    expect(dashboard).toContain('<HospitalBloodTypeAvailability v-if="thresholds" :thresholds="thresholds" />')
+    expect(dashboard).toContain('<HospitalBloodTypeAvailability v-if="thresholds || thresholdsLoading" :thresholds="thresholds" />')
     expect(source('app/components/Hospital/BloodTypeAvailability.vue')).toContain(':to="`/hospital/inventory?blood_type_id=${card.id}`"')
   })
 

@@ -15,7 +15,7 @@
         <span class="crumb-current">Request Details</span>
       </nav> -->
 
-      <PageHeader title="Blood Request Details" subtitle="View the complete information and progress of this blood request.">
+      <PageHeader title="Blood Request Details">
         <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="ui-btn" type="button" @click="handleDownloadPdf">
@@ -32,15 +32,7 @@
 
     <!-- ============== LOADING SKELETON ============== -->
     <div v-if="isLoadingRequest" class="skeleton-stack">
-      <div class="skeleton skeleton--summary" />
-      <div class="skeleton-grid">
-        <div class="skeleton-grid__main">
-          <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-        </div>
-        <div class="skeleton-grid__side">
-          <div class="skeleton skeleton--card-sm" v-for="n in 3" :key="n" />
-        </div>
-      </div>
+      <PageSkeleton :sections="[['form', 'list'], ['table', 'list']]" />
     </div>
 
     <!-- ============== ERROR STATE ============== -->
@@ -683,6 +675,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'

@@ -280,6 +280,8 @@ html.portal-bc .sk--line { height: 12px; border-radius: 6px; }
 html.portal-bc .sk--icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; }
 html.portal-bc .sk--avatar { flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; }
 html.portal-bc .sk--value { width: 42%; height: 26px; border-radius: 8px; }
+html.portal-bc .sk--figure { width: 56px; height: 26px; border-radius: 8px; }
+html.portal-bc .sk--ring { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; }
 html.portal-bc .sk-card {
   display: flex;
   flex-direction: column;

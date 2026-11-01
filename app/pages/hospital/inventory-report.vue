@@ -1,20 +1,7 @@
 <template>
   <div class="report">
     <!-- ============ HEADER ============ -->
-    <header class="hero">
-      <span class="hero__icon" aria-hidden="true"><AssetIcon name="file-text" :size="24" /></span>
-      <div class="hero__text">
-        <h1 class="hero__title">Inventory Report</h1>
-        <p class="hero__sub">Choose the components and blood types to cover, then generate the blood bank's inventory sheet.</p>
-      </div>
-      <p class="hero__tag" aria-hidden="true">
-        <AssetIcon name="blood-drop" :size="26" class="hero__drop" />
-        <span>Safe Blood.<br>Healthier Communities.</span>
-      </p>
-      <svg class="hero__wave" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 80 C 120 40, 240 120, 360 80 S 540 40, 600 70 L 600 120 L 0 120 Z" />
-      </svg>
-    </header>
+    <PageHeader title="Inventory Report" />
 
     <div v-if="error" class="alert" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
@@ -157,9 +144,7 @@
             </thead>
 
             <tbody v-if="historyLoading && !reports.length">
-              <tr v-for="n in 3" :key="'skr-' + n">
-                <td colspan="6"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="6" :rows="3" />
             </tbody>
 
             <tbody v-else-if="!reports.length">
@@ -395,6 +380,8 @@
  * the free bags and those tagged but still waiting for their crossmatch,
  * marked (T).
  */
+import PageHeader from '~/components/ui/PageHeader.vue'
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
@@ -686,35 +673,6 @@ function formatTime(value) {
 }
 
 /* ── Header: the page's title on a soft wash of the portal colour ── */
-.hero {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 22px 24px;
-  overflow: hidden;
-  border: 1px solid var(--rb-border);
-  border-radius: 20px;
-  background:
-    radial-gradient(60% 140% at 100% 0%, rgba(var(--rb-primary-rgb), 0.10), transparent 60%),
-    var(--rb-surface);
-  box-shadow: var(--rb-shadow-sm);
-}
-.hero__icon {
-  position: relative; z-index: 1; flex-shrink: 0;
-  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px;
-  background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text);
-}
-.hero__text { position: relative; z-index: 1; flex: 1; min-width: 0; }
-.hero__title { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--rb-text-primary); }
-.hero__sub { margin: 4px 0 0; font-size: 13.5px; color: var(--rb-text-secondary); }
-.hero__tag {
-  position: relative; z-index: 1; flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px; margin: 0;
-  font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary);
-}
-.hero__drop { color: rgba(var(--rb-primary-rgb), 0.55); }
-.hero__wave { position: absolute; right: 0; bottom: 0; width: 55%; height: 70%; fill: rgba(var(--rb-primary-rgb), 0.05); pointer-events: none; }
 
 /* ── The settings card and its tabs ── */
 .panel {
@@ -982,15 +940,11 @@ function formatTime(value) {
 }
 
 @media (max-width: 760px) {
-  .hero__tag { display: none; }
   .layouts { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
   .report { padding: 16px 16px 32px; }
-  .hero { padding: 18px; }
-  .hero__icon { width: 44px; height: 44px; }
-  .hero__title { font-size: 20px; }
   .setting { padding: 18px 16px; gap: 10px; }
   .select-all { position: static; margin: -4px 0 10px -6px; }
   .panel__foot { padding: 14px 16px; }

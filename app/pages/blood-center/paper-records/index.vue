@@ -1,10 +1,6 @@
 <template>
   <div class="paper-page">
-    <div v-if="initialLoading" class="paper-inner" aria-busy="true" aria-label="Loading paper records">
-      <PageSkeleton title="Paper Records" :sections="[['table']]" :columns="6" />
-    </div>
-
-    <div v-else class="paper-inner">
+    <div class="paper-inner">
       <header class="header-row">
         <div>
           <NuxtLink to="/blood-center/donations" class="back-link">
@@ -259,7 +255,6 @@
 
 <script setup>
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
-import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -293,8 +288,7 @@ const router = useRouter()
 const { can } = useUser()
 const canDelete = computed(() => can('donations.close'))
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
 const sheets = ref([])
@@ -323,7 +317,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load the paper sheets.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 

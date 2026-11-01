@@ -1,7 +1,7 @@
 <template>
   <div class="bdash">
     <div v-if="initialLoading" class="bdash-inner" aria-busy="true" aria-label="Loading the dashboard">
-      <PageSkeleton title="Billing dashboard" :sections="[['list', 'list'], ['chart', 'list'], ['list', 'list']]" />
+      <PageSkeleton title="Billing dashboard" :actions="1" needs :sections="[['list', 'list'], ['chart', 'list'], ['list', 'list', 'list']]" />
     </div>
 
     <div v-else class="bdash-inner">

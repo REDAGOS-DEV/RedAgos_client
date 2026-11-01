@@ -37,7 +37,7 @@
       </p>
 
       <!-- The period in five figures, counted on the server. -->
-      <PageSkeleton v-if="loading && !report" :tiles="5" :sections="[['chart', 'list'], ['list', 'list']]" />
+      <PageSkeleton v-if="loading && !report" :tiles="5" :sections="[['chart', 'list'], ['table', 'table']]" />
 
       <template v-else>
       <dl class="figures" :aria-busy="loading">

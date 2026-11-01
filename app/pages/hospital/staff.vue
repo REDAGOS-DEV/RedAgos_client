@@ -1,7 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Staff" subtitle="Your blood bank's accounts and what each person may do." />
+      <PageHeader title="Staff" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -86,9 +86,7 @@
             </thead>
 
             <tbody v-if="loading">
-              <tr v-for="n in 4" :key="'skr-' + n">
-                <td colspan="5"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="5" :rows="4" />
             </tbody>
 
             <tbody v-else-if="!visible.length">
@@ -316,6 +314,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * A hospital blood bank's staff, kept by its Head (project owner, 2026-10-11).

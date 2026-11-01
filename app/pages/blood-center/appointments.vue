@@ -1,10 +1,6 @@
 <template>
   <div class="appointments-page">
-    <div v-if="initialLoading" class="appointments-inner" aria-busy="true" aria-label="Loading appointments">
-      <PageSkeleton title="Appointments" toolbar :sections="[['table']]" :columns="7" />
-    </div>
-
-    <div v-else class="appointments-inner">
+    <div class="appointments-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Appointments</h1>
@@ -373,7 +369,6 @@
 
 <script setup>
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
-import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -431,8 +426,7 @@ const HORIZON_DAYS = 90
 const todayIso = isoDaysFromToday(0)
 const horizonIso = isoDaysFromToday(HORIZON_DAYS)
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
 const updatedAt = ref(null)
@@ -472,7 +466,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load appointments.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 

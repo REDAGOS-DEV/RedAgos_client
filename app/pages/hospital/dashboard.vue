@@ -1,27 +1,7 @@
 <template>
   <div class="dashboard scope-hospital-dashboard">
-    <!-- Skeleton loading state -->
-    <div v-if="loading" class="dashboard-inner">
-      <div class="skeleton skeleton--header" />
-      <div class="stats-grid">
-        <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-      </div>
-      <div class="main-grid">
-        <div class="col-left">
-          <div class="skeleton skeleton--panel" style="height:340px" />
-          <div class="skeleton skeleton--panel" style="height:260px" />
-        </div>
-        <div class="col-right">
-          <div class="skeleton skeleton--panel" style="height:280px" />
-          <div class="skeleton skeleton--panel" style="height:220px" />
-          <div class="skeleton skeleton--panel" style="height:200px" />
-        </div>
-      </div>
-      <div class="skeleton skeleton--panel" style="height:120px" />
-    </div>
-
-    <div v-else class="dashboard-inner">
-      <PageHeader title="Hospital Blood Bank Dashboard" subtitle="Manage blood requests, monitor request status, and check blood availability.">
+    <div class="dashboard-inner">
+      <PageHeader title="Blood Bank Dashboard">
         <template #actions>
           <NuxtLink to="/hospital/bloodrequests/newrequest" class="ui-btn ui-btn--primary">
             <AssetIcon name="plus" :size="15" />
@@ -30,18 +10,26 @@
         </template>
       </PageHeader>
 
+      <p v-if="loadError" class="load-error" role="alert">
+        <AssetIcon name="circle-alert" :size="15" />
+        <span>{{ loadError }}</span>
+      </p>
+
+      <!-- What waits now, first on every dashboard. -->
+      <NeedsYou :tasks="needsYou" :loaded="!loading && !loadError" class="needs-you" />
+
       <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" class="low-stock-banner" />
 
       <!-- Summary figures: each opens the page that owns the number. -->
       <StatStrip>
-        <StatItem label="Available blood units" :value="unitsAvailable" hint="Across all compatible blood types" icon="blood-drop" tone="primary" to="/hospital/bloodavailability" />
-        <StatItem label="Pending requests" :value="pendingCount" hint="Awaiting Blood Center approval" icon="clock" tone="warning" to="/hospital/bloodrequests" />
-        <StatItem label="Approved requests" :value="approvedCount" hint="Ready for processing" icon="check-circle" tone="success" to="/hospital/bloodrequests" />
-        <StatItem label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
+        <StatItem :loading="loading" label="Available blood units" :value="unitsAvailable" hint="Across all compatible blood types" icon="blood-drop" tone="primary" to="/hospital/bloodavailability" />
+        <StatItem :loading="loading" label="Pending requests" :value="pendingCount" hint="Awaiting Blood Center approval" icon="clock" tone="warning" to="/hospital/bloodrequests" />
+        <StatItem :loading="loading" label="Approved requests" :value="approvedCount" hint="Ready for processing" icon="check-circle" tone="success" to="/hospital/bloodrequests" />
+        <StatItem :loading="loading" label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
       </StatStrip>
 
       <!-- The shelf by blood type, from Blood Bank Inventory (project owner, 2026-10-28). -->
-      <HospitalBloodTypeAvailability v-if="thresholds" :thresholds="thresholds" />
+      <HospitalBloodTypeAvailability v-if="thresholds || thresholdsLoading" :thresholds="thresholds" />
 
       <!-- Main content -->
       <div class="main-grid">
@@ -67,24 +55,29 @@
             <div class="trend-stats">
               <div class="trend-stat">
                 <p class="trend-stat__label">Total Requests</p>
-                <p class="trend-stat__value">{{ trendTotal }}</p>
+                <span v-if="loading" class="sk sk--figure" />
+                <p v-else class="trend-stat__value">{{ trendTotal }}</p>
               </div>
               <div class="trend-stat">
                 <p class="trend-stat__label">Avg. Daily Requests</p>
-                <p class="trend-stat__value">{{ trendAverage }}</p>
+                <span v-if="loading" class="sk sk--figure" />
+                <p v-else class="trend-stat__value">{{ trendAverage }}</p>
               </div>
               <div class="trend-stat">
                 <p class="trend-stat__label">Peak Day</p>
-                <p class="trend-stat__value trend-stat__value--sm">{{ trendPeak }}</p>
+                <span v-if="loading" class="sk sk--figure" />
+                <p v-else class="trend-stat__value trend-stat__value--sm">{{ trendPeak }}</p>
               </div>
               <div class="trend-stat">
                 <p class="trend-stat__label">Growth</p>
-                <p class="trend-stat__value" :class="trendGrowthClass">{{ trendGrowthLabel }}</p>
+                <span v-if="loading" class="sk sk--figure" />
+                <p v-else class="trend-stat__value" :class="trendGrowthClass">{{ trendGrowthLabel }}</p>
               </div>
             </div>
 
             <div class="trend-body">
-              <svg v-if="chartPoints.length" class="trend-svg" viewBox="0 0 640 200" preserveAspectRatio="none"
+              <SkeletonChart v-if="loading" />
+              <svg v-else-if="chartPoints.length" class="trend-svg" viewBox="0 0 640 200" preserveAspectRatio="none"
                 role="img" aria-label="Blood request trend chart">
                 <line v-for="g in gridLines" :key="g" x1="0" :x2="640" :y1="g" :y2="g" class="trend-grid" />
                 <path :d="areaPath" class="trend-area" :class="{ 'trend-area--animate': chartAnimateKey }" />
@@ -121,7 +114,8 @@
               </NuxtLink>
             </template>
 
-            <div v-if="recentRequests.length" class="request-table">
+            <SkeletonList v-if="loading" class="dash-skeleton" :rows="4" />
+            <div v-else-if="recentRequests.length" class="request-table">
               <div class="request-table__head">
                 <span>Reference</span>
                 <span>Blood type</span>
@@ -155,7 +149,8 @@
         <div class="col-right">
           <!-- Today's activities -->
           <SectionCard title="Today's Activities" flush>
-            <div v-if="activities.length" class="timeline">
+            <SkeletonList v-if="loading" class="dash-skeleton" :rows="2" />
+            <div v-else-if="activities.length" class="timeline">
               <div v-for="(item, i) in activities" :key="i" class="timeline-row">
                 <div class="timeline-row__rail">
                   <span class="timeline-dot" />
@@ -172,10 +167,11 @@
 
           <!-- Recent notifications -->
           <SectionCard title="Recent Notifications" flush>
-            <div v-if="notifications.length" class="notif-list">
+            <SkeletonList v-if="loading" class="dash-skeleton" :rows="2" />
+            <div v-else-if="notifications.length" class="notif-list">
               <div v-for="(n, i) in notifications" :key="i" class="notif-row">
-                <div class="notif-row__icon" :style="{ background: `${n.color}14` }">
-                  <AssetIcon :name="n.icon" :size="14" :style="{ color: n.color }" />
+                <div class="notif-row__icon" :style="{ background: `${toneColor(n.tone)}14` }">
+                  <AssetIcon :name="n.icon" :size="14" :style="{ color: toneColor(n.tone) }" />
                 </div>
                 <div class="notif-row__body">
                   <p class="notif-row__message">{{ n.message }}</p>
@@ -209,8 +205,11 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import SkeletonChart from '~/components/ui/SkeletonChart.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import NeedsYou from '~/components/common/NeedsYou.vue'
 import HospitalBloodTypeAvailability from '~/components/Hospital/BloodTypeAvailability.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
@@ -245,6 +244,23 @@ const monthlyTrend = ref([])
 const yearlyTrend = ref([])
 
 const unreadNotifications = computed(() => notifications.value.length)
+const loadError = ref('')
+
+// A notification's tone, in the colours of the rest of the page.
+const TONE_COLOR = { red: '#D32F2F', danger: '#D32F2F', urgent: '#D32F2F', amber: '#F57C00', warning: '#F57C00', green: '#2E7D32', success: '#2E7D32' }
+const toneColor = tone => TONE_COLOR[tone] ?? '#1565C0'
+
+// "Needs you", from the dashboard's own counts; only what has something waiting.
+const taskCounts = ref({})
+const TASKS = [
+  { key: 'overdue_tags', label: 'tags past their deadline', detail: 'Being released. Check them in the inventory.', to: '/hospital/inventory', action: 'Open inventory', icon: 'clock', tone: 'urgent' },
+  { key: 'to_receive', label: 'requests to receive', detail: 'Units are on the way from a blood center.', to: '/hospital/bloodrequests', action: 'Confirm receipt', icon: 'truck', tone: 'info' },
+  { key: 'to_stock_in', label: 'bags to stock in', detail: 'Received, and waiting for a shelf.', to: '/hospital/stock-intake', action: 'Open Stock Intake', icon: 'package-check', tone: 'warning' },
+  { key: 'expiring', label: 'bags expiring soon', detail: 'Within the next 3 days.', to: '/hospital/inventory', action: 'Open inventory', icon: 'triangle-alert', tone: 'warning' },
+]
+const needsYou = computed(() => TASKS
+  .map(task => ({ ...task, count: taskCounts.value[task.key] ?? 0 }))
+  .filter(task => task.count > 0))
 
 // ---------- Animated counters ----------
 const prefersReducedMotion = () =>
@@ -412,6 +428,7 @@ const quickActions = [
 // Loaded on its own so the banner and the type cards do not depend on the
 // dashboard call below. Supplementary: a failure leaves neither.
 const thresholds = ref(null)
+const thresholdsLoading = ref(true)
 const lowStock = computed(() => thresholds.value?.low ?? [])
 
 onMounted(async () => {
@@ -419,6 +436,8 @@ onMounted(async () => {
     thresholds.value = await hospitalService.stockThresholds()
   } catch (err) {
     console.error('Failed to load stock thresholds:', err)
+  } finally {
+    thresholdsLoading.value = false
   }
 })
 
@@ -439,6 +458,7 @@ onMounted(async () => {
     weeklyTrend.value = data.weekly_trend ?? []
     monthlyTrend.value = data.monthly_trend ?? []
     yearlyTrend.value = data.yearly_trend ?? []
+    taskCounts.value = data.tasks ?? {}
 
     loading.value = false
 
@@ -451,6 +471,8 @@ onMounted(async () => {
     animateCounter(completedToday, data.completed_today ?? 0)
   } catch (err) {
     console.error('Failed to load hospital dashboard data:', err)
+    // Said plainly: zeros here would read as a real, empty day.
+    loadError.value = err?.message || 'The dashboard could not be loaded. Refresh the page to try again.'
 
     loading.value = false
   }
@@ -859,4 +881,8 @@ onMounted(async () => {
   .dashboard { padding: 16px 16px 32px; }
   .quick-grid { grid-template-columns: 1fr; }
 }
+
+.needs-you { margin-bottom: 20px; }
+.load-error { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: rgba(var(--rb-accent-rgb), 0.08); font-size: 13px; color: var(--rb-accent-text); }
+.dash-skeleton { padding: 18px 20px; }
 </style>

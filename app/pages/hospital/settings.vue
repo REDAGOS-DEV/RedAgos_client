@@ -1,9 +1,7 @@
 <template>
   <div class="settings-page scope-hospital-settings">
     <div v-if="loading" class="settings-skeleton" aria-busy="true">
-      <div class="skeleton skeleton--banner" />
-      <div class="skeleton skeleton--tabs" />
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton :sections="[['banner'], ['form']]" />
     </div>
 
     <div v-else class="settings-inner">
@@ -345,6 +343,7 @@
  * appearance is this device's own. The hospital's record is shown, not
  * edited: the RedAgos administrators keep it.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
 import ComboInput from '~/components/common/ComboInput.vue'

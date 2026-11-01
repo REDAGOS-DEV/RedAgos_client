@@ -74,9 +74,7 @@
             </thead>
 
             <tbody v-if="loading">
-              <tr v-for="n in 3" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="3" />
             </tbody>
 
             <tbody v-else-if="!visible.length">
@@ -232,6 +230,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The blood bank's request days: which weekdays it sends each blood center its

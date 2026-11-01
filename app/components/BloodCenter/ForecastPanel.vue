@@ -6,7 +6,7 @@
     ForecastWeekChart draws the history and, dashed, the weeks forecast.
   -->
   <div class="fc">
-    <PageSkeleton v-if="loading" :tiles="4" :sections="[['chart', 'list']]" />
+    <PageSkeleton v-if="loading" :top="[['banner']]" :tiles="4" :sections="[['chart', 'list'], ['table']]" />
 
     <div v-else-if="error" class="fc__error" role="alert">
       {{ error }} <button type="button" class="link" @click="load">Try again</button>

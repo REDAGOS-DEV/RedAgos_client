@@ -6,7 +6,7 @@
         <AssetIcon name="arrow-left" :size="16" class="eb-back-arrow" /> Back to Request Details
       </NuxtLink>
 
-      <PageHeader class="eb-header-row" title="Edit Blood Request" subtitle="Update request information before it is processed by the Blood Center.">
+      <PageHeader class="eb-header-row" title="Edit Blood Request">
         <template v-if="originalRequest" #actions>
           <StatusBadge v-if="isEditable" :tone="statusTone('Pending')">Pending</StatusBadge>
           <StatusBadge v-else tone="neutral">Editing Disabled</StatusBadge>
@@ -16,9 +16,7 @@
 
     <!-- ====== LOADING ====== -->
     <div v-if="isLoading" class="eb-skeleton-wrap">
-      <div class="eb-skeleton eb-skeleton-banner"></div>
-      <div class="eb-skeleton eb-skeleton-card"></div>
-      <div class="eb-skeleton eb-skeleton-card"></div>
+      <PageSkeleton :sections="[['form', 'list'], ['form', 'list']]" />
     </div>
 
     <!-- ======= ERROR ======= -->
@@ -294,6 +292,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatusBadge from '~/components/ui/StatusBadge.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'

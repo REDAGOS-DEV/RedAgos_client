@@ -1,7 +1,7 @@
 <template>
   <div class="track-page">
     <!-- ============== PAGE HEADER ============== -->
-    <PageHeader class="page-header" title="Track Requests" subtitle="Monitor the real-time progress and fulfillment status of submitted blood requests.">
+    <PageHeader class="page-header" title="Track Requests">
       <template #actions>
         <button
           class="ui-btn ui-btn--primary"
@@ -59,7 +59,7 @@
         </button>
       </form>
 
-      <div v-if="isLoadingRecent" class="recent-loading">Loading recent tracked requests…</div>
+      <SkeletonList v-if="isLoadingRecent" class="recent-loading" :rows="2" />
     </section>
 
     <!-- ============== EMPTY STATE ============== -->
@@ -80,10 +80,7 @@
     </section>
 
     <!-- ============== SEARCHING SKELETON ============== -->
-    <div v-else-if="isSearching && !request" class="skeleton-stack">
-      <div class="skeleton skeleton--hero" />
-      <div class="skeleton skeleton--stepper" />
-    </div>
+    <PageSkeleton v-else-if="isSearching && !request" :sections="[['form'], ['list', 'list']]" />
 
     <!-- ============== MAIN TRACKING VIEW ============== -->
     <template v-else-if="request">
@@ -386,6 +383,8 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

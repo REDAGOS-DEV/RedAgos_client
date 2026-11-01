@@ -3,35 +3,8 @@
     <!-- ===================== LOADING SKELETON ===================== -->
     <template v-if="isLoading">
       <div class="ba-inner">
-        <div class="ba-header skeleton-block">
-          <div>
-            <div class="skeleton-line" style="width:220px;height:32px;margin-bottom:10px;"></div>
-            <div class="skeleton-line" style="width:340px;height:16px;"></div>
-          </div>
-          <div class="skeleton-line" style="width:260px;height:44px;border-radius:12px;"></div>
-        </div>
-
-        <div class="ba-filter-panel skeleton-block">
-          <div class="skeleton-line" style="width:100%;height:44px;border-radius:12px;"></div>
-        </div>
-
-        <div class="ba-summary-grid">
-          <div v-for="n in 4" :key="n" class="ba-summary-card skeleton-block">
-            <div class="skeleton-line" style="width:32px;height:32px;border-radius:10px;margin-bottom:12px;"></div>
-            <div class="skeleton-line" style="width:70%;height:44px;margin-bottom:8px;"></div>
-            <div class="skeleton-line" style="width:50%;height:12px;"></div>
-          </div>
-        </div>
-
-        <div class="ba-type-grid">
-          <div v-for="n in 8" :key="n" class="ba-type-card skeleton-block">
-            <div class="skeleton-line" style="width:40%;height:22px;margin-bottom:14px;"></div>
-            <div class="skeleton-line" style="width:60%;height:40px;margin-bottom:16px;"></div>
-            <div class="skeleton-line" style="width:100%;height:10px;border-radius:6px;margin-bottom:14px;"></div>
-            <div class="skeleton-line" style="width:50%;height:12px;"></div>
-          </div>
-        </div>
-      </div>
+      <PageSkeleton title="Blood Availability" :tiles="4" :sections="[['list', 'list'], ['table']]" />
+    </div>
     </template>
 
     <!-- ===================== EMPTY STATE ===================== -->
@@ -55,7 +28,7 @@
     <template v-else>
       <div class="ba-inner">
         <!-- PAGE HEADER -->
-        <PageHeader title="Blood Availability" subtitle="View the latest available blood units provided by the Blood Center.">
+        <PageHeader title="Blood Availability">
           <template #actions>
             <span class="ba-sync-badge" role="status">
               <span class="ba-sync-dot" aria-hidden="true"></span>
@@ -438,6 +411,8 @@
 </template>
 
 <script setup>
+import { useDarkMode } from '~/composables/useDarkMode'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
@@ -479,7 +454,9 @@ const lastUpdatedAt = ref(null)
 const now = ref(Date.now())
 let syncTimer = null
 
-const isDark = ref(false)
+// The portal's theme, not one of this page's own (2026-11-01): it read another
+// storage key and forced the whole portal dark on a dark OS.
+const { isDark, toggleTheme } = useDarkMode()
 
 const bloodTypesRaw = ref([]) // grid data: { bloodType, units, status, lastUpdated, eta, componentSummary }
 const tableRows = ref([])     // detailed table rows: { bloodType, component, units, status, lastUpdated, center }
@@ -609,43 +586,7 @@ async function fetchInventory() {
   }
 }
 
-// ======================= THEME (LIGHT / DARK) =======================
-function applyTheme(dark) {
-  if (typeof document === 'undefined') return
-  document.documentElement.classList.toggle('dark', dark)
-}
-
-function toggleTheme() {
-  isDark.value = !isDark.value
-  applyTheme(isDark.value)
-  try {
-    localStorage.setItem('redagos-theme', isDark.value ? 'dark' : 'light')
-  } catch {
-    // localStorage unavailable (e.g. private browsing) — theme just won't persist
-  }
-}
-
-function initTheme() {
-  let stored = null
-  try {
-    stored = localStorage.getItem('redagos-theme')
-  } catch {
-    // ignore
-  }
-
-  if (stored === 'dark' || stored === 'light') {
-    isDark.value = stored === 'dark'
-  } else if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
-    isDark.value = true
-  } else if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-    isDark.value = true
-  }
-
-  applyTheme(isDark.value)
-}
-
 onMounted(() => {
-  initTheme()
   isLoading.value = true
   fetchInventory()
   syncTimer = setInterval(() => { now.value = Date.now() }, 30000)

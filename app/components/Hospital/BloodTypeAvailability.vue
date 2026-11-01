@@ -19,13 +19,26 @@
       </ul>
     </template>
 
-    <p v-if="!anyMinimumSet" class="types-hint">
+    <p v-if="thresholds && !anyMinimumSet" class="types-hint">
       <AssetIcon name="info" :size="14" />
       <span>No critical level is set yet, so no type is graded.</span>
       <NuxtLink to="/hospital/stock-thresholds" class="link-btn">Set levels</NuxtLink>
     </p>
 
     <div class="type-grid">
+      <template v-if="!thresholds">
+        <div v-for="n in 8" :key="n" class="type-card" aria-hidden="true">
+          <span class="sk sk--line" style="width: 28%" />
+          <span class="type-card__body">
+            <span class="sk sk--ring" />
+            <span class="sk-lines">
+              <span class="sk sk--line" style="width: 92%" />
+              <span class="sk sk--line" style="width: 78%" />
+              <span class="sk sk--line" style="width: 86%" />
+            </span>
+          </span>
+        </div>
+      </template>
       <NuxtLink
         v-for="card in typeCards"
         :key="card.code"
@@ -303,4 +316,5 @@ function formatCount(value) {
 @container bta (max-width: 440px) {
   .type-grid { grid-template-columns: minmax(0, 1fr); }
 }
+.sk-lines { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; }
 </style>

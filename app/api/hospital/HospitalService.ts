@@ -521,6 +521,16 @@ class HospitalService extends BaseService {
   }
 
   /** The hospital's minimum stock per blood type and component, against its own shelf. */
+  /** The dashboard: figures, trends, today's activity and what waits for this person. */
+  dashboard() {
+    return this.request<any>('/hospital/dashboard')
+  }
+
+  /** The sidebar's badge counts, from the same place as the dashboard's. */
+  dashboardSummary() {
+    return this.dashboard()
+  }
+
   stockThresholds() {
     return this.request<StockThresholdStatus>('/hospital/inventory/thresholds')
   }

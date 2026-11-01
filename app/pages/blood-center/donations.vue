@@ -1,10 +1,6 @@
 <template>
   <div class="donations-page">
-    <div v-if="initialLoading" class="donations-inner" aria-busy="true" aria-label="Loading donations">
-      <PageSkeleton title="Donations" toolbar :sections="[['table']]" :columns="8" />
-    </div>
-
-    <div v-else class="donations-inner">
+    <div class="donations-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Donations</h1>
@@ -327,7 +323,6 @@
 
 <script setup>
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
-import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -377,8 +372,7 @@ const canRecordPaper = computed(() => can('donations.record_paper'))
 
 const PER_PAGE = 25
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
 const updatedAt = ref(null)
@@ -427,7 +421,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load donations.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 

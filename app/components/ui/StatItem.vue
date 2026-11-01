@@ -3,14 +3,22 @@
     One figure in a StatStrip: an icon in its tone, the label, the number, a
     short note. With `to`, the whole figure is a link to the page that owns it.
   -->
-  <component :is="to ? NuxtLink : 'div'" :to="to" class="si" :class="[`si--${tone}`, { 'si--alert': alert, 'si--link': to }]">
+  <component
+    :is="to ? NuxtLink : pressable ? 'button' : 'div'"
+    :to="to"
+    :type="pressable && !to ? 'button' : undefined"
+    :aria-pressed="pressable && !to ? pressed : undefined"
+    class="si"
+    :class="[`si--${tone}`, { 'si--alert': alert, 'si--link': to || pressable, 'si--pressable': pressable && !to, 'si--pressed': pressed }]"
+  >
     <span v-if="icon" class="si__icon" :class="`si__icon--${tone}`" aria-hidden="true">
       <AssetIcon :name="icon" :size="16" />
     </span>
     <div class="si__body">
       <dt class="si__label">{{ label }}</dt>
       <dd class="si__value" :class="{ 'si__value--empty': value === null || value === undefined }">
-        <slot>{{ value ?? 'No data' }}</slot>
+        <span v-if="loading" class="sk sk--figure" />
+        <slot v-else>{{ value ?? 'No data' }}</slot>
       </dd>
       <span v-if="hint || $slots.hint" class="si__hint"><slot name="hint">{{ hint }}</slot></span>
     </div>
@@ -33,6 +41,11 @@ withDefaults(defineProps<{
   alert?: boolean
   /** Makes the figure a link to the page that owns the number. */
   to?: string
+  /** The number is on its way: the tile keeps its shape. */
+  loading?: boolean
+  /** The figure is a button, usually a filter on the list below it. */
+  pressable?: boolean
+  pressed?: boolean
 }>(), { value: undefined, hint: undefined, icon: undefined, tone: 'primary', alert: false, to: undefined })
 </script>
 
@@ -60,4 +73,7 @@ withDefaults(defineProps<{
 .si__go { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: var(--rb-text-muted); opacity: 0; transition: opacity .15s ease; }
 .si--link:hover .si__go, .si--link:focus-visible .si__go { opacity: 1; }
 .si__hint { display: inline-flex; align-items: center; gap: 4px; font-size: var(--rb-fs-caption); color: var(--rb-text-secondary); }
+.si--pressable { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.si--pressed { background: rgba(var(--rb-primary-rgb), .07); box-shadow: inset 0 0 0 1.5px rgba(var(--rb-primary-rgb), .55); }
+.si--pressed:hover { background: rgba(var(--rb-primary-rgb), .1); }
 </style>

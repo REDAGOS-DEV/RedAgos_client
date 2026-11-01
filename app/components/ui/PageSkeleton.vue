@@ -6,7 +6,23 @@
     look (.sk) is one rule in bc-ui.css.
   -->
   <div class="psk" role="status" aria-busy="true" aria-label="Loading">
-    <PageHeader v-if="title" :title="title" />
+    <PageHeader v-if="title" :title="title">
+      <template v-if="actions" #actions>
+        <span v-for="n in actions" :key="n" class="sk psk__action" />
+      </template>
+    </PageHeader>
+
+    <NeedsYou v-if="needs" />
+
+    <div v-for="(row, r) in top" :key="`top-${r}`" class="psk__row" :class="`psk__row--${row.length}`">
+      <div v-for="(kind, k) in row" :key="k" class="psk__card psk__card--banner">
+        <span class="sk psk__mark" />
+        <div class="psk__lines">
+          <span class="sk psk__heading" />
+          <span class="sk sk--line" style="width: 44%" />
+        </div>
+      </div>
+    </div>
 
     <div v-if="tiles" class="psk__tiles" :style="{ '--psk-tiles': tiles }">
       <div v-for="n in tiles" :key="n" class="psk__card psk__tile">
@@ -35,6 +51,17 @@
             </template>
           </div>
         </template>
+
+        <!-- A row of figures in one card. -->
+        <div v-else-if="kind === 'strip'" class="psk__strip">
+          <div v-for="n in 4" :key="n" class="psk__mini">
+            <span class="sk sk--icon" />
+            <div class="psk__lines">
+              <span class="sk sk--line" style="width: 62%" />
+              <span class="sk sk--figure" />
+            </div>
+          </div>
+        </div>
 
         <template v-else-if="kind === 'chart'">
           <span class="sk psk__heading" />
@@ -69,6 +96,7 @@
 </template>
 
 <script setup>
+import NeedsYou from '~/components/common/NeedsYou.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import SkeletonChart from '~/components/ui/SkeletonChart.vue'
 import SkeletonList from '~/components/ui/SkeletonList.vue'
@@ -76,9 +104,15 @@ import SkeletonList from '~/components/ui/SkeletonList.vue'
 defineProps({
   // The page's own title. Leave it out where the page already shows its heading.
   title: { type: String, default: '' },
+  // Buttons at the title's right, so the header keeps its height.
+  actions: { type: Number, default: 0 },
+  // The dashboards' "Needs attention", still checking.
+  needs: { type: Boolean, default: false },
+  // Banners above the tiles.
+  top: { type: Array, default: () => [] },
   // How many figure tiles head the page.
   tiles: { type: Number, default: 0 },
-  // Rows of cards, each 'table', 'chart', 'list', 'form' or 'banner'.
+  // Rows of cards, each 'table', 'chart', 'list', 'form', 'strip' or 'banner'.
   sections: { type: Array, default: () => [] },
   // For a 'table': its filter bar, columns and rows.
   toolbar: { type: Boolean, default: false },
@@ -112,9 +146,13 @@ const widthOf = (row, column) => WIDTHS[(row * 3 + column) % WIDTHS.length]
 .psk__tile-note { width: 72%; height: 11px; border-radius: 6px; }
 
 .psk__row { display: grid; gap: 16px; }
-.psk__row--2 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.psk__row--2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 .psk__row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+.psk__action { display: inline-block; width: 104px; height: 38px; border-radius: 10px; }
+.psk__mark { width: 42px; height: 42px; border-radius: 12px; }
+.psk__strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.psk__mini { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 12px; background: var(--rb-surface-alt); }
 .psk__heading { width: 38%; height: 16px; border-radius: 6px; }
 .psk__lines { display: flex; flex: 1; flex-direction: column; gap: 8px; min-width: 0; }
 

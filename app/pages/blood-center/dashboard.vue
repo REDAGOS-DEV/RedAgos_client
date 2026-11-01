@@ -2,7 +2,7 @@
   <div class="dashboard">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="dashboard-inner">
-      <PageSkeleton title="Blood Center Dashboard" :tiles="4" :sections="[['chart', 'list'], ['list', 'list']]" />
+      <PageSkeleton title="Blood Center Dashboard" :actions="1" needs :sections="[['strip'], ['list', 'list'], ['list', 'list']]" />
     </div>
 
     <div v-else class="dashboard-inner">

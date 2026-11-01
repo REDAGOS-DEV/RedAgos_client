@@ -32,9 +32,7 @@
             </thead>
 
             <tbody v-if="statusLoading">
-              <tr v-for="n in 2" :key="'skt-' + n">
-                <td colspan="5"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="5" :rows="2" />
             </tbody>
 
             <tbody v-else-if="!schedules.length">
@@ -189,9 +187,7 @@
             </thead>
 
             <tbody v-if="listLoading && !weeklyRequests.length">
-              <tr v-for="n in 5" :key="'skr-' + n">
-                <td colspan="9"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="9" :rows="5" />
             </tbody>
 
             <tbody v-else-if="!weeklyRequests.length">
@@ -290,6 +286,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The weekly request: the blood bank's scheduled restock from each blood center.

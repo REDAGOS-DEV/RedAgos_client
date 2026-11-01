@@ -1,24 +1,10 @@
 <template>
   <div class="inv-page inv-tones">
-    <!-- Skeleton loading state -->
-    <div v-if="loading" class="inv-inner" aria-busy="true">
-      <div class="skeleton skeleton--header" />
-      <div class="kpi-row">
-        <div v-for="n in 5" :key="n" class="skeleton skeleton--kpi" />
-      </div>
-      <div class="inv-grid">
-        <div class="skeleton skeleton--panel" style="grid-area: list; height: 640px" />
-        <div class="skeleton skeleton--panel" style="grid-area: expiring; height: 300px" />
-        <div class="skeleton skeleton--panel" style="grid-area: activity; height: 320px" />
-      </div>
-    </div>
-
-    <div v-else class="inv-inner">
+    <div class="inv-inner">
       <!-- ============ HEADER ============ -->
       <header class="page-head">
         <div>
           <h1 class="page-title">Blood Bank Inventory</h1>
-          <p class="page-subtitle">Monitor and manage {{ facilityLabel }}'s blood units in real time.</p>
         </div>
         <div class="page-head__meta">
           <span v-if="lastUpdatedLabel" class="live-note">
@@ -65,7 +51,8 @@
           </span>
           <span class="kpi__body">
             <span class="kpi__label">{{ kpi.label }}</span>
-            <span class="kpi__value">{{ kpi.value }}</span>
+            <span v-if="loading" class="sk sk--figure" />
+            <span v-else class="kpi__value">{{ kpi.value }}</span>
             <span class="kpi__sub" :class="{ 'kpi__sub--up': kpi.rising }">
               <AssetIcon v-if="kpi.rising" name="trending-up" :size="13" />
               {{ kpi.sub }}
@@ -89,7 +76,8 @@
             <button type="button" class="link-btn" @click="showExpiringInList">View All</button>
           </header>
 
-          <p v-if="expiringError" class="side-empty">{{ expiringError }}</p>
+          <SkeletonList v-if="loading" :rows="3" />
+          <p v-else-if="expiringError" class="side-empty">{{ expiringError }}</p>
           <p v-else-if="!expiringUnits.length" class="side-empty">
             <AssetIcon name="check-circle" :size="22" />
             Nothing on the shelf expires in the next 7 days.
@@ -190,7 +178,8 @@
           <p v-if="unitsError" class="list-error" role="alert">{{ unitsError }}</p>
 
           <div class="table-wrap" :class="{ 'table-wrap--busy': unitsLoading }" :aria-busy="unitsLoading">
-            <table v-if="unitRows.length" class="unit-table">
+            <SkeletonList v-if="unitsLoading && !unitRows.length" class="inv-skeleton" :rows="6" />
+            <table v-else-if="unitRows.length" class="unit-table">
               <thead>
                 <tr>
                   <th>Bag</th>
@@ -352,7 +341,8 @@
             <button type="button" class="link-btn" @click="openActivityDrawer">View All</button>
           </header>
 
-          <p v-if="activityError" class="side-empty">{{ activityError }}</p>
+          <SkeletonList v-if="loading" :rows="3" />
+          <p v-else-if="activityError" class="side-empty">{{ activityError }}</p>
           <p v-else-if="!activity.length" class="side-empty">
             <AssetIcon name="activity" :size="22" />
             No bag has moved yet.
@@ -768,6 +758,7 @@
  * to show it. Every action is re-checked by the API under lock; a refusal is
  * explained and the list reloaded, since it means the bag moved on.
  */
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 
 import { resolveComponent } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -971,7 +962,7 @@ const kpis = computed(() => {
 const PAGE_SIZE = 8
 const listSection = ref(null)
 const units = ref([])
-const unitsLoading = ref(false)
+const unitsLoading = ref(true)
 const unitsError = ref('')
 const unitsMeta = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
 
@@ -1992,4 +1983,5 @@ onBeforeUnmount(() => {
   .detail-drawer { width: 100%; }
   .detail-drawer__footer .btn-outline { flex: 1 1 100%; }
 }
+.inv-skeleton { padding: 16px 20px; }
 </style>

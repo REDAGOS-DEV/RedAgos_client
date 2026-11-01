@@ -58,7 +58,7 @@
       {{ error }} <button type="button" class="link" @click="load">Try again</button>
     </p>
 
-    <PageSkeleton v-if="loading && !data" :tiles="4" :sections="[['chart', 'list'], ['list', 'list']]" />
+    <PageSkeleton v-if="loading && !data" :tiles="4" :sections="[['chart'], ['list', 'list']]" />
 
     <template v-else-if="data">
       <section class="stack" :aria-label="currentTab.label">

@@ -1,7 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Notifications" subtitle="Stay informed with updates about your blood requests, blood availability, billing, and system announcements." />
+      <PageHeader title="Notifications" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -76,9 +76,7 @@
             </thead>
 
             <tbody v-if="isLoading && !notifications.length">
-              <tr v-for="n in 6" :key="'skr-' + n">
-                <td colspan="5"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="5" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!shown.length">
@@ -155,6 +153,7 @@
 
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
