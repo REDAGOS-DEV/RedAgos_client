@@ -256,7 +256,7 @@ describe('the deferrals page', () => {
     for (const text of ['Search donor / code…', 'All statuses', 'Refresh', 'New Deferral', 'record(s)']) {
       expect(page).toContain(text)
     }
-    for (const text of ['Save Deferral', 'Ignored for permanent and indefinite deferrals.', 'Search donor…', 'Until Date']) {
+    for (const text of ['Save Deferral', 'Search donor…', 'Until Date']) {
       expect(dialog).toContain(text)
     }
     for (const heading of ['ID', 'Donor', 'Type', 'Reason', 'From', 'Until', 'Status', 'Actions']) {

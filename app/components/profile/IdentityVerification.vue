@@ -28,7 +28,7 @@
         </div>
         <div class="status-row">
           <span class="status-row__label">ID number</span>
-          <span class="status-row__value">{{ identity?.valid_id_number || '-' }}</span>
+          <span class="status-row__value">{{ formatIdNumber(identity?.valid_id_type, identity?.valid_id_number) || '-' }}</span>
         </div>
         <div class="status-row">
           <span class="status-row__label">Verified on</span>
@@ -52,14 +52,13 @@
 
           <div class="form-field">
             <label class="form-label" for="identity-number">ID number</label>
-            <input
+            <IdNumberField
               id="identity-number"
               v-model="form.validIdNumber"
-              type="text"
-              class="form-input"
-              placeholder="As printed on the card"
+              :id-type="form.validIdType"
+              class="identity__number"
               :disabled="submitting"
-            >
+            />
           </div>
 
           <div class="form-field form-field--full">
@@ -110,7 +109,6 @@
                   <AssetIcon name="camera" :size="18" />
                 </span>
                 <span class="identity__dropzone-text">Take photo</span>
-                <span class="identity__dropzone-sub">Scan it with your camera</span>
               </button>
 
               <button
@@ -123,7 +121,6 @@
                   <AssetIcon name="upload" :size="18" />
                 </span>
                 <span class="identity__dropzone-text">Attach file</span>
-                <span class="identity__dropzone-sub">Choose a photo you already have</span>
               </button>
             </div>
 
@@ -137,7 +134,6 @@
               <AssetIcon name="triangle-alert" :size="13" />
               <span>Choose your ID type first, so the camera knows whether to ask for the back.</span>
             </p>
-            <p class="identity__hint">JPG, PNG or WEBP, up to 4MB. Make sure the number and your name are readable.</p>
           </div>
         </div>
 
@@ -175,7 +171,9 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import IdCameraCapture from '~/components/profile/IdCameraCapture.vue'
+import IdNumberField from '~/components/common/IdNumberField.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import { formatIdNumber, idNumberProblem } from '~/utils/validId'
 import { useIdentityStatus } from '~/composables/useIdentityStatus'
 
 const props = defineProps({
@@ -191,6 +189,7 @@ const selectedFile = ref(null)
 const localPreview = ref(null)
 const message = ref('')
 const failed = ref(false)
+useNoticeToast(message, { tone: () => (failed.value ? 'error' : 'success') })
 const cameraOpen = ref(false)
 const needsIdType = ref(false)
 
@@ -218,9 +217,11 @@ const statusLead = computed(() => ({
 const submitLabel = computed(() => (status.value === 'unsubmitted' ? 'Submit ID' : 'Replace ID'))
 
 // The photo is required on every submission: the server takes type, number and
-// image together rather than patching one at a time.
+// image together rather than patching one at a time. A number of the wrong
+// shape for its type has the field's tooltip saying why.
 const canSubmit = computed(() =>
   Boolean(form.validIdType && form.validIdNumber.trim() && selectedFile.value)
+  && !idNumberProblem(form.validIdType, form.validIdNumber)
 )
 
 // Prefill from whatever the donor already gave, including a type and number
@@ -472,6 +473,18 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
+.identity .identity__number {
+  --idf-radius: 8px;
+  --idf-font: 13px;
+  --idf-field: var(--surface);
+  --idf-border: var(--border);
+  --idf-text: var(--text-primary);
+  --idf-accent: var(--focus-ring);
+  --idf-focus: 0 0 0 3px var(--primary-soft);
+  --idf-disabled-field: var(--surface-muted);
+  --idf-disabled-text: var(--text-muted);
+}
+
 .identity select.form-input {
   appearance: none;
   -webkit-appearance: none;
@@ -547,7 +560,6 @@ onUnmounted(() => {
   background: var(--primary-soft); color: var(--primary-text);
 }
 .identity__dropzone-text { font-size: 13px; font-weight: 700; color: var(--primary-text); }
-.identity__dropzone-sub { font-size: 11px; color: var(--text-secondary); }
 
 .identity__preview-wrap {
   position: relative;

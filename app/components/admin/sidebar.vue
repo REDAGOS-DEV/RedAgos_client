@@ -2,25 +2,40 @@
   <div>
     <!--
       Mobile overlay. The trigger that opens the drawer lives in the layout
-      header, not floating over the page, so the header needs no permanent
-      left gutter to clear it at desktop widths.
+      header, not floating over the page.
     -->
     <Transition name="scrim">
       <div v-if="mobileOpen" class="lg:hidden fixed inset-0 z-40 bg-slate-900/50" @click="closeMobile" />
     </Transition>
 
+    <!--
+      The other portals' rail (project owner, 2026-11-01). Desktop: 72px of
+      icons under the full-width top bar, opened by the menu button in the bar
+      only, and closed when the pointer leaves it (or a click lands outside, or
+      Escape). The layout moves the content column over with it, so nothing is
+      covered. Below 1024px it is the drawer.
+    -->
     <aside
+      id="admin-sidebar"
+      ref="asideEl"
       aria-label="Super Admin navigation"
-      class="sidebar fixed top-0 left-0 h-screen z-50 flex flex-col overflow-hidden w-[272px] lg:translate-x-0"
+      class="sidebar fixed top-0 left-0 h-screen lg:top-16 lg:h-[calc(100vh-4rem)] z-50 flex flex-col w-[272px] lg:translate-x-0"
       :class="[
         mobileOpen ? 'translate-x-0' : '-translate-x-full',
-        railCollapsed ? 'lg:w-20' : 'lg:w-64'
+        railOpen ? 'lg:w-64 is-hover-open' : 'lg:w-[72px]'
       ]"
-      :style="{ background: SIDEBAR_BG, boxShadow: sidebarShadow }"
-      @mouseenter="handleSidebarEnter"
-      @mouseleave="handleSidebarLeave"
-      @focusin="handleSidebarEnter"
-      @focusout="handleSidebarLeave">
+      :style="{
+        background: SIDEBAR_BG,
+        boxShadow: sidebarShadow,
+        '--sb-hover': SIDEBAR_HOVER_SOFT,
+        '--sb-current-bg': SIDEBAR_CURRENT_BG,
+        '--sb-current-text': SIDEBAR_ACTIVE_TEXT,
+        '--sb-text': SIDEBAR_TEXT,
+        '--sb-border': SIDEBAR_BORDER
+      }"
+      @pointerenter="cancelClose"
+      @mouseleave="closeRailSoon"
+      @focusout="onFocusOut">
 
       <!-- Close button (mobile drawer only) -->
       <button
@@ -31,73 +46,76 @@
         <AssetIcon name="x" :size="18" />
       </button>
 
-      <!--
-        The brand row is height-matched to the topbar (h-14 / sm:h-16) so the
-        sidebar's divider lines up with the header's instead of sitting a few
-        pixels adrift.
-      -->
-      <div
-        class="brand px-5 h-14 sm:h-16 flex items-center gap-3 border-b flex-shrink-0 transition-colors duration-150 cursor-pointer select-none"
-        :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
+      <!-- The drawer's brand row, height-matched to the top bar so the dividers line up. -->
+      <NuxtLink
+        to="/admin/dashboard"
+        class="brand px-4 h-14 sm:h-16 flex lg:hidden items-center gap-3 border-b flex-shrink-0 select-none overflow-hidden"
         :style="{ borderColor: SIDEBAR_BORDER }"
-        role="link"
-        tabindex="0"
-        aria-label="RedAgos — go to the dashboard"
-        @click="goHome"
-        @keydown.enter.prevent="goHome"
-        @keydown.space.prevent="goHome">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden relative"
-          style="background: #1565C0">
-          <img v-if="!navigatingHome" :src="logo" alt="RedAgos" class="logo-image">
-          <span v-else class="logo-spinner" />
+        aria-label="RedAgos, go to the dashboard"
+        @click="closeMobile">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <img :src="logo" alt="" class="logo-image">
         </div>
-
-        <div v-if="showLabels" class="min-w-0 whitespace-nowrap">
-          <h1 class="font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
+        <div class="min-w-0 whitespace-nowrap">
+          <p class="font-extrabold text-base leading-none" :style="{ color: SIDEBAR_HEADING_TEXT }">
             Red<span style="color:#D32F2F">Agos</span>
-          </h1>
-          <p class="text-[11px] mt-0.5 truncate" :style="{ color: SIDEBAR_IDLE_TEXT }">
+          </p>
+          <p class="text-[12px] mt-0.5 truncate max-w-[160px]" :style="{ color: SIDEBAR_IDLE_TEXT }">
             Super Admin
           </p>
         </div>
-      </div>
+      </NuxtLink>
 
       <!--
-        Navigation. The clusters carry no headings, so they are separated by
-        spacing while the labels are readable and by a rule once the rail is
-        collapsed — at 80px the vertical gap alone is too weak to read as a
-        break.
+        The same rows on the rail and in the drawer. Three pages have no use for
+        the other portals' folders, so the groups are rows: Dashboard on top, the
+        work beneath a divider, and the accounts at the bottom, where the others
+        keep Staff.
       -->
-      <nav
-        class="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4"
-        :class="[isDark ? 'nav-dark' : '', railCollapsed && !isMobile ? 'nav-rail' : '']">
-        <template v-for="(group, gIndex) in visibleGroups" :key="gIndex">
-          <div v-if="!showLabels" class="group-rule" :class="gIndex === 0 ? 'is-first' : ''"
-            :style="{ background: SIDEBAR_BORDER }" />
+      <nav class="rail flex-1 overflow-y-auto overflow-x-hidden" aria-label="Super Admin pages">
+        <NuxtLink
+          v-for="item in topItems"
+          :key="item.path"
+          :to="item.path"
+          class="rail-row"
+          :class="{ 'is-current': isActive(item.path) }"
+          :title="railOpen || isMobile ? null : item.label"
+          :aria-current="isActive(item.path) ? 'page' : null"
+          @click="closeMobile">
+          <span class="icon-box"><AssetIcon :name="item.icon" :size="18" /></span>
+          <span class="rail-row__label">{{ item.label }}</span>
+        </NuxtLink>
 
-          <div :class="showLabels && gIndex > 0 ? 'mt-3.5' : ''">
-            <NuxtLink v-for="item in group" :key="item.path" :to="item.path"
-              class="nav-item flex items-center gap-3 px-3 py-2.5 mb-1 rounded-[10px] text-sm transition-colors duration-150"
-              :class="railCollapsed && !isMobile ? 'lg:justify-center lg:px-0' : ''"
-              :title="railCollapsed && !isMobile ? item.label : null"
-              :aria-current="isActive(item.path) ? 'page' : null"
-              :style="navStyle(item.path)"
-              @click="closeMobile"
-              @mouseenter="hoveredPath = item.path"
-              @mouseleave="hoveredPath = null">
-              <span
-                class="flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors duration-150"
-                :style="{ background: isActive(item.path) ? '#1565C0' : 'transparent' }">
-                <AssetIcon :name="item.icon" :size="14"
-                  :style="{ color: isActive(item.path) ? '#ffffff' : 'currentColor' }" />
-              </span>
+        <div v-if="topItems.length && workItems.length" class="rail__divider" aria-hidden="true" />
 
-              <span v-if="showLabels" class="flex-1 min-w-0 truncate whitespace-nowrap">{{ item.label }}</span>
-            </NuxtLink>
-          </div>
-        </template>
+        <NuxtLink
+          v-for="item in workItems"
+          :key="item.path"
+          :to="item.path"
+          class="rail-row"
+          :class="{ 'is-current': isActive(item.path) }"
+          :title="railOpen || isMobile ? null : item.label"
+          :aria-current="isActive(item.path) ? 'page' : null"
+          @click="closeMobile">
+          <span class="icon-box"><AssetIcon :name="item.icon" :size="18" /></span>
+          <span class="rail-row__label">{{ item.label }}</span>
+        </NuxtLink>
+
+        <div v-if="bottomItems.length" class="rail__bottom">
+          <NuxtLink
+            v-for="item in bottomItems"
+            :key="item.path"
+            :to="item.path"
+            class="rail-row"
+            :class="{ 'is-current': isActive(item.path) }"
+            :title="railOpen || isMobile ? null : item.label"
+            :aria-current="isActive(item.path) ? 'page' : null"
+            @click="closeMobile">
+            <span class="icon-box"><AssetIcon :name="item.icon" :size="18" /></span>
+            <span class="rail-row__label">{{ item.label }}</span>
+          </NuxtLink>
+        </div>
       </nav>
-
     </aside>
   </div>
 </template>
@@ -106,15 +124,8 @@
 /*
  * Super Admin rail.
  *
- * Behaviour matches the blood-centre rail: collapsed to 80px on desktop and
- * widened on hover, with the layout *reflowing* the content column beside it
- * rather than letting the widened rail float over the page, and a full drawer
- * below 1024px.
- *
- * `useSidebar('admin')` takes its own namespace. The admin build used to share
- * the donor bucket, so opening the donor drawer and coming back left this rail
- * holding a hover the admin user never made — and now that the layout tracks
- * the rail's width, that stale state would reflow the page with it.
+ * `useSidebar('admin')` takes its own namespace, so another portal's open rail
+ * cannot move this layout's content column.
  *
  * Navigation is filtered by privilege. This is presentation only — every route
  * behind these links is re-checked by `can:` middleware on the server — but
@@ -122,16 +133,16 @@
  * the moment it loads.
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import logo from '~/assets/images/RedAgosLogo.png'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useUser } from '~/composables/useUser'
 import { useSidebar } from '~/composables/useSidebar.js'
 
 const {
+  collapsed,
   hoverExpanded,
   railExpanded,
-  expandOnHover,
   collapseOnHover,
   mobileOpen,
   closeMobile
@@ -140,59 +151,80 @@ const {
 const { user } = useUser()
 
 const route = useRoute()
-const router = useRouter()
 
 // --- Dark mode awareness ---
 const isDark = ref(false)
 let themeObserver = null
 
 // --- Viewport awareness ---
-// Below lg the sidebar is a drawer, so hover must not apply there at all.
+// Below lg the sidebar is a drawer, so the rail's states do not apply there.
 const isMobile = ref(false)
 let mobileMql = null
 
-const hoveredPath = ref(null)
-const navigatingHome = ref(false)
-
-/** The rail's visual state: collapsed unless hovered, or unless it is a drawer. */
-const railCollapsed = computed(() => !railExpanded.value)
-
-/** Whether labels/text should render at all. */
-const showLabels = computed(() => isMobile.value || railExpanded.value)
-
-const updateIsMobile = (event) => {
-  isMobile.value = event ? event.matches : mobileMql.matches
-  // Dropping to drawer widths with a hover still latched would leave the rail
-  // — and the content padding that tracks it — stuck open on the way back up.
-  if (isMobile.value) collapseOnHover()
+const onViewportChange = (e) => {
+  isMobile.value = e.matches
+  // Dropping to drawer widths with the rail open would leave it — and the
+  // content padding that tracks it — stuck open on the way back up.
+  if (isMobile.value) closeRail()
 }
 
 /*
- * Leaving is deferred by a beat. Without it a pointer crossing the rail's own
- * edge — which moves out from under the cursor as the sidebar widens and the
- * content reflows — can fire leave/enter in quick succession and flicker.
+ * Opened by the menu button in the top bar (the layout) only; closed when the
+ * pointer leaves the rail, a click lands outside it, Escape, or the button
+ * again. The state lives in useSidebar, which the layout reads to move its
+ * content column, so the two always agree.
  */
-let leaveTimer = null
+const railOpen = computed(() => !isMobile.value && railExpanded.value)
 
-const handleSidebarEnter = () => {
-  if (isMobile.value) return
-  clearTimeout(leaveTimer)
-  expandOnHover()
+const asideEl = ref(null)
+let railTimer = null
+
+// Back on the rail before the close fires: keep it open.
+function cancelClose() {
+  clearTimeout(railTimer)
 }
 
-const handleSidebarLeave = () => {
+// A beat before closing, so brushing past the edge doesn't flicker it.
+function closeRailSoon() {
   if (isMobile.value) return
-  clearTimeout(leaveTimer)
-  leaveTimer = setTimeout(collapseOnHover, 120)
+  clearTimeout(railTimer)
+  railTimer = setTimeout(closeRail, 160)
 }
+
+function closeRail() {
+  clearTimeout(railTimer)
+  collapseOnHover()
+}
+
+// Keyboard: stay open while focus is anywhere in the rail.
+function onFocusOut(e) {
+  if (isMobile.value) return
+  if (asideEl.value?.contains(e.relatedTarget) || asideEl.value?.matches(':hover')) return
+  closeRailSoon()
+}
+
+function onOutsidePointer(e) {
+  if (!hoverExpanded.value) return
+  // The menu button toggles on its own click; closing here first would reopen it.
+  if (asideEl.value?.contains(e.target) || e.target.closest?.('[data-rail-toggle]')) return
+  closeRail()
+}
+
+// Arriving on a page closes the rail, unless the pointer is still on it.
+watch(() => route.path, () => {
+  if (!asideEl.value?.matches(':hover')) closeRail()
+})
 
 const handleEscape = (e) => {
   if (e.key !== 'Escape') return
   if (mobileOpen.value) closeMobile()
-  else if (hoverExpanded.value) collapseOnHover()
+  else if (hoverExpanded.value) closeRail()
 }
 
 onMounted(() => {
+  // Narrow until the menu button opens it, like the other portals.
+  collapsed.value = true
+
   isDark.value = document.documentElement.classList.contains('dark')
   themeObserver = new MutationObserver(() => {
     isDark.value = document.documentElement.classList.contains('dark')
@@ -201,15 +233,16 @@ onMounted(() => {
 
   mobileMql = window.matchMedia('(max-width: 1023px)')
   isMobile.value = mobileMql.matches
-  mobileMql.addEventListener('change', updateIsMobile)
-
+  mobileMql.addEventListener('change', onViewportChange)
   window.addEventListener('keydown', handleEscape)
+  document.addEventListener('pointerdown', onOutsidePointer)
 })
 
 onUnmounted(() => {
-  clearTimeout(leaveTimer)
+  clearTimeout(railTimer)
+  document.removeEventListener('pointerdown', onOutsidePointer)
   themeObserver?.disconnect()
-  mobileMql?.removeEventListener('change', updateIsMobile)
+  mobileMql?.removeEventListener('change', onViewportChange)
   window.removeEventListener('keydown', handleEscape)
   if (typeof document !== 'undefined') document.body.style.removeProperty('overflow')
 })
@@ -222,46 +255,41 @@ watch(mobileOpen, (open) => {
   else document.body.style.removeProperty('overflow')
 })
 
-// Light/dark theme tokens — the same palette the donor and blood-centre rails
-// use, so the three portals read as one product rather than three.
-const SIDEBAR_BG = computed(() => (isDark.value ? '#0F172A' : '#F7F8FA'))
-const SIDEBAR_BORDER = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
-const SIDEBAR_ACTIVE_BG = computed(() => (isDark.value ? 'rgba(66,165,245,0.16)' : 'rgba(21,101,192,0.08)'))
-const SIDEBAR_HOVER_BG = computed(() => (isDark.value ? 'rgba(148,163,184,0.12)' : 'rgba(21,101,192,0.06)'))
-const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? '#64B5F6' : '#1565C0'))
-const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? '#94A3B8' : '#64748B'))
-const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? '#F1F5F9' : '#1F2937'))
-const sidebarShadow = computed(() =>
-  isDark.value
-    ? `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(0,0,0,0.35)`
-    : `1px 0 0 ${SIDEBAR_BORDER.value}, 4px 0 24px rgba(15,23,42,0.04)`
-)
+// Light/dark theme tokens: the other portals' rail, so they read as one product.
+// Solid, in the chrome colour the top bar shares (main.css, html.portal-bc).
+const SIDEBAR_BG = computed(() => (isDark.value ? 'var(--rb-chrome, #1E293B)' : 'var(--rb-chrome, #FFFFFF)'))
+const SIDEBAR_BORDER = computed(() => (isDark.value ? 'var(--ink-border, #334155)' : '#E5EAF0'))
+const SIDEBAR_ACTIVE_TEXT = computed(() => (isDark.value ? 'var(--rb-primary-text)' : 'var(--rb-primary)'))
+const SIDEBAR_IDLE_TEXT = computed(() => (isDark.value ? 'var(--ink-text-2, #94A3B8)' : '#64748B'))
+const SIDEBAR_TEXT = computed(() => (isDark.value ? 'var(--ink-text-4, #E2E8F0)' : '#334155'))
+const SIDEBAR_HEADING_TEXT = computed(() => (isDark.value ? 'var(--ink-text, #F1F5F9)' : '#1F2937'))
+const SIDEBAR_CURRENT_BG = computed(() => (isDark.value ? 'color-mix(in srgb, var(--rb-primary-text) 14%, transparent)' : 'color-mix(in srgb, var(--rb-primary) 10%, white)'))
+const SIDEBAR_HOVER_SOFT = computed(() => (isDark.value ? 'rgba(148,163,184,0.10)' : '#EEF1F5'))
+const sidebarShadow = computed(() => '1px 0 0 ' + SIDEBAR_BORDER.value)
 
 /*
  * `requires` names the privilege the page's endpoints are guarded by. An item
  * with none is reachable by any admin — the dashboard degrades to whatever the
  * account can actually read rather than being gated wholesale.
  */
-const navGroups = [
-  [
+const NAV = {
+  top: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: 'layout-dashboard' },
   ],
-  [
+  work: [
     { label: 'Organizations', path: '/admin/facilities', icon: 'building-2', requires: 'admin.facility.manage' },
     { label: 'ID Verification', path: '/admin/donor-identities', icon: 'id-card', requires: 'admin.donor_identity.verify' },
   ],
-  [
+  bottom: [
     { label: 'Administrators', path: '/admin/administrators', icon: 'shield-check', requires: 'admin.accounts.manage' },
   ],
-]
+}
 
-const visibleGroups = computed(() => {
-  const held = user.value?.permissions ?? []
-
-  return navGroups
-    .map((group) => group.filter((item) => !item.requires || held.includes(item.requires)))
-    .filter((group) => group.length > 0)
-})
+const held = computed(() => user.value?.permissions ?? [])
+const visible = items => items.filter(item => !item.requires || held.value.includes(item.requires))
+const topItems = computed(() => visible(NAV.top))
+const workItems = computed(() => visible(NAV.work))
+const bottomItems = computed(() => visible(NAV.bottom))
 
 const isActive = (path) => {
   const current = route.path.replace(/\/$/, '')
@@ -273,182 +301,125 @@ const isActive = (path) => {
 
   return current === target || current.startsWith(`${target}/`)
 }
-
-const navStyle = (path) => {
-  const active = isActive(path)
-  const hovered = hoveredPath.value === path
-
-  let background = 'transparent'
-  if (active) background = SIDEBAR_ACTIVE_BG.value
-  else if (hovered) background = SIDEBAR_HOVER_BG.value
-
-  return {
-    background,
-    color: active || hovered ? SIDEBAR_ACTIVE_TEXT.value : SIDEBAR_IDLE_TEXT.value,
-    fontWeight: active ? '700' : '500',
-  }
-}
-
-const goHome = async () => {
-  if (route.path === '/admin/dashboard' || navigatingHome.value) return
-  navigatingHome.value = true
-  closeMobile()
-  try {
-    await router.push('/admin/dashboard')
-  } finally {
-    navigatingHome.value = false
-  }
-}
 </script>
 
 <style scoped>
 /*
- * Width and transform are the only animated properties, and they share the
- * layout's 200ms/ease-out so the rail and the content padding that tracks it
- * move as one. Animating anything that repaints the whole nav during the same
- * window is what makes a hover rail read as flicker.
+ * The other portals' rail styles (components/BloodCenter/sidebar.vue). Width and
+ * transform are the only animated properties, and they share the layout's
+ * 200ms/ease-out so the rail and the content padding that tracks it move as one.
  */
 .sidebar {
   will-change: width, transform;
   transition: width 200ms ease-out, transform 200ms ease-out;
 }
 
+.rail {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 14px;
+}
+/* nav px-12 + row px-12 + the 24px icon box = the 36px icon axis */
+.rail-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border-radius: 999px;
+  color: var(--sb-text);
+  font-size: var(--rb-fs-body);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.rail-row:hover { background: var(--sb-hover); }
+.rail-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.rail-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 150ms ease;
+}
+/* Narrow rail only: the drawer always shows its labels. */
+@media (min-width: 1024px) {
+  .sidebar:not(.is-hover-open) .rail-row__label { opacity: 0; }
+}
+.rail-row.is-current { background: var(--sb-current-bg); color: var(--sb-current-text); font-weight: 700; }
+
+.icon-box {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  margin: -2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition: background-color 150ms ease;
+}
+/* Current page: the icon sits in a solid blue rounded square. */
+.is-current .icon-box {
+  border-radius: 8px;
+  background: var(--rb-primary);
+  color: #FFFFFF;
+  box-shadow: 0 4px 10px -4px rgba(var(--rb-primary-rgb), 0.7);
+}
+
+.rail__divider { flex-shrink: 0; height: 1px; margin: 8px 4px; background: var(--sb-border); }
+.rail__bottom {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--sb-border);
+}
+
+/* The logo stands on its own, with no tile: it carries its own red and blue. */
 .logo-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
 }
 
-.logo-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Divider standing in for the cluster gap while the rail is collapsed. */
-.group-rule {
-  height: 1px;
-  margin: 10px 12px;
-  border-radius: 999px;
-}
-
-.group-rule.is-first {
-  display: none;
-}
-
-
-
-/*
- * The focus ring reads its colour from the token rather than a second
- * :global(.dark) rule. This build's scoped-CSS transform drops the descendant
- * half of `:global(.dark) .x` and emits a bare `.dark { … }`, which puts the
- * declaration on <html> instead. The token flips on its own, so no second rule
- * is needed.
- */
-.brand:focus-visible,
-.nav-item:focus-visible {
+.brand:focus-visible {
   outline: 2px solid var(--rb-primary-text);
   outline-offset: -2px;
 }
 
-/* Sidebar navigation scrollbar */
-nav {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-/*
- * No scrollbar gutter while the rail is collapsed. A 5px track inside an 80px
- * rail takes its 5px off the content box, so the centred icons render 2.5px
- * left of centre while the brand mark above them — which sits outside this
- * scroller — stays on 40px.
- */
-.nav-rail {
-  scrollbar-width: none;
-}
-
-.nav-rail::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-nav::-webkit-scrollbar {
-  width: 5px;
-}
-
-nav::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 999px;
-}
-
-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.nav-dark::-webkit-scrollbar-thumb {
-  background-color: #334155;
-}
-
-.nav-dark {
-  scrollbar-color: #334155 transparent;
-}
+/* No scrollbar gutter: a track would take its width off the content box and
+   nudge every icon off the shared axis. The nav still scrolls. */
+nav { scrollbar-width: none; }
+nav::-webkit-scrollbar { width: 0; height: 0; }
 
 .scrim-enter-active,
-.scrim-leave-active {
-  transition: opacity 200ms ease;
-}
-
+.scrim-leave-active { transition: opacity 200ms ease; }
 .scrim-enter-from,
-.scrim-leave-to {
-  opacity: 0;
-}
-
-.popup-enter-active,
-.popup-leave-active {
-  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.popup-enter-from,
-.popup-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.98);
-}
+.scrim-leave-to { opacity: 0; }
 
 /* Touch devices get a pressed state instead of a hover that never ends. */
 @media (hover: none) {
-  .nav-item {
-    transition: background 0.1s ease, color 0.1s ease;
-  }
-
-  .nav-item:active {
-    background: rgba(21, 101, 192, 0.10) !important;
-    color: #1565C0 !important;
+  .rail-row { transition: background 0.1s ease, color 0.1s ease; }
+  .rail-row:active {
+    background: rgba(var(--rb-primary-rgb), 0.10) !important;
+    color: var(--rb-primary) !important;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rail-row,
+  .rail-row__label,
   .sidebar,
   .scrim-enter-active,
-  .scrim-leave-active,
-  .popup-enter-active,
-  .popup-leave-active {
+  .scrim-leave-active {
     transition: none;
   }
-
-  .logo-spinner {
-    animation: none;
-  }
 }
 
-a, button {
-  touch-action: manipulation;
-}
+a, button { touch-action: manipulation; }
 </style>

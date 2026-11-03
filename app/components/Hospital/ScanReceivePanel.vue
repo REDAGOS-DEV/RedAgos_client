@@ -1,16 +1,10 @@
 <template>
   <section class="receive" aria-labelledby="receive-title">
     <header class="receive__head">
-      <div>
-        <h2 id="receive-title" class="receive__title">
-          <AssetIcon name="scan-line" :size="16" />
-          Receive this delivery
-        </h2>
-        <p class="receive__hint">
-          Scan each bag's barcode as it comes off the truck, or type its number. Only the bags you scan or tick are
-          confirmed — a bag that did not arrive stays awaiting receipt.
-        </p>
-      </div>
+      <h2 id="receive-title" class="receive__title">
+        <AssetIcon name="scan-line" :size="16" />
+        Receive this delivery
+      </h2>
       <span class="receive__count" aria-live="polite">{{ scanned.size }} of {{ bags.length }} scanned</span>
     </header>
 
@@ -185,7 +179,6 @@ defineExpose({ clear })
 }
 .receive__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .receive__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
-.receive__hint { margin: 4px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 68ch; }
 .receive__count {
   font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
   background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); font-variant-numeric: tabular-nums;

@@ -21,6 +21,7 @@ import type {
   UrgencyLevel,
 } from '~/types/bloodRequest'
 import { LINE_STATUS_LABELS, LINE_STATUS_TONES, requestLineLabel } from '~/types/bloodRequest'
+import { idNumberProblem } from '~/utils/validId'
 
 export type Tone = 'info' | 'progress' | 'warning' | 'success' | 'danger' | 'muted'
 
@@ -273,24 +274,26 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
       if (blank(form.patient.surname)) problems.push('Enter the patient surname.')
       if (blank(form.patient.firstName)) problems.push('Enter the patient first name.')
       if (!form.bloodTypeId) problems.push('Select the blood type required.')
+
+      // The whole patient is on the first step now (project owner, 2026-10-31).
+      const age = Number(form.patient.age)
+      if (blank(form.patient.age) || !Number.isInteger(age) || age < 0 || age > 130) problems.push('Enter the patient age.')
+      if (!form.patient.sex) problems.push('Select the patient sex.')
     }
 
     return problems
   }
 
   // details
-  if (!continuing) {
-    const age = Number(form.patient.age)
-
-    if (blank(form.patient.age) || !Number.isInteger(age) || age < 0 || age > 130) problems.push('Enter the patient age.')
-    if (!form.patient.sex) problems.push('Select the patient sex.')
-    if (!form.bloodTypeId) problems.push('Select the blood type required.')
-  }
 
   if (blank(form.representative.name)) problems.push('Enter the name of the watcher presenting the request.')
   if (blank(form.representative.relationship)) problems.push('Enter how the watcher is related to the patient.')
   if (blank(form.representative.contact)) problems.push("Enter the watcher's contact number.")
   if (!blank(form.representative.idType) && blank(form.representative.idNumber)) problems.push('Enter the ID number of the ID presented.')
+  else {
+    const idProblem = idNumberProblem(form.representative.idType, form.representative.idNumber)
+    if (idProblem) problems.push(idProblem)
+  }
 
   const lines = form.lines.filter((line) => line.componentId !== null || line.requirementItemId !== null)
 

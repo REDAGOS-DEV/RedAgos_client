@@ -3,7 +3,7 @@
 
   <header class="navbar" :class="{ scrolled: isScrolled }">
     <div class="nav-inner">
-      <a href="#home" class="nav-logo" @click.prevent="scrollToSection('home')">
+      <a href="home" class="nav-logo" @click.prevent="scrollToSection('home')">
         <img :src="logo" alt="" class="logo-image" width="36" height="36" />
         <span class="logo-text">
           <span class="logo-name">Red<span class="logo-accent">Agos</span></span>
@@ -15,7 +15,7 @@
         <ul class="nav-links">
           <li v-for="item in navItems" :key="item.id">
             <a
-              :href="`#${item.id}`"
+              :href="`${item.id}`"
               :class="{ active: activeSection === item.id }"
               :aria-current="activeSection === item.id ? 'location' : undefined"
               @click.prevent="scrollToSection(item.id)"
@@ -62,7 +62,7 @@
           <ul class="mobile-links">
             <li v-for="item in navItems" :key="item.id">
               <a
-                :href="`#${item.id}`"
+                :href="`${item.id}`"
                 :class="{ active: activeSection === item.id }"
                 :aria-current="activeSection === item.id ? 'location' : undefined"
                 @click.prevent="handleMobileNavClick(item.id)"
@@ -116,7 +116,7 @@ const scrollToSection = (id) => {
   activeSection.value = id
   // A hash, not `/${id}`: there is no /features route, so the old path 404'd
   // on reload or when the link was shared.
-  window.history.replaceState(null, '', id === 'home' ? '/' : `#${id}`)
+  window.history.replaceState(null, '', id === 'home' ? '/' : `${id}`)
 }
 
 const closeMenu = () => {

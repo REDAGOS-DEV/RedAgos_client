@@ -50,5 +50,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
   }
 
-  return navigateTo(home)
+  // On the first load the server has already drawn the refused page, as it knows
+  // no user. Hydrating the home page over it leaves that page's nodes under the
+  // home page for good, so that one redirect is a clean page load.
+  return navigateTo(home, { external: useNuxtApp().isHydrating, replace: true })
 })

@@ -223,7 +223,6 @@
               <span class="type-switch__icon"><AssetIcon name="building-2" :size="18" /></span>
               <span class="type-switch__body">
                 <span class="type-switch__title">Walk-in at a blood center</span>
-                <span class="type-switch__desc">Pick a center and a time slot</span>
               </span>
             </button>
             <button type="button" role="radio" class="type-switch__opt"
@@ -232,7 +231,6 @@
               <span class="type-switch__icon"><AssetIcon name="truck" :size="18" /></span>
               <span class="type-switch__body">
                 <span class="type-switch__title">Mobile blood drive</span>
-                <span class="type-switch__desc">Join a community drive near you</span>
               </span>
             </button>
           </div>
@@ -515,12 +513,9 @@
       <div class="modal-card modal-card--summary" role="dialog" aria-modal="true" aria-labelledby="summary-title"
         v-focus-trap @dialog-escape="closeSummary">
         <div class="summary-head">
-          <div>
-            <h3 id="summary-title" class="modal-title summary-head__title">
-              {{ reschedulingId ? 'Review your new slot' : 'Review your booking' }}
-            </h3>
-            <p class="summary-head__sub">Check the details before you confirm.</p>
-          </div>
+          <h3 id="summary-title" class="modal-title summary-head__title">
+            {{ reschedulingId ? 'Review your new slot' : 'Review your booking' }}
+          </h3>
           <button type="button" class="summary-close" aria-label="Close" :disabled="confirming" @click="closeSummary">
             <AssetIcon name="x" :size="18" />
           </button>
@@ -576,8 +571,6 @@
             </button>
           </template>
         </div>
-
-        <p class="modal-note">You can cancel or reschedule any time before your appointment.</p>
       </div>
     </div>
 
@@ -611,10 +604,6 @@
           <AssetIcon name="check" :size="22" class="confirm-icon__svg" />
         </div>
         <h3 id="confirm-title" class="modal-title modal-title--center">{{ wasRescheduled ? "Appointment Updated!" : "Appointment Confirmed!" }}</h3>
-        <p class="modal-sub">
-          {{ wasRescheduled ? "Your appointment has been updated." : "Your appointment has been booked, and the details are on their way to your email." }}
-          {{ bookedScreening.hint }}
-        </p>
         <div class="summary-list">
           <div class="summary-row"><span>Location</span><span>{{ bookedLocationLabel }}</span></div>
           <div class="summary-row"><span>Date &amp; Time</span><span>{{ bookedDateTimeLabel }}</span></div>
@@ -1322,24 +1311,22 @@ const bookedScreening = computed(() => {
   const booked = bookedAppointment.value
   switch (booked?.screening_status) {
     case 'answered':
-      return { label: 'Done', tone: 'success', hint: 'Bring your QR code when you arrive.', cta: null }
+      return { label: 'Done', tone: 'success', cta: null }
     case 'due':
     case 'missed':
       return {
         label: 'Due now',
         tone: 'warning',
-        hint: 'Answer your health questionnaire now so your visit starts with a scan.',
         cta: 'Answer questionnaire',
       }
     case 'not_due':
       return {
         label: `Opens ${formatDate(booked.screening_window_opens_on)}`,
         tone: 'muted',
-        hint: "You'll answer a short health questionnaire the day before. We'll email you a reminder.",
         cta: null,
       }
     default:
-      return { label: '-', tone: 'muted', hint: '', cta: null }
+      return { label: '-', tone: 'muted', cta: null }
   }
 })
 
@@ -1623,11 +1610,6 @@ function goDashboard() {
   margin: 0;
 }
 
-.summary-head__sub {
-  margin: 2px 0 0;
-  font-size: var(--rb-fs-small);
-  color: var(--text-secondary);
-}
 
 .summary-close {
   display: inline-flex;
@@ -2480,14 +2462,7 @@ function goDashboard() {
 
 .modal-title--center {
   text-align: center;
-}
-
-.modal-sub {
-  font-size: var(--rb-fs-small);
-  color: var(--text-secondary);
-  text-align: center;
-  margin: 0 0 16px;
-  line-height: 1.5;
+  margin-bottom: 16px;
 }
 
 .summary-list {
@@ -2703,13 +2678,6 @@ function goDashboard() {
   opacity: 0.6;
 }
 
-.modal-note {
-  font-size: var(--rb-fs-caption);
-  color: var(--text-secondary);
-  text-align: center;
-  margin: 4px 0 0;
-  line-height: 1.5;
-}
 
 .modal-card--confirm {
   align-items: center;
@@ -2833,7 +2801,6 @@ function goDashboard() {
 
 .type-switch__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .type-switch__title { font-size: var(--rb-fs-body); font-weight: 700; color: var(--text-primary); }
-.type-switch__desc { font-size: var(--rb-fs-caption); color: var(--text-secondary); }
 
 /* Step cards: one open at a time, the rest show what was picked */
 .bstep {

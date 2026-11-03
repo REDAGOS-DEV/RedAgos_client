@@ -156,16 +156,15 @@
 
             <div class="field">
               <label for="plan-phone" class="field-label">Contact number <span class="field-optional">optional</span></label>
-              <input
+              <PhoneField
                 id="plan-phone"
                 v-model="contactPhone"
-                type="tel"
-                class="input"
-                maxlength="30"
+                size="sm"
+                landline
+                autocomplete="off"
                 :disabled="busy"
-                :aria-invalid="Boolean(errors.contact_phone)"
-                placeholder="e.g. (082) 227-2731"
-              >
+                :invalid="Boolean(errors.contact_phone)"
+              />
               <span v-if="errors.contact_phone" class="field-error" role="alert">{{ errors.contact_phone }}</span>
             </div>
 
@@ -218,6 +217,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateTimeField from '~/components/common/DateTimeField.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 
 const props = defineProps({
   /** The review's view of the request: code, hospital, contact (its address), raw, and the per-line availability. */

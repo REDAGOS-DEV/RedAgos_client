@@ -7,12 +7,12 @@
     <div class="qd__grid">
       <label class="qd__field">
         <span class="qd__label">First name</span>
-        <input ref="firstInput" v-model="form.first_name" type="text" class="qd__input" maxlength="100" autocomplete="off">
+        <input ref="firstInput" v-model="form.first_name" v-person-name type="text" class="qd__input" maxlength="100" autocomplete="off">
         <span v-if="fieldError('first_name')" class="qd__error">{{ fieldError('first_name') }}</span>
       </label>
       <label class="qd__field">
         <span class="qd__label">Last name</span>
-        <input v-model="form.last_name" type="text" class="qd__input" maxlength="100" autocomplete="off">
+        <input v-model="form.last_name" v-person-name type="text" class="qd__input" maxlength="100" autocomplete="off">
         <span v-if="fieldError('last_name')" class="qd__error">{{ fieldError('last_name') }}</span>
       </label>
       <label class="qd__field">
@@ -36,7 +36,7 @@
       </label>
       <label class="qd__field">
         <span class="qd__label">Mobile number <span class="qd__optional">optional</span></span>
-        <input v-model="form.phone" type="tel" class="qd__input" maxlength="20" placeholder="09XX XXX XXXX" autocomplete="off">
+        <PhoneField v-model="form.phone" size="sm" autocomplete="off" :invalid="Boolean(fieldError('phone'))" />
         <span v-if="fieldError('phone')" class="qd__error">{{ fieldError('phone') }}</span>
       </label>
       <label class="qd__field">
@@ -64,6 +64,7 @@
 <script setup lang="ts">
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import type { BloodTypeOption } from '~/utils/bloodType'
 import { GENDER_OPTIONS, blankDonorForm, registerPayload } from '~/utils/donorRecords'

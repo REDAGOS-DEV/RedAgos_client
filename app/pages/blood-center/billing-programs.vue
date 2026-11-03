@@ -41,10 +41,6 @@
               <input v-model.number="form.value" type="number" min="0.01" :max="form.kind === 'percentage_discount' ? 100 : 1000000" step="0.01" class="input" required>
             </div>
           </label>
-          <p v-else class="field field--hint">
-            <AssetIcon name="info" :size="14" />
-            A subsidy has no amount: it covers the patient's invoice while it is in effect.
-          </p>
           <div class="field">
             <label for="program-from">Effective from</label>
             <DatePicker id="program-from" v-model="form.effective_from" :max="form.effective_to || undefined" placeholder="Start date" />
@@ -59,10 +55,7 @@
           </label>
           <label class="enabled field--wide">
             <input v-model="form.is_enabled" type="checkbox" class="switch">
-            <span>
-              <strong>Program enabled</strong>
-              <small>{{ form.is_enabled ? 'Applies between its dates.' : 'Kept on file, applied to nothing.' }}</small>
-            </span>
+            <strong>Program enabled</strong>
           </label>
         </div>
 
@@ -111,7 +104,7 @@
 
     <section class="program-list" aria-label="Billing programs">
       <template v-if="loading && !programs.length">
-        <div v-for="n in 3" :key="n" class="skeleton" />
+        <div v-for="n in 3" :key="n" class="sk-card"><span class="sk sk--icon" /><span class="sk sk--line" style="width: 55%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 72%" /></div>
       </template>
       <div v-else-if="!programs.length" class="bp-empty">
         <span class="bp-empty__icon" aria-hidden="true"><AssetIcon name="badge-check" :size="24" /></span>
@@ -176,6 +169,7 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const messageTone = ref('success')
+useNoticeToast(message, { kind: messageTone })
 const editorOpen = ref(false)
 const editingId = ref(null)
 const formError = ref('')
@@ -280,8 +274,6 @@ onMounted(load)
 .field { min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; }
 .field--wide { grid-column: 1 / -1; }
 .field small { font-weight: 500; color: var(--rb-text-secondary); }
-.field--hint { flex-direction: row; align-items: flex-start; gap: 7px; align-self: end; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(var(--rb-success-rgb), .07); font-weight: 500; line-height: 1.45; color: var(--rb-text-secondary); }
-.field--hint :deep(.asset-icon) { flex: none; margin-top: 2px; color: var(--rb-success-text); }
 .input { box-sizing: border-box; width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13px; }
 .input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .amount-input { display: flex; align-items: center; height: 42px; overflow: hidden; border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); }
@@ -291,8 +283,7 @@ onMounted(load)
 
 /* Enabled, as a switch (still the checkbox). */
 .enabled { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); cursor: pointer; }
-.enabled span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
-.enabled small { font-size: 12px; color: var(--rb-text-secondary); }
+.enabled strong { font-size: 13px; }
 .switch { position: relative; flex: none; width: 38px; height: 22px; margin: 0; border-radius: 999px; background: var(--rb-border-strong); appearance: none; cursor: pointer; transition: background-color .15s ease; }
 .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s ease; }
 .switch:checked { background: var(--rb-primary); }

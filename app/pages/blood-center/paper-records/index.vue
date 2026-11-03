@@ -1,14 +1,6 @@
 <template>
   <div class="paper-page">
-    <div v-if="initialLoading" class="paper-inner" aria-busy="true" aria-label="Loading paper records">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
-    </div>
-
-    <div v-else class="paper-inner">
+    <div class="paper-inner">
       <header class="header-row">
         <div>
           <NuxtLink to="/blood-center/donations" class="back-link">
@@ -51,9 +43,7 @@
             </thead>
 
             <tbody v-if="loading && !sheets.length">
-              <tr v-for="n in 4" :key="'sk-' + n">
-                <td colspan="6"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="6" :rows="4" />
             </tbody>
 
             <tbody v-else-if="!sheets.length">
@@ -184,7 +174,6 @@
               <label class="field">
                 <span class="form-label">Started at</span>
                 <input v-model="form.starts_at" type="time" class="form-input">
-                <span class="field-hint">A donor with no screening time on the paper is dated at this time.</span>
               </label>
             </div>
 
@@ -198,13 +187,11 @@
                 <input v-model="form.phlebotomist_name" type="text" class="form-input" maxlength="120" placeholder="As written on the paper">
               </label>
             </div>
-            <p class="field-hint">Each donor starts with these names; change them on any donor the paper says otherwise.</p>
 
             <label class="check">
               <input v-model="form.notify_donors" type="checkbox">
               <span>
                 <strong>Email donors their thank-you or deferral notice</strong>
-                <span class="field-hint">Untick for an old record, so no one is emailed about a donation from long ago.</span>
               </span>
             </label>
 
@@ -264,6 +251,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -297,10 +285,10 @@ const router = useRouter()
 const { can } = useUser()
 const canDelete = computed(() => can('donations.close'))
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const sheets = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
 
@@ -327,7 +315,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load the paper sheets.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 
@@ -806,7 +793,6 @@ onBeforeUnmount(() => {
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .form-label { font-size: 12.5px; font-weight: 600; }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
-.field-hint { display: block; margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--rb-text-secondary); font-weight: 500; }
 .field-error { font-size: 12px; color: var(--rb-accent-text); }
 
 .choice { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 0; border: 0; }

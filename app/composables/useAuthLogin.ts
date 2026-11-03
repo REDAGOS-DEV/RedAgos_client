@@ -13,8 +13,8 @@ import { portalHomeFor } from '~/utils/authRoutes'
  *    401 handler both append it, so on three of four portals being bounced to
  *    sign in silently lost the page you were trying to reach.
  *  - Hospital and admin had no `email_not_verified` branch, so an unverified
- *    user saw a bare error with no way to request a fresh link, while donor and
- *    blood-centre offered one.
+ *    user saw a bare error with no way to verify, while donor and blood-centre
+ *    offered one.
  *  - The hospital page sent `role: 'blood-center'`, which the server normalises
  *    to a role hospital users do not hold — a guaranteed 403. That is exactly
  *    the class of drift a shared flow prevents, and why the portal key below is
@@ -47,7 +47,7 @@ interface PortalConfig {
 const PORTALS: Record<PortalKey, PortalConfig> = {
   'user': {
     role: null,
-    title: 'Sign In · RedAgos',
+    title: 'RedAgos',
     // A reset is by address, whatever the portal: any forgot-password page will do.
     forgotPasswordPath: '/auth/donor/forgot-password',
     resolveHome: async (response) => {
@@ -64,13 +64,13 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
   },
   'donor': {
     role: 'donor',
-    title: 'Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/donor/forgot-password',
     resolveHome: () => '/donor/dashboard',
   },
   'blood-center': {
     role: 'blood-center',
-    title: 'Blood Center Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/blood-center/forgot-password',
     resolveHome: async () => {
       // No status branch here any more. A centre is created active by a Super
@@ -88,13 +88,13 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     // 'hospital' is the server's alias for blood_bank. Sending 'blood-center'
     // here — as this page used to — resolves to a different role and 403s.
     role: 'hospital',
-    title: 'Hospital Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/hospital/forgot-password',
     resolveHome: () => '/hospital/dashboard',
   },
   'admin': {
     role: 'admin',
-    title: 'Administrator Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/admin/forgot-password',
     resolveHome: () => '/admin/facilities',
   },
@@ -135,74 +135,22 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   watch(email, (v) => { typed.email = v.trim().length > 0 })
   watch(password, (v) => { typed.password = v.trim().length > 0 })
 
-  // Sign-in is refused until the address is verified, so offer the resend
-  // rather than leaving the user with nothing to do. Previously donor and
-  // blood-centre only.
+  // Sign-in is refused until the address is verified. The server mails a code
+  // with the refusal when none is waiting, and the screen asks for it, then
+  // signs in again (EmailCodeStep).
   const needsVerification = ref(false)
-  const resending = ref(false)
-  const resendMessage = ref('')
-  const resendFailed = ref(false)
-  // True once a fresh link has gone out, so the alert can switch from
-  // "something is wrong" to "check your inbox".
-  const resendSent = ref(false)
-  // The address sign-in was refused for. Captured at failure time so the
-  // alert names the right inbox even if the field is edited afterwards.
+  // The address the code went to, from the refusal: the sign-in may have been
+  // by username, and the field may be edited afterwards.
   const verificationEmail = ref('')
-  // Seconds before the resend button unlocks again. The endpoint allows
-  // three sends per ten minutes; without this a few clicks hit the 429.
-  const resendCooldown = ref(0)
-  let cooldownTimer: ReturnType<typeof setInterval> | null = null
-
-  function startCooldown(seconds: number) {
-    if (cooldownTimer) clearInterval(cooldownTimer)
-    resendCooldown.value = seconds
-    cooldownTimer = setInterval(() => {
-      resendCooldown.value -= 1
-      if (resendCooldown.value <= 0 && cooldownTimer) {
-        clearInterval(cooldownTimer)
-        cooldownTimer = null
-      }
-    }, 1000)
-  }
-
-  onScopeDispose(() => {
-    if (cooldownTimer) clearInterval(cooldownTimer)
-  })
 
   function goToForgotPassword() {
     return navigateTo(config.value.forgotPasswordPath)
   }
 
-  /** Clears a refusal, e.g. when the screen switches between User and Admin. */
+  /** Clears a refusal, e.g. "Back to sign in" from the code step. */
   function clearError() {
     errorMessage.value = ''
     needsVerification.value = false
-    resendMessage.value = ''
-    resendFailed.value = false
-    resendSent.value = false
-  }
-
-  async function resendVerification() {
-    if (resending.value || resendCooldown.value > 0) return
-
-    resending.value = true
-    resendMessage.value = ''
-    resendFailed.value = false
-
-    try {
-      const response = await authService.resendVerificationEmailFor(verificationEmail.value || email.value)
-      resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
-      resendSent.value = true
-      startCooldown(60)
-    } catch (error: any) {
-      resendFailed.value = true
-      resendMessage.value = error?.status === 429
-        ? 'Too many requests. Please wait a few minutes before trying again.'
-        : (error?.message || 'Could not send the verification email. Please try again.')
-      if (error?.status === 429) startCooldown(120)
-    } finally {
-      resending.value = false
-    }
   }
 
   /**
@@ -225,22 +173,30 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   }
 
   async function login() {
+    // `login`, not `email`: the server matches an email address, a donor
+    // code (from the blood center desk's sign-in) or a username.
+    const portal = config.value
+    await signIn(() => authService.login({
+      login: email.value,
+      password: password.value,
+      ...(portal.role ? { role: portal.role } : {}),
+    } as any))
+  }
+
+  /** Sign in with Google (2026-10-30): the credential Google's button handed over. */
+  async function loginWithGoogle(credential: string) {
+    await signIn(() => authService.loginWithGoogle(credential), { google: true })
+  }
+
+  /** One sign-in, by password or by Google: keep the token, then go home. */
+  async function signIn(request: () => Promise<any>, { google = false } = {}) {
+    const portal = config.value
     loading.value = true
     errorMessage.value = ''
     needsVerification.value = false
-    resendMessage.value = ''
-    resendFailed.value = false
-    resendSent.value = false
 
     try {
-      // `login`, not `email`: the server matches an email address, a donor
-      // code (from the blood center desk's sign-in) or a username.
-      const portal = config.value
-      const response = await authService.login({
-        login: email.value,
-        password: password.value,
-        ...(portal.role ? { role: portal.role } : {}),
-      } as any)
+      const response = await request()
 
       const token = extractToken(response)
       if (token) {
@@ -262,8 +218,8 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
       workspace.settle()
     } catch (error: any) {
       workspace.cancel()
-      needsVerification.value = error?.data?.code === 'email_not_verified'
-      if (needsVerification.value) verificationEmail.value = email.value.trim()
+      needsVerification.value = !google && error?.data?.code === 'email_not_verified'
+      if (needsVerification.value) verificationEmail.value = error?.data?.email || email.value.trim()
 
       errorMessage.value = error instanceof Error
         ? error.message
@@ -281,14 +237,9 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     errorMessage,
     typed,
     needsVerification,
-    resending,
-    resendMessage,
-    resendFailed,
-    resendSent,
-    resendCooldown,
     verificationEmail,
     login,
-    resendVerification,
+    loginWithGoogle,
     goToForgotPassword,
     clearError,
   }

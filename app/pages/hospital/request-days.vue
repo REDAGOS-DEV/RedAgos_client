@@ -1,8 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Request Days">
-        <template #subtitle>The days you send each blood center your weekly request. A weekly request can only be sent on one of them, once a day.</template>
+      <PageHeader title="Request Days" :subtitle="hospitalPageSubtitle('requestDays', can)">
       </PageHeader>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -74,9 +73,7 @@
             </thead>
 
             <tbody v-if="loading">
-              <tr v-for="n in 3" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="3" />
             </tbody>
 
             <tbody v-else-if="!visible.length">
@@ -225,13 +222,11 @@
       </div>
     </div>
 
-    <Transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </Transition>
   </div>
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * The blood bank's request days: which weekdays it sends each blood center its
@@ -249,6 +244,7 @@ import SelectField from '~/components/common/SelectField.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useListPager } from '~/composables/useListPager'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS } from '~/types/receiving'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -289,15 +285,13 @@ const updatedAtLabel = computed(() => (updatedAt.value
   ? updatedAt.value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   : ''))
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
 onMounted(() => {
   loadSchedules()
   loadFacilities()
 })
 
-onUnmounted(() => clearTimeout(toastTimer))
 
 async function loadSchedules() {
   loadError.value = ''
@@ -412,10 +406,8 @@ function firstError(err) {
   return (Array.isArray(first) ? first[0] : first) || err?.message || ''
 }
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4000)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 /** An ISO timestamp as a date: "Oct 28, 2026". */

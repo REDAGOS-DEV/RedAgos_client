@@ -141,10 +141,7 @@
           <section v-for="section in SECTIONS" :key="section.key" class="panel info-card"
             :class="{ 'info-card--editing': editing === section.key }" :aria-labelledby="`sec-${section.key}`">
             <div class="info-card__head">
-              <div>
-                <h2 :id="`sec-${section.key}`" class="panel-title">{{ section.title }}</h2>
-                <p v-if="section.sub" class="panel-sub">{{ section.sub }}</p>
-              </div>
+              <h2 :id="`sec-${section.key}`" class="panel-title">{{ section.title }}</h2>
               <button v-if="editing !== section.key" type="button" class="info-card__edit"
                 :aria-label="`Edit ${section.title}`" @click="startEdit(section.key)">
                 <AssetIcon name="pencil" :size="14" />
@@ -161,6 +158,10 @@
                     :class="user?.email_verified ? 'email-tag--ok' : 'email-tag--warn'">
                     {{ user?.email_verified ? 'Verified' : 'Not verified' }}
                   </span>
+                  <button v-if="f.key === 'email' && shownValue(f) && user?.email && !user.email_verified"
+                    type="button" class="email-verify" @click="openVerify(false)">
+                    Verify
+                  </button>
                 </dd>
               </div>
             </dl>
@@ -169,15 +170,15 @@
               <div v-if="section.key === 'name'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-first">First name</label>
-                  <input id="pf-first" v-model="profileForm.first_name" type="text" class="form-input" autocomplete="given-name">
+                  <input id="pf-first" v-model="profileForm.first_name" v-person-name type="text" class="form-input" autocomplete="given-name">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-middle">Middle name</label>
-                  <input id="pf-middle" v-model="profileForm.middle_name" type="text" class="form-input" autocomplete="additional-name">
+                  <input id="pf-middle" v-model="profileForm.middle_name" v-person-name type="text" class="form-input" autocomplete="additional-name">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-last">Last name</label>
-                  <input id="pf-last" v-model="profileForm.last_name" type="text" class="form-input" autocomplete="family-name">
+                  <input id="pf-last" v-model="profileForm.last_name" v-person-name type="text" class="form-input" autocomplete="family-name">
                 </div>
               </div>
 
@@ -219,11 +220,11 @@
               <div v-else-if="section.key === 'contact'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-mobile">Contact number</label>
-                  <input id="pf-mobile" v-model="profileForm.contact_number" type="text" class="form-input" autocomplete="tel">
+                  <PhoneField id="pf-mobile" v-model="profileForm.contact_number" class="form-phone" />
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-tel">Telephone no.</label>
-                  <input id="pf-tel" v-model="profileForm.telephone_no" type="text" class="form-input">
+                  <PhoneField id="pf-tel" v-model="profileForm.telephone_no" class="form-phone" landline placeholder="82 XXX XXXX" autocomplete="off" />
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-email">Email address</label>
@@ -239,22 +240,23 @@
                 </div>
                 <!--
                   Kung mausab ang email, i-revoke sa server ang verification ug
-                  mo-send og bag-ong link. Kinahanglan makita ni sa donor, kay
-                  mo-undang ang QR ug booking hangtod dili pa siya ma-verify.
+                  mo-send og code sa bag-ong address. Kinahanglan makita ni sa
+                  donor, kay mo-undang ang QR ug booking hangtod dili pa siya
+                  ma-verify.
                 -->
                 <p v-if="profileForm.email !== savedValue('email')" class="form-field--full info-card__note">
-                  Changing your email sends a new confirmation link. Booking and your QR code pause until you confirm it.
+                  Changing your email sends a code to the new address. Booking and your QR code pause until you enter it.
                 </p>
               </div>
 
               <div v-else-if="section.key === 'emergency'" class="form-grid">
                 <div class="form-field">
                   <label class="form-label" for="pf-cp-name">Name</label>
-                  <input id="pf-cp-name" v-model="profileForm.contact_person_name" type="text" class="form-input">
+                  <input id="pf-cp-name" v-model="profileForm.contact_person_name" v-person-name type="text" class="form-input">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-cp-number">Contact number</label>
-                  <input id="pf-cp-number" v-model="profileForm.contact_person_number" type="text" class="form-input">
+                  <PhoneField id="pf-cp-number" v-model="profileForm.contact_person_number" class="form-phone" landline autocomplete="off" />
                 </div>
                 <div class="form-field form-field--full">
                   <label class="form-label" for="pf-cp-address">Address</label>
@@ -336,6 +338,14 @@
         </div>
       </div>
     </div>
+
+    <EmailCodeDialog
+      v-if="verifyOpen && user?.email"
+      :email="user.email"
+      :sent="verifyCodeSent"
+      @close="verifyOpen = false"
+      @verified="onEmailVerified"
+    />
   </div>
 </template>
 
@@ -349,8 +359,10 @@ definePageMeta({
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import IdentityVerification from '~/components/profile/IdentityVerification.vue'
+import EmailCodeDialog from '~/components/donor/EmailCodeDialog.vue'
 import { donorService } from '~/api/donor/DonorService'
 
 
@@ -602,7 +614,6 @@ const SECTIONS = [
   {
     key: 'emergency',
     title: 'Emergency contact',
-    sub: 'A relative the blood center can reach if they need to.',
     fields: [
       { key: 'contact_person_name', label: 'Name', format: titleCase },
       { key: 'contact_person_number', label: 'Contact number' },
@@ -726,8 +737,27 @@ async function saveSection() {
 // The valid ID card sits up top until it is verified.
 const idVerified = computed(() => identity.value?.status === 'verified')
 
+// The code dialog: from "Verify" beside the address, or straight after the
+// address is changed, when the server has just mailed the code itself.
+const verifyOpen = ref(false)
+const verifyCodeSent = ref(false)
+
+function openVerify(codeSent) {
+  verifyCodeSent.value = codeSent
+  verifyOpen.value = true
+}
+
+async function onEmailVerified() {
+  verifyOpen.value = false
+  profileFailed.value = false
+  profileMessage.value = 'Email verified.'
+  await fetchUser()
+}
+
 async function handleProfileSave() {
   savingProfile.value = true
+  const sameAddress = (a) => String(a ?? '').trim().toLowerCase()
+  const emailChanged = sameAddress(profileForm.email) !== sameAddress(savedValue('email'))
   try {
     // Backend contract: PUT /api/donor-profile/me
     // Body: { first_name, last_name, date_of_birth, blood_type, contact_number,
@@ -752,6 +782,10 @@ async function handleProfileSave() {
     // refresh nga dirty pa gihapon ang form ug dili na siya mo-update.
     formSnapshot.value = snapshotForm()
     await fetchUser()
+
+    if (emailChanged && user.value?.email && !user.value.email_verified) {
+      openVerify(true)
+    }
   } catch (err) {
     console.error('Failed to save profile:', err)
     profileFailed.value = true
@@ -1145,6 +1179,21 @@ async function handleProfileSave() {
 .profile-page .email-tag { margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; font-style: normal; }
 .profile-page .email-tag--ok { background: var(--success-bg); color: var(--success-fg); }
 .profile-page .email-tag--warn { background: var(--warning-bg); color: var(--warning-fg); }
+.profile-page .email-verify {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rb-primary-text, var(--rb-primary));
+  font: inherit;
+  font-size: var(--rb-fs-caption);
+  font-weight: 700;
+  font-style: normal;
+  cursor: pointer;
+}
+.profile-page .email-verify:hover { text-decoration: underline; text-underline-offset: 3px; }
+.profile-page .email-verify:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
 .profile-page .profile-status { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--success-bg); color: var(--success-fg); font-size: var(--rb-fs-small); font-weight: 600; }
 .profile-page .profile-status--error { background: var(--danger-bg); color: var(--danger-fg); }
 .profile-page .info-card .profile-status { margin-top: 14px; }
@@ -1232,7 +1281,6 @@ html.dark .profile-page .complete-card__chip:hover { background: rgba(247, 144, 
 .profile-page .id-panel { width: 100%; }
 .profile-page .col-side { display: flex; flex-direction: column; gap: 20px; }
 .profile-page .panel { border-radius: 20px; }
-.profile-page .panel-sub { margin: 2px 0 0; font-size: var(--rb-fs-caption); color: var(--text-muted); }
 .profile-page .panel-header--simple { display: block; }
 
 /* Form sections */
@@ -1253,6 +1301,15 @@ html.dark .profile-page .complete-card__chip:hover { background: rgba(247, 144, 
 
 .profile-page .form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .profile-page .form-input { min-height: 40px; border-radius: 10px; }
+.profile-page .form-phone {
+  --pf-h: 40px;
+  --pf-font: var(--rb-fs-small);
+  --pf-field: var(--surface);
+  --pf-border: var(--border);
+  --pf-text: var(--text-primary);
+  --pf-accent: var(--focus-ring);
+  --pf-focus: 0 0 0 3px var(--primary-soft);
+}
 
 
 /* Link to Settings */

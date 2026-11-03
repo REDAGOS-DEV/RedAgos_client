@@ -11,11 +11,7 @@
     <BloodCenterTestingReports v-else-if="canViewTesting" />
     <div v-else class="reports-page">
         <div v-if="initialLoading" class="page-skeleton" aria-busy="true">
-            <div class="skeleton-block page-skeleton__title" />
-            <div class="stats-row">
-                <div v-for="n in 4" :key="'pk-' + n" class="stat-card stat-card--skeleton skeleton-block" />
-            </div>
-            <div class="skeleton-block page-skeleton__panel" />
+          <PageSkeleton title="Reports &amp; Analytics" :tiles="4" :sections="[['chart', 'list']]" />
         </div>
 
         <div v-else class="reports-inner">
@@ -389,7 +385,6 @@
                         </div>
                     </form>
                     <p v-if="generateError" class="form-error" role="alert">{{ generateError }}</p>
-                    <p v-else-if="!canGenerateReport" class="form-hint">Pick a date range to generate a report.</p>
 
                     <!-- Weekly trend chart -->
                     <div class="chart-header-row">
@@ -497,7 +492,6 @@
                             <div v-for="n in 4" :key="'skp-' + n" class="donor-row skeleton-block" />
                         </div>
                         <div v-else-if="reportPreviewData">
-                            <p class="modal-subtitle">{{ reportPreviewData.summary }}</p>
                             <div class="preview-stats">
                                 <div v-for="stat in reportPreviewData.stats" :key="stat.label" class="preview-stat">
                                     <span class="preview-stat__value">{{ stat.value }}</span>
@@ -516,17 +510,11 @@
             </div>
         </Transition>
 
-        <!-- TOAST -->
-        <Transition name="toast">
-            <div v-if="toastMessage" class="toast">
-                <AssetIcon name="check-circle" :size="16" />
-                {{ toastMessage }}
-            </div>
-        </Transition>
     </div>
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -733,8 +721,7 @@ const loadingRecentReports = ref(false)
 const reportForm = reactive({ type: 'request_trend', dateFrom: '', dateTo: '', bloodType: 'all' })
 const generatingReport = ref(false)
 const generateError = ref('')
-const toastMessage = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
 const canGenerateReport = computed(() => Boolean(reportForm.dateFrom) && Boolean(reportForm.dateTo))
 
@@ -917,10 +904,8 @@ function reportTypeLabel(type) {
     return map[type] || type
 }
 
-function showToast(message) {
-    toastMessage.value = message
-    clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => (toastMessage.value = ''), 3200)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 async function loadFacilities() {
@@ -1290,7 +1275,6 @@ onMounted(async () => {
 .view-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 .form-error { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-accent-text); }
-.form-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .spinner {
     width: 32px;
@@ -2191,7 +2175,6 @@ onMounted(async () => {
     gap: 14px;
 }
 
-.modal-subtitle { font-size: 13px; color: var(--rf-text-secondary); margin: 0; }
 
 .preview-stats {
     display: grid;

@@ -47,11 +47,6 @@
     <form v-if="adding" class="card add" novalidate @submit.prevent="submitAdd">
       <div class="add__head">
         <h2 class="add__title">Add a component</h2>
-        <p class="add__note">
-          <AssetIcon name="info" :size="13" />
-          Every centre and every hospital's request form will list it. Other centres see it as not configured until they
-          set their own shelf life.
-        </p>
       </div>
 
       <div class="add__body">
@@ -331,10 +326,11 @@ useHead({ title: 'Blood Components · RedAgos' })
 const rows = ref([])
 const drafts = reactive({})
 const facilityName = ref('')
-const busy = ref(false)
+const busy = ref(true)
 const savingId = ref(null)
 const banner = ref('')
 const bannerKind = ref('notice')
+useNoticeToast(banner, { kind: bannerKind, keepWhile: () => busy.value })
 
 // ── What is still unset, as a filter (2026-10-28) ──
 const unsetCount = computed(() => rows.value.filter((row) => !row.shelf_life_configured).length)
@@ -629,8 +625,6 @@ onMounted(load)
 .add { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; overflow: visible; }
 .add__head { display: flex; flex-direction: column; gap: 4px; }
 .add__title { margin: 0; font-size: 14px; font-weight: 700; }
-.add__note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--rb-text-secondary); }
-.add__note :deep(svg) { flex-shrink: 0; margin-top: 2px; }
 .add__fields {
   display: grid;
   grid-template-columns: minmax(200px, 2fr) minmax(130px, 1fr) minmax(130px, 1fr) 170px;

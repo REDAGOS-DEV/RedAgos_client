@@ -1,7 +1,7 @@
 <template>
   <div class="list-page">
     <div class="list-inner">
-      <PageHeader title="Staff" subtitle="Your blood bank's accounts and what each person may do." />
+      <PageHeader title="Staff" :subtitle="hospitalPageSubtitle('staff', can)" />
 
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -86,9 +86,7 @@
             </thead>
 
             <tbody v-if="loading">
-              <tr v-for="n in 4" :key="'skr-' + n">
-                <td colspan="5"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="5" :rows="4" />
             </tbody>
 
             <tbody v-else-if="!visible.length">
@@ -185,12 +183,12 @@
           <div class="field-pair">
             <label class="field">
               <span class="field-label">First name</span>
-              <input v-model.trim="form.first_name" class="field-input" required maxlength="150" autocomplete="off">
+              <input v-model.trim="form.first_name" v-person-name class="field-input" required maxlength="150" autocomplete="off">
               <span v-if="errors.first_name" class="field-error">{{ errors.first_name }}</span>
             </label>
             <label class="field">
               <span class="field-label">Last name</span>
-              <input v-model.trim="form.last_name" class="field-input" required maxlength="150" autocomplete="off">
+              <input v-model.trim="form.last_name" v-person-name class="field-input" required maxlength="150" autocomplete="off">
               <span v-if="errors.last_name" class="field-error">{{ errors.last_name }}</span>
             </label>
           </div>
@@ -204,7 +202,7 @@
           <div class="field-pair">
             <label class="field">
               <span class="field-label">Mobile <span class="optional">(optional)</span></span>
-              <input v-model.trim="form.phone" class="field-input" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="off">
+              <PhoneField v-model="form.phone" size="sm" autocomplete="off" :invalid="Boolean(errors.phone)" />
               <span v-if="errors.phone" class="field-error">{{ errors.phone }}</span>
             </label>
             <label class="field">
@@ -217,10 +215,7 @@
             <legend class="field-label">Role</legend>
             <label v-for="role in roles" :key="role.value" class="role-option" :class="{ 'role-option--on': form.hospital_role === role.value }">
               <input v-model="form.hospital_role" type="radio" name="hospital_role" :value="role.value" required>
-              <span>
-                <strong>{{ role.label }}</strong>
-                <span class="role-option__desc">{{ role.description }}</span>
-              </span>
+              <strong>{{ role.label }}</strong>
             </label>
             <span v-if="errors.hospital_role" class="field-error">{{ errors.hospital_role }}</span>
           </fieldset>
@@ -236,7 +231,6 @@
               <input v-model="form.password_confirmation" type="password" class="field-input" required autocomplete="new-password">
             </label>
           </div>
-          <p class="hint">At least 8 characters, with upper- and lower-case letters and a number. They verify their email before signing in.</p>
 
           <p v-if="addError" class="form-error" role="alert">{{ addError }}</p>
         </div>
@@ -275,15 +269,11 @@
             <legend class="field-label">Role</legend>
             <label v-for="role in roles" :key="role.value" class="role-option" :class="{ 'role-option--on': editForm.hospital_role === role.value }">
               <input v-model="editForm.hospital_role" type="radio" name="edit_hospital_role" :value="role.value" required>
-              <span>
-                <strong>{{ role.label }}</strong>
-                <span class="role-option__desc">{{ role.description }}</span>
-              </span>
+              <strong>{{ role.label }}</strong>
             </label>
             <span v-if="editErrors.hospital_role" class="field-error">{{ editErrors.hospital_role }}</span>
           </fieldset>
 
-          <p class="hint">Only the role and title can be changed here. Their name, email and mobile number stay as they signed up.</p>
           <p v-if="editError" class="form-error" role="alert">{{ editError }}</p>
         </div>
 
@@ -309,13 +299,11 @@
       </div>
     </div>
 
-    <transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </transition>
   </div>
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 /**
  * A hospital blood bank's staff, kept by its Head (project owner, 2026-10-11).
@@ -327,8 +315,12 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { useListPager } from '~/composables/useListPager'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+
+const { can } = useUser()
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
 
@@ -390,13 +382,10 @@ async function refresh() {
   }
 }
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4000)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 function firstError(err) {
@@ -523,7 +512,7 @@ async function confirmRemove() {
     showToast(response.message)
     await load()
   } catch (err) {
-    showToast(firstError(err))
+    showToast(firstError(err), 'error')
   } finally {
     busy.value = null
   }
@@ -537,7 +526,7 @@ async function restore(member) {
     showToast(response.message)
     await load()
   } catch (err) {
-    showToast(firstError(err))
+    showToast(firstError(err), 'error')
   } finally {
     busy.value = null
   }
@@ -598,7 +587,6 @@ async function submitAdd() {
 
 onMounted(load)
 
-onUnmounted(() => clearTimeout(toastTimer))
 </script>
 
 <!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->
@@ -646,14 +634,12 @@ onUnmounted(() => clearTimeout(toastTimer))
 }
 .field-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 .field-error, .form-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
-.hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
 
 .role-option { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--rb-border); cursor: pointer; }
 .role-option + .role-option { margin-top: 6px; }
 .role-option--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), .05); }
 .role-option input { margin-top: 3px; }
 .role-option strong { display: block; font-size: 13px; }
-.role-option__desc { display: block; font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .45); }
 .dialog { width: min(560px, 100%); border: 1px solid var(--rb-border); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; border-radius: 18px; background: var(--rb-surface); box-shadow: 0 20px 50px -12px rgba(15, 23, 42, .35); }

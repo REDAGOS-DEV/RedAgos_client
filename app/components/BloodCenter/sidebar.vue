@@ -243,7 +243,6 @@ const {
   collapsed,
   hoverExpanded,
   railExpanded,
-  expandOnHover,
   collapseOnHover,
   mobileOpen,
   closeMobile
@@ -270,9 +269,9 @@ const onViewportChange = (e) => {
 }
 
 /*
- * Opened by the menu button in the top bar (the layout) or by hovering the
- * rail, closed when the pointer leaves the rail, a click lands outside it,
- * Escape, or the button again. The state lives in useSidebar, which the
+ * Opened by the menu button in the top bar (the layout) only; closed when
+ * the pointer leaves the rail, a click lands outside it, Escape, or the
+ * button again. The state lives in useSidebar, which the
  * layout reads to move its content column, so the two always agree.
  */
 const railOpen = computed(() => !isMobile.value && railExpanded.value)
@@ -282,7 +281,6 @@ const showLabels = computed(() => isMobile.value || railOpen.value)
 
 const asideEl = ref(null)
 let railTimer = null
-let openTimer = null
 
 // Back on the rail before the close fires: keep it open.
 function cancelClose() {
@@ -290,29 +288,22 @@ function cancelClose() {
 }
 
 /*
- * Hovering the narrow rail opens it again, as it did before the menu button
- * (project owner, 2026-10-24: it stayed shut until the button was clicked).
- * A beat first, so a pointer crossing it on the way elsewhere does not open
- * it and shift the page. A mouse or pen only: a tap would open it and follow
- * the link in one go.
+ * Hovering no longer opens the rail (project owner, 2026-10-30): only the menu
+ * button in the top bar does. Coming back onto an open rail still keeps it
+ * from closing.
  */
-function onRailEnter(e) {
+function onRailEnter() {
   cancelClose()
-  if (isMobile.value || e.pointerType === 'touch' || railOpen.value) return
-  clearTimeout(openTimer)
-  openTimer = setTimeout(expandOnHover, 120)
 }
 
 // A beat before closing, so brushing past the edge doesn't flicker it.
 function closeRailSoon() {
   if (isMobile.value) return
-  clearTimeout(openTimer)
   clearTimeout(railTimer)
   railTimer = setTimeout(closeRail, 160)
 }
 
 function closeRail() {
-  clearTimeout(openTimer)
   clearTimeout(railTimer)
   collapseOnHover()
 }
@@ -362,7 +353,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearTimeout(railTimer)
-  clearTimeout(openTimer)
   document.removeEventListener('pointerdown', onOutsidePointer)
   themeObserver?.disconnect()
   mobileMql?.removeEventListener('change', onViewportChange)

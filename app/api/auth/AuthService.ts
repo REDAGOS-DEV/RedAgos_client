@@ -20,6 +20,11 @@ class AuthService extends BaseService {
         return await this.request('/login', 'POST', payload);
     }
 
+    /** Sign in with the ID token Google Identity Services gave the browser. */
+    async loginWithGoogle(credential: string): Promise<any> {
+        return await this.request('/login/google', 'POST', { credential });
+    }
+
     async forgotPassword(payload: { email: string }): Promise<any> {
         return await this.request('/forgot-password', 'POST', payload);
     }
@@ -47,12 +52,11 @@ class AuthService extends BaseService {
     }
 
     /**
-     * Ang query string kay gi-forward nga verbatim: gi-validate sa Laravel ang
-     * signature batok sa raw, order-sensitive nga query string. Kung i-rebuild
-     * nato ang params isip object, mausab ang order ug mapakyas ang signature.
+     * The address and the six-digit code mailed to it (2026-11-03; it was a
+     * signed link before). A wrong, expired or used-up code is a 422 on `code`.
      */
-    async verifyEmail(rawQuery: string): Promise<any> {
-        return await this.request(`/email/verify?${rawQuery}`, 'POST');
+    async verifyEmail(email: string, code: string): Promise<any> {
+        return await this.request('/email/verify', 'POST', { email, code });
     }
 
     async resendVerificationEmail(): Promise<any> {

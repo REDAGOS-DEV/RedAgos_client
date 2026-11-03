@@ -16,11 +16,6 @@
           <p v-if="error" class="form-error" role="alert">{{ error }}</p>
 
           <BloodCenterQrScanner ref="scannerRef" :busy="busy" :show-manual="false" @scanned="onScanned" />
-
-          <p class="form-hint">
-            A walk-in, or a donor without their QR, is started from
-            <NuxtLink to="/blood-center/donors" class="text-link">Donor Management</NuxtLink>.
-          </p>
         </div>
 
         <div class="modal-card__footer">
@@ -159,9 +154,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   flex-shrink: 0;
 }
 
-.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
-.text-link { color: var(--rb-primary-text); font-weight: 600; text-decoration: none; }
-.text-link:hover { text-decoration: underline; }
 
 .form-error {
   margin: 0;
@@ -195,8 +187,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-outline:focus-visible,
-.modal-card__close:focus-visible,
-.text-link:focus-visible {
+.modal-card__close:focus-visible {
   outline: none;
   box-shadow: var(--rb-focus-ring);
 }

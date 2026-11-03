@@ -8,51 +8,60 @@
       that both reserves the space and reflows the children inside it, which is
       what keeps the widened sidebar beside the page rather than over it.
     -->
-    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-20'">
-      <!-- Top bar -->
+    <div class="content-shift" :class="railExpanded ? 'lg:pl-64' : 'lg:pl-[72px]'">
+      <!--
+        The other portals' bar (project owner, 2026-11-01). Desktop: it runs the
+        full width above the sidebar, with the menu button and brand at its left
+        edge on the rail's icon axis and the account on the right.
+      -->
       <header
-        class="topbar fixed top-0 left-0 right-0 z-30 h-14 sm:h-16 bg-white dark:bg-slate-900 border-b"
-        :class="railExpanded ? 'lg:left-64' : 'lg:left-20'"
-        :style="{ borderColor: headerBorderColor, boxShadow: headerShadow }">
-
-        <!--
-          The bar spans the full width — it carries the background and the
-          divider — but its contents sit in the same centred 1280px column the
-          admin pages use, with the same 16/32px gutters, so the breadcrumb
-          lines up with the page title directly beneath it.
-        -->
-        <div class="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8">
-          <!-- Left cluster -->
+        class="topbar fixed top-0 left-0 right-0 z-30 lg:z-[60] h-14 sm:h-16 border-b"
+        :style="{ boxShadow: headerShadow }">
+        <div class="flex h-full w-full items-center justify-between gap-2 sm:gap-3 px-4 sm:px-6 lg:px-4">
+          <!-- Left cluster: menu toggle, logo, wordmark and where this page sits -->
           <div class="flex items-center gap-2 min-w-0">
+            <!--
+              On desktop it opens the rail, which closes again when the pointer
+              leaves it; below 1024px it opens the drawer. On the 36px icon axis.
+            -->
             <button
-              class="lg:hidden w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
-              aria-label="Open menu" @click="openMobile">
-              <AssetIcon name="menu" :size="20" class="text-[#64748b] dark:text-slate-300" />
+              type="button"
+              class="rail-toggle"
+              data-rail-toggle
+              :aria-expanded="railExpanded || mobileOpen"
+              aria-controls="admin-sidebar"
+              :aria-label="railExpanded ? 'Close menu' : 'Open menu'"
+              @click="toggleMenu">
+              <AssetIcon name="menu" :size="20" />
             </button>
 
-            <span class="sm:hidden font-bold text-sm text-gray-800 dark:text-slate-100 truncate">
-              {{ pageTitle }}
-            </span>
+            <NuxtLink to="/admin/dashboard" class="bc-logo" aria-label="RedAgos, go to the dashboard">
+              <img :src="logo" alt="" class="bc-logo__img">
+            </NuxtLink>
 
-            <div class="hidden sm:flex flex-col justify-center min-w-0 flex-shrink">
-              <span class="hidden lg:block text-[11px] text-[#94a3b8] dark:text-slate-500 leading-tight truncate">
-                {{ breadcrumb }}
-              </span>
-              <span class="text-xs sm:text-sm font-semibold text-gray-800 dark:text-slate-100 truncate leading-tight">
-                {{ greeting }}
-              </span>
+            <div class="brand-word">
+              <NuxtLink to="/admin/dashboard" class="brand-word__name" tabindex="-1" aria-hidden="true">
+                Red<span class="brand-word__accent">Agos</span>
+              </NuxtLink>
+              <span class="brand-word__tag lg:hidden">Super Admin</span>
+              <nav class="brand-crumb hidden lg:block" aria-label="Breadcrumb" :title="`Super Admin / ${pageTitle}`">
+                <ol>
+                  <li>Super Admin</li>
+                  <li aria-current="page">{{ pageTitle }}</li>
+                </ol>
+              </nav>
             </div>
           </div>
 
           <!-- Right cluster -->
           <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <button
-              class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+              class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F1F5F9] dark:hover:bg-[color:var(--ink-hover,#334155)]"
               :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="toggleTheme">
               <AssetIcon :name="isDark ? 'sun' : 'moon'" :size="18" class="text-[#64748b] dark:text-slate-300" />
             </button>
 
-            <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-slate-700" />
+            <div class="hidden sm:block w-px h-5 mx-0.5 bg-[#EEF1F5] dark:bg-[color:var(--ink-border,#334155)]" />
 
             <!--
               The account menu, in the top bar like the other portals. Opens on
@@ -62,7 +71,7 @@
             <div ref="profileRoot" class="relative" @mouseenter="openMenuOnHover" @mouseleave="closeMenuOnHover">
               <button
                 type="button"
-                class="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+                class="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-full transition-colors hover:bg-[#F1F5F9] dark:hover:bg-[color:var(--ink-hover,#334155)]"
                 :aria-expanded="menuOpen"
                 aria-haspopup="menu"
                 aria-label="Account menu"
@@ -74,7 +83,7 @@
                     {{ initial }}
                   </span>
                   <span v-if="user?.is_super_admin"
-                    class="absolute -top-0.5 -right-0.5 rounded-full p-0.5 flex bg-white dark:bg-slate-900"
+                    class="absolute -top-0.5 -right-0.5 rounded-full p-0.5 flex bg-white dark:bg-[color:var(--ink-chrome,#1E293B)]"
                     title="Unrestricted administrator">
                     <AssetIcon name="badge-check" :size="11" class="text-[#0052FF]" />
                   </span>
@@ -96,7 +105,7 @@
 
               <Transition name="popup">
                 <div v-if="menuOpen" class="admin-acct" role="menu" aria-label="Account">
-                  <div class="flex items-start gap-3 px-4 py-3.5 border-b border-[#E5EAF0] dark:border-slate-700">
+                  <div class="flex items-start gap-3 px-4 py-3.5 border-b border-[#E5EAF0] dark:border-[color:var(--ink-border,#334155)]">
                     <div
                       class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white overflow-hidden flex-shrink-0"
                       style="background:#1565C0">
@@ -148,8 +157,8 @@
 /*
  * Super Admin portal shell.
  *
- * Mirrors the blood-centre layout's chrome — fixed 56/64px top bar, a content
- * column that *reflows* to follow the rail's width, the same page background —
+ * The other portals' chrome: a full-width 56/64px top bar above the rail, a
+ * content column that *reflows* to follow the rail's width, the same palette —
  * minus the pieces the admin console has no use for. There is no notification
  * bell and no global search because neither has an admin endpoint behind it.
  * The account menu sits in the top bar, as in the other portals (2026-10-15);
@@ -163,6 +172,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSidebar from '~/components/admin/sidebar.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import logo from '~/assets/images/RedAgosLogo.png'
 import { useUser } from '~/composables/useUser'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useSidebar } from '~/composables/useSidebar.js'
@@ -170,12 +180,27 @@ import { useSidebar } from '~/composables/useSidebar.js'
 // 'admin' namespace, not the donor default: this layout now reflows on the
 // rail's state, so inheriting a hover the donor drawer latched would move the
 // page.
-const { railExpanded, openMobile } = useSidebar('admin')
+const { railExpanded, mobileOpen, openMobile, expandOnHover, collapseOnHover } = useSidebar('admin')
+
+// One button for both: the rail on desktop, the drawer below 1024px.
+function toggleMenu() {
+  if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (railExpanded.value) collapseOnHover()
+    else expandOnHover()
+  } else {
+    openMobile()
+  }
+}
+
+// The other portals' palette (main.css): the canvas, the chrome and, in dark,
+// Chrome's greys.
+onMounted(() => document.documentElement.classList.add('portal-bc'))
+onUnmounted(() => document.documentElement.classList.remove('portal-bc'))
+
 const { user, logout } = useUser()
 const { isDark, toggleTheme } = useDarkMode()
 const route = useRoute()
 
-const headerBorderColor = computed(() => (isDark.value ? '#334155' : '#E5EAF0'))
 /*
  * Bound rather than written as a `:global(.dark) header` rule: this build's
  * scoped-CSS transform drops the descendant half of `:global(.dark) .x` and
@@ -196,15 +221,6 @@ const PAGE_TITLES = {
 }
 
 const pageTitle = computed(() => PAGE_TITLES[route.path] || 'Admin')
-const breadcrumb = computed(() => `Super Admin / ${pageTitle.value}`)
-
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  const first = user.value?.full_name?.split(' ')[0] || 'Admin'
-
-  return `${part}, ${first}!`
-})
 
 // --- Account menu ---
 const menuOpen = ref(false)
@@ -267,10 +283,67 @@ const handleLogout = async () => {
   transition: padding-left 200ms ease-out;
 }
 
+/* Solid chrome, shared with the sidebar: --rb-chrome (main.css, html.portal-bc). */
 .topbar {
-  transition: left 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
-  will-change: left;
+  border-color: var(--rb-border);
+  background-color: var(--rb-chrome, #FFFFFF);
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
+
+/* ── Brand: menu button, logo, wordmark and breadcrumb, as in the other portals ── */
+.rail-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rb-text-primary, #1E293B);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.rail-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+:global(.dark .rail-toggle:hover) { background: rgba(255, 255, 255, 0.08); }
+.rail-toggle:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.rail-toggle:active { transform: scale(0.95); }
+
+/* The logo stands on its own: no tile to swallow its red and blue. */
+.bc-logo { display: flex; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; }
+.bc-logo__img { width: 100%; height: 100%; object-fit: contain; }
+.bc-logo:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+@media (min-width: 1024px) {
+  .bc-logo { width: 48px; height: 48px; }
+}
+
+.brand-word { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
+.brand-word__name {
+  font-family: var(--rb-font-sans);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--rb-text-primary);
+  text-decoration: none;
+}
+.brand-word__accent { color: #D32F2F; }
+.brand-word__tag {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--rb-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brand-crumb { margin-top: 2px; min-width: 0; }
+.brand-crumb ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.1; }
+.brand-crumb li { flex-shrink: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rb-text-secondary); font-weight: 500; }
+.brand-crumb li + li::before { content: '\203A'; margin: 0 5px; opacity: 0.7; }
+.brand-crumb li[aria-current] { color: var(--rb-text-primary); font-weight: 600; }
 
 main {
   background: var(--rb-page-bg);
@@ -298,7 +371,7 @@ main {
   right: 0;
   height: 10px;
 }
-:global(.dark .admin-acct) { border-color: #334155; background: #1E293B; box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7); }
+:global(.dark .admin-acct) { border-color: var(--ink-border, #334155); background: var(--ink-surface, #1E293B); box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7); }
 .logout-btn:hover:not(:disabled) { background: rgba(211, 47, 47, 0.08); }
 .logout-btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
 
@@ -324,7 +397,8 @@ main {
 
 @media (prefers-reduced-motion: reduce) {
   .content-shift,
-  .topbar {
+  .topbar,
+  .rail-toggle {
     transition: none;
   }
 }

@@ -338,7 +338,8 @@ function when(iso: string | null | undefined): string {
 
 .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 20px 22px; border-bottom: 2px solid var(--rb-primary); }
 .doc-brand { display: flex; gap: 12px; align-items: center; }
-.issuer-logo { flex: none; max-width: 120px; max-height: 52px; object-fit: contain; }
+/* Large enough to read on the printed invoice and receipt (2026-10-31; was 52px tall). */
+.issuer-logo { flex: none; width: 72px; height: 72px; object-fit: contain; }
 .monogram { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--rb-primary); color: #fff; display: grid; place-items: center; font-size: 18px; font-weight: 800; letter-spacing: .5px; }
 .doc-brand h2 { margin: 0; font-size: 17px; font-weight: 800; }
 .doc-brand p { margin: 1px 0; color: var(--rb-text-secondary); font-size: 11.5px; }

@@ -234,6 +234,17 @@ describe('the walk-in form', () => {
     ])
   })
 
+  it("checks the watcher's ID number against its type, spaces and hyphens aside", () => {
+    const form = completed()
+    form.representative.idType = 'philsys'
+    form.representative.idNumber = '1234-5678-9012'
+
+    expect(walkInStepProblems(form, 'details')).toEqual(['PhilSys number: 16 digits, e.g. 1234567890123456.'])
+
+    form.representative.idNumber = '1234 5678 9012 3456'
+    expect(walkInStepProblems(form, 'details')).toEqual([])
+  })
+
   it('leaves the reference on the watcher\'s paperwork optional', () => {
     const form = completed()
     form.presentedReference = ''

@@ -14,7 +14,6 @@
         <span class="kind-icon" :class="`kind--${kind.tone}`" aria-hidden="true"><AssetIcon :name="kind.icon" :size="20" /></span>
         <div class="dialog__heading">
           <h2 id="correction-title" class="dialog__title">Request a correction</h2>
-          <p class="dialog__sub">To the saved {{ label }}</p>
         </div>
         <button type="button" class="icon-btn" aria-label="Close" :disabled="busy" @click="$emit('close')">
           <AssetIcon name="x" :size="16" />
@@ -238,7 +237,6 @@ async function submit() {
 .dialog__head { display: flex; align-items: flex-start; gap: 12px; }
 .dialog__heading { flex: 1; min-width: 0; }
 .dialog__title { margin: 2px 0 0; font-size: 17px; font-weight: 800; }
-.dialog__sub { margin: 2px 0 0; font-size: 13px; color: var(--rb-text-secondary); }
 .icon-btn { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--rb-text-secondary); cursor: pointer; }
 .icon-btn:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
 

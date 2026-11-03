@@ -248,10 +248,7 @@
 
           <label class="check">
             <input v-model="form.not_to_lab" type="checkbox">
-            <span>
-              <strong>This bag will not reach the laboratory</strong>
-              <span class="pdf__optional">Lost or broken on the way back, or an old record. The draw still counts for the donor.</span>
-            </span>
+            <strong>This bag will not reach the laboratory</strong>
           </label>
           <label v-if="form.not_to_lab" class="pdf__field">
             <span class="pdf__flabel">Why</span>
@@ -673,7 +670,6 @@ defineExpose({ reset })
 
 .check { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.45; cursor: pointer; }
 .check input { margin-top: 3px; }
-.check .pdf__optional { display: block; margin-left: 0; }
 
 .more { border: 1px solid var(--rb-border); border-radius: 10px; }
 

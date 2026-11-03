@@ -33,7 +33,12 @@
         </button>
       </div>
 
-      <p v-if="loadingReferrals" class="card__hint">Loading referrals…</p>
+      <ul v-if="loadingReferrals" class="referrals" aria-busy="true">
+        <li v-for="n in 4" :key="n" class="referral referral--skeleton">
+          <span class="sk sk--line" style="width: 42%" />
+          <span class="sk sk--line" style="width: 68%" />
+        </li>
+      </ul>
 
       <div v-else-if="!referrals.length" class="empty">
         <AssetIcon name="life-buoy" :size="28" />
@@ -180,10 +185,6 @@
               your earliest convenience.
             </p>
           </blockquote>
-          <p class="dialog__hint">
-            It names no test, result or infection, as the donor's consent requires. It is sent in your centre's name,
-            and replies go to your centre's email address.
-          </p>
           <p v-if="contact.referral.contact_requested_at" class="dialog__hint">
             Last sent {{ formatDate(contact.referral.contact_requested_at) }}<template v-if="contact.referral.contact_requested_by"> by {{ contact.referral.contact_requested_by }}</template>.
           </p>
@@ -240,10 +241,11 @@ const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 const referrals = ref([])
 const pendingReferrals = ref(0)
-const loadingReferrals = ref(false)
+const loadingReferrals = ref(true)
 const referralFilter = ref('open')
 const editing = ref(null)
 
@@ -712,4 +714,5 @@ onMounted(loadReferrals)
 
 .btn--ghost { border-color: transparent; background: transparent; color: var(--rb-text-secondary); }
 .btn--ghost:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.referral--skeleton { display: flex; flex-direction: column; gap: 10px; }
 </style>

@@ -262,10 +262,6 @@
                 Final labels print once Testing has cleared both sections. Until then the bags stay with Processing.
               </template>
             </p>
-            <p v-if="!isFinal" class="card__hint">
-              Base labels carry the bag number, component and volume, marked "Quarantine, not for issue". A saved
-              breakdown changes only through a correction the component technologist approves on the Processed list.
-            </p>
           </template>
 
           <div v-if="isFinal" class="actions">
@@ -554,10 +550,11 @@ function setStatusFilter(value) {
   statusFilter.value = value
   loadQueue()
 }
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 const rejecting = ref(false)
 const rejectReason = ref('')
 const rejectInput = ref(null)

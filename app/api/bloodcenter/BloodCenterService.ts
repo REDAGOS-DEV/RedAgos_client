@@ -1237,9 +1237,29 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/drives`, 'GET')
   }
 
-  /** Schedule a drive. Ang facility kay gikan sa token, dili sa payload. */
+  /** Schedule a drive. Ang facility kay gikan sa token, dili sa payload. `publish: false` = draft. */
   async createDrive(payload: Record<string, any>): Promise<any> {
     return this.request(`${this.resource}/drives`, 'POST', payload)
+  }
+
+  /** Edit a drive. Ang petsa ug oras kay lock na kung naay naka-book (422 drive_schedule_locked). */
+  async updateDrive(id: number | string, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/drives/${id}`, 'PATCH', payload)
+  }
+
+  /** Show a draft to donors; the centre's donors are told once. */
+  async publishDrive(id: number | string): Promise<any> {
+    return this.request(`${this.resource}/drives/${id}/publish`, 'POST')
+  }
+
+  /** Stop (open = false) or resume new bookings; the bookings already held stand. */
+  async setDriveRegistration(id: number | string, open: boolean): Promise<any> {
+    return this.request(`${this.resource}/drives/${id}/registration/${open ? 'open' : 'close'}`, 'POST')
+  }
+
+  /** Cancel a drive: its waiting bookings are cancelled and those donors told the reason. */
+  async cancelDrive(id: number | string, reason: string): Promise<any> {
+    return this.request(`${this.resource}/drives/${id}/cancel`, 'POST', { reason })
   }
 
   async listNotifications(params: Record<string, any> = {}): Promise<any> {

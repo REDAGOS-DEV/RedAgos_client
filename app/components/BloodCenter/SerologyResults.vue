@@ -80,9 +80,7 @@
           </thead>
 
           <tbody v-if="loading && !rows.length">
-            <tr v-for="n in 6" :key="'sk-' + n">
-              <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-            </tr>
+            <SkeletonRows :columns="columnCount" :rows="6" />
           </tbody>
 
           <tbody v-else-if="!rows.length">
@@ -379,12 +377,6 @@
             </template>
 
             <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
-
-            <p v-if="editable" class="hint">
-              A saved panel is never saved over.
-              <template v-if="isHead">As the Laboratory Supervisor, your correction applies as soon as you send it.</template>
-              <template v-else>Your correction goes to the Laboratory Supervisor, who approves it here. Nothing changes until they do.</template>
-            </p>
           </div>
 
           <div class="modal-card__footer">
@@ -473,6 +465,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -533,9 +526,10 @@ const isHead = computed(() => (user.value?.staff_roles ?? []).includes('lab_supe
 
 const PER_PAGE = 25
 
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
@@ -1365,7 +1359,6 @@ onBeforeUnmount(() => {
 .warn__confirm { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; cursor: pointer; }
 .warn__confirm input { margin-top: 3px; accent-color: var(--rb-accent); }
 
-.hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .tti-results .form-textarea { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
 

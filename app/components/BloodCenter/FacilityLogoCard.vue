@@ -1,10 +1,7 @@
 <template>
   <section v-if="canConfigure" class="logo-card" :aria-labelledby="titleId">
     <div class="logo-card__head">
-      <div>
-        <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
-        <p class="logo-card__hint">PNG or JPG, 2 MB or smaller.</p>
-      </div>
+      <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
     </div>
 
     <div class="logo-card__body">
@@ -45,6 +42,7 @@
 <script setup>
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { logoProblem } from '~/utils/stockReport'
+import { trimImageFile } from '~/utils/trimImage'
 
 /**
  * The Blood Center Admin's upload of their own facility's logos.
@@ -102,6 +100,7 @@ const defaultSealVisible = ref(true)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
+useNoticeToast(notice)
 const fileInput = ref(null)
 
 // What the preview shows: the upload, else (left logo only) the DOH seal.
@@ -140,12 +139,13 @@ async function onFileChosen(event) {
     return
   }
 
-  const form = new FormData()
-  form.append('logo', file)
-
   busy.value = true
 
   try {
+    // The empty margin off, so it prints as large as the logo opposite (2026-10-31).
+    const form = new FormData()
+    form.append('logo', await trimImageFile(file))
+
     const res = await copy.value.upload(form)
 
     previewUrl.value = res?.[copy.value.field] ?? null
@@ -198,13 +198,6 @@ onMounted(() => {
 
 .logo-card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
-.logo-card__hint {
-  margin: 0.25rem 0 0;
-  max-width: 62ch;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
 
 .logo-card__body { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 

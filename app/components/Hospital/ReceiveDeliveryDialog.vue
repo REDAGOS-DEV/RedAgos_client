@@ -53,7 +53,6 @@
       <template v-else>
         <p class="dialog__text">
           {{ unitsLabel(bags.length) }} dispatched by {{ centres.join(', ') || 'the blood center' }}.
-          Receiving {{ bags.length === 1 ? 'it puts it' : 'them puts them' }} in Stock Intake.
         </p>
 
         <div class="table-wrap">
@@ -79,11 +78,6 @@
             </tbody>
           </table>
         </div>
-
-        <!-- Receiving here takes the whole delivery; a bag that did not come is scanned off on the request. -->
-        <p class="dialog__hint">
-          Only some arrived? <NuxtLink :to="partialPath" class="dialog__link">Open the request</NuxtLink> and scan the ones you have.
-        </p>
 
         <div class="dialog__actions">
           <button type="button" class="btn btn--primary" :disabled="busy" @click="receive">
@@ -136,15 +130,6 @@ const done = ref(null)
 
 const bags = computed(() => awaitingBagsFor(requests.value))
 const centres = computed(() => [...new Set(bags.value.map((bag) => bag.centre).filter(Boolean))])
-
-/** Where a short delivery is received bag by bag: the share's own page when one center sent it all. */
-const partialPath = computed(() => {
-  if (props.kind === 'weekly') return `/hospital/receiving/weekly/${props.requestId}`
-
-  const shares = [...new Set(bags.value.map((bag) => bag.request_id))]
-
-  return shares.length === 1 ? `/hospital/bloodrequests/${shares[0]}` : `/hospital/transfusion-requests/${props.requestId}`
-})
 
 onMounted(load)
 
@@ -213,8 +198,6 @@ function unitsLabel(count) {
 .dialog:focus { outline: none; }
 .dialog__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; font-weight: 700; }
 .dialog__text { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--rb-text-secondary); }
-.dialog__hint { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.dialog__link { color: var(--rb-primary-text); font-weight: 600; }
 .dialog__error { margin: 0; font-size: 12.5px; color: var(--rb-accent-text); }
 .dialog__done { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 13.5px; font-weight: 600; line-height: 1.5; color: var(--rb-success-text); }
 .dialog__done :deep(svg) { flex-shrink: 0; margin-top: 2px; }

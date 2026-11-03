@@ -70,10 +70,6 @@
                 :options="codeOptions" />
               <p v-if="fieldError('deferral_code') && form.code !== OTHER_DEFERRAL" class="field-error">{{ fieldError('deferral_code') }}</p>
               <p v-else-if="codes.error" class="field-error">{{ codes.error }}</p>
-              <p v-else class="form-hint">
-                The record shows the code only.
-                <NuxtLink v-if="can('deferrals.configure')" to="/blood-center/deferral-codes" class="btn-link">Manage codes</NuxtLink>
-              </p>
             </div>
           </div>
 
@@ -89,13 +85,11 @@
               <label class="form-label" for="d-from">From Date</label>
               <DatePicker id="d-from" v-model="form.from" :max="todayIso" :disabled="fixedFrom" @update:model-value="onFromChange" />
               <p v-if="fieldError('deferred_on')" class="field-error">{{ fieldError('deferred_on') }}</p>
-              <p v-else-if="fixedFrom" class="form-hint">Today: the day of this visit.</p>
             </div>
             <div class="form-group">
               <label class="form-label" for="d-until">Until Date <span v-if="isTemporary" class="req">*</span></label>
               <DatePicker id="d-until" v-model="form.until" :min="untilMin" :disabled="!isTemporary" />
               <p v-if="fieldError('ends_on') || fieldError('deferred_until')" class="field-error">{{ fieldError('ends_on') || fieldError('deferred_until') }}</p>
-              <p v-else class="form-hint">Ignored for permanent and indefinite deferrals.</p>
             </div>
           </div>
 
@@ -159,7 +153,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submit'])
 
-const { can } = useUser()
 
 const todayIso = isoDaysFromToday(0)
 
@@ -415,7 +408,6 @@ onBeforeUnmount(() => {
 .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; }
 .req { color: var(--rb-accent-text); }
-.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
 .form-error {

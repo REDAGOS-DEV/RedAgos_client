@@ -1,7 +1,7 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <NuxtLink to="/hospital/receiving/weekly" class="back-link">
+      <NuxtLink to="/hospital/receiving/weekly" class="back-link back-link--narrow">
         <AssetIcon name="arrow-left" :size="14" />
         Weekly Request
       </NuxtLink>
@@ -68,7 +68,7 @@
             </p>
             <p v-if="request.supply_plan.contact_name || request.supply_plan.contact_phone" class="handover__contact">
               <AssetIcon name="phone" :size="13" />
-              {{ [request.supply_plan.contact_name, request.supply_plan.contact_phone].filter(Boolean).join(' · ') }}
+              {{ [request.supply_plan.contact_name, formatPhoneNumber(request.supply_plan.contact_phone)].filter(Boolean).join(' · ') }}
             </p>
             <p v-if="request.supply_plan.notes" class="handover__notes">{{ request.supply_plan.notes }}</p>
           </div>
@@ -159,9 +159,6 @@
       </template>
     </div>
 
-    <Transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </Transition>
   </div>
 </template>
 
@@ -181,6 +178,7 @@ import HospitalScanReceivePanel from '~/components/Hospital/ScanReceivePanel.vue
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeSummary, handoverWhen, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKLY_STATUS_TONES } from '~/types/receiving'
+import { formatPhoneNumber } from '~/utils/phone'
 import { awaitingBagsFor, receiptsByRequest } from '~/utils/receiving'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
@@ -195,8 +193,7 @@ const receiving = ref(false)
 const receiveError = ref('')
 const receivePanel = ref(null)
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
 const totals = computed(() => weekly.value?.totals ?? {})
 
@@ -264,7 +261,6 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => clearTimeout(toastTimer))
 
 async function load() {
   loadError.value = ''
@@ -320,10 +316,8 @@ async function receive(ticked) {
   receiving.value = false
 }
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4500)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 function formatDay(value) {

@@ -259,9 +259,6 @@
                 Screened by {{ selected.immunohematology.recorded_by || '—' }} ·
                 {{ formatDate(selected.immunohematology.recorded_at) }}
               </p>
-              <p v-if="selected?.immunohematology && !isFinal" class="card__hint">
-                Saved typings change only with approval: a change you save goes as a correction request.
-              </p>
             </div>
 
             <!-- SEROLOGY: TTI Testing's section. Shown first in the Serology view. -->
@@ -348,9 +345,6 @@
                   <AssetIcon :name="isFinal ? 'eye' : 'pencil'" :size="14" />
                   {{ isFinal ? 'View in Serology Results' : 'View or edit in Serology Results' }}
                 </NuxtLink>
-                <span v-if="!isFinal" class="card__hint">
-                  A saved panel changes only through a correction the Laboratory Supervisor approves there.
-                </span>
               </div>
             </div>
           </div>
@@ -539,6 +533,7 @@ const service = bloodCenterService
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 // --- reference data ---------------------------------------------------------
 
@@ -574,7 +569,7 @@ const viewOptions = computed(() => [
   { value: 'serology', label: 'Serology', count: queue.value.filter(needsSerology).length },
   { value: 'all', label: 'All', count: queue.value.length },
 ])
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const barcodeSearch = ref('')
 const activeBarcode = ref('')
 

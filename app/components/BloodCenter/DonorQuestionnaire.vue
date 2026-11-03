@@ -62,15 +62,6 @@
               >
             </label>
           </div>
-
-          <p class="dhq__intake-hint">
-            <template v-if="canEditIntake">
-              Saved when you record the screening.
-            </template>
-            <template v-else>
-              Open the donation first — these are recorded against this visit.
-            </template>
-          </p>
         </fieldset>
 
         <nav class="dhq__tabs">
@@ -158,7 +149,7 @@
               <div class="dhq__field">
                 <dt class="dhq__field-label">Contact number</dt>
                 <dd class="dhq__field-value" :class="{ 'dhq__field-value--absent': !personal.contact_person_number }">
-                  {{ personal.contact_person_number || 'Not provided' }}
+                  {{ formatPhoneNumber(personal.contact_person_number) || 'Not provided' }}
                 </dd>
               </div>
               <div class="dhq__field dhq__field--wide">
@@ -184,6 +175,7 @@
  * anywhere. Everything here was declared by the donor in the app; the blood
  * centre decides what it means.
  */
+import { formatPhoneNumber } from '~/utils/phone'
 
 const props = defineProps({
   data: { type: Object, default: null },
@@ -245,8 +237,8 @@ const personalFields = computed(() => {
     ['Home address', p.home_address],
     ['Office address', p.office_address],
     ['Preferred mailing address', p.preferred_mailing_address],
-    ['Contact number', p.contact_number],
-    ['Telephone no.', p.telephone_no],
+    ['Contact number', formatPhoneNumber(p.contact_number)],
+    ['Telephone no.', formatPhoneNumber(p.telephone_no)],
     ['E-mail address', p.email],
     ['Occupation', p.occupation],
     ['Nationality', p.nationality],
@@ -458,11 +450,6 @@ onBeforeUnmount(() => {
   border-color: var(--rb-primary);
 }
 
-.dhq__intake-hint {
-  margin: 0.55rem 0 0;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
 
 .dhq__tabs {
   display: flex;

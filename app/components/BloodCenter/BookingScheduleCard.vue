@@ -18,10 +18,7 @@
     <form v-else-if="draft" class="bk__form" @submit.prevent="save">
       <!-- Taking bookings at all -->
       <label class="bk-switch-row">
-        <span>
-          <span class="bk-label">Taking bookings</span>
-          <span class="bk-help">Off closes the centre to new bookings in the Donor Portal. Bookings already made stay.</span>
-        </span>
+        <span class="bk-label">Taking bookings</span>
         <span class="toggle">
           <input v-model="draft.is_accepting_donations" type="checkbox">
           <span class="toggle__track" />
@@ -79,7 +76,6 @@
       <!-- Closed dates -->
       <div class="bk-field">
         <span class="bk-label">Closed dates</span>
-        <span class="bk-help">Holidays and other days the centre takes no bookings, even on an open day.</span>
         <ul v-if="draft.closed_dates.length" class="closed">
           <li v-for="(c, i) in draft.closed_dates" :key="c.date" class="closed__item">
             <span class="closed__date">{{ fmtDate(c.date) }}</span>
@@ -266,7 +262,6 @@ const openDaysLabel = computed(() => {
 
 .bk-field { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .bk-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
-.bk-help { font-size: 12px; color: var(--rb-text-secondary); }
 .bk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 
 .bk .bk-input {
@@ -283,7 +278,6 @@ const openDaysLabel = computed(() => {
 .bk .bk-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
 .bk-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(var(--rb-primary-rgb), 0.04); cursor: pointer; }
-.bk-switch-row > span:first-child { display: flex; flex-direction: column; gap: 2px; }
 .toggle { position: relative; flex-shrink: 0; width: 42px; height: 24px; }
 .toggle input { position: absolute; inset: 0; z-index: 1; margin: 0; opacity: 0; cursor: pointer; }
 .toggle__track { position: absolute; inset: 0; border-radius: 999px; background: var(--rb-border-strong); transition: background 0.15s ease; }

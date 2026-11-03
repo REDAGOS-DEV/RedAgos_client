@@ -1,13 +1,5 @@
 <template>
   <div class="pos">
-    <div class="toast-stack" aria-live="polite">
-      <transition-group name="toast">
-        <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-          <div class="toast-title">{{ t.title }}</div>
-          <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-        </div>
-      </transition-group>
-    </div>
 
     <PageHeader class="pos-head" title="Billing Counter" />
 
@@ -110,7 +102,7 @@
 
         <div class="queue-list" role="listbox" :aria-label="listHeading">
           <template v-if="listLoading">
-            <div v-for="n in 4" :key="n" class="skeleton skeleton--row" />
+            <div v-for="n in 4" :key="n" class="sk-card"><span class="sk sk--line" style="width: 62%" /><span class="sk sk--line" style="width: 84%" /><span class="sk sk--line" style="width: 40%" /></div>
           </template>
           <div v-else-if="!listRows.length" class="queue-empty">
             <span class="queue-empty__icon"><AssetIcon :name="typing ? 'search-x' : 'check-check'" :size="22" /></span>
@@ -310,9 +302,8 @@
               <!-- The subsidy waives the whole bill; it is a decision, not a payment. -->
               <div v-if="subsidyOpen" class="subsidy-form">
                 <p class="subsidy-title">Apply the government subsidy</p>
-                <p class="quiet">
-                  Waives the whole {{ pesos(bill.total_amount) }} and clears the blood for release. No payment is recorded.
-                  <template v-if="Number(bill.collected) > 0">The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.</template>
+                <p v-if="Number(bill.collected) > 0" class="quiet">
+                  The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.
                 </p>
                 <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="Reason (optional), e.g. DOH allocation" aria-label="Reason for the subsidy">
                 <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
@@ -639,15 +630,7 @@ const METHODS = [
 const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 function formatTime(iso) {
   return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'

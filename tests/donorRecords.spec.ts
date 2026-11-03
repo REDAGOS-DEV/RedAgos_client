@@ -16,6 +16,7 @@ import {
   orderBloodGroups,
   registerPayload,
   reminderSkipSummary,
+  unlistedLookup,
 } from '~/utils/donorRecords'
 
 /**
@@ -102,14 +103,14 @@ describe('eligibility badge', () => {
 
 describe('donor form payloads', () => {
   it('registers with only the fields that were filled in', () => {
-    const form = { ...blankDonorForm(), first_name: ' Ana ', last_name: 'Cruz', birth_date: '1990-01-01', valid_id_number: 'N01', blood_type_id: '3' }
+    const form = { ...blankDonorForm(), first_name: ' Ana ', last_name: 'Cruz', birth_date: '1990-01-01', valid_id_type: 'drivers_license', valid_id_number: 'N0112123456', blood_type_id: '3' }
     expect(registerPayload(form)).toEqual({
       first_name: 'Ana',
       last_name: 'Cruz',
       birth_date: '1990-01-01',
-      valid_id_number: 'N01',
+      valid_id_type: 'drivers_license',
+      valid_id_number: 'N0112123456',
       blood_type_id: 3,
-      status: 'active',
     })
   })
 
@@ -121,19 +122,27 @@ describe('donor form payloads', () => {
       email: 'mohit@example.test',
       occupation: 'Engineer',
       address: 'House 42',
-      status: 'active',
       blood_type_id: 2,
-      valid_id_number: 'N01',
+      valid_id_type: 'drivers_license',
+      valid_id_number: 'N0112123456',
     })
-    const form = { ...original, occupation: 'Teacher', address: '', valid_id_number: 'CHANGED' }
+    const form = { ...original, occupation: 'Teacher', address: '', valid_id_type: 'passport', valid_id_number: 'CHANGED' }
 
     expect(original.phone).toBe('09171234567')
+    expect(original.valid_id_type).toBe('drivers_license')
     expect(editPayload(form, original)).toEqual({ occupation: 'Teacher', address: null })
   })
 
   it('sends nothing when nothing changed, so a locked field is never re-sent', () => {
-    const original = donorFormFrom({ first_name: 'Ana', email: 'ana@example.test', status: 'inactive' })
+    const original = donorFormFrom({ first_name: 'Ana', email: 'ana@example.test' })
     expect(editPayload({ ...original }, original)).toEqual({})
+  })
+
+  it('never sends a status: Active / Inactive comes from the last donation', () => {
+    const form = { ...blankDonorForm(), first_name: 'Ana', last_name: 'Cruz' }
+    expect(form).not.toHaveProperty('status')
+    expect(registerPayload(form)).not.toHaveProperty('status')
+    expect(donorFormFrom({ first_name: 'Ana', status: 'inactive' })).not.toHaveProperty('status')
   })
 })
 
@@ -219,6 +228,39 @@ describe('the donors page', () => {
 
   it('sends the server only what an edit changed', () => {
     expect(page).toContain('editPayload(form.data, form.original)')
+  })
+
+  // Only people checked in at a centre are listed (project owner,
+  // 2026-11-01); anyone else is reached through the exact lookup.
+  it('finds someone the list does not show by an exact identifier', () => {
+    expect(page).toContain('const unlisted = rows.length ? null : await findUnlisted()')
+    expect(page).toContain('bloodCenterService.lookupDonor(exact)')
+    expect(page).toMatch(/if \(bloodTypeId\.value \|\| statusFilter\.value \|\| !canViewProfile\.value \|\| !can\('appointments\.verify'\)\) return null/)
+    expect(page).toContain('>Not checked in</span>')
+  })
+
+  it('no longer says a booking puts a donor on the list', () => {
+    expect(page).not.toMatch(/\bbook(ed)?\b[^'"<]*\b(registered|donated)\b/i)
+    expect(page).not.toContain('register, book or donate')
+  })
+})
+
+describe('unlisted lookup', () => {
+  it('reads a donor ID, email or mobile number as the Appointments desk does', () => {
+    expect(unlistedLookup('donor-000032')).toEqual({ type: 'donor_code', value: 'DONOR-000032' })
+    expect(unlistedLookup(' Ana@Example.com ')).toEqual({ type: 'email', value: 'ana@example.com' })
+    expect(unlistedLookup('0917 123 4567')).toEqual({ type: 'phone', value: '+639171234567' })
+  })
+
+  it('reads an ID card number, spaces and dashes and all', () => {
+    expect(unlistedLookup('N01-23-456789')).toEqual({ type: 'valid_id_number', value: 'N01-23-456789' })
+    expect(unlistedLookup('P1234567A')).toEqual({ type: 'valid_id_number', value: 'P1234567A' })
+  })
+
+  it('leaves a name or a fragment to the list', () => {
+    expect(unlistedLookup('Ana Cruz')).toBeNull()
+    expect(unlistedLookup('Cruz 2')).toBeNull()
+    expect(unlistedLookup('0917')).toBeNull()
   })
 })
 

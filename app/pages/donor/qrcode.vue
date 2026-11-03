@@ -71,8 +71,9 @@
               </button>
 
               <button v-else-if="qrState === 'unverified'" type="button" class="btn-primary"
-                :disabled="resending" @click="resendVerification">
-                {{ resending ? 'Sending...' : 'Resend verification email' }}
+                @click="verifyOpen = true">
+                <AssetIcon name="mail" :size="16" />
+                Verify email
               </button>
 
               <NuxtLink v-else-if="qrEmptyCopy.action" :to="qrEmptyCopy.action.to" class="btn-primary">
@@ -82,7 +83,6 @@
                 {{ qrEmptyCopy.alt.label }}
               </NuxtLink>
 
-              <p v-if="resendMessage" class="qr-resend-note">{{ resendMessage }}</p>
             </div>
 
             <p v-if="qrError" class="qr-error">{{ qrError }}</p>
@@ -186,6 +186,13 @@
         </section>
       </div>
     </div>
+
+    <EmailCodeDialog
+      v-if="verifyOpen && emailAddress"
+      :email="emailAddress"
+      @close="verifyOpen = false"
+      @verified="onEmailVerified"
+    />
   </div>
 </template>
 
@@ -197,8 +204,8 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import EmailCodeDialog from '~/components/donor/EmailCodeDialog.vue'
 import { donorService } from '~/api/donor/DonorService'
-import { authService } from '~/api/auth/AuthService'
 import QRCode from 'qrcode'
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -230,27 +237,15 @@ const qrError = ref('')
 // GET /donors/qr-code failed: nothing on the pass can be trusted, so the page
 // says that instead of guessing a state.
 const loadError = ref('')
-const resending = ref(false)
-const resendMessage = ref('')
+// The code dialog (2026-11-03; it was a link before). Once the address is
+// confirmed the page reloads quietly, and the pass can be generated.
+const verifyOpen = ref(false)
+const { user, refreshUser } = useUser()
+const emailAddress = computed(() => user.value?.email ?? '')
 
-async function resendVerification() {
-  resending.value = true
-  resendMessage.value = ''
-
-  try {
-    // POST /api/email/verification-notification (throttle:3,10)
-    // 204 ang balik — walay body. Ang link sa email padulong sa
-    // /auth/verify-email sa frontend, dala ang signed nga query string.
-    await authService.resendVerificationEmail()
-    resendMessage.value = 'Verification email sent. Check your inbox, then reload this page.'
-  } catch (err) {
-    console.error('Failed to resend verification email:', err)
-    resendMessage.value = err?.status === 429
-      ? 'Too many requests. Please wait a few minutes before trying again.'
-      : err?.message || 'Could not send the verification email. Please try again.'
-  } finally {
-    resending.value = false
-  }
+async function onEmailVerified() {
+  verifyOpen.value = false
+  await Promise.all([load({ silent: true }), refreshUser()])
 }
 
 const QR_STORAGE_KEY = 'donor-qr-code'
@@ -974,7 +969,6 @@ onBeforeUnmount(() => {
   color: #C62828;
 }
 
-.qr-resend-note { margin: 12px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: #64748B; }
 
 /* Perforation, with notches cut into the card's sides */
 .pass__tear {

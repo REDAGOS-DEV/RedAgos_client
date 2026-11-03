@@ -1,15 +1,6 @@
 <template>
   <div class="donors-page">
-    <!-- Skeleton loading state, the same as the other pages -->
-    <div v-if="initialLoading" class="donors-inner" aria-busy="true" aria-label="Loading donors">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
-    </div>
-
-    <div v-else class="donors-inner">
+    <div class="donors-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Donor Management</h1>
@@ -96,7 +87,7 @@
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': loadingDonors && donors.length }">
           <table class="donor-table">
-            <caption class="sr-only">Donors who have registered, booked or donated at this centre</caption>
+            <caption class="sr-only">Donors checked in or registered at a RedAgos blood centre</caption>
             <thead>
               <tr>
                 <th scope="col" class="c-id" :aria-sort="sort === 'name' ? 'none' : (sort === 'oldest' ? 'ascending' : 'descending')">
@@ -123,9 +114,7 @@
             </thead>
 
             <tbody v-if="loadingDonors && !donors.length">
-              <tr v-for="n in 6" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!donors.length">
@@ -137,7 +126,7 @@
                     <p class="empty-state__text">
                       {{ hasFilters
                         ? 'Try another name, phone, email or ID, or clear the filters.'
-                        : 'Donors appear here once they register, book or donate at this centre.' }}
+                        : 'Donors appear here once they are checked in at a blood centre.' }}
                     </p>
                     <button v-if="hasFilters" type="button" class="btn-outline" @click="clearFilters">Clear filters</button>
                     <button v-else-if="canManage" type="button" class="btn-primary" @click="openCreate">
@@ -155,7 +144,8 @@
                 <td class="c-donor">
                   <div class="donor-cell">
                     <span class="donor-cell__name">{{ donor.name }}</span>
-                    <span v-if="donor.otherCentre" class="donor-cell__other" title="Not yet booked, registered or donated at your centre">Other centre</span>
+                    <span v-if="donor.notCheckedIn" class="donor-cell__other" title="Not yet checked in at any blood centre">Not checked in</span>
+                    <span v-else-if="donor.otherCentre" class="donor-cell__other" title="Not yet checked in or registered at your centre">Other centre</span>
                     <span v-if="donor.subline" class="donor-cell__sub">{{ donor.subline }}</span>
                     <!-- Takes the Phone column's place when the panel is too narrow for it. -->
                     <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}</span>
@@ -184,10 +174,17 @@
                   </span>
                 </td>
                 <td class="c-status">
-                  <span class="badge" :class="donor.status === 'active' ? 'badge--ok' : 'badge--neutral'">
+                  <!-- From the last donation, never set by staff: 12 months or less is Active. -->
+                  <span
+                    v-if="donor.status"
+                    class="badge"
+                    :class="donor.status === 'active' ? 'badge--ok' : 'badge--neutral'"
+                    :title="donor.status === 'active' ? 'Donated in the last 12 months' : 'No donation in the last 12 months'"
+                  >
                     <span class="badge__dot" aria-hidden="true" />
                     {{ donor.status === 'active' ? 'Active' : 'Inactive' }}
                   </span>
+                  <span v-else class="muted" title="No donation yet">—</span>
                 </td>
                 <td class="c-actions">
                   <div class="row-actions">
@@ -301,7 +298,6 @@
                 <strong>{{ remind.preview.recipients }} donor{{ remind.preview.recipients === 1 ? '' : 's' }}</strong>.
               </p>
               <p v-if="remindSkipped" class="modal-hint">Not included: {{ remindSkipped }}.</p>
-              <p class="modal-hint">It is sent in {{ centerLabel }}'s name, and replies go to your centre's email address.</p>
             </template>
             <p v-if="remind.error" class="form-error" role="alert">{{ remind.error }}</p>
           </div>
@@ -344,19 +340,15 @@
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="d-first">First name <span class="req">*</span></label>
-                  <input id="d-first" v-model="form.data.first_name" type="text" class="form-input" maxlength="150" :disabled="!form.editable.identity" required>
+                  <input id="d-first" v-model="form.data.first_name" v-person-name type="text" class="form-input" maxlength="150" :disabled="!form.editable.identity" required>
                   <p v-if="fieldError('first_name')" class="field-error">{{ fieldError('first_name') }}</p>
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="d-last">Last name <span class="req">*</span></label>
-                  <input id="d-last" v-model="form.data.last_name" type="text" class="form-input" maxlength="150" :disabled="!form.editable.identity" required>
+                  <input id="d-last" v-model="form.data.last_name" v-person-name type="text" class="form-input" maxlength="150" :disabled="!form.editable.identity" required>
                   <p v-if="fieldError('last_name')" class="field-error">{{ fieldError('last_name') }}</p>
                 </div>
               </div>
-              <p v-if="!form.editable.identity" class="form-hint form-hint--lock">
-                <AssetIcon name="lock" :size="12" />
-                Name and date of birth were verified against the donor's ID.
-              </p>
 
               <div class="form-row">
                 <div class="form-group">
@@ -378,26 +370,26 @@
                   <p v-if="fieldError('blood_type_id')" class="field-error">{{ fieldError('blood_type_id') }}</p>
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="d-id">Valid ID number <span v-if="form.mode === 'create'" class="req">*</span></label>
-                  <input
+                  <label class="form-label" for="d-id">Valid ID <span v-if="form.mode === 'create'" class="req">*</span></label>
+                  <IdNumberField
                     id="d-id"
                     v-model="form.data.valid_id_number"
-                    type="text"
-                    class="form-input mono"
-                    maxlength="50"
+                    v-model:id-type="form.data.valid_id_type"
+                    type-picker
+                    class="form-idnum"
                     placeholder="As printed on the ID card"
                     :disabled="form.mode === 'edit'"
                     :required="form.mode === 'create'"
-                  >
-                  <p v-if="fieldError('valid_id_number')" class="field-error">{{ fieldError('valid_id_number') }}</p>
-                  <p v-else-if="form.mode === 'create'" class="form-hint">Each ID registers one donor, so no one is added twice.</p>
+                    :invalid="!!fieldError('valid_id_type') || !!fieldError('valid_id_number')"
+                  />
+                  <p v-if="fieldError('valid_id_type') || fieldError('valid_id_number')" class="field-error">{{ fieldError('valid_id_type') || fieldError('valid_id_number') }}</p>
                 </div>
               </div>
 
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="d-phone">Phone</label>
-                  <input id="d-phone" v-model="form.data.phone" type="tel" class="form-input" placeholder="09XXXXXXXXX" :disabled="!form.editable.contact">
+                  <PhoneField id="d-phone" v-model="form.data.phone" class="form-phone" autocomplete="off" :invalid="Boolean(fieldError('phone'))" :disabled="!form.editable.contact" />
                   <p v-if="fieldError('phone')" class="field-error">{{ fieldError('phone') }}</p>
                 </div>
                 <div class="form-group">
@@ -406,10 +398,6 @@
                   <p v-if="fieldError('email')" class="field-error">{{ fieldError('email') }}</p>
                 </div>
               </div>
-              <p v-if="!form.editable.contact" class="form-hint form-hint--lock">
-                <AssetIcon name="lock" :size="12" />
-                The donor manages their phone, email and photo from their own account.
-              </p>
 
               <div class="form-group">
                 <label class="form-label" for="d-address">Address</label>
@@ -426,16 +414,10 @@
                   <label class="form-label" for="d-last-donation">Last donation date</label>
                   <DatePicker id="d-last-donation" v-model="form.data.last_donation_date" :max="todayIso" />
                   <p v-if="fieldError('last_donation_date')" class="field-error">{{ fieldError('last_donation_date') }}</p>
-                  <p v-else class="form-hint">As the donor recalls it. A donation recorded here always wins.</p>
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="d-status">Status</label>
-                  <SelectField id="d-status" v-model="form.data.status" :options="[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]" />
-                  <p class="form-hint">Inactive donors are not sent eligibility reminders.</p>
-                </div>
                 <div class="form-group">
                   <span class="form-label" id="d-photo-label">Donor photo <span class="form-optional">optional</span></span>
                   <div class="photo-field">
@@ -448,7 +430,6 @@
                       {{ form.photoFile ? 'Change' : 'Choose photo' }}
                       <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" aria-labelledby="d-photo-label" @change="onPhotoPicked">
                     </label>
-                    <span v-else class="form-hint">Set by the donor</span>
                   </div>
                   <p v-if="fieldError('photo')" class="field-error">{{ fieldError('photo') }}</p>
                 </div>
@@ -515,7 +496,7 @@
                       <span v-if="profile.tier" class="tier" :class="`tier--${profile.tier.key}`">
                         {{ profile.tier.label }} Donor ({{ profile.totalDonations }})
                       </span>
-                      <span v-if="profile.status === 'inactive'" class="badge badge--neutral">
+                      <span v-if="profile.status === 'inactive'" class="badge badge--neutral" title="No donation in the last 12 months">
                         <span class="badge__dot" aria-hidden="true" />
                         Inactive
                       </span>
@@ -823,9 +804,13 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
+import IdNumberField from '~/components/common/IdNumberField.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import { idNumberProblem } from '~/utils/validId'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
@@ -847,6 +832,7 @@ import {
   registerPayload,
   reminderSkipSummary,
   startDonationBlock,
+  unlistedLookup,
 } from '~/utils/donorRecords'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
@@ -859,7 +845,7 @@ definePageMeta({
   requires: 'donors.view_contact',
 })
 
-const { can, user } = useUser()
+const { can } = useUser()
 const canViewProfile = computed(() => can('donors.view'))
 const canViewHistory = computed(() => can('donors.view_clinical'))
 const canManage = computed(() => can('donors.manage'))
@@ -902,10 +888,10 @@ function counterLink(donorUuid) {
 
 const PER_PAGE = 25
 
-const initialLoading = ref(true)
 const loadError = ref('')
 // { tone: 'success' | 'error', text }
 const notice = ref(null)
+useNoticeToast(notice)
 
 const todayIso = computed(() => {
   const d = new Date()
@@ -913,7 +899,6 @@ const todayIso = computed(() => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 })
 
-const centerLabel = computed(() => user.value?.facility?.name || 'your centre')
 
 function errorMessage(err, fallback) {
   return Object.values(err?.errors ?? err?.data?.errors ?? {}).flat()[0] || err?.message || fallback
@@ -936,7 +921,7 @@ async function loadReference() {
 /* ---------- list ---------- */
 
 const donors = ref([])
-const loadingDonors = ref(false)
+const loadingDonors = ref(true)
 const search = ref('')
 const bloodTypeId = ref('')
 const statusFilter = ref('')
@@ -962,7 +947,7 @@ const updatedAtLabel = computed(() => updatedAt.value
 
 /** Why a donor cannot be emailed from here, or ''. */
 function emailBlock(donor) {
-  if (donor.otherCentre) return 'Emails go only to donors who have booked, registered or donated at your centre'
+  if (donor.otherCentre) return 'Emails go only to donors checked in or registered at your centre'
   if (!donor.email) return 'No email address on record'
   return ''
 }
@@ -993,33 +978,62 @@ function mapDonor(row) {
     lastDonationDeclared: Boolean(row.last_donation_declared),
     eligibility: eligibilityBadge(row),
     deferral: row.deferral ?? null,
-    status: row.status || 'active',
+    // active | inactive from the last donation (DonorStanding::activity()); null before any.
+    status: row.status ?? null,
     contactOnly: Boolean(row.contact_only),
     otherCentre: row.scope === 'cross_facility',
   }
 }
 
+let loadSeq = 0
+
 async function loadDonors(page = 1) {
+  const seq = ++loadSeq
   loadingDonors.value = true
   loadError.value = ''
   try {
     const res = await bloodCenterService.donors({ ...filterParams(), page, per_page: PER_PAGE })
     const rows = Array.isArray(res) ? res : (res?.data ?? [])
+    const unlisted = rows.length ? null : await findUnlisted()
+    if (seq !== loadSeq) return
 
-    donors.value = rows.map(mapDonor)
-    Object.assign(pager, {
-      page: res?.current_page ?? page,
-      lastPage: res?.last_page ?? 1,
-      total: res?.total ?? rows.length,
-      from: res?.from ?? (rows.length ? 1 : 0),
-      to: res?.to ?? rows.length,
-    })
+    donors.value = unlisted ? [unlisted] : rows.map(mapDonor)
+    Object.assign(pager, unlisted
+      ? { page: 1, lastPage: 1, total: 1, from: 1, to: 1 }
+      : {
+          page: res?.current_page ?? page,
+          lastPage: res?.last_page ?? 1,
+          total: res?.total ?? rows.length,
+          from: res?.from ?? (rows.length ? 1 : 0),
+          to: res?.to ?? rows.length,
+        })
     updatedAt.value = new Date()
   } catch (err) {
+    if (seq !== loadSeq) return
     loadError.value = err?.message || 'Could not load donor records.'
     console.error(err)
   } finally {
-    loadingDonors.value = false
+    if (seq === loadSeq) loadingDonors.value = false
+  }
+}
+
+/**
+ * The list holds only people checked in at a centre (project owner,
+ * 2026-11-01). Someone with just a Donor Portal account or a booking is found
+ * by what they hand over in person, through the exact lookup, so the desk can
+ * start their first visit instead of registering them twice.
+ */
+async function findUnlisted() {
+  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return null
+  const exact = unlistedLookup(search.value)
+  if (!exact) return null
+
+  try {
+    const found = await bloodCenterService.lookupDonor(exact)
+    return found?.uuid ? { ...mapDonor(found), notCheckedIn: true } : null
+  } catch {
+    // Not found: the empty list says so.
+    return null
   }
 }
 
@@ -1351,7 +1365,10 @@ const form = reactive({
 const canSaveForm = computed(() => {
   const d = form.data
   const base = d.first_name.trim() && d.last_name.trim() && d.birth_date
-  return Boolean(form.mode === 'create' ? base && d.valid_id_number.trim() : base)
+  // A new donor's ID is its type and a number of that type's shape; the
+  // field's tooltip says what a wrong one should be.
+  const id = d.valid_id_type && d.valid_id_number.trim() && !idNumberProblem(d.valid_id_type, d.valid_id_number)
+  return Boolean(form.mode === 'create' ? base && id : base)
 })
 
 function fieldError(field) {
@@ -1511,7 +1528,6 @@ function openEmail(donor) {
   const remindBlocked = [
     [kind === 'permanent' || kind === 'indefinite', 'A deferred donor cannot be reminded to donate.'],
     [donor.eligibility?.key === 'in_progress', 'This donor is in a visit at your centre right now.'],
-    [donor.status === 'inactive', 'This donor is inactive. Mark them active to remind them.'],
     [donor.acceptsReminders === false, 'This donor has turned off eligibility reminders.'],
   ].find(([applies]) => applies)?.[1] ?? ''
 
@@ -1561,7 +1577,6 @@ function onKeydown(event) {
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   await Promise.all([loadDonors(), loadReference()])
-  initialLoading.value = false
 })
 
 onBeforeUnmount(() => {
@@ -2211,8 +2226,6 @@ td.c-address {
 .form-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
 .req { color: var(--rb-accent-text); }
-.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
-.form-hint--lock { display: flex; align-items: center; gap: 6px; margin-top: -6px; }
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
 .form-error {
@@ -2242,6 +2255,8 @@ td.c-address {
 .donors-page .form-input:disabled { background-color: var(--rb-surface-alt); color: var(--rb-text-secondary); cursor: not-allowed; }
 .donors-page .form-input::placeholder { color: var(--rb-placeholder); }
 .donors-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.donors-page .form-phone { --pf-h: 38px; --pf-font: 13px; --pf-disabled-text: var(--rb-text-secondary); --pf-disabled-cursor: not-allowed; }
+.donors-page .form-idnum { --idf-h: 38px; --idf-font: 13px; --idf-disabled-text: var(--rb-text-secondary); --idf-disabled-cursor: not-allowed; }
 
 .donors-page .form-select {
   padding-right: 30px;

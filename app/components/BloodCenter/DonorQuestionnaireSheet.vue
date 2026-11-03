@@ -98,7 +98,7 @@
 
       <dl class="sheet__contact">
         <div><dt>Contact person</dt><dd>{{ personal.contact_person_name || '' }}</dd></div>
-        <div><dt>Contact number</dt><dd>{{ personal.contact_person_number || '' }}</dd></div>
+        <div><dt>Contact number</dt><dd>{{ formatPhoneNumber(personal.contact_person_number) }}</dd></div>
         <div class="sheet__contact-wide"><dt>Address</dt><dd>{{ personal.contact_person_address || '' }}</dd></div>
       </dl>
 
@@ -124,6 +124,7 @@
  * with the donor from the desk to the physician, so it reads as the document
  * the donor declared, with the lines staff complete by hand left blank.
  */
+import { formatPhoneNumber } from '~/utils/phone'
 
 const props = defineProps({
   data: { type: Object, required: true },
@@ -146,7 +147,7 @@ const personalRows = computed(() => {
     [{ label: 'Sex', value: text(p.sex) }, { label: 'Civil status', value: text(p.civil_status_label) }],
     [{ label: 'Home address', value: text(p.home_address), wide: true }],
     [{ label: 'Office address', value: text(p.office_address), wide: true }],
-    [{ label: 'Contact number', value: text(p.contact_number) }, { label: 'Telephone no.', value: text(p.telephone_no) }],
+    [{ label: 'Contact number', value: formatPhoneNumber(p.contact_number) }, { label: 'Telephone no.', value: formatPhoneNumber(p.telephone_no) }],
     [{ label: 'E-mail address', value: text(p.email) }, { label: 'Occupation', value: text(p.occupation) }],
     [{ label: 'Nationality', value: text(p.nationality) }, { label: 'Religion', value: text(p.religion) }],
     [{ label: 'Blood type', value: text(p.blood_type) }, { label: 'Type of donor', value: text(p.donor_type_label) }],

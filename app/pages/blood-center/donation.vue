@@ -115,9 +115,6 @@
               Not completed in the Donor Portal. The donor can answer it onsite here, or on the paper form.
             </template>
           </p>
-          <p v-if="canRecordQuestionnaire && !donation" class="visit__muted">
-            Open the donation first. The questionnaire is recorded against this visit.
-          </p>
         </template>
 
         <div class="visit__actions">
@@ -255,12 +252,9 @@
         <div class="dtype__choices" role="radiogroup" aria-label="Type of donation">
           <button v-for="t in DONATION_TYPES" :key="t.value" type="button" role="radio" class="dtype__choice"
             :class="{ 'dtype__choice--on': donationType === t.value }" :aria-checked="donationType === t.value"
-            @click="donationType = t.value">
+            :title="t.hint" @click="donationType = t.value">
             <span class="dtype__radio" aria-hidden="true" />
-            <span class="dtype__text">
-              <strong>{{ t.label }}</strong>
-              <small>{{ t.hint }}</small>
-            </span>
+            <strong class="dtype__label">{{ t.label }}</strong>
           </button>
         </div>
       </fieldset>
@@ -360,9 +354,6 @@
           :blood-types="bloodTypes"
           optional
         />
-        <p class="exam__hint">
-          Preliminary. The Testing department confirms the typing; this does not change the donor's blood type on record.
-        </p>
       </fieldset>
 
       <label class="field">
@@ -390,8 +381,6 @@
       >
         <template #default="{ outcome }">
           <p v-if="findings.length" class="card__hint">Out of range: {{ findingsText }}.</p>
-          <p v-else class="card__hint">Every reading is within range, so the vital-sign codes are not offered.</p>
-          <p class="card__hint">The donor's visit ends here and their appointment closes.</p>
           <p v-if="BLOCKING_OUTCOMES.includes(outcome)" class="card__hint card__hint--warn">
             The donor will not be invited to book again, and the next counter to scan
             them will see this deferral.
@@ -498,7 +487,6 @@
             placeholder="Scan the sticker"
             @keydown.enter.prevent="startedInput?.focus()"
           >
-          <span class="field__optional">From the donor's barcode sticker sheet.</span>
         </label>
 
         <label class="field">
@@ -520,12 +508,11 @@
         <label class="field">
           <span class="field__label">Volume collected</span>
           <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
-          <span class="field__optional">A whole-blood bag is nominally 450 mL.</span>
         </label>
       </div>
 
       <p class="card__hint">
-        Phlebotomist: <strong>{{ phlebotomistName }}</strong> — recorded from your sign-in.
+        Phlebotomist: <strong>{{ phlebotomistName }}</strong>
       </p>
 
       <ul v-if="collectionAttempted && collectionProblems.length" class="problems" role="alert">
@@ -1561,9 +1548,7 @@ function finishVisit() {
   border-radius: 999px;
 }
 .dtype__choice--on .dtype__radio { border-color: var(--rb-primary); box-shadow: inset 0 0 0 3px var(--rb-surface); background: var(--rb-primary); }
-.dtype__text { display: flex; flex-direction: column; gap: 2px; }
-.dtype__text strong { font-size: 14px; color: var(--rb-text-primary); }
-.dtype__text small { font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary); }
+.dtype__label { font-size: 14px; color: var(--rb-text-primary); }
 .pill--kind { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text, var(--rb-primary)); }
 @media (prefers-reduced-motion: reduce) {
   .dtype__choice { transition: none; }
@@ -1650,13 +1635,6 @@ function finishVisit() {
   color: var(--rb-text-secondary);
 }
 
-.exam__hint {
-  margin: 0;
-  max-width: 68ch;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
 
 .card__hint--warn {
   color: var(--rb-accent-text);

@@ -86,12 +86,10 @@ describe('the questionnaire drawer', () => {
     // The margin boxes are saved with the screening, not on their own: a set
     // of answers with no screening behind them would belong to nothing.
     expect(drawer).not.toMatch(/@click="submit|@click="save/)
-    expect(drawer).toContain('Saved when you record the screening')
   })
 
   it('will not take intake answers before there is a visit to record them against', () => {
     expect(drawer).toContain(':disabled="!canEditIntake"')
-    expect(drawer).toContain('Open the donation first')
   })
 
   it('prints a field the donor never supplied as absent rather than empty', () => {

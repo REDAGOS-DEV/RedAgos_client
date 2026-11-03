@@ -157,7 +157,7 @@ describe('Donor Management across the blood centres', () => {
 
   it('lists every donor and marks those another centre knows', () => {
     expect(donors).toContain("otherCentre: row.scope === 'cross_facility',")
-    expect(donors).toContain('<span v-if="donor.otherCentre" class="donor-cell__other"')
+    expect(donors).toContain('<span v-else-if="donor.otherCentre" class="donor-cell__other"')
   })
 
   it("keeps email, export and reminders to this centre's own donors", () => {

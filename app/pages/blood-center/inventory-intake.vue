@@ -174,7 +174,6 @@
             </template>
             <span v-else class="declared__item declared__item--none">—</span>
           </div>
-          <p class="bench__note">Blood type comes from the donation. Only declared components can be booked in.</p>
         </div>
 
         <div v-if="unconfigured.length" class="alert alert--warning">
@@ -196,10 +195,6 @@
             <p class="section-label">Bags to book into stock</p>
             <span class="pill">{{ unitRows.length }} of {{ MAX_PER_REQUEST }} per batch</span>
           </div>
-          <p class="bench__note">
-            <template v-if="!selected">One row per bag, with its expiry and storage location.</template>
-            <template v-else>Labelled by Processing, so the expiry is the one on the label. Set each bag's shelf.</template>
-          </p>
 
           <div class="bags">
             <div class="bags__head" aria-hidden="true">
@@ -390,10 +385,11 @@ const queue = ref([])
 const selected = ref(null)
 const storageLocations = ref([])
 
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 const unitRows = ref([])
 
