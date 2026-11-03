@@ -23,7 +23,6 @@
         <span v-if="sides.length > 1" class="scanner__title-sub">
           {{ currentSide.label }} side &middot; {{ sideIndex + 1 }} of {{ sides.length }}
         </span>
-        <span v-else class="scanner__title-sub">Fit your ID inside the frame</span>
       </div>
 
       <div class="scanner__steps" aria-hidden="true">

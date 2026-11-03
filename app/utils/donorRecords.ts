@@ -6,6 +6,8 @@
  * only decide how that is shown and what a form sends back.
  */
 
+import { exactIdentifier } from '~/utils/appointments'
+
 /** The blood groups in the order the filter lists them. */
 export const BLOOD_GROUP_ORDER = ['A-', 'A+', 'B-', 'B+', 'AB-', 'AB+', 'O-', 'O+']
 
@@ -169,6 +171,26 @@ export function startDonationBlock(badge: { key: string, label: string, hint: st
   }
 }
 
+/**
+ * The search box's text as the exact donor lookup reads it, for someone the
+ * list does not show: a Donor Portal account or a booking, not yet checked
+ * in at any centre (project owner, 2026-11-01). A donor ID, email or mobile
+ * number as the Appointments desk reads one; failing that, anything shaped
+ * like an ID card's number once its spaces and dashes are gone: six or more
+ * letters and digits, at least four of them digits.
+ */
+export function unlistedLookup(term: string): { type: string, value: string } | null {
+  const exact = exactIdentifier(term)
+  if (exact) return exact
+
+  const compact = term.replace(/[\s-]+/g, '')
+  if (/^[A-Za-z0-9]{6,}$/.test(compact) && (compact.match(/\d/g)?.length ?? 0) >= 4) {
+    return { type: 'valid_id_number', value: term.trim() }
+  }
+
+  return null
+}
+
 /** The fields the Register / Edit donor form holds, all as strings. */
 export interface DonorForm {
   first_name: string
@@ -181,8 +203,8 @@ export interface DonorForm {
   address: string
   occupation: string
   last_donation_date: string
-  status: string
   notes: string
+  valid_id_type: string
   valid_id_number: string
 }
 
@@ -198,8 +220,8 @@ export function blankDonorForm(): DonorForm {
     address: '',
     occupation: '',
     last_donation_date: '',
-    status: 'active',
     notes: '',
+    valid_id_type: '',
     valid_id_number: '',
   }
 }
@@ -219,8 +241,8 @@ export function donorFormFrom(profile: Record<string, any>): DonorForm {
     address: text(profile.address),
     occupation: text(profile.occupation),
     last_donation_date: text(profile.declared_last_donation_date).slice(0, 10),
-    status: text(profile.status) || 'active',
     notes: text(profile.notes),
+    valid_id_type: text(profile.valid_id_type),
     valid_id_number: text(profile.valid_id_number),
   }
 }
@@ -245,14 +267,14 @@ export function registerPayload(form: DonorForm): Record<string, string | number
 
 /**
  * What an Edit form sends: only the fields that changed, with a cleared
- * field sent as null so it is cleared on the server too. The valid ID number
- * is never sent; it is registered once and not edited here.
+ * field sent as null so it is cleared on the server too. The valid ID (type
+ * and number) is never sent; it is registered once and not edited here.
  */
 export function editPayload(form: DonorForm, original: DonorForm): Record<string, string | number | null> {
   const payload: Record<string, string | number | null> = {}
 
   for (const key of Object.keys(form) as (keyof DonorForm)[]) {
-    if (key === 'valid_id_number') continue
+    if (key === 'valid_id_type' || key === 'valid_id_number') continue
 
     const value = String(form[key] ?? '').trim()
     const before = String(original[key] ?? '').trim()

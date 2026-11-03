@@ -493,7 +493,7 @@
                     </div>
                     <div class="plan-fact plan-fact--wide">
                       <dt>Contact</dt>
-                      <dd>{{ [activeRequest.plan.contact_name, activeRequest.plan.contact_phone].filter(Boolean).join(' · ') || 'Not given' }}</dd>
+                      <dd>{{ [activeRequest.plan.contact_name, formatPhoneNumber(activeRequest.plan.contact_phone)].filter(Boolean).join(' · ') || 'Not given' }}</dd>
                     </div>
                     <div v-if="activeRequest.plan.notes" class="plan-fact plan-fact--full">
                       <dt>Notes for the hospital</dt>
@@ -777,6 +777,7 @@ import {
   supplyPlanSummary,
 } from '~/types/bloodRequest'
 import { formatShortDate } from '~/utils/donorRecords'
+import { formatPhoneNumber } from '~/utils/phone'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',

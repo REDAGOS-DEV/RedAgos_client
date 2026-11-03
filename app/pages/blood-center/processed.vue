@@ -338,13 +338,8 @@
                   <span>{{ bagText(bag) }}</span>
                 </li>
               </ul>
-              <p v-if="open.mode === 'view' && open.row.status !== 'rejected'" class="hint">
-                Base labels are printed on
-                <NuxtLink :to="`/blood-center/laboratory?donation=${open.row.donation_id}`" class="inline-link">Component Processing</NuxtLink>.
-                <template v-if="open.row.labelled_at">
-                  Final labels printed {{ formatDateTime(open.row.labelled_at) }}<template v-if="open.row.labelled_by"> by {{ open.row.labelled_by }}</template>.
-                </template>
-                <template v-else>Final labels print here once Testing has cleared both sections.</template>
+              <p v-if="open.mode === 'view' && open.row.status !== 'rejected' && open.row.labelled_at" class="hint">
+                Final labels printed {{ formatDateTime(open.row.labelled_at) }}<template v-if="open.row.labelled_by"> by {{ open.row.labelled_by }}</template>.
               </p>
             </div>
 
@@ -409,11 +404,6 @@
                 />
               </label>
 
-              <p class="hint">
-                A saved breakdown is never saved over.
-                <template v-if="isHead">As the component technologist, your correction applies as soon as you send it.</template>
-                <template v-else>Your correction goes to the component technologist, who approves it here. Nothing changes until they do.</template>
-              </p>
             </template>
 
             <!-- A correction waiting for the component technologist: who asked, why, and what it changes. -->

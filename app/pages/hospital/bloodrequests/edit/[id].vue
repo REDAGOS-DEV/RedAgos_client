@@ -123,9 +123,6 @@
                 <span v-if="errors.unitsRequested" class="eb-error-msg">{{ errors.unitsRequested }}</span>
               </div>
             </div>
-            <p v-if="isEditable" class="eb-hint">
-              Changing the blood type will require re-verification by the Blood Center before approval.
-            </p>
           </fieldset>
 
           <fieldset class="eb-card" :disabled="!isEditable">

@@ -443,7 +443,8 @@ const appointmentRows = computed(() => {
   return [
     { key: 'waiting', label: 'Waiting to arrive', value: a.waiting ?? 0, tone: 'info' },
     { key: 'in_progress', label: 'In progress', value: a.in_progress ?? 0, tone: 'warn' },
-    { key: 'collected', label: 'Collected', value: a.collected ?? 0, tone: 'ok' },
+    // A finished booking, drawn or deferred: the visits below say which.
+    { key: 'collected', label: 'Completed', value: a.collected ?? 0, tone: 'ok' },
     { key: 'no_show', label: 'No-show', value: a.no_show ?? 0, tone: 'muted' },
     { key: 'cancelled', label: 'Cancelled', value: a.cancelled ?? 0, tone: 'neutral' },
   ]
@@ -468,7 +469,7 @@ const poolKpis = computed(() => {
     { key: 'in_progress', label: 'In a visit now', value: p.in_progress ?? 0, tone: 'info', hint: 'Registered or screening' },
     { key: 'waiting', label: 'Waiting period', value: p.waiting ?? 0, tone: 'warn', hint: 'Donated recently' },
     { key: 'deferred', label: 'Deferred', value: p.deferred ?? 0, tone: 'crit', hint: 'Not to be called in' },
-    { key: 'inactive', label: 'Inactive', value: p.inactive ?? 0, tone: 'neutral', hint: 'Marked by your centre' },
+    { key: 'inactive', label: 'Inactive', value: p.inactive ?? 0, tone: 'neutral', hint: 'No donation in 12 months' },
     { key: 'new', label: 'New this week', value: p.new_this_week ?? 0, tone: 'neutral', hint: 'Registered in 7 days' },
   ]
 })

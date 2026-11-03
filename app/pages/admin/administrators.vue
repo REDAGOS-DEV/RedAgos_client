@@ -122,10 +122,7 @@
 
         <div class="modal">
           <header class="modal__head">
-            <div>
-              <h2 class="modal__title">Add administrator</h2>
-              <p class="modal__subtitle">A platform admin belongs to RedAgos, not to a facility.</p>
-            </div>
+            <h2 class="modal__title">Add administrator</h2>
             <button type="button" class="modal__close" aria-label="Close" @click="closeModal">
               <AssetIcon name="x" :size="18" />
             </button>
@@ -140,13 +137,13 @@
             <div class="row row--split">
               <label class="group">
                 <span class="label">First name <span class="req">*</span></span>
-                <input v-model="form.first_name" type="text" class="input" placeholder="Paolo">
+                <input v-model="form.first_name" v-person-name type="text" class="input" placeholder="Paolo">
                 <span v-if="fieldError('first_name')" class="field-error">{{ fieldError('first_name') }}</span>
               </label>
 
               <label class="group">
                 <span class="label">Last name <span class="req">*</span></span>
-                <input v-model="form.last_name" type="text" class="input" placeholder="Guzman">
+                <input v-model="form.last_name" v-person-name type="text" class="input" placeholder="Guzman">
                 <span v-if="fieldError('last_name')" class="field-error">{{ fieldError('last_name') }}</span>
               </label>
             </div>
@@ -171,7 +168,6 @@
                 <span class="label">Temporary password <span class="req">*</span></span>
                 <input v-model="form.password" type="text" class="input" placeholder="At least 8 characters">
                 <span v-if="fieldError('password')" class="field-error">{{ fieldError('password') }}</span>
-                <span v-else class="hint">Mixed case and a number. Share it with them directly.</span>
               </label>
 
               <label class="group">
@@ -197,7 +193,6 @@
                     @change="applyRole"
                   />
                 </span>
-                <span class="hint">{{ roleHint }}</span>
               </label>
             </div>
 
@@ -206,11 +201,6 @@
                 Privileges <span class="req">*</span>
                 <span class="label__count">{{ form.privileges.length }} of {{ privileges.length }}</span>
               </legend>
-
-              <p class="section-hint">
-                A role is a preset. Change any tick and the role becomes <strong>Custom</strong>, so what you
-                see always matches what the account gets.
-              </p>
 
               <div v-if="catalogueLoading" class="privileges">
                 <div v-for="n in 4" :key="n" class="skeleton" style="height:56px;border-radius:12px" />
@@ -223,10 +213,7 @@
                   <span class="privilege__box">
                     <AssetIcon v-if="form.privileges.includes(privilege.key)" name="check" :size="11" />
                   </span>
-                  <span class="privilege__text">
-                    <span class="privilege__label">{{ privilege.label }}</span>
-                    <span class="privilege__hint">{{ privilege.description }}</span>
-                  </span>
+                  <span class="privilege__label">{{ privilege.label }}</span>
                 </button>
               </div>
 
@@ -234,12 +221,6 @@
                 {{ fieldError('admin_privileges') }}
               </span>
             </fieldset>
-
-            <p v-else class="note">
-              <AssetIcon name="info" :size="15" class="note__icon" />
-              <span>A Super Administrator holds every privilege, including the ability to create and rescope
-                other administrators. Grant it sparingly.</span>
-            </p>
           </div>
 
           <footer class="modal__foot">
@@ -323,14 +304,6 @@ const form = reactive(emptyForm())
    admin from filling in a whole form only to be refused at the end. */
 const canGrantSuper = computed(() => Boolean(user.value?.is_super_admin))
 
-const roleHint = computed(() => {
-  if (form.role === 'super_admin') return 'Unrestricted access to every module.'
-  if (form.role === 'custom') return 'Privileges picked by hand.'
-
-  const preset = presets.value.find((entry) => entry.name === form.role)
-
-  return preset ? `${preset.privileges.length} privilege${preset.privileges.length === 1 ? '' : 's'} granted.` : ''
-})
 
 const canSubmit = computed(() => {
   const filled = form.first_name.trim() && form.last_name.trim() && form.email.trim()
@@ -856,7 +829,6 @@ onActivated(() => {
 }
 
 .modal__title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); }
-.modal__subtitle { margin: 3px 0 0; font-size: 12.5px; color: var(--text-secondary); }
 
 .modal__close {
   width: 32px;
@@ -942,7 +914,6 @@ onActivated(() => {
   pointer-events: none;
 }
 
-.hint { font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); }
 .field-error { font-size: 11.5px; font-weight: 700; color: var(--accent); }
 
 .section {
@@ -954,7 +925,6 @@ onActivated(() => {
   color: var(--text-primary);
 }
 
-.section-hint { margin: 6px 0 10px; font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); }
 
 .fieldset { border: none; margin: 0; padding: 0; }
 
@@ -992,24 +962,7 @@ onActivated(() => {
 
 .privilege--on .privilege__box { background: var(--primary); border-color: var(--primary); }
 
-.privilege__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.privilege__label { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
-.privilege__hint { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
-
-.note {
-  display: flex;
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid rgba(21, 101, 192, 0.22);
-  border-radius: 12px;
-  background: rgba(21, 101, 192, 0.06);
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-primary);
-}
-
-.note__icon { color: var(--primary); flex-shrink: 0; margin-top: 1px; }
+.privilege__label { min-width: 0; font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
 
 /* Responsive */
 @media (max-width: 900px) {

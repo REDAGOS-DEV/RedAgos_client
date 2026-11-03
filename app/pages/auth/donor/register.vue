@@ -69,14 +69,14 @@
           <div class="au-field">
             <label for="firstName">First name</label>
             <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.first_name }">
-              <input id="firstName" v-model="form.firstName" type="text" placeholder="e.g. Maria" autocomplete="given-name">
+              <input id="firstName" v-model="form.firstName" v-person-name type="text" placeholder="e.g. Maria" autocomplete="given-name">
             </div>
             <p v-if="fieldErrors.first_name" class="au-error">{{ fieldErrors.first_name }}</p>
           </div>
           <div class="au-field">
             <label for="lastName">Last name</label>
             <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.last_name }">
-              <input id="lastName" v-model="form.lastName" type="text" placeholder="e.g. Santos" autocomplete="family-name">
+              <input id="lastName" v-model="form.lastName" v-person-name type="text" placeholder="e.g. Santos" autocomplete="family-name">
             </div>
             <p v-if="fieldErrors.last_name" class="au-error">{{ fieldErrors.last_name }}</p>
           </div>
@@ -116,12 +116,8 @@
             v-model="form.bloodType"
             :options="bloodTypeOptions"
             icon="blood-drop"
-            describedby="bloodTypeHint"
             :invalid="Boolean(fieldErrors.blood_type)"
           />
-          <p id="bloodTypeHint" class="au-hint">
-            Not sure? Leave it as “I don’t know yet”. The lab records it from your first donation.
-          </p>
           <p v-if="fieldErrors.blood_type" class="au-error">{{ fieldErrors.blood_type }}</p>
         </div>
 
@@ -137,10 +133,7 @@
           </div>
           <div class="au-field">
             <label for="phone">Phone number</label>
-            <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.phone }">
-              <AssetIcon name="phone" :size="18" class="au-icon" />
-              <input id="phone" v-model="form.phone" type="tel" placeholder="09XX XXX XXXX" autocomplete="tel">
-            </div>
+            <PhoneField id="phone" v-model="form.phone" class="au-phone" :invalid="Boolean(fieldErrors.phone)" />
             <p v-if="fieldErrors.phone" class="au-error">{{ fieldErrors.phone }}</p>
           </div>
         </div>
@@ -175,13 +168,17 @@
             </div>
             <div class="au-field">
               <label for="validIdNumber">ID number</label>
-              <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.valid_id_number }">
-                <input id="validIdNumber" v-model="form.validIdNumber" type="text" placeholder="As printed on the card">
-              </div>
+              <IdNumberField
+                id="validIdNumber"
+                v-model="form.validIdNumber"
+                :id-type="form.validIdType"
+                class="au-idnum"
+                :invalid="Boolean(fieldErrors.valid_id_number)"
+                :reveal="revealIdNumber"
+              />
               <p v-if="fieldErrors.valid_id_number" class="au-error">{{ fieldErrors.valid_id_number }}</p>
             </div>
           </div>
-          <p class="au-hint">Speeds up check-in at the donation counter. You can add it later from your profile.</p>
         </div>
 
         <!-- Password -->
@@ -272,6 +269,9 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import AuthShell from '~/components/auth/AuthShell.vue'
 import AuthSelect from '~/components/auth/AuthSelect.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
+import IdNumberField from '~/components/common/IdNumberField.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
+import { VALID_ID_TYPE_OPTIONS, idNumberProblem } from '~/utils/validId'
 import { authPhoto } from '~/utils/authPhotos'
 import { donorService } from '~/api/donor/DonorService'
 import { authService } from '~/api/auth/AuthService'
@@ -329,16 +329,11 @@ const form = reactive({
   agreedToTerms: false,
 })
 
-const validIdTypes = [
-  { value: 'philsys', label: 'PhilSys (National ID)' },
-  { value: 'umid', label: 'UMID' },
-  { value: 'drivers_license', label: "Driver's License" },
-  { value: 'passport', label: 'Passport' },
-  { value: 'postal_id', label: 'Postal ID' },
-  { value: 'prc_id', label: 'PRC ID' },
-  { value: 'voters_id', label: "Voter's ID" },
-  { value: 'sss_id', label: 'SSS ID' },
-]
+const validIdTypes = VALID_ID_TYPE_OPTIONS
+
+// Set on a submit tried with an ID number of the wrong shape, so the field's
+// tooltip shows even if the donor never left the field.
+const revealIdNumber = ref(false)
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -355,6 +350,12 @@ const resendFailed = ref(false)
 
 async function handleSubmit() {
   if (isSubmitting.value) return
+
+  if (idNumberProblem(form.validIdType, form.validIdNumber)) {
+    revealIdNumber.value = true
+    document.getElementById('validIdNumber')?.focus()
+    return
+  }
 
   isSubmitting.value = true
   submitError.value = ''
@@ -491,6 +492,48 @@ function applyValidationErrors(error) {
   The frame, fields and buttons come from AuthShell (.au-*). Only what is
   specific to registration lives here.
 */
+
+/* ── The phone field, drawn as an .au-input ── */
+.au-field .au-phone {
+  --pf-h: 50px;
+  --pf-radius: var(--au-radius);
+  --pf-font: 15px;
+  --pf-field: var(--au-field);
+  --pf-border: var(--au-border);
+  --pf-text: var(--au-text);
+  --pf-muted: var(--au-muted);
+  --pf-placeholder: var(--au-muted);
+  --pf-accent: var(--au-accent);
+  --pf-focus: 0 0 0 4px var(--au-accent-soft);
+  --pf-hover: var(--au-accent-soft);
+}
+.au-field .au-phone:focus-within { --pf-field: var(--au-field-focus); }
+@media (max-width: 900px) {
+  .au-field .au-phone { --pf-field: rgba(255, 255, 255, 0.8); --pf-border: rgba(11, 42, 85, 0.12); }
+  .au-field .au-phone:focus-within { --pf-field: #fff; }
+  /* 16px so iOS Safari does not zoom in on focus. */
+  .au-field .au-phone { --pf-font: 16px; }
+}
+
+/* The ID number field (IdNumberField), drawn as the page's other inputs. */
+.au-field .au-idnum {
+  --idf-h: 50px;
+  --idf-radius: var(--au-radius);
+  --idf-font: 15px;
+  --idf-pad: 14px;
+  --idf-field: var(--au-field);
+  --idf-border: var(--au-border);
+  --idf-text: var(--au-text);
+  --idf-placeholder: var(--au-muted);
+  --idf-accent: var(--au-accent);
+  --idf-focus: 0 0 0 4px var(--au-accent-soft);
+  --idf-danger: var(--au-danger);
+}
+.au-field .au-idnum:focus-within { --idf-field: var(--au-field-focus); }
+@media (max-width: 900px) {
+  .au-field .au-idnum { --idf-field: rgba(255, 255, 255, 0.8); --idf-border: rgba(11, 42, 85, 0.12); --idf-font: 16px; }
+  .au-field .au-idnum:focus-within { --idf-field: #fff; }
+}
 
 /* ── Brand panel perks ── */
 .perks {

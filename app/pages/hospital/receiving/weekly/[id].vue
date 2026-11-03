@@ -68,7 +68,7 @@
             </p>
             <p v-if="request.supply_plan.contact_name || request.supply_plan.contact_phone" class="handover__contact">
               <AssetIcon name="phone" :size="13" />
-              {{ [request.supply_plan.contact_name, request.supply_plan.contact_phone].filter(Boolean).join(' · ') }}
+              {{ [request.supply_plan.contact_name, formatPhoneNumber(request.supply_plan.contact_phone)].filter(Boolean).join(' · ') }}
             </p>
             <p v-if="request.supply_plan.notes" class="handover__notes">{{ request.supply_plan.notes }}</p>
           </div>
@@ -181,6 +181,7 @@ import HospitalScanReceivePanel from '~/components/Hospital/ScanReceivePanel.vue
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { bloodTypeSummary, handoverWhen, LINE_STATUS_LABELS, LINE_STATUS_TONES } from '~/types/bloodRequest'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKLY_STATUS_TONES } from '~/types/receiving'
+import { formatPhoneNumber } from '~/utils/phone'
 import { awaitingBagsFor, receiptsByRequest } from '~/utils/receiving'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })

@@ -253,7 +253,6 @@
           </div>
 
           <form id="booking-form" class="modal-card__body modal-form" novalidate @submit.prevent="submitBooking">
-            <p class="form-hint">For a donor who phones in. They get the same confirmation as a portal booking.</p>
             <p v-if="booking.error" class="form-error" role="alert">{{ booking.error }}</p>
 
             <!-- Donor -->
@@ -306,7 +305,6 @@
                 <label class="form-label" for="b-date">Date <span class="req">*</span></label>
                 <DatePicker id="b-date" v-model="booking.date" :min="todayIso" :max="horizonIso"
                   :disabled="Boolean(booking.drive)" @update:model-value="loadSlots" />
-                <p v-if="booking.drive" class="form-hint">The drive's date.</p>
                 <p v-if="fieldError('date')" class="field-error">{{ fieldError('date') }}</p>
               </div>
               <div class="form-group">
@@ -1212,7 +1210,6 @@ onBeforeUnmount(() => {
 .form-label { font-size: 12.5px; font-weight: 600; }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
 .req { color: var(--rb-accent-text); }
-.form-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--rb-text-secondary); }
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 
 .form-error {

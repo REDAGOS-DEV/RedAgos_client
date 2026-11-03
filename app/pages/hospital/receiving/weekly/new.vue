@@ -64,13 +64,7 @@
 
         <section class="panel">
           <div class="panel__head">
-            <div>
-              <h2 class="panel__title">Blood you need</h2>
-              <p class="panel__hint">
-                One line per component and blood type. The center may supply less than you ask for; requested and
-                supplied are kept separately.
-              </p>
-            </div>
+            <h2 class="panel__title">Blood you need</h2>
           </div>
 
           <div class="lines">
@@ -344,7 +338,6 @@ function formatDay(value) {
 .panel--pad { padding: 16px; }
 .panel__head { padding: 16px 16px 8px; }
 .panel__title { margin: 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
-.panel__hint { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); max-width: 80ch; }
 
 /* Every label sits above its control, in one column of the same width as the control. */
 .form-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }

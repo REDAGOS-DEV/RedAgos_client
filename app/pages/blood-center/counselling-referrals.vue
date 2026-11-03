@@ -180,10 +180,6 @@
               your earliest convenience.
             </p>
           </blockquote>
-          <p class="dialog__hint">
-            It names no test, result or infection, as the donor's consent requires. It is sent in your centre's name,
-            and replies go to your centre's email address.
-          </p>
           <p v-if="contact.referral.contact_requested_at" class="dialog__hint">
             Last sent {{ formatDate(contact.referral.contact_requested_at) }}<template v-if="contact.referral.contact_requested_by"> by {{ contact.referral.contact_requested_by }}</template>.
           </p>

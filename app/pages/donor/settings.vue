@@ -69,12 +69,8 @@
                     <p class="theme-preview__label">Preview</p>
                 </div>
 
-                <!-- Across the whole card: the note on the left, Reset in the bottom-right corner. -->
+                <!-- Across the whole card: Reset in the bottom-right corner. -->
                 <div class="appearance__foot">
-                    <p class="appearance__note">
-                        <AssetIcon name="info" :size="13" />
-                        Buttons and links keep readable contrast with any colour you pick.
-                    </p>
                     <button type="button" class="appearance__reset" :disabled="isDefaultAppearance" @click="resetAppearance">
                         Reset to default
                     </button>
@@ -86,7 +82,6 @@
                 <section id="notifications" class="panel" aria-labelledby="notif-title">
                     <div class="panel-header panel-header--simple">
                         <h2 id="notif-title" class="panel-title">Notifications</h2>
-                        <p class="panel-sub">Choose what RedAgos tells you about.</p>
                     </div>
                     <!--
                       Topics against channels. A switch is a choice the server
@@ -109,7 +104,6 @@
                         <div v-for="topic in NOTIFICATION_TOPICS" :key="topic.key" class="notif-row" role="row">
                             <div class="notif-row__text" role="rowheader">
                                 <p :id="`notif-${topic.key}`" class="notif-row__label">{{ topic.label }}</p>
-                                <p class="notif-row__desc">{{ topic.desc }}</p>
                             </div>
                             <div
                                 v-for="channel in ['inApp', 'email']"
@@ -168,7 +162,6 @@
                 <section class="panel" aria-labelledby="security-title">
                     <div class="panel-header panel-header--simple">
                         <h2 id="security-title" class="panel-title">Password &amp; security</h2>
-                        <p class="panel-sub">Choose one you don't use on other sites.</p>
                     </div>
                     <div class="form-body">
                         <div class="form-stack">
@@ -374,11 +367,11 @@ const security = reactive({
  * server); 'always' can't be turned off; null isn't sent on that channel.
  */
 const NOTIFICATION_TOPICS = [
-    { key: 'appointments', label: 'Appointments', desc: 'Booking confirmations, and a reminder the day before when your health questions open.', inApp: 'always', email: 'appointments_email' },
-    { key: 'results', label: 'Donation results', desc: 'When a donation is recorded, or if you need to wait before giving again.', inApp: 'always', email: 'results_email' },
-    { key: 'eligibility', label: 'Eligibility reminders', desc: 'An email from your blood center when you can donate again.', inApp: null, email: 'eligibility_renewal' },
-    { key: 'drives', label: 'Blood drives', desc: 'When a blood center you have visited schedules a drive.', inApp: 'drives_in_app', email: 'drives_email' },
-    { key: 'account', label: 'Account and security', desc: 'ID checks and password resets. Requests to contact your blood center come in the portal only.', inApp: 'always', email: 'always' },
+    { key: 'appointments', label: 'Appointments', inApp: 'always', email: 'appointments_email' },
+    { key: 'results', label: 'Donation results', inApp: 'always', email: 'results_email' },
+    { key: 'eligibility', label: 'Eligibility reminders', inApp: null, email: 'eligibility_renewal' },
+    { key: 'drives', label: 'Blood drives', inApp: 'drives_in_app', email: 'drives_email' },
+    { key: 'account', label: 'Account and security', inApp: 'always', email: 'always' },
 ]
 
 // The server's defaults, until the profile loads.
@@ -722,9 +715,8 @@ function applyProfile(data) {
     padding-top: 16px;
     border-top: 1px solid var(--rb-border);
 }
-.appearance__foot .appearance__note { margin: 0; }
 .appearance__reset {
-    margin-left: auto; /* stays in the corner when it wraps under the note */
+    margin-left: auto; /* stays in the bottom-right corner */
     min-height: 34px;
     padding: 0 14px;
     border: 1px solid var(--rb-border);
@@ -737,14 +729,7 @@ function applyProfile(data) {
     cursor: pointer;
 }
 .appearance__reset:hover:not(:disabled) { background: var(--rb-surface-hover, #F1F5F9); }
-.appearance__reset:disabled { opacity: 0.5; cursor: default; }.appearance__note {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 16px 0 0;
-    font-size: var(--rb-fs-caption);
-    color: var(--text-secondary);
-}
+.appearance__reset:disabled { opacity: 0.5; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
     .swatch__circle { transition: none; }
 }
@@ -911,7 +896,6 @@ function applyProfile(data) {
 .notif-row { padding: 12px 0; border-bottom: 1px solid var(--rb-border); }
 .notif-row:last-child { border-bottom: 0; }
 .notif-row__label { margin: 0; font-size: var(--rb-fs-small); font-weight: 700; color: var(--text-primary); }
-.notif-row__desc { margin: 3px 0 0; font-size: var(--rb-fs-caption); line-height: 1.4; color: var(--text-secondary); }
 .notif-row__cell { display: flex; justify-content: center; }
 .notif-row__cell .toggle-switch { margin-top: 0; }
 .notif-row__cell .toggle-switch:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1250,7 +1234,6 @@ function applyProfile(data) {
 /* ── Redesign ── */
 .panel { border-radius: 20px; }
 .panel-header--simple { padding: 18px 20px 14px; }
-.panel-sub { margin: 2px 0 0; font-size: var(--rb-fs-caption); color: #64748B; }
 .main-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Profile strip: who is signed in, linking to the Profile page */
@@ -1470,7 +1453,6 @@ function applyProfile(data) {
 :global(.dark .scope-donor-settings .account-panel .account-action:hover) { background: var(--ink-hover, #263449); }
 :global(.dark .scope-donor-settings .account-panel .account-action--danger) { border-color: rgba(239, 83, 80, 0.35); }
 :global(.dark .scope-donor-settings .account-panel .account-action--danger:hover) { background: rgba(239, 83, 80, 0.12); }
-:global(.dark .scope-donor-settings .panel-sub),
 :global(.dark .scope-donor-settings .profile-strip__meta) { color: var(--ink-text-2, #94A3B8); }
 
 /* ============ Dark mode ============ */

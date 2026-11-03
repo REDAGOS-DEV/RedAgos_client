@@ -21,6 +21,7 @@ import type {
   UrgencyLevel,
 } from '~/types/bloodRequest'
 import { LINE_STATUS_LABELS, LINE_STATUS_TONES, requestLineLabel } from '~/types/bloodRequest'
+import { idNumberProblem } from '~/utils/validId'
 
 export type Tone = 'info' | 'progress' | 'warning' | 'success' | 'danger' | 'muted'
 
@@ -291,6 +292,10 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
   if (blank(form.representative.relationship)) problems.push('Enter how the watcher is related to the patient.')
   if (blank(form.representative.contact)) problems.push("Enter the watcher's contact number.")
   if (!blank(form.representative.idType) && blank(form.representative.idNumber)) problems.push('Enter the ID number of the ID presented.')
+  else {
+    const idProblem = idNumberProblem(form.representative.idType, form.representative.idNumber)
+    if (idProblem) problems.push(idProblem)
+  }
 
   const lines = form.lines.filter((line) => line.componentId !== null || line.requirementItemId !== null)
 

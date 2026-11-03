@@ -158,7 +158,6 @@
       <div v-if="modal.open" class="modal-overlay" @click.self="closeModal">
         <div class="modal">
           <h2>{{ modal.title }}</h2>
-          <p class="modal-lede">{{ modal.lede }}</p>
 
           <label for="reason">Reason</label>
           <textarea
@@ -197,10 +196,6 @@
       <div v-if="create.open" class="modal-overlay" @click.self="closeCreate">
         <form class="modal modal-wide" @submit.prevent="submitCreate">
           <h2>Create facility</h2>
-          <p class="modal-lede">
-            The facility is active as soon as it is created. Its primary account must verify
-            its email address before it can sign in.
-          </p>
 
           <fieldset class="type-choice">
             <legend>Facility type</legend>
@@ -217,10 +212,7 @@
                 name="facility_type"
                 :value="option.value"
               />
-              <span>
-                <strong>{{ option.label }}</strong>
-                <small>{{ option.hint }}</small>
-              </span>
+              <strong>{{ option.label }}</strong>
             </label>
           </fieldset>
           <p v-if="errorFor('facility_type')" class="field-error">{{ errorFor('facility_type') }}</p>
@@ -254,7 +246,7 @@
 
             <div class="field">
               <label for="f-phone">Facility phone</label>
-              <input id="f-phone" v-model="form.phone" type="tel" placeholder="09171234567" required />
+              <PhoneField id="f-phone" v-model="form.phone" class="modal-phone" autocomplete="off" required :invalid="Boolean(errorFor('phone'))" />
               <p v-if="errorFor('phone')" class="field-error">{{ errorFor('phone') }}</p>
             </div>
 
@@ -323,7 +315,7 @@
           <div class="field-grid">
             <div class="field">
               <label for="a-first">First name</label>
-              <input id="a-first" v-model="form.primary_account.first_name" type="text" maxlength="150" required />
+              <input id="a-first" v-model="form.primary_account.first_name" v-person-name type="text" maxlength="150" required />
               <p v-if="errorFor('primary_account.first_name')" class="field-error">
                 {{ errorFor('primary_account.first_name') }}
               </p>
@@ -331,7 +323,7 @@
 
             <div class="field">
               <label for="a-last">Last name</label>
-              <input id="a-last" v-model="form.primary_account.last_name" type="text" maxlength="150" required />
+              <input id="a-last" v-model="form.primary_account.last_name" v-person-name type="text" maxlength="150" required />
               <p v-if="errorFor('primary_account.last_name')" class="field-error">
                 {{ errorFor('primary_account.last_name') }}
               </p>
@@ -355,7 +347,7 @@
 
             <div class="field">
               <label for="a-phone">Phone</label>
-              <input id="a-phone" v-model="form.primary_account.phone" type="tel" placeholder="09181234567" required />
+              <PhoneField id="a-phone" v-model="form.primary_account.phone" class="modal-phone" autocomplete="off" required :invalid="Boolean(errorFor('primary_account.phone'))" />
               <p v-if="errorFor('primary_account.phone')" class="field-error">
                 {{ errorFor('primary_account.phone') }}
               </p>
@@ -402,6 +394,7 @@ import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } f
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 
 definePageMeta({
@@ -457,12 +450,10 @@ const FACILITY_TYPES = [
   {
     value: 'blood_center',
     label: 'Blood Center',
-    hint: 'Collects from donors, processes donations, and holds stock.',
   },
   {
     value: 'blood_bank',
     label: 'Hospital Blood Bank',
-    hint: 'Requests blood from centers for its hospital.',
   },
 ]
 
@@ -503,7 +494,6 @@ const modal = reactive({
   kind: '',
   row: null,
   title: '',
-  lede: '',
   confirmLabel: '',
   reason: '',
   error: '',
@@ -574,7 +564,6 @@ function actionsFor(status) {
 const MODAL_COPY = {
   reject: {
     title: 'Reject legacy registration',
-    lede: 'This clears a facility left over from the old self-registration flow. Its record is kept.',
     confirmLabel: 'Reject',
   },
 }
@@ -593,7 +582,6 @@ function startAction(row, action) {
     kind: action.kind,
     row,
     title: copy.title,
-    lede: copy.lede,
     confirmLabel: copy.confirmLabel,
     reason: '',
     error: '',
@@ -1205,7 +1193,7 @@ onActivated(() => {
 }
 
 .modal h2 {
-  margin: 0 0 6px;
+  margin: 0 0 18px;
   font-size: 18px;
   font-weight: 700;
   color: v-bind('TEXT_PRIMARY');
@@ -1220,12 +1208,6 @@ onActivated(() => {
   color: v-bind('TEXT_SECONDARY');
 }
 
-.modal-lede {
-  margin: 0 0 18px;
-  font-size: 13px;
-  color: v-bind('TEXT_SECONDARY');
-  line-height: 1.5;
-}
 
 .modal label {
   display: block;
@@ -1256,6 +1238,16 @@ onActivated(() => {
   outline: none;
   border-color: v-bind('ACCENT_PRIMARY');
   box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
+}
+
+/* The phone field drawn like the modal's other inputs. */
+.modal .modal-phone {
+  --pf-radius: 8px;
+  --pf-field: v-bind('BG_SECONDARY');
+  --pf-border: v-bind('BORDER_COLOR');
+  --pf-text: v-bind('TEXT_PRIMARY');
+  --pf-accent: v-bind('ACCENT_PRIMARY');
+  --pf-focus: 0 0 0 3px rgba(21, 101, 192, 0.1);
 }
 
 .type-choice {
@@ -1308,14 +1300,6 @@ onActivated(() => {
   color: v-bind('TEXT_PRIMARY');
 }
 
-.type-option small {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  font-weight: 500;
-  color: v-bind('TEXT_SECONDARY');
-  line-height: 1.4;
-}
 
 .field-grid {
   display: grid;

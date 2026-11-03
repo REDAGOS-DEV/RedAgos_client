@@ -62,10 +62,6 @@
               <span class="field__label">Hospital name *</span>
               <input v-model="form.hospitalName" class="field__input" maxlength="150" placeholder="e.g. St. Jude Hospital" autocomplete="off" :disabled="isContinuing">
             </label>
-            <p v-if="hospitalNotOnRedAgos" class="field__hint field--wide">
-              This hospital is not on RedAgos: it will not be notified and cannot follow the request. The watcher takes
-              the units, and a referral slip if this center cannot supply everything.
-            </p>
 
             <label class="field">
               <span class="field__label">Patient surname *</span>
@@ -150,10 +146,6 @@
               </div>
             </li>
           </ul>
-
-          <p v-if="acknowledgementNeeded.length" class="field__hint">
-            To record a separate request anyway, you will be asked why on the last step.
-          </p>
         </section>
 
         <!-- STEP 2: THE REQUEST AND THE WATCHER -->
@@ -255,7 +247,6 @@
           </div>
 
           <h3 class="step__heading">Watcher presenting the request</h3>
-          <p class="field__hint">Recorded as the representative who brought it. The hospital remains the requester.</p>
           <div class="grid">
             <label class="field">
               <span class="field__label">Full name *</span>
@@ -267,7 +258,7 @@
             </label>
             <label class="field">
               <span class="field__label">Contact number *</span>
-              <input v-model="form.representative.contact" class="field__input" maxlength="30" autocomplete="off">
+              <PhoneField v-model="form.representative.contact" size="sm" landline autocomplete="off" />
             </label>
             <label class="field">
               <span class="field__label">ID presented</span>
@@ -278,7 +269,13 @@
             </label>
             <label v-if="form.representative.idType" class="field">
               <span class="field__label">ID number *</span>
-              <input v-model="form.representative.idNumber" class="field__input" maxlength="50" autocomplete="off">
+              <IdNumberField
+                v-model="form.representative.idNumber"
+                :id-type="form.representative.idType"
+                size="sm"
+                placeholder=""
+                :reveal="attempted"
+              />
             </label>
           </div>
         </section>
@@ -370,6 +367,8 @@ import {
   matchesNeedingAcknowledgement,
   walkInStepProblems,
 } from '~/utils/requestFulfilment'
+import IdNumberField from '~/components/common/IdNumberField.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 
 const emit = defineEmits(['close', 'created', 'open-existing'])

@@ -141,10 +141,7 @@
           <section v-for="section in SECTIONS" :key="section.key" class="panel info-card"
             :class="{ 'info-card--editing': editing === section.key }" :aria-labelledby="`sec-${section.key}`">
             <div class="info-card__head">
-              <div>
-                <h2 :id="`sec-${section.key}`" class="panel-title">{{ section.title }}</h2>
-                <p v-if="section.sub" class="panel-sub">{{ section.sub }}</p>
-              </div>
+              <h2 :id="`sec-${section.key}`" class="panel-title">{{ section.title }}</h2>
               <button v-if="editing !== section.key" type="button" class="info-card__edit"
                 :aria-label="`Edit ${section.title}`" @click="startEdit(section.key)">
                 <AssetIcon name="pencil" :size="14" />
@@ -169,15 +166,15 @@
               <div v-if="section.key === 'name'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-first">First name</label>
-                  <input id="pf-first" v-model="profileForm.first_name" type="text" class="form-input" autocomplete="given-name">
+                  <input id="pf-first" v-model="profileForm.first_name" v-person-name type="text" class="form-input" autocomplete="given-name">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-middle">Middle name</label>
-                  <input id="pf-middle" v-model="profileForm.middle_name" type="text" class="form-input" autocomplete="additional-name">
+                  <input id="pf-middle" v-model="profileForm.middle_name" v-person-name type="text" class="form-input" autocomplete="additional-name">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-last">Last name</label>
-                  <input id="pf-last" v-model="profileForm.last_name" type="text" class="form-input" autocomplete="family-name">
+                  <input id="pf-last" v-model="profileForm.last_name" v-person-name type="text" class="form-input" autocomplete="family-name">
                 </div>
               </div>
 
@@ -219,11 +216,11 @@
               <div v-else-if="section.key === 'contact'" class="form-grid form-grid--3">
                 <div class="form-field">
                   <label class="form-label" for="pf-mobile">Contact number</label>
-                  <input id="pf-mobile" v-model="profileForm.contact_number" type="text" class="form-input" autocomplete="tel">
+                  <PhoneField id="pf-mobile" v-model="profileForm.contact_number" class="form-phone" />
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-tel">Telephone no.</label>
-                  <input id="pf-tel" v-model="profileForm.telephone_no" type="text" class="form-input">
+                  <PhoneField id="pf-tel" v-model="profileForm.telephone_no" class="form-phone" landline placeholder="82 XXX XXXX" autocomplete="off" />
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-email">Email address</label>
@@ -250,11 +247,11 @@
               <div v-else-if="section.key === 'emergency'" class="form-grid">
                 <div class="form-field">
                   <label class="form-label" for="pf-cp-name">Name</label>
-                  <input id="pf-cp-name" v-model="profileForm.contact_person_name" type="text" class="form-input">
+                  <input id="pf-cp-name" v-model="profileForm.contact_person_name" v-person-name type="text" class="form-input">
                 </div>
                 <div class="form-field">
                   <label class="form-label" for="pf-cp-number">Contact number</label>
-                  <input id="pf-cp-number" v-model="profileForm.contact_person_number" type="text" class="form-input">
+                  <PhoneField id="pf-cp-number" v-model="profileForm.contact_person_number" class="form-phone" landline autocomplete="off" />
                 </div>
                 <div class="form-field form-field--full">
                   <label class="form-label" for="pf-cp-address">Address</label>
@@ -349,6 +346,7 @@ definePageMeta({
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import AvatarUpload from '~/components/profile/AvatarUpload.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import IdentityVerification from '~/components/profile/IdentityVerification.vue'
 import { donorService } from '~/api/donor/DonorService'
@@ -602,7 +600,6 @@ const SECTIONS = [
   {
     key: 'emergency',
     title: 'Emergency contact',
-    sub: 'A relative the blood center can reach if they need to.',
     fields: [
       { key: 'contact_person_name', label: 'Name', format: titleCase },
       { key: 'contact_person_number', label: 'Contact number' },
@@ -1232,7 +1229,6 @@ html.dark .profile-page .complete-card__chip:hover { background: rgba(247, 144, 
 .profile-page .id-panel { width: 100%; }
 .profile-page .col-side { display: flex; flex-direction: column; gap: 20px; }
 .profile-page .panel { border-radius: 20px; }
-.profile-page .panel-sub { margin: 2px 0 0; font-size: var(--rb-fs-caption); color: var(--text-muted); }
 .profile-page .panel-header--simple { display: block; }
 
 /* Form sections */
@@ -1253,6 +1249,15 @@ html.dark .profile-page .complete-card__chip:hover { background: rgba(247, 144, 
 
 .profile-page .form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .profile-page .form-input { min-height: 40px; border-radius: 10px; }
+.profile-page .form-phone {
+  --pf-h: 40px;
+  --pf-font: var(--rb-fs-small);
+  --pf-field: var(--surface);
+  --pf-border: var(--border);
+  --pf-text: var(--text-primary);
+  --pf-accent: var(--focus-ring);
+  --pf-focus: 0 0 0 3px var(--primary-soft);
+}
 
 
 /* Link to Settings */

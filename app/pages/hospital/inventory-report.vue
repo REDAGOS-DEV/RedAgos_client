@@ -63,10 +63,7 @@
             <span class="setting__icon" aria-hidden="true"><AssetIcon name="flask-conical" :size="17" /></span>
             <div class="setting__body">
               <div class="setting__head">
-                <span>
-                  <span id="set-components" class="setting__title">Blood Components</span>
-                  <span class="setting__sub">Select the components to include in the report.</span>
-                </span>
+                <span id="set-components" class="setting__title">Blood Components</span>
               </div>
               <button type="button" class="select-all" :aria-pressed="allComponents" @click="toggleAll('components')">
                 <AssetIcon :name="allComponents ? 'check-circle' : 'circle'" :size="15" /> Select All
@@ -85,10 +82,7 @@
             <span class="setting__icon" aria-hidden="true"><AssetIcon name="blood-drop" :size="17" /></span>
             <div class="setting__body">
               <div class="setting__head">
-                <span>
-                  <span id="set-types" class="setting__title">Blood Types</span>
-                  <span class="setting__sub">Select the blood types to include in the report.</span>
-                </span>
+                <span id="set-types" class="setting__title">Blood Types</span>
               </div>
               <button type="button" class="select-all" :aria-pressed="allTypes" @click="toggleAll('bloodTypes')">
                 <AssetIcon :name="allTypes ? 'check-circle' : 'circle'" :size="15" /> Select All
@@ -107,10 +101,7 @@
             <span class="setting__icon" aria-hidden="true"><AssetIcon name="file-text" :size="17" /></span>
             <div class="setting__body">
               <div class="setting__head">
-                <span>
-                  <span id="set-sheets" class="setting__title">Sheets</span>
-                  <span class="setting__sub">Choose how you want to organize the report.</span>
-                </span>
+                <span id="set-sheets" class="setting__title">Sheets</span>
               </div>
               <div class="layouts" role="radiogroup" aria-label="Sheets">
                 <label v-for="option in LAYOUTS" :key="option.value" class="layout" :class="{ 'layout--on': config.by === option.value }">
@@ -118,7 +109,6 @@
                   <span class="layout__icon" aria-hidden="true"><AssetIcon :name="option.icon" :size="18" /></span>
                   <span class="layout__text">
                     <span class="layout__title">{{ option.label }}</span>
-                    <span class="layout__desc">{{ option.description }}</span>
                   </span>
                   <span class="layout__radio" aria-hidden="true" />
                 </label>
@@ -404,8 +394,8 @@ import { orderDashboardTypes } from '~/utils/inventoryDashboard'
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
 const LAYOUTS = [
-  { value: 'type', label: 'One sheet per type', description: 'Each blood type will have its own sheet.', icon: 'layout-grid' },
-  { value: 'all', label: 'All types on one sheet', description: 'All selected blood types will be included in a single sheet.', icon: 'layers' },
+  { value: 'type', label: 'One sheet per type', icon: 'layout-grid' },
+  { value: 'all', label: 'All types on one sheet', icon: 'layers' },
 ]
 
 const SECTIONS = [
@@ -750,7 +740,6 @@ function formatTime(value) {
 .setting__body { position: relative; flex: 1; min-width: 0; }
 .setting__head { padding: 0; margin-bottom: 12px; }
 .setting__title { display: block; font-size: 14.5px; font-weight: 700; color: var(--rb-text-primary); }
-.setting__sub { display: block; margin-top: 2px; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .select-all {
   position: absolute; top: 0; right: 0;
@@ -796,7 +785,6 @@ function formatTime(value) {
 }
 .layout__text { flex: 1; min-width: 0; }
 .layout__title { display: block; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
-.layout__desc { display: block; margin-top: 3px; font-size: 12px; color: var(--rb-text-secondary); }
 .layout__radio {
   flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
   border: 1.5px solid var(--rb-border-strong); background: var(--rb-surface);

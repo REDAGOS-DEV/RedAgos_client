@@ -259,9 +259,6 @@
                 Screened by {{ selected.immunohematology.recorded_by || '—' }} ·
                 {{ formatDate(selected.immunohematology.recorded_at) }}
               </p>
-              <p v-if="selected?.immunohematology && !isFinal" class="card__hint">
-                Saved typings change only with approval: a change you save goes as a correction request.
-              </p>
             </div>
 
             <!-- SEROLOGY: TTI Testing's section. Shown first in the Serology view. -->
@@ -348,9 +345,6 @@
                   <AssetIcon :name="isFinal ? 'eye' : 'pencil'" :size="14" />
                   {{ isFinal ? 'View in Serology Results' : 'View or edit in Serology Results' }}
                 </NuxtLink>
-                <span v-if="!isFinal" class="card__hint">
-                  A saved panel changes only through a correction the Laboratory Supervisor approves there.
-                </span>
               </div>
             </div>
           </div>

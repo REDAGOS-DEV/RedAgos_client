@@ -200,7 +200,7 @@
               on {{ handoverWhen(request.supply_plan.scheduled_at) }}<template v-if="request.supply_plan.handover_address">,
                 {{ request.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ request.supply_plan.handover_address }}</template>.
               <template v-if="request.supply_plan.contact_name || request.supply_plan.contact_phone">
-                Contact: {{ [request.supply_plan.contact_name, request.supply_plan.contact_phone].filter(Boolean).join(' · ') }}.
+                Contact: {{ [request.supply_plan.contact_name, formatPhoneNumber(request.supply_plan.contact_phone)].filter(Boolean).join(' · ') }}.
               </template>
             </p>
             <p v-else-if="request.is_open" class="part-of__text">
@@ -692,6 +692,7 @@ import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
+import { formatPhoneNumber } from '~/utils/phone'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],

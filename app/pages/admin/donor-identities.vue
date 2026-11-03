@@ -37,6 +37,7 @@
         <thead>
           <tr>
             <th>Donor</th>
+            <th>Existing account</th>
             <th>ID type</th>
             <th>ID number</th>
             <th>Submitted</th>
@@ -58,17 +59,23 @@
           </template>
 
           <tr v-else-if="loadError">
-            <td colspan="6" class="state state-error">{{ loadError }}</td>
+            <td colspan="7" class="state state-error">{{ loadError }}</td>
           </tr>
 
           <tr v-else-if="!rows.length">
-            <td colspan="6" class="state">Nothing here.</td>
+            <td colspan="7" class="state">Nothing here.</td>
           </tr>
 
           <tr v-for="row in rows" v-else :key="row.uuid">
             <td>
               <span class="donor-name">{{ row.full_name }}</span>
               <span class="donor-meta">{{ row.email || row.phone || '—' }}</span>
+            </td>
+            <td>
+              <span v-if="row.possible_matches?.length" class="match-pill">
+                {{ row.possible_matches.length }} possible
+              </span>
+              <span v-else class="none-found">None found</span>
             </td>
             <td>{{ row.valid_id_type_label || '—' }}</td>
             <!--
@@ -103,9 +110,6 @@
       <div class="modal modal-review">
         <div class="modal-head">
           <h2 class="modal-title">{{ review.row?.full_name }}</h2>
-          <p class="modal-lede">
-            Check the photo against the details below, then verify or reject.
-          </p>
         </div>
 
         <!--
@@ -117,7 +121,13 @@
           <div class="review-body">
             <section class="review-photo-pane">
               <header class="photo-bar">
-                <span class="photo-bar__label">Submitted ID</span>
+                <span v-if="comparing" class="photo-bar__label photo-bar__label--other">
+                  {{ comparing.full_name }}'s ID · {{ comparing.donor_code }}
+                  <button type="button" class="link-btn photo-back" @click="backToSubmitted">
+                    Back to submitted ID
+                  </button>
+                </span>
+                <span v-else class="photo-bar__label">Submitted ID</span>
 
                 <div v-if="imageUrl" class="photo-modes" role="group" aria-label="Photo size">
                   <button
@@ -139,23 +149,72 @@
                 <p v-else-if="!imageUrl" class="photo-state photo-state--error">
                   {{ photoError || 'No photo on file.' }}
                 </p>
-                <img v-else :src="imageUrl" alt="Submitted ID" class="photo">
+                <img v-else :src="imageUrl" :alt="comparing ? `${comparing.full_name}'s ID` : 'Submitted ID'" class="photo">
               </div>
-
-              <p v-if="imageUrl && isTwoSided" class="photo-note">
-                This ID has two sides. A camera capture stores them as one image, front above
-                back — switch to Full width and scroll to read each side at full size.
-              </p>
             </section>
 
-            <dl class="review-facts">
-              <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
-              <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
-              <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
-              <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
-              <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
-              <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
-            </dl>
+            <div class="review-side">
+              <!--
+                First in the column because it is the question this page exists
+                to answer: is this person already a donor under another account?
+                The ID number, email and phone are unique, so a second account
+                never shares those; the server matches on name and date of birth.
+              -->
+              <section class="existing" aria-labelledby="existing-title">
+                <h3 id="existing-title" class="existing__title">
+                  Existing accounts
+                  <span v-if="matches.length" class="match-pill">{{ matches.length }} possible</span>
+                </h3>
+
+                <p v-if="!matches.length" class="existing__none">
+                  No other donor account has this date of birth with the same first or last name.
+                </p>
+
+                <ul v-else class="existing__list">
+                  <li
+                    v-for="match in matches"
+                    :key="match.uuid"
+                    class="match"
+                    :class="{ 'match--viewing': comparing?.uuid === match.uuid }"
+                  >
+                    <div class="match__head">
+                      <span class="match__name">{{ match.full_name }}</span>
+                      <span class="match__code mono">{{ match.donor_code }}</span>
+                    </div>
+
+                    <span class="likeness" :class="{ 'likeness--strong': match.likeness === 'name_and_birth_date' }">
+                      {{ match.likeness_label }}
+                    </span>
+
+                    <p class="match__line">Born {{ formatDate(match.birth_date) }}</p>
+                    <p class="match__line">{{ [match.email, match.phone].filter(Boolean).join(' · ') || 'No email or phone' }}</p>
+                    <p class="match__line">{{ originOf(match) }}</p>
+                    <p class="match__line">{{ idOf(match) }}</p>
+                    <p class="match__line">{{ donationsOf(match) }}</p>
+
+                    <button
+                      v-if="match.image_url && comparing?.uuid !== match.uuid"
+                      type="button"
+                      class="link-btn match__view"
+                      @click="compareWith(match)"
+                    >
+                      View their ID
+                    </button>
+                  </li>
+                </ul>
+              </section>
+
+              <dl class="review-facts">
+                <div><dt>Donor code</dt><dd class="mono">{{ review.row?.donor_code || '—' }}</dd></div>
+                <div><dt>Account</dt><dd>{{ originOf(review.row) }}</dd></div>
+                <div><dt>ID type</dt><dd>{{ review.row?.valid_id_type_label || '—' }}</dd></div>
+                <div><dt>ID number</dt><dd class="mono">{{ review.row?.valid_id_number_masked || '—' }}</dd></div>
+                <div><dt>Date of birth</dt><dd>{{ formatDate(review.row?.birth_date) }}</dd></div>
+                <div><dt>Blood type</dt><dd>{{ review.row?.blood_type || '—' }}</dd></div>
+                <div><dt>Address</dt><dd>{{ review.row?.address || '—' }}</dd></div>
+                <div><dt>Submitted</dt><dd>{{ formatDate(review.row?.submitted_at) }}</dd></div>
+              </dl>
+            </div>
           </div>
 
           <div v-if="review.rejecting" class="reason-block">
@@ -198,7 +257,6 @@
 import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donorIdentityService } from '~/api/admin/DonorIdentityService'
-import { idSidesFor } from '~/composables/useIdentityDocument'
 import { useUser } from '~/composables/useUser'
 
 definePageMeta({
@@ -233,7 +291,7 @@ const total = ref(null)
 
 const loading = ref(true)
 /* Uneven widths so the placeholder reads as text, not as a progress bar. */
-const SKELETON_WIDTHS = ['70%', '45%', '60%', '75%', '50%', '40%']
+const SKELETON_WIDTHS = ['70%', '35%', '45%', '60%', '75%', '50%', '40%']
 
 // Background refresh over content already on screen; see load({ silent }).
 const refreshing = ref(false)
@@ -249,7 +307,18 @@ const bannerKind = ref('info')
 const imageUrl = ref(null)
 const loadingImage = ref(false)
 const photoError = ref('')
-let objectUrl = null
+
+// Object URLs by donor uuid, so going back and forth between the submitted ID
+// and an existing account's neither refetches nor audits the view twice.
+const objectUrls = new Map()
+
+// The uuid the pane should be showing, and a counter releasePhoto() bumps, so
+// a photo that lands after the reviewer moved on, or closed, is not shown.
+let photoShown = null
+let photoGeneration = 0
+
+// The possible match whose ID is in the photo pane, or null for the submitted one.
+const comparing = ref(null)
 
 /**
  * Fit shows the whole document at once; Full width trades the overview for
@@ -275,12 +344,47 @@ const review = reactive({
   submitting: false,
 })
 
-// The donor's own camera flow decides this from the same helper, so the note
-// the reviewer reads and the sides the donor was asked for cannot disagree.
-const isTwoSided = computed(() => idSidesFor(review.row?.valid_id_type).length > 1)
+const matches = computed(() => review.row?.possible_matches ?? [])
+
+const ACCOUNT_LABELS = {
+  pending_verification: 'Not activated',
+  suspended: 'Suspended',
+  deactivated: 'Closed',
+}
+
+const MATCH_ID_LABELS = {
+  unsubmitted: 'No ID photo',
+  pending: 'ID awaiting review',
+  verified: 'ID verified',
+  rejected: 'ID not approved',
+}
 
 function labelFor(status) {
   return STATUS_LABELS[status] ?? status
+}
+
+/* Where the account came from: a centre's counter, or the donor's own sign-up. */
+function originOf(donor) {
+  if (!donor) return '—'
+
+  const where = donor.registered_at ? `Registered at ${donor.registered_at}` : 'Signed up on the portal'
+  const state = ACCOUNT_LABELS[donor.account_status]
+
+  return [`${where}, ${formatDate(donor.created_at)}`, state].filter(Boolean).join(' · ')
+}
+
+function idOf(match) {
+  const id = [match.valid_id_type_label, match.valid_id_number_masked].filter(Boolean).join(' ')
+
+  return [id || 'No ID number on file', MATCH_ID_LABELS[match.identity_status]].filter(Boolean).join(' · ')
+}
+
+function donationsOf(match) {
+  if (!match.donations) return 'No donations'
+
+  const count = match.donations === 1 ? '1 donation' : `${match.donations} donations`
+
+  return `${count}, last ${formatDate(match.last_donation_at)}`
 }
 
 function formatDate(value) {
@@ -293,15 +397,75 @@ function formatDate(value) {
 }
 
 function releasePhoto() {
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl)
-    objectUrl = null
-  }
+  photoGeneration++
+
+  for (const url of objectUrls.values()) URL.revokeObjectURL(url)
+  objectUrls.clear()
+
+  photoShown = null
+  comparing.value = null
   imageUrl.value = null
+  loadingImage.value = false
   photoError.value = ''
 }
 
-async function openReview(row) {
+/* Put one donor's ID in the photo pane: the submitted one or a possible match's. */
+async function showPhoto(donor) {
+  photoShown = donor.uuid
+  imageUrl.value = null
+  photoError.value = ''
+
+  // Every document starts on the overview. Carrying the last one's zoom over
+  // would open the next ID already scrolled to the middle of it.
+  photoMode.value = 'fit'
+
+  if (!donor.image_url) {
+    loadingImage.value = false
+    photoError.value = 'No photo on file.'
+    return
+  }
+
+  const cached = objectUrls.get(donor.uuid)
+  if (cached) {
+    loadingImage.value = false
+    imageUrl.value = cached
+    return
+  }
+
+  const generation = photoGeneration
+  const current = () => generation === photoGeneration && photoShown === donor.uuid
+
+  loadingImage.value = true
+
+  try {
+    const blob = await donorIdentityService.image(donor.uuid)
+    const url = URL.createObjectURL(blob)
+
+    if (generation !== photoGeneration) {
+      URL.revokeObjectURL(url)
+      return
+    }
+
+    objectUrls.set(donor.uuid, url)
+    if (current()) imageUrl.value = url
+  } catch (error) {
+    if (current()) photoError.value = messageFor(error)
+  } finally {
+    if (current()) loadingImage.value = false
+  }
+}
+
+function compareWith(match) {
+  comparing.value = match
+  showPhoto(match)
+}
+
+function backToSubmitted() {
+  comparing.value = null
+  showPhoto(review.row)
+}
+
+function openReview(row) {
   banner.value = ''
 
   Object.assign(review, {
@@ -314,27 +478,7 @@ async function openReview(row) {
   })
 
   releasePhoto()
-
-  // Every review starts on the overview. Carrying the last donor's zoom over
-  // would open the next ID already scrolled to the middle of it.
-  photoMode.value = 'fit'
-
-  if (!row.image_url) {
-    photoError.value = 'No photo on file.'
-    return
-  }
-
-  loadingImage.value = true
-
-  try {
-    const blob = await donorIdentityService.image(row.uuid)
-    objectUrl = URL.createObjectURL(blob)
-    imageUrl.value = objectUrl
-  } catch (error) {
-    photoError.value = messageFor(error)
-  } finally {
-    loadingImage.value = false
-  }
+  showPhoto(row)
 }
 
 function closeReview() {
@@ -697,6 +841,22 @@ onUnmounted(releasePhoto)
   color: #475569;
 }
 
+.match-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.none-found {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 .actions-col {
   text-align: right;
   white-space: nowrap;
@@ -780,7 +940,6 @@ onUnmounted(releasePhoto)
   border-bottom: 1px solid #e2e8f0;
 }
 
-.modal-head .modal-lede { margin: 0; }
 
 .modal-scroll {
   flex: 1;
@@ -790,16 +949,11 @@ onUnmounted(releasePhoto)
 }
 
 .modal-title {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 18px;
   font-weight: 700;
 }
 
-.modal-lede {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: #64748b;
-}
 
 /* Roughly 57/43 — the photo takes the larger share, the facts stay wide enough
    that an address does not wrap to five lines. */
@@ -850,6 +1004,21 @@ onUnmounted(releasePhoto)
   cursor: pointer;
 }
 
+/* Another account's ID in the pane: said in plain case and the accent colour,
+   so it is never mistaken for the document being decided on. */
+.photo-bar__label--other {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #c2410c;
+}
+
+.photo-back { font-size: 12px; }
+
 .photo-mode + .photo-mode { border-left: 1px solid #e2e8f0; }
 .photo-mode:hover:not(.active) { background: #f1f5f9; }
 .photo-mode.active { background: #1565c0; color: #fff; }
@@ -886,12 +1055,6 @@ onUnmounted(releasePhoto)
   height: auto;
 }
 
-.photo-note {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: #94a3b8;
-}
 
 .photo-state {
   margin: 0;
@@ -901,6 +1064,121 @@ onUnmounted(releasePhoto)
 
 .photo-state--error {
   color: #b91c1c;
+}
+
+.review-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.existing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.existing__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.existing__title .match-pill {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.existing__none {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f7f1;
+  color: #2e7d32;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.existing__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fffbf5;
+}
+
+.match--viewing {
+  border-color: #c2410c;
+  box-shadow: 0 0 0 1px #c2410c;
+}
+
+.match__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.match__name {
+  font-size: 13px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.match__code {
+  font-size: 11.5px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.likeness {
+  margin: 2px 0 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.likeness--strong {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.match__line {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #475569;
+  word-break: break-word;
+}
+
+.match__view {
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .review-facts {
@@ -1059,7 +1337,6 @@ onUnmounted(releasePhoto)
 :global(.dark .scope-admin-donor-identities .tab),
 :global(.dark .scope-admin-donor-identities .submissions th),
 :global(.dark .scope-admin-donor-identities .page-label),
-:global(.dark .scope-admin-donor-identities .modal-lede),
 :global(.dark .scope-admin-donor-identities .donor-meta),
 :global(.dark .scope-admin-donor-identities .state),
 :global(.dark .scope-admin-donor-identities .photo-state),
@@ -1122,14 +1399,36 @@ onUnmounted(releasePhoto)
 :global(.dark .scope-admin-donor-identities .modal-head),
 :global(.dark .scope-admin-donor-identities .modal-review .modal-actions) { border-color: #334155; }
 
-:global(.dark .scope-admin-donor-identities .photo-bar__label),
-:global(.dark .scope-admin-donor-identities .photo-note) { color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .photo-bar__label) { color: #94a3b8; }
 
 :global(.dark .scope-admin-donor-identities .photo-modes) { border-color: #334155; }
 :global(.dark .scope-admin-donor-identities .photo-mode) { background: #1e293b; color: #cbd5e1; }
 :global(.dark .scope-admin-donor-identities .photo-mode + .photo-mode) { border-left-color: #334155; }
 :global(.dark .scope-admin-donor-identities .photo-mode:hover:not(.active)) { background: #263449; }
 :global(.dark .scope-admin-donor-identities .photo-mode.active) { background: #1565c0; color: #fff; }
+
+:global(.dark .scope-admin-donor-identities .match-pill) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .scope-admin-donor-identities .none-found) { color: #64748b; }
+:global(.dark .scope-admin-donor-identities .photo-bar__label--other) { color: #ffb74d; }
+:global(.dark .scope-admin-donor-identities .existing) { border-bottom-color: #334155; }
+:global(.dark .scope-admin-donor-identities .existing__title) { color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .existing__none) { background: rgba(76, 175, 80, 0.14); color: #81c784; }
+
+:global(.dark .scope-admin-donor-identities .match) {
+  border-color: rgba(245, 124, 0, 0.35);
+  background: rgba(245, 124, 0, 0.06);
+}
+
+:global(.dark .scope-admin-donor-identities .match--viewing) {
+  border-color: #ffb74d;
+  box-shadow: 0 0 0 1px #ffb74d;
+}
+
+:global(.dark .scope-admin-donor-identities .match__name) { color: #f1f5f9; }
+:global(.dark .scope-admin-donor-identities .match__code) { color: #94a3b8; }
+:global(.dark .scope-admin-donor-identities .match__line) { color: #cbd5e1; }
+:global(.dark .scope-admin-donor-identities .likeness) { background: rgba(245, 124, 0, 0.2); color: #ffb74d; }
+:global(.dark .scope-admin-donor-identities .likeness--strong) { background: rgba(239, 83, 80, 0.18); color: #ef9a9a; }
 
 :global(.dark .scope-admin-donor-identities .review-facts dd) { color: #f1f5f9; }
 :global(.dark .scope-admin-donor-identities .reason-label) { color: #cbd5e1; }

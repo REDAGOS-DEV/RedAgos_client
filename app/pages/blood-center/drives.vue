@@ -26,7 +26,7 @@
       <!-- Figures, as on Inventory -->
       <StatStrip :columns="3">
         <StatItem label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
-        <StatItem label="Registered donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
+        <StatItem label="Booked donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
         <StatItem label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
       </StatStrip>
 
@@ -39,7 +39,7 @@
 
           <div class="seg" role="tablist" aria-label="Show drives">
             <button
-              v-for="tab in TABS"
+              v-for="tab in DRIVE_TABS"
               :key="tab.value"
               type="button"
               role="tab"
@@ -73,18 +73,18 @@
 
         <div v-else-if="!visibleDrives.length" class="empty-state">
           <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
-          <p class="empty-state__title">{{ view === 'completed' ? 'No completed drives' : 'No upcoming drives' }}</p>
-          <p class="empty-state__text">
-            {{ view === 'completed' ? 'Drives move here once their date has passed.' : 'Create one to open registrations for donors.' }}
-          </p>
+          <p class="empty-state__title">{{ EMPTY_TAB[view].title }}</p>
+          <p class="empty-state__text">{{ EMPTY_TAB[view].text }}</p>
         </div>
 
-        <ul v-else class="drive-list">
+        <p v-if="actionError" class="form-error list-error" role="alert">{{ actionError }}</p>
+
+        <ul v-if="visibleDrives.length && !loadError" class="drive-list">
           <li
             v-for="drive in visibleDrives"
             :key="drive.id"
             class="drive"
-            :class="{ 'drive--done': drive.status === 'Completed', 'drive--today': drive.status === 'Open' }"
+            :class="{ 'drive--done': drive.status === 'Completed' || drive.status === 'Cancelled', 'drive--today': drive.status === 'Open' }"
           >
             <!-- Calendar block: the date is what a drive is planned around. -->
             <div class="drive__date" aria-hidden="true">
@@ -97,8 +97,9 @@
               <div class="drive__title-row">
                 <p class="drive__title">{{ drive.name }}</p>
                 <span class="status-badge" :class="`status-badge--${String(drive.status).toLowerCase()}`">
-                  {{ drive.status === 'Open' ? 'Today' : drive.status }}
+                  {{ driveStatusLabel(drive) }}
                 </span>
+                <span v-if="registrationClosed(drive)" class="status-badge status-badge--closed">Registration closed</span>
               </div>
 
               <p class="drive__facts">
@@ -114,16 +115,23 @@
                   <AssetIcon name="users" :size="13" />
                   {{ drive.assigned_staff }}
                 </span>
+                <span v-if="drive.expected_participants" class="drive__fact">
+                  <AssetIcon name="clipboard-list" :size="13" />
+                  Expected {{ drive.expected_participants }}
+                </span>
               </p>
 
-              <p v-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
+              <p v-if="drive.status === 'Cancelled'" class="drive__note drive__note--cancelled">
+                Cancelled{{ drive.cancellation_reason ? `: ${drive.cancellation_reason}` : '' }}
+              </p>
+              <p v-else-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
             </div>
 
             <!-- Registrations against capacity -->
             <div class="drive__fill">
               <p class="drive__fill-head">
                 <strong>{{ drive.registered_count ?? 0 }}</strong>
-                <span>{{ drive.capacity ? `of ${drive.capacity} registered` : 'registered' }}</span>
+                <span>{{ drive.capacity ? `of ${drive.capacity} booked` : 'booked' }}</span>
               </p>
               <div class="progress-track">
                 <div
@@ -137,15 +145,46 @@
               </p>
             </div>
 
-            <!-- Staff manage their own drives. Both open their dialog; saving waits on the server. -->
+            <!-- What the drive's state allows (utils/drives driveActions); the server decides. -->
             <div class="drive__actions">
-              <template v-if="drive.status !== 'Completed'">
-                <button type="button" class="ui-btn ui-btn--sm" @click="openEditModal(drive)">
-                  <AssetIcon name="pencil" :size="13" />
-                  Edit
-                </button>
-                <button type="button" class="ui-btn ui-btn--sm ui-btn--ghost btn-ghost-danger" @click="openCancelDialog(drive)">Cancel</button>
-              </template>
+              <button
+                v-if="driveActions(drive).publish"
+                type="button"
+                class="ui-btn ui-btn--sm ui-btn--primary"
+                @click="openPublishDialog(drive)"
+              >
+                Publish
+              </button>
+              <button
+                v-if="driveActions(drive).closeRegistration"
+                type="button"
+                class="ui-btn ui-btn--sm"
+                :disabled="busyId === drive.id"
+                @click="setRegistration(drive, false)"
+              >
+                Close registration
+              </button>
+              <button
+                v-if="driveActions(drive).reopenRegistration"
+                type="button"
+                class="ui-btn ui-btn--sm"
+                :disabled="busyId === drive.id"
+                @click="setRegistration(drive, true)"
+              >
+                Reopen registration
+              </button>
+              <button v-if="driveActions(drive).edit" type="button" class="ui-btn ui-btn--sm" @click="openEditModal(drive)">
+                <AssetIcon name="pencil" :size="13" />
+                Edit
+              </button>
+              <button
+                v-if="driveActions(drive).cancel"
+                type="button"
+                class="ui-btn ui-btn--sm ui-btn--ghost btn-ghost-danger"
+                @click="openCancelDialog(drive)"
+              >
+                Cancel
+              </button>
               <!-- A drive held on paper: type its records in once they are back. -->
               <NuxtLink
                 v-if="canRecordPaper && (drive.status === 'Completed' || drive.status === 'Open')"
@@ -164,7 +203,7 @@
     <!-- Create drive modal -->
     <Transition name="modal">
       <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreateModal">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-drive-title">
+        <div v-focus-trap class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-drive-title" @dialog-escape="closeCreateModal">
           <div class="modal-card__header">
             <div>
               <h2 id="create-drive-title" class="modal-card__title">{{ editingDrive ? 'Edit drive' : 'Create drive' }}</h2>
@@ -176,10 +215,6 @@
 
           <form class="modal-form" @submit.prevent="handleCreateDrive">
             <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-            <p v-if="editingDrive" class="form-notice">
-              <AssetIcon name="info" :size="14" />
-              <span>Saving changes is not connected yet. The server needs a route to update a drive.</span>
-            </p>
 
             <div class="form-group">
               <label class="form-label" for="drive-name">Drive name</label>
@@ -191,35 +226,38 @@
               <input id="drive-venue" v-model="driveForm.location" type="text" class="form-input" placeholder="Venue name and address" maxlength="150" required>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="drive-date">Date</label>
-                <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="drive-capacity">Max donors</label>
-                <div class="stepper">
-                  <input id="drive-capacity" v-model.number="driveForm.max_capacity" type="number" min="1" class="form-input stepper__input" required>
-                  <div class="stepper__controls">
-                    <button type="button" class="stepper__btn" aria-label="More" @click="driveForm.max_capacity = (driveForm.max_capacity || 0) + 1">
-                      <AssetIcon name="chevron-up" :size="10" />
-                    </button>
-                    <button type="button" class="stepper__btn" aria-label="Fewer" @click="driveForm.max_capacity = Math.max(1, (driveForm.max_capacity || 1) - 1)">
-                      <AssetIcon name="chevron-down" :size="10" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div class="form-group">
+              <label class="form-label" for="drive-date">Date</label>
+              <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" :disabled="scheduleLocked" />
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="drive-start">Starts</label>
-                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required>
+                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required :disabled="scheduleLocked">
               </div>
               <div class="form-group">
                 <label class="form-label" for="drive-end">Ends</label>
-                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required>
+                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required :disabled="scheduleLocked">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="drive-expected">Expected participants <span class="form-optional">optional</span></label>
+                <input id="drive-expected" v-model="driveForm.expected_participants" type="number" min="1" inputmode="numeric" class="form-input" placeholder="e.g. 120">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="drive-capacity">Registration capacity <span class="form-optional">optional</span></label>
+                <input
+                  id="drive-capacity"
+                  v-model="driveForm.max_capacity"
+                  type="number"
+                  :min="editingDrive?.registered_count || 1"
+                  inputmode="numeric"
+                  class="form-input"
+                  placeholder="No limit"
+                >
               </div>
             </div>
 
@@ -233,15 +271,15 @@
               <textarea id="drive-note" v-model="driveForm.announcement" class="form-textarea" rows="3" placeholder="e.g. Bring a valid ID and eat before donating." />
             </div>
 
+            <label v-if="!editingDrive" class="form-check">
+              <input v-model="driveForm.publish" type="checkbox">
+              <span>Publish to donors now</span>
+            </label>
+
             <div class="modal-actions">
               <button type="button" class="ui-btn" @click="closeCreateModal">Discard</button>
-              <button
-                type="submit"
-                class="ui-btn ui-btn--primary"
-                :disabled="submitting || Boolean(editingDrive)"
-                :title="editingDrive ? 'Not connected yet: the server has no route for this.' : undefined"
-              >
-                {{ editingDrive ? 'Save changes' : submitting ? 'Creating…' : 'Create drive' }}
+              <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
+                {{ submitLabel }}
               </button>
             </div>
           </form>
@@ -252,7 +290,14 @@
     <!-- Cancel drive -->
     <Transition name="modal">
       <div v-if="cancelTarget" class="modal-overlay" @click.self="closeCancelDialog">
-        <div class="modal-card modal-card--narrow" role="alertdialog" aria-modal="true" aria-labelledby="cancel-drive-title">
+        <div
+          v-focus-trap
+          class="modal-card modal-card--narrow"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="cancel-drive-title"
+          @dialog-escape="closeCancelDialog"
+        >
           <div class="modal-card__header">
             <div>
               <h2 id="cancel-drive-title" class="modal-card__title">Cancel this drive?</h2>
@@ -267,11 +312,13 @@
           </div>
 
           <div class="modal-form">
+            <p v-if="cancelError" class="form-error" role="alert">{{ cancelError }}</p>
+
             <div class="cancel-impact">
               <AssetIcon name="circle-alert" :size="16" />
               <p>
-                <strong>{{ cancelTarget.registered_count ?? 0 }} donor{{ (cancelTarget.registered_count ?? 0) === 1 ? '' : 's' }}</strong>
-                registered. The drive closes to new registrations, and the donors who signed up need to be told.
+                <strong>{{ bookedLabel(cancelTarget.registered_count) }}</strong>
+                booked. Their bookings are cancelled with the drive, and each donor is notified with the reason.
               </p>
             </div>
 
@@ -285,18 +332,60 @@
                 maxlength="255"
                 placeholder="e.g. Venue unavailable because of the weather advisory"
               />
-              <p class="form-hint">Shown to the registered donors.</p>
             </div>
-
-            <p class="form-notice">
-              <AssetIcon name="info" :size="14" />
-              <span>Cancelling is not connected yet. The server needs a route to cancel a drive.</span>
-            </p>
 
             <div class="modal-actions">
               <button type="button" class="ui-btn" @click="closeCancelDialog">Keep drive</button>
-              <button type="button" class="ui-btn ui-btn--danger" disabled title="Not connected yet: the server has no route for this.">
-                Cancel drive
+              <button
+                type="button"
+                class="ui-btn ui-btn--danger"
+                :disabled="cancelling || !cancelReason.trim()"
+                @click="confirmCancel"
+              >
+                {{ cancelling ? 'Cancelling…' : 'Cancel drive' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Publish drive -->
+    <Transition name="modal">
+      <div v-if="publishTarget" class="modal-overlay" @click.self="closePublishDialog">
+        <div
+          v-focus-trap
+          class="modal-card modal-card--narrow"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="publish-drive-title"
+          @dialog-escape="closePublishDialog"
+        >
+          <div class="modal-card__header">
+            <div>
+              <h2 id="publish-drive-title" class="modal-card__title">Publish this drive?</h2>
+              <p class="modal-card__subtitle">
+                {{ publishTarget.name }} &middot; {{ dateParts(publishTarget.event_date).weekday }},
+                {{ dateParts(publishTarget.event_date).month }} {{ dateParts(publishTarget.event_date).day }}
+              </p>
+            </div>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="closePublishDialog">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <div class="modal-form">
+            <p v-if="publishError" class="form-error" role="alert">{{ publishError }}</p>
+
+            <p class="form-notice">
+              <AssetIcon name="info" :size="14" />
+              <span>Donors see it in the portal and can book it, and the centre's donors are notified.</span>
+            </p>
+
+            <div class="modal-actions">
+              <button type="button" class="ui-btn" @click="closePublishDialog">Not yet</button>
+              <button type="button" class="ui-btn ui-btn--primary" :disabled="publishing" @click="confirmPublish">
+                {{ publishing ? 'Publishing…' : 'Publish' }}
               </button>
             </div>
           </div>
@@ -315,6 +404,17 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
+import {
+  DRIVE_TABS,
+  blankDriveForm,
+  driveActions,
+  driveFormFrom,
+  drivePayload,
+  driveStatusLabel,
+  driveTab,
+  drivesFor,
+  registrationClosed,
+} from '~/utils/drives'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -329,39 +429,36 @@ const loading = ref(true)
 const submitting = ref(false)
 const showCreateModal = ref(false)
 const loadError = ref('')
+// A row action (registration open/close) that failed, shown above the list.
+const actionError = ref('')
+// The drive whose row action is in flight.
+const busyId = ref(null)
 
 // Ang mga key dinhi kay pareho gyud sa mga column sa `mobile_events`, dili ang
 // UI labels ('venue', 'capacity'). Usa ra ka vocabulary sa tibuok wire, so
 // walay translation layer nga pwede mag-drift sa server.
-const driveForm = reactive({
-  name: '',
-  location: '',
-  event_date: '',
-  max_capacity: 50,
-  start_time: '08:00',
-  end_time: '16:00',
-  assigned_staff: '',
-  announcement: '',
-})
+const driveForm = reactive(blankDriveForm())
 
 const formError = ref('')
 
 const todayIso = computed(() => new Date().toISOString().slice(0, 10))
 
 function resetDriveForm() {
-  driveForm.name = ''
-  driveForm.location = ''
-  driveForm.event_date = ''
-  driveForm.max_capacity = 50
-  driveForm.start_time = '08:00'
-  driveForm.end_time = '16:00'
-  driveForm.assigned_staff = ''
-  driveForm.announcement = ''
+  Object.assign(driveForm, blankDriveForm())
   formError.value = ''
 }
 
 // The drive being edited, or null when the modal creates one.
 const editingDrive = ref(null)
+
+// Naay naka-book: ang petsa ug oras dili na mausab (server: drive_schedule_locked).
+const scheduleLocked = computed(() => Boolean(editingDrive.value) && driveActions(editingDrive.value).scheduleLocked)
+
+const submitLabel = computed(() => {
+  if (editingDrive.value) return submitting.value ? 'Saving…' : 'Save changes'
+  if (submitting.value) return 'Creating…'
+  return driveForm.publish ? 'Create and publish' : 'Save as draft'
+})
 
 function openCreateModal() {
   editingDrive.value = null
@@ -373,16 +470,7 @@ function openCreateModal() {
 function openEditModal(drive) {
   editingDrive.value = drive
   formError.value = ''
-  Object.assign(driveForm, {
-    name: drive.name ?? '',
-    location: drive.location ?? '',
-    event_date: String(drive.event_date ?? '').slice(0, 10),
-    max_capacity: drive.capacity ?? 50,
-    start_time: String(drive.start_time ?? '08:00').slice(0, 5),
-    end_time: String(drive.end_time ?? '16:00').slice(0, 5),
-    assigned_staff: drive.assigned_staff ?? '',
-    announcement: drive.announcement ?? '',
-  })
+  Object.assign(driveForm, driveFormFrom(drive))
   showCreateModal.value = true
 }
 
@@ -392,24 +480,7 @@ function closeCreateModal() {
   resetDriveForm()
 }
 
-// Cancel dialog
-const cancelTarget = ref(null)
-const cancelReason = ref('')
-
-function openCancelDialog(drive) {
-  cancelTarget.value = drive
-  cancelReason.value = ''
-}
-
-function closeCancelDialog() {
-  cancelTarget.value = null
-  cancelReason.value = ''
-}
-
 async function handleCreateDrive() {
-  // Editing has no server route yet; the button is disabled, this is the backstop.
-  if (editingDrive.value) return
-
   if (!driveForm.event_date) {
     formError.value = 'Choose the date of the drive.'
     return
@@ -418,21 +489,105 @@ async function handleCreateDrive() {
   submitting.value = true
   formError.value = ''
   try {
-    // POST /api/blood-center/drives — ang facility_id ug created_by kay gikan sa
-    // token, dili sa payload, so wala tay ipadala nga facility dinhi.
-    const newDrive = await bloodCenterService.createDrive({ ...driveForm })
-    drives.value = [newDrive, ...drives.value]
-    upcomingDrivesCount.value += 1
-    totalRegistered.value += newDrive.registered_count ?? 0
-    view.value = 'upcoming'
+    // Ang facility_id ug created_by kay gikan sa token, dili sa payload.
+    if (editingDrive.value) {
+      await bloodCenterService.updateDrive(editingDrive.value.id, drivePayload(driveForm, false))
+    } else {
+      await bloodCenterService.createDrive(drivePayload(driveForm, true))
+      view.value = 'upcoming'
+    }
     closeCreateModal()
+    // Reload, so the headline figures follow the change too.
+    await loadDrives()
   } catch (err) {
     // Ang BaseService nagbutang sa message sa server sa `err.message` ug sa
     // per-field nga 422 sa `err.errors`. Ipakita gyud — kaniadto console ra ni,
     // mao nga ang "Save Changes" morag walay gibuhat.
-    formError.value = firstFieldError(err) || err?.message || 'Could not create this drive. Please try again.'
+    formError.value = firstFieldError(err) || err?.message || 'Could not save this drive. Please try again.'
   } finally {
     submitting.value = false
+  }
+}
+
+// Cancel dialog
+const cancelTarget = ref(null)
+const cancelReason = ref('')
+const cancelError = ref('')
+const cancelling = ref(false)
+
+function openCancelDialog(drive) {
+  cancelTarget.value = drive
+  cancelReason.value = ''
+  cancelError.value = ''
+}
+
+function closeCancelDialog() {
+  if (cancelling.value) return
+  cancelTarget.value = null
+  cancelReason.value = ''
+  cancelError.value = ''
+}
+
+async function confirmCancel() {
+  if (!cancelTarget.value || !cancelReason.value.trim()) return
+  cancelling.value = true
+  cancelError.value = ''
+  try {
+    await bloodCenterService.cancelDrive(cancelTarget.value.id, cancelReason.value.trim())
+    cancelling.value = false
+    closeCancelDialog()
+    await loadDrives()
+  } catch (err) {
+    // E.g. 409 drive_in_progress: someone is already checked in at the drive.
+    cancelError.value = firstFieldError(err) || err?.message || 'Could not cancel this drive. Please try again.'
+  } finally {
+    cancelling.value = false
+  }
+}
+
+// Publish dialog: publishing tells the centre's donors, so it is asked first.
+const publishTarget = ref(null)
+const publishError = ref('')
+const publishing = ref(false)
+
+function openPublishDialog(drive) {
+  publishTarget.value = drive
+  publishError.value = ''
+}
+
+function closePublishDialog() {
+  if (publishing.value) return
+  publishTarget.value = null
+  publishError.value = ''
+}
+
+async function confirmPublish() {
+  if (!publishTarget.value) return
+  publishing.value = true
+  publishError.value = ''
+  try {
+    await bloodCenterService.publishDrive(publishTarget.value.id)
+    publishing.value = false
+    closePublishDialog()
+    await loadDrives()
+  } catch (err) {
+    publishError.value = err?.message || 'Could not publish this drive. Please try again.'
+  } finally {
+    publishing.value = false
+  }
+}
+
+/** Close or reopen registration. The bookings already held stand either way. */
+async function setRegistration(drive, open) {
+  busyId.value = drive.id
+  actionError.value = ''
+  try {
+    await bloodCenterService.setDriveRegistration(drive.id, open)
+    await loadDrives()
+  } catch (err) {
+    actionError.value = err?.message || 'Could not change registration for this drive. Please try again.'
+  } finally {
+    busyId.value = null
   }
 }
 
@@ -445,6 +600,12 @@ function firstFieldError(err) {
   return Array.isArray(first) ? first[0] : first
 }
 
+/** "1 donor is" / "3 donors are", for the booked count. */
+function bookedLabel(count) {
+  const n = count ?? 0
+  return n === 1 ? '1 donor is' : `${n} donors are`
+}
+
 // All values start empty/zero — populated only from the API response.
 const upcomingDrivesCount = ref(0)
 const totalRegistered = ref(0)
@@ -452,39 +613,33 @@ const unitsCollectedMonth = ref(0)
 const drives = ref([])
 // drive shape: {
 //   id, name, facility_name, location, event_date, start_time, end_time,
-//   capacity, registered_count, assigned_staff, announcement,
-//   status: 'Completed' | 'Full' | 'Open' | 'Upcoming',   // capitalized, server-computed
+//   capacity (hard limit, null = none), expected_participants (estimate),
+//   registered_count (active bookings), assigned_staff, announcement,
+//   status: 'Draft' | 'Upcoming' | 'Open' | 'Full' | 'Completed' | 'Cancelled',
+//   published_at, registration_open, registration_closed_at,
+//   cancelled_at, cancellation_reason,
 //   donor_preview: []   // always empty for now: no endpoint lists a drive's donors
 // }
 
 /* ---------- display: which drives, and how each reads ---------- */
 
-const TABS = [
-  { value: 'upcoming', label: 'Upcoming' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'all', label: 'All' },
-]
-
 const view = ref('upcoming')
 
-const isDone = (drive) => drive.status === 'Completed'
-
-function countFor(value) {
-  if (value === 'upcoming') return drives.value.filter((d) => !isDone(d)).length
-  if (value === 'completed') return drives.value.filter(isDone).length
-  return drives.value.length
+const EMPTY_TAB = {
+  upcoming: { title: 'No upcoming drives', text: 'Create one to open registrations for donors.' },
+  completed: { title: 'No completed drives', text: 'Drives move here once their date has passed.' },
+  cancelled: { title: 'No cancelled drives', text: 'Cancelled drives are kept here.' },
+  all: { title: 'No drives', text: '' },
 }
 
-// Upcoming soonest first; completed most recent first.
-const visibleDrives = computed(() => {
-  const byDate = (x, y) => String(x.event_date).localeCompare(String(y.event_date))
-  if (view.value === 'upcoming') return drives.value.filter((d) => !isDone(d)).sort(byDate)
-  if (view.value === 'completed') return drives.value.filter(isDone).sort((x, y) => byDate(y, x))
-  return [...drives.value].sort((x, y) => byDate(y, x))
-})
+function countFor(value) {
+  if (value === 'all') return drives.value.length
+  return drives.value.filter((d) => driveTab(d) === value).length
+}
 
-const nextDrive = computed(() =>
-  drives.value.filter((d) => !isDone(d)).sort((x, y) => String(x.event_date).localeCompare(String(y.event_date)))[0])
+const visibleDrives = computed(() => drivesFor(drives.value, view.value))
+
+const nextDrive = computed(() => drivesFor(drives.value, 'upcoming')[0])
 
 const nextDriveLabel = computed(() => {
   if (!nextDrive.value) return 'None scheduled'
@@ -525,8 +680,8 @@ function fillLevel(drive) {
 async function loadDrives() {
   loadError.value = ''
   try {
-    // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman na.
-    // { upcoming_drives_count, total_registered, units_collected_month, drives: [...] }
+    // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman ug na-cancel.
+    // { upcoming_drives_count, total_registered, units_collected_month (drives only), drives: [...] }
     const data = await bloodCenterService.drives()
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
     totalRegistered.value = data.total_registered ?? 0
@@ -794,7 +949,7 @@ a.btn-small { text-decoration: none; }
 
 .drive {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 220px 150px;
+  grid-template-columns: 64px minmax(0, 1fr) 220px minmax(150px, 250px);
   align-items: center;
   gap: 20px;
   padding: 16px 18px;
@@ -908,6 +1063,9 @@ a.btn-small { text-decoration: none; }
 .status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
 .status-badge--full { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 .status-badge--completed { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
+.status-badge--draft { background: transparent; color: var(--rb-text-secondary); border: 1px dashed var(--rb-border-strong); }
+.status-badge--cancelled { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.status-badge--closed { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
 
 /* Registrations */
 .drive__fill-head {
@@ -952,9 +1110,17 @@ a.btn-small { text-decoration: none; }
 
 .drive__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
 }
+
+.drive__note--cancelled {
+  border-left-color: rgba(var(--rb-accent-rgb), 0.5);
+  color: var(--rb-accent-text);
+}
+
+.list-error { margin: 12px 18px 0; }
 
 /* ---------- Empty states ---------- */
 .empty-state {
@@ -1053,9 +1219,8 @@ a.btn-small { text-decoration: none; }
   color: var(--rb-text-primary);
 }
 
-.form-hint { margin: 0; font-size: 12px; color: var(--rb-text-secondary); }
 
-/* "Not connected yet": calm, not an error. */
+/* A calm note (what publishing does), not an error. */
 .form-notice {
   display: flex;
   align-items: flex-start;
@@ -1144,41 +1309,23 @@ a.btn-small { text-decoration: none; }
   min-height: 72px;
 }
 
-.stepper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.stepper__input {
-  padding-right: 32px;
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.stepper__input::-webkit-inner-spin-button,
-.stepper__input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.stepper__controls {
-  position: absolute;
-  right: 4px;
-  display: flex;
-  flex-direction: column;
-}
-
-.stepper__btn {
-  background: none;
-  border: none;
-  cursor: pointer;
+.drives-page .form-input:disabled {
+  background: var(--rb-surface-alt);
   color: var(--rb-text-secondary);
-  padding: 1px 6px;
-  display: flex;
+  cursor: not-allowed;
 }
 
-.stepper__btn:hover { color: var(--rb-primary-text); }
+.form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rb-text-primary);
+  cursor: pointer;
+}
+
+.form-check input { width: 16px; height: 16px; accent-color: var(--rb-primary); }
 
 .modal-actions {
   display: flex;

@@ -199,12 +199,12 @@
                 <div class="form__row">
                   <label class="form__field">
                     <span>First name</span>
-                    <input v-model="form.first_name" type="text" required >
+                    <input v-model="form.first_name" v-person-name type="text" required >
                     <em v-if="errors.first_name">{{ errors.first_name[0] }}</em>
                   </label>
                   <label class="form__field">
                     <span>Last name</span>
-                    <input v-model="form.last_name" type="text" required >
+                    <input v-model="form.last_name" v-person-name type="text" required >
                     <em v-if="errors.last_name">{{ errors.last_name[0] }}</em>
                   </label>
                 </div>
@@ -229,11 +229,7 @@
                     <input v-model="form.password_confirmation" type="text" autocomplete="new-password" required >
                   </label>
                 </div>
-                <p class="form__hint">
-                  At least 8 characters, with upper and lower case and a number. Share it with them directly; they will be
-                  asked to verify their email address.
-                  <button type="button" class="link-btn" @click="generatePassword">Generate a password</button>
-                </p>
+                <button type="button" class="link-btn" @click="generatePassword">Generate a password</button>
               </section>
             </template>
 
@@ -242,7 +238,7 @@
               <div class="form__row">
                 <label class="form__field">
                   <span>Phone <i>optional</i></span>
-                  <input v-model="form.phone" type="tel" placeholder="09XXXXXXXXX" >
+                  <PhoneField v-model="form.phone" class="form__phone" size="sm" autocomplete="off" :invalid="Boolean(errors.phone)" />
                   <em v-if="errors.phone">{{ errors.phone[0] }}</em>
                 </label>
                 <label class="form__field">
@@ -283,18 +279,15 @@
 
               <!-- Several roles, all in this department (project owner, 2026-10-17). -->
               <fieldset class="form__field roles">
-                <legend>Roles <i>tick every role they cover</i></legend>
+                <legend>Roles</legend>
                 <p v-if="!form.department" class="form__hint">Choose a department to see its roles.</p>
                 <div v-else class="roles__list">
                   <label v-for="role in departmentRoles" :key="role.key" class="privilege role-option">
                     <input v-model="form.roles" type="checkbox" :value="role.key" >
-                    <span>
-                      <strong>
-                        {{ role.label }}
-                        <span v-if="form.roles.length > 1 && form.main_role === role.key" class="tag tag--main">main</span>
-                      </strong>
-                      <small>{{ role.description }}</small>
-                    </span>
+                    <strong>
+                      {{ role.label }}
+                      <span v-if="form.roles.length > 1 && form.main_role === role.key" class="tag tag--main">main</span>
+                    </strong>
                   </label>
                 </div>
                 <em v-if="errors.staff_role">{{ errors.staff_role[0] }}</em>
@@ -306,7 +299,6 @@
                 <label v-if="form.roles.length > 1" class="form__field">
                   <span>Main role</span>
                   <SelectField v-model="form.main_role" aria-label="Main role" :options="form.roles.map(key => ({ value: key, label: roleLabelOf(key) }))" />
-                  <small>Where they start after signing in.</small>
                 </label>
 
                 <!-- A div, not a label: a click on a suggestion would otherwise
@@ -325,28 +317,15 @@
                   <em v-if="errors.custom_role">{{ errors.custom_role[0] }}</em>
                 </div>
               </div>
-              <p class="form__hint form__hint--role">
-                <template v-if="form.roles.length || form.custom_role.trim()">
-                  They can do everything their roles allow<template v-if="form.custom_role.trim()">, and a custom role can do what the {{ departmentLabel }} department does</template>,
-                  within the privileges ticked below.
-                </template>
-                <template v-else>
-                  An Admin or Supervisor needs no role. Anyone else needs one, or they can sign in but reach nothing.
-                </template>
-              </p>
 
               <fieldset class="form__field privileges">
                 <legend>Privileges</legend>
                 <div class="privileges__grid">
                   <label v-for="privilege in privileges" :key="privilege.key" class="privilege">
                     <input v-model="form.staff_privileges" type="checkbox" :value="privilege.key" >
-                    <span>
-                      <strong>{{ privilege.label }}</strong>
-                      <small>{{ privilege.description }}</small>
-                    </span>
+                    <strong>{{ privilege.label }}</strong>
                   </label>
                 </div>
-                <small>They cap the role, not the access level below: unticking Delete, for example, stops them closing a donation or discarding a unit.</small>
                 <em v-if="errors.staff_privileges">{{ errors.staff_privileges[0] }}</em>
               </fieldset>
 
@@ -356,10 +335,7 @@
                 <div class="levels__list">
                   <label v-for="level in levelOptions" :key="level.key || 'staff'" class="privilege level">
                     <input v-model="form.management_level" type="radio" name="management_level" :value="level.key" >
-                    <span>
-                      <strong>{{ level.label }}</strong>
-                      <small>{{ level.description }}</small>
-                    </span>
+                    <strong>{{ level.label }}</strong>
                   </label>
                 </div>
                 <em v-if="errors.management_level">{{ errors.management_level[0] }}</em>
@@ -369,7 +345,6 @@
                 <span>Account status</span>
                 <SelectField v-model="form.account_status" aria-label="Account status"
                   :options="[{ value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' }, { value: 'deactivated', label: 'Deactivated' }]" />
-                <small>Suspending or deactivating an account signs it out immediately.</small>
               </label>
             </section>
 
@@ -428,6 +403,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -457,7 +433,6 @@ const credentialOptions = ref(['RMT', 'RN', 'MD'])
 const catalogueError = ref('')
 
 const departmentRoles = computed(() => departments.value.find((group) => group.department === form.department)?.roles ?? [])
-const departmentLabel = computed(() => departments.value.find((group) => group.department === form.department)?.label ?? 'chosen')
 
 const allRoles = computed(() => departments.value.flatMap((group) => group.roles.map((role) => ({ ...role, department: group.department }))))
 
@@ -503,22 +478,20 @@ async function loadCatalogue() {
 }
 
 /**
- * The access levels, least first. The two management levels take their words
- * from the server's catalogue, so the form describes them as the matrix
- * enforces them; the fallback covers a catalogue that failed to load.
+ * The access levels, least first. The two management levels take their names
+ * from the server's catalogue; the fallback covers a catalogue that failed to load.
  */
 const LEVEL_FALLBACK = {
-  supervisor: { label: 'Supervisor', description: 'Sees the dashboard, the reports and the view-only monitoring pages. Cannot record, approve or manage anyone.' },
-  admin: { label: 'Blood Center Admin', description: 'Creates staff accounts, assigns roles and privileges, and sets the centre\'s logo. Sees the dashboard, the reports and the audit log; no department pages and no corrections.' },
+  supervisor: 'Supervisor',
+  admin: 'Blood Center Admin',
 }
 
 const levelOptions = computed(() => [
-  { key: '', label: 'Staff', description: 'Does the work of their role, within the privileges above. No management access.' },
-  ...['supervisor', 'admin'].map((key) => {
-    const served = levels.value.find((level) => level.key === key)
-
-    return { key, label: served?.label ?? LEVEL_FALLBACK[key].label, description: served?.description ?? LEVEL_FALLBACK[key].description }
-  }),
+  { key: '', label: 'Staff' },
+  ...['supervisor', 'admin'].map((key) => ({
+    key,
+    label: levels.value.find((level) => level.key === key)?.label ?? LEVEL_FALLBACK[key],
+  })),
 ])
 
 /**
@@ -962,6 +935,8 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   cursor: not-allowed;
 }
 
+.form__field .form__phone { --pf-radius: 10px; }
+
 .toggle {
   display: inline-flex;
   align-items: center;
@@ -1312,7 +1287,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-secondary);
 }
 
-.form__field small { font-size: 11px; color: var(--rb-text-secondary); }
 .form__field em { font-size: 11px; font-style: normal; color: var(--rb-accent-text); }
 
 .form__error {
@@ -1351,10 +1325,9 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   color: var(--rb-text-secondary);
 }
 
-.form__hint--role { margin-top: -4px; }
 
 .link-btn {
-  margin-left: 4px;
+  align-self: flex-start;
   padding: 0;
   border: 0;
   background: none;
@@ -1404,11 +1377,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   font-size: 12px;
 }
 
-.privilege small {
-  display: block;
-  font-size: 11px;
-  color: var(--rb-text-secondary);
-}
 
 .privs {
   display: inline-flex;
@@ -1457,7 +1425,6 @@ onMounted(() => Promise.all([load(), loadCatalogue()]))
   font-weight: 600;
 }
 
-.roles legend i { font-style: normal; font-weight: 400; color: var(--rb-text-secondary); }
 
 .roles__list {
   display: grid;

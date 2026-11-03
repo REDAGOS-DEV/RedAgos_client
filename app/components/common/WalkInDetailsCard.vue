@@ -26,14 +26,13 @@
 
       <section class="walk-in__block">
         <h4 class="walk-in__heading">Presented by</h4>
-        <p class="walk-in__hint">The watcher who brought the request — not the requester.</p>
         <dl>
           <div><dt>Name</dt><dd>{{ walkIn.representative.name }}</dd></div>
           <div><dt>Relationship</dt><dd>{{ walkIn.representative.relationship }}</dd></div>
-          <div><dt>Contact</dt><dd>{{ walkIn.representative.contact }}</dd></div>
+          <div><dt>Contact</dt><dd>{{ formatPhoneNumber(walkIn.representative.contact) }}</dd></div>
           <div v-if="walkIn.representative.id_type_label">
             <dt>ID presented</dt>
-            <dd>{{ walkIn.representative.id_type_label }} · {{ walkIn.representative.id_number || '—' }}</dd>
+            <dd>{{ walkIn.representative.id_type_label }} · {{ formatIdNumber(walkIn.representative.id_type, walkIn.representative.id_number) || '—' }}</dd>
           </div>
         </dl>
       </section>
@@ -68,6 +67,8 @@
 
 import { computed } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { formatPhoneNumber } from '~/utils/phone'
+import { formatIdNumber } from '~/utils/validId'
 
 const props = defineProps({
   walkIn: { type: Object, required: true },
@@ -150,11 +151,6 @@ function formatDateTime(value) {
   color: var(--rb-text-secondary);
 }
 
-.walk-in__hint {
-  margin: -0.15rem 0 0.4rem;
-  font-size: 12px;
-  color: var(--rb-text-secondary);
-}
 
 dl {
   margin: 0;

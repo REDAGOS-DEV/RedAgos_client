@@ -388,9 +388,6 @@
                                     <input v-model.number="vitals.age" type="number" min="0" class="form-input"
                                         :class="{ 'form-input--locked': prefilled.age }" :readonly="prefilled.age"
                                         placeholder="29">
-                                    <p v-if="prefilled.age" class="form-hint">
-                                        From your profile, computed from your birth date.
-                                    </p>
                                 </div>
 
                                 <div class="form-field">
@@ -402,9 +399,6 @@
                                     <label class="form-label">Blood type (if known)</label>
                                     <SelectField id="vitals-blood" v-model="vitals.bloodType" :options="bloodSelectOptions"
                                         icon="blood-drop" placeholder="Select" :disabled="prefilled.bloodType" />
-                                    <p v-if="prefilled.bloodType" class="form-hint">
-                                        From your profile. Change it in Profile settings.
-                                    </p>
                                 </div>
 
                                 <div class="form-field">
@@ -509,13 +503,6 @@
                         <span>
                             Submitting will replace your current screening, which is valid until
                             {{ formatDate(eligibility.screening_valid_until) }}.
-                        </span>
-                    </p>
-                    <p v-else class="submit-hint">
-                        <AssetIcon name="info" :size="15" />
-                        <span>
-                            Your QR code is generated as soon as you submit. Present it at the donation centre,
-                            where staff will go through your answers with you.
                         </span>
                     </p>
 
@@ -628,9 +615,6 @@
                         aria-labelledby="rev-title">
                         <div class="review-head">
                             <h2 id="rev-title" class="modal-title">Review your answers</h2>
-                            <p class="modal-subtitle">
-                                This is exactly what will be sent. Close this to change anything.
-                            </p>
                         </div>
 
                         <div class="review-list">
@@ -673,10 +657,8 @@
                         </div>
 
                         <h2 id="epm-title" class="modal-title">Questionnaire submitted</h2>
-                        <p class="modal-subtitle">
-                            {{ qrCodeDataUrl
-                                ? 'Bring this QR code with you. The blood centre will review your answers when you arrive.'
-                                : 'Verify your email address to receive your check-in QR code.' }}
+                        <p v-if="!qrCodeDataUrl" class="modal-subtitle">
+                            Verify your email address to receive your check-in QR code.
                         </p>
 
                         <div v-if="qrCodeDataUrl" class="modal-qr-wrap">
@@ -2253,12 +2235,6 @@ onActivated(() => {
     cursor: not-allowed;
 }
 
-.form-hint {
-    font-size: var(--rb-fs-caption);
-    color: var(--text-secondary);
-    margin: 6px 0 0;
-    line-height: 1.5;
-}
 
 .select-wrap {
     position: relative;
@@ -2786,7 +2762,7 @@ onActivated(() => {
     padding: 10px;
     border-radius: 12px;
     border: 1px solid #eef0f3;
-    margin-bottom: 14px;
+    margin: 20px 0 14px;
 }
 
 .modal-qr-image {
@@ -3329,11 +3305,6 @@ onActivated(() => {
     border-bottom: 1px solid #eef0f3;
 }
 
-.review-head .modal-subtitle {
-    max-width: none;
-    margin: 4px 0 0;
-    color: var(--text-muted);
-}
 
 .review-list {
     flex: 1;

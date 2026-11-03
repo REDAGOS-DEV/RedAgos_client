@@ -1,10 +1,7 @@
 <template>
   <section v-if="canConfigure" class="logo-card" :aria-labelledby="titleId">
     <div class="logo-card__head">
-      <div>
-        <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
-        <p class="logo-card__hint">PNG or JPG, 2 MB or smaller.</p>
-      </div>
+      <h2 :id="titleId" class="logo-card__title">{{ copy.title }}</h2>
     </div>
 
     <div class="logo-card__body">
@@ -198,13 +195,6 @@ onMounted(() => {
 
 .logo-card__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 
-.logo-card__hint {
-  margin: 0.25rem 0 0;
-  max-width: 62ch;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--rb-text-secondary);
-}
 
 .logo-card__body { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 

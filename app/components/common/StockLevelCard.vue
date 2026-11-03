@@ -82,10 +82,7 @@
             table's Save still sends them, and Discard takes them back.
           -->
           <tr v-if="editable && rows.length > 1" class="st-bulk">
-            <th scope="row" class="st-table__type st-bulk__label">
-              All types
-              <span class="st-bulk__hint">fill a column</span>
-            </th>
+            <th scope="row" class="st-table__type st-bulk__label">All types</th>
             <td v-for="component in components" :key="component.id" class="st-table__cell">
               <div class="st-bulk__field">
                 <input
@@ -517,7 +514,6 @@ function savedOf(cell: StockThresholdCell): number | null {
 /* Fill a column */
 .st-bulk th, .st-bulk td { background: rgba(var(--st-level-rgb), 0.04); border-bottom: 1px dashed var(--rb-border-strong); }
 .st-bulk__label { line-height: 1.2; }
-.st-bulk__hint { display: block; font-size: 11px; font-weight: 500; color: var(--rb-text-secondary); }
 .st-bulk__field {
   display: flex;
   align-items: stretch;

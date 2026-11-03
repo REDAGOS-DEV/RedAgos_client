@@ -32,7 +32,6 @@
               @blur="form.number = normalizeUnitNumber(form.number)"
             >
             <p v-if="fieldErrors.external_unit_number" class="field__error">{{ fieldErrors.external_unit_number }}</p>
-            <p v-else class="field__hint">As printed on the bag by the blood service that sent it.</p>
           </div>
 
           <div class="field">
@@ -254,7 +253,6 @@ function todayLocal() {
 }
 .field__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.12); }
 .field__input--error { border-color: var(--rb-accent); }
-.field__hint { margin: 0; font-size: 11.5px; color: var(--rb-text-secondary); }
 .field__error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
 .req { color: var(--rb-accent-text); }
 .optional { font-weight: 400; color: var(--rb-text-secondary); }

@@ -379,12 +379,6 @@
             </template>
 
             <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
-
-            <p v-if="editable" class="hint">
-              A saved panel is never saved over.
-              <template v-if="isHead">As the Laboratory Supervisor, your correction applies as soon as you send it.</template>
-              <template v-else>Your correction goes to the Laboratory Supervisor, who approves it here. Nothing changes until they do.</template>
-            </p>
           </div>
 
           <div class="modal-card__footer">
@@ -1365,7 +1359,6 @@ onBeforeUnmount(() => {
 .warn__confirm { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; cursor: pointer; }
 .warn__confirm input { margin-top: 3px; accent-color: var(--rb-accent); }
 
-.hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 
 .tti-results .form-textarea { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
 

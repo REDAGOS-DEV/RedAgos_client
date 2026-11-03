@@ -69,11 +69,11 @@
               <!-- First and last name are stored apart, so they are edited apart. -->
               <div class="form-group">
                 <label class="form-label" for="bc-first-name">First name</label>
-                <input id="bc-first-name" v-model="profileForm.firstName" type="text" class="form-input" :disabled="!editingProfile" />
+                <input id="bc-first-name" v-model="profileForm.firstName" v-person-name type="text" class="form-input" :disabled="!editingProfile" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="bc-last-name">Last name</label>
-                <input id="bc-last-name" v-model="profileForm.lastName" type="text" class="form-input" :disabled="!editingProfile" />
+                <input id="bc-last-name" v-model="profileForm.lastName" v-person-name type="text" class="form-input" :disabled="!editingProfile" />
               </div>
             </div>
           </div>
@@ -98,7 +98,7 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="bc-phone">Contact number</label>
-                <input id="bc-phone" v-model="profileForm.contactNumber" type="tel" class="form-input" placeholder="09XXXXXXXXX" :disabled="!editingProfile" />
+                <PhoneField id="bc-phone" v-model="profileForm.contactNumber" class="settings-phone" :disabled="!editingProfile" />
               </div>
             </div>
           </div>
@@ -112,7 +112,6 @@
               <div><dt><AssetIcon name="building-2" :size="13" /> Blood center</dt><dd>{{ profileForm.bloodCenter || '-' }}</dd></div>
               <div><dt><AssetIcon name="mail" :size="13" /> Sign-in email</dt><dd>{{ profileForm.email || '-' }}</dd></div>
             </dl>
-            <p v-if="editingProfile" class="form-hint">Ask your Blood Center Admin to change your role or sign-in email.</p>
           </div>
         </div>
 
@@ -221,12 +220,8 @@
             <p class="mini__label">Preview</p>
           </div>
 
-          <!-- Across the whole card: the note on the left, Reset in the bottom-right corner. -->
+          <!-- Across the whole card: Reset in the bottom-right corner. -->
           <div class="appearance-foot">
-            <p class="appearance-foot__note">
-              <AssetIcon name="info" :size="13" />
-              Buttons and links keep readable contrast with any colour you pick.
-            </p>
             <button type="button" class="appearance-foot__reset" :disabled="isDefaultAppearance" @click="resetAppearance">
               Reset to default
             </button>
@@ -383,6 +378,7 @@ import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
 import BloodCenterDonorEmailTemplatesCard from '~/components/BloodCenter/DonorEmailTemplatesCard.vue'
 import BloodCenterBookingScheduleCard from '~/components/BloodCenter/BookingScheduleCard.vue'
@@ -1052,7 +1048,6 @@ onMounted(async () => {
 .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
 .form-optional { font-weight: 400; color: var(--rb-placeholder, #94A3B8); }
-.form-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); }
 
 /*
  * Anchored on the page root on purpose. Several other portals ship
@@ -1081,6 +1076,14 @@ onMounted(async () => {
 }
 
 .settings-page .form-input:disabled { background: var(--rb-surface-alt); color: var(--text-primary); cursor: default; }
+
+/* The phone field at the same size as the inputs beside it. */
+.settings-page .settings-phone {
+  --pf-h: var(--rb-control-height, 42px);
+  --pf-radius: 12px;
+  --pf-text: var(--text-primary);
+  --pf-focus: 0 0 0 4px rgba(var(--rb-primary-rgb), 0.14);
+}
 
 .readonly-grid {
   display: grid;
@@ -1143,12 +1146,11 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   padding: 16px 26px 20px;
   border-top: 1px solid var(--rb-border);
 }
-.appearance-foot__note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--rb-fs-caption); color: var(--rb-text-secondary); }
 .appearance-foot__reset {
   margin-left: auto;
   min-height: 34px;

@@ -310,9 +310,8 @@
               <!-- The subsidy waives the whole bill; it is a decision, not a payment. -->
               <div v-if="subsidyOpen" class="subsidy-form">
                 <p class="subsidy-title">Apply the government subsidy</p>
-                <p class="quiet">
-                  Waives the whole {{ pesos(bill.total_amount) }} and clears the blood for release. No payment is recorded.
-                  <template v-if="Number(bill.collected) > 0">The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.</template>
+                <p v-if="Number(bill.collected) > 0" class="quiet">
+                  The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.
                 </p>
                 <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="Reason (optional), e.g. DOH allocation" aria-label="Reason for the subsidy">
                 <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>

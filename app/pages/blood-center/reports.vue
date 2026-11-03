@@ -389,7 +389,6 @@
                         </div>
                     </form>
                     <p v-if="generateError" class="form-error" role="alert">{{ generateError }}</p>
-                    <p v-else-if="!canGenerateReport" class="form-hint">Pick a date range to generate a report.</p>
 
                     <!-- Weekly trend chart -->
                     <div class="chart-header-row">
@@ -497,7 +496,6 @@
                             <div v-for="n in 4" :key="'skp-' + n" class="donor-row skeleton-block" />
                         </div>
                         <div v-else-if="reportPreviewData">
-                            <p class="modal-subtitle">{{ reportPreviewData.summary }}</p>
                             <div class="preview-stats">
                                 <div v-for="stat in reportPreviewData.stats" :key="stat.label" class="preview-stat">
                                     <span class="preview-stat__value">{{ stat.value }}</span>
@@ -1290,7 +1288,6 @@ onMounted(async () => {
 .view-toggle__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 .form-error { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-accent-text); }
-.form-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
 
 .spinner {
     width: 32px;
@@ -2191,7 +2188,6 @@ onMounted(async () => {
     gap: 14px;
 }
 
-.modal-subtitle { font-size: 13px; color: var(--rf-text-secondary); margin: 0; }
 
 .preview-stats {
     display: grid;

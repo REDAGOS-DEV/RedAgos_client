@@ -67,23 +67,10 @@
         </ol>
 
         <template v-if="step === 'details'">
-          <!-- WHAT THIS IS -->
-          <section class="panel fade-in" style="--delay:40ms">
-            <h2 class="panel-title">Blood request</h2>
-            <p class="panel-hint">
-              Blood for a named patient, which may be split across several blood centers. Restocking your blood bank
-              is not requested here: it is your
-              <NuxtLink to="/hospital/receiving/weekly">weekly request</NuxtLink>, sent on your request days.
-            </p>
-          </section>
 
           <!-- OWN STOCK CHECK -->
           <section class="panel fade-in" style="--delay:50ms">
             <h2 class="panel-title">Your own stock first</h2>
-            <p class="panel-hint">
-              Check your blood bank's own inventory before asking other facilities. Continue only if it cannot cover
-              this patient.
-            </p>
             <label class="check" :class="{ 'check--error': errors.stock_confirmed }">
               <input v-model="form.stock_confirmed" type="checkbox">
               <span>We checked our own inventory and it cannot cover this patient's need.</span>
@@ -222,13 +209,7 @@
           <!-- COMPONENTS -->
           <section class="panel fade-in" style="--delay:100ms">
             <div class="panel-head">
-              <div>
-                <h2 class="panel-title">Components needed</h2>
-                <p class="panel-hint">
-                  Each component carries its own indication code and unit count. A component can
-                  only be listed once.
-                </p>
-              </div>
+              <h2 class="panel-title">Components needed</h2>
               <button
                 type="button"
                 class="ui-btn ui-btn--sm"
@@ -318,9 +299,6 @@
                     maxlength="255"
                     placeholder="State the clinical indication"
                   >
-                  <p class="field-hint">
-                    This code automatically triggers a review of your indication.
-                  </p>
                   <p v-if="lineErrors[index]?.indication_other" class="field-error">
                     {{ lineErrors[index].indication_other }}
                   </p>
@@ -348,10 +326,6 @@
         <template v-else-if="step === 'sourcing'">
           <section class="panel fade-in">
             <h2 class="panel-title">Choose facilities</h2>
-            <p class="panel-hint">
-              Split the patient's need across facilities. You may ask for less than required and ask another facility
-              later; you cannot ask for more.
-            </p>
             <SourcingPanel
               v-model="split"
               :plan="plan"
@@ -397,11 +371,6 @@
                 — {{ share.lines.map((line) => `${componentName(line.component_id)} ${line.quantity}`).join(', ') }}
               </li>
             </ul>
-
-            <p class="panel-hint review__hint">
-              Selecting a facility is a request, not a reservation. Each facility reviews its own share and reserves units
-              only when it approves.
-            </p>
           </section>
 
           <div class="action-bar">
@@ -785,9 +754,6 @@ function startAnother() {
 }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 4px; }
-.panel-hint { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; max-width: 64ch; }
-/* A card that is only a title and a note ends at the note, with no gap under it. */
-.panel > .panel-hint:last-child { margin-bottom: 0; }
 
 .banner {
   display: flex; align-items: center; gap: 8px;
@@ -850,7 +816,6 @@ function startAnother() {
 .dup-warning__ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--rb-primary-text); }
 .dup-warning__hint { margin: 0; color: var(--rb-text-secondary); }
 .field-error--block { margin-bottom: 10px; }
-.field-hint { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 
 /* Priority pills */
 .priority-row { display: flex; gap: 8px; }
@@ -978,7 +943,6 @@ function startAnother() {
 .review__heading { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); margin: 14px 0 6px; }
 .review__list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-primary); }
 .review__open { color: var(--rb-warning-text); font-weight: 600; }
-.review__hint { margin: 14px 0 0; }
 
 .success-list { margin: 0 auto 14px; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.7; color: var(--rb-text-primary); }
 .success-note { font-size: 13px; color: var(--rb-warning-text); margin: 0 auto 16px; max-width: 52ch; }

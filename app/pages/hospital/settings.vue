@@ -58,7 +58,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Profile</h2>
-            <p class="card__sub">Your details as blood centers see them on the requests you send.</p>
           </div>
           <span v-if="editingProfile" class="editing-pill"><AssetIcon name="pencil" :size="12" /> Editing</span>
         </header>
@@ -70,11 +69,11 @@
               <!-- First and last name are stored apart, so they are edited apart. -->
               <div class="form-group">
                 <label class="form-label" for="hs-first-name">First name</label>
-                <input id="hs-first-name" v-model="profileForm.firstName" type="text" class="form-input" :disabled="!editingProfile" />
+                <input id="hs-first-name" v-model="profileForm.firstName" v-person-name type="text" class="form-input" :disabled="!editingProfile" />
               </div>
               <div class="form-group">
                 <label class="form-label" for="hs-last-name">Last name</label>
-                <input id="hs-last-name" v-model="profileForm.lastName" type="text" class="form-input" :disabled="!editingProfile" />
+                <input id="hs-last-name" v-model="profileForm.lastName" v-person-name type="text" class="form-input" :disabled="!editingProfile" />
               </div>
             </div>
           </div>
@@ -96,7 +95,7 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="hs-phone">Contact number</label>
-                <input id="hs-phone" v-model="profileForm.contactNumber" type="tel" class="form-input" placeholder="09XXXXXXXXX" :disabled="!editingProfile" />
+                <PhoneField id="hs-phone" v-model="profileForm.contactNumber" class="settings-phone" :disabled="!editingProfile" />
               </div>
             </div>
           </div>
@@ -110,7 +109,6 @@
               <div><dt><AssetIcon name="mail" :size="13" /> Sign-in email</dt><dd>{{ profileForm.email || '-' }}</dd></div>
               <div><dt><AssetIcon name="id-card" :size="13" /> Employee ID</dt><dd>{{ profileForm.employeeId || '-' }}</dd></div>
             </dl>
-            <p v-if="editingProfile" class="form-hint">Ask your Blood Bank Head to change your role or sign-in email.</p>
           </div>
         </div>
 
@@ -130,7 +128,6 @@
         <div class="card__aside">
           <span class="aside-icon"><AssetIcon name="lock" :size="20" /></span>
           <h2 class="card__title">Password</h2>
-          <p class="card__sub">Changing it signs you out everywhere, this device included; sign in again with the new one.</p>
           <ul class="checklist" aria-label="Password requirements">
             <li v-for="rule in passwordRules" :key="rule.label" :class="{ 'checklist--ok': rule.met }">
               <AssetIcon :name="rule.met ? 'check' : 'circle'" :size="13" /> {{ rule.label }}
@@ -185,7 +182,6 @@
       <section v-if="activeTab === 'appearance'" class="card card--split card--appearance">
         <div class="card__main">
           <h2 class="card__title">Appearance</h2>
-          <p class="card__sub">Make RedAgos yours. Saved on this device and used in every RedAgos portal.</p>
           <!-- The shared picker: mode, colour and custom colour. -->
           <AppearancePicker class="card__picker" />
         </div>
@@ -217,12 +213,8 @@
           <p class="mini__label">Preview</p>
         </div>
 
-        <!-- Across the whole card: the note on the left, Reset in the bottom-right corner. -->
+        <!-- Across the whole card: Reset in the bottom-right corner. -->
         <div class="appearance-foot">
-          <p class="appearance-foot__note">
-            <AssetIcon name="info" :size="13" />
-            Buttons and links keep readable contrast with any colour you pick.
-          </p>
           <button type="button" class="appearance-foot__reset" :disabled="isDefaultAppearance" @click="resetAppearance">
             Reset to default
           </button>
@@ -235,7 +227,6 @@
           <header class="card__head">
             <div>
               <h2 class="card__title">Signed-in devices</h2>
-              <p class="card__sub">Where your account is open right now.</p>
             </div>
           </header>
 
@@ -259,7 +250,6 @@
           <header class="card__head">
             <div>
               <h2 class="card__title">Account information</h2>
-              <p class="card__sub">Read-only details about your account.</p>
             </div>
           </header>
           <dl class="info-grid">
@@ -281,7 +271,6 @@
         <header class="card__head">
           <div>
             <h2 class="card__title">Hospital</h2>
-            <p class="card__sub">Your blood bank as blood centers see it when you request blood. Kept by the RedAgos administrators; ask them to change it.</p>
           </div>
         </header>
         <dl class="info-grid info-grid--two">
@@ -317,9 +306,6 @@
               <AssetIcon name="x" :size="18" />
             </button>
           </div>
-          <p class="modal-subtitle">
-            This signs you out everywhere, including this device. You'll need to sign in again on each one.
-          </p>
           <p v-if="sessionError" class="note note--error note--flat"><AssetIcon name="circle-alert" :size="14" /> {{ sessionError }}</p>
           <div class="modal-actions">
             <button type="button" class="ui-btn ui-btn--ghost" @click="confirmLogoutOthers = false">Cancel</button>
@@ -349,6 +335,7 @@
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PhoneField from '~/components/common/PhoneField.vue'
 import { authService } from '~/api/auth/AuthService'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { resolveApiAssetURL } from '~/api/BaseService'
@@ -849,7 +836,6 @@ onMounted(async () => {
   padding: 22px 0 16px;
 }
 .card__title { margin: 0; font-size: var(--rb-fs-section, 15px); font-weight: 700; color: var(--text-primary); }
-.card__sub { margin: 3px 0 0; font-size: var(--rb-fs-small, 13px); line-height: 1.5; color: var(--text-secondary); }
 .card__foot {
   display: flex;
   justify-content: flex-end;
@@ -910,7 +896,6 @@ onMounted(async () => {
 .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
 .form-optional { font-weight: 400; color: var(--rb-placeholder, #94A3B8); }
-.form-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); }
 
 /* Anchored on the page root, so a portal's unscoped `.dark .form-input` rule cannot outrank it. */
 .settings-page .form-input {
@@ -931,6 +916,14 @@ onMounted(async () => {
   box-shadow: 0 0 0 4px rgba(var(--rb-primary-rgb), 0.14);
 }
 .settings-page .form-input:disabled { background: var(--rb-surface-alt); color: var(--text-primary); cursor: default; }
+
+/* The phone field at the same size as the inputs beside it. */
+.settings-page .settings-phone {
+  --pf-h: var(--rb-control-height, 42px);
+  --pf-radius: 12px;
+  --pf-text: var(--text-primary);
+  --pf-focus: 0 0 0 4px rgba(var(--rb-primary-rgb), 0.14);
+}
 
 .readonly-grid {
   display: grid;
@@ -990,12 +983,11 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   padding: 16px 26px 20px;
   border-top: 1px solid var(--rb-border);
 }
-.appearance-foot__note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--rb-fs-caption); color: var(--rb-text-secondary); }
 .appearance-foot__reset {
   margin-left: auto;
   min-height: 34px;
@@ -1195,7 +1187,7 @@ onMounted(async () => {
   box-shadow: var(--rb-shadow-md);
 }
 .modal-card:focus { outline: none; }
-.modal-card__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-card__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .modal-card__heading { display: flex; align-items: center; gap: 10px; }
 .modal-card__icon {
   display: flex;
@@ -1221,7 +1213,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 .modal-card__close:hover { background: var(--rb-surface-hover); }
-.modal-subtitle { margin: 14px 0 18px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .modal-enter-active,
 .modal-leave-active { transition: opacity 0.18s ease; }

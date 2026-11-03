@@ -40,7 +40,6 @@
 
         <div class="tpl-field">
           <span class="tpl-label">Insert a detail</span>
-          <span class="tpl-help">Click one to add it where your cursor is. Each email fills it in for its donor.</span>
           <!-- Named in words; the {code} the email uses is in the tooltip. -->
           <div class="tpl-chips">
             <button
@@ -82,7 +81,6 @@
               </template>
             </p>
           </div>
-          <span class="tpl-help">Sample donor. Each real email uses its own donor's details.</span>
         </div>
 
         <div class="tpl-actions">
@@ -348,7 +346,6 @@ onMounted(() => {
 
 .tpl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.tpl-help { margin-top: -2px; font-size: 12px; color: var(--rb-text-secondary); }
 
 .tpl-chip {
   display: inline-flex;

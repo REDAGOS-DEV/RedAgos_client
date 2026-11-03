@@ -184,7 +184,6 @@
               <label class="field">
                 <span class="form-label">Started at</span>
                 <input v-model="form.starts_at" type="time" class="form-input">
-                <span class="field-hint">A donor with no screening time on the paper is dated at this time.</span>
               </label>
             </div>
 
@@ -198,13 +197,11 @@
                 <input v-model="form.phlebotomist_name" type="text" class="form-input" maxlength="120" placeholder="As written on the paper">
               </label>
             </div>
-            <p class="field-hint">Each donor starts with these names; change them on any donor the paper says otherwise.</p>
 
             <label class="check">
               <input v-model="form.notify_donors" type="checkbox">
               <span>
                 <strong>Email donors their thank-you or deferral notice</strong>
-                <span class="field-hint">Untick for an old record, so no one is emailed about a donation from long ago.</span>
               </span>
             </label>
 
@@ -806,7 +803,6 @@ onBeforeUnmount(() => {
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .form-label { font-size: 12.5px; font-weight: 600; }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
-.field-hint { display: block; margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--rb-text-secondary); font-weight: 500; }
 .field-error { font-size: 12px; color: var(--rb-accent-text); }
 
 .choice { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 0; border: 0; }

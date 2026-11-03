@@ -297,9 +297,6 @@
               maxlength="150"
               :placeholder="handedToPlaceholder(dispatchFor)"
             >
-            <p v-if="dispatchFor.is_walk_in" class="field-hint">
-              A walk-in's units usually leave with the watcher who presented the request.
-            </p>
           </div>
 
           <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
@@ -925,7 +922,6 @@ onMounted(load)
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
 .field-optional { font-weight: 400; color: var(--rb-text-secondary); }
-.field-hint { font-size: 11.5px; color: var(--rb-text-secondary); margin: 0; }
 .req { color: var(--rb-accent-text); }
 .input {
   width: 100%; padding: 9px 11px; font-size: 13.5px; font-family: inherit;
