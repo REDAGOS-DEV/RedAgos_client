@@ -2,19 +2,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import {
   rememberPendingVerification,
   readPendingVerification,
-  markEmailVerified,
-  hasVerifiedSignal,
-  clearVerificationHandoff,
-  onEmailVerified,
+  clearPendingVerification,
 } from '~/utils/emailVerification'
 
 /**
- * The hand-off between the tab that registered and the tab that verified.
- *
- * What is worth pinning down here is the decision it drives: a donor is only
- * sent on to login on a marker the verify page wrote after the API confirmed
- * the address, and a *stale* marker must never send someone registering a
- * second account straight past their own "check your email" step.
+ * The registration waiting on its verification code, kept across a reload so
+ * the register page can put the code step back instead of an empty form.
  */
 function fakeStorage(): Storage {
   const data = new Map<string, string>()
@@ -39,13 +32,28 @@ afterEach(() => {
 })
 
 describe('the pending registration', () => {
-  it('survives a reload so the panel can be restored', () => {
+  it('survives a reload so the code step can be restored', () => {
     rememberPendingVerification('donor@example.com')
 
     expect(readPendingVerification()?.email).toBe('donor@example.com')
   })
 
   it('is absent before anyone registers', () => {
+    expect(readPendingVerification()).toBeNull()
+  })
+
+  it('is replaced by a second registration', () => {
+    rememberPendingVerification('first@example.com')
+    rememberPendingVerification('second@example.com')
+
+    expect(readPendingVerification()?.email).toBe('second@example.com')
+  })
+
+  it('is forgotten once the address is verified', () => {
+    rememberPendingVerification('donor@example.com')
+
+    clearPendingVerification()
+
     expect(readPendingVerification()).toBeNull()
   })
 
@@ -68,90 +76,12 @@ describe('the pending registration', () => {
 
     expect(() => rememberPendingVerification('donor@example.com')).not.toThrow()
     expect(readPendingVerification()).toBeNull()
-    expect(hasVerifiedSignal()).toBe(false)
+    expect(() => clearPendingVerification()).not.toThrow()
   })
 
   it('reports nothing when the stored value is not the shape we wrote', () => {
     localStorage.setItem('_pending_verification', 'not json')
 
     expect(readPendingVerification()).toBeNull()
-  })
-})
-
-describe('the verified signal', () => {
-  it('is only raised once the verify page records a confirmed verification', () => {
-    rememberPendingVerification('donor@example.com')
-    expect(hasVerifiedSignal()).toBe(false)
-
-    markEmailVerified()
-
-    expect(hasVerifiedSignal()).toBe(true)
-  })
-
-  it('does not survive into a second registration', () => {
-    rememberPendingVerification('first@example.com')
-    markEmailVerified()
-
-    // Somebody signs up again on the same browser. Carrying the old marker over
-    // would skip them straight past their own verification step.
-    rememberPendingVerification('second@example.com')
-
-    expect(hasVerifiedSignal()).toBe(false)
-    expect(readPendingVerification()?.email).toBe('second@example.com')
-  })
-
-  it('is forgotten once acted on', () => {
-    rememberPendingVerification('donor@example.com')
-    markEmailVerified()
-
-    clearVerificationHandoff()
-
-    expect(hasVerifiedSignal()).toBe(false)
-    expect(readPendingVerification()).toBeNull()
-  })
-})
-
-describe('onEmailVerified', () => {
-  const listeners = new Set<(_e: StorageEvent) => void>()
-
-  beforeEach(() => {
-    listeners.clear()
-    vi.stubGlobal('window', {
-      addEventListener: (_: string, fn: (_e: StorageEvent) => void) => void listeners.add(fn),
-      removeEventListener: (_: string, fn: (_e: StorageEvent) => void) => void listeners.delete(fn),
-    })
-  })
-
-  function emit(key: string, newValue: string | null) {
-    for (const fn of listeners) fn({ key, newValue } as StorageEvent)
-  }
-
-  it('fires when another tab records a verification', () => {
-    const handler = vi.fn()
-    onEmailVerified(handler)
-
-    emit('_email_verified', String(Date.now()))
-
-    expect(handler).toHaveBeenCalledOnce()
-  })
-
-  it('ignores unrelated keys and our own clean-up removal', () => {
-    const handler = vi.fn()
-    onEmailVerified(handler)
-
-    emit('_token', 'abc')
-    emit('_email_verified', null)
-
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('stops listening once unsubscribed', () => {
-    const handler = vi.fn()
-    const stop = onEmailVerified(handler)
-
-    stop()
-    emit('_email_verified', String(Date.now()))
-
-    expect(handler).not.toHaveBeenCalled()
   })
 })

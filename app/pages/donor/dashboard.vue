@@ -111,7 +111,7 @@
           <section v-if="setupItems.length || emailPrompt" class="setup" aria-label="Finish setting up">
             <!--
               A donor the blood center desk registered has no confirmed email:
-              the desk typed it (no link is mailed then), or there is none.
+              the desk typed it (no code is mailed then), or there is none.
               Booking, the check-in QR and a forgotten-password link all need one.
             -->
             <NuxtLink v-if="emailPrompt === 'add'" to="/donor/profile" class="setup__item setup__item--warning">
@@ -122,18 +122,14 @@
               </span>
               <AssetIcon name="chevron-right" :size="16" class="setup__chev" />
             </NuxtLink>
-            <div v-else-if="emailPrompt" class="setup__item" :class="verifySent ? 'setup__item--muted' : 'setup__item--warning'"
-              role="status">
+            <div v-else-if="emailPrompt" class="setup__item setup__item--warning" role="status">
               <span class="setup__icon"><AssetIcon name="mail" :size="18" /></span>
               <span class="setup__text">
-                <strong>{{ verifySent ? 'Check your inbox' : 'Confirm your email' }}</strong>
-                <span v-if="verifySent">Open the link we sent to {{ user?.email }} to confirm it.</span>
-                <span v-else>Confirm {{ user?.email }} to book online, get your check-in QR code and reset a forgotten password.</span>
-                <span v-if="verifyError" class="setup__error">{{ verifyError }}</span>
+                <strong>Confirm your email</strong>
+                <span>Confirm {{ user?.email }} to book online, get your check-in QR code and reset a forgotten password.</span>
               </span>
-              <button v-if="!verifySent" type="button" class="setup__action" :disabled="verifySending"
-                @click="sendVerification">
-                {{ verifySending ? 'Sending…' : 'Send link' }}
+              <button type="button" class="setup__action" @click="verifyOpen = true">
+                Send code
               </button>
             </div>
 
@@ -338,6 +334,13 @@
         </aside>
       </div>
     </div>
+
+    <EmailCodeDialog
+      v-if="verifyOpen && user?.email"
+      :email="user.email"
+      @close="verifyOpen = false"
+      @verified="onEmailVerified"
+    />
   </div>
 </template>
 
@@ -349,10 +352,10 @@ definePageMeta({
 })
 
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import EmailCodeDialog from '~/components/donor/EmailCodeDialog.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { donorService } from '~/api/donor/DonorService'
-import { authService } from '~/api/auth/AuthService'
 import { bookingCatalogService } from '~/api/booking-catalog/BookingCatalogService'
 import { useUser } from '~/composables/useUser'
 
@@ -361,7 +364,7 @@ const route = useRoute()
 const loading = ref(true)
 
 // ── Greeting ──
-const { user } = useUser()
+const { user, refreshUser } = useUser()
 
 // ── Email prompt ──
 // 'add' with no address, 'confirm' with an unconfirmed one, null otherwise.
@@ -371,24 +374,14 @@ const emailPrompt = computed(() => {
   if (!user.value.email) return 'add'
   return user.value.email_verified ? null : 'confirm'
 })
-const verifySending = ref(false)
-const verifySent = ref(false)
-const verifyError = ref('')
 
-async function sendVerification() {
-  if (verifySending.value) return
-  verifySending.value = true
-  verifyError.value = ''
-  try {
-    await authService.resendVerificationEmail()
-    verifySent.value = true
-  } catch (err) {
-    verifyError.value = err?.status === 429
-      ? 'Too many requests. Please wait a few minutes and try again.'
-      : (err?.message || 'Could not send the link. Please try again.')
-  } finally {
-    verifySending.value = false
-  }
+// The code dialog: it mails the code as it opens. Once the address is
+// confirmed, the fresh /user drops the prompt.
+const verifyOpen = ref(false)
+
+async function onEmailVerified() {
+  verifyOpen.value = false
+  await refreshUser()
 }
 
 const greeting = computed(() => {
@@ -1324,7 +1317,6 @@ watch(() => route.path, () => {
 .setup__text strong { font-size: 14px; font-weight: 700; }
 .setup__text span { font-size: 13px; line-height: 1.4; color: var(--rb-text-secondary); }
 .setup__chev { margin-left: auto; flex: none; color: var(--rb-text-muted); }
-.setup__error { font-weight: 600; color: var(--danger-text) !important; }
 .setup__action {
   flex: none;
   margin-left: auto;

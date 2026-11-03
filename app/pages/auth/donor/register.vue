@@ -11,51 +11,18 @@
 
     <!--
       Ang email verification kay parte na sa registration, dili na sa ulahi.
-      Human ma-submit, dinhi ra ta mo-puyo hangtod ma-verify. Walay redirect
-      padulong sa login, kay dili man gyud siya makasulod kung wala pa
-      na-verify ang address.
+      Human ma-submit, dinhi ra ta mo-puyo hangtod ma-verify: ang code nga
+      gi-email (2026-11-03, kaniadto link), ug human niana diretso na siya
+      maka-sign in.
     -->
-    <section v-if="registeredEmail" class="verify-step" aria-live="polite">
-      <span class="verify-icon"><AssetIcon name="mail" :size="26" /></span>
-
-      <header class="au-header">
-        <h1>Check your email</h1>
-        <p>We sent a verification link to</p>
-      </header>
-
-      <p class="verify-email">{{ registeredEmail }}</p>
-
-      <p class="verify-lead">
-        Open it to activate your account. You can sign in once your email is verified.
-      </p>
-      <p class="au-hint verify-hint">
-        The link is valid for 60 minutes. No email? Check your spam folder first.
-      </p>
-
-      <button
-        type="button"
-        class="au-btn au-btn--outline"
-        :disabled="isResending"
-        @click="resendVerification"
-      >
-        <AssetIcon name="refresh-cw" :size="16" :class="{ 'au-spinner': isResending }" />
-        {{ isResending ? 'Sending...' : 'Resend verification email' }}
-      </button>
-
-      <p
-        v-if="resendMessage"
-        class="verify-note"
-        :class="{ 'verify-note--error': resendFailed }"
-        role="status"
-      >
-        {{ resendMessage }}
-      </p>
-
-      <p class="au-footer">
-        Already verified?
-        <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
-      </p>
-    </section>
+    <EmailCodeStep v-if="registeredEmail" :email="registeredEmail" @verified="continueToPortal">
+      <template #footer>
+        <p class="au-footer">
+          Already verified?
+          <NuxtLink to="/auth/donor/login">Sign In</NuxtLink>
+        </p>
+      </template>
+    </EmailCodeStep>
 
     <template v-else>
       <header class="au-header">
@@ -264,17 +231,17 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import AuthShell from '~/components/auth/AuthShell.vue'
 import AuthSelect from '~/components/auth/AuthSelect.vue'
+import EmailCodeStep from '~/components/auth/EmailCodeStep.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import IdNumberField from '~/components/common/IdNumberField.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
 import { VALID_ID_TYPE_OPTIONS, idNumberProblem } from '~/utils/validId'
 import { authPhoto } from '~/utils/authPhotos'
 import { donorService } from '~/api/donor/DonorService'
-import { authService } from '~/api/auth/AuthService'
 
 definePageMeta({
   layout: 'default',
@@ -341,12 +308,13 @@ const isSubmitting = ref(false)
 const submitError = ref('')
 const fieldErrors = reactive({})
 
-// Kung dili blangko, na-submit na ang registration ug ang verification step na
-// ang gipakita imbes ang porma.
+// Kung dili blangko, na-submit na ang registration ug ang code step na ang
+// gipakita imbes ang porma.
 const registeredEmail = ref('')
-const isResending = ref(false)
-const resendMessage = ref('')
-const resendFailed = ref(false)
+
+// The sign-in after the code: the address and password just typed, so the
+// donor lands in the portal instead of typing them again.
+const signIn = useAuthLogin('donor')
 
 async function handleSubmit() {
   if (isSubmitting.value) return
@@ -382,11 +350,10 @@ async function handleSubmit() {
 
     // Wala nay redirect padulong sa login: ang account kay dili pa maka-sign in
     // hangtod ma-verify ang address, so dinhi ra siya magpabilin diin naa ang
-    // instruksyon ug ang resend.
+    // code ug ang resend.
     registeredEmail.value = form.email.trim()
 
-    // Gi-sulat sa localStorage aron ma-survive ang refresh, ug aron makaila ang
-    // page sa signal gikan sa tab nga mo-abli sa verification link.
+    // Gi-sulat sa localStorage aron ma-survive ang refresh.
     rememberPendingVerification(registeredEmail.value)
   } catch (err) {
     applyValidationErrors(err)
@@ -396,81 +363,38 @@ async function handleSubmit() {
   }
 }
 
-async function resendVerification() {
-  if (isResending.value) return
+/**
+ * The address is verified: sign in with what was typed at registration.
+ *
+ * After a reload the password is gone (only the address is kept), and a
+ * sign-in that fails for any reason leaves the donor on the sign-in screen
+ * rather than here.
+ */
+async function continueToPortal() {
+  clearPendingVerification()
 
-  isResending.value = true
-  resendMessage.value = ''
-  resendFailed.value = false
+  if (!form.password) {
+    return navigateTo('/auth/donor/login')
+  }
 
-  try {
-    const response = await authService.resendVerificationEmailFor(registeredEmail.value)
-    resendMessage.value = response?.message || 'Sent. Check your inbox for a fresh link.'
-  } catch (err) {
-    resendFailed.value = true
-    resendMessage.value = err?.status === 429
-      ? 'Too many requests. Please wait a few minutes before trying again.'
-      : (err?.message || 'Could not send the verification email. Please try again.')
-  } finally {
-    isResending.value = false
+  signIn.email.value = registeredEmail.value
+  signIn.password.value = form.password
+  await signIn.login()
+
+  if (signIn.errorMessage.value) {
+    return navigateTo('/auth/donor/login')
   }
 }
-
-/**
- * Balhin padulong sa login kay na-verify na ang address.
- *
- * Gi-tawag ra ni gikan sa marker nga gisulat sa verify-email page human mo-tubag
- * og 200/204 ang `POST /api/email/verify` — so ang backend gyud ang nag-ingon,
- * dili ang pag-klik sa link ug dili pod usa ka timeout.
- */
-function proceedToLogin() {
-  clearVerificationHandoff()
-
-  return navigateTo('/auth/donor/login')
-}
-
-/**
- * Ang tab nga nag-rehistro kay wala nakakita sa verification — sa laing tab man
- * na nahitabo. Duha ka agianan padulong dinhi:
- *
- *   - `storage`: nag-abli pa ang duha ka tab, ug mi-verify siya sa pikas. Ang
- *     event mo-fire ra sa mga tab nga WALA nagsulat, so kini ra gyud.
- *   - mount: gi-refresh niya kini nga tab human ma-verify. Ang `storage` wala
- *     mi-fire para niya, so ang marker mismo ang basahon.
- *
- * Kung walay pending nga registration, wala gyuy bation nga marker: gi-clear man
- * siya sa `rememberPendingVerification` sa matag bag-ong sign-up.
- */
-let stopListening = () => {}
 
 onMounted(() => {
-  // Kanunay maminaw, bisan walay pending karon: mahimong mo-rehistro siya dinhi
-  // mismo karon ug unya mo-verify sa laing tab, ug kung hulaton pa nato ang
-  // pending sa mount, wala gyuy maminaw niadtong signal.
-  stopListening = onEmailVerified(() => {
-    // Ang panel ra ang gi-balhin. Kung nagbasa pa siya sa porma, pasagdi siya.
-    if (registeredEmail.value) {
-      proceedToLogin()
-    }
-  })
-
+  // Ibalik ang code step: kung wala ni, ang refresh mo-balik sa blangko nga
+  // porma, ug ang pag-rehistro pag-usab mo-ingon ra nga gamit na ang email.
   const pending = readPendingVerification()
 
-  if (!pending) {
-    return
+  if (pending) {
+    registeredEmail.value = pending.email
   }
-
-  if (hasVerifiedSignal()) {
-    proceedToLogin()
-    return
-  }
-
-  // Ibalik ang panel: kung wala ni, ang refresh mo-balik sa blangko nga porma ug
-  // mawala ang resend button nga mao ra ang ilang agianan.
-  registeredEmail.value = pending.email
 })
-
-onBeforeUnmount(() => stopListening())
 
 function clearFieldErrors() {
   for (const key of Object.keys(fieldErrors)) {
@@ -604,44 +528,4 @@ function applyValidationErrors(error) {
   line-height: 1.45;
 }
 .submit-error :deep(svg) { margin-top: 2px; }
-
-/* ── Verification step ── */
-.verify-step { text-align: center; }
-.verify-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20px;
-  background: var(--au-accent-soft);
-  color: var(--au-accent-text);
-}
-.verify-step .au-header { margin-bottom: 12px; }
-.verify-email {
-  display: inline-block;
-  max-width: 100%;
-  margin: 0 0 20px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--au-panel);
-  color: var(--au-text);
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-.verify-lead {
-  max-width: 40ch;
-  margin: 0 auto 8px;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--au-text-2);
-}
-.verify-hint { margin-bottom: 24px; }
-.verify-note {
-  margin: 12px 0 0;
-  font-size: 13.5px;
-  color: var(--au-text-2);
-}
-.verify-note--error { color: var(--au-danger); font-weight: 600; }
 </style>
