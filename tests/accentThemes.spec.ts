@@ -49,23 +49,20 @@ describe('surfaces tinted by the theme', () => {
   it.each(picks)('%s: light text passes on every dark surface', (hex) => {
     const { dark } = accentSurfaces(customAccentTheme(hex)!)
     for (const bg of [dark.base, dark.page, dark.surface, dark.chrome, dark.hover]) {
-      expect(contrast(rgb('#EEF1F5'), rgb(bg))).toBeGreaterThanOrEqual(7)
-      expect(contrast(rgb('#B4BCC9'), rgb(bg))).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(rgb('#E8EAED'), rgb(bg))).toBeGreaterThanOrEqual(7)
+      expect(contrast(rgb('#BDC1C6'), rgb(bg))).toBeGreaterThanOrEqual(4.5)
     }
   })
 
-  it('gives neutral greys for a grey, black or white pick', () => {
+  it("gives a grey, black or white pick the same dark greys as any other", () => {
     for (const hex of ['#7F7F7F', '#000000', '#FFFFFF']) {
-      const [r, g, b] = rgb(accentSurfaces(customAccentTheme(hex)!).dark.chrome)
-      expect(r).toBe(g)
-      expect(g).toBe(b)
+      expect(accentSurfaces(customAccentTheme(hex)!).dark.chrome).toBe('#2D2E31')
     }
   })
 
-  it('keeps Classic Blue close to the slate the portal used before', () => {
-    const [r, g, b] = rgb(accentSurfaces(accentTheme('blue')).dark.chrome)
-    const [r0, g0, b0] = rgb('#333C4D')
-    expect(Math.abs(r - r0) + Math.abs(g - g0) + Math.abs(b - b0)).toBeLessThan(24)
+  it("uses Chrome's dark greys whatever the theme (2026-10-31)", () => {
+    expect(accentSurfaces(accentTheme('blue')).dark.page).toBe('#202124')
+    expect(accentSurfaces(customAccentTheme('#2E7D32')!).dark).toEqual(accentSurfaces(accentTheme('blue')).dark)
   })
 })
 

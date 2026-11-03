@@ -331,10 +331,11 @@ useHead({ title: 'Blood Components · RedAgos' })
 const rows = ref([])
 const drafts = reactive({})
 const facilityName = ref('')
-const busy = ref(false)
+const busy = ref(true)
 const savingId = ref(null)
 const banner = ref('')
 const bannerKind = ref('notice')
+useNoticeToast(banner, { kind: bannerKind, keepWhile: () => busy.value })
 
 // ── What is still unset, as a filter (2026-10-28) ──
 const unsetCount = computed(() => rows.value.filter((row) => !row.shelf_life_configured).length)

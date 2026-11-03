@@ -1,22 +1,24 @@
 <template>
   <div class="requests-page">
-    <!-- Loading skeleton -->
-    <div v-if="loading" class="page-inner">
-      <div class="skeleton skeleton--title" />
-      <div class="skeleton skeleton--search" />
-      <div class="stats-grid">
-        <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-      </div>
-      <div class="skeleton skeleton--panel" style="height:420px" />
-    </div>
-
-    <div v-else class="page-inner">
+    <div class="page-inner">
       <!-- Page header -->
-      <PageHeader title="Patient Request" subtitle="Create, monitor, and manage blood requests submitted to the Blood Center." />
+      <PageHeader title="Patient Request" :subtitle="hospitalPageSubtitle('patientRequests', can)">
+        <template #actions>
+          <!-- A patient's need is raised here; restocking the shelf is the weekly request. -->
+          <NuxtLink to="/hospital/receiving/weekly" class="ui-btn" title="To restock your blood bank, send your weekly request">
+            <AssetIcon name="calendar-check" :size="15" />
+            Weekly Request
+          </NuxtLink>
+          <button v-if="canCreate" type="button" class="ui-btn ui-btn--primary" @click="openNewRequest">
+            <AssetIcon name="plus" :size="15" />
+            New Request
+          </button>
+        </template>
+      </PageHeader>
 
       <!-- Summary figures -->
       <StatStrip>
-        <StatItem label="Pending requests" :value="animatedCounts.pending" icon="clock" tone="warning">
+        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.pending" @click="toggleStatus(CARD_STATUSES.pending)" label="Pending requests" :value="animatedCounts.pending" icon="clock" tone="warning">
           <template #hint>
             Awaiting Blood Center review
             <span v-if="trends.pending.hasData" class="stat-trend" :class="trends.pending.up ? 'up' : 'down'">
@@ -25,7 +27,7 @@
             </span>
           </template>
         </StatItem>
-        <StatItem label="Processing" :value="animatedCounts.approved" icon="check-circle" tone="success">
+        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.approved" @click="toggleStatus(CARD_STATUSES.approved)" label="Processing" :value="animatedCounts.approved" icon="check-circle" tone="success">
           <template #hint>
             Stock reserved by the blood center
             <span v-if="trends.approved.hasData" class="stat-trend" :class="trends.approved.up ? 'up' : 'down'">
@@ -34,7 +36,7 @@
             </span>
           </template>
         </StatItem>
-        <StatItem label="Partially fulfilled" :value="animatedCounts.ready" icon="package-check" tone="purple">
+        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.ready" @click="toggleStatus(CARD_STATUSES.ready)" label="Partially fulfilled" :value="animatedCounts.ready" icon="package-check" tone="purple">
           <template #hint>
             Some units supplied, the rest outstanding
             <span v-if="trends.ready.hasData" class="stat-trend" :class="trends.ready.up ? 'up' : 'down'">
@@ -43,7 +45,7 @@
             </span>
           </template>
         </StatItem>
-        <StatItem label="Fulfilled" :value="animatedCounts.completed" icon="clipboard-check" tone="primary">
+        <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.completed" @click="toggleStatus(CARD_STATUSES.completed)" label="Fulfilled" :value="animatedCounts.completed" icon="clipboard-check" tone="primary">
           <template #hint>
             Every requested unit released
             <span v-if="trends.completed.hasData" class="stat-trend" :class="trends.completed.up ? 'up' : 'down'">
@@ -55,11 +57,6 @@
       </StatStrip>
 
       <!-- Restocking the blood bank is not requested here: it is the weekly request. -->
-      <p class="restock-note fade-in" style="--delay:80ms">
-        Blood requests for your patients. To restock your blood bank, send your
-        <NuxtLink to="/hospital/receiving/weekly">weekly request</NuxtLink> under Receiving.
-      </p>
-
       <!-- The list, as the centre's Donor Management draws it (project owner, 2026-10-30). -->
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
@@ -78,8 +75,8 @@
                 v-model="searchQuery"
                 type="search"
                 class="search__input"
-                placeholder="Search reference / type / component"
-                aria-label="Search requests by reference number, blood type or component"
+                placeholder="Search patient or reference"
+                aria-label="Search requests by patient, reference number, blood type or component"
               >
             </label>
             <DateRangeFilter v-model:from="filters.dateFrom" v-model:to="filters.dateTo" aria-label="Requested between" />
@@ -120,33 +117,74 @@
               <span class="btn-text">Refresh</span>
             </button>
 
-            <button v-if="canCreate" type="button" class="btn-primary" @click="openNewRequest">
-              <AssetIcon name="plus" :size="15" />
-              New Request
-            </button>
           </div>
+        </div>
+
+        <!-- What waits on this blood bank, one click away; only what has something. -->
+        <div v-if="hasQuickFilters || hasActiveFilters" class="quick-filters">
+          <button
+            v-if="waitingCounts.receive"
+            type="button"
+            class="quick"
+            :class="{ 'quick--on': filters.waiting === 'receive' }"
+            :aria-pressed="filters.waiting === 'receive'"
+            @click="toggleWaiting('receive')"
+          >
+            <AssetIcon name="package-check" :size="14" />
+            To receive
+            <span class="quick__count">{{ waitingCounts.receive }}</span>
+          </button>
+          <button
+            v-if="waitingCounts.allocate"
+            type="button"
+            class="quick"
+            :class="{ 'quick--on': filters.waiting === 'allocate' }"
+            :aria-pressed="filters.waiting === 'allocate'"
+            @click="toggleWaiting('allocate')"
+          >
+            <AssetIcon name="building-2" :size="14" />
+            Needs a facility
+            <span class="quick__count">{{ waitingCounts.allocate }}</span>
+          </button>
+          <button
+            v-if="waitingCounts.stat"
+            type="button"
+            class="quick quick--stat"
+            :class="{ 'quick--on': filters.priority === 'emergency' }"
+            :aria-pressed="filters.priority === 'emergency'"
+            @click="filters.priority = filters.priority === 'emergency' ? '' : 'emergency'"
+          >
+            <AssetIcon name="triangle-alert" :size="14" />
+            STAT, still open
+            <span class="quick__count">{{ waitingCounts.stat }}</span>
+          </button>
+          <button v-if="hasActiveFilters" type="button" class="quick-clear" @click="resetFilters">
+            <AssetIcon name="x" :size="13" />
+            Clear filters
+          </button>
         </div>
 
         <div class="table-wrap" :class="{ 'table-wrap--busy': refreshing && allRequests.length }">
           <table class="list-table">
-            <caption class="sr-only">Your patient transfusion requests, newest first</caption>
+            <caption class="sr-only">Your patient transfusion requests, open STAT requests first, then newest first</caption>
             <thead>
               <tr>
                 <th scope="col">Reference</th>
-                <th scope="col">Date</th>
-                <th scope="col">Group</th>
-                <th scope="col">Component</th>
-                <th scope="col" class="num">Units</th>
-                <th scope="col">Priority</th>
-                <th scope="col">Status</th>
+                <th scope="col">Patient</th>
+                <th scope="col">Needed</th>
+                <th scope="col">Requested</th>
                 <th scope="col">Progress</th>
                 <th scope="col" class="c-actions">Actions</th>
               </tr>
             </thead>
 
-            <tbody v-if="!pageItems.length">
+            <tbody v-if="loading">
+              <SkeletonRows :columns="6" :rows="6" />
+            </tbody>
+
+            <tbody v-else-if="!pageItems.length">
               <tr>
-                <td colspan="9" class="empty-cell">
+                <td colspan="6" class="empty-cell">
                   <div class="empty-state">
                     <span class="empty-state__icon"><AssetIcon :name="hasActiveFilters ? 'search-x' : 'droplets'" :size="20" /></span>
                     <p class="empty-state__title">{{ hasActiveFilters ? 'No requests match' : 'No blood requests yet' }}</p>
@@ -156,60 +194,66 @@
                         : 'Requests you raise for your patients appear here, with what each blood center supplied.' }}
                     </p>
                     <button v-if="hasActiveFilters" type="button" class="btn-outline" @click="resetFilters">Clear filters</button>
-                    <button v-else-if="canCreate" type="button" class="btn-primary" @click="openNewRequest">
-                      <AssetIcon name="plus" :size="15" />
-                      New Request
-                    </button>
                   </div>
                 </td>
               </tr>
             </tbody>
 
             <tbody v-else>
-              <tr v-for="req in pageItems" :key="req.id" class="list-row">
+              <tr v-for="req in pageItems" :key="req.id" class="list-row list-row--link" @click="openDrawer(req)">
                 <td>
                   <div class="cell">
                     <button type="button" class="code code-btn" :title="`Quick view of ${req.reference_number}`" @click="openDrawer(req)">{{ req.reference_number }}</button>
+                    <span v-if="req.priority === 'emergency'" class="tag tag--stat">STAT</span>
                     <span v-if="req.is_walk_in" class="tag" title="Brought to the blood center by a watcher and confirmed by your blood bank by phone">Walk-in</span>
                     <span v-if="req.needs_allocation" class="tag tag--alert" title="Some units have not been asked of any facility">{{ req.unallocated }} unallocated</span>
                     <span v-if="req.awaiting_receipt" class="tag tag--alert" title="Dispatched by the blood center, not yet received">{{ req.awaiting_receipt }} to receive</span>
                   </div>
                 </td>
+                <td>
+                  <div class="cell">
+                    <span class="cell__main">{{ req.patient || 'Not recorded' }}</span>
+                    <span v-if="req.purpose" class="cell__sub">{{ req.purpose }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="need">
+                    <span v-if="req.blood_type" class="blood">{{ req.blood_type }}</span>
+                    <span v-else class="muted">—</span>
+                    <div class="cell">
+                      <span class="cell__main">{{ req.component || '—' }}</span>
+                      <span class="cell__sub">{{ req.units }} unit{{ req.units === 1 ? '' : 's' }}</span>
+                    </div>
+                  </div>
+                </td>
                 <td class="nowrap">{{ formatDate(req.request_date) }}</td>
-                <td><span v-if="req.blood_type" class="blood">{{ req.blood_type }}</span><span v-else class="muted">—</span></td>
-                <td>{{ req.component || '—' }}</td>
-                <td class="num">{{ req.units }}</td>
                 <td>
-                  <!-- Only STAT is coloured; routine is the rule. -->
-                  <span class="badge" :class="badgeClass(req.priority === 'emergency' ? 'danger' : 'muted')">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ priorityOf(req.priority).label }}
-                  </span>
-                </td>
-                <td>
-                  <span class="badge" :class="badgeClass(statusOf(req.status).tone)">
-                    <span class="badge__dot" aria-hidden="true" />
-                    {{ req.status_text }}
-                  </span>
-                </td>
-                <td>
-                  <span class="step-dots" :title="progressLabel(req.status)" :aria-label="`Progress: ${progressLabel(req.status)}`">
-                    <span v-for="(s, i) in progressSteps" :key="s"
-                      class="step-dot"
-                      :class="{
-                        'step-dot--done': stepIndex(req.status) > i,
-                        'step-dot--current': stepIndex(req.status) === i,
-                        'step-dot--halted': isHalted(req.status)
-                      }" />
-                  </span>
+                  <div class="progress" :title="progressLabel(req.status)" :aria-label="`Progress: ${progressLabel(req.status)}`">
+                    <span class="badge" :class="badgeClass(statusOf(req.status).tone)">
+                      <span class="badge__dot" aria-hidden="true" />
+                      {{ req.status_text }}
+                    </span>
+                    <span class="progress__bar" aria-hidden="true">
+                      <span
+                        v-for="(step, i) in progressSteps"
+                        :key="step"
+                        class="progress__step"
+                        :class="{
+                          'progress__step--done': stepIndex(req.status) > i || req.status === 'fulfilled',
+                          'progress__step--current': stepIndex(req.status) === i && req.status !== 'fulfilled',
+                          'progress__step--halted': isHalted(req.status)
+                        }"
+                      />
+                    </span>
+                  </div>
                 </td>
                 <td class="c-actions">
-                  <div class="row-actions">
+                  <div class="row-actions" @click.stop>
                     <!-- Dispatched or picked up: the whole delivery into Stock Intake from here (project owner, 2026-10-30). -->
                     <button
                       v-if="canReceive && req.awaiting_receipt"
                       type="button"
-                      class="btn-outline btn-outline--sm btn-receive"
+                      class="btn-primary btn-receive"
                       :aria-label="`Receive ${req.awaiting_receipt} unit${req.awaiting_receipt === 1 ? '' : 's'} for ${req.reference_number}`"
                       @click="receiving = req"
                     >
@@ -278,23 +322,14 @@
       @close="receiving = null"
     />
 
-    <!-- Slide-over drawer -->
-    <Transition name="drawer-fade">
-      <div v-if="drawerOpen" class="drawer-backdrop" @click="closeDrawer" />
-    </Transition>
-    <Transition name="drawer-slide">
-      <aside v-if="drawerOpen && selectedRequest" class="drawer" role="dialog" v-focus-trap aria-label="Request details">
-        <div class="drawer__header">
-          <div>
-            <p class="drawer__eyebrow">Request Details</p>
-            <h2 class="drawer__title">{{ selectedRequest.reference_number }}</h2>
-          </div>
-          <button type="button" class="ui-btn ui-btn--icon" @click="closeDrawer" aria-label="Close details">
-            <AssetIcon name="x" :size="18" />
-          </button>
-        </div>
-
-        <div class="drawer__body">
+    <!-- Quick view, in the middle of the screen (2026-11-01). -->
+    <CenterModal
+      v-if="drawerOpen && selectedRequest"
+      :title="selectedRequest.reference_number"
+      eyebrow="Request details"
+      @close="closeDrawer"
+    >
+      <div class="quick-view">
           <div class="drawer__status-row">
             <StatusBadge :tone="statusOf(selectedRequest.status).tone">{{ selectedRequest.status_text }}</StatusBadge>
             <StatusBadge :tone="priorityOf(selectedRequest.priority).tone" :dot="false">{{ priorityOf(selectedRequest.priority).label }} Priority</StatusBadge>
@@ -341,11 +376,15 @@
               <dt>Requested By</dt>
               <dd>{{ selectedRequest.requested_by }}</dd>
             </div>
+            <div v-if="selectedRequest.raw?.needed_by" class="drawer__field">
+              <dt>Needed by</dt>
+              <dd>{{ formatDate(new Date(selectedRequest.raw.needed_by), true) }}</dd>
+            </div>
             <div class="drawer__field">
               <dt>Date Submitted</dt>
               <dd>{{ formatDate(selectedRequest.request_date, true) }}</dd>
             </div>
-            <div class="drawer__field drawer__field--full">
+            <div v-if="selectedRequest.reason" class="drawer__field drawer__field--full">
               <dt>Reason</dt>
               <dd>{{ selectedRequest.reason }}</dd>
             </div>
@@ -372,20 +411,46 @@
           </div>
         </div>
 
-        <div class="drawer__footer">
+      <template #actions>
           <button type="button" class="ui-btn ui-btn--primary" @click="viewDetails(selectedRequest)">
             <AssetIcon name="file-text" :size="15" /> Full Details
           </button>
           <button v-if="canCancel(selectedRequest)" type="button" class="ui-btn ui-btn--danger" @click="askCancel(selectedRequest)">
             <AssetIcon name="circle-x" :size="15" /> Cancel Request
           </button>
-        </div>
-      </aside>
-    </Transition>
+      </template>
+    </CenterModal>
+
+    <!-- Full Details and Track, in the same place. -->
+    <CenterModal
+      v-if="detailsFor"
+      :title="detailsFor.reference_number"
+      eyebrow="Full details and fulfilment"
+      size="lg"
+      @close="detailsFor = null"
+    >
+      <template #meta>
+        <span>{{ detailsFor.patient || 'Patient not recorded' }}</span>
+        <StatusBadge :tone="statusOf(detailsFor.status).tone">{{ detailsFor.status_text }}</StatusBadge>
+      </template>
+      <HospitalTransfusionRequestDetail :request-id="detailsFor.id" embedded @changed="refresh" />
+    </CenterModal>
+
+    <HospitalTransfusionTrackDialog
+      v-if="trackingFor"
+      :request-id="trackingFor.id"
+      :reference="trackingFor.reference_number"
+      @close="trackingFor = null"
+      @details="openDetailsFromTrack"
+    />
   </div>
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import HospitalTransfusionRequestDetail from '~/components/Hospital/TransfusionRequestDetail.vue'
+import HospitalTransfusionTrackDialog from '~/components/Hospital/TransfusionTrackDialog.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
@@ -402,6 +467,7 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
 import SelectField from '~/components/common/SelectField.vue'
 import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
 
@@ -529,6 +595,8 @@ const filters = reactive({
   status: '',
   component: '',
   priority: '',
+  // What waits on this blood bank: 'receive' or 'allocate'.
+  waiting: '',
   dateFrom: '',
   dateTo: '',
 })
@@ -538,6 +606,7 @@ const hasActiveFilters = computed(() =>
 )
 
 function resetFilters() {
+  filters.waiting = ''
   filters.status = ''
   filters.component = ''
   filters.priority = ''
@@ -546,11 +615,30 @@ function resetFilters() {
   searchQuery.value = ''
 }
 
+// A figure toggles its status on the list; a chip toggles what waits.
+function toggleStatus(status) {
+  filters.status = filters.status === status ? '' : status
+}
+function toggleWaiting(kind) {
+  filters.waiting = filters.waiting === kind ? '' : kind
+}
+
+const isOpenStat = r => r.priority === 'emergency' && !['fulfilled', 'rejected', 'cancelled'].includes(r.status)
+const waitingCounts = computed(() => ({
+  receive: allRequests.value.filter(r => r.awaiting_receipt > 0).length,
+  allocate: allRequests.value.filter(r => r.needs_allocation).length,
+  stat: allRequests.value.filter(isOpenStat).length,
+}))
+const hasQuickFilters = computed(() => Object.values(waitingCounts.value).some(Boolean))
+
+// Open STAT requests first, so an emergency is never pages down; the rest as they came.
 const filteredRequests = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  return allRequests.value.filter(r => {
+  const rows = allRequests.value.filter(r => {
+    if (filters.waiting === 'receive' && !(r.awaiting_receipt > 0)) return false
+    if (filters.waiting === 'allocate' && !r.needs_allocation) return false
     if (q) {
-      const haystack = `${r.reference_number} ${r.blood_type} ${r.component}`.toLowerCase()
+      const haystack = `${r.reference_number} ${r.patient} ${r.blood_type} ${r.component}`.toLowerCase()
       if (!haystack.includes(q)) return false
     }
     if (filters.status && r.status !== filters.status) return false
@@ -560,6 +648,7 @@ const filteredRequests = computed(() => {
     if (filters.dateTo && r.request_date > new Date(filters.dateTo + 'T23:59:59')) return false
     return true
   })
+  return [...rows.filter(isOpenStat), ...rows.filter(r => !isOpenStat(r))]
 })
 
 // ---------- Pagination ----------
@@ -614,7 +703,7 @@ function buildTrend(status) {
   return {
     up,
     hasData: true,
-    label: `${up ? '↑' : '↓'} ${Math.abs(percent)}% this week`,
+    label: `${Math.abs(percent)}% this week`,
   }
 }
 
@@ -638,6 +727,13 @@ function animateCounter(key, endValue, duration = 800) {
 }
 
 // ---------- Drawer ----------
+const detailsFor = ref(null)
+const trackingFor = ref(null)
+function openDetailsFromTrack() {
+  detailsFor.value = trackingFor.value
+  trackingFor.value = null
+}
+
 const drawerOpen = ref(false)
 const selectedRequest = ref(null)
 function openDrawer(req) {
@@ -653,11 +749,21 @@ function openNewRequest() {
   router.push('/hospital/bloodrequests/newrequest')
 }
 function trackRequest(req) {
+  drawerOpen.value = false
+  if (req.kind === 'transfusion') {
+    trackingFor.value = req
+    return
+  }
   // The page is /hospital/trackrequests; the hyphenated path this pushed to
   // has never existed, so "Track Request" landed on a 404.
   router.push(`/hospital/trackrequests?ref=${req.reference_number}`)
 }
 function viewDetails(req) {
+  drawerOpen.value = false
+  if (req.kind === 'transfusion') {
+    detailsFor.value = req
+    return
+  }
   router.push(req.kind === 'transfusion' ? `/hospital/transfusion-requests/${req.id}` : `/hospital/bloodrequests/${req.id}`)
 }
 
@@ -811,8 +917,6 @@ onUnmounted(() => {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .fade-in, .skeleton { animation: none !important; } }
 
-.restock-note { margin: 0; font-size: 13px; color: var(--rb-text-secondary); }
-.restock-note a { color: var(--rb-primary-text); font-weight: 600; }
 
 /* The reference opens the quick view, as the eye does. */
 .code-btn { align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer; }
@@ -850,19 +954,6 @@ onUnmounted(() => {
 .btn-primary--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
 /* ---------- Drawer ---------- */
-.drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 50; }
-.drawer {
-  position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 100vw;
-  background: var(--surface); z-index: 51; display: flex; flex-direction: column;
-  box-shadow: -12px 0 40px rgba(15,23,42,0.18);
-}
-.drawer__header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 22px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.drawer__eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 4px; }
-.drawer__title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.drawer__body { flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 26px; }
 .drawer__status-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .drawer__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0; }
@@ -887,12 +978,7 @@ onUnmounted(() => {
 .v-timeline__label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0; }
 .v-timeline__label--muted { color: var(--text-muted); font-weight: 500; }
 
-.drawer__footer { display: flex; gap: 10px; padding: 18px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
 
-.drawer-slide-enter-active, .drawer-slide-leave-active { transition: transform 0.28s cubic-bezier(0.22,1,0.36,1); }
-.drawer-slide-enter-from, .drawer-slide-leave-to { transform: translateX(100%); }
-.drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.2s ease; }
-.drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Responsive */
 @media (max-width: 1024px) {
@@ -913,4 +999,65 @@ onUnmounted(() => {
 }
 .stat-trend.up { color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), 0.1); }
 .stat-trend.down { color: var(--rb-accent-text); background: rgba(var(--rb-accent-rgb), 0.09); }
+
+/* What waits, one click away (2026-11-01). */
+.quick-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rb-border); }
+.stat-trend { white-space: nowrap; }
+:deep(.si__hint) { flex-wrap: wrap; }
+.quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.quick:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-text-primary); }
+.quick:focus-visible, .quick-clear:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.quick__count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--rb-surface-alt); font-size: 11.5px; font-weight: 700; text-align: center; color: var(--rb-text-primary); }
+.quick--on { border-color: rgba(var(--rb-primary-rgb), 0.55); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.quick--on .quick__count { background: var(--rb-primary); color: #FFFFFF; }
+.quick--stat { color: var(--rb-accent-text); }
+.quick--stat.quick--on { border-color: rgba(var(--rb-accent-rgb), 0.55); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
+.quick--stat.quick--on .quick__count { background: var(--rb-accent); }
+.quick-clear { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); cursor: pointer; }
+
+/* The row: who, what, how far. */
+.tag--stat { border-color: transparent; background: var(--rb-accent); font-weight: 700; color: #FFFFFF; }
+.need { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.progress { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.progress__bar { display: grid; grid-template-columns: repeat(4, 22px); gap: 3px; }
+.progress__step { height: 4px; border-radius: 999px; background: var(--rb-border); }
+.progress__step--done { background: var(--rb-success); }
+.progress__step--current { background: var(--rb-primary); }
+.progress__step--halted { background: var(--rb-border-hover); }
+
+/* Quick view: its fields beside its timeline. */
+/* The dialog sits on the body, outside .requests-page and the tokens it sets. */
+.quick-view {
+  --primary: var(--rb-primary);
+  --surface: var(--rb-surface);
+  --border: var(--rb-border);
+  --text-primary: var(--rb-text-primary);
+  --text-secondary: var(--rb-text-secondary);
+  --text-muted: var(--rb-text-muted);
+  --danger: var(--rb-accent);
+  --success: var(--rb-success);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 28px;
+}
+.quick-view .drawer__status-row { grid-column: 1 / -1; }
+.quick-view .drawer__grid { grid-column: 2; grid-row: 2; }
+.quick-view .drawer__timeline-section { grid-column: 1; grid-row: 2; padding-right: 24px; border-right: 1px solid var(--rb-border); }
+@media (max-width: 640px) {
+  .quick-view { grid-template-columns: minmax(0, 1fr); }
+  .quick-view .drawer__grid, .quick-view .drawer__timeline-section { grid-column: 1; grid-row: auto; border-right: 0; padding-right: 0; }
+}
 </style>

@@ -1,14 +1,5 @@
 <template>
   <div class="page scope-blood-center-bloodrequests">
-    <!-- TOASTS -->
-    <div class="toast-stack">
-      <transition-group name="toast">
-        <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-          <div class="toast-title">{{ t.title }}</div>
-          <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-        </div>
-      </transition-group>
-    </div>
 
     <!-- HEADER -->
     <header class="header-row">
@@ -148,6 +139,9 @@
                 <button type="button" class="code-link" :title="`Review ${r.code}`" @click="openReview(r)">{{ r.code }}</button>
                 <span class="sub id-date">{{ r.date }} · {{ r.time }}</span>
                 <!-- Priority: only an emergency is marked; routine is the rule. -->
+                <span v-if="r.dueBy" class="chip" :title="`The hospital needs this by ${r.dueBy}`">
+                  <AssetIcon name="clock" :size="11" /> By {{ r.dueBy }}
+                </span>
                 <span v-if="r.emergency" class="chip chip--crit" :title="`${r.priority} priority`">
                   <AssetIcon name="circle-alert" :size="11" /> {{ r.priority }}
                 </span>
@@ -277,7 +271,7 @@
                   <!-- Issue is dispatch, on Request Fulfillment: open once units
                        are reserved, and says why not before then. -->
                   <template v-if="r.isOpen && canRelease">
-                    <NuxtLink v-if="r.held > 0" to="/blood-center/fulfillment" class="btn-issue" :aria-label="`Issue ${r.code}`">
+                    <NuxtLink v-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
                       <AssetIcon name="send" :size="13" />
                       Issue
                     </NuxtLink>
@@ -348,7 +342,7 @@
 
           <div class="review-card__body">
             <div v-if="drawerLoading" class="drawer-loading">
-              <div v-for="n in 4" :key="n" class="skeleton-row" />
+              <SkeletonList />
             </div>
 
             <template v-else-if="activeRequest">
@@ -660,7 +654,7 @@
                   {{ drawerMutating ? 'Processing…' : activeRequest.isReplenishment ? 'Reserve Units' : 'Approve & Reserve' }}
                 </button>
               </template>
-              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" to="/blood-center/fulfillment" class="btn btn-primary">
+              <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" :to="`/blood-center/fulfillment?request=${activeRequest.id}`" class="btn btn-primary">
                 <AssetIcon name="send" :size="14" />
                 Issue
               </NuxtLink>
@@ -753,6 +747,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import CloseLineDialog from '~/components/common/CloseLineDialog.vue'
@@ -964,6 +959,8 @@ function mapRequest(r) {
     // The API shape, for the shared fulfilment and walk-in components.
     raw: r,
     urgency: r.urgency_level,
+    // When the hospital needs it, if it set a time (2026-11-01).
+    dueBy: dueByLabel(r),
     purpose: r.purpose_label ?? '',
     patient: r.patient?.full_name ?? '',
     // Age and sex as the form records them, for the review.
@@ -976,7 +973,7 @@ function mapRequest(r) {
     requestDate: formatDateTime(r.request_date),
     neededBy: isReplenishment
       ? (plan ? supplyPlanSummary(plan) : 'Not confirmed yet')
-      : r.is_emergency ? 'Immediate' : 'Routine',
+      : dueByLabel(r) || (r.is_emergency ? 'Immediate' : 'Routine'),
     reason: r.rejection_reason ?? '',
     reference_number: r.reference_number,
   }
@@ -985,15 +982,7 @@ function mapRequest(r) {
 const rows = computed(() => (apiRequests.value ?? []).map(mapRequest))
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 /* FILTERS */
 // "Open" is every request still being worked; the rest are the statuses the
@@ -1043,6 +1032,12 @@ function selectTab(purpose) {
 const searchQuery = ref('')
 const statusFilter = ref('')
 // Set by the Emergency quick filter; the list's other filters still apply.
+// The time the hospital asked for, when it set one.
+function dueByLabel(r) {
+  const at = r.transfusion_request?.needed_by
+  return at ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
+}
+
 const urgencyFilter = ref('')
 
 /** This tab's own counts, for the quick filters. */
@@ -2515,4 +2510,20 @@ onBeforeUnmount(() => {
 <style scoped>
 /* The system dropdown in a toolbar: a fixed width rather than the row's. */
 .sel-filter { width: 180px; flex: none; }
+
+/*
+  The width shared out by what each column holds (2026-10-31): Actions takes
+  only its buttons (the 1% of an auto table), so the room it held empty goes
+  to the reference, hospital and patient, whose text no longer cuts off.
+*/
+.req-table { table-layout: auto; }
+.req-table th { width: auto !important; }
+.req-table th.c-actions, .req-table td.c-actions { width: 1% !important; white-space: nowrap; }
+.req-table .c-id .sub, .req-table .c-hospital .sub { white-space: normal; overflow: visible; text-overflow: clip; }
+.req-table td.c-date, .req-table td.c-units, .req-table td.c-status { white-space: nowrap; }
+/* The date under the ID only where the Date column is folded away; it was showing twice. */
+.req-table .sub.id-date { display: none; }
+@container (max-width: 1199px) {
+  .req-table .sub.id-date { display: block; }
+}
 </style>

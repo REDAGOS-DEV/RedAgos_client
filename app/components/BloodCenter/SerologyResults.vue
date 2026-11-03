@@ -80,9 +80,7 @@
           </thead>
 
           <tbody v-if="loading && !rows.length">
-            <tr v-for="n in 6" :key="'sk-' + n">
-              <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-            </tr>
+            <SkeletonRows :columns="columnCount" :rows="6" />
           </tbody>
 
           <tbody v-else-if="!rows.length">
@@ -473,6 +471,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -533,9 +532,10 @@ const isHead = computed(() => (user.value?.staff_roles ?? []).includes('lab_supe
 
 const PER_PAGE = 25
 
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })

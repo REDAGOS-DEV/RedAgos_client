@@ -1,15 +1,6 @@
 <template>
   <div class="donors-page">
-    <!-- Skeleton loading state, the same as the other pages -->
-    <div v-if="initialLoading" class="donors-inner" aria-busy="true" aria-label="Loading donors">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
-    </div>
-
-    <div v-else class="donors-inner">
+    <div class="donors-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Donor Management</h1>
@@ -123,9 +114,7 @@
             </thead>
 
             <tbody v-if="loadingDonors && !donors.length">
-              <tr v-for="n in 6" :key="'skr-' + n">
-                <td :colspan="columnCount"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="columnCount" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!donors.length">
@@ -823,6 +812,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -902,10 +892,10 @@ function counterLink(donorUuid) {
 
 const PER_PAGE = 25
 
-const initialLoading = ref(true)
 const loadError = ref('')
 // { tone: 'success' | 'error', text }
 const notice = ref(null)
+useNoticeToast(notice)
 
 const todayIso = computed(() => {
   const d = new Date()
@@ -936,7 +926,7 @@ async function loadReference() {
 /* ---------- list ---------- */
 
 const donors = ref([])
-const loadingDonors = ref(false)
+const loadingDonors = ref(true)
 const search = ref('')
 const bloodTypeId = ref('')
 const statusFilter = ref('')
@@ -1561,7 +1551,6 @@ function onKeydown(event) {
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   await Promise.all([loadDonors(), loadReference()])
-  initialLoading.value = false
 })
 
 onBeforeUnmount(() => {

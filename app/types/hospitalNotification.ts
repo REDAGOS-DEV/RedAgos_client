@@ -17,6 +17,8 @@ export interface HospitalNotification {
   tone: string | null
   action_label: string | null
   action_route: string | null
+  /** An emergency request: the inbox puts it first until it is read. */
+  urgent?: boolean
   read: boolean
   created_at: string | null
 }
@@ -36,6 +38,9 @@ export interface HospitalNotificationView {
   created_at: string | null
   read: boolean
   tone: string | null
+  /** The reference it is about, when it is about one. */
+  meta: string | null
+  urgent: boolean
   action_label: string | null
   action_path: string | null
 }

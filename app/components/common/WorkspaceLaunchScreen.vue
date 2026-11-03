@@ -1,51 +1,56 @@
 <template>
   <!--
     "Launching Workspace": covers the step from a sign-in that went through to
-    a portal page with its data (composables/useWorkspaceLaunch.ts). The same
-    light wash, logo and spinning loader as the sign-in screen it follows, so
-    the hand-over reads as one motion. Mounted once in app.vue, above every
-    layout, so it survives the route change.
+    a portal page with its data (composables/useWorkspaceLaunch.ts). The logo is
+    the loader (project owner, 2026-11-01): colour flows up the drop, over and
+    over, for as long as the wait lasts, never claiming how far along it is.
+    Mounted once in app.vue, above every layout, so it survives the route change.
   -->
   <Transition name="ws-launch">
     <div
       v-if="launching"
       class="ws-launch"
+      :class="{ 'ws-launch--dark': dark }"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <div class="ws-launch__stack">
-        <img :src="logo" alt="" class="ws-launch__logo" width="64" height="64">
-        <p class="ws-launch__brand">Red<span>Agos</span></p>
-
-        <p class="ws-launch__label">
-          <AssetIcon name="loader" :size="18" class="ws-launch__spinner" />
-          Launching Workspace
-        </p>
-
-        <div class="ws-launch__track" aria-hidden="true">
-          <span class="ws-launch__bar" />
+        <div class="ws-launch__drop" :style="{ '--ws-logo': `url(${logo})` }" aria-hidden="true">
+          <img :src="logo" alt="" class="ws-launch__logo ws-launch__logo--empty" width="96" height="96">
+          <img :src="logo" alt="" class="ws-launch__logo ws-launch__logo--filled" width="96" height="96">
         </div>
+        <p class="ws-launch__brand">Red<span>Agos</span></p>
+        <p class="ws-launch__label">Preparing your workspace</p>
       </div>
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
-import AssetIcon from '~/components/common/AssetIcon.vue'
 import logo from '~/assets/images/RedAgosLogo.png'
 
 const { launching } = useWorkspaceLaunch()
+
+/*
+ * The theme the portal is about to open in. Sign-in stays light and <html> only
+ * turns dark when a portal layout mounts, partway through this screen, so
+ * following html.dark would flash light, then dark. Same rule as useDarkMode.
+ */
+const dark = ref(false)
+watch(launching, (on) => {
+  if (!on) return
+  const stored = localStorage.getItem('theme')
+  dark.value = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+})
 </script>
 
 <style scoped>
-/* The sign-in screen's tokens (AuthShell): always light, blue for activity,
-   red for the brand only. */
+/* Frosted glass in the portals' canvas colour: whatever is behind shows through, blurred. */
 .ws-launch {
+  --ws-canvas: rgba(245, 246, 248, 0.62);
   --ws-text: #0B1F3A;
   --ws-muted: #475569;
-  --ws-accent: #1565C0;
-  --ws-accent-soft: rgba(21, 101, 192, 0.14);
   --ws-brand: #C62828;
   --ws-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -60,10 +65,22 @@ const { launching } = useWorkspaceLaunch()
   font-family: var(--rb-font-sans);
   color: var(--ws-text);
   -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(45% 55% at 100% 0%, rgba(21, 101, 192, 0.16), transparent 70%),
-    radial-gradient(40% 50% at 0% 100%, rgba(198, 40, 40, 0.08), transparent 70%),
-    linear-gradient(180deg, #EAF2FC 0%, #F5F8FC 100%);
+  background: var(--ws-canvas);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+.ws-launch--dark {
+  --ws-canvas: rgba(32, 33, 36, 0.84);
+  --ws-text: #E8EAED;
+  --ws-muted: #BDC1C6;
+  --ws-brand: #FF8A8A;
+  color-scheme: dark;
+}
+
+/* No frosting to read through in this browser: the canvas, solid. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ws-launch { --ws-canvas: #F5F6F8; }
+  .ws-launch--dark { --ws-canvas: #202124; }
 }
 
 .ws-launch__stack {
@@ -73,15 +90,24 @@ const { launching } = useWorkspaceLaunch()
   text-align: center;
 }
 
+.ws-launch__drop {
+  position: relative;
+  width: 96px;
+  height: 96px;
+}
 .ws-launch__logo {
-  width: 64px;
-  height: 64px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
+/* Only there to be filled: without motion the full logo stands alone. */
+.ws-launch__logo--empty { display: none; }
 
 .ws-launch__brand {
-  margin: 12px 0 0;
-  font-size: 22px;
+  margin: 14px 0 0;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -89,60 +115,60 @@ const { launching } = useWorkspaceLaunch()
 .ws-launch__brand span { color: var(--ws-brand); }
 
 .ws-launch__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 28px 0 0;
-  font-size: 15px;
-  font-weight: 600;
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ws-muted);
-}
-.ws-launch__spinner { color: var(--ws-accent); }
-
-/* An indeterminate bar: no promise of how long, only that it is moving. */
-.ws-launch__track {
-  position: relative;
-  width: 200px;
-  height: 4px;
-  margin-top: 16px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--ws-accent-soft);
-}
-.ws-launch__bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  border-radius: inherit;
-  background: var(--ws-accent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .ws-launch__stack { animation: ws-rise 480ms var(--ws-ease) both; }
-  .ws-launch__spinner { animation: ws-spin 900ms linear infinite; }
-  .ws-launch__bar { animation: ws-slide 1.3s var(--ws-ease) infinite; }
-}
 
-/* Reduced motion: the bar holds still and only breathes. */
-@media (prefers-reduced-motion: reduce) {
-  .ws-launch__bar {
-    width: 100%;
-    animation: ws-pulse 1.6s ease-in-out infinite;
+  /* Before the colour arrives the drop is tinted glass in its own colours, not grey. */
+  .ws-launch__logo--empty {
+    display: block;
+    filter: saturate(1.15) drop-shadow(0 6px 14px rgba(21, 101, 192, 0.22));
+    opacity: 0.34;
+  }
+  .ws-launch--dark .ws-launch__logo--empty {
+    filter: saturate(1.15) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+    opacity: 0.42;
+  }
+
+  /* The glass's shine, in the logo's exact shape, over the tint and the colour alike. */
+  .ws-launch__drop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.22) 38%, rgba(255, 255, 255, 0) 62%);
+    -webkit-mask: var(--ws-logo) center / contain no-repeat;
+    mask: var(--ws-logo) center / contain no-repeat;
+    pointer-events: none;
+  }
+  .ws-launch--dark .ws-launch__drop::after {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.12) 38%, rgba(255, 255, 255, 0) 62%);
+  }
+
+  /*
+   * A wave one drop wide, solid beneath its crest. Sliding it sideways is the
+   * ripple; sliding it up is the rising colour.
+   */
+  .ws-launch__logo--filled {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='200'%3E%3Cpath d='M0 8Q24 0 48 8T96 8V200H0Z'/%3E%3C/svg%3E") 0 96px / 96px 200px repeat-x;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='200'%3E%3Cpath d='M0 8Q24 0 48 8T96 8V200H0Z'/%3E%3C/svg%3E") 0 96px / 96px 200px repeat-x;
+    animation: ws-fill 2.4s linear infinite;
   }
 }
 
 @keyframes ws-rise {
   from { opacity: 0; transform: translateY(8px); }
 }
-@keyframes ws-spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes ws-slide {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(250%); }
-}
-@keyframes ws-pulse {
-  50% { opacity: 0.45; }
+/* Up the drop, a moment full, then it fades and flows again: never a 100% that waits. */
+@keyframes ws-fill {
+  0% { -webkit-mask-position: 0 96px; mask-position: 0 96px; opacity: 1; }
+  78% { -webkit-mask-position: -288px -18px; mask-position: -288px -18px; opacity: 1; }
+  90% { -webkit-mask-position: -288px -18px; mask-position: -288px -18px; opacity: 1; }
+  100% { -webkit-mask-position: -288px -18px; mask-position: -288px -18px; opacity: 0; }
 }
 
 /* In quickly over the sign-in form; out a little slower onto the portal. */

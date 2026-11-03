@@ -232,6 +232,7 @@ const qrError = ref('')
 const loadError = ref('')
 const resending = ref(false)
 const resendMessage = ref('')
+useNoticeToast(resendMessage, { tone: () => (resendMessage.value.startsWith('Verification') ? 'success' : 'error') })
 
 async function resendVerification() {
   resending.value = true

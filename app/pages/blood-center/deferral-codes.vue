@@ -224,10 +224,11 @@ useHead({ title: 'Deferral Codes · RedAgos' })
 
 const rows = ref([])
 const canManage = ref(false)
-const busy = ref(false)
+const busy = ref(true)
 const showRetired = ref(false)
 const banner = ref('')
 const bannerKind = ref('notice')
+useNoticeToast(banner, { kind: bannerKind, keepWhile: () => busy.value })
 
 const visibleRows = computed(() => rows.value.filter((row) => showRetired.value || !row.retired))
 const retiredCount = computed(() => rows.value.filter((row) => row.retired).length)

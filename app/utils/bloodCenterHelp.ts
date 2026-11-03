@@ -435,7 +435,7 @@ export const HELP_GUIDES: HelpGuide[] = [
     requires: 'staff.manage',
     summary: 'The Admin\'s dashboard: what waits for you, who fills each key post, and the centre\'s setup.',
     steps: [
-      'Start with Needs you: each card opens the place to act.',
+      'Start with Needs attention: each card opens the place to act.',
       'Role coverage lists the posts each department needs. One shown in red has no one: Assign opens Staff Accounts.',
       'Centre setup shows whether the logos for printed documents are uploaded.',
     ],

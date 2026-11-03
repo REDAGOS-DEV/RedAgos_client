@@ -102,9 +102,7 @@
           </thead>
 
           <tbody v-if="loading && !rows.length">
-            <tr v-for="n in 6" :key="'sk-' + n">
-              <td :colspan="COLUMN_COUNT"><span class="skeleton skeleton--line" /></td>
-            </tr>
+            <SkeletonRows :columns="COLUMN_COUNT" :rows="6" />
           </tbody>
 
           <tbody v-else-if="!rows.length">
@@ -618,6 +616,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
@@ -707,9 +706,10 @@ const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
 const PER_PAGE = 25
 const COLUMN_COUNT = 8
 
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
@@ -1848,6 +1848,11 @@ onBeforeUnmount(() => {
   .c-id { display: table-cell; }
   .c-id, .c-bag, .c-processed, .c-actions { white-space: nowrap; }
   .c-components { min-width: 150px; }
+  /* Actions and ID take only what their content needs (the 1% width of an
+     auto table), so the rest of the width spreads between the other columns
+     instead of pooling after the buttons (2026-10-31). */
+  .processed-table th.c-actions, .processed-table td.c-actions,
+  .processed-table th.c-id, .processed-table td.c-id { width: 1% !important; }
   .btn-handover:disabled { gap: 0; padding: 0 9px; font-size: 0; }
 }
 </style>

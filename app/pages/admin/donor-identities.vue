@@ -243,6 +243,7 @@ const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const banner = ref('')
 const bannerKind = ref('info')
+useNoticeToast(banner, { kind: bannerKind })
 
 // Ang litrato kay authenticated ang route, so dili siya mahimong i-turo
 // direkta sa browser. I-fetch nato dala ang token, unya object URL ang i-render.

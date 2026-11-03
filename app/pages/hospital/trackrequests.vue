@@ -1,10 +1,10 @@
 <template>
   <div class="track-page">
     <!-- ============== PAGE HEADER ============== -->
-    <PageHeader class="page-header" title="Track Requests" subtitle="Monitor the real-time progress and fulfillment status of submitted blood requests.">
+    <PageHeader class="page-header" title="Track Requests" :subtitle="hospitalPageSubtitle('track', can)">
       <template #actions>
         <button
-          class="ui-btn ui-btn--primary"
+          class="ui-btn"
           type="button"
           :disabled="!request || isRefreshing"
           @click="handleRefresh"
@@ -48,8 +48,8 @@
               @click="handleSelectRecent(item.reference_number)"
             >
               <span class="recent-item__ref">{{ item.reference_number }}</span>
-              <span class="status-badge status-badge--sm" :class="`badge--${statusColorMap[item.status] ?? 'neutral'}`">
-                {{ item.status }}
+              <span class="status-badge status-badge--sm" :class="`badge--${TONE_BADGES[REQUEST_STATUS_TONES[item.status]] ?? 'neutral'}`">
+                {{ requestStatusLabel(item) }}
               </span>
             </button>
           </div>
@@ -59,12 +59,25 @@
         </button>
       </form>
 
-      <div v-if="isLoadingRecent" class="recent-loading">Loading recent tracked requests…</div>
+      <SkeletonList v-if="isLoadingRecent" class="recent-loading" :rows="2" />
     </section>
 
     <!-- ============== EMPTY STATE ============== -->
     <section v-if="!hasSearched" class="card">
-      <EmptyState icon="package-search" title="No Request Selected" description="Search using a blood request reference number to begin tracking." />
+      <template v-if="recentRequests.length">
+        <h2 class="section-title">Recent requests</h2>
+        <ul class="recent-list">
+          <li v-for="item in recentRequests.slice(0, 6)" :key="item.reference_number">
+            <button type="button" class="recent-row" @click="handleSelectRecent(item.reference_number)">
+              <span class="recent-row__ref">{{ item.reference_number }}</span>
+              <span class="recent-row__what">{{ bloodTypeSummary(item) }} · {{ componentSummary(item) || '—' }}</span>
+              <span class="status-badge status-badge--sm" :class="`badge--${TONE_BADGES[REQUEST_STATUS_TONES[item.status]] ?? 'neutral'}`">{{ requestStatusLabel(item) }}</span>
+              <AssetIcon name="arrow-right" :size="14" class="recent-row__go" />
+            </button>
+          </li>
+        </ul>
+      </template>
+      <EmptyState v-else icon="package-search" title="No Request Selected" description="Search using a blood request reference number to begin tracking." />
     </section>
 
     <!-- ============== ERROR STATE ============== -->
@@ -72,35 +85,28 @@
       <EmptyState
         icon="triangle-alert"
         title="Request Not Found"
-        :description="searchError === 'not_found'
-          ? 'The entered reference number could not be located.'
-          : 'Something went wrong while searching. Please try again.'">
+        :description="searchError">
         <button class="ui-btn ui-btn--primary" type="button" @click="handleSearchSubmit">Search Again</button>
       </EmptyState>
     </section>
 
     <!-- ============== SEARCHING SKELETON ============== -->
-    <div v-else-if="isSearching && !request" class="skeleton-stack">
-      <div class="skeleton skeleton--hero" />
-      <div class="skeleton skeleton--stepper" />
-    </div>
+    <PageSkeleton v-else-if="isSearching && !request" :sections="[['form'], ['list', 'list']]" />
 
     <!-- ============== MAIN TRACKING VIEW ============== -->
     <template v-else-if="request">
-      <!-- CURRENT STATUS CARD -->
+      <!-- WHERE IT IS: the reference, what was asked, and each step with its time -->
       <section class="card hero-card">
         <div class="hero-card__top">
-          <div>
-            <span class="hero-ref">{{ request.reference_number }}</span>
-            <div class="hero-badges">
-              <span class="status-badge status-badge--anim" :class="statusColorClass">{{ statusText }}</span>
-              <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ priorityText }} priority</span>
-              <span v-if="request.is_walk_in" class="status-badge status-badge--sm badge--info">Walk-in</span>
-              <span v-if="hasAttentionFlag" class="attention-chip">
-                <AssetIcon name="circle-alert" />
-                Needs attention
-              </span>
-            </div>
+          <span class="hero-ref">{{ request.reference_number }}</span>
+          <div class="hero-badges">
+            <span class="status-badge status-badge--anim" :class="statusColorClass">{{ statusText }}</span>
+            <span class="status-badge status-badge--sm" :class="priorityColorClass">{{ priorityText }} priority</span>
+            <span v-if="request.is_walk_in" class="status-badge status-badge--sm badge--info">Walk-in</span>
+            <span v-if="hasAttentionFlag" class="attention-chip">
+              <AssetIcon name="circle-alert" />
+              Needs attention
+            </span>
           </div>
         </div>
 
@@ -111,26 +117,22 @@
           </div>
           <div class="hero-item">
             <span class="hero-label">Blood Component</span>
-            <span class="hero-value">{{ request.blood_component || '—' }}</span>
+            <span class="hero-value">{{ componentSummary(request) || '—' }}</span>
           </div>
           <div class="hero-item">
             <span class="hero-label">Units Requested</span>
-            <span class="hero-value">{{ request.units_requested ?? '—' }}</span>
+            <span class="hero-value">{{ request.quantity ?? '—' }}</span>
           </div>
           <div class="hero-item">
-            <span class="hero-label">Submitted Date</span>
+            <span class="hero-label">Blood Center</span>
+            <span class="hero-value">{{ request.target_facility?.name || '—' }}</span>
+          </div>
+          <div class="hero-item">
+            <span class="hero-label">Submitted</span>
             <span class="hero-value">{{ formatDate(request.request_date) }}</span>
           </div>
-          <div class="hero-item">
-            <span class="hero-label">Estimated Completion</span>
-            <span class="hero-value">{{ formatDate(request.estimated_completion) }}</span>
-          </div>
         </div>
-      </section>
 
-      <!-- FULFILLMENT PROGRESS (horizontal stepper) -->
-      <section class="card">
-        <h2 class="section-title">Fulfillment Progress</h2>
         <ol class="stepper">
           <li
             v-for="(step, index) in timeline"
@@ -143,153 +145,83 @@
               <span v-else>{{ index + 1 }}</span>
             </span>
             <span class="stepper-label">{{ step.label }}</span>
+            <span v-if="step.timestamp" class="stepper-time">{{ formatDateTime(step.timestamp) }}</span>
           </li>
         </ol>
       </section>
 
-      <!-- REQUESTED VERSUS FULFILLED, PER COMPONENT -->
-      <section class="card">
-        <h2 class="section-title">Requested vs Fulfilled</h2>
-        <RequestFulfilmentTable :request="request" />
-      </section>
-
-      <!-- WHERE IT CAME FROM, AND WHAT IT IS A SHARE OF -->
-      <section v-if="request.is_walk_in || request.transfusion_request" class="card">
-        <h2 class="section-title">Source &amp; Blood Request</h2>
-        <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
-          A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
-          it<template v-if="request.walk_in?.verification"> after your blood bank confirmed it by phone</template><template v-else> on your behalf</template>.
-        </p>
-        <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
-          This is {{ request.target_facility?.name || 'one facility' }}'s share of
-          <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="track-ptr">{{ request.transfusion_request.reference_number }}</NuxtLink>
-          ({{ requestStatusLabel(request.transfusion_request) }}), where every facility asked for this patient is followed.
-        </p>
-      </section>
-
       <div class="content-grid">
-        <!-- ============== LEFT COLUMN ============== -->
         <div class="content-main">
-          <!-- TIMELINE -->
           <section class="card">
-            <h2 class="section-title">Timeline</h2>
-            <ol class="v-timeline">
-              <li
-                v-for="(step, index) in timeline"
-                :key="step.step || index"
-                class="v-timeline-step"
-                :class="`v-timeline-step--${step.status}`"
-                :style="{ animationDelay: `${index * 0.06}s` }"
-              >
-                <span class="v-timeline-marker">
-                  <AssetIcon v-if="step.status === 'completed'" name="check" />
-                  <span v-else class="v-timeline-dot" />
-                </span>
-                <div class="v-timeline-body">
-                  <div class="v-timeline-head">
-                    <span class="v-timeline-activity">{{ step.label }}</span>
-                    <span v-if="step.status === 'current'" class="v-timeline-tag">Current Step</span>
-                    <span v-else-if="step.status === 'upcoming'" class="v-timeline-tag v-timeline-tag--pending">Pending</span>
-                  </div>
-                  <span v-if="step.timestamp" class="v-timeline-time">{{ formatDateTime(step.timestamp) }}</span>
-                  <p v-if="step.description" class="v-timeline-desc">{{ step.description }}</p>
-                </div>
-              </li>
-            </ol>
+            <h2 class="section-title">Requested vs Fulfilled</h2>
+            <RequestFulfilmentTable :request="request" />
           </section>
 
-          <!-- REQUEST INFORMATION -->
+          <!-- WHERE IT CAME FROM, AND WHAT IT IS A SHARE OF -->
+          <section v-if="request.is_walk_in || request.transfusion_request" class="card">
+            <h2 class="section-title">Source &amp; Blood Request</h2>
+            <p v-if="request.is_walk_in" class="empty-hint track-walk-in">
+              A watcher brought this request to {{ request.target_facility?.name || 'the blood center' }}, which recorded
+              it<template v-if="request.walk_in?.verification"> after your blood bank confirmed it by phone</template><template v-else> on your behalf</template>.
+            </p>
+            <p v-if="request.transfusion_request" class="empty-hint track-walk-in">
+              This is {{ request.target_facility?.name || 'one facility' }}'s share of
+              <NuxtLink :to="`/hospital/transfusion-requests/${request.transfusion_request.id}`" class="track-ptr">{{ request.transfusion_request.reference_number }}</NuxtLink>
+              ({{ requestStatusLabel(request.transfusion_request) }}), where every facility asked for this patient is followed.
+            </p>
+          </section>
+
           <section class="card">
             <h2 class="section-title">Request Information</h2>
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-label">Reference Number</span>
-                <span class="info-value info-value--mono">{{ request.reference_number }}</span>
-              </div>
-              <div class="info-item">
                 <span class="info-label">Hospital</span>
-                <span class="info-value">{{ request.hospital || '—' }}</span>
+                <span class="info-value">{{ request.requesting_facility?.name || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Department</span>
-                <span class="info-value">{{ request.department || '—' }}</span>
+                <span class="info-label">Patient</span>
+                <span class="info-value">{{ request.patient?.full_name || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Requesting Physician</span>
-                <span class="info-value">{{ request.requesting_physician || '—' }}</span>
+                <span class="info-label">Requested by</span>
+                <span class="info-value">{{ request.requester_name || request.recorder_name || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Blood Type</span>
-                <span class="info-value">{{ bloodTypeSummary(request) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Blood Component</span>
-                <span class="info-value">{{ request.blood_component || '—' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Units Requested</span>
-                <span class="info-value">{{ request.units_requested ?? '—' }}</span>
+                <span class="info-label">Source</span>
+                <span class="info-value">{{ request.source_label || '—' }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Priority</span>
-                <span class="info-value">{{ request.priority || '—' }}</span>
-              </div>
-              <div class="info-item info-item--full">
-                <span class="info-label">Purpose of Request</span>
-                <span class="info-value">{{ request.purpose || '—' }}</span>
+                <span class="info-value">{{ request.urgency_label || '—' }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Submitted Date</span>
-                <span class="info-value">{{ formatDate(request.request_date) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Required Date</span>
-                <span class="info-value">{{ formatDate(request.required_date) }}</span>
+                <span class="info-label">Purpose</span>
+                <span class="info-value">{{ request.purpose_label || '—' }}</span>
               </div>
             </div>
           </section>
 
-          <!-- LATEST UPDATES -->
           <section class="card">
             <h2 class="section-title">Latest Updates</h2>
             <ul v-if="updates.length" class="updates-list">
-              <li v-for="update in updates" :key="update.id" class="update-item">
-                <span class="update-icon">
-                  <AssetIcon :name="update.icon || 'bell'" />
+              <li v-for="update in updates" :key="`${update.label}-${update.at}`" class="update-item">
+                <span class="update-icon" :class="`update-icon--${update.tone}`">
+                  <AssetIcon :name="update.tone === 'danger' ? 'circle-x' : update.tone === 'success' ? 'check' : 'clock'" />
                 </span>
                 <div class="update-body">
-                  <p class="update-desc">{{ update.description }}</p>
-                  <span class="update-time">{{ formatDateTime(update.timestamp) }}</span>
+                  <p class="update-desc">{{ update.label }}</p>
+                  <p v-if="update.detail" class="update-desc update-desc--note">{{ update.detail }}</p>
+                  <span class="update-time">{{ formatDateTime(update.at) }}</span>
                 </div>
               </li>
             </ul>
             <p v-else class="empty-hint">No updates yet from the Blood Center.</p>
           </section>
-
-          <!-- DOCUMENTS -->
-          <section class="card">
-            <h2 class="section-title">Documents</h2>
-            <div v-if="documents.length" class="documents-table">
-              <div v-for="doc in documents" :key="doc.id" class="documents-row">
-                <div class="documents-row__label">
-                  <AssetIcon name="file-text" />
-                  <span>{{ doc.label || doc.name }}</span>
-                </div>
-                <div class="documents-row__actions">
-                  <a :href="doc.url" target="_blank" rel="noopener" class="ui-btn ui-btn--sm">View</a>
-                  <a :href="doc.url" download class="ui-btn ui-btn--sm">Download</a>
-                </div>
-              </div>
-            </div>
-            <p v-else class="empty-hint">No documents have been generated for this request yet.</p>
-          </section>
         </div>
 
-        <!-- ============== RIGHT SIDEBAR ============== -->
         <aside class="content-side">
-          <!-- Card 1: Current Request Status -->
           <section class="card side-card">
-            <h3 class="side-card__title">Current Request Status</h3>
+            <h3 class="side-card__title">Progress</h3>
             <div class="progress-circle-wrap">
               <svg class="progress-circle" viewBox="0 0 100 100">
                 <circle class="progress-circle__track" cx="50" cy="50" :r="circleRadius" />
@@ -304,40 +236,31 @@
               </svg>
               <span class="progress-circle__label">{{ progressPercent }}%</span>
             </div>
-            <div class="side-card__row">
-              <span class="info-label">Estimated Completion</span>
-              <span class="info-value">{{ formatDate(request.estimated_completion) }}</span>
-            </div>
           </section>
 
-          <!-- ESTIMATED PICKUP -->
-          <section v-if="pickup" class="card side-card">
-            <h3 class="side-card__title">Estimated Pickup</h3>
+          <!-- THE UNITS ON THEIR WAY -->
+          <section v-if="pickup?.units_dispatched" class="card side-card">
+            <h3 class="side-card__title">On the way</h3>
             <div class="pickup-rows">
               <div class="pickup-row">
-                <span class="info-label">Estimated Pickup Time</span>
-                <span class="info-value">{{ formatDateTime(pickup.estimated_pickup_time) }}</span>
+                <span class="info-label">From</span>
+                <span class="info-value">{{ pickup.facility || '—' }}</span>
               </div>
-              <div v-if="countdownLabel" class="countdown-chip">
-                <AssetIcon name="clock" />
-                <span>{{ countdownLabel }}</span>
-              </div>
-              <div class="pickup-row">
-                <span class="info-label">Pickup Location</span>
-                <span class="info-value">{{ pickup.pickup_location || '—' }}</span>
+              <div v-if="pickup.address" class="pickup-row">
+                <span class="info-label">Address</span>
+                <span class="info-value">{{ pickup.address }}</span>
               </div>
               <div class="pickup-row">
-                <span class="info-label">Blood Center Contact</span>
-                <span class="info-value">{{ pickup.blood_center_contact || '—' }}</span>
+                <span class="info-label">Units dispatched</span>
+                <span class="info-value">{{ pickup.units_dispatched }}<template v-if="pickup.awaiting_confirmation">, {{ pickup.awaiting_confirmation }} to confirm</template></span>
               </div>
               <div class="pickup-row">
-                <span class="info-label">Operating Hours</span>
-                <span class="info-value">{{ pickup.operating_hours || '—' }}</span>
+                <span class="info-label">Dispatched</span>
+                <span class="info-value">{{ formatDateTime(pickup.dispatched_at) }}</span>
               </div>
             </div>
           </section>
 
-          <!-- Card 2: Quick Actions -->
           <section class="card side-card">
             <h3 class="side-card__title">Quick Actions</h3>
             <div class="quick-actions">
@@ -356,28 +279,13 @@
               <button
                 class="ui-btn btn--full"
                 type="button"
-                :disabled="!pickup?.blood_center_contact"
+                :disabled="!centerContact"
                 @click="contactBloodCenter"
               >
                 <AssetIcon name="phone" />
                 <span>Contact Blood Center</span>
               </button>
             </div>
-          </section>
-
-          <!-- Card 3: Notifications -->
-          <section class="card side-card">
-            <h3 class="side-card__title">Notifications</h3>
-            <ul v-if="updates.length" class="notif-list">
-              <li v-for="update in updates.slice(0, 4)" :key="update.id" class="notif-item">
-                <span class="notif-dot" />
-                <div>
-                  <p class="notif-desc">{{ update.description }}</p>
-                  <span class="notif-time">{{ formatDateTime(update.timestamp) }}</span>
-                </div>
-              </li>
-            </ul>
-            <p v-else class="empty-hint">No recent notifications.</p>
           </section>
         </aside>
       </div>
@@ -386,11 +294,16 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
-import { bloodTypeSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { bloodTypeSummary, componentSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+
+const { can } = useUser()
 /**
  * /hospital/track-requests
  * Tracking-only page (NOT a management page) for Hospital Blood Bank staff.
@@ -416,7 +329,6 @@ const {
   request,
   timeline,
   updates,
-  documents,
   pickup,
   progressPercent,
   isSearching,
@@ -464,32 +376,6 @@ const hasAttentionFlag = computed(() => request.value?.status === 'rejected')
 const circleRadius = 42
 const circleCircumference = 2 * Math.PI * circleRadius
 const circleOffset = computed(() => circleCircumference * (1 - progressPercent.value / 100))
-
-// Countdown to estimated pickup, ticks every minute while the page is open
-const now = ref(Date.now())
-let countdownTimer = null
-onMounted(() => {
-  countdownTimer = setInterval(() => {
-    now.value = Date.now()
-  }, 60_000)
-})
-onUnmounted(() => {
-  if (countdownTimer) clearInterval(countdownTimer)
-})
-
-const countdownLabel = computed(() => {
-  const target = pickup.value?.estimated_pickup_time
-  if (!target) return null
-  const targetTime = new Date(target).getTime()
-  if (Number.isNaN(targetTime)) return null
-  const diffMs = targetTime - now.value
-  if (diffMs <= 0) return 'Ready now'
-  const totalMinutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours <= 0) return `${minutes}m remaining`
-  return `${hours}h ${minutes}m remaining`
-})
 
 function formatDate(value) {
   if (!value) return '—'
@@ -551,8 +437,11 @@ function viewRequestDetails() {
   navigateTo(`/hospital/bloodrequests/${request.value.id}`)
 }
 
+// The blood center's number, when the request carries one.
+const centerContact = computed(() => request.value?.target_facility?.contact_number || request.value?.target_facility?.email || '')
+
 function contactBloodCenter() {
-  const contact = pickup.value?.blood_center_contact
+  const contact = centerContact.value
   if (!contact) return
   const isEmail = contact.includes('@')
   window.location.href = isEmail ? `mailto:${contact}` : `tel:${contact.replace(/\s+/g, '')}`
@@ -1168,4 +1057,18 @@ function contactBloodCenter() {
   }
   .content-grid { grid-template-columns: 1fr; }
 }
+
+/* Redone 2026-11-01: each fact once, from what the API really sends. */
+.hero-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.hero-card .stepper { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--rb-border); }
+.stepper-time { font-size: 11.5px; color: var(--rb-text-secondary); text-align: center; }
+.update-desc--note { color: var(--rb-text-secondary); }
+.recent-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.recent-list li + li { border-top: 1px solid var(--rb-border); }
+.recent-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 11px 4px; border: 0; background: none; font: inherit; font-size: 13px; text-align: left; color: var(--rb-text-primary); cursor: pointer; }
+.recent-row:hover { background: var(--rb-surface-hover); }
+.recent-row:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: -2px; }
+.recent-row__ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--rb-primary-text); }
+.recent-row__what { flex: 1; min-width: 0; color: var(--rb-text-secondary); }
+.recent-row__go { flex-shrink: 0; color: var(--rb-text-muted); }
 </style>

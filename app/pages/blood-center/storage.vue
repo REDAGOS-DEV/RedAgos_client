@@ -16,7 +16,7 @@
     <!-- ============ HEADLINE LEVELS ============ -->
     <section class="kpis" aria-label="Stock at a glance" :aria-busy="loading">
       <template v-if="loading">
-        <div v-for="n in 3" :key="n" class="kpi skeleton" />
+        <div v-for="n in 3" :key="n" class="kpi"><span class="sk sk--icon" /><span class="sk sk--line" style="width: 55%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 72%" /></div>
       </template>
       <template v-else>
         <component
@@ -88,7 +88,7 @@
       </header>
 
       <div v-if="loading" class="types">
-        <div v-for="n in 8" :key="n" class="tcard tcard--skeleton skeleton" />
+        <div v-for="n in 8" :key="n" class="tcard tcard--skeleton"><span class="sk sk--line" style="width: 40%" /><span class="sk sk--value" /><span class="sk sk--line" style="width: 76%" /></div>
       </div>
 
       <div v-else-if="!summary" class="empty">
@@ -178,7 +178,7 @@
           </NuxtLink>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonList v-if="loading" />
         <div v-else-if="!canSeeRequests" class="empty">
           <AssetIcon name="clipboard-check" :size="22" />
           <p class="empty__title">Not part of your role</p>
@@ -233,7 +233,7 @@
           </NuxtLink>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonList v-if="loading" />
         <div v-else-if="!canSeeRequests" class="empty">
           <AssetIcon name="building-2" :size="22" />
           <p class="empty__title">Not part of your role</p>
@@ -293,7 +293,7 @@
           </div>
         </header>
 
-        <div v-if="loading" class="panel-skeleton skeleton" />
+        <SkeletonChart v-if="loading" />
         <div v-else-if="trend.length < 2" class="empty">
           <AssetIcon name="bar-chart" :size="22" />
           <p class="empty__title">{{ summary ? 'Not enough days yet' : 'Stock could not be loaded' }}</p>
@@ -331,14 +331,52 @@
           </div>
         </div>
       </section>
+
+      <!-- ============ DEMAND, NEXT 4 WEEKS ============ -->
+      <!--
+        The Issuance part of the forecast (2026-10-31), as Billing has its own on
+        its dashboard: units asked for a week, the curve ahead, and the pairs
+        about to run short. The whole forecast is on Demand Forecast.
+      -->
+      <section v-if="demand" class="panel ahead" aria-labelledby="ahead-title">
+        <header class="panel__head">
+          <div class="panel__titles">
+            <AssetIcon name="trending-up" :size="20" class="panel__icon" />
+            <div>
+              <h2 id="ahead-title" class="panel__title">Demand, next {{ demand.weeks }} weeks</h2>
+            </div>
+          </div>
+          <NuxtLink to="/blood-center/forecast" class="panel__link">
+            Demand Forecast
+            <AssetIcon name="arrow-right" :size="13" />
+          </NuxtLink>
+        </header>
+
+        <p class="ahead__figure">
+          <strong>{{ formatCount(demand.total.per_week) }}</strong>
+          units a week
+        </p>
+        <p class="ahead__sub">Range {{ demand.total.low }} to {{ demand.total.high }}, from the last 12 weeks of requests</p>
+
+        <ForecastWeekChart :series="demand.total.series" :estimate="demand.total" :weeks="demand.history" :horizon="demand.horizon" unit="units" compact />
+
+        <dl class="ahead__facts">
+          <div :class="{ 'ahead__fact--bad': demand.short }"><dt>Short within a week</dt><dd>{{ demand.short }}</dd></div>
+          <div :class="{ 'ahead__fact--warn': demand.watch }"><dt>Under two weeks of stock</dt><dd>{{ demand.watch }}</dd></div>
+          <div><dt>Emergencies a week</dt><dd>{{ formatCount(demand.emergency) }}</dd></div>
+        </dl>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
+import SkeletonChart from '~/components/ui/SkeletonChart.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import ForecastWeekChart from '~/components/BloodCenter/ForecastWeekChart.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { niceScale } from '~/utils/collectionDashboard'
 import { stockSparkline, stockTypeAlert, stockTypeCards, stockWeekChange } from '~/utils/issuanceDashboard'
@@ -381,15 +419,36 @@ const canRelease = computed(() => hydrated.value && can('requests.release'))
 /** The open requests listed here: the queue's own order, emergencies first. */
 const REQUEST_ROWS = 5
 
+// ---- Demand, next 4 weeks (the demand part of the forecast) ----
+const forecastData = ref(null)
+const demand = computed(() => {
+  const f = forecastData.value
+  const d = f?.demand
+  if (!d?.total?.series?.length) return null
+  return {
+    weeks: f.method?.horizon_weeks ?? 4,
+    history: f.weeks ?? [],
+    horizon: f.horizon ?? [],
+    total: d.total,
+    short: d.short ?? 0,
+    watch: d.watch ?? 0,
+    emergency: d.emergency?.per_week ?? 0,
+  }
+})
+
 onMounted(async () => {
   hydrated.value = true
 
-  const [inventoryResult, requestResult, listResult, thresholdResult] = await Promise.allSettled([
+  const [inventoryResult, requestResult, listResult, thresholdResult, forecastResult] = await Promise.allSettled([
     bloodCenterService.inventorySummary(),
     canSeeRequests.value ? bloodCenterService.incomingRequestsSummary() : Promise.resolve(null),
     canSeeRequests.value ? bloodCenterService.incomingRequests({ open: 1, per_page: REQUEST_ROWS }) : Promise.resolve(null),
     bloodCenterService.stockThresholds(),
+    bloodCenterService.forecast(),
   ])
+
+  // The panel is left out when the forecast cannot be had.
+  forecastData.value = forecastResult.status === 'fulfilled' ? forecastResult.value : null
 
   if (inventoryResult.status === 'fulfilled') summary.value = inventoryResult.value
   else console.error('Failed to load inventory summary:', inventoryResult.reason)
@@ -1117,6 +1176,18 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 /* The bottom row: requests and releases side by side, the trend under them. */
 .row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 .trend-panel { grid-column: 1 / -1; }
+/* Beside the stock chart when the forecast is there (2026-10-31). */
+.row:has(.ahead) .trend-panel { grid-column: auto; }
+.ahead { display: flex; flex-direction: column; gap: 10px; }
+.ahead__figure { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--rb-text-secondary); }
+.ahead__figure strong { font-size: 28px; font-weight: 800; line-height: 1.05; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.ahead__sub { margin: -6px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.ahead__facts { display: grid; gap: 8px; margin: auto 0 0; padding-top: 10px; border-top: 1px solid var(--rb-border); }
+.ahead__facts div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.ahead__facts dt { color: var(--rb-text-secondary); }
+.ahead__facts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.ahead__fact--bad dd { color: var(--rb-accent-text); }
+.ahead__fact--warn dd { color: var(--rb-warning-text, var(--rb-warning)); }
 .panel__aside--row { flex-direction: row; align-items: center; gap: 18px; }
 
 .tchart { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; }
@@ -1198,4 +1269,6 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 @media (max-width: 640px) {
   .iss { padding: 20px 16px 32px; }
 }
+/* A figure while it loads: stacked, as the other portals' tiles. */
+.kpi:has(> .sk) { flex-direction: column; align-items: stretch; gap: 10px; }
 </style>

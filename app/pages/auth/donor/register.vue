@@ -176,12 +176,16 @@
             <div class="au-field">
               <label for="validIdNumber">ID number</label>
               <div class="au-input" :class="{ 'au-input--invalid': fieldErrors.valid_id_number }">
-                <input id="validIdNumber" v-model="form.validIdNumber" type="text" placeholder="As printed on the card">
+                <input id="validIdNumber" v-model="form.validIdNumber" type="text" :placeholder="idFormat.placeholder" aria-describedby="validIdNumberHint">
               </div>
               <p v-if="fieldErrors.valid_id_number" class="au-error">{{ fieldErrors.valid_id_number }}</p>
             </div>
           </div>
-          <p class="au-hint">Speeds up check-in at the donation counter. You can add it later from your profile.</p>
+          <!-- Under the row, so both fields stay level: where the chosen ID's number is (2026-10-30), then the usual note. -->
+          <p class="au-hint">
+            <span v-if="idFormat.hint" id="validIdNumberHint" class="au-hint__id">{{ idFormat.hint }}</span>
+            Speeds up check-in at the donation counter. You can add it later from your profile.
+          </p>
         </div>
 
         <!-- Password -->
@@ -267,10 +271,11 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import AuthShell from '~/components/auth/AuthShell.vue'
 import AuthSelect from '~/components/auth/AuthSelect.vue'
+import { VALID_ID_TYPES, validIdFormat } from '~/utils/validIdTypes'
 import DatePicker from '~/components/common/DatePicker.vue'
 import { authPhoto } from '~/utils/authPhotos'
 import { donorService } from '~/api/donor/DonorService'
@@ -329,16 +334,9 @@ const form = reactive({
   agreedToTerms: false,
 })
 
-const validIdTypes = [
-  { value: 'philsys', label: 'PhilSys (National ID)' },
-  { value: 'umid', label: 'UMID' },
-  { value: 'drivers_license', label: "Driver's License" },
-  { value: 'passport', label: 'Passport' },
-  { value: 'postal_id', label: 'Postal ID' },
-  { value: 'prc_id', label: 'PRC ID' },
-  { value: 'voters_id', label: "Voter's ID" },
-  { value: 'sss_id', label: 'SSS ID' },
-]
+// One list with the profile's ID form, each with its number's sample (utils/validIdTypes).
+const validIdTypes = VALID_ID_TYPES.map(({ value, label }) => ({ value, label }))
+const idFormat = computed(() => validIdFormat(form.validIdType))
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -601,4 +599,6 @@ function applyValidationErrors(error) {
   color: var(--au-text-2);
 }
 .verify-note--error { color: var(--au-danger); font-weight: 600; }
+
+.au-hint__id { display: block; margin-bottom: 2px; font-weight: 600; color: var(--au-text-2, inherit); }
 </style>

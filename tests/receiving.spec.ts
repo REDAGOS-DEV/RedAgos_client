@@ -211,7 +211,7 @@ describe('the receiving routes and pages', () => {
     for (const file of [
       'app/components/Hospital/Sidebar.vue',
       'app/layouts/hospitaldashboard.vue',
-      'app/pages/hospital/transfusion-requests/[id].vue',
+      'app/components/Hospital/TransfusionRequestDetail.vue',
     ]) {
       expect(source(file)).not.toContain('/hospital/receiving/direct-distribution')
     }
@@ -300,7 +300,7 @@ describe('replenishment lives only in the weekly request', () => {
   })
 
   it('dispatches a weekly request whole', () => {
-    expect(source('app/pages/blood-center/fulfillment.vue'))
+    expect(source('app/components/BloodCenter/FulfillmentBoard.vue'))
       .toContain('request.selected.length && !request.weekly_request ? request.selected : undefined')
   })
 })

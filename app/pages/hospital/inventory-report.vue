@@ -1,76 +1,77 @@
 <template>
   <div class="report">
     <!-- ============ HEADER ============ -->
-    <header class="hero">
-      <span class="hero__icon" aria-hidden="true"><AssetIcon name="file-text" :size="24" /></span>
-      <div class="hero__text">
-        <h1 class="hero__title">Inventory Report</h1>
-        <p class="hero__sub">Choose the components and blood types to cover, then generate the blood bank's inventory sheet.</p>
-      </div>
-      <p class="hero__tag" aria-hidden="true">
-        <AssetIcon name="blood-drop" :size="26" class="hero__drop" />
-        <span>Safe Blood.<br>Healthier Communities.</span>
-      </p>
-      <svg class="hero__wave" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 80 C 120 40, 240 120, 360 80 S 540 40, 600 70 L 600 120 L 0 120 Z" />
-      </svg>
-    </header>
+    <PageHeader title="Inventory Report" :subtitle="hospitalPageSubtitle('inventoryReport', can)" />
 
     <div v-if="error" class="alert" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
       <span>{{ error }}</span>
     </div>
 
-    <!-- ============ SETTINGS / GENERATED REPORTS ============ -->
-    <section class="panel">
-      <div class="tabs" role="tablist" aria-label="Inventory report">
-        <button
-          id="tab-settings"
-          type="button"
-          role="tab"
-          class="tabs__tab"
-          :class="{ 'tabs__tab--on': tab === 'settings' }"
-          :aria-selected="tab === 'settings'"
-          aria-controls="panel-settings"
-          @click="tab = 'settings'"
-        >
-          <AssetIcon name="settings" :size="15" /> Report Settings
-        </button>
-        <button
-          id="tab-history"
-          type="button"
-          role="tab"
-          class="tabs__tab"
-          :class="{ 'tabs__tab--on': tab === 'history' }"
-          :aria-selected="tab === 'history'"
-          aria-controls="panel-history"
-          @click="openHistory"
-        >
-          <AssetIcon name="file-text" :size="15" /> Generated Reports
-          <span v-if="historyTotal" class="tabs__count">{{ historyTotal }}</span>
-        </button>
-      </div>
+    <div class="tabs" role="tablist" aria-label="Inventory report">
+      <button
+        id="tab-settings"
+        type="button"
+        role="tab"
+        class="tabs__tab"
+        :class="{ 'tabs__tab--on': tab === 'settings' }"
+        :aria-selected="tab === 'settings'"
+        aria-controls="panel-settings"
+        @click="tab = 'settings'"
+      >
+        <AssetIcon name="file-text" :size="15" /> New Report
+      </button>
+      <button
+        id="tab-history"
+        type="button"
+        role="tab"
+        class="tabs__tab"
+        :class="{ 'tabs__tab--on': tab === 'history' }"
+        :aria-selected="tab === 'history'"
+        aria-controls="panel-history"
+        @click="openHistory"
+      >
+        <AssetIcon name="history" :size="15" /> Generated Reports
+        <span v-if="historyTotal" class="tabs__count">{{ historyTotal }}</span>
+      </button>
+    </div>
 
-      <!-- Settings: chosen before anything is drawn (project owner, 2026-10-28) -->
-      <div v-show="tab === 'settings'" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
-        <div v-if="optionsLoading" class="setting" aria-busy="true">
-          <span class="skeleton skeleton--line" style="width: 60%" />
-          <span class="skeleton skeleton--line" style="width: 45%" />
-        </div>
+    <!-- ============ NEW REPORT: the settings beside the document ============ -->
+    <div v-show="tab === 'settings'" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" class="workspace">
+      <!-- Chosen before anything is drawn (project owner, 2026-10-28) -->
+      <aside class="panel rail" aria-labelledby="rail-title">
+        <h2 id="rail-title" class="rail__title">Report Settings</h2>
 
-        <template v-else>
-          <div class="setting" role="group" aria-labelledby="set-components">
-            <span class="setting__icon" aria-hidden="true"><AssetIcon name="flask-conical" :size="17" /></span>
-            <div class="setting__body">
-              <div class="setting__head">
-                <span>
-                  <span id="set-components" class="setting__title">Blood Components</span>
-                  <span class="setting__sub">Select the components to include in the report.</span>
-                </span>
+        <div class="rail__body">
+          <template v-if="optionsLoading">
+            <div class="setting" aria-busy="true">
+              <span class="sk sk--line" style="width: 46%" />
+              <div class="checks">
+                <span v-for="n in 4" :key="n" class="sk check-sk" />
               </div>
-              <button type="button" class="select-all" :aria-pressed="allComponents" @click="toggleAll('components')">
-                <AssetIcon :name="allComponents ? 'check-circle' : 'circle'" :size="15" /> Select All
-              </button>
+            </div>
+            <div class="setting" aria-busy="true">
+              <span class="sk sk--line" style="width: 36%" />
+              <div class="checks checks--types">
+                <span v-for="n in 8" :key="n" class="sk check-sk" />
+              </div>
+            </div>
+            <div class="setting" aria-busy="true">
+              <span class="sk sk--line" style="width: 24%" />
+              <div class="layouts">
+                <span v-for="n in 2" :key="n" class="sk layout-sk" />
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="setting" role="group" aria-labelledby="set-components">
+              <div class="setting__head">
+                <span id="set-components" class="setting__title">Blood Components</span>
+                <button type="button" class="select-all" :aria-pressed="allComponents" @click="toggleAll('components')">
+                  <AssetIcon :name="allComponents ? 'check-circle' : 'circle'" :size="14" /> Select All
+                </button>
+              </div>
               <div class="checks">
                 <label v-for="component in componentOptions" :key="component.id" class="check" :class="{ 'check--on': config.components.includes(component.id) }" :title="component.name">
                   <input v-model="config.components" type="checkbox" :value="component.id" class="check__input">
@@ -79,236 +80,163 @@
                 </label>
               </div>
             </div>
-          </div>
 
-          <div class="setting" role="group" aria-labelledby="set-types">
-            <span class="setting__icon" aria-hidden="true"><AssetIcon name="blood-drop" :size="17" /></span>
-            <div class="setting__body">
+            <div class="setting" role="group" aria-labelledby="set-types">
               <div class="setting__head">
-                <span>
-                  <span id="set-types" class="setting__title">Blood Types</span>
-                  <span class="setting__sub">Select the blood types to include in the report.</span>
-                </span>
+                <span id="set-types" class="setting__title">Blood Types</span>
+                <button type="button" class="select-all" :aria-pressed="allTypes" @click="toggleAll('bloodTypes')">
+                  <AssetIcon :name="allTypes ? 'check-circle' : 'circle'" :size="14" /> Select All
+                </button>
               </div>
-              <button type="button" class="select-all" :aria-pressed="allTypes" @click="toggleAll('bloodTypes')">
-                <AssetIcon :name="allTypes ? 'check-circle' : 'circle'" :size="15" /> Select All
-              </button>
-              <div class="checks">
-                <label v-for="type in typeOptions" :key="type.id" class="check check--type" :class="{ 'check--on': config.bloodTypes.includes(type.id) }">
+              <div class="checks checks--types">
+                <label v-for="type in typeOptions" :key="type.id" class="check" :class="{ 'check--on': config.bloodTypes.includes(type.id) }">
                   <input v-model="config.bloodTypes" type="checkbox" :value="type.id" class="check__input">
                   <span class="check__box" aria-hidden="true"><AssetIcon name="check" :size="12" /></span>
                   {{ displayType(type.code) }}
                 </label>
               </div>
             </div>
-          </div>
 
-          <div class="setting" role="group" aria-labelledby="set-sheets">
-            <span class="setting__icon" aria-hidden="true"><AssetIcon name="file-text" :size="17" /></span>
-            <div class="setting__body">
+            <div class="setting" role="group" aria-labelledby="set-sheets">
               <div class="setting__head">
-                <span>
-                  <span id="set-sheets" class="setting__title">Sheets</span>
-                  <span class="setting__sub">Choose how you want to organize the report.</span>
-                </span>
+                <span id="set-sheets" class="setting__title">Sheets</span>
               </div>
               <div class="layouts" role="radiogroup" aria-label="Sheets">
                 <label v-for="option in LAYOUTS" :key="option.value" class="layout" :class="{ 'layout--on': config.by === option.value }">
                   <input v-model="config.by" type="radio" name="report-layout" :value="option.value" class="check__input">
-                  <span class="layout__icon" aria-hidden="true"><AssetIcon :name="option.icon" :size="18" /></span>
+                  <span class="layout__radio" aria-hidden="true" />
                   <span class="layout__text">
                     <span class="layout__title">{{ option.label }}</span>
                     <span class="layout__desc">{{ option.description }}</span>
                   </span>
-                  <span class="layout__radio" aria-hidden="true" />
                 </label>
               </div>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
 
-        <footer class="panel__foot">
-          <p class="panel__summary" :class="{ 'panel__summary--warn': !canGenerate && !optionsLoading }">{{ summary }}</p>
+        <footer class="rail__foot">
+          <p class="rail__summary" :class="{ 'rail__summary--warn': !canGenerate && !optionsLoading }">{{ summary }}</p>
           <button type="button" class="btn-primary" :disabled="!canGenerate || generating" @click="generate">
             <AssetIcon :name="generating ? 'refresh-cw' : 'file-text'" :size="15" :class="{ spin: generating }" />
             {{ generating ? 'Generating…' : 'Generate Report' }}
-            <AssetIcon v-if="!generating" name="arrow-right" :size="15" />
           </button>
         </footer>
-      </div>
+      </aside>
 
-      <!-- Generated reports: each kept as the PDF it was printed as (project owner, 2026-10-29) -->
-      <div v-show="tab === 'history'" id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="history">
-        <p v-if="historyError" class="history__error" role="alert">{{ historyError }}</p>
-
-        <!-- The centre's Donor Management list (project owner, 2026-10-30). -->
-        <div class="table-wrap" :class="{ 'table-wrap--busy': historyLoading && reports.length }">
-          <table class="reports">
-            <caption class="sr-only">Generated reports, newest first</caption>
-            <thead>
-              <tr>
-                <th scope="col">Generated</th>
-                <th scope="col">By</th>
-                <th scope="col">Covers</th>
-                <th scope="col">Sheets</th>
-                <th scope="col" class="num">Pages</th>
-                <th scope="col" class="reports__actions">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody v-if="historyLoading && !reports.length">
-              <tr v-for="n in 3" :key="'skr-' + n">
-                <td colspan="6"><span class="skeleton skeleton--line" /></td>
-              </tr>
-            </tbody>
-
-            <tbody v-else-if="!reports.length">
-              <tr>
-                <td colspan="6" class="reports__empty">
-                  <div class="list-empty">
-                    <span class="list-empty__icon"><AssetIcon name="history" :size="20" /></span>
-                    <p class="list-empty__title">No reports generated yet</p>
-                    <p class="list-empty__text">Every report you generate is kept here as its PDF, to download again exactly as it was printed.</p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-
-            <tbody v-else>
-              <tr v-for="item in reports" :key="item.id" :class="{ 'reports__row--new': item.id === current?.id }">
-                <td>
-                  <span class="reports__date">{{ formatDate(item.generated_at) }}</span>
-                  <span class="reports__sub">{{ formatTime(item.generated_at) }}</span>
-                </td>
-                <td>{{ item.generated_by || '—' }}</td>
-                <td class="reports__covers">
-                  <span>{{ coverLabel(item.components, componentOptions.length) }}</span>
-                  <span class="reports__sub">{{ coverLabel(item.blood_types.map(displayType), typeOptions.length, 'blood types') }}</span>
-                </td>
-                <td>{{ item.layout === 'type' ? 'One per type' : 'All on one' }}</td>
-                <td class="num">{{ item.pages }}</td>
-                <td class="reports__actions">
-                  <div class="row-actions">
-                    <button
-                      type="button"
-                      class="row-btn"
-                      :disabled="busyReport === item.id"
-                      :aria-label="`View the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
-                      title="View"
-                      @click="viewReport(item)"
-                    >
-                      <AssetIcon name="eye" :size="15" />
-                    </button>
-                    <button
-                      type="button"
-                      class="row-btn"
-                      :disabled="busyReport === item.id"
-                      :aria-label="`Download the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
-                      title="Download PDF"
-                      @click="downloadReport(item)"
-                    >
-                      <AssetIcon name="download" :size="15" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <ListPager
-          :page="historyPage || 1"
-          :last-page="historyLastPage"
-          :from="historyFrom"
-          :to="historyTo"
-          :total="historyTotal"
-          :busy="historyLoading"
-          @go="loadHistory"
-        />
-      </div>
-    </section>
-
-    <!-- ============ THE REPORT ============ -->
-    <section ref="previewEl" class="preview" aria-label="Report preview">
-      <div v-if="generating && !sheet" class="canvas" aria-busy="true">
-        <div class="paper paper--skeleton">
-          <span class="skeleton" style="height: 18px; width: 40%" />
-          <span class="skeleton" style="height: 420px" />
-        </div>
-      </div>
-
-      <!-- Nothing yet: the report is drawn only once it is set up. -->
-      <div v-else-if="!sheet" class="empty">
-        <span class="empty__art" aria-hidden="true">
-          <span class="empty__icon empty__icon--lg"><AssetIcon name="file-text" :size="26" /></span>
-        </span>
-        <p class="empty__title">No report generated yet</p>
-        <p class="empty__desc">Choose the components and blood types above, then press Generate report to see the sheets and download the PDF.</p>
-        <svg class="empty__wave" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 70 C 150 30, 260 110, 400 70 S 560 40, 600 60 L 600 120 L 0 120 Z" />
-        </svg>
-      </div>
-
-      <template v-else>
-        <div class="result">
-          <div class="result__text">
-            <p class="result__title">
-              Report generated {{ formatDate(current?.generated_at) }}, {{ formatTime(current?.generated_at) }}
+      <!-- ============ THE REPORT ============ -->
+      <section ref="previewEl" class="panel viewer" aria-label="Report preview">
+        <header class="viewer__bar">
+          <div class="viewer__heading">
+            <h2 class="viewer__name">{{ sheet?.facility.name || facilityLabel }} · Inventory Report</h2>
+            <p v-if="sheet" class="viewer__meta">
+              As of {{ sheet.as_of_date }}, {{ sheet.as_of_time }} · Prepared by {{ sheet.prepared_by }}
             </p>
-            <p class="result__meta">
-              <strong>{{ sheet.totals.crossmatched }}</strong> crossmatched ·
-              <strong>{{ sheet.totals.uncrossmatched }}</strong> uncrossmatched ·
-              {{ sheet.components.join(', ') || 'No components' }} · {{ sheet.blood_types.map(displayType).join(', ') || 'No blood types' }}
-            </p>
-            <p v-if="stale" class="result__stale" role="status">
-              <AssetIcon name="info" :size="13" />
-              The settings have changed since this report. Generate again for a new one; this one stays in Generated Reports.
-            </p>
+            <p v-else-if="generating" class="viewer__meta">Generating the report…</p>
+            <p v-else class="viewer__meta">Nothing generated yet. Choose the settings, then press Generate Report.</p>
           </div>
-          <button type="button" class="btn-primary" :disabled="busyReport === current?.id" @click="downloadReport(current)">
-            <AssetIcon name="file-down" :size="15" />
-            {{ busyReport === current?.id ? 'Preparing…' : 'Download PDF' }}
-          </button>
-        </div>
+          <div v-if="sheet" class="viewer__actions">
+            <button type="button" class="btn-outline" :disabled="busyReport === current?.id" @click="viewReport(current)">
+              <AssetIcon name="eye" :size="15" />
+              View PDF
+            </button>
+            <button type="button" class="btn-primary" :disabled="busyReport === current?.id" @click="downloadReport(current)">
+              <AssetIcon name="file-down" :size="15" />
+              {{ busyReport === current?.id ? 'Preparing…' : 'Download PDF' }}
+            </button>
+          </div>
+        </header>
 
-        <!-- Each type's sheet, to jump to. -->
-        <nav v-if="sheet.by === 'type' && sheet.sheets.length" class="jump" aria-label="Blood types">
-          <button
-            v-for="(page, index) in sheet.sheets"
-            v-show="page.page === 1"
-            :key="index"
-            type="button"
-            class="jump__chip"
-            @click="jumpTo(index)"
-          >
-            {{ displayType(page.blood_type) }}
-            <span class="jump__count">{{ bagsOn(page.blood_type) }}</span>
-          </button>
+        <p v-if="stale" class="viewer__stale" role="status">
+          <AssetIcon name="info" :size="14" />
+          The settings have changed since this report. Generate again for a new one; this one stays in Generated Reports.
+        </p>
+
+        <!-- The report's own figures, from the sheets just built. -->
+        <dl v-if="sheet || generating" class="figures" :aria-busy="!sheet">
+          <div v-for="figure in figures" :key="figure.label" class="figure">
+            <dt>{{ figure.label }}</dt>
+            <dd>
+              <span v-if="!sheet" class="sk sk--line figure__sk" />
+              <template v-else>{{ figure.value }}</template>
+            </dd>
+          </div>
+          <div class="figure figure--wide">
+            <dt>Covers</dt>
+            <dd class="figure__covers">
+              <span v-if="!sheet" class="sk sk--line" style="width: 70%" />
+              <template v-else>{{ sheet.components.join(', ') || 'No components' }} · {{ sheet.blood_types.map(displayType).join(', ') || 'No blood types' }}</template>
+            </dd>
+          </div>
+        </dl>
+
+        <!-- Each type's sheet to jump to, and the page being read. -->
+        <nav v-if="sheet?.sheets.length > 1" class="pages" aria-label="Report pages">
+          <div v-if="sheet.by === 'type'" class="jump">
+            <button
+              v-for="(page, index) in sheet.sheets"
+              v-show="page.page === 1"
+              :key="index"
+              type="button"
+              class="jump__chip"
+              :class="{ 'jump__chip--on': page.blood_type === sheet.sheets[activeSheet]?.blood_type }"
+              @click="jumpTo(index)"
+            >
+              {{ displayType(page.blood_type) }}
+              <span class="jump__count">{{ bagsOn(page.blood_type) }}</span>
+            </button>
+          </div>
+          <div class="pager">
+            <button type="button" class="pager__btn" :disabled="activeSheet === 0" aria-label="Previous page" @click="jumpTo(activeSheet - 1)">
+              <AssetIcon name="chevron-left" :size="15" />
+            </button>
+            <span class="pager__label" aria-live="polite">Page {{ activeSheet + 1 }} of {{ sheet.sheets.length }}</span>
+            <button type="button" class="pager__btn" :disabled="activeSheet >= sheet.sheets.length - 1" aria-label="Next page" @click="jumpTo(activeSheet + 1)">
+              <AssetIcon name="chevron-right" :size="15" />
+            </button>
+          </div>
         </nav>
 
-        <div v-if="!sheet.sheets.length" class="empty">
+        <p v-if="sheet && sheet.sheets.length && !bagTotal" class="viewer__note">
+          <AssetIcon name="info" :size="14" />
+          No bags in date on these settings, so the form is empty.
+        </p>
+
+        <div v-if="sheet && !sheet.sheets.length" class="empty">
           <span class="empty__icon"><AssetIcon name="inbox" :size="22" /></span>
           <p class="empty__title">Nothing to print</p>
           <p class="empty__desc">These settings cover no sheet. Choose at least one component and one blood type.</p>
         </div>
 
-        <!-- A print preview: white paper whatever the theme, because this is what prints. -->
-        <div v-else class="canvas" :class="{ 'canvas--busy': generating }">
+        <!--
+          A print preview: white paper whatever the theme, because this is what
+          prints. Until a report exists it shows the blank form, as it will fill.
+        -->
+        <div
+          v-else
+          ref="canvasEl"
+          class="canvas"
+          :class="{ 'canvas--busy': generating }"
+          :aria-busy="generating"
+          @scroll.passive="onCanvasScroll"
+        >
           <article
-            v-for="(page, index) in sheet.sheets"
+            v-for="(page, index) in drawnPages"
             :id="`sheet-${index}`"
             :key="index"
             class="paper"
+            :class="{ 'paper--blank': !sheet }"
+            :aria-hidden="!sheet"
             :aria-label="`Inventory sheet${page.blood_type ? `, ${page.blood_type}` : ''}${page.kind === 'other' ? ', other components' : ''}${page.pages > 1 ? `, page ${page.page} of ${page.pages}` : ''}`"
           >
             <header class="paper__head">
               <div>
-                <p class="paper__facility">{{ sheet.facility.name }}</p>
+                <p class="paper__facility">{{ sheet?.facility.name || facilityLabel }}</p>
                 <p class="paper__type">
                   {{ page.blood_type ? `Blood type: ${page.blood_type}` : 'All blood types' }}<template v-if="page.kind === 'other'"> · Other components</template>
                 </p>
               </div>
-              <p class="paper__when">
+              <p v-if="sheet" class="paper__when">
                 As of {{ sheet.as_of_date }}, {{ sheet.as_of_time }}
                 <template v-if="page.pages > 1"><br>Page {{ page.page }} of {{ page.pages }}</template>
               </p>
@@ -337,7 +265,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in sheet.rows" :key="row">
+                  <tr v-for="row in rowNumbers" :key="row">
                     <td class="form__num">{{ row }}</td>
                     <template v-for="(column, c) in page[section.key]" :key="c">
                       <td class="form__bag">
@@ -355,8 +283,8 @@
               <table class="form form--sign">
                 <tbody>
                   <tr>
-                    <td class="form__sign" style="width: 40%">INVENTORY DONE BY:<span class="form__sign-value">{{ sheet.prepared_by }}</span></td>
-                    <td class="form__sign" style="width: 25%">DATE:<span class="form__sign-value">{{ sheet.as_of_date }}</span></td>
+                    <td class="form__sign" style="width: 40%">INVENTORY DONE BY:<span class="form__sign-value">{{ sheet?.prepared_by }}</span></td>
+                    <td class="form__sign" style="width: 25%">DATE:<span class="form__sign-value">{{ sheet?.as_of_date }}</span></td>
                     <td class="form__sign" style="width: 35%">CHECKED BY:</td>
                   </tr>
                 </tbody>
@@ -365,15 +293,136 @@
 
             <p class="paper__legend">(T) Tagged to a patient, waiting for crossmatch.</p>
 
-            <footer class="paper__control">
+            <footer v-if="sheet" class="paper__control">
               <span>{{ sheet.footer.form_code }}</span>
               <span>{{ sheet.footer.effectivity }}</span>
               <span>{{ sheet.footer.revision }}</span>
             </footer>
           </article>
         </div>
-      </template>
+      </section>
+    </div>
+
+    <!-- ============ GENERATED REPORTS ============ -->
+    <!-- Each kept as the PDF it was printed as (project owner, 2026-10-29) -->
+    <section v-show="tab === 'history'" id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="panel history">
+      <p v-if="historyError" class="history__error" role="alert">{{ historyError }}</p>
+
+      <!-- The centre's Donor Management list (project owner, 2026-10-30). -->
+      <div class="table-wrap" :class="{ 'table-wrap--busy': historyLoading && reports.length }">
+        <table class="reports">
+          <caption class="sr-only">Generated reports, newest first</caption>
+          <thead>
+            <tr>
+              <th scope="col">Generated</th>
+              <th scope="col">By</th>
+              <th scope="col">Covers</th>
+              <th scope="col">Sheets</th>
+              <th scope="col" class="num">Bags</th>
+              <th scope="col" class="num">Pages</th>
+              <th scope="col" class="reports__actions">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody v-if="historyLoading && !reports.length">
+            <SkeletonRows :columns="7" :rows="3" />
+          </tbody>
+
+          <tbody v-else-if="!reports.length">
+            <tr>
+              <td colspan="7" class="reports__empty">
+                <div class="list-empty">
+                  <span class="list-empty__icon"><AssetIcon name="history" :size="20" /></span>
+                  <p class="list-empty__title">No reports generated yet</p>
+                  <p class="list-empty__text">Every report you generate is kept here as its PDF, to download again exactly as it was printed.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+
+          <tbody v-else>
+            <tr v-for="item in reports" :key="item.id">
+              <td>
+                <span class="reports__date">
+                  {{ formatDate(item.generated_at) }}
+                  <span v-if="item.id === current?.id" class="reports__new">Just generated</span>
+                </span>
+                <span class="reports__sub">{{ formatTime(item.generated_at) }}</span>
+              </td>
+              <td>{{ item.generated_by || '—' }}</td>
+              <td class="reports__covers">
+                <span>{{ coverLabel(item.components, componentOptions.length) }}</span>
+                <span class="reports__sub">{{ coverLabel(item.blood_types.map(displayType), typeOptions.length, 'blood types') }}</span>
+              </td>
+              <td>{{ item.layout === 'type' ? 'One per type' : 'All on one' }}</td>
+              <td class="num">
+                <span class="reports__date">{{ reportBags(item) }}</span>
+                <span class="reports__sub">{{ item.totals?.crossmatched ?? 0 }} crossmatched</span>
+              </td>
+              <td class="num">{{ item.pages }}</td>
+              <td class="reports__actions">
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    class="row-btn"
+                    :disabled="busyReport === item.id"
+                    :aria-label="`View the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
+                    title="View"
+                    @click="viewReport(item)"
+                  >
+                    <AssetIcon name="eye" :size="15" />
+                  </button>
+                  <button
+                    type="button"
+                    class="row-btn"
+                    :disabled="busyReport === item.id"
+                    :aria-label="`Download the report generated ${formatDate(item.generated_at)}, ${formatTime(item.generated_at)}`"
+                    title="Download PDF"
+                    @click="downloadReport(item)"
+                  >
+                    <AssetIcon name="download" :size="15" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ListPager
+        :page="historyPage || 1"
+        :last-page="historyLastPage"
+        :from="historyFrom"
+        :to="historyTo"
+        :total="historyTotal"
+        :busy="historyLoading"
+        @go="loadHistory"
+      />
     </section>
+
+    <!-- A kept report's PDF, on this page rather than in another tab. -->
+    <CenterModal
+      v-if="viewing"
+      size="lg"
+      title="Inventory Report"
+      :eyebrow="`Generated ${formatDate(viewing.item.generated_at)}, ${formatTime(viewing.item.generated_at)}`"
+      @close="closeViewer"
+    >
+      <p v-if="viewing.error" class="alert" role="alert">
+        <AssetIcon name="circle-alert" :size="16" />
+        <span>{{ viewing.error }}</span>
+      </p>
+      <iframe v-else-if="viewing.url" :src="viewing.url" class="pdf-frame" :title="`Inventory report, ${formatDate(viewing.item.generated_at)}`" />
+      <span v-else class="sk pdf-frame" aria-busy="true" />
+
+      <template #actions>
+        <button type="button" class="btn-outline" @click="closeViewer">Close</button>
+        <button type="button" class="btn-primary" :disabled="busyReport === viewing.item.id" @click="downloadReport(viewing.item)">
+          <AssetIcon name="file-down" :size="15" />
+          {{ busyReport === viewing.item.id ? 'Preparing…' : 'Download PDF' }}
+        </button>
+      </template>
+    </CenterModal>
   </div>
 </template>
 
@@ -384,28 +433,33 @@
  * Blood and Packed RBC; every other component follows on "Other components"
  * pages in the same layout, a column each.
  *
- * Laid out from the owner's mock-up (2026-10-29): Report Settings — the
- * components, the blood types and the layout, chosen before anything is
- * drawn — and Generated Reports. Generate Report has the server build the
+ * New Report sets Report Settings beside the document, as a report viewer does
+ * (project owner, 2026-11-01): the components, the blood types and the layout,
+ * chosen before anything is drawn. Generate Report has the server build the
  * sheets and keep them as their PDF, so the preview, the Download and every
- * later re-download are the same report, exactly as printed that day.
+ * later re-download are the same report, exactly as printed that day; those
+ * are listed under Generated Reports.
  *
  * CROSSMATCHED holds the bags tagged to a patient and crossmatched, ready to
  * transfuse, its Whole Blood under TRANSFUSE AS PRBC; UNCROSSMATCHED holds
  * the free bags and those tagged but still waiting for their crossmatch,
  * marked (T).
  */
+import PageHeader from '~/components/ui/PageHeader.vue'
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 
+import CenterModal from '~/components/ui/CenterModal.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { orderDashboardTypes } from '~/utils/inventoryDashboard'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
 const LAYOUTS = [
-  { value: 'type', label: 'One sheet per type', description: 'Each blood type will have its own sheet.', icon: 'layout-grid' },
-  { value: 'all', label: 'All types on one sheet', description: 'All selected blood types will be included in a single sheet.', icon: 'layers' },
+  { value: 'type', label: 'One sheet per type', description: 'Each blood type has its own sheet.', icon: 'layout-grid' },
+  { value: 'all', label: 'All types on one sheet', description: 'Every chosen type on a single sheet.', icon: 'layers' },
 ]
 
 const SECTIONS = [
@@ -416,6 +470,9 @@ const SECTIONS = [
 // The names the settings show, as the mock-up writes them; the sheets print the codes.
 const COMPONENT_LABELS = { WB: 'Whole Blood', PC: 'PLT', CRYO: 'Cryo' }
 const componentLabel = (component) => COMPONENT_LABELS[component.code] || component.code || component.name
+
+const { can, user } = useUser()
+const facilityLabel = computed(() => user.value?.facility?.facility_name || 'Your blood bank')
 
 const tab = ref('settings')
 const error = ref('')
@@ -501,6 +558,31 @@ const sheet = ref(null)
 const current = ref(null)
 const generating = ref(false)
 const previewEl = ref(null)
+const canvasEl = ref(null)
+const activeSheet = ref(0)
+
+// The form's own grid, empty, until a report fills it: the server's Whole Blood
+// and Packed RBC page, with nothing on it.
+const BLANK_ROWS = 20
+const blankColumn = (label) => ({ label, cells: [] })
+const BLANK_PAGE = {
+  kind: 'form',
+  blood_type: null,
+  page: 1,
+  pages: 1,
+  crossmatched: ['TRANSFUSE AS PRBC', 'WB', 'PRBC', 'PRBC'].map(blankColumn),
+  uncrossmatched: ['WB', 'PRBC', 'PRBC', 'PRBC'].map(blankColumn),
+}
+const drawnPages = computed(() => (sheet.value ? sheet.value.sheets : [BLANK_PAGE]))
+const rowNumbers = computed(() => sheet.value?.rows ?? BLANK_ROWS)
+
+const bagTotal = computed(() => (sheet.value?.totals.crossmatched ?? 0) + (sheet.value?.totals.uncrossmatched ?? 0))
+const figures = computed(() => [
+  { label: 'Bags in date', value: bagTotal.value },
+  { label: 'Crossmatched', value: sheet.value?.totals.crossmatched ?? 0 },
+  { label: 'Uncrossmatched', value: sheet.value?.totals.uncrossmatched ?? 0 },
+  { label: 'Pages', value: sheet.value?.sheets.length ?? 0 },
+])
 
 const options = () => ({ by: config.by, components: [...config.components], bloodTypes: [...config.bloodTypes] })
 const generatedWith = ref(null)
@@ -524,7 +606,11 @@ async function generate() {
     // It joins the archive at the top.
     reports.value = [response.report, ...reports.value.filter((item) => item.id !== response.report.id)]
     historyTotal.value += 1
-    nextTick(() => previewEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    activeSheet.value = 0
+    nextTick(() => {
+      if (canvasEl.value) canvasEl.value.scrollTop = 0
+      previewEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   } catch (err) {
     error.value = Object.values(err?.data?.errors ?? {}).flat()[0] || err?.message || 'The report could not be generated. Try again.'
   } finally {
@@ -587,28 +673,31 @@ async function downloadReport(item) {
   }
 }
 
-/**
- * Open a kept report's PDF in a new tab. The tab is opened at once, while the
- * click still counts as the user's, and given the PDF when it arrives; a
- * browser that refuses the tab gets the download instead.
- */
+// The kept report being read, on this page: never another browser tab.
+const viewing = ref(null)
+
 async function viewReport(item) {
-  const viewer = window.open('', '_blank')
-  if (!viewer) {
-    downloadReport(item)
-    return
-  }
+  if (!item) return
+  viewing.value = { item, url: '', error: '' }
   busyReport.value = item.id
   try {
     const blob = await hospitalService.downloadInventoryReport(item.id)
-    viewer.location.href = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+    // Closed while it was on its way: nothing to show it in.
+    if (viewing.value?.item.id !== item.id) return
+    viewing.value.url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
   } catch (err) {
-    viewer.close()
-    error.value = err?.message || 'The PDF could not be opened. Try again.'
+    if (viewing.value?.item.id === item.id) viewing.value.error = err?.message || 'The PDF could not be opened. Try again.'
   } finally {
     busyReport.value = null
   }
 }
+
+function closeViewer() {
+  if (viewing.value?.url) URL.revokeObjectURL(viewing.value.url)
+  viewing.value = null
+}
+
+onBeforeUnmount(closeViewer)
 
 onMounted(() => {
   loadOptions()
@@ -618,8 +707,23 @@ onMounted(() => {
 
 // ── Drawing ──
 function jumpTo(index) {
+  activeSheet.value = index
   document.getElementById(`sheet-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
+
+/** The page being read: the last to have reached the top of the canvas. */
+function onCanvasScroll(event) {
+  const canvas = event.target
+  const papers = canvas.querySelectorAll('.paper')
+  let reading = 0
+  papers.forEach((paper, index) => {
+    if (paper.offsetTop <= canvas.scrollTop + 80) reading = index
+  })
+  activeSheet.value = reading
+}
+
+/** Every bag a kept report listed. */
+const reportBags = (item) => (item.totals?.crossmatched ?? 0) + (item.totals?.uncrossmatched ?? 0)
 
 /** How many bags a blood type's sheets hold, across its pages. */
 function bagsOn(bloodType) {
@@ -671,10 +775,10 @@ function formatTime(value) {
   font-family: var(--rb-font-sans);
   max-width: var(--rb-content-max, 1600px);
   margin: 0 auto;
-  padding: 24px var(--rb-gutter, 24px) 40px;
+  padding: 24px var(--rb-gutter, 24px) 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -685,48 +789,18 @@ function formatTime(value) {
   background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), 0.25);
 }
 
-/* ── Header: the page's title on a soft wash of the portal colour ── */
-.hero {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 22px 24px;
-  overflow: hidden;
-  border: 1px solid var(--rb-border);
-  border-radius: 20px;
-  background:
-    radial-gradient(60% 140% at 100% 0%, rgba(var(--rb-primary-rgb), 0.10), transparent 60%),
-    var(--rb-surface);
-  box-shadow: var(--rb-shadow-sm);
-}
-.hero__icon {
-  position: relative; z-index: 1; flex-shrink: 0;
-  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px;
-  background: rgba(var(--rb-primary-rgb), 0.12); color: var(--rb-primary-text);
-}
-.hero__text { position: relative; z-index: 1; flex: 1; min-width: 0; }
-.hero__title { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--rb-text-primary); }
-.hero__sub { margin: 4px 0 0; font-size: 13.5px; color: var(--rb-text-secondary); }
-.hero__tag {
-  position: relative; z-index: 1; flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px; margin: 0;
-  font-size: 12px; line-height: 1.4; color: var(--rb-text-secondary);
-}
-.hero__drop { color: rgba(var(--rb-primary-rgb), 0.55); }
-.hero__wave { position: absolute; right: 0; bottom: 0; width: 55%; height: 70%; fill: rgba(var(--rb-primary-rgb), 0.05); pointer-events: none; }
-
-/* ── The settings card and its tabs ── */
 .panel {
   overflow: hidden;
   border: 1px solid var(--rb-border);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--rb-surface);
   box-shadow: var(--rb-shadow-sm);
 }
-.tabs { display: flex; gap: 8px; padding: 0 20px; border-bottom: 1px solid var(--rb-border); overflow-x: auto; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--rb-border); overflow: auto hidden; }
 .tabs__tab {
-  display: inline-flex; align-items: center; gap: 8px; padding: 15px 6px 13px; margin-right: 14px;
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 6px; margin-right: 14px;
   border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; white-space: nowrap;
   font: inherit; font-size: 13.5px; font-weight: 600; color: var(--rb-text-secondary);
 }
@@ -738,98 +812,176 @@ function formatTime(value) {
   background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); font-size: 11px; font-weight: 700;
 }
 
-/* A setting: its icon in the margin, then the title, its line and the choices. */
-.setting {
-  display: flex; gap: 14px; margin: 0; padding: 20px 24px; min-width: 0;
-  border: 0; border-bottom: 1px solid var(--rb-border);
+/* ── New Report: settings beside the document, each scrolling on its own ── */
+.workspace {
+  display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: stretch;
+  height: max(560px, calc(100dvh - 240px));
 }
-.setting__icon {
-  flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
-  background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text);
-}
-.setting__body { position: relative; flex: 1; min-width: 0; }
-.setting__head { padding: 0; margin-bottom: 12px; }
-.setting__title { display: block; font-size: 14.5px; font-weight: 700; color: var(--rb-text-primary); }
-.setting__sub { display: block; margin-top: 2px; font-size: 12.5px; color: var(--rb-text-secondary); }
+
+.rail { display: flex; flex-direction: column; min-height: 0; }
+.rail__title { margin: 0; padding: 10px 18px; font-size: 14.5px; font-weight: 700; color: var(--rb-text-primary); border-bottom: 1px solid var(--rb-border); }
+.rail__body { flex: 1; min-height: 0; overflow-y: auto; }
+.rail__foot { display: flex; flex-direction: column; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--rb-border); }
+.rail__foot .btn-primary { width: 100%; }
+.rail__summary { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--rb-text-secondary); }
+.rail__summary--warn { color: var(--rb-warning-text, #B45309); font-weight: 600; }
+
+.setting { display: flex; flex-direction: column; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--rb-border); }
+.setting:last-child { border-bottom: 0; }
+.setting__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
+.setting__title { font-size: 13px; font-weight: 700; color: var(--rb-text-primary); }
 
 .select-all {
-  position: absolute; top: 0; right: 0;
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border: 0; border-radius: 8px; background: none; cursor: pointer;
-  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text);
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 6px; border: 0; border-radius: 7px; background: none; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--rb-primary-text);
 }
 .select-all:hover { background: rgba(var(--rb-primary-rgb), 0.08); }
 .select-all:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 
 /* Checkbox chips */
-.checks { display: flex; flex-wrap: wrap; gap: 10px; }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.checks--types { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .check {
-  position: relative; display: inline-flex; align-items: center; gap: 9px; min-width: 64px; padding: 8px 14px 8px 10px;
-  border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); cursor: pointer; user-select: none;
-  font-size: 13px; font-weight: 600; color: var(--rb-text-primary);
+  position: relative; display: flex; align-items: center; gap: 7px; min-width: 0; height: 32px; padding: 0 9px;
+  border: 1px solid var(--rb-border-strong); border-radius: 9px; background: var(--rb-surface); cursor: pointer; user-select: none;
+  font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); white-space: nowrap;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .check:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); }
-.check--on { border-color: rgba(var(--rb-primary-rgb), 0.35); background: rgba(var(--rb-primary-rgb), 0.04); }
-.check--type { min-width: 60px; }
+.check--on { border-color: rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.05); }
 .check__input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 .check__box {
-  display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+  display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; flex-shrink: 0;
   border: 1.5px solid var(--rb-border-strong); background: var(--rb-surface); color: transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .check--on .check__box { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
 .check:focus-within { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.check-sk { height: 32px; border-radius: 9px; }
 
-/* Layout cards, chosen like radio buttons */
-.layouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* The two ways to organize it, as a radio list */
+.layouts { display: flex; flex-direction: column; gap: 8px; }
 .layout {
-  position: relative; display: flex; align-items: center; gap: 14px; padding: 16px 18px;
-  border: 1px solid var(--rb-border-strong); border-radius: 14px; background: var(--rb-surface); cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px;
+  border: 1px solid var(--rb-border-strong); border-radius: 10px; background: var(--rb-surface); cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .layout:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); }
-.layout--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.04); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.1); }
+.layout--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.05); }
 .layout:focus-within { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.layout__icon {
-  flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
-  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
-}
 .layout__text { flex: 1; min-width: 0; }
-.layout__title { display: block; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
-.layout__desc { display: block; margin-top: 3px; font-size: 12px; color: var(--rb-text-secondary); }
+.layout__title { display: block; font-size: 12.5px; font-weight: 700; color: var(--rb-text-primary); }
+.layout__desc { display: block; margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--rb-text-secondary); }
 .layout__radio {
-  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+  flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%;
   border: 1.5px solid var(--rb-border-strong); background: var(--rb-surface);
 }
-.layout--on .layout__radio { border-color: var(--rb-primary); box-shadow: inset 0 0 0 4px var(--rb-surface); background: var(--rb-primary); }
-
-.panel__foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 14px 24px; background: color-mix(in srgb, var(--rb-surface-alt) 60%, var(--rb-surface));
-}
-.panel__summary { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.panel__summary--warn { color: var(--rb-warning-text, #B45309); font-weight: 600; }
+.layout--on .layout__radio { border-color: var(--rb-primary); box-shadow: inset 0 0 0 3px var(--rb-surface); background: var(--rb-primary); }
+.layout-sk { height: 52px; border-radius: 10px; }
 
 /* Buttons */
-.btn-primary {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px;
-  border: 0; border-radius: 10px; background: var(--rb-primary); color: #fff; cursor: pointer; white-space: nowrap;
-  font: inherit; font-size: 13.5px; font-weight: 700;
-  box-shadow: 0 6px 14px -8px rgba(var(--rb-primary-rgb), 0.7);
-  transition: background-color 0.15s ease, transform 0.1s ease;
+.btn-primary, .btn-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px;
+  border-radius: 10px; cursor: pointer; white-space: nowrap; font: inherit; font-size: 13px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
+.btn-primary { border: 0; background: var(--rb-primary); color: #fff; font-weight: 700; }
 .btn-primary:hover:not(:disabled) { background: var(--rb-primary-hover); }
-.btn-primary:active:not(:disabled) { transform: translateY(1px); }
-.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
-.btn-primary:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.btn-ghost {
-  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px;
-  border: 1px solid var(--rb-border-strong); border-radius: 9px; background: var(--rb-surface); cursor: pointer; white-space: nowrap;
-  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary);
+.btn-outline { border: 1px solid var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-primary); font-weight: 600; }
+.btn-outline:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.btn-primary:active:not(:disabled), .btn-outline:active:not(:disabled) { transform: translateY(1px); }
+.btn-primary:disabled, .btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary:focus-visible, .btn-outline:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+/* ── The report viewer ── */
+.viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; scroll-margin-top: 80px; }
+.viewer__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--rb-border); }
+.viewer__heading { min-width: 0; }
+.viewer__name { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--rb-text-primary); }
+.viewer__meta { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.viewer__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.viewer__stale, .viewer__note { display: flex; align-items: center; gap: 7px; margin: 0; padding: 9px 18px; border-bottom: 1px solid var(--rb-border); font-size: 12.5px; }
+.viewer__stale { font-weight: 600; color: var(--rb-warning-text, #B45309); }
+.viewer__note { color: var(--rb-text-secondary); }
+
+.figures { display: flex; flex-wrap: wrap; margin: 0; border-bottom: 1px solid var(--rb-border); }
+.figure { flex: 0 0 auto; min-width: 112px; padding: 8px 18px; border-right: 1px solid var(--rb-border); }
+.figure--wide { flex: 1 1 200px; min-width: 0; border-right: 0; }
+.figure dt { font-size: 11.5px; color: var(--rb-text-secondary); }
+.figure dd { display: flex; align-items: center; min-height: 26px; margin: 2px 0 0; font-size: 19px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
+.figure .figure__covers { display: block; font-size: 12.5px; font-weight: 500; line-height: 1.4; }
+.figure__sk { width: 44px; }
+
+.pages { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 18px; border-bottom: 1px solid var(--rb-border); }
+.jump { display: flex; flex-wrap: wrap; gap: 6px; }
+.jump__chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-primary);
+  font: inherit; font-size: 12.5px; font-weight: 700;
 }
-.btn-ghost:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.45); color: var(--rb-primary-text); }
-.btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-ghost:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.jump__chip:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.jump__chip--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.jump__chip:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+.jump__count { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--rb-text-secondary); }
+.pager { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.pager__label { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--rb-text-secondary); }
+.pager__btn {
+  display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--rb-border-strong); border-radius: 8px;
+  background: var(--rb-surface); color: var(--rb-text-primary); cursor: pointer;
+}
+.pager__btn:hover:not(:disabled) { border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.pager__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pager__btn:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
+
+.empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 56px 28px; text-align: center; }
+.empty__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.empty__title { margin: 10px 0 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
+.empty__desc { margin: 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
+
+/* The print preview canvas: the paper on a darker desk, as a PDF viewer sets it. */
+.canvas {
+  position: relative; flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 22px; background: var(--rb-surface-alt);
+  transition: opacity 0.15s ease;
+}
+.canvas--busy { opacity: 0.6; }
+.paper {
+  flex-shrink: 0; width: 100%; max-width: 860px; margin: 0 auto; scroll-margin-top: 12px;
+  background: #ffffff; color: #111827;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px -12px rgba(15, 23, 42, 0.28);
+  padding: 32px 36px 28px;
+}
+/* The form before there is a report: plainly not filled in. */
+.paper--blank > * { opacity: 0.45; }
+
+.paper__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.paper__facility { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.paper__type { margin: 2px 0 0; font-size: 11.5px; }
+.paper__when { margin: 0; font-size: 10.5px; color: #374151; text-align: right; }
+.paper__scroll { overflow-x: auto; }
+.paper__legend { margin: 4px 0 0; font-size: 9.5px; color: #374151; }
+.paper__control { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 10px; font-weight: 700; }
+
+/* The form: hairline rules, as printed. */
+.form { width: 100%; min-width: 640px; border-collapse: collapse; table-layout: fixed; }
+.form + .form { margin-top: -1px; }
+.form__num-col { width: 4%; }
+.form__bag-col { width: 15.5%; }
+.form__exp-col { width: 8.5%; }
+.form th, .form td {
+  height: 21px; padding: 0 4px; border: 1px solid #4B5563;
+  font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.form__section { font-size: 14px !important; font-weight: 800; letter-spacing: 0.02em; text-align: center; height: 26px !important; }
+.form__col { font-size: 10px; font-weight: 700; text-align: center; }
+.form__num { text-align: center; font-size: 9px !important; color: #4B5563; }
+.form__bag { font-family: var(--rb-font-mono); font-size: 9.5px !important; }
+.form__exp { text-align: center; font-size: 9.5px !important; font-variant-numeric: tabular-nums; }
+.form__tag { margin-left: 3px; font-family: var(--rb-font-sans); font-weight: 700; text-decoration: none; }
+.form__sign { height: 34px !important; vertical-align: top; padding-top: 3px !important; font-size: 8.5px !important; }
+.form__sign-value { display: block; margin-top: 6px; font-size: 10.5px; }
 
 /* ── Generated reports ── */
 .history { min-height: 120px; }
@@ -849,8 +1001,8 @@ function formatTime(value) {
 .reports tbody tr:last-child td { border-bottom: 0; }
 .reports tbody tr { transition: background 0.12s ease; }
 .reports tbody tr:hover { background: var(--rb-surface-hover); }
-.reports__row--new td:first-child { box-shadow: inset 3px 0 0 var(--rb-primary); }
 .reports__date { display: block; font-weight: 700; white-space: nowrap; }
+.reports__new { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
 .reports__sub { display: block; font-size: 11.5px; color: var(--rb-text-secondary); }
 .reports__covers { min-width: 180px; }
 .reports .reports__actions { text-align: right; white-space: nowrap; }
@@ -876,126 +1028,27 @@ function formatTime(value) {
 .list-empty__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
 .list-empty__text { margin: 0; max-width: 44ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
 
-/* ── The report ── */
-.preview { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 80px; }
-.result {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  padding: 16px 20px; border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface);
-}
-.result__text { min-width: 0; }
-.result__title { margin: 0; font-size: 14px; font-weight: 700; color: var(--rb-text-primary); }
-.result__meta { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.result__meta strong { color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
-.result__stale { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 12.5px; font-weight: 600; color: var(--rb-warning-text, #B45309); }
-
-.empty {
-  position: relative; overflow: hidden;
-  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 56px 28px; text-align: center;
-  border: 1px solid var(--rb-border); border-radius: 20px; background: var(--rb-surface);
-}
-.empty--flat { border: 0; border-radius: 0; padding: 44px 28px; }
-.empty__art { position: relative; z-index: 1; padding: 0 22px; }
-.empty__art::before,
-.empty__art::after {
-  content: ''; position: absolute; top: 50%; width: 14px; height: 2px; border-radius: 2px;
-  background: rgba(var(--rb-primary-rgb), 0.35); box-shadow: 0 -10px 0 rgba(var(--rb-primary-rgb), 0.2), 0 10px 0 rgba(var(--rb-primary-rgb), 0.2);
-}
-.empty__art::before { left: -2px; }
-.empty__art::after { right: -2px; }
-.empty__icon {
-  position: relative; z-index: 1;
-  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px;
-  background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text);
-}
-.empty__icon--lg { width: 62px; height: 62px; border-radius: 50%; box-shadow: 0 0 0 8px rgba(var(--rb-primary-rgb), 0.05); }
-.empty__title { position: relative; z-index: 1; margin: 10px 0 0; font-size: 15px; font-weight: 700; color: var(--rb-text-primary); }
-.empty__desc { position: relative; z-index: 1; margin: 0; max-width: 52ch; font-size: 13px; line-height: 1.5; color: var(--rb-text-secondary); }
-.empty__wave { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 45%; fill: rgba(var(--rb-primary-rgb), 0.04); pointer-events: none; }
-
-.jump { display: flex; flex-wrap: wrap; gap: 6px; }
-.jump__chip {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--rb-border); background: var(--rb-surface); color: var(--rb-text-primary);
-  font: inherit; font-size: 12.5px; font-weight: 700;
-}
-.jump__chip:hover { border-color: rgba(var(--rb-primary-rgb), 0.45); }
-.jump__chip:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
-.jump__count {
-  min-width: 18px; padding: 0 6px; border-radius: 999px; text-align: center;
-  background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
-}
-
-/* The print preview canvas, as the centre's Daily Stock Report draws it. */
-.canvas {
-  display: flex; flex-direction: column; gap: 28px;
-  padding: 28px; border-radius: 20px;
-  background: var(--rb-surface-alt); border: 1px solid var(--rb-border);
-  transition: opacity 0.15s ease;
-}
-.canvas--busy { opacity: 0.6; }
-.paper {
-  width: 100%; max-width: 860px; margin: 0 auto; scroll-margin-top: 80px;
-  background: #ffffff; color: #111827;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px -12px rgba(15, 23, 42, 0.28);
-  padding: 32px 36px 28px;
-}
-.paper--skeleton { display: flex; flex-direction: column; gap: 14px; }
-.skeleton {
-  display: block; border-radius: 6px;
-  background: linear-gradient(90deg, var(--rb-skeleton-a, #EEF1F5) 25%, var(--rb-skeleton-b, #F6F8FA) 37%, var(--rb-skeleton-a, #EEF1F5) 63%);
-  background-size: 400% 100%; animation: shimmer 1.4s ease infinite;
-}
-.skeleton--line { height: 14px; }
-@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
-
-.paper__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.paper__facility { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
-.paper__type { margin: 2px 0 0; font-size: 11.5px; }
-.paper__when { margin: 0; font-size: 10.5px; color: #374151; text-align: right; }
-.paper__scroll { overflow-x: auto; }
-.paper__legend { margin: 4px 0 0; font-size: 9.5px; color: #374151; }
-.paper__control { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 10px; font-weight: 700; }
-
-/* The form: hairline rules, as printed. */
-.form { width: 100%; min-width: 640px; border-collapse: collapse; table-layout: fixed; }
-.form + .form { margin-top: -1px; }
-.form__num-col { width: 4%; }
-.form__bag-col { width: 17%; }
-.form__exp-col { width: 7%; }
-.form th, .form td {
-  height: 21px; padding: 0 4px; border: 1px solid #4B5563;
-  font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.form__section { font-size: 14px !important; font-weight: 800; letter-spacing: 0.02em; text-align: center; height: 26px !important; }
-.form__col { font-size: 10px; font-weight: 700; text-align: center; }
-.form__num { text-align: center; font-size: 9px !important; color: #4B5563; }
-.form__bag { font-family: var(--rb-font-mono); font-size: 9.5px !important; }
-.form__exp { text-align: center; font-variant-numeric: tabular-nums; }
-.form__tag { margin-left: 3px; font-family: var(--rb-font-sans); font-weight: 700; text-decoration: none; }
-.form__sign { height: 34px !important; vertical-align: top; padding-top: 3px !important; font-size: 8.5px !important; }
-.form__sign-value { display: block; margin-top: 6px; font-size: 10.5px; }
+/* A kept report's PDF */
+.pdf-frame { display: block; width: 100%; height: 68dvh; border: 1px solid var(--rb-border); border-radius: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .spin, .skeleton { animation: none; }
-  .check, .check__box, .layout, .btn-primary { transition: none; }
+  .spin { animation: none; }
+  .check, .check__box, .layout, .btn-primary, .btn-outline { transition: none; }
 }
 
-@media (max-width: 760px) {
-  .hero__tag { display: none; }
-  .layouts { grid-template-columns: minmax(0, 1fr); }
+/* Too narrow for the two side by side: settings first, and the page scrolls. */
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .canvas { overflow-y: visible; }
+  .checks { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+  .checks--types { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
 }
 
 @media (max-width: 640px) {
   .report { padding: 16px 16px 32px; }
-  .hero { padding: 18px; }
-  .hero__icon { width: 44px; height: 44px; }
-  .hero__title { font-size: 20px; }
-  .setting { padding: 18px 16px; gap: 10px; }
-  .select-all { position: static; margin: -4px 0 10px -6px; }
-  .panel__foot { padding: 14px 16px; }
-  .panel__foot .btn-primary { width: 100%; }
   .canvas { padding: 12px; }
   .paper { padding: 18px 14px; }
+  .viewer__actions, .viewer__actions .btn-primary, .viewer__actions .btn-outline { flex: 1 1 auto; }
+  .figure { flex: 1 1 40%; min-width: 0; border-right: 0; }
 }
 </style>

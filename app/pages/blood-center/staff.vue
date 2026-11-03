@@ -575,6 +575,7 @@ const errors = ref({})
 const formError = ref('')
 const banner = ref('')
 const bannerKind = ref('success')
+useNoticeToast(banner, { kind: bannerKind })
 
 function blankForm() {
   return {

@@ -1,14 +1,6 @@
 <template>
   <div class="soa-page">
     <div class="soa-inner">
-      <div class="toast-stack" aria-live="polite">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
 
       <!-- Statements of Account only (project owner, 2026-10-25). -->
       <PageHeader title="Statements">
@@ -64,7 +56,9 @@
         rather than a statement of ₱0.00 that reads like real figures
         (2026-10-27).
       -->
-      <section v-if="!hospitalsLoading && !hospitals.length" class="card soa-empty" aria-labelledby="soa-empty-title">
+      <PageSkeleton v-if="hospitalsLoading" :tiles="4" :sections="[['table'], ['table']]" :columns="6" :rows="3" />
+
+      <section v-else-if="!hospitals.length" class="card soa-empty" aria-labelledby="soa-empty-title">
         <span class="soa-empty__icon"><AssetIcon name="clipboard" :size="24" /></span>
         <h2 id="soa-empty-title" class="soa-empty__title">No hospital statements yet</h2>
         <p class="soa-empty__text">
@@ -205,6 +199,7 @@
  * server from the billing journal each time it is asked, never stored or
  * numbered, and printed from the same figures as its PDF.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -224,15 +219,7 @@ useHead({ title: 'Statements · RedAgos' })
 const PERIOD_OPTIONS = PERIOD_PRESETS.map((p) => ({ value: p.value, label: p.label }))
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 function day(value) {
   if (!value) return '—'
