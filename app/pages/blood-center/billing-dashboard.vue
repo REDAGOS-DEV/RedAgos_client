@@ -1,12 +1,7 @@
 <template>
   <div class="bdash">
     <div v-if="initialLoading" class="bdash-inner" aria-busy="true" aria-label="Loading the dashboard">
-      <div class="skeleton skeleton--header" />
-      <div class="bento">
-        <div class="skeleton skeleton--card bento__today" />
-        <div class="skeleton skeleton--card bento__owed" />
-        <div class="skeleton skeleton--panel bento__trend" />
-      </div>
+      <PageSkeleton title="Billing dashboard" :actions="1" needs :sections="[['list', 'list'], ['chart', 'list'], ['list', 'list', 'list']]" />
     </div>
 
     <div v-else class="bdash-inner">
@@ -39,7 +34,7 @@
         <!-- ============ TODAY AT THE COUNTER ============ -->
         <section class="card today bento__today" aria-labelledby="today-title">
           <div class="card__head">
-            <h2 id="today-title" class="card__label">Today at the counter</h2>
+            <h2 id="today-title" class="card__label">Collected today</h2>
           </div>
           <p class="today__amount">{{ peso(t.collected_today) }}</p>
           <p class="today__sub">
@@ -235,6 +230,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

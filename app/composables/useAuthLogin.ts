@@ -47,7 +47,7 @@ interface PortalConfig {
 const PORTALS: Record<PortalKey, PortalConfig> = {
   'user': {
     role: null,
-    title: 'Sign In · RedAgos',
+    title: 'RedAgos',
     // A reset is by address, whatever the portal: any forgot-password page will do.
     forgotPasswordPath: '/auth/donor/forgot-password',
     resolveHome: async (response) => {
@@ -64,13 +64,13 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
   },
   'donor': {
     role: 'donor',
-    title: 'Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/donor/forgot-password',
     resolveHome: () => '/donor/dashboard',
   },
   'blood-center': {
     role: 'blood-center',
-    title: 'Blood Center Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/blood-center/forgot-password',
     resolveHome: async () => {
       // No status branch here any more. A centre is created active by a Super
@@ -88,13 +88,13 @@ const PORTALS: Record<PortalKey, PortalConfig> = {
     // 'hospital' is the server's alias for blood_bank. Sending 'blood-center'
     // here — as this page used to — resolves to a different role and 403s.
     role: 'hospital',
-    title: 'Hospital Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/hospital/forgot-password',
     resolveHome: () => '/hospital/dashboard',
   },
   'admin': {
     role: 'admin',
-    title: 'Administrator Sign In · RedAgos',
+    title: 'RedAgos',
     forgotPasswordPath: '/auth/admin/forgot-password',
     resolveHome: () => '/admin/facilities',
   },
@@ -225,6 +225,24 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   }
 
   async function login() {
+    // `login`, not `email`: the server matches an email address, a donor
+    // code (from the blood center desk's sign-in) or a username.
+    const portal = config.value
+    await signIn(() => authService.login({
+      login: email.value,
+      password: password.value,
+      ...(portal.role ? { role: portal.role } : {}),
+    } as any))
+  }
+
+  /** Sign in with Google (2026-10-30): the credential Google's button handed over. */
+  async function loginWithGoogle(credential: string) {
+    await signIn(() => authService.loginWithGoogle(credential), { google: true })
+  }
+
+  /** One sign-in, by password or by Google: keep the token, then go home. */
+  async function signIn(request: () => Promise<any>, { google = false } = {}) {
+    const portal = config.value
     loading.value = true
     errorMessage.value = ''
     needsVerification.value = false
@@ -233,14 +251,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     resendSent.value = false
 
     try {
-      // `login`, not `email`: the server matches an email address, a donor
-      // code (from the blood center desk's sign-in) or a username.
-      const portal = config.value
-      const response = await authService.login({
-        login: email.value,
-        password: password.value,
-        ...(portal.role ? { role: portal.role } : {}),
-      } as any)
+      const response = await request()
 
       const token = extractToken(response)
       if (token) {
@@ -262,7 +273,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
       workspace.settle()
     } catch (error: any) {
       workspace.cancel()
-      needsVerification.value = error?.data?.code === 'email_not_verified'
+      needsVerification.value = !google && error?.data?.code === 'email_not_verified'
       if (needsVerification.value) verificationEmail.value = email.value.trim()
 
       errorMessage.value = error instanceof Error
@@ -288,6 +299,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     resendCooldown,
     verificationEmail,
     login,
+    loginWithGoogle,
     resendVerification,
     goToForgotPassword,
     clearError,

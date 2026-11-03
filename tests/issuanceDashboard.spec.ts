@@ -196,7 +196,7 @@ describe('the page', () => {
   it('shows no quarantine, since nothing reaches Issuance uncleared (project owner, 2026-10-22)', () => {
     expect(page).not.toContain("label: 'In Quarantine'")
     expect(page).not.toContain('quarantined')
-    expect(page).toContain('<div v-for="n in 3" :key="n" class="kpi skeleton" />')
+    expect(page).toContain('<div v-for="n in 3" :key="n" class="kpi"><span class="sk sk--icon" />')
   })
 
   it('keeps its dark palette on its own root', () => {

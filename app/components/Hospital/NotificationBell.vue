@@ -32,13 +32,7 @@
 
         <div class="bell__body">
           <ul v-if="loading && !items.length" class="bell__list" aria-busy="true">
-            <li v-for="n in 3" :key="n" class="bell__item bell__item--skeleton">
-              <span class="skeleton skeleton--icon" />
-              <span class="bell__text">
-                <span class="skeleton skeleton--line" />
-                <span class="skeleton skeleton--short" />
-              </span>
-            </li>
+            <li v-for="n in 3" :key="n"><HospitalNotificationRow skeleton compact /></li>
           </ul>
 
           <p v-else-if="error" class="bell__state">{{ error }}</p>
@@ -51,25 +45,7 @@
 
           <ul v-else class="bell__list">
             <li v-for="item in items" :key="item.id">
-              <button
-                type="button"
-                class="bell__item"
-                :class="{ 'bell__item--unread': !item.read }"
-                @click="openItem(item)"
-              >
-                <span class="bell__icon" :class="`bell__icon--${item.tone || 'neutral'}`">
-                  <AssetIcon :name="item.icon || 'bell'" :size="15" />
-                </span>
-                <span class="bell__text">
-                  <span class="bell__item-title">{{ item.title || 'Notification' }}</span>
-                  <span v-if="item.desc" class="bell__desc">{{ item.desc }}</span>
-                  <span class="bell__time">
-                    {{ timeAgo(item.created_at) }}
-                    <template v-if="item.action_label"> · {{ item.action_label }}</template>
-                  </span>
-                </span>
-                <span v-if="!item.read" class="bell__dot" aria-label="Unread" />
-              </button>
+              <HospitalNotificationRow :item="item" compact @open="openItem" />
             </li>
           </ul>
         </div>
@@ -87,6 +63,8 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
+import HospitalNotificationRow from '~/components/Hospital/NotificationRow.vue'
+import { normalizeHospitalNotification, urgentFirst } from '~/utils/hospitalNotifications'
 
 /**
  * The header bell for the hospital portal: the blood centre's dropdown
@@ -111,7 +89,7 @@ async function loadItems() {
   error.value = ''
   try {
     const res = await hospitalService.listNotifications({ per_page: PAGE_SIZE })
-    items.value = res?.notifications ?? []
+    items.value = urgentFirst((res?.notifications ?? []).map(normalizeHospitalNotification))
     if (typeof res?.unread_count === 'number') setUnread(res.unread_count)
   } catch {
     error.value = 'Notifications could not be loaded. Try again in a moment.'
@@ -140,9 +118,9 @@ async function openItem(item) {
     }
   }
 
-  if (typeof item.action_route === 'string' && item.action_route.startsWith('/')) {
+  if (typeof item.action_path === 'string' && item.action_path.startsWith('/')) {
     open.value = false
-    await navigateTo(item.action_route)
+    await navigateTo(item.action_path)
   }
 }
 
@@ -157,19 +135,6 @@ async function markAll() {
   } finally {
     markingAll.value = false
   }
-}
-
-function timeAgo(iso) {
-  const at = iso ? new Date(iso).getTime() : NaN
-  if (Number.isNaN(at)) return ''
-  const minutes = Math.round((Date.now() - at) / 60000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  const days = Math.round(hours / 24)
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
-  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 </script>
 
@@ -256,76 +221,11 @@ function timeAgo(iso) {
 .bell__list { list-style: none; margin: 0; padding: 6px; }
 .bell__foot { display: flex; justify-content: center; padding: 11px 16px; border-top: 1px solid var(--rb-border); }
 
-.bell__item {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 10px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.bell__item:hover { background: var(--rb-surface-hover); }
-.bell__item:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
-.bell__item--unread { background: rgba(var(--rb-primary-rgb), 0.05); }
-.bell__item--skeleton { cursor: default; }
-
-.bell__icon {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-  color: var(--rb-text-secondary);
-}
-.bell__icon--primary, .bell__icon--info { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
-.bell__icon--success { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.bell__icon--warning { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
-.bell__icon--danger, .bell__icon--accent { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-
-.bell__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.bell__item-title { font-size: 13px; font-weight: 600; color: var(--rb-text-primary); }
-.bell__item--unread .bell__item-title { font-weight: 700; }
-.bell__desc {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--rb-text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.bell__time { font-size: 11.5px; color: var(--rb-text-secondary); }
-.bell__dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: var(--rb-primary); flex-shrink: 0; }
-
 .bell__empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 20px; text-align: center; }
 .bell__empty-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
 .bell__empty-title { margin: 6px 0 0; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); }
 .bell__state { margin: 0; padding: 0 4px; font-size: 12.5px; line-height: 1.5; color: var(--rb-text-secondary); }
 p.bell__state:only-child { padding: 20px 16px; }
-
-.skeleton {
-  display: block;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--rb-skeleton-a) 25%, var(--rb-skeleton-b) 37%, var(--rb-skeleton-a) 63%);
-  background-size: 400% 100%;
-  animation: bell-shimmer 1.4s ease infinite;
-}
-.skeleton--icon { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0; }
-.skeleton--line { height: 12px; width: 80%; }
-.skeleton--short { height: 10px; width: 45%; margin-top: 4px; }
-@keyframes bell-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
-}
 
 .bell-pop-enter-active,
 .bell-pop-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
@@ -333,7 +233,6 @@ p.bell__state:only-child { padding: 20px 16px; }
 .bell-pop-leave-to { opacity: 0; transform: translateY(6px) scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
   .bell-pop-enter-active, .bell-pop-leave-active { transition: none; }
 }
 </style>

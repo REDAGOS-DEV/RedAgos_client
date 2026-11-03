@@ -1,14 +1,6 @@
 <template>
   <div class="rc-page">
     <div class="rc-inner">
-      <div class="toast-stack" aria-live="polite">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
 
       <nav class="crumbs" aria-label="Breadcrumb">
         <NuxtLink to="/blood-center/receipts">Receipts</NuxtLink>
@@ -17,9 +9,7 @@
       </nav>
 
       <div v-if="loading" class="skeleton-stack">
-        <div class="skeleton skeleton--head" />
-        <div class="skeleton skeleton--facts" />
-        <div class="skeleton skeleton--doc" />
+        <PageSkeleton :sections="[['form'], ['table']]" />
       </div>
 
       <div v-else-if="loadError" class="empty card">
@@ -163,6 +153,7 @@
  * payer was handed even if the bill has changed since. The PDF from the
  * server is the official copy; the 80mm print is the counter's slip.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingDocument from '~/components/common/BillingDocument.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
@@ -181,15 +172,7 @@ const route = useRoute()
 const receiptId = computed(() => Number(route.params.id))
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 function when(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'

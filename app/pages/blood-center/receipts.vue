@@ -1,14 +1,6 @@
 <template>
   <div class="rl-page">
     <div class="rl-inner">
-      <div class="toast-stack" aria-live="polite">
-        <transition-group name="toast">
-          <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast--${t.variant}`">
-            <div class="toast-title">{{ t.title }}</div>
-            <div v-if="t.message" class="toast-message">{{ t.message }}</div>
-          </div>
-        </transition-group>
-      </div>
 
       <!-- Payments, the Receipts tab (2026-10-27). -->
       <PageHeader title="Payments" />
@@ -39,7 +31,7 @@
             </button>
           </div>
         </div>
-        <div v-if="loading" class="skeleton-wrap"><div v-for="n in 6" :key="n" class="skeleton" /></div>
+        <div v-if="loading" class="skeleton-wrap"><SkeletonList :rows="6" /></div>
 
         <EmptyState v-else-if="error" icon="triangle-alert" title="The receipts could not be loaded" :description="error">
           <button class="ui-btn" @click="load()">Try again</button>
@@ -51,7 +43,7 @@
           <p class="pay-empty__text">
             {{ filtered
               ? 'Try another number or name, widen the dates, or show every status.'
-              : 'Every payment taken at the billing counter is given a receipt, listed here to reopen, reprint or download.' }}
+              : 'Every payment recorded on the Billing Counter is given a receipt, listed here to reopen, reprint or download.' }}
           </p>
           <button v-if="filtered" type="button" class="ui-btn" @click="clearFilters">
             <AssetIcon name="x" :size="14" />
@@ -141,6 +133,7 @@
  * Receipts carry payment details, so the page sits behind the ability to
  * record payments, as the payments list does.
  */
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -161,15 +154,7 @@ const STATUSES = [
 ]
 
 /* TOASTS */
-const toasts = ref([])
-let toastId = 0
-function toast(title, variant = 'success', message = '') {
-  const id = ++toastId
-  toasts.value.push({ id, title, message, variant })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3600)
-}
+const { notify: toast } = useToast()
 
 function when(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'

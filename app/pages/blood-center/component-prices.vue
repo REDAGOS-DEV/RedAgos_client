@@ -216,10 +216,11 @@ const rows = ref([])
 const drafts = reactive({})
 const errors = reactive({})
 const inputs = {}
-const busy = ref(false)
+const busy = ref(true)
 const saving = ref(false)
 const banner = ref('')
 const bannerKind = ref('notice')
+useNoticeToast(banner, { kind: bannerKind, keepWhile: () => busy.value })
 
 // Errors show only after a save is tried; from then on each edit rechecks its row.
 const attempted = ref(false)

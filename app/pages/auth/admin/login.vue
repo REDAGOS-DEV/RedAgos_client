@@ -1,6 +1,6 @@
 <template>
-  <!-- The one sign-in screen, opened on Admin: the administrators' bookmark. -->
-  <AuthLoginLayout initial-mode="admin" />
+  <!-- The administrators' old bookmark: the one sign-in screen, which admits them too (2026-10-30). -->
+  <AuthLoginLayout />
 </template>
 
 <script setup>

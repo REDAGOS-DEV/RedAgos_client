@@ -484,6 +484,7 @@ const loadError = ref('')
 const busyId = ref(null)
 const banner = ref('')
 const bannerKind = ref('info')
+useNoticeToast(banner, { kind: bannerKind })
 
 const pendingCount = computed(
   () => rows.value.filter((row) => row.status === 'pending_approval').length

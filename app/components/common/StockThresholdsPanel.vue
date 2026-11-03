@@ -4,8 +4,10 @@
       <div class="page-head__text">
         <h1 class="page-head__title">Stock Thresholds</h1>
         <p class="page-head__subtitle">
-          Set the PAR and critical levels for each blood type and component the {{ facilityNoun }} keeps. They help
-          restock on time and warn staff before a shelf runs out.
+          <slot name="subtitle">
+            Set the PAR and critical levels for each blood type and component the {{ facilityNoun }} keeps. They help
+            restock on time and warn staff before a shelf runs out.
+          </slot>
         </p>
 
         <div class="scope">
@@ -17,11 +19,15 @@
             <AssetIcon name="eye" :size="14" />
             {{ readOnlyNote }}
           </span>
-          <button type="button" class="refresh" :disabled="busy || savingLevel !== null" @click="loadStatus(false)">
-            <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
-            {{ busy ? 'Loading…' : 'Refresh' }}
-          </button>
         </div>
+      </div>
+
+      <!-- Refresh at the top right, as on the other pages (2026-10-31). -->
+      <div class="page-head__actions">
+        <button type="button" class="refresh" :disabled="busy || savingLevel !== null" @click="loadStatus(false)">
+          <AssetIcon name="refresh-cw" :size="14" :class="{ spin: busy }" />
+          {{ busy ? 'Loading…' : 'Refresh' }}
+        </button>
       </div>
 
       <aside class="guide" aria-label="What the levels mean">
@@ -42,6 +48,7 @@
     <div v-if="loadError" class="alert" role="alert">
       <AssetIcon name="circle-alert" :size="16" />
       <span>{{ loadError }}</span>
+      <button type="button" class="alert__retry" :disabled="busy" @click="loadStatus(false)">Try again</button>
     </div>
 
     <template v-if="status">
@@ -117,9 +124,7 @@
     </template>
 
     <!-- First load -->
-    <div v-else-if="busy" class="skeletons" aria-hidden="true">
-      <span v-for="n in 2" :key="n" class="skeleton" />
-    </div>
+    <PageSkeleton v-else-if="busy" :sections="[['table'], ['table']]" :columns="5" :rows="4" />
   </div>
 </template>
 
@@ -138,6 +143,7 @@
  * save in one table re-seeds only that table's side: unsaved edits in the
  * other survive it.
  */
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import StockLevelCard from '~/components/common/StockLevelCard.vue'
@@ -202,7 +208,7 @@ const props = withDefaults(defineProps<{
 
 const status = ref<StockThresholdStatus | null>(null)
 const drafts = reactive<Record<string, StockThresholdDraft>>({})
-const busy = ref(false)
+const busy = ref(true)
 const loadError = ref('')
 const savingLevel = ref<ThresholdLevel | null>(null)
 const feedback = reactive<Record<ThresholdLevel, Feedback | null>>({ par: null, critical: null })
@@ -562,4 +568,9 @@ onBeforeUnmount(() => {
   .skeleton, .spin { animation: none; }
   .refresh { transition: none; }
 }
+
+/* Refresh at the top right of the heading. */
+.page-head__actions { flex: none; display: flex; align-items: center; }
+.page-head__actions .refresh { height: 38px; padding: 0 14px; }
+.alert__retry { margin-left: auto; border: 0; background: none; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
 </style>

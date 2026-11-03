@@ -42,7 +42,7 @@
         <section v-show="step === 1" class="step">
           <div class="grid">
             <label class="field field--wide">
-              <span class="field__label">Patient's hospital blood bank *</span>
+              <span class="field__label">Choose hospital blood bank *</span>
               <SelectField
                 v-model="hospitalChoice"
                 :options="[
@@ -63,13 +63,31 @@
               <input v-model="form.hospitalName" class="field__input" maxlength="150" placeholder="e.g. St. Jude Hospital" autocomplete="off" :disabled="isContinuing">
             </label>
 
+            <!-- The whole patient on this step (project owner, 2026-10-31): what was on
+                 step 2 is here, the ward is no longer asked, the physician optional. -->
             <label class="field">
-              <span class="field__label">Patient surname *</span>
+              <span class="field__label">Surname *</span>
               <input v-model="form.patient.surname" class="field__input" maxlength="100" :disabled="isContinuing" autocomplete="off">
             </label>
             <label class="field">
-              <span class="field__label">Patient first name *</span>
+              <span class="field__label">First name *</span>
               <input v-model="form.patient.firstName" class="field__input" maxlength="100" :disabled="isContinuing" autocomplete="off">
+            </label>
+            <label v-if="!isContinuing" class="field">
+              <span class="field__label">Middle name <span class="field__optional">(optional)</span></span>
+              <input v-model="form.patient.middleName" class="field__input" maxlength="100" autocomplete="off">
+            </label>
+            <label v-if="!isContinuing" class="field">
+              <span class="field__label">Age *</span>
+              <input v-model="form.patient.age" type="number" min="0" max="130" class="field__input">
+            </label>
+            <label v-if="!isContinuing" class="field">
+              <span class="field__label">Sex *</span>
+              <SelectField
+                v-model="form.patient.sex"
+                :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
+                placeholder="Select"
+              />
             </label>
 
             <label class="field">
@@ -80,6 +98,21 @@
                 placeholder="Select the blood type"
                 :disabled="isContinuing"
               />
+            </label>
+            <label class="field">
+              <span class="field__label">Priority *</span>
+              <SelectField
+                v-model="form.urgency"
+                :options="reference.priorities.map((priority) => ({ value: priority.value, label: priority.label }))"
+              />
+            </label>
+            <label class="field">
+              <span class="field__label">Attending physician <span class="field__optional">(optional)</span></span>
+              <input v-model="form.attendingPhysician" class="field__input" maxlength="150" autocomplete="off">
+            </label>
+            <label class="field">
+              <span class="field__label">Patient record no. <span class="field__optional">(optional)</span></span>
+              <input v-model="form.patientRecordNumber" class="field__input" maxlength="60" autocomplete="off">
             </label>
             <label class="field">
               <span class="field__label">Reference on the watcher's paperwork <span class="field__optional">(optional)</span></span>
@@ -150,50 +183,6 @@
 
         <!-- STEP 2: THE REQUEST AND THE WATCHER -->
         <section v-show="step === 2" class="step">
-          <h3 class="step__heading">Patient</h3>
-          <div class="grid">
-            <p v-if="isContinuing" class="field__hint field--wide">
-              {{ patientName }} · {{ bloodTypeCode || '—' }} — taken from {{ form.transfusionReference }}.
-            </p>
-            <template v-else>
-              <label class="field">
-                <span class="field__label">Middle name</span>
-                <input v-model="form.patient.middleName" class="field__input" maxlength="100" autocomplete="off">
-              </label>
-              <label class="field">
-                <span class="field__label">Age *</span>
-                <input v-model="form.patient.age" type="number" min="0" max="130" class="field__input">
-              </label>
-              <label class="field">
-                <span class="field__label">Sex *</span>
-                <SelectField
-                  v-model="form.patient.sex"
-                  :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]"
-                  placeholder="Select"
-                />
-              </label>
-            </template>
-            <label class="field">
-              <span class="field__label">Priority *</span>
-              <SelectField
-                v-model="form.urgency"
-                :options="reference.priorities.map((priority) => ({ value: priority.value, label: priority.label }))"
-              />
-            </label>
-            <label class="field">
-              <span class="field__label">Attending physician</span>
-              <input v-model="form.attendingPhysician" class="field__input" maxlength="150" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Ward</span>
-              <input v-model="form.patientWard" class="field__input" maxlength="100" autocomplete="off">
-            </label>
-            <label class="field">
-              <span class="field__label">Patient record no.</span>
-              <input v-model="form.patientRecordNumber" class="field__input" maxlength="60" autocomplete="off">
-            </label>
-          </div>
-
           <h3 class="step__heading">Components requested</h3>
           <div class="lines">
             <div v-for="(line, index) in form.lines" :key="index" class="line">
@@ -350,7 +339,9 @@
  * project owner on 2026-10-19, and with it the rule that nothing was recorded
  * until the hospital confirmed. Step one needs the hospital, the patient's
  * surname and first name, and the blood type; the reference on the watcher's
- * paperwork is optional.
+ * paperwork is optional. Since 2026-10-31 it holds the whole patient (age,
+ * sex, priority; physician and record number optional, no ward), and step two
+ * the components and the watcher.
  */
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue'

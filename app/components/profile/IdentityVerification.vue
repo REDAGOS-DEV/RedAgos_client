@@ -189,6 +189,7 @@ const selectedFile = ref(null)
 const localPreview = ref(null)
 const message = ref('')
 const failed = ref(false)
+useNoticeToast(message, { tone: () => (failed.value ? 'error' : 'success') })
 const cameraOpen = ref(false)
 const needsIdType = ref(false)
 

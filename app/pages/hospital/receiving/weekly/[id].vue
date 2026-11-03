@@ -1,7 +1,7 @@
 <template>
   <div class="rcv-page">
     <div class="rcv-inner">
-      <NuxtLink to="/hospital/receiving/weekly" class="back-link">
+      <NuxtLink to="/hospital/receiving/weekly" class="back-link back-link--narrow">
         <AssetIcon name="arrow-left" :size="14" />
         Weekly Request
       </NuxtLink>
@@ -159,9 +159,6 @@
       </template>
     </div>
 
-    <Transition name="toast">
-      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
-    </Transition>
   </div>
 </template>
 
@@ -196,8 +193,7 @@ const receiving = ref(false)
 const receiveError = ref('')
 const receivePanel = ref(null)
 
-const toast = ref('')
-let toastTimer = null
+const { notify } = useToast()
 
 const totals = computed(() => weekly.value?.totals ?? {})
 
@@ -265,7 +261,6 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => clearTimeout(toastTimer))
 
 async function load() {
   loadError.value = ''
@@ -321,10 +316,8 @@ async function receive(ticked) {
   receiving.value = false
 }
 
-function showToast(message) {
-  toast.value = message
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = '' }, 4500)
+function showToast(message, tone = 'success') {
+  notify(message, tone)
 }
 
 function formatDay(value) {

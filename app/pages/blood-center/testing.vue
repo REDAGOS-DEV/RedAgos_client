@@ -533,6 +533,7 @@ const service = bloodCenterService
 const busy = ref(false)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 
 // --- reference data ---------------------------------------------------------
 
@@ -568,7 +569,7 @@ const viewOptions = computed(() => [
   { value: 'serology', label: 'Serology', count: queue.value.filter(needsSerology).length },
   { value: 'all', label: 'All', count: queue.value.length },
 ])
-const loadingQueue = ref(false)
+const loadingQueue = ref(true)
 const barcodeSearch = ref('')
 const activeBarcode = ref('')
 

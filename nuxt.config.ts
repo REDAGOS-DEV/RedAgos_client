@@ -32,6 +32,8 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      // The tab's name wherever a page sets none; without it the browser shows the domain.
+      title: 'RedAgos',
       link: [
         // The RedAgos drop, from assets/images/RedAgosLogo.png. The tab icon is
         // cropped to the solid shape so it stays crisp at 16-32 px; the home-screen
@@ -59,6 +61,10 @@ export default defineNuxtConfig({
       // Kung wala ni na-set, ang BaseService na ang mo-derive sa host gikan
       // sa browser. Sa deploy, i-set ang NUXT_PUBLIC_API_BASE_URL.
       apiBaseURL: process.env.API_BASE_URL || '',
+
+      // Sign in with Google (2026-10-30): the same Web client ID the server's
+      // GOOGLE_CLIENT_ID holds. Unset, the Google button is not shown.
+      googleClientId: process.env.GOOGLE_CLIENT_ID || '',
 
       // Ang hospital / blood-bank portal kay ABLI na by default.
       //

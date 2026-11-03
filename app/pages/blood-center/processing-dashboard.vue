@@ -1,16 +1,7 @@
 <template>
   <div class="pdash">
     <div v-if="initialLoading" class="pdash-inner" aria-busy="true" aria-label="Loading the dashboard">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--row" />
-      <div class="grid-2">
-        <div class="skeleton skeleton--card" />
-        <div class="skeleton skeleton--card" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Processing dashboard" :actions="1" needs :sections="[['strip'], ['list', 'list'], ['chart', 'list']]" />
     </div>
 
     <div v-else class="pdash-inner">
@@ -314,6 +305,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'

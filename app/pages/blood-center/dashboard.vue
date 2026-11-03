@@ -2,18 +2,7 @@
   <div class="dashboard">
     <!-- Skeleton loading state -->
     <div v-if="loading" class="dashboard-inner">
-      <div class="skeleton skeleton--header" />
-      <div class="stats-grid">
-        <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-      </div>
-      <div class="focus-grid">
-        <div class="skeleton skeleton--panel" style="height:300px" />
-        <div class="skeleton skeleton--panel" style="height:300px" />
-      </div>
-      <div class="insights-grid">
-        <div class="skeleton skeleton--panel" style="height:280px" />
-        <div class="skeleton skeleton--panel" style="height:280px" />
-      </div>
+      <PageSkeleton title="Blood Center Dashboard" :actions="1" needs :sections="[['strip'], ['list', 'list'], ['list', 'list']]" />
     </div>
 
     <div v-else class="dashboard-inner">
@@ -452,6 +441,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterAdminOverview from '~/components/BloodCenter/AdminOverview.vue'
 import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'

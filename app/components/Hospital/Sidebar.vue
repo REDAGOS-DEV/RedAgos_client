@@ -11,8 +11,8 @@
     <!--
       The blood center's rail (project owner, 2026-10-28). Desktop: 72px of
       icons under the full-width top bar, opened by the menu button in the bar
-      or by hovering it, and closed when the pointer leaves it (or a click
-      lands outside, or Escape). The layout moves the content column over
+      only (project owner, 2026-11-01), and closed when the pointer leaves it (or
+      a click lands outside, or Escape). The layout moves the content column over
       with it, so nothing is covered. Opened, each folder shows its pages on a
       thin "agos" line that fills up to the current page. Below 1024px it is
       the drawer.
@@ -36,7 +36,7 @@
         '--sb-muted': SIDEBAR_IDLE_TEXT,
         '--sb-border': SIDEBAR_BORDER
       }"
-      @pointerenter="onRailEnter"
+      @pointerenter="cancelClose"
       @mouseleave="closeRailSoon"
       @focusout="onFocusOut">
 
@@ -242,7 +242,6 @@ const {
   collapsed,
   hoverExpanded,
   railExpanded,
-  expandOnHover,
   collapseOnHover,
   mobileOpen,
   closeMobile
@@ -268,44 +267,29 @@ const onViewportChange = (e) => {
 }
 
 /*
- * Opened by the menu button in the top bar (the layout) or by hovering the
- * rail, closed when the pointer leaves the rail, a click lands outside it,
- * Escape, or the button again. The state lives in useSidebar, which the
- * layout reads to move its content column, so the two always agree.
+ * Opened by the menu button in the top bar (the layout) only; closed when the
+ * pointer leaves the rail, a click lands outside it, Escape, or the button
+ * again. The state lives in useSidebar, which the layout reads to move its
+ * content column, so the two always agree.
  */
 const railOpen = computed(() => !isMobile.value && railExpanded.value)
 
 const asideEl = ref(null)
 let railTimer = null
-let openTimer = null
 
 // Back on the rail before the close fires: keep it open.
 function cancelClose() {
   clearTimeout(railTimer)
 }
 
-/*
- * Hovering the narrow rail opens it. A beat first, so a pointer crossing it
- * on the way elsewhere does not open it and shift the page. A mouse or pen
- * only: a tap would open it and follow the link in one go.
- */
-function onRailEnter(e) {
-  cancelClose()
-  if (isMobile.value || e.pointerType === 'touch' || railOpen.value) return
-  clearTimeout(openTimer)
-  openTimer = setTimeout(expandOnHover, 120)
-}
-
 // A beat before closing, so brushing past the edge doesn't flicker it.
 function closeRailSoon() {
   if (isMobile.value) return
-  clearTimeout(openTimer)
   clearTimeout(railTimer)
   railTimer = setTimeout(closeRail, 160)
 }
 
 function closeRail() {
-  clearTimeout(openTimer)
   clearTimeout(railTimer)
   collapseOnHover()
 }
@@ -336,7 +320,7 @@ const handleEscape = (e) => {
 }
 
 onMounted(() => {
-  // Narrow until the menu button (or a hover) opens it, as at the centre.
+  // Narrow until the menu button opens it, as at the centre.
   collapsed.value = true
   restoreFolders()
 
@@ -355,7 +339,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearTimeout(railTimer)
-  clearTimeout(openTimer)
   document.removeEventListener('pointerdown', onOutsidePointer)
   themeObserver?.disconnect()
   mobileMql?.removeEventListener('change', onViewportChange)
@@ -420,12 +403,13 @@ const NAV_GROUPS = [
     label: 'Receiving',
     items: [
       // Patient Request sits under Receiving; there is no "Requests" folder.
-      // Blood Availability and Track Requests are off the menu; their pages
-      // are still reached from the dashboard and the request list. Direct
+      // Track Requests is off the menu; its page is still reached from the
+      // dashboard. Blood Availability came back on 2026-11-01, rebuilt. Direct
       // Distribution is gone: outside blood is added on Stock Intake
       // (project owner, 2026-10-30).
       { label: 'Patient Request', path: '/hospital/bloodrequests', icon: 'clipboard-list', badge: 'pending', requires: 'hospital.requests.view' },
-      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' }
+      { label: 'Weekly Request', path: '/hospital/receiving/weekly', icon: 'calendar-check', requires: 'hospital.requests.view' },
+      { label: 'Blood Availability', path: '/hospital/bloodavailability', icon: 'search', requires: 'hospital.requests.view' }
     ]
   },
   {
@@ -453,13 +437,14 @@ const NAV_GROUPS = [
       { label: 'Request Days', path: '/hospital/request-days', icon: 'calendar', requires: 'hospital.requests.view' }
     ]
   },
-  // Ang Finance group (billing, transactions) ug ang Help & Support kay
-  // gitangtang: walay page files para nila, so 404 ang tanan. Ibalik ni kung
-  // naa nay backend + page — tan-awa ang Phase P sa audit plan.
+  // Ang Finance group (billing, transactions) kay gitangtang: walay page files
+  // para niini, so 404 ang tanan. Ibalik ni kung naa nay backend + page — tan-awa
+  // ang Phase P sa audit plan. Help Center came back on 2026-11-02, with its page.
   {
     label: 'System',
     items: [
       { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
+      { label: 'Help Center', path: '/hospital/help', icon: 'help-circle' },
       { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
     ]
   }

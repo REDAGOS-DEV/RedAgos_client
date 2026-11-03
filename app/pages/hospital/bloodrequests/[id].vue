@@ -2,7 +2,7 @@
   <div class="request-details-page">
     <!-- ============== PAGE HEADER ============== -->
     <div class="page-header">
-      <button class="back-link" type="button" @click="goBack">
+      <button class="back-link back-link--narrow" type="button" @click="goBack">
         <AssetIcon name="arrow-left" />
         <span>Back to Patient Request</span>
       </button>
@@ -15,7 +15,7 @@
         <span class="crumb-current">Request Details</span>
       </nav> -->
 
-      <PageHeader title="Blood Request Details" subtitle="View the complete information and progress of this blood request.">
+      <PageHeader title="Blood Request Details" :subtitle="hospitalPageSubtitle('requestDetails', can)">
         <template v-if="!isLoadingRequest && request" #actions>
           <span class="status-badge" :class="statusColorClass">{{ statusText }}</span>
           <button class="ui-btn" type="button" @click="handleDownloadPdf">
@@ -32,15 +32,7 @@
 
     <!-- ============== LOADING SKELETON ============== -->
     <div v-if="isLoadingRequest" class="skeleton-stack">
-      <div class="skeleton skeleton--summary" />
-      <div class="skeleton-grid">
-        <div class="skeleton-grid__main">
-          <div class="skeleton skeleton--card" v-for="n in 4" :key="n" />
-        </div>
-        <div class="skeleton-grid__side">
-          <div class="skeleton skeleton--card-sm" v-for="n in 3" :key="n" />
-        </div>
-      </div>
+      <PageSkeleton :sections="[['form', 'list'], ['table', 'list']]" />
     </div>
 
     <!-- ============== ERROR STATE ============== -->
@@ -569,13 +561,6 @@
         </aside>
       </div>
 
-      <!-- ============== PAYMENT TOAST ============== -->
-      <Transition name="toast">
-        <div v-if="toastMessage" class="toast" role="status">
-          <AssetIcon name="check-circle" :size="16" style="color: var(--rb-success-text)" />
-          {{ toastMessage }}
-        </div>
-      </Transition>
 
       <!-- ============== AWAITING RECEIPT ============== -->
       <!--
@@ -683,6 +668,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -693,6 +679,7 @@ import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.v
 import RequestHistoryTimeline from '~/components/common/RequestHistoryTimeline.vue'
 import WalkInDetailsCard from '~/components/common/WalkInDetailsCard.vue'
 import { formatPhoneNumber } from '~/utils/phone'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
@@ -770,8 +757,7 @@ function formatCurrency(value) {
   return `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-const toastMessage = ref('')
-let toastTimer = null
+const { notify } = useToast()
 /*
  * Confirming receipt of dispatched units.
  *
@@ -830,10 +816,8 @@ const priorityLabel = computed(() =>
   request.value?.urgency_level ? PRIORITY_LABELS[request.value.urgency_level] : '—',
 )
 
-function showToast(msg) {
-  toastMessage.value = msg
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMessage.value = '' }, 3000)
+function showToast(msg, tone = 'success') {
+  notify(msg, tone)
 }
 
 /*
@@ -962,7 +946,7 @@ async function handleDownloadPdf() {
     URL.revokeObjectURL(url)
   } catch (err) {
     console.error('Failed to download request form:', err)
-    showToast(err?.message || 'Could not download the request form.')
+    showToast(err?.message || 'Could not download the request form.', 'error')
   } finally {
     downloadingForm.value = false
   }

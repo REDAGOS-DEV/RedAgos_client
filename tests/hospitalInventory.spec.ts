@@ -45,13 +45,18 @@ describe('the hospital inventory page', () => {
     }
   })
 
-  it('leaves the blood type cards to the dashboard, which opens the list on a type (project owner, 2026-10-28)', () => {
-    expect(page).not.toContain('Blood Type Availability')
+  it('shows the blood type cards as the centre does, filtering the list (project owner, 2026-11-01)', () => {
+    expect(page).toContain('<HospitalBloodTypeAvailability')
+    expect(page).toContain('@select="toggleTypeFilter"')
+    expect(page).toContain('"types expiring" "list activity"')
+  })
+
+  it('still opens the list on a type from the dashboard', () => {
     expect(page).toContain('Number(route.query.blood_type_id)')
 
     const dashboard = source('app/pages/hospital/dashboard.vue')
-    expect(dashboard).toContain('<HospitalBloodTypeAvailability v-if="thresholds" :thresholds="thresholds" />')
-    expect(source('app/components/Hospital/BloodTypeAvailability.vue')).toContain(':to="`/hospital/inventory?blood_type_id=${card.id}`"')
+    expect(dashboard).toContain('<HospitalBloodTypeAvailability v-if="thresholds || thresholdsLoading" :thresholds="thresholds" />')
+    expect(source('app/components/Hospital/BloodTypeAvailability.vue')).toContain('{ to: `/hospital/inventory?blood_type_id=${card.id}` }')
   })
 
   it('leaves stock-in to Stock Intake (project owner, 2026-10-28)', () => {
@@ -180,6 +185,12 @@ describe('the hospital Inventory Report', () => {
     expect(service).not.toContain('/hospital/inventory/sheet')
   })
 
+  it('reads a kept report on the page, never in another browser tab (project owner, 2026-11-01)', () => {
+    expect(page).toContain('<CenterModal')
+    expect(page).toContain('URL.revokeObjectURL(viewing.value.url)')
+    expect(page).not.toContain('window.open')
+  })
+
   it('names the pages of the other components that follow the form', () => {
     expect(page).toContain("page.kind === 'other'")
     expect(source('app/types/hospitalInventory.ts')).toContain("kind: 'form' | 'other'")
@@ -222,7 +233,7 @@ describe('receipt and the patient page', () => {
   })
 
   it('shows the patient\'s bags on their transfusion request', () => {
-    expect(source('app/pages/hospital/transfusion-requests/[id].vue'))
+    expect(source('app/components/Hospital/TransfusionRequestDetail.vue'))
       .toContain('hospitalService.inventory({ transfusion_request_id: Number(requestId.value), per_page: 100 })')
   })
 })

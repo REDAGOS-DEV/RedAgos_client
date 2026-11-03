@@ -37,7 +37,7 @@ const { can } = useUser()
 </script>
 
 <style scoped>
-.forecast-page { display: flex; flex-direction: column; gap: 20px; max-width: var(--rb-content-max, 1400px); margin: 0 auto; padding: 24px 32px 40px; }
+.forecast-page { width: 100%; display: flex; flex-direction: column; gap: 20px; max-width: var(--rb-content-max, 1400px); margin: 0 auto; padding: 24px 32px 40px; }
 .aside-link {
   display: inline-flex;
   align-items: center;

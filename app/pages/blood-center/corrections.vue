@@ -98,7 +98,7 @@
       <div class="detail">
         <span class="skeleton skeleton--title" />
         <span class="skeleton skeleton--line" />
-        <span class="skeleton skeleton--block" />
+        <SkeletonList :rows="3" />
       </div>
     </div>
 
@@ -235,6 +235,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import PageHeader from '~/components/ui/PageHeader.vue'
@@ -265,10 +266,11 @@ const canApprove = computed(() => can('corrections.approve'))
 const scope = ref(canApprove.value ? 'review' : 'mine')
 const statusFilter = ref('pending')
 const items = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const busy = ref(null)
 const error = ref(null)
 const notice = ref(null)
+useNoticeToast(notice)
 const notes = reactive({})
 const noteOpen = reactive({})
 const noteInputs = {}

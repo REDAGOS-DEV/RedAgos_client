@@ -1,14 +1,6 @@
 <template>
   <div class="audit-page">
-    <div v-if="initialLoading" class="audit-inner" aria-busy="true" aria-label="Loading the audit log">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
-    </div>
-
-    <div v-else class="audit-inner">
+    <div class="audit-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Audit Log</h1>
@@ -69,9 +61,7 @@
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <tr v-for="n in 8" :key="'sk-' + n">
-                <td colspan="6"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="6" :rows="8" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -132,6 +122,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
@@ -161,8 +152,7 @@ definePageMeta({
 
 const PER_PAGE = 25
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const updatedAt = ref(null)
 const rows = ref([])
@@ -207,7 +197,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load the audit log.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 

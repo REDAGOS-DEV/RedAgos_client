@@ -1,11 +1,7 @@
 <template>
   <div class="sheet-page">
     <div v-if="initialLoading" class="sheet-inner" aria-busy="true" aria-label="Loading the sheet">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
+      <PageSkeleton title="Paper Records" :sections="[['table']]" :columns="6" />
     </div>
 
     <div v-else class="sheet-inner">
@@ -188,6 +184,7 @@
 </template>
 
 <script setup>
+import PageSkeleton from '~/components/ui/PageSkeleton.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { donationTone } from '~/utils/donationRecords'
@@ -215,6 +212,7 @@ const route = useRoute()
 const initialLoading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const sheet = ref(null)
 const rows = ref([])
 const justSavedId = ref(null)

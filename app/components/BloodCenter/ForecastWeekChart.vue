@@ -184,7 +184,8 @@ const ariaLabel = computed(() => `${props.unit} a week over the last ${props.ser
   color: var(--rb-text-secondary);
   transform: translateX(-50%);
 }
-.wc--compact .wc__empty { top: 40px; }
+/* A narrow card wraps the note inside it rather than past its edge. */
+.wc--compact .wc__empty { top: 40px; width: max-content; max-width: calc(100% - 16px); white-space: normal; text-align: center; border-radius: 12px; }
 
 @media (prefers-reduced-motion: reduce) {
   .wc__col::before, .wc__tip { transition: none; }

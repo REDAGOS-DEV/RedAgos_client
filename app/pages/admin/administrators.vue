@@ -276,6 +276,7 @@ const busy = computed(() => loading.value || refreshing.value)
 const loadError = ref('')
 const banner = ref('')
 const bannerKind = ref('success')
+useNoticeToast(banner, { kind: bannerKind })
 
 const privileges = ref([])
 const presets = ref([])

@@ -172,3 +172,64 @@ html.portal-bc .bc-shell .section-title {
   html.portal-bc .bc-shell :is(.search__input, .search .search-input, .search-field__input),
   html.portal-bc .bc-shell .table-wrap tbody tr { transition: none; }
 }
+
+/* ===== Skeletons (project owner, 2026-11-01) =====
+ * One colour and one sweep for every loading shape in the portal, whichever
+ * page drew it: ui/PageSkeleton and ui/SkeletonRows (.sk), and the shapes pages
+ * keep inside their own cards. Not under .bc-shell, as dialogs teleport out.
+ */
+html.portal-bc:not(.dark) { --rb-skeleton-a: #E3E7ED; --rb-skeleton-b: #F2F4F7; }
+html.dark.portal-bc { --rb-skeleton-a: #36373B; --rb-skeleton-b: #46474C; }
+
+html.portal-bc .sk,
+html.portal-bc .skeleton,
+html.portal-bc .skeleton-block,
+html.portal-bc .skeleton-line,
+html.portal-bc .nt__skeleton,
+html.portal-bc .history__skeleton,
+html.portal-bc .summary__item--skeleton,
+html.portal-bc .band--skeleton {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, var(--rb-skeleton-a) 30%, var(--rb-skeleton-b) 50%, var(--rb-skeleton-a) 70%) !important;
+  background-size: 300% 100% !important;
+  animation: rb-skeleton 1.5s linear infinite !important;
+}
+html.portal-bc .sk { display: block; }
+html.portal-bc .sk--line { height: 12px; border-radius: 6px; }
+html.portal-bc .sk--icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; }
+html.portal-bc .sk--avatar { flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; }
+html.portal-bc .sk--value { width: 42%; height: 26px; border-radius: 8px; }
+html.portal-bc .sk--figure { width: 56px; height: 26px; border-radius: 8px; }
+html.portal-bc .sk--ring { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; }
+html.portal-bc .sk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+}
+
+@keyframes rb-skeleton {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.portal-bc .sk,
+  html.portal-bc .skeleton,
+  html.portal-bc .skeleton-block,
+    html.portal-bc .skeleton-line,
+  html.portal-bc .nt__skeleton,
+  html.portal-bc .history__skeleton,
+  html.portal-bc .summary__item--skeleton,
+  html.portal-bc .band--skeleton {
+    animation: none !important;
+  }
+}
+
+/* From 1024px the breadcrumb is the way back, so the page's own link stands down. */
+@media (min-width: 1024px) {
+  html.portal-bc .bc-shell .back-link--narrow { display: none; }
+}

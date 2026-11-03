@@ -1,18 +1,6 @@
 <template>
   <div class="drives-page">
-    <!-- Skeleton loading state, the same as the other pages -->
-    <div v-if="loading" class="drives-inner" aria-busy="true" aria-label="Loading drives">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="stats-row">
-        <div v-for="n in 3" :key="'skc-' + n" class="skeleton skeleton--card" />
-      </div>
-      <div class="skeleton skeleton--panel" style="height: 420px" />
-    </div>
-
-    <div v-else class="drives-inner">
+    <div class="drives-inner">
       <!-- Header -->
       <PageHeader title="Donation Drives">
         <template #actions>
@@ -25,9 +13,9 @@
 
       <!-- Figures, as on Inventory -->
       <StatStrip :columns="3">
-        <StatItem label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
-        <StatItem label="Booked donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
-        <StatItem label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
+        <StatItem :loading="loading" label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
+        <StatItem :loading="loading" label="Booked donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
+        <StatItem :loading="loading" label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
       </StatStrip>
 
       <!-- Drive list -->
@@ -54,7 +42,8 @@
           </div>
         </div>
 
-        <div v-if="loadError" class="empty-state" role="alert">
+        <SkeletonList v-if="loading" class="drives-skeleton" :rows="5" />
+        <div v-else-if="loadError" class="empty-state" role="alert">
           <span class="empty-state__icon empty-state__icon--error"><AssetIcon name="circle-alert" :size="20" /></span>
           <p class="empty-state__title">Could not load the drives</p>
           <p class="empty-state__text">{{ loadError }}</p>
@@ -396,6 +385,7 @@
 </template>
 
 <script setup>
+import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 
@@ -1348,4 +1338,5 @@ a.btn-small { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none !important; }
 }
+.drives-skeleton { padding: 16px 20px; }
 </style>

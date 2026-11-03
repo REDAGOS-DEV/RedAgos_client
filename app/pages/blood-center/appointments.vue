@@ -1,18 +1,16 @@
 <template>
   <div class="appointments-page">
-    <div v-if="initialLoading" class="appointments-inner" aria-busy="true" aria-label="Loading appointments">
-      <div class="skeleton-head">
-        <div class="skeleton skeleton--header" />
-        <div class="skeleton skeleton--sub" />
-      </div>
-      <div class="skeleton skeleton--panel" />
-    </div>
-
-    <div v-else class="appointments-inner">
+    <div class="appointments-inner">
       <header class="header-row">
         <div>
           <h1 class="page-title">Appointments</h1>
         </div>
+        <!-- The page's one main action, beside its title, so the toolbar keeps to one row
+             with the sidebar open (2026-10-30). -->
+        <button v-if="canManage" type="button" class="btn-primary" @click="openBooking">
+          <AssetIcon name="plus" :size="15" />
+          New Appointment
+        </button>
       </header>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -59,10 +57,6 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
               Refresh
             </button>
-            <button v-if="canManage" type="button" class="btn-primary" @click="openBooking">
-              <AssetIcon name="plus" :size="15" />
-              New Appointment
-            </button>
           </div>
         </div>
 
@@ -82,9 +76,7 @@
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <tr v-for="n in 6" :key="'sk-' + n">
-                <td colspan="7"><span class="skeleton skeleton--line" /></td>
-              </tr>
+              <SkeletonRows :columns="7" :rows="6" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -374,6 +366,7 @@
 </template>
 
 <script setup>
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
@@ -431,10 +424,10 @@ const HORIZON_DAYS = 90
 const todayIso = isoDaysFromToday(0)
 const horizonIso = isoDaysFromToday(HORIZON_DAYS)
 
-const initialLoading = ref(true)
-const loading = ref(false)
+const loading = ref(true)
 const loadError = ref('')
 const notice = ref(null)
+useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
@@ -472,7 +465,6 @@ async function load(page = 1) {
     loadError.value = errorMessage(err, 'Could not load appointments.')
   } finally {
     loading.value = false
-    initialLoading.value = false
   }
 }
 
@@ -1331,4 +1323,6 @@ onBeforeUnmount(() => {
 <style scoped>
 /* The system dropdown in a toolbar: a fixed width rather than the row's. */
 .sel-filter { width: 180px; flex: none; }
+/* The search gives way first, so filters and actions share one row on a narrower bench. */
+.toolbar__filters .search { flex: 1 1 200px; min-width: 160px; }
 </style>

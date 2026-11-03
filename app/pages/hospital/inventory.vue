@@ -1,24 +1,11 @@
 <template>
   <div class="inv-page inv-tones">
-    <!-- Skeleton loading state -->
-    <div v-if="loading" class="inv-inner" aria-busy="true">
-      <div class="skeleton skeleton--header" />
-      <div class="kpi-row">
-        <div v-for="n in 5" :key="n" class="skeleton skeleton--kpi" />
-      </div>
-      <div class="inv-grid">
-        <div class="skeleton skeleton--panel" style="grid-area: list; height: 640px" />
-        <div class="skeleton skeleton--panel" style="grid-area: expiring; height: 300px" />
-        <div class="skeleton skeleton--panel" style="grid-area: activity; height: 320px" />
-      </div>
-    </div>
-
-    <div v-else class="inv-inner">
+    <div class="inv-inner">
       <!-- ============ HEADER ============ -->
       <header class="page-head">
         <div>
           <h1 class="page-title">Blood Bank Inventory</h1>
-          <p class="page-subtitle">Monitor and manage {{ facilityLabel }}'s blood units in real time.</p>
+          <p class="page-subtitle">{{ hospitalPageSubtitle('inventory', can) }}</p>
         </div>
         <div class="page-head__meta">
           <span v-if="lastUpdatedLabel" class="live-note">
@@ -65,8 +52,9 @@
           </span>
           <span class="kpi__body">
             <span class="kpi__label">{{ kpi.label }}</span>
-            <span class="kpi__value">{{ kpi.value }}</span>
-            <span class="kpi__sub" :class="{ 'kpi__sub--up': kpi.rising }">
+            <span v-if="loading" class="sk sk--figure" />
+            <span v-else class="kpi__value">{{ kpi.value }}</span>
+            <span class="kpi__sub" :class="{ 'kpi__sub--up': kpi.rising, 'sk kpi__sub--loading': loading }">
               <AssetIcon v-if="kpi.rising" name="trending-up" :size="13" />
               {{ kpi.sub }}
             </span>
@@ -78,7 +66,17 @@
       <!-- Every shelf under its critical level, by name; hidden when none is. -->
       <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" />
 
-      <div class="inv-grid">
+      <div class="inv-grid" :class="{ 'inv-grid--no-types': !loading && !thresholds }">
+        <!-- ============ BLOOD TYPE AVAILABILITY ============ -->
+        <HospitalBloodTypeAvailability
+          v-if="loading || thresholds"
+          class="types-panel"
+          :thresholds="thresholds"
+          filterable
+          :selected-id="filters.bloodTypeId"
+          @select="toggleTypeFilter"
+        />
+
         <!-- ============ EXPIRING SOON ============ -->
         <aside class="panel side-panel expiring-panel" aria-labelledby="expiring-title">
           <header class="side-head">
@@ -89,12 +87,16 @@
             <button type="button" class="link-btn" @click="showExpiringInList">View All</button>
           </header>
 
-          <p v-if="expiringError" class="side-empty">{{ expiringError }}</p>
-          <p v-else-if="!expiringUnits.length" class="side-empty">
+          <p v-if="loading && !shape.expiring" class="side-empty" aria-busy="true">
+            <span class="sk side-empty__mark" />
+            <span class="sk sk--line" style="width: 62%" />
+          </p>
+          <p v-else-if="!loading && expiringError" class="side-empty">{{ expiringError }}</p>
+          <p v-else-if="!loading && !expiringUnits.length" class="side-empty">
             <AssetIcon name="check-circle" :size="22" />
             Nothing on the shelf expires in the next 7 days.
           </p>
-          <table v-else class="mini-table">
+          <table v-else class="mini-table" :class="{ 'mini-table--loading': loading }">
             <thead>
               <tr>
                 <th>Bag / Blood Type</th>
@@ -104,8 +106,9 @@
               </tr>
             </thead>
             <tbody>
+              <SkeletonRows v-if="loading" :columns="4" :rows="shape.expiring" />
               <tr
-                v-for="row in expiringUnits"
+                v-for="row in (loading ? [] : expiringUnits)"
                 :key="row.id"
                 class="mini-row"
                 tabindex="0"
@@ -135,12 +138,17 @@
           <header class="panel-head">
             <div>
               <h2 id="list-title" class="panel-title">Inventory List</h2>
-              <p class="panel-subtitle">Every bag in your blood bank's custody, and the patients they are tagged to.</p>
             </div>
-            <button type="button" class="btn-outline btn-outline--sm" @click="openTagHistory">
-              <AssetIcon name="history" :size="13" />
-              Tag History
-            </button>
+            <div class="panel-head__actions">
+              <button type="button" class="btn-outline" @click="openTagHistory">
+                <AssetIcon name="history" :size="14" />
+                Tag History
+              </button>
+              <NuxtLink v-if="canStockIn" to="/hospital/stock-intake" class="btn-primary">
+                <AssetIcon name="plus" :size="15" />
+                Stock Intake
+              </NuxtLink>
+            </div>
           </header>
 
           <div class="list-filters">
@@ -190,7 +198,7 @@
           <p v-if="unitsError" class="list-error" role="alert">{{ unitsError }}</p>
 
           <div class="table-wrap" :class="{ 'table-wrap--busy': unitsLoading }" :aria-busy="unitsLoading">
-            <table v-if="unitRows.length" class="unit-table">
+            <table v-if="unitRows.length || (unitsLoading && shape.units)" class="unit-table" :class="{ 'unit-table--loading': !unitRows.length }">
               <thead>
                 <tr>
                   <th>Bag</th>
@@ -215,6 +223,7 @@
                 </tr>
               </thead>
               <tbody>
+                <SkeletonRows v-if="!unitRows.length" :columns="9" :rows="shape.units" />
                 <tr
                   v-for="(row, index) in unitRows"
                   :key="row.id"
@@ -303,7 +312,13 @@
               </tbody>
             </table>
 
-            <div v-else-if="!unitsLoading" class="empty-state">
+            <div v-else-if="unitsLoading" class="empty-state empty-state--sk" aria-busy="true">
+              <span class="sk empty-state__sk-mark" />
+              <span class="sk sk--line" style="width: 200px" />
+              <span class="sk sk--line" style="width: min(420px, 80%)" />
+            </div>
+
+            <div v-else class="empty-state">
               <AssetIcon name="inbox" :size="36" />
               <p class="empty-state__title">{{ hasActiveFilters ? 'No bags match these filters' : 'No bags in your blood bank yet' }}</p>
               <p class="empty-state__desc">
@@ -352,7 +367,24 @@
             <button type="button" class="link-btn" @click="openActivityDrawer">View All</button>
           </header>
 
-          <p v-if="activityError" class="side-empty">{{ activityError }}</p>
+          <p v-if="loading && !shape.activity" class="side-empty" aria-busy="true">
+            <span class="sk side-empty__mark" />
+            <span class="sk sk--line" style="width: 40%" />
+          </p>
+          <ol v-else-if="loading" class="activity-list" aria-busy="true">
+            <li v-for="n in shape.activity" :key="n" class="activity-item">
+              <span class="sk activity-item__icon" />
+              <span class="activity-item__body activity-item__sk">
+                <span class="sk sk--line" style="width: 36%" />
+                <span class="sk sk--line" style="width: 72%" />
+              </span>
+              <span class="activity-item__when activity-item__sk">
+                <span class="sk sk--line" style="width: 62px" />
+                <span class="sk sk--line" style="width: 76px" />
+              </span>
+            </li>
+          </ol>
+          <p v-else-if="activityError" class="side-empty">{{ activityError }}</p>
           <p v-else-if="!activity.length" class="side-empty">
             <AssetIcon name="activity" :size="22" />
             No bag has moved yet.
@@ -394,7 +426,7 @@
           >
             <header class="detail-drawer__header">
               <div>
-                <p class="detail-drawer__eyebrow">{{ bagLabel(drawerUnit) }}</p>
+                <p class="detail-drawer__eyebrow mono">{{ bagLabel(drawerUnit) }}</p>
                 <h2 id="unit-drawer-title" class="detail-drawer__title">
                   {{ displayType(drawerUnit.blood_type?.code) }} &middot; {{ drawerUnit.component?.name || '—' }}
                 </h2>
@@ -464,7 +496,15 @@
 
               <section>
                 <p class="drawer-section-title">Tags</p>
-                <p v-if="drawerTagsLoading" class="drawer-muted">Loading…</p>
+                <ol v-if="drawerTagsLoading" class="history-list" aria-hidden="true">
+                  <li v-for="n in 2" :key="n" class="history-list__item">
+                    <span class="sk activity-item__icon activity-item__icon--sm" />
+                    <span class="history-list__body history-list__sk">
+                      <span class="sk sk--line" style="width: 44%" />
+                      <span class="sk sk--line" style="width: 70%" />
+                    </span>
+                  </li>
+                </ol>
                 <p v-else-if="drawerTagsError" class="drawer-muted">{{ drawerTagsError }}</p>
                 <p v-else-if="!drawerTags.length" class="drawer-muted">This bag has never been tagged to a patient.</p>
                 <ol v-else class="history-list">
@@ -485,7 +525,15 @@
 
               <section>
                 <p class="drawer-section-title">Movement History</p>
-                <p v-if="drawerHistoryLoading" class="drawer-muted">Loading…</p>
+                <ol v-if="drawerHistoryLoading" class="history-list" aria-hidden="true">
+                  <li v-for="n in 2" :key="n" class="history-list__item">
+                    <span class="sk activity-item__icon activity-item__icon--sm" />
+                    <span class="history-list__body history-list__sk">
+                      <span class="sk sk--line" style="width: 44%" />
+                      <span class="sk sk--line" style="width: 70%" />
+                    </span>
+                  </li>
+                </ol>
                 <p v-else-if="drawerHistoryError" class="drawer-muted">{{ drawerHistoryError }}</p>
                 <p v-else-if="!drawerHistory.length" class="drawer-muted">No recorded movement yet.</p>
                 <ol v-else class="history-list">
@@ -543,7 +591,20 @@
             </header>
 
             <div class="detail-drawer__body detail-drawer__body--flush">
-              <p v-if="allActivityError" class="drawer-muted drawer-muted--pad">{{ allActivityError }}</p>
+              <ol v-if="allActivityLoading && !allActivity.length" class="activity-list" aria-busy="true">
+                <li v-for="n in 5" :key="n" class="activity-item">
+                  <span class="sk activity-item__icon" />
+                  <span class="activity-item__body activity-item__sk">
+                    <span class="sk sk--line" style="width: 36%" />
+                    <span class="sk sk--line" style="width: 72%" />
+                  </span>
+                  <span class="activity-item__when activity-item__sk">
+                    <span class="sk sk--line" style="width: 62px" />
+                    <span class="sk sk--line" style="width: 76px" />
+                  </span>
+                </li>
+              </ol>
+              <p v-else-if="allActivityError" class="drawer-muted drawer-muted--pad">{{ allActivityError }}</p>
               <p v-else-if="!allActivity.length && !allActivityLoading" class="drawer-muted drawer-muted--pad">No bag has moved yet.</p>
               <ol class="activity-list">
                 <li v-for="item in allActivity" :key="item.id" class="activity-item">
@@ -564,7 +625,7 @@
                   </span>
                 </li>
               </ol>
-              <div v-if="allActivityPage < allActivityLastPage || allActivityLoading" class="drawer-more">
+              <div v-if="allActivity.length && (allActivityPage < allActivityLastPage || allActivityLoading)" class="drawer-more">
                 <button type="button" class="btn-outline btn-outline--sm" :disabled="allActivityLoading" @click="loadAllActivity(allActivityPage + 1)">
                   {{ allActivityLoading ? 'Loading…' : 'Load more' }}
                 </button>
@@ -624,7 +685,20 @@
             </div>
 
             <div class="detail-drawer__body detail-drawer__body--flush">
-              <p v-if="eventsError" class="drawer-muted drawer-muted--pad">{{ eventsError }}</p>
+              <ol v-if="eventsLoading && !events.length" class="activity-list" aria-busy="true">
+                <li v-for="n in 5" :key="n" class="activity-item">
+                  <span class="sk activity-item__icon" />
+                  <span class="activity-item__body activity-item__sk">
+                    <span class="sk sk--line" style="width: 36%" />
+                    <span class="sk sk--line" style="width: 72%" />
+                  </span>
+                  <span class="activity-item__when activity-item__sk">
+                    <span class="sk sk--line" style="width: 62px" />
+                    <span class="sk sk--line" style="width: 76px" />
+                  </span>
+                </li>
+              </ol>
+              <p v-else-if="eventsError" class="drawer-muted drawer-muted--pad">{{ eventsError }}</p>
               <p v-else-if="!events.length && !eventsLoading" class="drawer-muted drawer-muted--pad">
                 No ended tags yet. Released and transfused bags appear here, newest first.
               </p>
@@ -651,7 +725,7 @@
                   </span>
                 </li>
               </ol>
-              <div v-if="eventsPage < eventsLastPage || eventsLoading" class="drawer-more">
+              <div v-if="events.length && (eventsPage < eventsLastPage || eventsLoading)" class="drawer-more">
                 <button type="button" class="btn-outline btn-outline--sm" :disabled="eventsLoading" @click="loadEvents(eventsPage + 1)">
                   {{ eventsLoading ? 'Loading…' : 'Load more' }}
                 </button>
@@ -755,10 +829,10 @@
 /**
  * The hospital blood bank's own stock: the bags it holds, and the patients they are tagged to.
  *
- * Laid out as the centre's Blood Inventory is (project owner, 2026-10-28):
- * headline cards, the list, Expiring Soon and Recent Activity. The type
- * cards moved to the dashboard the same day, and stock-in has a page of its
- * own, Stock Intake.
+ * Laid out as the centre's Blood Inventory is (project owner, 2026-10-28, and
+ * again 2026-11-01): headline cards, the blood type cards, Expiring Soon, the
+ * list and Recent Activity. The dashboard shows the type cards too, and stock-in
+ * has a page of its own, Stock Intake.
  *
  * A tag is one specific bag held for one specific patient. Tag Assigned keeps
  * it in storage with 24 hours to crossmatch; Tag Crossmatched means it left
@@ -768,11 +842,13 @@
  * to show it. Every action is re-checked by the API under lock; a refusal is
  * explained and the list reloaded, since it means the bag moved on.
  */
+import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 
 import { resolveComponent } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import HospitalBloodTypeAvailability from '~/components/Hospital/BloodTypeAvailability.vue'
 import HospitalTagUnitDialog from '~/components/Hospital/TagUnitDialog.vue'
 import HospitalUnitReasonDialog from '~/components/Hospital/UnitReasonDialog.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
@@ -787,6 +863,7 @@ import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } fr
 import { typeHealthByCode } from '~/utils/stockThreshold'
 import { daysLeftLabel, orderDashboardTypes, pageWindow, timeAgo } from '~/utils/inventoryDashboard'
 import { hospitalActivityKindMeta, hospitalRemainingDaysTag, hospitalUnitStatusTag } from '~/utils/hospitalInventoryDashboard'
+import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
 
@@ -825,6 +902,7 @@ const facilityLabel = computed(() => user.value?.facility?.facility_name || 'you
  */
 const canHandle = computed(() => can('hospital.inventory.handle'))
 const canDiscard = computed(() => can('hospital.inventory.discard'))
+const canStockIn = computed(() => can('hospital.inventory.stock_in'))
 
 const loading = ref(true)
 const loadError = ref('')
@@ -835,6 +913,36 @@ const lastUpdated = ref(null)
 const now = ref(Date.now())
 /** How far this browser's clock is from the server's. */
 const skew = ref(0)
+
+// The loading rows copy what this browser last saw of each list; a first visit
+// has no record, so it draws a few. Zero draws the shape of the empty message.
+const SHAPE_KEY = 'hospital_inventory_shape'
+const shape = reactive({ expiring: 3, activity: 3, units: 6 })
+
+function readShape() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SHAPE_KEY))
+    if (!saved) return
+    shape.expiring = Math.min(6, Math.max(0, Number(saved.expiring) || 0))
+    shape.activity = Math.min(6, Math.max(0, Number(saved.activity) || 0))
+    shape.units = Math.min(PAGE_SIZE, Math.max(0, Number(saved.units) || 0))
+  } catch {
+    // Nothing usable saved: the first-visit rows stand.
+  }
+}
+
+function rememberShape() {
+  try {
+    localStorage.setItem(SHAPE_KEY, JSON.stringify({
+      expiring: expiringUnits.value.length,
+      activity: activity.value.length,
+      // Only the whole list says what the page opens on, not a filtered one.
+      units: hasActiveFilters.value ? shape.units : units.value.length,
+    }))
+  } catch {
+    // Private window or blocked storage: the next load draws the defaults.
+  }
+}
 
 // --- Reference data ---
 const bloodTypeOptions = ref([])
@@ -971,7 +1079,7 @@ const kpis = computed(() => {
 const PAGE_SIZE = 8
 const listSection = ref(null)
 const units = ref([])
-const unitsLoading = ref(false)
+const unitsLoading = ref(true)
 const unitsError = ref('')
 const unitsMeta = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
 
@@ -1079,6 +1187,10 @@ function onExpiryRiskChange() {
 
 function onStatusChange() {
   if (filters.status) filters.expiryRisk = ''
+}
+
+function toggleTypeFilter(card) {
+  filters.bloodTypeId = filters.bloodTypeId === card.id ? '' : card.id
 }
 
 function clearFilters() {
@@ -1279,6 +1391,12 @@ async function loadEvents(page) {
   }
 }
 
+// The page behind does not scroll under a dialog.
+watch(() => Boolean(drawerUnit.value || activityDrawerOpen.value || tagHistoryOpen.value), (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+onBeforeUnmount(() => { document.body.style.overflow = '' })
+
 function openTagHistory() {
   tagHistoryOpen.value = true
   loadEvents(1)
@@ -1394,7 +1512,7 @@ async function perform(call) {
       dialogError.value = firstError(err) || 'Check the highlighted fields.'
     } else if (err?.status === 409 || err?.status === 404) {
       closeDialog()
-      notice.value = refusalMessage(err)
+      notice.value = { tone: 'error', text: refusalMessage(err) }
       await refresh({ quiet: true })
     } else {
       dialogError.value = err?.message || 'That could not be done. Please try again.'
@@ -1423,6 +1541,7 @@ function firstError(err) {
 
 // --- Toast ---
 const notice = ref('')
+useNoticeToast(notice)
 let noticeTimer = null
 watch(notice, (message) => {
   clearTimeout(noticeTimer)
@@ -1514,10 +1633,12 @@ let pollTimer = null
 let ticker = null
 
 onMounted(async () => {
+  readShape()
   await loadReference()
   await Promise.all([loadSummary(), loadOverview(), loadUnits(1)])
   lastUpdated.value = new Date()
   loading.value = false
+  rememberShape()
 
   ticker = setInterval(() => { now.value = Date.now() }, 30_000)
   pollTimer = setInterval(() => {
@@ -1698,6 +1819,24 @@ onBeforeUnmount(() => {
 .kpi__value { font-size: 24px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-text); font-variant-numeric: tabular-nums; }
 .kpi__sub { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--inv-muted); }
 .kpi__sub--up :deep(svg) { color: var(--inv-ok); }
+/* Holds the wording's place and height without saying anything yet. */
+.kpi__sub--loading { width: fit-content; color: transparent; border-radius: 6px; }
+.kpi__sub--loading :deep(svg) { visibility: hidden; }
+.kpi__body .sk--figure { height: 31px; }
+
+/* Loading rows stand as tall as the rows they become. SkeletonRows draws its
+   own cells, so these reach it with :deep. */
+.side-empty__mark { width: 22px; height: 22px; border-radius: 50%; }
+.side-empty .sk--line { margin-block: 3.5px; }
+.empty-state__sk-mark { width: 36px; height: 36px; border-radius: 10px; }
+.empty-state--sk { min-height: 232px; }
+.mini-table--loading :deep(td) { height: 64px; padding: 0 8px; border-bottom: 1px solid var(--inv-border-soft); }
+.mini-table--loading :deep(td:first-child) { padding-left: 16px; }
+.mini-table--loading :deep(tr:last-child td) { border-bottom: none; }
+.unit-table--loading :deep(td) { height: 67px; padding: 0 12px; border-bottom: 1px solid var(--inv-border-soft); }
+.unit-table--loading :deep(td:first-child) { padding-left: 18px; }
+.activity-item__sk { justify-content: center; gap: 8px; min-height: 40px; }
+.history-list__sk { flex: 1; gap: 8px; padding-top: 4px; }
 .kpi__chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--inv-faint); }
 .kpi--action:hover .kpi__chevron { color: var(--inv-action-text); }
 
@@ -1705,8 +1844,11 @@ onBeforeUnmount(() => {
 .inv-grid {
   display: grid; gap: 16px; align-items: stretch;
   grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-areas: "list expiring" "list activity";
+  grid-template-areas: "types expiring" "list activity";
 }
+/* The thresholds failed to load, so there are no type cards to place. */
+.inv-grid--no-types { grid-template-areas: "list expiring" "list activity"; }
+.types-panel { grid-area: types; min-width: 0; }
 .expiring-panel { grid-area: expiring; }
 .list-panel { grid-area: list; }
 .activity-panel { grid-area: activity; }
@@ -1718,7 +1860,7 @@ onBeforeUnmount(() => {
 }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; flex-wrap: wrap; }
 .panel-title { font-size: 15px; font-weight: 600; color: var(--inv-text); margin: 0; }
-.panel-subtitle { font-size: 12.5px; color: var(--inv-muted); margin: 3px 0 0; }
+.panel-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* Badge: a tint of the state, the neutral ones left grey. */
 .badge {
@@ -1905,24 +2047,28 @@ onBeforeUnmount(() => {
 .inv-page :deep(.low-banner__chip--more::before) { display: none; }
 .inv-page :deep(.low-banner__link) { color: var(--inv-action-text); font-weight: 600; }
 
-/* Drawers */
-.drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.5); }
+/* In the middle of the screen, as ui/CenterModal is (project owner, 2026-11-01).
+   One height, so loading and a short list do not resize the dialog. */
+.drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(15, 23, 42, 0.5); }
 .detail-drawer {
-  width: clamp(400px, 32vw, 500px); max-width: 100%; height: 100%; display: flex; flex-direction: column;
-  background: var(--inv-surface); border-left: 1px solid var(--inv-border); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.3);
-  animation: drawer-slide-in 0.25s ease; font-family: var(--rb-font-sans); color: var(--inv-text);
+  width: 100%; max-width: 760px; height: min(680px, calc(100dvh - 48px)); display: flex; flex-direction: column;
+  overflow: hidden; border: 1px solid var(--inv-border); border-radius: 18px;
+  background: var(--inv-surface); box-shadow: 0 28px 70px -24px rgba(15, 23, 42, 0.55);
+  animation: drawer-rise 0.2s cubic-bezier(0.16, 1, 0.3, 1); font-family: var(--rb-font-sans); color: var(--inv-text);
 }
-@keyframes drawer-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes drawer-rise { from { transform: translateY(8px) scale(0.98); } to { transform: none; } }
 .detail-drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--inv-border); }
-.detail-drawer__eyebrow { font-family: var(--rb-font-mono); font-size: 11.5px; color: var(--inv-muted); margin: 0 0 3px; }
-.detail-drawer__title { font-size: 16px; font-weight: 600; color: var(--inv-text); margin: 0; }
+.detail-drawer__eyebrow { font-size: 12px; font-weight: 600; color: var(--inv-muted); margin: 0 0 2px; }
+.detail-drawer__title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: var(--inv-text); margin: 0; }
 .detail-drawer__body { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 22px; }
 .detail-drawer__body--flush { padding: 0; gap: 0; }
 .detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--inv-border); }
-.detail-drawer__footer .btn-outline { flex: 1 1 30%; }
+.detail-drawer__footer { justify-content: flex-end; }
+.drawer-filters .search-field { flex: 1 1 260px; }
+.drawer-filters .filter-field { flex: 0 0 200px; }
 .drawer-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 14px 22px; border-bottom: 1px solid var(--inv-border); }
 .drawer-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--inv-muted); margin: 0 0 10px; }
-.drawer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 0; }
+.drawer-info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 14px; margin: 0; }
 .drawer-info-grid dt { font-size: 11.5px; color: var(--inv-muted); margin-bottom: 3px; }
 .drawer-info-grid dd { font-size: 13px; font-weight: 500; color: var(--inv-text); margin: 0; }
 .drawer-info-grid__wide { grid-column: 1 / -1; }
@@ -1970,8 +2116,9 @@ onBeforeUnmount(() => {
   .kpi { padding-left: 14px; gap: 12px; }
   .inv-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "list list" "expiring activity";
+    grid-template-areas: "types types" "list list" "expiring activity";
   }
+  .inv-grid--no-types { grid-template-areas: "list list" "expiring activity"; }
 }
 @container inv (max-width: 1040px) {
   .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1979,7 +2126,8 @@ onBeforeUnmount(() => {
 }
 @container inv (max-width: 760px) {
   .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "list" "expiring" "activity"; }
+  .inv-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "types" "list" "expiring" "activity"; }
+  .inv-grid--no-types { grid-template-areas: "list" "expiring" "activity"; }
 }
 @container inv (max-width: 440px) {
   .kpi-row { grid-template-columns: minmax(0, 1fr); }
@@ -1989,7 +2137,9 @@ onBeforeUnmount(() => {
 @media (max-width: 640px) {
   .inv-page { padding: 16px 16px 32px; }
   .filter-field { flex: 1 1 calc(50% - 5px); }
-  .detail-drawer { width: 100%; }
+  .drawer-overlay { padding: 12px; }
+  .detail-drawer { height: calc(100dvh - 24px); }
   .detail-drawer__footer .btn-outline { flex: 1 1 100%; }
+  .drawer-info-grid { grid-template-columns: 1fr 1fr; }
 }
 </style>

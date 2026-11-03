@@ -2,7 +2,7 @@
   <!--
     The top of a staff page: the title and a one-line subtitle on the left,
     the page's actions on the right. Two columns, so the actions never wrap
-    under the text; only the text column narrows.
+    under the text; only the text column narrows. Phones stack the two.
   -->
   <header class="ph">
     <div class="ph__text">
@@ -31,4 +31,10 @@ defineProps<{
 .ph__title { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; color: var(--rb-text-primary); }
 .ph__sub { margin: 4px 0 0; font-size: var(--rb-fs-small); line-height: 1.5; color: var(--rb-text-secondary); max-width: 72ch; }
 .ph__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--rb-space-2); }
+
+/* A phone has no room for two columns: the actions go under the title. */
+@media (max-width: 640px) {
+  .ph { grid-template-columns: minmax(0, 1fr); }
+  .ph__actions { flex-wrap: wrap; justify-content: flex-start; }
+}
 </style>
