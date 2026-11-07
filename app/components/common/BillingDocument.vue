@@ -55,7 +55,7 @@
           </div>
           <div>
             <p class="cap">Payable</p>
-            <strong>{{ revision.statement_only ? 'Settled outside RedAgos' : 'Before the units are released' }}</strong>
+            <strong>{{ revision.statement_only ? 'Settled outside RedAgos' : revision.payment_deferred ? 'After the units are released' : 'Before the units are released' }}</strong>
           </div>
           <div>
             <p class="cap">Currency</p>
@@ -137,7 +137,7 @@
           </table>
         </div>
       </template>
-      <p v-else-if="revision" class="muted">No units are held for this request.</p>
+      <p v-else-if="revision" class="muted">No units are on this invoice.</p>
 
       <!-- STATEMENT: what it means beside the totals -->
       <div v-if="revision && figures" class="summary">

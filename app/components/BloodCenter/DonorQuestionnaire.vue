@@ -1,12 +1,12 @@
 <template>
   <Teleport to="body">
-    <div class="dhq-overlay" role="dialog" aria-modal="true" :aria-label="title" @click.self="$emit('close')">
-      <section class="dhq" @keydown.esc="$emit('close')">
+    <div class="dhq-overlay" role="dialog" aria-modal="true" :aria-label="title" @click.self="requestClose">
+      <section class="dhq" @keydown.esc="requestClose">
         <header class="dhq__header">
           <div class="dhq__heading">
             <p class="dhq__eyebrow">
               Blood Donor's Health Questionnaire
-              <span class="dhq__chip">Donor's answers are read only</span>
+              <span v-if="!amendable" class="dhq__chip">Donor's answers are read only</span>
             </p>
             <h2 class="dhq__title">{{ title }}</h2>
             <!--
@@ -19,7 +19,7 @@
 
           <div class="dhq__header-actions">
             <button type="button" class="dhq__btn" @click="$emit('print')">Print</button>
-            <button type="button" class="dhq__btn dhq__btn--icon" aria-label="Close" @click="$emit('close')">×</button>
+            <button type="button" class="dhq__btn dhq__btn--icon" aria-label="Close" @click="requestClose">×</button>
           </div>
         </header>
 
@@ -32,37 +32,6 @@
         <p v-if="data?.is_expired" class="dhq__banner dhq__banner--warn">
           These answers are past their validity date of {{ longDate(data.valid_until) }}.
         </p>
-
-        <!--
-          The four boxes printed in the top margin of the donor's sheet, in the
-          same place here. Unlike everything below them these are the officer's
-          to fill: they are asked in person at the counter and typed in, which
-          is why the one editable block in this document sits above the tabs
-          rather than inside the donor's own declaration.
-
-          They are saved with the screening, not on their own — they describe
-          the visit the screening records, and a set of answers with no
-          screening behind them would belong to nothing.
-        -->
-        <fieldset class="dhq__intake" :disabled="!canEditIntake">
-          <legend class="dhq__intake-legend">
-            Ask the donor
-            <span class="dhq__intake-tag">Staff</span>
-          </legend>
-
-          <div class="dhq__intake-grid">
-            <label v-for="field in intakeFields" :key="field.key" class="dhq__intake-field">
-              <span class="dhq__intake-label">{{ field.label }}</span>
-              <input
-                :value="intake[field.key]"
-                type="text"
-                class="dhq__intake-input"
-                maxlength="255"
-                @input="$emit('update-intake', field.key, $event.target.value)"
-              >
-            </label>
-          </div>
-        </fieldset>
 
         <nav class="dhq__tabs">
           <button
@@ -111,8 +80,33 @@
                   <span class="dhq__question-text">
                     {{ question.text }}
                     <span v-if="question.flagged" class="dhq__flag">Review</span>
+                    <!-- An answer that is no longer the donor's has to say so. -->
+                    <span v-if="question.amendment" class="dhq__amended">
+                      Changed by {{ question.amendment.amended_by || 'staff' }}.
+                      Donor answered: {{ question.amendment.donor_answer_label }}
+                    </span>
                   </span>
-                  <span class="dhq__answer" :class="answerClass(question)">{{ question.answer_label }}</span>
+
+                  <div
+                    v-if="amendable && question.applicable"
+                    class="dhq__choice"
+                    role="radiogroup"
+                    :aria-label="`Question ${question.number}`"
+                  >
+                    <button
+                      v-for="option in ANSWER_OPTIONS"
+                      :key="option.label"
+                      type="button"
+                      role="radio"
+                      class="dhq__choice-btn"
+                      :class="{ 'dhq__choice-btn--on': shownAnswer(question) === option.value }"
+                      :aria-checked="shownAnswer(question) === option.value"
+                      @click="choose(question, option.value)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  </div>
+                  <span v-else class="dhq__answer" :class="answerClass(question)">{{ question.answer_label }}</span>
                 </li>
               </ol>
             </section>
@@ -161,7 +155,35 @@
             </dl>
           </div>
         </div>
+
+        <footer v-if="editCount" class="dhq__save">
+          <p v-if="saveError" class="dhq__save-error" role="alert">{{ saveError }}</p>
+          <div class="dhq__save-actions">
+            <button type="button" class="dhq__btn" :disabled="saving" @click="clearEdits">Discard</button>
+            <button type="button" class="dhq__btn dhq__btn--primary" :disabled="saving" @click="saveEdits">
+              {{ saving ? 'Saving…' : `Save ${editCount} change${editCount === 1 ? '' : 's'}` }}
+            </button>
+          </div>
+        </footer>
       </section>
+
+      <!-- Closing with changes unsaved: the drawer's own confirm, over it. -->
+      <div v-if="discarding" class="dhq-confirm" @click.self="discarding = false">
+        <div
+          v-focus-trap
+          class="dhq-confirm__card"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="dhq-discard-title"
+          @dialog-escape="discarding = false"
+        >
+          <h3 id="dhq-discard-title" class="dhq-confirm__title">Discard the changed answers?</h3>
+          <div class="dhq-confirm__actions">
+            <button type="button" class="dhq__btn" @click="discarding = false">Keep editing</button>
+            <button type="button" class="dhq__btn dhq__btn--danger" @click="discardAndClose">Discard</button>
+          </div>
+        </div>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -171,32 +193,88 @@
  * The donor's questionnaire, as a document.
  *
  * Deliberately reads nothing like the staff's own screening form, which sits on
- * the same page: numbered rows, answer pills, no inputs and no write buttons
- * anywhere. Everything here was declared by the donor in the app; the blood
- * centre decides what it means.
+ * the same page: numbered rows, answer pills and no text inputs. Everything here
+ * was declared by the donor; the blood centre decides what it means.
+ *
+ * One exception (project owner, 2026-11-06): while the donor is at screening the
+ * physician can change Section I-B's Yes and No. A changed row goes on saying
+ * what the donor declared. Personal data and consent stay read-only.
  */
+import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { formatPhoneNumber } from '~/utils/phone'
 
 const props = defineProps({
   data: { type: Object, default: null },
-  // The four margin boxes, held by the counter so the screening form and this
-  // drawer cannot drift apart.
-  intake: { type: Object, required: true },
-  // They describe a visit, so there has to be one to record them against.
-  canEditIntake: { type: Boolean, default: false },
+  donorUuid: { type: String, default: '' },
+  canAmend: { type: Boolean, default: false },
 })
 
-const intakeFields = [
-  { key: 'sleep', label: 'Sleep' },
-  { key: 'meal', label: 'Meal' },
-  { key: 'meds', label: 'Meds' },
-  { key: 'allergies', label: 'Allergies' },
+// `print` opens the A4 sheet the desk prints, so paper from either reads alike.
+// `amended` hands over the document as the server now has it.
+const emit = defineEmits(['close', 'print', 'amended'])
+
+const ANSWER_OPTIONS = [
+  { label: 'Yes', value: true },
+  { label: 'No', value: false },
 ]
 
-// `update-intake` rather than writing into the prop: the counter owns this
-// state, because the screening form has to send it and both have to agree.
-// `print` opens the A4 sheet the desk prints, so paper from either reads alike.
-defineEmits(['close', 'update-intake', 'print'])
+// Lapsed answers are not corrected: the donor answers the form again.
+const amendable = computed(() => props.canAmend && !props.data?.is_expired)
+
+// Unsaved changes, by question code.
+const edits = reactive({})
+const editCount = computed(() => Object.keys(edits).length)
+const saving = ref(false)
+const saveError = ref('')
+const discarding = ref(false)
+
+function shownAnswer(question) {
+  return question.code in edits ? edits[question.code] : question.answer
+}
+
+function choose(question, answer) {
+  if (answer === question.answer) delete edits[question.code]
+  else edits[question.code] = answer
+}
+
+function clearEdits() {
+  for (const code of Object.keys(edits)) delete edits[code]
+  saveError.value = ''
+}
+
+async function saveEdits() {
+  saving.value = true
+  saveError.value = ''
+
+  try {
+    const result = await bloodCenterService.amendQuestionnaireAnswers(props.donorUuid, {
+      screening_id: props.data.screening_id,
+      answers: Object.entries(edits).map(([code, answer]) => ({ code, answer })),
+    })
+
+    emit('amended', result?.data ?? props.data)
+    clearEdits()
+  } catch (err) {
+    saveError.value = err?.data?.message || err?.message || 'The answers could not be saved. Try again.'
+  } finally {
+    saving.value = false
+  }
+}
+
+function requestClose() {
+  if (editCount.value) {
+    discarding.value = true
+    return
+  }
+
+  emit('close')
+}
+
+function discardAndClose() {
+  clearEdits()
+  discarding.value = false
+  emit('close')
+}
 
 const activeTab = ref('personal')
 
@@ -368,6 +446,11 @@ onBeforeUnmount(() => {
 
 .dhq__btn:hover { background: var(--rb-surface-hover); }
 .dhq__btn--icon { font-size: 18px; line-height: 1; padding: 0.3rem 0.55rem; }
+.dhq__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.dhq__btn--primary { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+.dhq__btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-primary) 88%, #000); }
+.dhq__btn--danger { background: var(--rb-accent); border-color: var(--rb-accent); color: #fff; }
+.dhq__btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
 
 .dhq__banner {
   margin: 0.75rem 1.2rem 0;
@@ -382,74 +465,6 @@ onBeforeUnmount(() => {
   color: var(--rb-warning-text);
   border: 1px solid rgba(var(--rb-warning-rgb), 0.3);
 }
-
-/* --- The officer's own block, above the donor's declaration --- */
-/*
- * Marked out from everything below it. The rest of this drawer is a document
- * the donor authored days ago; this is the one part the counter writes, and a
- * staff member must never be in doubt about which they are looking at.
- */
-.dhq__intake {
-  margin: 0.9rem 1.2rem 0;
-  padding: 0.75rem 0.85rem 0.8rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 10px;
-  background: var(--rb-surface-alt);
-}
-
-.dhq__intake[disabled] { opacity: 0.6; }
-
-.dhq__intake-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.35rem;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
-}
-
-.dhq__intake-tag {
-  padding: 0.05rem 0.35rem;
-  border-radius: 4px;
-  background: rgba(var(--rb-primary-rgb), 0.12);
-  color: var(--rb-primary-text);
-  letter-spacing: 0.04em;
-}
-
-.dhq__intake-grid {
-  display: grid;
-  gap: 0.6rem;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-}
-
-.dhq__intake-field { display: flex; flex-direction: column; gap: 0.25rem; }
-
-.dhq__intake-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rb-text-primary);
-}
-
-.dhq__intake-input {
-  width: 100%;
-  padding: 0.42rem 0.6rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 8px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font: inherit;
-  font-size: 13.5px;
-}
-
-.dhq__intake-input:focus-visible {
-  outline: 2px solid var(--rb-primary);
-  outline-offset: 1px;
-  border-color: var(--rb-primary);
-}
-
 
 .dhq__tabs {
   display: flex;
@@ -569,6 +584,72 @@ onBeforeUnmount(() => {
    they answered. */
 .dhq__answer--na { font-style: italic; color: var(--rb-text-secondary); }
 
+.dhq__amended {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rb-warning-text);
+}
+
+.dhq__choice { justify-self: end; display: inline-flex; gap: 0.25rem; }
+
+.dhq__choice-btn {
+  min-width: 2.6rem;
+  min-height: 30px;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--rb-border-strong);
+  border-radius: 999px;
+  background: var(--rb-surface);
+  color: var(--rb-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dhq__choice-btn:hover { border-color: var(--rb-border-hover); }
+.dhq__choice-btn:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 2px; }
+.dhq__choice-btn--on,
+.dhq__choice-btn--on:hover { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
+
+.dhq__save {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  border-top: 1px solid var(--rb-border);
+  background: var(--rb-surface);
+}
+
+.dhq__save-error { margin: 0; font-size: 13px; color: var(--rb-accent-text); }
+.dhq__save-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* The discard confirm, over the drawer (the overlay is its containing block). */
+.dhq-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--rb-overlay);
+}
+
+.dhq-confirm__card {
+  width: min(24rem, 100%);
+  padding: 1.25rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
+  font-family: var(--rb-font-sans);
+}
+
+.dhq-confirm__title { margin: 0 0 1rem; font-size: 16px; font-weight: 700; color: var(--rb-text-primary); }
+.dhq-confirm__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+
 .dhq__consent-date { margin: 0 0 0.75rem; font-size: 14px; font-weight: 600; color: var(--rb-text-primary); }
 .dhq__consent-version { margin-left: 0.4rem; font-weight: 400; font-size: 12.5px; color: var(--rb-text-secondary); }
 
@@ -578,7 +659,8 @@ onBeforeUnmount(() => {
 @media (max-width: 640px) {
   .dhq { width: 100%; }
   .dhq__question { grid-template-columns: 1.4rem minmax(0, 1fr); }
-  .dhq__answer { grid-column: 2; justify-self: start; margin-top: 0.3rem; }
+  .dhq__answer,
+  .dhq__choice { grid-column: 2; justify-self: start; margin-top: 0.3rem; }
 }
 
 /* Staff keep a paper copy, so the drawer prints as the document it is. */
@@ -586,8 +668,8 @@ onBeforeUnmount(() => {
   .dhq-overlay { position: static; background: none; }
   .dhq { width: 100%; height: auto; border: none; }
   .dhq__header-actions,
-  .dhq__tabs { display: none; }
-  .dhq__intake { border-color: #000; background: none; }
+  .dhq__tabs,
+  .dhq__save { display: none; }
   .dhq__panel { display: block !important; }
   .dhq__body { overflow: visible; }
 }

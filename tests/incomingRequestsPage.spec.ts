@@ -64,9 +64,9 @@ describe('patient requests and replenishment orders', () => {
 })
 
 describe('a row', () => {
-  it('reserves only what is still needed, and only for whoever allocates', () => {
-    expect(page).toContain('canReserve: isOpen && outstanding > 0 && !needsPlan,')
-    expect(page).toMatch(/<template v-if="r\.canReserve">\s*<button\s+v-if="canAllocate"/)
+  it('tags only what a patient still needs, and only for whoever allocates', () => {
+    expect(page).toContain('canTag: isOpen && outstanding > 0 && !isReplenishment,')
+    expect(page).toMatch(/<template v-if="r\.canTag">\s*<button\s+v-if="canAllocate"/)
   })
 
   it('rejects only while nothing is held or sent, and only for whoever decides', () => {
@@ -74,11 +74,11 @@ describe('a row', () => {
     expect(page).toMatch(/<template v-if="r\.canReject">\s*<button\s+v-if="canDecide"/)
   })
 
-  it('issues on Request Fulfillment once units are reserved, for whoever releases', () => {
+  it('issues on Request Fulfillment once units are tagged, for whoever releases', () => {
     expect(page).toContain("const canRelease = computed(() => can('requests.release'))")
     expect(page).toContain('<template v-if="r.isOpen && canRelease">')
     // Issue opens that request alone (2026-10-31).
-    expect(page).toContain('<NuxtLink v-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue"')
+    expect(page).toContain('<NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue"')
     expect(page).toContain('held: Math.max(0, allocated - issued),')
   })
 
@@ -101,8 +101,8 @@ describe('the review', () => {
     expect(style).toMatch(/\.modal-overlay \{[^}]*z-index: 100;/)
   })
 
-  it('offers to reserve only what is still needed, and to issue once all of it is held', () => {
-    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canReserve">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" :to="`\/blood-center\/fulfillment\?request=\$\{activeRequest\.id\}`"/)
+  it('offers to tag only what is still needed, and to issue once all of it is tagged', () => {
+    expect(page).toMatch(/<template v-(else-)?if="activeRequest\.canTag">[\s\S]*?v-else-if="canAllocate"[\s\S]*?<\/template>\s*<NuxtLink v-else-if="activeRequest\.held > 0 && canRelease" :to="`\/blood-center\/fulfillment\?request=\$\{activeRequest\.id\}`"/)
   })
 
   it('rejects only while nothing is held or sent', () => {
@@ -110,7 +110,7 @@ describe('the review', () => {
   })
 })
 
-describe('reserving', () => {
+describe('tagging', () => {
   const picker = source('app/components/BloodCenter/UnitPickerDialog.vue')
 
   it('lets staff pick the bags instead of the server choosing (project owner, 2026-10-19)', () => {
@@ -194,10 +194,16 @@ describe('the composable', () => {
 describe('a replenishment order (project owner, 2026-10-29)', () => {
   const dialog = source('app/components/BloodCenter/SupplyPlanDialog.vue')
 
-  it('is confirmed before anything is reserved, by whoever decides', () => {
+  it('is confirmed before it goes, by whoever decides', () => {
     expect(page).toContain("const needsPlan = isOpen && isReplenishment && !plan")
     expect(page).toMatch(/<template v-if="r\.needsPlan">\s*<button\s+v-if="canDecide"[\s\S]*?@click="openPlan\(r\)"/)
     expect(page).toMatch(/<template v-if="activeRequest\.needsPlan">\s*<button v-if="canDecide"[^>]*@click="openPlan\(activeRequest\)"/)
+  })
+
+  it('is never tagged: confirmed, it goes straight to For Dispatch (project owner, 2026-11-07)', () => {
+    expect(page).toContain('canDispatch: isOpen && isReplenishment && Boolean(plan) && outstanding > 0,')
+    expect(page).toContain('<NuxtLink v-if="r.canDispatch" :to="`/blood-center/dispatch?request=${r.id}`" class="btn-issue"')
+    expect(page).toContain('<NuxtLink v-else-if="activeRequest.canDispatch && canRelease" :to="`/blood-center/dispatch?request=${activeRequest.id}`"')
   })
 
   it('can be changed until units go out', () => {
@@ -212,8 +218,8 @@ describe('a replenishment order (project owner, 2026-10-29)', () => {
     expect(dialog).toContain('lines: openRows.value.map((line) => ({ request_item_id: line.id, committed_quantity: Number(committed[line.id]) })),')
   })
 
-  it('never commits a line below what is already reserved, nor above what was asked', () => {
-    expect(dialog).toContain(':min="line.held"')
+  it('never commits a line above what was asked', () => {
+    expect(dialog).toContain('min="0"')
     expect(dialog).toContain(':max="line.requested"')
     expect(dialog).toContain("if (totalCommitted.value < 1) found.lines = 'Commit at least one unit. If you can supply none of this order, reject it instead.'")
   })
@@ -238,6 +244,6 @@ describe('a replenishment order (project owner, 2026-10-29)', () => {
     expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'pickup') return 'Collected by'")
     expect(fulfillment).toContain("if (request.supply_plan?.handover_method === 'delivery') return 'Driver or courier'")
     // What lay beyond the commitment is closed with the rest.
-    expect(fulfillment).toContain('dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity')
+    expect(fulfillment).toContain('orderFor.unclaimed_quantity > picked')
   })
 })

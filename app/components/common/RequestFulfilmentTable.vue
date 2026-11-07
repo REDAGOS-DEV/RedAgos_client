@@ -7,7 +7,7 @@
           <tr>
             <th scope="col">Component</th>
             <th scope="col" class="num">Requested</th>
-            <th scope="col" class="num">Reserved</th>
+            <th v-if="tags" scope="col" class="num">Tagged</th>
             <th scope="col" class="num">Fulfilled</th>
             <th scope="col" class="num">Received</th>
             <th scope="col" class="num">Remaining</th>
@@ -19,7 +19,7 @@
           <tr v-for="row in rows" :key="row.id">
             <th scope="row" class="fulfilment__component">{{ row.component }}</th>
             <td class="num">{{ row.requested }}</td>
-            <td class="num">{{ row.reserved }}</td>
+            <td v-if="tags" class="num">{{ row.reserved }}</td>
             <td class="num fulfilment__strong">{{ row.fulfilled }}</td>
             <td class="num">{{ row.received }}</td>
             <td class="num" :class="{ 'fulfilment__strong': row.remaining > 0 }">{{ row.remaining }}</td>
@@ -46,7 +46,7 @@
           <tr>
             <th scope="row">Total</th>
             <td class="num">{{ totals.requested }}</td>
-            <td class="num">{{ totals.reserved }}</td>
+            <td v-if="tags" class="num">{{ totals.reserved }}</td>
             <td class="num fulfilment__strong">{{ totals.fulfilled }}</td>
             <td class="num">{{ totals.received }}</td>
             <td class="num fulfilment__strong">{{ totals.remaining }}</td>
@@ -89,6 +89,8 @@ defineEmits(['close-line'])
 const rows = computed(() => fulfilmentRows(props.request))
 const totals = computed(() => fulfilmentTotals(rows.value))
 const requestOpen = computed(() => props.request?.is_open !== false)
+// Only a patient's request is tagged; a replenishment order's units are picked at dispatch.
+const tags = computed(() => props.request?.request_purpose !== 'replenishment')
 </script>
 
 <style scoped>

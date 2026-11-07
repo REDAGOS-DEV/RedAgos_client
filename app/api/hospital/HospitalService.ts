@@ -400,6 +400,16 @@ class HospitalService extends BaseService {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/tag`, 'POST', payload)
   }
 
+  /** Reserve an untagged bag on the shelf for a blood donor partner. It stays available. */
+  reserveUnit(unit: string, partner: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/reserve`, 'POST', { partner })
+  }
+
+  /** Release a bag's blood donor partner reservation. */
+  unreserveUnit(unit: string) {
+    return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/unreserve`, 'POST')
+  }
+
   /** Record the crossmatch: the bag leaves storage, 24 hours to transfuse. */
   crossmatchUnit(unit: string) {
     return this.request<UnitActionResult>(`/hospital/inventory/${encodeURIComponent(unit)}/crossmatch`, 'POST')

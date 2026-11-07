@@ -113,8 +113,8 @@ describe('unit status', () => {
     expect(unitStatusTag('available', 7).label).toBe('Expiring Soon')
     expect(unitStatusTag('available', 0).label).toBe('Expiring Soon')
     expect(unitStatusTag('available', 8).label).toBe('Available')
-    // Held units are not the ones to issue next, whatever their date.
-    expect(unitStatusTag('reserved', 2).label).toBe('Reserved')
+    // Tagged units are not the ones to issue next, whatever their date.
+    expect(unitStatusTag('reserved', 2).label).toBe('Tagged')
   })
 
   it('colours only health: green, amber, red, and neutral for everything else', () => {
@@ -130,7 +130,7 @@ describe('unit status', () => {
 
   it('says whether a unit can be handed out', () => {
     expect(unitAvailability('available').label).toBe('In Stock')
-    expect(unitAvailability('reserved').label).toBe('Reserved')
+    expect(unitAvailability('reserved').label).toBe('Tagged')
     expect(unitAvailability('quarantined').label).toBe('On Hold')
     for (const status of ['issued', 'expired', 'discarded']) {
       expect(unitAvailability(status).label).toBe('Not Available')

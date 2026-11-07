@@ -44,12 +44,16 @@ describe('pesos', () => {
 
 describe('which statements take a payment', () => {
   it('offers payment only on a collectible statement that still blocks release', () => {
-    expect(takesPayment({ collects_payment: true, clears_release: false })).toBe(true)
-    expect(takesPayment({ collects_payment: true, clears_release: true })).toBe(false)
+    expect(takesPayment({ collects_payment: true, clears_release: false, is_payment_deferred: false })).toBe(true)
+    expect(takesPayment({ collects_payment: true, clears_release: true, is_payment_deferred: false })).toBe(false)
+  })
+
+  it('still offers payment on a deferred bill, whose units need not wait for it', () => {
+    expect(takesPayment({ collects_payment: true, clears_release: true, is_payment_deferred: true })).toBe(true)
   })
 
   it('never offers payment on a weekly statement-only order, even if it were blocking', () => {
-    expect(takesPayment({ collects_payment: false, clears_release: false })).toBe(false)
+    expect(takesPayment({ collects_payment: false, clears_release: false, is_payment_deferred: false })).toBe(false)
   })
 })
 

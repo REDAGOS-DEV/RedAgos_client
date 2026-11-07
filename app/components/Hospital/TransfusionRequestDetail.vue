@@ -112,7 +112,7 @@
         <section class="panel">
           <h2 class="panel-title">Facility allocations</h2>
           <p class="panel-hint">
-            Each facility reviews its own share. Approving reserves units for this patient; a rejected or withdrawn share
+            Each facility reviews its own share. Approving tags units for this patient; a rejected or withdrawn share
             returns its units to unallocated.
           </p>
 

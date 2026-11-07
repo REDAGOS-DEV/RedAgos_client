@@ -4,7 +4,7 @@
       <div class="picker__header">
         <h2 id="picker-title" class="picker__title">
           <AssetIcon name="package-check" :size="17" />
-          Reserve units — <span class="mono">{{ request.code }}</span>
+          {{ dispatch ? 'Dispatch units' : 'Tag units' }} — <span class="mono">{{ request.code }}</span>
         </h2>
         <button type="button" class="picker__close" aria-label="Close" :disabled="busy" @click="emitClose">
           <AssetIcon name="x" :size="18" />
@@ -150,8 +150,11 @@
 
           <p v-if="!lines.some((l) => l.allocatable > 0)" class="notice">
             <AssetIcon name="check-circle" :size="14" />
-            <span>Every unit this request still needs here is already reserved.</span>
+            <span>{{ dispatch ? 'Every unit committed on this order has already been dispatched.' : 'Every unit this request still needs here is already tagged.' }}</span>
           </p>
+
+          <!-- What the caller asks beside the pick: who takes a dispatch, and what it closes. -->
+          <slot name="details" :picked="totalPicked" />
         </template>
 
         <div v-if="error" class="notice notice--error" role="alert">
@@ -169,7 +172,7 @@
         <span class="picker__count">{{ totalPicked }} unit{{ totalPicked === 1 ? '' : 's' }} picked</span>
         <button type="button" class="btn" :disabled="busy" @click="emitClose">Cancel</button>
         <button type="button" class="btn btn--primary" :disabled="busy || !totalPicked" @click="confirm">
-          {{ busy ? 'Reserving…' : totalPicked ? `Reserve ${totalPicked} unit${totalPicked === 1 ? '' : 's'}` : 'Reserve units' }}
+          {{ confirmLabel }}
         </button>
       </div>
     </div>
@@ -178,7 +181,9 @@
 
 <script setup>
 /**
- * Pick the bags to reserve for one request (project owner, 2026-10-19).
+ * Pick the bags for one request (project owner, 2026-10-19): to tag them for a
+ * patient's request or, with `dispatch`, to send out a replenishment order, which
+ * holds nothing until the moment it goes (project owner, 2026-11-07).
  *
  * The server lists, per line, the units it would accept — this centre's,
  * available, in date, held for nobody, of the line's own blood type and
@@ -198,8 +203,10 @@ const props = defineProps({
   request: { type: Object, required: true },
   busy: { type: Boolean, default: false },
   error: { type: String, default: '' },
-  /** Unit id → why the server would not hold it. */
+  /** Unit id → why the server would not take it. */
   unitErrors: { type: Object, default: () => ({}) },
+  /** The picked units go out now, rather than being tagged. */
+  dispatch: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'confirm'])
@@ -218,6 +225,13 @@ const expanded = ref({})
 
 const totalPicked = computed(() => Object.values(picked.value).reduce((sum, set) => sum + set.size, 0))
 
+const confirmLabel = computed(() => {
+  if (props.busy) return props.dispatch ? 'Dispatching…' : 'Tagging…'
+
+  const verb = props.dispatch ? 'Dispatch' : 'Tag'
+  return totalPicked.value ? `${verb} ${totalPicked.value} unit${totalPicked.value === 1 ? '' : 's'}` : `${verb} units`
+})
+
 /** Refusals for units no longer listed (taken meanwhile), which have no row to sit on. */
 const orphanErrors = computed(() => {
   const listed = new Set(lines.value.flatMap((line) => line.units.map((unit) => unit.id)))
@@ -229,7 +243,9 @@ async function load() {
   loadError.value = ''
 
   try {
-    const response = await bloodCenterService.requestUnits(props.request.id)
+    const response = await (props.dispatch
+      ? bloodCenterService.dispatchUnits(props.request.id)
+      : bloodCenterService.requestUnits(props.request.id))
     lines.value = response?.lines ?? []
     // Keep any pick still on offer, so a refusal does not wipe the rest.
     picked.value = Object.fromEntries(lines.value.map((line) => {
@@ -315,7 +331,7 @@ function pickByNumber(line) {
       }
     }
 
-    note(line, 'warn', `${term} is not an issuable ${line.blood_type.code} ${line.component.name} bag. It may be reserved, expired, still in quarantine, or another blood type.`)
+    note(line, 'warn', `${term} is not an issuable ${line.blood_type.code} ${line.component.name} bag. It may be tagged, expired, still in quarantine, or another blood type.`)
     return
   }
 

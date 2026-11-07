@@ -299,9 +299,17 @@ describe('replenishment lives only in the weekly request', () => {
     expect(source('app/pages/hospital/inventory.vue')).toContain('unit.bag_number || unit.unit_id')
   })
 
-  it('dispatches a weekly request whole', () => {
+  it('picks a replenishment order\'s units as it is dispatched (project owner, 2026-11-07)', () => {
+    const board = source('app/components/BloodCenter/FulfillmentBoard.vue')
+
+    expect(board).toContain('const response = await bloodCenterService.dispatchOrder(request.id, unitIds, handedTo.value || null)')
+    expect(board).toContain('<UnitPickerDialog')
+    expect(source('app/components/BloodCenter/UnitPickerDialog.vue')).toContain('bloodCenterService.dispatchUnits(props.request.id)')
+  })
+
+  it('tells staff what a weekly dispatch will close', () => {
     expect(source('app/components/BloodCenter/FulfillmentBoard.vue'))
-      .toContain('request.selected.length && !request.weekly_request ? request.selected : undefined')
+      .toContain('The {{ orderFor.unclaimed_quantity - picked }} unit(s) not picked will be')
   })
 })
 
@@ -334,7 +342,7 @@ describe('a supply plan in words', () => {
     expect(handoverWhen(null)).toBe('—')
   })
 
-  it('reads a confirmed order as such until stock is reserved', () => {
+  it('reads a confirmed order as such until it is dispatched', () => {
     const order = { status: 'pending', is_walk_in: false, allocated_count: 0, supply_plan: { handover_method: 'pickup' } } as never
 
     expect(requestStage(order)).toBe('Order confirmed')

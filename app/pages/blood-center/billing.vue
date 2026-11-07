@@ -155,7 +155,7 @@
                 <td v-if="category === 'patient'">
                   <span class="gate" :class="s.clears_release ? 'gate--ok' : 'gate--held'">
                     <AssetIcon :name="s.clears_release ? 'check' : 'x'" :size="12" />
-                    {{ s.clears_release ? 'Cleared' : 'Held' }}
+                    {{ s.is_payment_deferred ? 'Deferred' : s.clears_release ? 'Cleared' : 'Held' }}
                   </span>
                 </td>
                 <td v-else class="nowrap">
@@ -304,10 +304,10 @@ async function show(card) {
 
 // ── An empty tab, said for what it is ──
 const EMPTY = {
-  'patient:outstanding': { good: true, icon: 'check-check', title: 'Every patient invoice is paid', text: 'Nothing is waiting to be collected. A new invoice appears here once Issuance reserves units for a request.', to: '/blood-center/pos', action: 'Open billing counter', actionIcon: 'philippine-peso' },
+  'patient:outstanding': { good: true, icon: 'check-check', title: 'Every patient invoice is paid', text: 'Nothing is waiting to be collected. A new invoice appears here once Issuance tags units for a request.', to: '/blood-center/pos', action: 'Open billing counter', actionIcon: 'philippine-peso' },
   'patient:paid': { icon: 'receipt', title: 'No paid invoices yet', text: 'Invoices paid in full at the billing counter appear here.' },
   'patient:subsidised': { icon: 'heart', title: 'No subsidised invoices', text: 'Invoices met by the government subsidy appear here, applied at the billing counter.' },
-  'patient:all': { icon: 'file-text', title: 'No patient invoices yet', text: 'An invoice is raised for each patient request once Issuance reserves units for it.' },
+  'patient:all': { icon: 'file-text', title: 'No patient invoices yet', text: 'An invoice is raised for each patient request once Issuance tags units for it.' },
   'weekly:statement_only': { good: true, icon: 'check-check', title: 'No hospital invoice awaiting settlement', text: 'Every released weekly order has been settled.', to: '/blood-center/statements', action: 'View statements', actionIcon: 'clipboard' },
   'weekly:settled_outside': { icon: 'building-2', title: 'No settled hospital invoices yet', text: "Once a hospital pays a weekly invoice, its settlement is recorded at the billing counter and it moves here." },
   'weekly:all': { icon: 'building-2', title: 'No hospital invoices yet', text: "A hospital's weekly replenishment order is invoiced once Issuance releases it." },

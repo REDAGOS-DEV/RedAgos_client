@@ -7,7 +7,7 @@
         :title="forDispatch ? 'For Dispatch' : 'Request Fulfillment'"
         :subtitle="forDispatch
           ? 'Paid or otherwise cleared: dispatch the units, then the hospital confirms they arrived.'
-          : 'Requests sent from Issue whose invoice still has a balance. Once it is cleared, they move to For Dispatch.'"
+          : 'Requests sent from Issue whose invoice still has a balance. Once it is settled or its payment is deferred, they move to For Dispatch.'"
       >
         <template #actions>
           <NuxtLink :to="forDispatch ? '/blood-center/fulfillment' : '/blood-center/dispatch'" class="ui-btn">
@@ -46,7 +46,7 @@
         </div>
 
         <div class="legend" aria-label="Unit states">
-          <span class="legend-step"><span class="dot dot--allocated" />Reserved</span>
+          <span class="legend-step"><span class="dot dot--allocated" />Tagged</span>
           <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
           <span class="legend-step"><span class="dot dot--released" />Released</span>
           <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
@@ -69,14 +69,14 @@
           v-if="!forDispatch"
           icon="receipt"
           title="No invoice waiting on payment"
-          description="A request sent from Issue stays here until its invoice is cleared. Paid requests are on For Dispatch."
+          description="A request sent from Issue stays here until its invoice is settled or its payment is deferred. Those are on For Dispatch."
         />
         <EmptyState
           v-else
           :icon="activeTab === 'awaiting_release' ? 'truck' : 'inbox'"
           :title="activeTab === 'awaiting_release' ? 'Nothing cleared to dispatch' : 'Nothing awaiting confirmation'"
           :description="activeTab === 'awaiting_release'
-            ? 'Requests appear here once their invoice is paid, subsidised or billed by statement.'
+            ? 'Requests appear here once their invoice is paid, subsidised or billed by statement, or its payment is deferred, and replenishment orders once they are confirmed.'
             : 'Units you dispatch appear here until the hospital confirms they arrived.'"
         />
       </div>
@@ -119,9 +119,10 @@
 
             <!-- The same three states as the legend, in its colours. -->
             <div class="request-counts">
-              <span class="count count--allocated">
+              <!-- Only a patient's request is tagged; an order's units are picked as it goes. -->
+              <span v-if="!isOrder(request)" class="count count--allocated">
                 <span class="dot dot--allocated" />
-                <strong>{{ request.allocated_count }}</strong> held
+                <strong>{{ Math.max(0, (request.allocated_count ?? 0) - (request.fulfilled_quantity ?? 0)) }}</strong> tagged
               </span>
               <span class="count count--released">
                 <span class="dot dot--released" />
@@ -155,6 +156,15 @@
             <NuxtLink v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing" class="gate-link">
               Go to Billing
             </NuxtLink>
+            <button
+              v-if="gateFor(request).canDefer"
+              type="button"
+              class="ui-btn ui-btn--sm gate-action"
+              :disabled="busyId === request.id"
+              @click="openDefer(request)"
+            >
+              Issue with Deferred Payment
+            </button>
           </div>
 
           <!-- UNITS -->
@@ -164,11 +174,11 @@
             <table v-else-if="request.allocations?.length" class="units-table">
               <thead>
                 <tr>
-                  <th v-if="activeTab === 'awaiting_release'" scope="col" class="pick">
+                  <th v-if="activeTab === 'awaiting_release' && !isOrder(request)" scope="col" class="pick">
                     <input
                       type="checkbox"
                       :checked="allSelected(request)"
-                      :aria-label="`Select every reserved unit on ${request.reference_number}`"
+                      :aria-label="`Select every tagged unit on ${request.reference_number}`"
                       @change="toggleAll(request)"
                     >
                   </th>
@@ -183,7 +193,7 @@
               </thead>
               <tbody>
                 <tr v-for="allocation in request.allocations" :key="allocation.id">
-                  <td v-if="activeTab === 'awaiting_release'" class="pick">
+                  <td v-if="activeTab === 'awaiting_release' && !isOrder(request)" class="pick">
                     <input
                       v-if="allocation.status === 'allocated'"
                       type="checkbox"
@@ -226,26 +236,41 @@
               </tbody>
             </table>
 
-            <p v-else class="units-empty">No units are held against this request.</p>
+            <p v-else class="units-empty">{{ isOrder(request) ? 'Nothing is held for this order. Pick its units as you dispatch it.' : 'No units are tagged for this request.' }}</p>
           </div>
 
           <!-- ACTIONS -->
-          <footer v-if="activeTab === 'awaiting_release'" class="request-actions">
+          <!-- A confirmed replenishment order: nothing to return, the bags are picked as it goes. -->
+          <footer v-if="activeTab === 'awaiting_release' && isOrder(request)" class="request-actions">
+            <span class="selection-note">
+              {{ request.outstanding_quantity }} unit{{ request.outstanding_quantity === 1 ? '' : 's' }} to send
+            </span>
+            <button
+              class="ui-btn ui-btn--primary ui-btn--sm"
+              :disabled="busyId === request.id || !request.outstanding_quantity"
+              @click="openOrderDispatch(request)"
+            >
+              <AssetIcon v-if="busyId !== request.id" name="truck" :size="14" />
+              {{ busyId === request.id ? 'Working…' : 'Pick Units & Dispatch' }}
+            </button>
+          </footer>
+
+          <footer v-else-if="activeTab === 'awaiting_release'" class="request-actions">
             <span class="selection-note">
               {{ selectedCount(request) > 0
                 ? `${selectedCount(request)} unit(s) selected`
-                : 'Nothing selected — Dispatch sends every reserved unit.' }}
+                : 'Nothing selected — Dispatch sends every tagged unit.' }}
             </span>
             <button
               class="ui-btn ui-btn--sm"
-              :disabled="busyId === request.id || reservedCount(request) === 0"
+              :disabled="busyId === request.id || taggedCount(request) === 0"
               @click="openReturn(request)"
             >
               Return to Stock
             </button>
             <button
               class="ui-btn ui-btn--primary ui-btn--sm"
-              :disabled="busyId === request.id || reservedCount(request) === 0 || !gateFor(request).ok"
+              :disabled="busyId === request.id || taggedCount(request) === 0 || !gateFor(request).ok"
               @click="openDispatch(request)"
             >
               <AssetIcon v-if="busyId !== request.id" name="truck" :size="14" />
@@ -269,22 +294,6 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dispatch-title">
           <h2 id="dispatch-title" class="modal-title">Dispatch Units</h2>
           <p class="modal-sub">{{ dispatchFor.reference_number }} · {{ dispatchFor.requesting_facility?.name }}</p>
-
-          <p v-if="dispatchFor.weekly_request" class="modal-warning" role="note">
-            <strong>Weekly request {{ dispatchFor.weekly_request.reference_number }}</strong> goes out in one delivery.
-            <!-- Unclaimed counts what lay beyond the commitment too. -->
-            <template v-if="(dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity) > 0">
-              The {{ dispatchFor.unclaimed_quantity ?? dispatchFor.outstanding_quantity }} unit(s) not reserved will be
-              closed as not supplied — the hospital's next request day replaces them.
-            </template>
-            <template v-else>Everything requested is reserved, so nothing will be closed.</template>
-          </p>
-
-          <p v-if="dispatchFor.supply_plan" class="modal-desc">
-            Confirmed for <strong>{{ dispatchFor.supply_plan.handover_method === 'delivery' ? 'delivery' : 'pick-up' }}
-              on {{ handoverWhen(dispatchFor.supply_plan.scheduled_at) }}</strong><template v-if="dispatchFor.supply_plan.handover_address">,
-              {{ dispatchFor.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ dispatchFor.supply_plan.handover_address }}</template>.
-          </p>
 
           <ul class="modal-units">
             <li v-for="unit in dispatchUnits" :key="unit.id" class="mono">
@@ -313,6 +322,84 @@
             <button class="ui-btn" :disabled="busyId" @click="closeDispatch">Cancel</button>
             <button class="ui-btn ui-btn--primary" :disabled="busyId" @click="confirmDispatch">
               {{ busyId ? 'Dispatching…' : 'Dispatch' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- DISPATCH A REPLENISHMENT ORDER: the bags are picked and recorded as it goes (project owner, 2026-11-07). -->
+    <Teleport to="body">
+      <UnitPickerDialog
+        v-if="orderFor"
+        ref="orderPickerRef"
+        dispatch
+        :request="{ id: orderFor.id, code: orderFor.reference_number }"
+        :busy="Boolean(busyId)"
+        :error="actionError"
+        :unit-errors="orderUnitErrors"
+        @close="closeOrderDispatch"
+        @confirm="confirmOrderDispatch"
+      >
+        <template #details="{ picked }">
+          <p v-if="orderFor.weekly_request" class="modal-warning modal-warning--flush" role="note">
+            <strong>Weekly request {{ orderFor.weekly_request.reference_number }}</strong> goes out in one delivery.
+            <template v-if="orderFor.unclaimed_quantity > picked">
+              The {{ orderFor.unclaimed_quantity - picked }} unit(s) not picked will be
+              closed as not supplied — the hospital's next request day replaces them.
+            </template>
+            <template v-else>Everything requested is picked, so nothing will be closed.</template>
+          </p>
+
+          <p v-if="orderFor.supply_plan" class="modal-desc modal-desc--flush">
+            Confirmed for <strong>{{ orderFor.supply_plan.handover_method === 'delivery' ? 'delivery' : 'pick-up' }}
+              on {{ handoverWhen(orderFor.supply_plan.scheduled_at) }}</strong><template v-if="orderFor.supply_plan.handover_address">,
+              {{ orderFor.supply_plan.handover_method === 'delivery' ? 'to' : 'at' }} {{ orderFor.supply_plan.handover_address }}</template>.
+          </p>
+
+          <div class="field field--flush">
+            <label for="order-handed-to" class="field-label">
+              {{ handedToLabel(orderFor) }}
+              <span class="field-optional">optional</span>
+            </label>
+            <input
+              id="order-handed-to"
+              v-model.trim="handedTo"
+              type="text"
+              class="input"
+              maxlength="150"
+              :disabled="Boolean(busyId)"
+              :placeholder="handedToPlaceholder(orderFor)"
+            >
+          </div>
+        </template>
+      </UnitPickerDialog>
+    </Teleport>
+
+    <!-- DEFERRED PAYMENT -->
+    <Teleport to="body">
+      <div v-if="deferFor" class="modal-overlay" @click.self="closeDefer">
+        <div
+          v-focus-trap
+          class="modal"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="defer-title"
+          @dialog-escape="closeDefer"
+        >
+          <h2 id="defer-title" class="modal-title">Issue with Deferred Payment</h2>
+          <p class="modal-sub">{{ deferFor.reference_number }} · {{ deferFor.requesting_facility?.name }}</p>
+
+          <p class="modal-warning" role="note">
+            The units can be dispatched unpaid. <strong>{{ owedOn(deferFor) }}</strong> stays on the invoice for later settlement.
+          </p>
+
+          <p v-if="actionError" class="field-error field-error--block">{{ actionError }}</p>
+
+          <div class="modal-actions">
+            <button class="ui-btn" :disabled="busyId" @click="closeDefer">Cancel</button>
+            <button class="ui-btn ui-btn--primary" :disabled="busyId" @click="confirmDefer">
+              {{ busyId ? 'Deferring…' : 'Defer Payment' }}
             </button>
           </div>
         </div>
@@ -398,8 +485,10 @@ import SkeletonList from '~/components/ui/SkeletonList.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
+import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { bloodTypeCodes, handoverWhen, requestLineLabel, requestStatusLabel } from '~/types/bloodRequest'
+import { pesos } from '~/utils/billing'
 import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
@@ -407,9 +496,12 @@ import EmptyState from '~/components/ui/EmptyState.vue'
 /*
  * The fulfilment board (2026-10-31), shared by two pages split on the invoice:
  * Request Fulfillment (pages/blood-center/fulfillment.vue), requests with units
- * reserved whose invoice still has a balance, and For Dispatch
+ * tagged whose invoice still has a balance, and For Dispatch
  * (pages/blood-center/dispatch.vue), the ones cleared to go out and then those
  * waiting on the hospital's confirmation. `view` picks the page.
+ *
+ * A confirmed replenishment order holds nothing (project owner, 2026-11-07): it
+ * waits on For Dispatch, and its bags are picked and recorded as it goes.
  */
 const props = defineProps({
   view: { type: String, default: 'fulfillment', validator: v => ['fulfillment', 'dispatch'].includes(v) },
@@ -519,17 +611,33 @@ async function loadUnits(request) {
   }
 }
 
+/** What is still owed on a request's invoice, as it reads on screen. */
+function owedOn(request) {
+  return pesos(Number(request.billing?.total_amount ?? 0) - Number(request.billing?.collected ?? 0))
+}
+
 /**
  * Whether this request's statement clears its units for release.
  *
  * The server refuses the dispatch itself — this only explains the refusal
- * before somebody clicks into it.
+ * before somebody clicks into it. `canDefer` is the decision taken here: a
+ * walk-in must be settled first, anything else may go now and be settled
+ * afterwards (project owner, 2026-11-07).
  */
 function gateFor(request) {
   const billing = request.billing
 
+  // Its invoice is raised as it goes, and never waits on a payment here.
+  if (!billing && isOrder(request)) {
+    return { ok: true, message: 'Replenishment order, billed to the hospital by invoice when it is dispatched. Cleared for release.' }
+  }
+
   if (!billing) {
     return { ok: false, message: 'No invoice has been raised for this request yet.' }
+  }
+
+  if (billing.is_payment_deferred) {
+    return { ok: true, message: `Payment deferred. ${owedOn(request)} stays on the invoice for later settlement. Cleared for release.` }
   }
 
   if (billing.clears_release) {
@@ -546,19 +654,28 @@ function gateFor(request) {
     return { ok: true, message }
   }
 
-  const owed = Number(billing.total_amount ?? 0) - Number(billing.collected ?? 0)
+  if (request.is_walk_in) {
+    return { ok: false, message: `${owedOn(request)} outstanding. A walk-in must be fully settled before its units are issued.` }
+  }
+
   return {
     ok: false,
-    message: `₱${owed.toLocaleString(undefined, { minimumFractionDigits: 2 })} outstanding. Blood cannot be released until it is paid (cash or GCash) or subsidised.`,
+    canDefer: true,
+    message: `${owedOn(request)} outstanding. Settle it first, or issue now with deferred payment.`,
   }
 }
 
-function reservedUnits(request) {
+/** A replenishment order: nothing is tagged for it, its units are picked at dispatch. */
+function isOrder(request) {
+  return request.request_purpose === 'replenishment'
+}
+
+function taggedUnits(request) {
   return (request.allocations ?? []).filter((a) => a.status === 'allocated')
 }
 
-function reservedCount(request) {
-  return reservedUnits(request).length
+function taggedCount(request) {
+  return taggedUnits(request).length
 }
 
 function componentFor(request, allocation) {
@@ -589,12 +706,12 @@ function toggleUnit(request, allocationId) {
 }
 
 function allSelected(request) {
-  const reserved = reservedUnits(request)
-  return reserved.length > 0 && reserved.every((a) => isSelected(request, a.id))
+  const tagged = taggedUnits(request)
+  return tagged.length > 0 && tagged.every((a) => isSelected(request, a.id))
 }
 
 function toggleAll(request) {
-  request.selected = allSelected(request) ? [] : reservedUnits(request).map((a) => a.id)
+  request.selected = allSelected(request) ? [] : taggedUnits(request).map((a) => a.id)
 }
 
 /* DISPATCH */
@@ -602,13 +719,12 @@ const dispatchFor = ref(null)
 
 const dispatchUnits = computed(() => {
   if (!dispatchFor.value) return []
-  const reserved = reservedUnits(dispatchFor.value)
-  // No selection means the whole hold, which is what the API does with an
-  // omitted allocation_ids. A weekly request always goes whole: the API
-  // refuses to dispatch part of one.
-  return dispatchFor.value.selected.length && !dispatchFor.value.weekly_request
-    ? reserved.filter((a) => dispatchFor.value.selected.includes(a.id))
-    : reserved
+  const tagged = taggedUnits(dispatchFor.value)
+  // No selection means every tagged unit, which is what the API does with an
+  // omitted allocation_ids.
+  return dispatchFor.value.selected.length
+    ? tagged.filter((a) => dispatchFor.value.selected.includes(a.id))
+    : tagged
 })
 
 const dispatchCount = computed(() => dispatchUnits.value.length)
@@ -653,21 +769,109 @@ async function confirmDispatch() {
   actionError.value = ''
 
   try {
-    const ids = request.selected.length && !request.weekly_request ? request.selected : undefined
+    const ids = request.selected.length ? request.selected : undefined
     const response = await bloodCenterService.releaseRequest(request.id, ids, handedTo.value || null)
 
-    const issued = response?.released_units?.length ?? dispatchCount.value
-    const closedShort = (response?.closed_short ?? []).reduce((sum, line) => sum + (line.quantity ?? 0), 0)
-    toast(
-      'Units Dispatched',
-      'success',
-      `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}${response?.status_label ? ` — ${response.status_label}` : ''}.`
-        + (closedShort ? ` ${closedShort} unit(s) not supplied were closed.` : ''),
-    )
+    toastDispatched(request, response, dispatchCount.value)
     dispatchFor.value = null
     await load()
   } catch (err) {
     actionError.value = err?.message || 'Those units could not be dispatched.'
+  } finally {
+    busyId.value = null
+  }
+}
+
+function toastDispatched(request, response, fallbackCount) {
+  const issued = response?.released_units?.length ?? fallbackCount
+  const closedShort = (response?.closed_short ?? []).reduce((sum, line) => sum + (line.quantity ?? 0), 0)
+  toast(
+    'Units Dispatched',
+    'success',
+    `${issued} unit(s) issued to ${request.requesting_facility?.name || 'the hospital'}${response?.status_label ? ` — ${response.status_label}` : ''}.`
+      + (closedShort ? ` ${closedShort} unit(s) not supplied were closed.` : ''),
+  )
+}
+
+/* DISPATCH A REPLENISHMENT ORDER */
+const orderFor = ref(null)
+const orderPickerRef = ref(null)
+// Unit id → why the server would not send it, shown against its row.
+const orderUnitErrors = ref({})
+
+function openOrderDispatch(request) {
+  actionError.value = ''
+  orderUnitErrors.value = {}
+  handedTo.value = ''
+  orderFor.value = request
+}
+
+function closeOrderDispatch() {
+  if (busyId.value) return
+  orderFor.value = null
+}
+
+/** Send exactly the units picked; on a refusal, say which unit and why, and reload what is left. */
+async function confirmOrderDispatch(unitIds) {
+  const request = orderFor.value
+  if (!request || !unitIds?.length) return
+
+  busyId.value = request.id
+  actionError.value = ''
+  orderUnitErrors.value = {}
+
+  try {
+    const response = await bloodCenterService.dispatchOrder(request.id, unitIds, handedTo.value || null)
+
+    toastDispatched(request, response, unitIds.length)
+    orderFor.value = null
+    await load()
+  } catch (err) {
+    const byUnit = {}
+
+    for (const [key, messages] of Object.entries(err?.data?.errors ?? {})) {
+      const index = Number(key.split('.')[1])
+      if (key.startsWith('unit_ids.') && unitIds[index]) byUnit[unitIds[index]] = [messages].flat()[0]
+    }
+
+    orderUnitErrors.value = byUnit
+    actionError.value = Object.keys(byUnit).length
+      ? 'Some of the units picked could not be sent; nothing was dispatched. Change the pick and try again.'
+      : err?.message || 'Those units could not be dispatched.'
+    orderPickerRef.value?.reload()
+  } finally {
+    busyId.value = null
+  }
+}
+
+/* DEFERRED PAYMENT */
+const deferFor = ref(null)
+
+function openDefer(request) {
+  actionError.value = ''
+  deferFor.value = request
+}
+
+function closeDefer() {
+  if (busyId.value) return
+  deferFor.value = null
+}
+
+// The request moves to For Dispatch, so that is where staff land, ready to send it.
+async function confirmDefer() {
+  const request = deferFor.value
+  if (!request) return
+
+  busyId.value = request.id
+  actionError.value = ''
+
+  try {
+    const response = await bloodCenterService.deferPayment(request.id)
+    toast('Payment Deferred', 'success', response?.message ?? 'The units can be dispatched.')
+    deferFor.value = null
+    await navigateTo({ path: '/blood-center/dispatch', query: { request: request.id } })
+  } catch (err) {
+    actionError.value = err?.message || 'The payment could not be deferred.'
   } finally {
     busyId.value = null
   }
@@ -761,7 +965,7 @@ const returnReason = ref('')
 
 const returnCount = computed(() => {
   if (!returnFor.value) return 0
-  return returnFor.value.selected.length || reservedCount(returnFor.value)
+  return returnFor.value.selected.length || taggedCount(returnFor.value)
 })
 
 function openReturn(request) {
@@ -890,6 +1094,8 @@ onMounted(load)
 .gate--ok { background: rgba(var(--rb-success-rgb), .08); color: var(--rb-success-text); border: 1px solid rgba(var(--rb-success-rgb), .2); }
 .gate--blocked { background: rgba(var(--rb-accent-rgb), .07); color: var(--rb-accent-text); border: 1px solid rgba(var(--rb-accent-rgb), .22); }
 .gate-link { margin-left: auto; font-weight: 700; color: inherit; text-decoration: underline; }
+.gate-action { margin-left: auto; }
+.gate-link + .gate-action { margin-left: 4px; }
 
 .units { margin-top: 12px; }
 .units-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -953,6 +1159,8 @@ onMounted(load)
 .modal-title { font-size: 17px; font-weight: 700; color: var(--rb-text-primary); margin: 0 0 3px; }
 .modal-sub { font-size: 12.5px; color: var(--rb-text-secondary); margin: 0 0 14px; }
 .modal-desc { font-size: 13px; color: var(--rb-text-secondary); margin: 0 0 14px; }
+/* Beside the pick, in the unit picker's own body. */
+.modal-warning--flush, .modal-desc--flush, .field--flush { margin: 0; }
 .modal-units { list-style: none; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--rb-border); border-radius: 9px; max-height: 160px; overflow-y: auto; }
 .modal-units li { padding: 2px 0; color: var(--rb-text-primary); }
 .unit-expiry { font-family: var(--rb-font-sans); font-weight: 400; color: var(--rb-text-secondary); }

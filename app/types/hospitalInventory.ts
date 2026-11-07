@@ -124,6 +124,11 @@ export interface HospitalUnit {
   stocked_by?: string | null
   storage_location?: string | null
   /**
+   * Held for a blood donor partner (project owner, 2026-11-07). The bag keeps
+   * its status, may still be tagged, and stays reserved after a tag ends.
+   */
+  partner_reservation?: HospitalPartnerReservation | null
+  /**
    * Where the bag came from: the request it was received for — the PTR, when
    * it was a patient's share — or a delivery from outside RedAgos.
    */
@@ -150,6 +155,12 @@ export interface HospitalUnit {
   discard_reason: string | null
 }
 
+export interface HospitalPartnerReservation {
+  partner: string
+  reserved_at: string | null
+  reserved_by: string | null
+}
+
 export interface HospitalInventorySummary {
   totals: Record<HospitalUnitStatus, number>
   by_blood_type: Array<{ blood_type_id: number; code: string; available: number }>
@@ -164,8 +175,8 @@ export interface HospitalInventorySummary {
 }
 
 export interface HospitalInventoryFilters {
-  /** A status, or `tagged` for both tag stages at once. */
-  status?: HospitalUnitStatus | 'tagged'
+  /** A status, `tagged` for both tag stages at once, or `reserved` for untagged bags held for a donor partner. */
+  status?: HospitalUnitStatus | 'tagged' | 'reserved'
   blood_type_id?: number
   component_id?: number
   transfusion_request_id?: number
@@ -182,8 +193,12 @@ export interface InventorySheetCell {
   bag_number: string
   blood_type: string | null
   expiry_date: string | null
-  /** Tagged to a patient and still waiting for its crossmatch. */
+  /** Tagged to a patient and still waiting for its crossmatch: printed pink, (T). */
   tagged: boolean
+  /** Untagged and reserved for a blood donor partner: printed purple, (R). */
+  reserved: boolean
+  /** In CROSSMATCHED, transfused during the day: printed green, (TF). The rest there print blue. */
+  transfused: boolean
 }
 
 export interface InventorySheetColumn {
@@ -212,7 +227,8 @@ export interface HospitalInventorySheet {
   as_of: string
   as_of_date: string
   as_of_time: string
-  totals: { crossmatched: number; uncrossmatched: number }
+  /** Crossmatched counts the bags still waiting for their transfusion; transfused, the day's transfusions (absent on reports kept before 2026-11-07). */
+  totals: { crossmatched: number; uncrossmatched: number; transfused?: number }
   sheets: InventorySheetPage[]
   /** What it was configured to cover: component codes and blood type codes. */
   components: string[]
@@ -230,7 +246,8 @@ export interface HospitalInventoryReportRecord {
   /** Component and blood type codes it covered. */
   components: string[]
   blood_types: string[]
-  totals: { crossmatched: number; uncrossmatched: number }
+  /** Crossmatched counts the bags still waiting for their transfusion; transfused, the day's transfusions (absent on reports kept before 2026-11-07). */
+  totals: { crossmatched: number; uncrossmatched: number; transfused?: number }
   pages: number
   file_size: number
   filename: string
@@ -244,6 +261,8 @@ export type HospitalActivityKind =
   | 'crossmatched'
   | 'transfused'
   | 'untagged'
+  | 'reserved'
+  | 'unreserved'
   | 'returned'
   | 'discarded'
   | 'expired'
@@ -355,6 +374,8 @@ export const UNIT_REFUSAL_MESSAGES: Record<string, string> = {
   unit_not_discardable: 'This bag cannot be discarded as it stands. Release its tag first.',
   transfusion_request_not_found: 'That blood request was not found.',
   transfusion_request_closed: 'That blood request was cancelled. Tag the bag to the patient directly instead.',
+  unit_already_reserved: 'That bag is already reserved for a blood donor partner. The list has been refreshed.',
+  unit_not_reserved: 'That bag is no longer reserved. The list has been refreshed.',
 }
 
 /** Status filter options, in lifecycle order. */

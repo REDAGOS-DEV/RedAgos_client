@@ -59,6 +59,20 @@ describe('the hospital inventory page', () => {
     expect(source('app/components/Hospital/BloodTypeAvailability.vue')).toContain('{ to: `/hospital/inventory?blood_type_id=${card.id}` }')
   })
 
+  it('opens Tag History on what a dashboard Untagged tile counts (project owner, 2026-11-07)', () => {
+    const dashboard = source('app/pages/hospital/dashboard.vue')
+    expect(dashboard).toContain('label="Untagged Crossmatch" :value="untaggedCrossmatched"')
+    expect(dashboard).toContain('to="/hospital/inventory?tag_status=untagged_crossmatched&untag_reason=transfusion_deadline_expired"')
+    expect(dashboard).toContain('label="Untagged Assigned" :value="untaggedAssigned"')
+    expect(dashboard).toContain('to="/hospital/inventory?tag_status=untagged_assigned&untag_reason=crossmatch_deadline_expired"')
+    expect(dashboard).toContain('data.untagged_crossmatched')
+    expect(dashboard).toContain('data.untagged_assigned')
+
+    expect(page).toContain('if (startTagStatus || startUntagReason) openTagHistory()')
+    expect(page).toContain('status: startTagStatus, untagReason: startUntagReason')
+    expect(page).toContain('untag_reason: eventFilters.untagReason || undefined')
+  })
+
   it('leaves stock-in to Stock Intake (project owner, 2026-10-28)', () => {
     expect(page).not.toContain('hospitalService.stockIn(')
     expect(page).not.toContain('matchStockInScan')
@@ -93,6 +107,29 @@ describe('the hospital inventory page', () => {
     expect(page).toContain("dialog?.kind === 'release'")
     expect(page).toContain("dialog?.kind === 'discard'")
     expect(source('app/components/Hospital/UnitReasonDialog.vue')).toContain(":disabled=\"busy || !reason.trim()\"")
+  })
+
+  it('reserves a bag for a blood donor partner from its menu or drawer (project owner, 2026-11-07)', () => {
+    expect(page).toContain("reserve: { label: 'Reserve for blood donor partner', icon: 'lock' }")
+    expect(page).toContain("unreserve: { label: 'Release reservation', icon: 'unlock' }")
+    // Offered on an untagged bag in date, and released while the bag is still here.
+    expect(page).toContain("...(!reserved && unit.status === 'available' && !unit.bag_expired ? ['reserve'] : [])")
+    expect(page).toContain("...(reserved && ON_HAND.includes(unit.status) ? ['unreserve'] : [])")
+    expect(page).toContain("dialog?.kind === 'reserve'")
+    expect(page).toContain('hospitalService.reserveUnit(unit.unit_id, partner)')
+    expect(page).toContain('hospitalService.unreserveUnit(unit.unit_id)')
+    // Listed, badged and named in the report's purple.
+    expect(page).toContain("{ value: 'reserved', label: 'Reserved for partner' }")
+    expect(page).toContain('hospitalUnitStatusTag(unit.status, unit.days_remaining, Boolean(unit.partner_reservation))')
+    expect(page).toContain('--inv-partner: #7B1FA2;')
+    expect(page).toContain('Reserved For')
+
+    const service = source('app/api/hospital/HospitalService.ts')
+    expect(service).toContain('`/hospital/inventory/${encodeURIComponent(unit)}/reserve`, \'POST\', { partner }')
+    expect(service).toContain('`/hospital/inventory/${encodeURIComponent(unit)}/unreserve`, \'POST\'')
+
+    // Tagging is still open, with the partner named.
+    expect(source('app/components/Hospital/TagUnitDialog.vue')).toContain('Reserved for blood donor partner {{ unit.partner_reservation.partner }}.')
   })
 })
 
@@ -189,6 +226,25 @@ describe('the hospital Inventory Report', () => {
     expect(page).toContain('<CenterModal')
     expect(page).toContain('URL.revokeObjectURL(viewing.value.url)')
     expect(page).not.toContain('window.open')
+  })
+
+  it('colour codes each section as the PDF does (project owner, 2026-11-07)', () => {
+    // Both the bag and its expiry take the colour; the marks stay for a grey copy.
+    expect(page.match(/:class="cellTone\(column\.cells\[row - 1\], section\.key\)"/g)).toHaveLength(2)
+    // CROSSMATCHED: waiting for transfusion blue, transfused green.
+    expect(page).toContain("if (section === 'crossmatched') return cell.transfused ? 'form__cell--transfused' : 'form__cell--waiting'")
+    expect(page).toContain('.form__cell--waiting { color: #1565C0; }')
+    expect(page).toContain('.form__cell--transfused { color: #2E7D32; }')
+    expect(page).toContain('title="Transfused today">(TF)</abbr>')
+    // UNCROSSMATCHED: tagged pink, reserved purple, the rest black.
+    expect(page).toContain("if (cell.tagged) return 'form__cell--tagged'")
+    expect(page).toContain("return cell.reserved ? 'form__cell--reserved' : ''")
+    expect(page).toContain('.form__cell--tagged { color: #D81B60; }')
+    expect(page).toContain('.form__cell--reserved { color: #7B1FA2; }')
+    expect(page).toContain('title="Tagged to a patient, waiting for crossmatch">(T)</abbr>')
+    expect(page).toContain('title="Reserved for a blood donor partner">(R)</abbr>')
+    // The day's transfusions are counted apart from the bags still here.
+    expect(page).toContain("{ label: 'Transfused today', value: transfusedTotal.value }")
   })
 
   it('names the pages of the other components that follow the form', () => {

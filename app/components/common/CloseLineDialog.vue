@@ -32,7 +32,7 @@
       </p>
 
       <p v-if="row.reserved > 0" class="dialog__hint">
-        {{ row.reserved }} reserved unit{{ row.reserved === 1 ? ' stays' : 's stay' }} reserved and can still be released.
+        {{ row.reserved }} tagged unit{{ row.reserved === 1 ? ' stays' : 's stay' }} tagged and can still be released.
       </p>
 
       <label class="field">

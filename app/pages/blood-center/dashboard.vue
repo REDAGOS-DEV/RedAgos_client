@@ -218,7 +218,7 @@
             <div v-else class="chart-body">
               <div class="chart-legend">
                 <span class="legend-item"><span class="legend-dot" style="background: var(--rb-primary)" />Available Units</span>
-                <span class="legend-item"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved Units</span>
+                <span class="legend-item"><span class="legend-dot" style="background: var(--rb-accent)" />Tagged Units</span>
               </div>
 
               <div class="line-chart-wrap" @mouseleave="hoveredPointIndex = null">
@@ -271,7 +271,7 @@
                 >
                   <p class="chart-tooltip__label">{{ availablePoints[hoveredPointIndex].label }}</p>
                   <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-primary)" />Available: {{ availablePoints[hoveredPointIndex].value }}</p>
-                  <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-accent)" />Reserved: {{ reservedPoints[hoveredPointIndex].value }}</p>
+                  <p class="chart-tooltip__row"><span class="legend-dot" style="background: var(--rb-accent)" />Tagged: {{ reservedPoints[hoveredPointIndex].value }}</p>
                 </div>
               </div>
             </div>

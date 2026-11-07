@@ -111,7 +111,7 @@ export const useIncomingRequests = () => {
    * Open one request beside the live stock that could fill it.
    *
    * Reading holds nothing — the availability figure is advisory, and
-   * allocation re-checks every unit under a lock before reserving.
+   * allocation re-checks every unit under a lock before tagging.
    */
   async function openRequest(id) {
     isLoadingDetail.value = true

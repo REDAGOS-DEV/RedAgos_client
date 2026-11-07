@@ -10,7 +10,7 @@
  * owner, 2026-10-10). Gitangtang ang mock ug ang payBilling, kay ang server na
  * ang tinuod nga tinubdan ug walay amount nga gikan sa browser.
  *
- * A request with no statement yet (nothing reserved) answers 404
+ * A request with no statement yet (nothing tagged or dispatched) answers 404
  * `billing_missing`; that is a state, not an error, and reads as "no
  * statement yet".
  */
@@ -41,7 +41,7 @@ export const useBloodRequestBilling = (requestId) => {
       statements.value = []
       receipts.value = []
 
-      // No statement yet is a normal state for a request nothing was reserved for.
+      // No statement yet is a normal state for a request nothing was tagged or sent for.
       if (err?.data?.code !== 'billing_missing') {
         billingError.value = err?.message || 'Could not load the billing for this request.'
       }

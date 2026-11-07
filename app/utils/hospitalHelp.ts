@@ -214,6 +214,30 @@ export const HOSPITAL_HELP_GUIDES: HospitalHelpGuide[] = [
     ],
   },
   {
+    id: 'reserve-for-partner',
+    title: 'Reserve a bag for a blood donor partner',
+    department: 'Stock and Supply',
+    path: '/hospital/inventory',
+    pageLabel: 'Blood Bank Inventory',
+    requires: 'hospital.inventory.handle',
+    summary: 'Hold a bag on the shelf for a blood donor partner. It prints purple on the Inventory Report.',
+    steps: [
+      'On Blood Bank Inventory, open the bag or its row menu, then press Reserve for blood donor partner.',
+      'Type the partner\'s name and press Reserve bag. The bag shows as Reserved, with the partner under it.',
+      'When the partner no longer needs it, press Release reservation.',
+    ],
+    questions: [
+      {
+        q: 'Can a reserved bag be tagged to a patient?',
+        a: 'Yes. While tagged it prints pink, and if the tag ends the bag is reserved for the partner again.',
+      },
+      {
+        q: 'How do I list the reserved bags?',
+        a: 'Set Status to Reserved for partner.',
+      },
+    ],
+  },
+  {
     id: 'read-inventory',
     title: 'Read your inventory',
     department: 'Stock and Supply',
@@ -272,8 +296,8 @@ export const HOSPITAL_HELP_GUIDES: HospitalHelpGuide[] = [
         a: 'Only bags in date on your shelf, as of the moment you generate it. It is not created on its own: someone has to press Generate Report.',
       },
       {
-        q: 'What does (T) mean on a sheet?',
-        a: 'The bag is tagged to a patient and still waiting for its crossmatch.',
+        q: 'What do the colours and marks mean on a sheet?',
+        a: 'Under Crossmatched, a blue bag is waiting for its transfusion, and a green bag, marked (TF), was transfused that day. Under Uncrossmatched, a black bag is on the shelf and not tagged, a pink bag, marked (T), is tagged to a patient and still waiting for its crossmatch, and a purple bag, marked (R), is reserved for a blood donor partner.',
       },
     ],
   },

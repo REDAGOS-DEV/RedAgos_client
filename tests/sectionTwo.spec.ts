@@ -292,8 +292,20 @@ describe('the counter', () => {
     expect(page).toContain('ended_at: atTimeOn(day, collectionForm.ended_time)')
   })
 
-  it('never sends a phlebotomist: that is whoever is signed in', () => {
+  it('never sends the recording account: that is whoever is signed in', () => {
     expect(page).not.toMatch(/collected_by\s*:/)
+  })
+
+  it('can name another phlebotomist, and shows who will be on the record (project owner, 2026-11-06)', () => {
+    expect(page).toContain('Other phlebotomist')
+    expect(page).toContain('phlebotomist_name: collectionForm.phlebotomist_name.trim() || null')
+    expect(page).toContain('const phlebotomistName = computed(() => collectionForm.phlebotomist_name.trim()')
+  })
+
+  it('opens a correction on the name saved, falling back on who recorded the bag', () => {
+    expect(page).toContain("phlebotomist_name: saved.phlebotomist_name ?? ''")
+    expect(page).toContain('phlebotomist_name: saved.phlebotomist_name ?? null')
+    expect(page).toContain("correcting.value === 'collection' ? donation.value?.collection?.recorded_by")
   })
 
   it('does not let a scanner\'s Enter submit half a record', () => {
@@ -370,7 +382,7 @@ describe('navigation', () => {
 describe('the incoming request queue', () => {
   const page = source('app/pages/blood-center/bloodrequests.vue')
 
-  it('offers reserving to whoever allocates and declining to whoever decides', () => {
+  it('offers tagging to whoever allocates and declining to whoever decides', () => {
     expect(page).toContain("const canAllocate = computed(() => can('requests.process'))")
     expect(page).toContain("const canDecide = computed(() => can('requests.approve'))")
     expect(page).not.toMatch(/<button(?![^>]*v-(else-)?if="canAllocate")[^>]*@click="(openMenuId = null; )?requestApprove/)

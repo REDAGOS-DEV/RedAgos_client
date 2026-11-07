@@ -14,7 +14,7 @@
         <span class="allocation__component">{{ item.component?.name || '—' }}</span>
         <span class="allocation__figures">
           Asked {{ item.quantity }}
-          <template v-if="(item.reserved_quantity ?? 0) > 0"> · {{ item.reserved_quantity }} reserved</template>
+          <template v-if="(item.reserved_quantity ?? 0) > 0"> · {{ item.reserved_quantity }} tagged</template>
           <template v-if="(item.fulfilled_quantity ?? 0) > 0"> · {{ item.fulfilled_quantity }} released</template>
           <template v-if="(item.received_quantity ?? 0) > 0"> · {{ item.received_quantity }} received</template>
         </span>
@@ -56,7 +56,7 @@
  * One facility's share of a Patient Transfusion Request, as the hospital sees it.
  *
  * Each share is reviewed by its centre on its own — approved (units
- * reserved), refused with a reason, released — so each gets its own card. The
+ * tagged), refused with a reason, released — so each gets its own card. The
  * allocation's page, linked from here, is where its receipt is confirmed and
  * its DOH form printed.
  */

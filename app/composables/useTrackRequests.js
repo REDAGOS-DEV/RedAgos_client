@@ -60,9 +60,10 @@ export const useTrackRequests = () => {
     }
 
     for (const allocation of req.allocations ?? []) {
-      if (allocation.allocated_at) {
+      // A replenishment order's unit is picked as it is dispatched, never tagged.
+      if (allocation.allocated_at && req.request_purpose !== 'replenishment') {
         entries.push({
-          label: `Unit ${allocation.unit_id} reserved`,
+          label: `Unit ${allocation.unit_id} tagged`,
           at: allocation.allocated_at,
           tone: 'progress',
         })

@@ -179,11 +179,11 @@
     <BloodCenterDonorQuestionnaire
       v-if="canReadQuestionnaire && questionnaireOpen && questionnaire"
       :data="questionnaire"
-      :intake="intakeForm"
-      :can-edit-intake="Boolean(donation)"
+      :donor-uuid="donor?.uuid"
+      :can-amend="canAmendQuestionnaire"
       @close="questionnaireOpen = false"
       @print="printQuestionnaire"
-      @update-intake="(key, value) => { intakeForm[key] = value }"
+      @amended="questionnaire = $event"
     />
 
     <!-- Progress through the one continuous transaction. -->
@@ -308,14 +308,6 @@
         This screening is already saved. Change what was entered wrongly; the corrected record goes to the Center
         Admin to approve.
       </p>
-      <!--
-        Sleep, Meal, Meds and Allergies are not here. They are printed in the
-        top margin of the donor's questionnaire sheet, so that is where staff
-        fill them in — inside the drawer under Review questionnaire, which is
-        the only part of that document the counter writes. They still travel to
-        the server with this form, because they describe the visit it records.
-      -->
-
       <!--
         All six before accepting or deferring (project owner, 2026-10-24),
         each against its normal range for this donor: the server sends the
@@ -509,6 +501,11 @@
           <span class="field__label">Volume collected</span>
           <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
         </label>
+
+        <label class="field">
+          <span class="field__label">Other phlebotomist</span>
+          <input v-model="collectionForm.phlebotomist_name" type="text" class="field__input" autocomplete="off" maxlength="120" >
+        </label>
       </div>
 
       <p class="card__hint">
@@ -696,13 +693,15 @@ const canReadQuestionnaire = computed(() => can('donors.view_questionnaire'))
 // it; neither is the physician's review read above.
 const canPrintQuestionnaire = computed(() => can('donors.print_questionnaire'))
 const canRecordQuestionnaire = computed(() => can('donors.record_questionnaire'))
+// Until the screening is saved; the server holds the same line.
+const canAmendQuestionnaire = computed(() => canScreen.value && stage.value === 'screening')
 const canViewDonors = computed(() => can('donors.view_contact'))
 
 const service = bloodCenterService
 
 const {
   donor, arrival, appointment, donation, stage, busy, error, notice, isDeferred,
-  priorDeferral, intakeForm,
+  priorDeferral,
   questionnaireMeta, questionnaire, questionnaireOpen, questionnaireError, questionnaireLoading,
   loadQuestionnaire, adoptQuestionnaireReference,
   bringUp, adoptArrival, checkIn, markNoShow, openDonation, recordScreening, recordCollection, reset,
@@ -889,11 +888,12 @@ async function confirmDeferral(choice) {
  * Section II, "For Phlebotomist Use Only".
  *
  * No bag is pre-selected: single, double and triple decide what the bag can be
- * separated into, so it has to be a deliberate choice. The phlebotomist is not
- * a field at all — it is whoever is signed in.
+ * separated into, so it has to be a deliberate choice. The phlebotomist is
+ * whoever is signed in, unless another name is given for a bag someone else
+ * drew (project owner, 2026-11-06); the signed-in account stays on the record.
  */
 function blankCollection() {
-  return { blood_bag_type: '', donation_barcode: '', started_time: '', ended_time: '', volume_ml: 450 }
+  return { blood_bag_type: '', donation_barcode: '', started_time: '', ended_time: '', volume_ml: 450, phlebotomist_name: '' }
 }
 
 const collectionForm = reactive(blankCollection())
@@ -908,7 +908,11 @@ watch(stage, (now) => {
   if (now === 'collection') nextTick(() => barcodeInput.value?.focus())
 })
 
-const phlebotomistName = computed(() => user.value?.full_name
+// A correction falls back on whoever recorded the bag, not on whoever is
+// correcting it now.
+const phlebotomistName = computed(() => collectionForm.phlebotomist_name.trim()
+  || (correcting.value === 'collection' ? donation.value?.collection?.recorded_by : '')
+  || user.value?.full_name
   || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ')
   || 'You')
 
@@ -1039,12 +1043,6 @@ async function submitScreening(outcome) {
     if (screeningForm[key] !== null && screeningForm[key] !== '') payload[key] = screeningForm[key]
   }
 
-  // Filled in the questionnaire drawer, where the form prints them, and
-  // carried here because they belong to the screening this call records.
-  for (const key of ['sleep', 'meal', 'meds', 'allergies']) {
-    if (intakeForm[key].trim()) payload[key] = intakeForm[key].trim()
-  }
-
   if (screeningForm.notes.trim()) payload.notes = screeningForm.notes.trim()
 
   if (screeningForm.fingerprick_blood_type_id) {
@@ -1060,7 +1058,16 @@ async function submitScreening(outcome) {
   if (needsQuestionnaire.value && dhqOnPaper.value) payload.dhq_on_paper = true
 
   if (correcting.value === 'screening') {
-    correction.value = { subject: 'screening', changes: payload, previous: donation.value?.screening ?? null }
+    const saved = donation.value?.screening ?? null
+
+    // A correction replaces the whole screening, and one saved earlier may hold
+    // these four, which the counter no longer asks: sent back as saved, or
+    // approving the correction would erase them.
+    for (const key of ['sleep', 'meal', 'meds', 'allergies']) {
+      if (saved?.[key]) payload[key] = saved[key]
+    }
+
+    correction.value = { subject: 'screening', changes: payload, previous: saved }
     deferring.value = false
     return
   }
@@ -1085,6 +1092,7 @@ async function submitCollection() {
     donation_barcode: normalizeBarcode(collectionForm.donation_barcode),
     started_at: atTimeOn(day, collectionForm.started_time),
     ended_at: atTimeOn(day, collectionForm.ended_time),
+    phlebotomist_name: collectionForm.phlebotomist_name.trim() || null,
   }
 
   if (correcting.value === 'collection') {
@@ -1097,6 +1105,7 @@ async function submitCollection() {
         donation_barcode: saved.donation_barcode,
         started_at: saved.started_at,
         ended_at: saved.ended_at,
+        phlebotomist_name: saved.phlebotomist_name ?? null,
       } : null,
     }
     return
@@ -1143,6 +1152,7 @@ function startCollectionCorrection() {
     started_time: hhmm(saved.started_at),
     ended_time: hhmm(saved.ended_at),
     volume_ml: donation.value?.volume_ml ?? 450,
+    phlebotomist_name: saved.phlebotomist_name ?? '',
   })
 
   collectionAttempted.value = false

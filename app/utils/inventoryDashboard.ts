@@ -81,7 +81,7 @@ export function unitStatusTag(status: string, daysRemaining: number | null): Inv
 
   const tags: Record<string, InventoryTag> = {
     available: { label: 'Available', tone: 'success' },
-    reserved: { label: 'Reserved', tone: 'neutral' },
+    reserved: { label: 'Tagged', tone: 'neutral' },
     quarantined: { label: 'Quarantined', tone: 'neutral' },
     issued: { label: 'Issued', tone: 'neutral' },
     expired: { label: 'Expired', tone: 'danger' },
@@ -94,7 +94,7 @@ export function unitStatusTag(status: string, daysRemaining: number | null): Inv
 /** Whether a unit can be handed out now, and if not, why not in a word. */
 export function unitAvailability(status: string): InventoryTag {
   if (status === 'available') return { label: 'In Stock', tone: 'success' }
-  if (status === 'reserved') return { label: 'Reserved', tone: 'neutral' }
+  if (status === 'reserved') return { label: 'Tagged', tone: 'neutral' }
   if (status === 'quarantined') return { label: 'On Hold', tone: 'neutral' }
 
   // Issued, expired or discarded: gone, which is not in itself a fault.
@@ -189,7 +189,7 @@ export interface ActivityKindMeta {
 const ACTIVITY_KINDS: Record<string, ActivityKindMeta> = {
   booked_in: { label: 'Booked In', icon: 'circle-plus', tone: 'neutral' },
   released: { label: 'Released to Stock', icon: 'package-check', tone: 'neutral' },
-  reserved: { label: 'Reserved', icon: 'clipboard-list', tone: 'neutral' },
+  reserved: { label: 'Tagged', icon: 'clipboard-list', tone: 'neutral' },
   issued: { label: 'Issued', icon: 'send', tone: 'neutral' },
   hold_returned: { label: 'Hold Returned', icon: 'unlock', tone: 'neutral' },
   updated: { label: 'Details Updated', icon: 'pencil', tone: 'neutral' },

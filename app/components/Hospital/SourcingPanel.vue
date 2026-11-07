@@ -13,7 +13,7 @@
       <p class="sourcing__advisory">
         <AssetIcon name="shield-check" :size="14" />
         <span>
-          Stock as of {{ formatTime(plan.as_of) }}, earliest expiry first. Nothing is reserved until each facility
+          Stock as of {{ formatTime(plan.as_of) }}, earliest expiry first. Nothing is tagged until each facility
           approves its own allocation.
         </span>
       </p>
