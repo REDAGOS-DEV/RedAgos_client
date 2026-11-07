@@ -31,6 +31,14 @@ describe('a hospital bag\'s status tag', () => {
     expect(hospitalUnitStatusTag('transfused', 3).tone).toBe('muted')
     expect(hospitalUnitStatusTag('discarded', 3).tone).toBe('muted')
   })
+
+  it('reads an untagged bag held for a blood donor partner as Reserved, in purple (project owner, 2026-11-07)', () => {
+    expect(hospitalUnitStatusTag('available', 30, true)).toEqual({ label: 'Reserved', tone: 'partner' })
+    // Its date still shows in Remaining Days; the badge names the reservation.
+    expect(hospitalUnitStatusTag('available', 2, true)).toEqual({ label: 'Reserved', tone: 'partner' })
+    // Once tagged, the tag stage is what the badge says.
+    expect(hospitalUnitStatusTag('tag_assigned', 30, true).label).toBe('Tag Assigned')
+  })
 })
 
 describe('a hospital bag\'s remaining days', () => {
@@ -48,7 +56,7 @@ describe('a hospital bag\'s remaining days', () => {
 
 describe('the hospital activity feed', () => {
   it('names every kind the server sends', () => {
-    for (const kind of ['received', 'stocked', 'tagged', 'crossmatched', 'transfused', 'untagged', 'returned', 'discarded', 'expired']) {
+    for (const kind of ['received', 'stocked', 'tagged', 'crossmatched', 'transfused', 'untagged', 'reserved', 'unreserved', 'returned', 'discarded', 'expired']) {
       expect(hospitalActivityKindMeta(kind).label).not.toBe('Updated')
     }
   })

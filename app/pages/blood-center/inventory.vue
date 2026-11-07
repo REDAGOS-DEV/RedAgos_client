@@ -852,7 +852,7 @@ const kpis = computed(() => {
     },
     {
       key: 'reserved',
-      label: 'Reserved for Requests',
+      label: 'Tagged for Patients',
       value: formatCount(summary.value?.totals?.reserved),
       sub: 'units',
       icon: 'clipboard-list',

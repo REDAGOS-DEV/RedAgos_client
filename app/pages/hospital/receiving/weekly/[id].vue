@@ -82,7 +82,7 @@
 
         <p v-if="weekly.is_open" class="note">
           <AssetIcon name="info" :size="14" />
-          The center supplies what it can. When it dispatches, anything it did not reserve is closed as not supplied —
+          The center supplies what it can. When it dispatches, anything it did not send is closed as not supplied —
           your next request day's order takes its place.
         </p>
 

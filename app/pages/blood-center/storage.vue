@@ -251,14 +251,14 @@
               <small>to release</small>
             </span>
             <p class="release__label">
-              {{ awaitingRelease === 1 ? 'request has' : 'requests have' }} units allocated and waiting to be released.
+              {{ awaitingRelease === 1 ? 'request is' : 'requests are' }} waiting to be dispatched.
             </p>
           </div>
           <p class="release__note">
             <AssetIcon name="info" :size="15" />
-            Units go out once paid or met by the government subsidy.
+            Units go out once paid, met by the government subsidy, or with payment deferred.
           </p>
-          <NuxtLink v-if="canRelease" to="/blood-center/fulfillment" class="btn-primary btn-primary--block">
+          <NuxtLink v-if="canRelease" to="/blood-center/dispatch" class="btn-primary btn-primary--block">
             View pending releases
             <AssetIcon name="arrow-right" :size="14" />
           </NuxtLink>
@@ -268,7 +268,7 @@
       <!-- ============ STOCK, LAST 8 DAYS ============ -->
       <!--
         Each type's count is on its tile above; what the tiles cannot show is
-        how the shelf has moved. Available, expiring and reserved, day by day,
+        how the shelf has moved. Available, expiring and tagged, day by day,
         in the tiles' colours.
       -->
       <section class="panel trend-panel" aria-labelledby="trend-title">
@@ -500,7 +500,7 @@ const kpis = computed(() => {
       alert: expired > 0 ? `${formatCount(expired)} expired, awaiting discard` : null,
     },
     {
-      key: 'reserved', label: 'Reserved', value: totals?.reserved ?? null,
+      key: 'reserved', label: 'Tagged', value: totals?.reserved ?? null,
       caption: 'Allocated to requests', icon: 'package', to: canRelease.value ? '/blood-center/fulfillment' : null,
       change: stockWeekChange(trend.value, 'reserved'), spark: sparkFor('reserved'),
     },
@@ -513,7 +513,7 @@ const kpis = computed(() => {
 const SEGMENTS = [
   { key: 'fresh', label: 'Available' },
   { key: 'expiring', label: 'Expiring (≤7 days)' },
-  { key: 'reserved', label: 'Reserved' },
+  { key: 'reserved', label: 'Tagged' },
 ]
 
 const SEGMENT_LABEL = Object.fromEntries(SEGMENTS.map((segment) => [segment.key, segment.label]))
@@ -597,7 +597,7 @@ const requestChips = computed(() => {
 const TREND_SERIES = [
   { key: 'available', label: 'Available', short: 'available', seg: 'fresh' },
   { key: 'expiring_soon', label: 'Expiring (≤7 days)', short: 'expiring', seg: 'expiring' },
-  { key: 'reserved', label: 'Reserved', short: 'reserved', seg: 'reserved' },
+  { key: 'reserved', label: 'Tagged', short: 'tagged', seg: 'reserved' },
 ]
 const trendScale = computed(() => niceScale(Math.max(0, ...trend.value.flatMap(p => TREND_SERIES.map(sr => p[sr.key] ?? 0)))))
 const trendHeight = v => Math.min(100, ((v ?? 0) / trendScale.value.max) * 100)
@@ -611,7 +611,7 @@ const trendLines = computed(() => {
   })
 })
 const trendDay = d => (d ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
-const trendLabel = computed(() => `Stock over the last ${trend.value.length} days: ${trend.value.map(p => `${trendDay(p.date)} ${p.available ?? 0} available, ${p.expiring_soon ?? 0} expiring, ${p.reserved ?? 0} reserved`).join('; ')}.`)
+const trendLabel = computed(() => `Stock over the last ${trend.value.length} days: ${trend.value.map(p => `${trendDay(p.date)} ${p.available ?? 0} available, ${p.expiring_soon ?? 0} expiring, ${p.reserved ?? 0} tagged`).join('; ')}.`)
 </script>
 
 <style scoped>

@@ -304,7 +304,7 @@
 
             <div v-if="!showBillingSection" class="billing-gated">
               <AssetIcon name="clock" />
-              <p>An invoice is raised once the blood centre reserves units for this request.</p>
+              <p>An invoice is raised once the blood centre {{ request?.request_purpose === 'replenishment' ? 'dispatches this order' : 'tags units for this request' }}.</p>
             </div>
 
             <div v-else-if="isLoadingBilling" class="availability-skeleton">
@@ -347,12 +347,16 @@
                 <template v-else-if="billing.is_subsidised">
                   Covered by the government subsidy. Nothing is payable on this request.
                 </template>
+                <template v-else-if="billing.is_payment_deferred">
+                  Payment deferred. The blood centre may release the units, and the balance is settled at its
+                  billing counter afterwards.
+                </template>
                 <template v-else-if="billing.clears_release">
                   Settled. The blood centre may release the units.
                 </template>
                 <template v-else>
                   Payable by the patient or watcher at the blood centre's billing counter, in cash or
-                  by GCash. The units are released once it is paid.
+                  by GCash. The units are released once it is paid, unless the blood centre defers the payment.
                 </template>
               </p>
 
@@ -729,8 +733,8 @@ onMounted(() => {
   fetchBilling()
 })
 
-// A statement is raised when the centre first reserves units, so a request
-// still pending has none to show. The API sends statuses lowercase; comparing
+// A statement is raised when the centre first tags units, or dispatches a
+// replenishment order, so a request still pending has none to show. The API sends statuses lowercase; comparing
 // against 'Pending' used to show the section for every request.
 const showBillingSection = computed(() => !!request.value?.status && request.value.status !== 'pending')
 
@@ -762,7 +766,7 @@ const { notify } = useToast()
  * Confirming receipt of dispatched units.
  *
  * Only allocations that have left the blood centre and have not been confirmed
- * are offered: `released` with no received_at. A reserved unit has not moved
+ * are offered: `released` with no received_at. A tagged unit has not moved
  * yet, and a received one is already done.
  */
 const receiptSelection = ref([])

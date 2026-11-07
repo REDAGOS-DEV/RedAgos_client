@@ -67,7 +67,14 @@
           </tr>
           <tr v-for="question in section.questions" :key="question.code">
             <td class="sheet__q-no">{{ question.number }}</td>
-            <td>{{ question.text }}</td>
+            <td>
+              {{ question.text }}
+              <!-- The tick is the physician's here, so the paper says whose it was. -->
+              <span v-if="question.amendment" class="sheet__q-amended">
+                Changed at screening by {{ question.amendment.amended_by || 'staff' }}.
+                Donor answered: {{ question.amendment.donor_answer_label }}
+              </span>
+            </td>
             <!-- A question never put to this donor is not a "No". -->
             <td v-if="!question.applicable || question.answer === null" colspan="2" class="sheet__q-na">
               {{ question.answer_label }}
@@ -270,6 +277,7 @@ function longDateTime(value) {
 .sheet__q-no { width: 8mm; text-align: center; }
 .sheet__q-mark { width: 11mm; text-align: center !important; font-weight: 700; }
 .sheet__q-na { text-align: center; font-style: italic; font-size: 9.5px; }
+.sheet__q-amended { display: block; font-size: 9px; font-style: italic; }
 .sheet__q-section td { font-weight: 700; background: #eee; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.03em; }
 
 .sheet__note { margin: 1.5mm 0 0; font-size: 9.5px; }

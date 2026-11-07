@@ -108,9 +108,13 @@ export function pesos(value: string | number | null | undefined): string {
   })}`
 }
 
-/** Whether billing staff may take a payment (cash, GCash, subsidy) on a statement at all. */
-export function takesPayment(billing: Pick<Billing, 'collects_payment' | 'clears_release'>): boolean {
-  return billing.collects_payment && !billing.clears_release
+/**
+ * Whether billing staff may take a payment (cash, GCash, subsidy) on a statement at all.
+ *
+ * A deferred bill clears release and is still owed, so it still takes one.
+ */
+export function takesPayment(billing: Pick<Billing, 'collects_payment' | 'clears_release' | 'is_payment_deferred'>): boolean {
+  return billing.collects_payment && (!billing.clears_release || billing.is_payment_deferred)
 }
 
 /** An amount the server sent as a decimal string, in whole centavos, so sums never drift. */

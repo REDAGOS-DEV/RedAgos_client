@@ -19,7 +19,7 @@
       </div>
 
       <form id="supply-plan-form" class="plan__body" novalidate @submit.prevent="submit">
-        <!-- WHAT: one figure per line, from what is held up to what was asked. -->
+        <!-- WHAT: one figure per line, up to what was asked. -->
         <section class="block" aria-labelledby="plan-units-title">
           <div class="block__head">
             <h3 id="plan-units-title" class="block__title">What you will supply</h3>
@@ -45,7 +45,6 @@
                   <th scope="row" class="c-name">
                     <span class="blood">{{ line.bloodType }}</span>
                     {{ line.component }}
-                    <span v-if="line.held" class="sub">{{ line.held }} already reserved</span>
                   </th>
                   <td class="num">{{ line.requested }}</td>
                   <td class="num" :class="{ short: !line.closed && line.shelf < line.requested }">{{ line.closed ? '—' : line.shelf }}</td>
@@ -57,7 +56,7 @@
                           type="button"
                           class="qty__step"
                           :aria-label="`One fewer ${line.component}`"
-                          :disabled="busy || committed[line.id] <= line.held"
+                          :disabled="busy || committed[line.id] <= 0"
                           @click="step(line, -1)"
                         >&minus;</button>
                         <input
@@ -66,7 +65,7 @@
                           type="number"
                           inputmode="numeric"
                           class="qty__input"
-                          :min="line.held"
+                          min="0"
                           :max="line.requested"
                           :disabled="busy"
                           :aria-label="`${line.bloodType} ${line.component}: units you will supply, of ${line.requested}`"
@@ -202,16 +201,16 @@
 
 <script setup>
 /**
- * Confirm a replenishment order before anything is reserved for it (project
- * owner, 2026-10-29): "Inventory Replenishment is not the same process like
- * how patient request behave."
+ * Confirm a replenishment order before it is dispatched (project owner,
+ * 2026-10-29): "Inventory Replenishment is not the same process like how patient
+ * request behave."
  *
- * The centre says how many units of each line it will supply — from what is
- * already reserved up to what was asked — whether the hospital picks the order
- * up or the centre delivers it, when, and who to call. The server judges every
- * figure again under a lock and answers per field; reserving afterwards never
- * takes more of a line than was committed. Whatever is left out is closed as
- * not supplied when the order is dispatched.
+ * The centre says how many units of each line it will supply, up to what was
+ * asked, whether the hospital picks the order up or the centre delivers it, when,
+ * and who to call. The server judges every figure again under a lock and answers
+ * per field. This holds no stock (project owner, 2026-11-07): the bags are picked
+ * at dispatch, never more of a line than was committed. Whatever is left out is
+ * closed as not supplied when the order is dispatched.
  */
 
 import { computed, reactive, ref, watch } from 'vue'
@@ -240,15 +239,13 @@ const existing = computed(() => props.request.raw?.supply_plan ?? null)
 
 /*
  * One row per line, in the order the order lists them. "On shelf" is what is
- * issuable here now and held for nobody; what is already reserved for this
- * order is counted apart, because a line can never be cut below it.
+ * issuable here now and held for nobody.
  */
 const rows = computed(() => {
   const availability = new Map((props.request.lines ?? []).map((line) => [line.request_item_id, line]))
 
   return (props.request.raw?.items ?? []).map((item) => {
     const line = availability.get(item.id) ?? {}
-    const held = (line.reserved ?? item.reserved_quantity ?? 0) + (line.fulfilled ?? item.fulfilled_quantity ?? 0)
 
     return {
       id: item.id,
@@ -256,7 +253,6 @@ const rows = computed(() => {
       bloodType: item.blood_type?.code || props.request.raw?.blood_type?.code || '—',
       requested: item.quantity,
       shelf: line.available ?? 0,
-      held,
       committed: item.committed_quantity,
       closed: Boolean(item.closed_at),
     }
@@ -269,7 +265,7 @@ const openRows = computed(() => rows.value.filter((line) => !line.closed))
 // much as the shelf can cover.
 const committed = reactive({})
 for (const line of openRows.value) {
-  committed[line.id] = line.committed ?? Math.min(line.requested, line.held + line.shelf)
+  committed[line.id] = line.committed ?? Math.min(line.requested, line.shelf)
 }
 
 const totalRequested = computed(() => openRows.value.reduce((sum, line) => sum + line.requested, 0))
@@ -277,11 +273,11 @@ const totalCommitted = computed(() => openRows.value.reduce((sum, line) => sum +
 
 function step(line, by) {
   const next = (Number(committed[line.id]) || 0) + by
-  committed[line.id] = Math.min(line.requested, Math.max(line.held, next))
+  committed[line.id] = Math.min(line.requested, Math.max(0, next))
 }
 
 function fillFromShelf() {
-  for (const line of openRows.value) committed[line.id] = Math.min(line.requested, line.held + line.shelf)
+  for (const line of openRows.value) committed[line.id] = Math.min(line.requested, line.shelf)
 }
 
 function fillRequested() {
@@ -349,7 +345,7 @@ function rangeError(line) {
   const value = committed[line.id]
   if (value === '' || !Number.isInteger(Number(value))) return 'Enter a whole number.'
   if (value > line.requested) return `No more than the ${line.requested} asked for.`
-  if (value < line.held) return `${line.held} already reserved; return some to stock first.`
+  if (value < 0) return 'Enter 0 or more.'
   return ''
 }
 

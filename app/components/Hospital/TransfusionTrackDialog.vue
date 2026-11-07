@@ -99,7 +99,7 @@ const steps = computed(() => {
   const raw = [
     { key: 'submitted', label: 'Submitted', note: r.is_walk_in ? 'Walk-in' : (r.source_label ?? ''), reached: true },
     { key: 'asked', label: 'Facilities asked', note: `${r.allocation_count ?? r.allocations?.length ?? 0} asked`, reached: (r.allocation_count ?? r.allocations?.length ?? 0) > 0 },
-    { key: 'reserved', label: 'Stock reserved', note: of(t.approved), reached: (t.approved ?? 0) > 0 },
+    { key: 'reserved', label: 'Units tagged', note: of(t.approved), reached: (t.approved ?? 0) > 0 },
     { key: 'released', label: 'Units released', note: of(t.fulfilled), reached: (t.fulfilled ?? 0) > 0 },
     { key: 'received', label: 'Received', note: of(t.received), reached: (t.received ?? 0) > 0 && t.received >= t.required },
   ]

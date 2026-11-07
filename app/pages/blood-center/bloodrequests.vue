@@ -60,9 +60,9 @@
           <AssetIcon v-if="chip.icon" :name="chip.icon" :size="13" />
           <strong>{{ chip.count }}</strong> {{ chip.label }}
         </button>
-        <NuxtLink v-if="canRelease" to="/blood-center/fulfillment" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
+        <NuxtLink v-if="canRelease" :to="isPatientTab ? '/blood-center/fulfillment' : '/blood-center/dispatch'" class="quick__chip quick__chip--go" :class="{ 'quick__chip--zero': !tabSummary.awaiting_release }">
           <AssetIcon name="send" :size="13" />
-          <strong>{{ tabSummary.awaiting_release }}</strong> ready to issue
+          <strong>{{ tabSummary.awaiting_release }}</strong> ready to {{ isPatientTab ? 'issue' : 'dispatch' }}
           <AssetIcon name="arrow-right" :size="12" />
         </NuxtLink>
       </div>
@@ -183,13 +183,13 @@
                   <span v-for="chip in r.componentChips" :key="chip.key" class="code-chip">{{ chip.code }}</span>
                 </span>
               </td>
-              <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested${r.held ? `, ${r.held} reserved and waiting to go out` : ''}`">
+              <td class="c-units nowrap" :title="`${r.issued} issued of ${r.units} requested${r.held ? `, ${r.held} tagged and waiting to go out` : ''}`">
                 <span class="units-bar" aria-hidden="true">
                   <span class="units-bar__issued" :style="{ width: `${share(r.issued, r.units)}%` }" />
                   <span class="units-bar__held" :style="{ width: `${share(r.held, r.units)}%` }" />
                 </span>
                 <span class="units-text">{{ r.issued }} / {{ r.units }}</span>
-                <span v-if="r.held" class="sub">{{ r.held }} reserved</span>
+                <span v-if="r.held" class="sub">{{ r.held }} tagged</span>
               </td>
               <td class="c-status">
                 <span class="badge" :class="`badge--${r.tone}`" :title="r.status">
@@ -216,9 +216,8 @@
                   <button type="button" class="icon-btn" :aria-label="`Review ${r.code}`" title="Review" @click="openReview(r)">
                     <AssetIcon name="eye" :size="15" />
                   </button>
-                  <!-- A replenishment order is confirmed before anything is
-                       reserved: what is supplied, and how and when it goes
-                       (project owner, 2026-10-29). -->
+                  <!-- A replenishment order is confirmed before it goes: what
+                       is supplied, and how and when (project owner, 2026-10-29). -->
                   <template v-if="r.needsPlan">
                     <button
                       v-if="canDecide"
@@ -233,21 +232,20 @@
                       Confirm
                     </button>
                   </template>
-                  <!-- Reserve stock for what it still needs: approving a new
-                       request, or topping up one part held. A confirmed
-                       order is reserved, never more than was committed. -->
-                  <template v-if="r.canReserve">
+                  <!-- Tag stock for what a patient's request still needs:
+                       approving a new one, or topping up one part tagged. -->
+                  <template v-if="r.canTag">
                     <button
                       v-if="canAllocate"
                       type="button"
                       class="btn-approve"
                       :disabled="isMutating(r.id)"
-                      :aria-label="`${r.statusValue === 'pending' && !r.isReplenishment ? 'Approve and reserve' : 'Reserve units for'} ${r.code}`"
-                      :title="r.statusValue === 'pending' && !r.isReplenishment ? 'Approve and reserve' : 'Reserve units'"
+                      :aria-label="`${r.statusValue === 'pending' ? 'Approve and tag' : 'Tag units for'} ${r.code}`"
+                      :title="r.statusValue === 'pending' ? 'Approve and tag' : 'Tag units'"
                       @click="requestApprove(r)"
                     >
                       <AssetIcon name="check" :size="14" />
-                      {{ r.statusValue === 'pending' && !r.isReplenishment ? 'Approve' : 'Reserve' }}
+                      {{ r.statusValue === 'pending' ? 'Approve' : 'Tag' }}
                     </button>
                   </template>
                   <!-- Only while nothing is held or sent: the server refuses
@@ -269,13 +267,21 @@
                     <AssetIcon name="file-down" :size="15" />
                   </button>
                   <!-- Issue is dispatch, on Request Fulfillment: open once units
-                       are reserved, and says why not before then. -->
+                       are tagged, and says why not before then. A confirmed
+                       replenishment order goes straight to For Dispatch. -->
                   <template v-if="r.isOpen && canRelease">
-                    <NuxtLink v-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
+                    <NuxtLink v-if="r.canDispatch" :to="`/blood-center/dispatch?request=${r.id}`" class="btn-issue" :aria-label="`Dispatch ${r.code}`">
+                      <AssetIcon name="send" :size="13" />
+                      Dispatch
+                    </NuxtLink>
+                    <NuxtLink v-else-if="r.held > 0" :to="`/blood-center/fulfillment?request=${r.id}`" class="btn-issue" :aria-label="`Issue ${r.code}`">
                       <AssetIcon name="send" :size="13" />
                       Issue
                     </NuxtLink>
-                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and reserve units first" title="Issue: approve and reserve units first">
+                    <span v-else-if="r.isReplenishment" class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Dispatch: confirm the order first" title="Dispatch: confirm the order first">
+                      <AssetIcon name="send" :size="13" />
+                    </span>
+                    <span v-else class="btn-issue btn-issue--off" role="link" aria-disabled="true" aria-label="Issue: approve and tag units first" title="Issue: approve and tag units first">
                       <AssetIcon name="send" :size="13" />
                     </span>
                   </template>
@@ -388,7 +394,7 @@
                   <dt>Units</dt>
                   <dd>
                     {{ activeRequest.issued }} of {{ activeRequest.units }} issued
-                    <span v-if="activeRequest.held" class="fact__sub">{{ activeRequest.held }} reserved, waiting to go out</span>
+                    <span v-if="activeRequest.held" class="fact__sub">{{ activeRequest.held }} tagged, waiting to go out</span>
                   </dd>
                 </div>
                 <div class="fact">
@@ -458,7 +464,7 @@
               </section>
 
               <!--
-                A replenishment order is confirmed before it is reserved
+                A replenishment order is confirmed before it is dispatched
                 (project owner, 2026-10-29): how many units of each line, pick-up
                 or delivery, and when. The hospital is told each time it changes.
               -->
@@ -515,7 +521,7 @@
                   <p class="plan-empty__text">
                     <strong>Not confirmed yet.</strong>
                     Say how many units of each line you can supply, and when the hospital picks the order up or you
-                    deliver it. Units are reserved once it is confirmed, never more than you commit.
+                    deliver it. Its units are picked when it is dispatched, never more than you commit.
                   </p>
                   <template v-if="activeRequest.isOpen">
                     <button v-if="canDecide" type="button" class="btn btn-primary btn-sm" :disabled="drawerMutating" @click="openPlan(activeRequest)">
@@ -542,7 +548,7 @@
                         <th scope="col">Component</th>
                         <th scope="col" class="num">Requested</th>
                         <th v-if="activeRequest.plan" scope="col" class="num">Will supply</th>
-                        <th scope="col" class="num">{{ activeRequest.plan ? 'To reserve' : 'Outstanding' }}</th>
+                        <th scope="col" class="num">{{ activeRequest.plan ? 'To dispatch' : 'Outstanding' }}</th>
                         <th scope="col" class="num">Available</th>
                         <th scope="col">Status</th>
                       </tr>
@@ -576,13 +582,19 @@
                   {{ availabilityLevel(activeRequest) === 'ok'
                     ? 'Sufficient Inventory'
                     : availabilityLevel(activeRequest) === 'low'
-                      ? 'Partial Inventory — some units can be reserved now'
+                      ? `Partial Inventory — some units can be ${activeRequest.isReplenishment ? 'dispatched' : 'tagged'} now`
                       : 'Insufficient Inventory' }}
                 </p>
 
                 <p class="inventory-advisory">
-                  Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held until you
-                  approve, and allocation re-checks every unit under a lock before reserving.
+                  <template v-if="activeRequest.isReplenishment">
+                    Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is held for this order,
+                    and every unit is checked again under a lock when it is dispatched.
+                  </template>
+                  <template v-else>
+                    Advisory at {{ activeRequest.availabilityAsOf || 'this moment' }} — nothing is tagged until you
+                    approve, and every unit is checked again under a lock before tagging.
+                  </template>
                 </p>
               </section>
 
@@ -635,9 +647,13 @@
                   Confirm Order
                 </button>
               </template>
-              <!-- Reserving only while something is still needed; once all of
-                   it is held, the next step is issuing it. -->
-              <template v-else-if="activeRequest.canReserve">
+              <NuxtLink v-else-if="activeRequest.canDispatch && canRelease" :to="`/blood-center/dispatch?request=${activeRequest.id}`" class="btn btn-primary">
+                <AssetIcon name="send" :size="14" />
+                Dispatch
+              </NuxtLink>
+              <!-- Tagging only while something is still needed; once all of
+                   it is tagged, the next step is issuing it. -->
+              <template v-else-if="activeRequest.canTag">
                 <button
                   v-if="availabilityLevel(activeRequest) === 'insufficient'"
                   class="btn btn-outline"
@@ -651,7 +667,7 @@
                   :disabled="drawerMutating"
                   @click="requestApprove(activeRequest)"
                 >
-                  {{ drawerMutating ? 'Processing…' : activeRequest.isReplenishment ? 'Reserve Units' : 'Approve & Reserve' }}
+                  {{ drawerMutating ? 'Processing…' : 'Approve & Tag' }}
                 </button>
               </template>
               <NuxtLink v-else-if="activeRequest.held > 0 && canRelease" :to="`/blood-center/fulfillment?request=${activeRequest.id}`" class="btn btn-primary">
@@ -665,8 +681,8 @@
     </Transition>
 
     <!--
-      APPROVE AND RESERVE: staff pick the bags (project owner, 2026-10-19).
-      The server holds exactly those, or refuses the pick unit by unit.
+      APPROVE AND TAG: staff pick the bags (project owner, 2026-10-19).
+      The server tags exactly those, or refuses the pick unit by unit.
     -->
     <UnitPickerDialog
       v-if="showApproveModal && requestToApprove"
@@ -779,10 +795,10 @@ definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashbo
   requires: 'requests.view',
 })
 
-// Two abilities split this queue. Reserving units against a request
+// Two abilities split this queue. Tagging units for a patient's request
 // (requests.process) is the Inventory Control Officer's; declining or handing
-// holds back (requests.approve) is also dispatch's, who never picks units.
-// A privilege cap can remove either.
+// tags back (requests.approve) is also dispatch's. A privilege cap can remove
+// either.
 const { can } = useUser()
 const canAllocate = computed(() => can('requests.process'))
 const canDecide = computed(() => can('requests.approve'))
@@ -890,14 +906,15 @@ const STATUS_TONES = {
 function mapRequest(r) {
   // allocated_count counts every claiming hold, dispatched ones included;
   // fulfilled_quantity is what has gone out. The difference is what is
-  // reserved and waiting to be issued.
+  // tagged and waiting to be issued.
   const allocated = r.allocated_count ?? 0
   const issued = r.fulfilled_quantity ?? 0
   const units = r.quantity ?? 0
   const outstanding = r.outstanding_quantity ?? Math.max(0, units - allocated)
   const isOpen = r.is_open !== false
-  // A restock is confirmed before it is reserved (project owner, 2026-10-29):
-  // what it gets, and how and when it reaches the hospital.
+  // A restock is confirmed before it goes (project owner, 2026-10-29): what it
+  // gets, and how and when it reaches the hospital. Nothing is tagged for it;
+  // its units are picked at dispatch (project owner, 2026-11-07).
   const isReplenishment = r.request_purpose === 'replenishment'
   const plan = r.supply_plan ?? null
   const needsPlan = isOpen && isReplenishment && !plan
@@ -945,10 +962,12 @@ function mapRequest(r) {
     statusClass: `status-${r.status ?? 'pending'}`,
     statusValue: r.status,
     isOpen,
-    // What the row offers, before the abilities are asked. Reserving needs
-    // something still to find, and a restock confirmed first; rejecting
-    // needs nothing held or sent, which is what the server checks.
-    canReserve: isOpen && outstanding > 0 && !needsPlan,
+    // What the row offers, before the abilities are asked. Tagging needs a
+    // patient's request with something still to find; dispatching an order
+    // needs it confirmed with committed units still to go; rejecting needs
+    // nothing held or sent, which is what the server checks.
+    canTag: isOpen && outstanding > 0 && !isReplenishment,
+    canDispatch: isOpen && isReplenishment && Boolean(plan) && outstanding > 0,
     canReject: isOpen && allocated === 0,
     isReplenishment,
     plan,
@@ -1184,7 +1203,7 @@ const drawerMutating = computed(() => Boolean(activeRequest.value) && isActing.v
  * Rebuild the drawer's view of the request from what the composable loaded.
  *
  * Run on open and again whenever an action refreshes `selected`, so closing a
- * line or reserving stock updates the fulfilment table in place rather than
+ * line or tagging stock updates the fulfilment table in place rather than
  * leaving the drawer showing the figures from before.
  */
 function syncActiveRequest() {
@@ -1338,7 +1357,7 @@ function onKeydown(event) {
   closeDrawer()
 }
 
-/* APPROVAL — staff pick the units to reserve (project owner, 2026-10-19) */
+/* APPROVAL — staff pick the units to tag (project owner, 2026-10-19) */
 const showApproveModal = ref(false)
 const requestToApprove = ref(null)
 const approving = ref(false)
@@ -1367,7 +1386,7 @@ function closeApproveModal() {
   requestToApprove.value = null
 }
 
-/** Hold exactly the units picked; on a refusal, say which unit and why. */
+/** Tag exactly the units picked; on a refusal, say which unit and why. */
 async function confirmApprove(unitIds) {
   if (!requestToApprove.value || !unitIds?.length) return
   approving.value = true
@@ -1379,9 +1398,9 @@ async function confirmApprove(unitIds) {
     // The composable refreshes the list, the counts and an open review.
     const result = await allocate(requestToApprove.value.id, unitIds)
     toast(
-      `${unitIds.length} unit${unitIds.length === 1 ? '' : 's'} reserved`,
+      `${unitIds.length} unit${unitIds.length === 1 ? '' : 's'} tagged`,
       'success',
-      `${requestToApprove.value.code}: ${result?.message || 'stock has been reserved.'}`,
+      `${requestToApprove.value.code}: ${result?.message || 'stock has been tagged.'}`,
     )
     showApproveModal.value = false
     requestToApprove.value = null
@@ -1398,8 +1417,8 @@ async function confirmApprove(unitIds) {
 
     unitErrors.value = byUnit
     approveError.value = Object.keys(byUnit).length
-      ? 'Some of the units picked could not be reserved; nothing was held. Change the pick and try again.'
-      : err?.message || 'The units could not be reserved. Please try again in a moment.'
+      ? 'Some of the units picked could not be tagged; nothing was tagged. Change the pick and try again.'
+      : err?.message || 'The units could not be tagged. Please try again in a moment.'
     pickerRef.value?.reload()
   } finally {
     approving.value = false
@@ -1408,7 +1427,7 @@ async function confirmApprove(unitIds) {
 }
 
 /*
- * SUPPLY PLAN — a replenishment order is confirmed before it is reserved
+ * SUPPLY PLAN — a replenishment order is confirmed before it is dispatched
  * (project owner, 2026-10-29): "Inventory Replenishment is not the same process
  * like how patient request behave." Staff say how many units of each line the
  * centre can supply, pick-up or delivery, and when; the hospital is told.
@@ -1538,7 +1557,7 @@ async function handleExportPdf(request) {
  *
  * They were briefly the same function, which is why a request for one unit
  * with one unit available still read "Insufficient Inventory": nothing had
- * been reserved yet, and coverage was being asked an availability question.
+ * been tagged yet, and coverage was being asked an availability question.
  */
 
 /**
@@ -1546,7 +1565,7 @@ async function handleExportPdf(request) {
  *
  * Measured against `outstanding` rather than the full request: units already
  * held are not needed from stock again, so judging against the original figure
- * would call a part-reserved request short when it is not.
+ * would call a part-tagged request short when it is not.
  */
 function availabilityLevel(request) {
   if (!request) return 'insufficient'
@@ -2123,7 +2142,7 @@ onBeforeUnmount(() => {
 
 .chip--crit { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; border-color: rgba(var(--rb-accent-rgb), 0.35); background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); font-weight: 700; }
 
-/* Units: issued, then reserved, on what was asked for. */
+/* Units: issued, then tagged, on what was asked for. */
 .units-bar { display: flex; width: 100%; max-width: 88px; height: 6px; margin-bottom: 5px; border-radius: 999px; background: var(--rb-surface-alt); box-shadow: inset 0 0 0 1px var(--rb-border); overflow: hidden; }
 .units-bar__issued { background: var(--rb-success); }
 .units-bar__held { background: var(--rb-primary); }

@@ -746,6 +746,7 @@ const dueNote = computed(() => {
   const s = statement.value
   if (weekly.value) return s?.is_settled_outside ? `Reference ${s.settlement?.reference ?? '—'}` : 'Settled outside RedAgos'
   if (s?.is_subsidised) return 'Nothing to collect: the subsidy covers it'
+  if (s?.is_payment_deferred) return 'Payment deferred: settled after the units are released'
   if (totals.value.balance > 0) return s?.clears_release ? 'Units already released' : 'Blood is held until it is paid'
   return s?.clears_release ? 'Cleared for release' : ''
 })

@@ -185,7 +185,7 @@ describe('the page', () => {
 
   it('offers the release queue only to someone who can release', () => {
     expect(page).toContain("can('requests.release')")
-    expect(page).toMatch(/v-if="canRelease" to="\/blood-center\/fulfillment" class="btn-primary/)
+    expect(page).toMatch(/v-if="canRelease" to="\/blood-center\/dispatch" class="btn-primary/)
   })
 
   it('reads the week\'s trend and the shelf by type from the summary', () => {

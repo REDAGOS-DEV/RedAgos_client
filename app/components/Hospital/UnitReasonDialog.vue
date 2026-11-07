@@ -13,18 +13,30 @@
         {{ title }}
       </h2>
 
-      <p class="dialog__body">
+      <p v-if="$slots.default" class="dialog__body">
         <slot />
       </p>
 
       <label class="field">
         <span class="field__label">{{ label }}</span>
+        <input
+          v-if="singleLine"
+          ref="inputRef"
+          v-model="reason"
+          class="field__input"
+          :maxlength="maxlength"
+          autocomplete="off"
+          required
+          :aria-invalid="Boolean(error) || undefined"
+          @keydown.enter.prevent="!busy && reason.trim() && $emit('confirm', reason.trim())"
+        />
         <textarea
+          v-else
           ref="inputRef"
           v-model="reason"
           class="field__input"
           rows="2"
-          maxlength="255"
+          :maxlength="maxlength"
           required
           :aria-invalid="Boolean(error) || undefined"
         />
@@ -55,6 +67,7 @@
  * Releasing a tag and discarding a bag both require one — the API refuses
  * either without it — so the confirm button stays disabled until there is
  * text. The wording around it is the caller's, passed in the default slot.
+ * Reserving a bag asks for its blood donor partner the same way, on one line.
  */
 
 import { nextTick, onMounted, ref } from 'vue'
@@ -66,6 +79,8 @@ defineProps({
   confirmLabel: { type: String, required: true },
   icon: { type: String, default: 'circle-x' },
   danger: { type: Boolean, default: true },
+  singleLine: { type: Boolean, default: false },
+  maxlength: { type: Number, default: 255 },
   busy: { type: Boolean, default: false },
   error: { type: String, default: '' },
 })

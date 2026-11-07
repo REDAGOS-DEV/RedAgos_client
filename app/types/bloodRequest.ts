@@ -245,7 +245,7 @@ export type HandoverMethod = 'pickup' | 'delivery'
 
 /**
  * How a blood centre will meet a replenishment order (project owner,
- * 2026-10-29). Set before anything is reserved; each line's own
+ * 2026-10-29). Set before it is dispatched; each line's own
  * committed_quantity says how much of it is coming.
  */
 export interface SupplyPlan {
@@ -519,6 +519,8 @@ export interface Billing {
   collects_payment: boolean
   represents_collected_money: boolean
   clears_release: boolean
+  /** Still owed, but its units need not wait for it: decided at issuance. */
+  is_payment_deferred: boolean
   billing_date: string | null
   /** Set once the hospital settled a weekly bill outside RedAgos. */
   settlement?: { settled_at: string | null; reference: string | null; note: string | null } | null
@@ -664,6 +666,7 @@ export interface CounterBill {
   collected: string
   outstanding: string
   clears_release: boolean
+  is_payment_deferred: boolean
   takes_payment: boolean
   /** Only on GET /pos/bills/{id}. */
   lines?: StatementLine[]
@@ -689,6 +692,8 @@ export interface StatementRevision {
   billing_status: BillingStatus
   billing_status_label: string
   statement_only: boolean
+  /** Issued after payment was deferred, so payable once the units have gone. */
+  payment_deferred: boolean
   currency: string
   total_amount: string
   collected_at_issue: string
@@ -1097,7 +1102,7 @@ export const TRANSFUSION_LINE_STATUS_TONES: Record<TransfusionLineStatus, 'info'
 }
 
 export const ALLOCATION_STATUS_LABELS: Record<AllocationStatus, string> = {
-  allocated: 'Reserved',
+  allocated: 'Tagged',
   released: 'Released',
   cancelled: 'Cancelled',
 }
@@ -1236,7 +1241,7 @@ export function requestStage(request: BloodRequest): string {
     return 'Partially fulfilled'
   }
 
-  if (request.allocated_count > 0) return 'Stock reserved'
+  if (request.allocated_count > 0) return 'Units tagged'
 
   return 'Under review'
 }

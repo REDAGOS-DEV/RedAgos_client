@@ -196,7 +196,7 @@
           </div>
         </nav>
 
-        <p v-if="sheet && sheet.sheets.length && !bagTotal" class="viewer__note">
+        <p v-if="sheet && sheet.sheets.length && !bagTotal && !transfusedTotal" class="viewer__note">
           <AssetIcon name="info" :size="14" />
           No bags in date on these settings, so the form is empty.
         </p>
@@ -267,13 +267,15 @@
                   <tr v-for="row in rowNumbers" :key="row">
                     <td class="form__num">{{ row }}</td>
                     <template v-for="(column, c) in page[section.key]" :key="c">
-                      <td class="form__bag">
+                      <td class="form__bag" :class="cellTone(column.cells[row - 1], section.key)">
                         <template v-if="column.cells[row - 1]">
                           {{ cellLabel(column.cells[row - 1]) }}
                           <abbr v-if="column.cells[row - 1].tagged" class="form__tag" title="Tagged to a patient, waiting for crossmatch">(T)</abbr>
+                          <abbr v-else-if="column.cells[row - 1].reserved" class="form__tag" title="Reserved for a blood donor partner">(R)</abbr>
+                          <abbr v-else-if="column.cells[row - 1].transfused" class="form__tag" title="Transfused today">(TF)</abbr>
                         </template>
                       </td>
-                      <td class="form__exp">{{ expiry(column.cells[row - 1]?.expiry_date) }}</td>
+                      <td class="form__exp" :class="cellTone(column.cells[row - 1], section.key)">{{ expiry(column.cells[row - 1]?.expiry_date) }}</td>
                     </template>
                   </tr>
                 </tbody>
@@ -290,7 +292,17 @@
               </table>
             </div>
 
-            <p class="paper__legend">(T) Tagged to a patient, waiting for crossmatch.</p>
+            <p class="paper__legend">
+              <b class="paper__section">Crossmatched:</b>
+              <span class="paper__key"><span class="paper__swatch paper__swatch--waiting" aria-hidden="true" />Waiting for transfusion</span>
+              <span class="paper__key"><span class="paper__swatch paper__swatch--transfused" aria-hidden="true" /><b class="form__cell--transfused">(TF)</b> Transfused today</span>
+            </p>
+            <p class="paper__legend">
+              <b class="paper__section">Uncrossmatched:</b>
+              <span class="paper__key"><span class="paper__swatch" aria-hidden="true" />Available, not tagged</span>
+              <span class="paper__key"><span class="paper__swatch paper__swatch--tagged" aria-hidden="true" /><b class="form__cell--tagged">(T)</b> Tagged to a patient, waiting for crossmatch</span>
+              <span class="paper__key"><span class="paper__swatch paper__swatch--reserved" aria-hidden="true" /><b class="form__cell--reserved">(R)</b> Reserved for a blood donor partner</span>
+            </p>
 
             <footer v-if="sheet" class="paper__control">
               <span>{{ sheet.footer.form_code }}</span>
@@ -440,9 +452,11 @@
  * are listed under Generated Reports.
  *
  * CROSSMATCHED holds the bags tagged to a patient and crossmatched, ready to
- * transfuse, its Whole Blood under TRANSFUSE AS PRBC; UNCROSSMATCHED holds
- * the free bags and those tagged but still waiting for their crossmatch,
- * marked (T).
+ * transfuse (blue), then the day's transfusions (green, (TF)), its Whole
+ * Blood under TRANSFUSE AS PRBC. UNCROSSMATCHED holds the free bags (black),
+ * those tagged but still waiting for their crossmatch (pink, (T)) and those
+ * reserved for a blood donor partner (purple, (R)). Colours: project owner,
+ * 2026-11-07.
  */
 import PageHeader from '~/components/ui/PageHeader.vue'
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
@@ -576,10 +590,13 @@ const drawnPages = computed(() => (sheet.value ? sheet.value.sheets : [BLANK_PAG
 const rowNumbers = computed(() => sheet.value?.rows ?? BLANK_ROWS)
 
 const bagTotal = computed(() => (sheet.value?.totals.crossmatched ?? 0) + (sheet.value?.totals.uncrossmatched ?? 0))
+/** The day's transfusions, listed with the crossmatched bags but no longer here. */
+const transfusedTotal = computed(() => sheet.value?.totals.transfused ?? 0)
 const figures = computed(() => [
   { label: 'Bags in date', value: bagTotal.value },
   { label: 'Crossmatched', value: sheet.value?.totals.crossmatched ?? 0 },
   { label: 'Uncrossmatched', value: sheet.value?.totals.uncrossmatched ?? 0 },
+  { label: 'Transfused today', value: transfusedTotal.value },
   { label: 'Pages', value: sheet.value?.sheets.length ?? 0 },
 ])
 
@@ -735,6 +752,19 @@ function bagsOn(bloodType) {
 // The bag, and its type when every type shares the sheet.
 function cellLabel(cell) {
   return sheet.value?.by === 'all' && cell.blood_type ? `${cell.bag_number} · ${cell.blood_type}` : cell.bag_number
+}
+
+/**
+ * The colour code, as the PDF prints it (project owner, 2026-11-07).
+ * CROSSMATCHED: waiting for transfusion blue, transfused green.
+ * UNCROSSMATCHED: tagged pink, reserved purple, the rest black.
+ */
+function cellTone(cell, section) {
+  if (!cell) return ''
+  if (section === 'crossmatched') return cell.transfused ? 'form__cell--transfused' : 'form__cell--waiting'
+  if (cell.tagged) return 'form__cell--tagged'
+
+  return cell.reserved ? 'form__cell--reserved' : ''
 }
 
 // As the PDF prints it: MM/DD/YY.
@@ -959,7 +989,15 @@ function formatTime(value) {
 .paper__type { margin: 2px 0 0; font-size: 11.5px; }
 .paper__when { margin: 0; font-size: 10.5px; color: #374151; text-align: right; }
 .paper__scroll { overflow-x: auto; }
-.paper__legend { margin: 4px 0 0; font-size: 9.5px; color: #374151; }
+.paper__legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 4px 0 0; font-size: 9.5px; color: #374151; }
+.paper__key { display: inline-flex; align-items: center; gap: 5px; }
+.paper__swatch { width: 8px; height: 8px; border-radius: 1px; background: #111827; }
+.paper__swatch--tagged { background: #D81B60; }
+.paper__swatch--reserved { background: #7B1FA2; }
+.paper__swatch--waiting { background: #1565C0; }
+.paper__swatch--transfused { background: #2E7D32; }
+.paper__section { color: #111827; }
+.paper__legend + .paper__legend { margin-top: 2px; }
 .paper__control { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 10px; font-weight: 700; }
 
 /* The form: hairline rules, as printed. */
@@ -978,6 +1016,13 @@ function formatTime(value) {
 .form__bag { font-family: var(--rb-font-mono); font-size: 9.5px !important; }
 .form__exp { text-align: center; font-size: 9.5px !important; font-variant-numeric: tabular-nums; }
 .form__tag { margin-left: 3px; font-family: var(--rb-font-sans); font-weight: 700; text-decoration: none; }
+/* The colour code (project owner, 2026-11-07), as the PDF prints it: a tagged
+   bag pink, one reserved for a blood donor partner purple, every other bag
+   black. The paper stays white in either theme. */
+.form__cell--tagged { color: #D81B60; }
+.form__cell--reserved { color: #7B1FA2; }
+.form__cell--waiting { color: #1565C0; }
+.form__cell--transfused { color: #2E7D32; }
 .form__sign { height: 34px !important; vertical-align: top; padding-top: 3px !important; font-size: 8.5px !important; }
 .form__sign-value { display: block; margin-top: 6px; font-size: 10.5px; }
 

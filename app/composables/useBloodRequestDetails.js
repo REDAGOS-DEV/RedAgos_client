@@ -76,10 +76,13 @@ export function buildTimeline(request) {
       timestamp: request.reviewed_at,
     },
     {
+      // Only a patient's request is tagged; a replenishment order's units are
+      // picked as it is dispatched.
       key: 'reserved',
-      label: 'Stock reserved',
+      label: 'Units tagged',
       done: request.allocated_count > 0,
       timestamp: allocations[0]?.allocated_at ?? null,
+      skipped: request.request_purpose === 'replenishment',
     },
     {
       key: 'dispatched',
@@ -101,9 +104,10 @@ export function buildTimeline(request) {
     },
   ]
 
-  const firstPending = steps.findIndex((s) => !s.done)
+  const shown = steps.filter((s) => !s.skipped)
+  const firstPending = shown.findIndex((s) => !s.done)
 
-  return steps.map((step, index) => ({
+  return shown.map((step, index) => ({
     step: step.key,
     label: step.label,
     status: step.done ? 'completed' : index === firstPending && !terminal ? 'current' : 'upcoming',
@@ -157,7 +161,7 @@ export const useBloodRequestDetails = (requestId) => {
   /**
    * Look up how much matching stock the network currently holds.
    *
-   * Advisory: nothing here is reserved for this request. What is actually held
+   * Advisory: nothing here is tagged for this request. What is actually held
    * is `request.allocated_count` and the allocations list.
    */
   async function fetchAvailability() {

@@ -118,6 +118,12 @@ describe('Stock Thresholds and the Daily Stock Report', () => {
 describe('Fulfillment\'s payment notice', () => {
   const page = readFileSync(path.join(root, 'app/components/BloodCenter/FulfillmentBoard.vue'), 'utf8')
 
+  it('offers deferred payment on anything but a walk-in', () => {
+    expect(page).toContain('v-if="gateFor(request).canDefer"')
+    expect(page).toMatch(/if \(request\.is_walk_in\) \{\s*return \{ ok: false, message:/)
+    expect(page).toContain('bloodCenterService.deferPayment(request.id)')
+  })
+
   it('links to Billing only for whoever can take the payment', () => {
     expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })

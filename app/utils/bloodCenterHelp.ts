@@ -165,15 +165,15 @@ export const HELP_GUIDES: HelpGuide[] = [
     summary: 'Requests from hospital blood banks, sent through the portal or brought in by a watcher.',
     steps: [
       'Open a request to see the patient, the units asked for and the priority.',
-      'Choose Approve and reserve to hold the units, or reject it with a reason.',
-      'On Inventory Replenishment, choose Confirm first: how many units of each line you can supply, pick-up or delivery, and when. Then reserve.',
+      'Choose Approve and tag to set the units aside for the patient, or reject it with a reason.',
+      'On Inventory Replenishment, choose Confirm: how many units of each line you can supply, pick-up or delivery, and when. Nothing is set aside; the units are picked when the order is dispatched.',
       'For a watcher at the counter, use New Walk-in Request.',
     ],
     questions: [
-      { q: 'Why can\'t I reserve units for a replenishment order?', a: 'A hospital\'s restocking order is confirmed before anything is reserved. Choose Confirm, say what you will supply and when it is picked up or delivered, and the hospital is told. You can then reserve up to what you committed. Anything you leave out is closed as not supplied when the order is dispatched.' },
-      { q: 'Can I change the pick-up or delivery time?', a: 'Yes, until units are dispatched. Open the order and choose Edit under Supply Plan; the hospital is told of the change. A line cannot go below what is already reserved for it.' },
+      { q: 'Why can\'t I tag units for a replenishment order?', a: 'Only a patient\'s request is tagged. A hospital\'s restocking order holds no stock: choose Confirm, say what you will supply and when it is picked up or delivered, and the hospital is told. The units stay available until you pick them on For Dispatch, as the order goes out.' },
+      { q: 'Can I change the pick-up or delivery time?', a: 'Yes, until units are dispatched. Open the order and choose Edit under Supply Plan; the hospital is told of the change.' },
       { q: 'A watcher brought a request. What do I do?', a: 'Choose New Walk-in Request. You call the patient\'s hospital blood bank to confirm it; if the hospital does not confirm, nothing is recorded.' },
-      { q: 'Where do approved requests go?', a: 'Approving reserves the selected units and moves the request to Request Fulfillment, where they are released.' },
+      { q: 'Where do approved requests go?', a: 'Approving tags the selected units for the patient and moves the request to Request Fulfillment, where they are released. A replenishment order goes to For Dispatch once it is confirmed.' },
     ],
   },
   {
@@ -181,14 +181,15 @@ export const HELP_GUIDES: HelpGuide[] = [
     title: 'Release units for a request',
     department: 'Issuance',
     path: '/blood-center/fulfillment',
-    summary: 'Dispatch the units held for each request. Releasing them is what fulfils it, partly or fully.',
+    summary: 'Dispatch the units tagged for each patient request, and pick the units for each confirmed replenishment order as it goes. Releasing them is what fulfils it, partly or fully.',
     steps: [
       'Open a request that is ready for release.',
-      'Dispatch the units held for it.',
+      'Dispatch the units tagged for it. On a replenishment order, choose Pick Units & Dispatch.',
       'The hospital then confirms each unit arrived.',
     ],
     questions: [
       { q: 'How do walk-in units leave?', a: 'A walk-in\'s units usually leave with the watcher who presented the request.' },
+      { q: 'Can units go out before the bill is paid?', a: 'Yes, except on a walk-in, which must be fully settled first. On any other request, choose Issue with Deferred Payment. The request moves to For Dispatch, and the balance stays on the invoice until Billing records the payment.' },
     ],
   },
 
@@ -211,7 +212,8 @@ export const HELP_GUIDES: HelpGuide[] = [
     ],
     questions: [
       { q: 'How do I fix a wrong payment?', a: 'Open the invoice and find the payment under Payment history. Choose Correct to change the amount or method, or Void if it was recorded in error. A void is only possible on the day the payment was taken, and the Billing Supervisor approves both.' },
-      { q: 'Why is a bill marked "Held"?', a: 'A patient bill holds the blood until it is paid in full or met by the government subsidy. Once it is cleared, the units can be released.' },
+      { q: 'Why is a bill marked "Held"?', a: 'A patient bill holds the blood until it is paid in full, met by the government subsidy, or Issuance defers its payment. Once it is cleared, the units can be released.' },
+      { q: 'What is a "Deferred" bill?', a: 'Issuance let its units go out before it was paid. It is still owed: take the payment at the counter as usual.' },
       { q: 'How is a weekly hospital bill paid?', a: 'Weekly orders are settled by the hospital outside RedAgos. Once the order closes, record the hospital\'s payment reference on its invoice.' },
     ],
   },
@@ -220,7 +222,7 @@ export const HELP_GUIDES: HelpGuide[] = [
     title: 'Read an invoice',
     department: 'Billing',
     path: '/blood-center/billing',
-    summary: 'One invoice for each billable request, raised the moment stock is reserved for it.',
+    summary: 'One invoice for each billable request, raised the moment units are tagged for it or a replenishment order is dispatched.',
     steps: [
       'Choose Patient invoices or Hospital invoices.',
       'Open an invoice to see its lines, payments and issued revisions.',

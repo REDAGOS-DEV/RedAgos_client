@@ -1,6 +1,6 @@
 import type { HospitalActivityKind, HospitalUnitStatus } from '~/types/hospitalInventory'
 import { remainingDaysTag } from '~/utils/inventoryDashboard'
-import type { ActivityKindMeta, InventoryTag } from '~/utils/inventoryDashboard'
+import type { ActivityKindMeta, InventoryTag, InventoryTone } from '~/utils/inventoryDashboard'
 
 /**
  * Shaping helpers for the hospital's Blood Bank Inventory dashboard.
@@ -25,12 +25,25 @@ const STATUS_TAGS: Record<HospitalUnitStatus, InventoryTag> = {
 }
 
 /**
+ * A hospital bag's badge: the centre's tones, and purple for a bag reserved
+ * for a blood donor partner, as the Inventory Report prints it.
+ */
+export interface HospitalInventoryTag {
+  label: string
+  tone: InventoryTone | 'partner'
+}
+
+/**
  * A bag's status as the list shows it.
  *
- * An available bag within a week of its date reads as Expiring Soon, as at
- * the centre: still free to tag, and the one to tag next.
+ * An untagged bag reserved for a blood donor partner reads as Reserved
+ * (project owner, 2026-11-07); the Remaining Days cell still warns of its
+ * date. Otherwise an available bag within a week of its date reads as
+ * Expiring Soon, as at the centre: still free to tag, and the one to tag next.
  */
-export function hospitalUnitStatusTag(status: HospitalUnitStatus, daysRemaining: number | null): InventoryTag {
+export function hospitalUnitStatusTag(status: HospitalUnitStatus, daysRemaining: number | null, reserved = false): HospitalInventoryTag {
+  if (status === 'available' && reserved) return { label: 'Reserved', tone: 'partner' }
+
   if (status === 'available' && daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7) {
     return { label: 'Expiring Soon', tone: 'warning' }
   }
@@ -56,6 +69,8 @@ const ACTIVITY_KINDS: Record<HospitalActivityKind, ActivityKindMeta> = {
   crossmatched: { label: 'Crossmatched', icon: 'flask-conical', tone: 'neutral' },
   transfused: { label: 'Transfused', icon: 'blood-drop', tone: 'neutral' },
   untagged: { label: 'Tag Released', icon: 'user-x', tone: 'neutral' },
+  reserved: { label: 'Reserved for Partner', icon: 'lock', tone: 'neutral' },
+  unreserved: { label: 'Reservation Released', icon: 'unlock', tone: 'neutral' },
   returned: { label: 'Back in Storage', icon: 'refresh-cw', tone: 'neutral' },
   discarded: { label: 'Discarded', icon: 'trash-2', tone: 'danger' },
   expired: { label: 'Expired', icon: 'clock', tone: 'danger' },

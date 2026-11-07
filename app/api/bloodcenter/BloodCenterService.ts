@@ -621,6 +621,14 @@ class BloodCenterService extends BaseService {
   }
 
   /**
+   * { screening_id, answers: [{ code, answer }] }: Section I-B answers changed
+   * during the donor's screening. Returns the document as it now stands.
+   */
+  async amendQuestionnaireAnswers(uuid: string, payload: Record<string, any>): Promise<any> {
+    return this.request(`${this.resource}/donors/${uuid}/health-questionnaire/answers`, 'PATCH', payload)
+  }
+
+  /**
    * Find a walk-in by name, email or phone: { data: [...], truncated }.
    * A POST so the name never sits in a URL.
    */
@@ -917,7 +925,7 @@ class BloodCenterService extends BaseService {
   /**
    * Confirm a replenishment order, or change how it will be met (project
    * owner, 2026-10-29): what each line gets, pick-up or delivery, and when.
-   * Required before anything is reserved for it; the hospital is told.
+   * Required before it is dispatched; the hospital is told.
    */
   async saveSupplyPlan(id: number | string, payload: SaveSupplyPlanPayload): Promise<{ message: string; request: BloodRequest }> {
     return this.request(`/blood-center/blood-requests/${id}/supply-plan`, 'PUT', payload)
@@ -937,6 +945,22 @@ class BloodCenterService extends BaseService {
    */
   async requestUnits(id: number | string): Promise<any> {
     return this.request(`/blood-center/blood-requests/${id}/units`, 'GET')
+  }
+
+  /** The same list, for whoever dispatches a replenishment order. */
+  async dispatchUnits(id: number | string): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/dispatch-units`, 'GET')
+  }
+
+  /**
+   * Dispatch a confirmed replenishment order. Nothing is held for one, so the
+   * units named here are recorded as they go; the server refuses per unit.
+   */
+  async dispatchOrder(id: number | string, unitIds: string[], handedTo?: string | null): Promise<any> {
+    return this.request(`/blood-center/blood-requests/${id}/dispatch`, 'POST', {
+      unit_ids: unitIds,
+      ...(handedTo ? { handed_to: handedTo } : {}),
+    })
   }
 
   /** Refuse a request. The reason is required and reaches the requester. */
@@ -1031,6 +1055,16 @@ class BloodCenterService extends BaseService {
    */
   async billingPayments(requestId: number | string): Promise<any> {
     return this.request(`/blood-center/billings/${requestId}/payments`, 'GET')
+  }
+
+  /**
+   * Let a request's units go out now, with its invoice settled afterwards.
+   *
+   * The balance stays on the invoice and on the counter; only the release gate
+   * stops waiting for it. The server refuses a walk-in (`settlement_required`).
+   */
+  async deferPayment(requestId: number | string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/defer-payment`, 'POST')
   }
 
   /**

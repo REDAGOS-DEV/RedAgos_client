@@ -431,7 +431,7 @@ const REFUSALS = {
   nothing_to_correct: 'There is nothing left to correct here. Reject the correction.',
   unit_not_editable: 'The unit can no longer be edited, so this cannot be applied. Reject the correction.',
   not_dispatched: 'The unit is no longer dispatched, so there is no dispatch record to correct. Reject the correction.',
-  dispatch_time_invalid: 'That release time no longer fits between when the unit was reserved and when it was received. Reject the correction.',
+  dispatch_time_invalid: 'That release time is now before the unit could have left, or after it was received. Reject the correction.',
   billing_void: 'The invoice has been voided, so its payments can no longer be corrected. Reject the correction.',
 }
 

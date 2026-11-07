@@ -69,7 +69,7 @@
 
     <p class="requirement__note">
       Required is what the patient needs and never changes. Awaiting is still with a facility to review; approved units
-      are reserved or already released for this patient; unallocated units have not been asked of any facility.
+      are tagged or already released for this patient; unallocated units have not been asked of any facility.
     </p>
   </div>
 </template>

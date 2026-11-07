@@ -66,7 +66,7 @@ export interface WeeklyStatus {
   schedules: ScheduleStatus[]
 }
 
-/** `confirmed`: the center has said what it will supply and when, and reserved nothing yet. */
+/** `confirmed`: the center has said what it will supply and when, and sent nothing yet. */
 export type WeeklyRequestStatus = 'submitted' | 'confirmed' | 'in_progress' | 'fulfilled' | 'partial' | 'not_supplied'
 
 export interface WeeklyTotals {

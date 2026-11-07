@@ -109,7 +109,7 @@
             <p class="queue-empty__title">{{ listEmpty }}</p>
             <p v-if="!typing" class="queue-empty__text">
               {{ category === 'patient'
-                ? 'A bill appears here once Issuance reserves units for a request. Scan a reference above to open one now.'
+                ? 'A bill appears here once Issuance tags units for a request. Scan a reference above to open one now.'
                 : 'A hospital invoice appears here once its weekly order is released and waiting for settlement.' }}
             </p>
             <p v-else class="queue-empty__text">Check the reference, or search by the patient's name.</p>
@@ -734,7 +734,7 @@ function fromCounter(b) {
     is_emergency: b.is_emergency,
     who: `${b.patient_name || 'Patient'} · ${b.requesting_facility || '—'}`,
     amount: b.outstanding,
-    amountWord: 'due',
+    amountWord: b.is_payment_deferred ? 'deferred' : 'due',
     owing: b.takes_payment,
     status_label: b.billing_status_label,
   }

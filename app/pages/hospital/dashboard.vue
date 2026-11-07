@@ -21,11 +21,13 @@
       <LowStockBanner :cells="lowStock" to="/hospital/stock-thresholds" class="low-stock-banner" />
 
       <!-- Summary figures: each opens the page that owns the number. -->
-      <StatStrip>
+      <StatStrip :columns="3">
         <StatItem :loading="loading" label="Available blood units" :value="unitsAvailable" hint="Across all compatible blood types" icon="blood-drop" tone="primary" to="/hospital/bloodavailability" />
         <StatItem :loading="loading" label="Pending requests" :value="pendingCount" hint="Awaiting Blood Center approval" icon="clock" tone="warning" to="/hospital/bloodrequests" />
         <StatItem :loading="loading" label="Approved requests" :value="approvedCount" hint="Ready for processing" icon="check-circle" tone="success" to="/hospital/bloodrequests" />
         <StatItem :loading="loading" label="Completed requests today" :value="completedToday" hint="Successfully fulfilled today" icon="trending-up" tone="primary" to="/hospital/trackrequests" />
+        <StatItem :loading="loading" label="Untagged Crossmatch" :value="untaggedCrossmatched" hint="Crossmatched units not transfused after 24 hrs" icon="user-x" tone="warning" to="/hospital/inventory?tag_status=untagged_crossmatched&untag_reason=transfusion_deadline_expired" />
+        <StatItem :loading="loading" label="Untagged Assigned" :value="untaggedAssigned" hint="Assigned units not crossmatched after 24 hrs" icon="user-x" tone="warning" to="/hospital/inventory?tag_status=untagged_assigned&untag_reason=crossmatch_deadline_expired" />
       </StatStrip>
 
       <!-- The shelf by blood type, from Blood Bank Inventory (project owner, 2026-10-28). -->
@@ -237,6 +239,8 @@ const unitsAvailable = ref(0)
 const pendingCount = ref(0)
 const approvedCount = ref(0)
 const completedToday = ref(0)
+const untaggedCrossmatched = ref(0)
+const untaggedAssigned = ref(0)
 
 // Widgets data
 const recentRequests = ref([])
@@ -472,6 +476,8 @@ onMounted(async () => {
     animateCounter(pendingCount, data.pending_requests ?? 0)
     animateCounter(approvedCount, data.approved_requests ?? 0)
     animateCounter(completedToday, data.completed_today ?? 0)
+    animateCounter(untaggedCrossmatched, data.untagged_crossmatched ?? 0)
+    animateCounter(untaggedAssigned, data.untagged_assigned ?? 0)
   } catch (err) {
     console.error('Failed to load hospital dashboard data:', err)
     // Said plainly: zeros here would read as a real, empty day.

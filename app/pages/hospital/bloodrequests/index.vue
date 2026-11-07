@@ -29,7 +29,7 @@
         </StatItem>
         <StatItem :loading="loading" pressable :pressed="filters.status === CARD_STATUSES.approved" @click="toggleStatus(CARD_STATUSES.approved)" label="Processing" :value="animatedCounts.approved" icon="check-circle" tone="success">
           <template #hint>
-            Stock reserved by the blood center
+            Units tagged by the blood center
             <span v-if="trends.approved.hasData" class="stat-trend" :class="trends.approved.up ? 'up' : 'down'">
               <AssetIcon :name="trends.approved.up ? 'trending-up' : 'trending-down'" :size="11" />
               {{ trends.approved.label }}
@@ -529,8 +529,8 @@ function priorityOf(priority) {
 
 // Fulfilment is counted at dispatch: released units move a request to
 // Partially Fulfilled, and every requested unit released makes it Fulfilled.
-const progressSteps = ['Submitted', 'Stock reserved', 'Partially fulfilled', 'Fulfilled']
-const detailSteps = ['Submitted', 'Reviewed', 'Stock reserved', 'Units released', 'Fulfilled']
+const progressSteps = ['Submitted', 'Units tagged', 'Partially fulfilled', 'Fulfilled']
+const detailSteps = ['Submitted', 'Reviewed', 'Units tagged', 'Units released', 'Fulfilled']
 
 function stepIndex(status) {
   return { pending: 0, processing: 1, partial: 2, fulfilled: 3, rejected: 0, cancelled: 0 }[status] ?? 0
@@ -659,7 +659,7 @@ watch([searchQuery, () => ({ ...filters })], () => go(1))
 
 // ---------- KPI counts (animated) ----------
 // The card keys are historical; each now counts a status the API really sends.
-// approved → processing (stock reserved), ready → partial, completed → fulfilled.
+// approved → processing (units tagged), ready → partial, completed → fulfilled.
 const CARD_STATUSES = { pending: 'pending', approved: 'processing', ready: 'partial', completed: 'fulfilled' }
 
 const rawCounts = computed(() => ({

@@ -264,6 +264,10 @@
                     <span v-else-if="row.last_tag && row.status === 'pending_return'" class="patient cell-muted">
                       Was {{ row.last_tag.patient.full_name }}
                     </span>
+                    <!-- Held for a blood donor partner; on the shelf the badge already says Reserved. -->
+                    <span v-if="row.partner_reservation" class="partner-line">
+                      <template v-if="row.status !== 'available'">Reserved · </template>{{ row.partner_reservation.partner }}
+                    </span>
                   </td>
                   <td class="actions-col" @click.stop>
                     <div class="row-menu" @focusout="onRowMenuFocusOut">
@@ -494,6 +498,23 @@
                 </dl>
               </section>
 
+              <section v-if="drawerUnit.partner_reservation">
+                <p class="drawer-section-title">Reserved For</p>
+                <dl class="drawer-info-grid">
+                  <div class="drawer-info-grid__wide">
+                    <dt>Blood Donor Partner</dt>
+                    <dd class="partner-line partner-line--strong">{{ drawerUnit.partner_reservation.partner }}</dd>
+                  </div>
+                  <div class="drawer-info-grid__wide">
+                    <dt>Reserved</dt>
+                    <dd>
+                      {{ formatDateTime(drawerUnit.partner_reservation.reserved_at) || '—' }}
+                      <span v-if="drawerUnit.partner_reservation.reserved_by" class="drawer-note">{{ drawerUnit.partner_reservation.reserved_by }}</span>
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
               <section>
                 <p class="drawer-section-title">Tags</p>
                 <ol v-if="drawerTagsLoading" class="history-list" aria-hidden="true">
@@ -678,7 +699,19 @@
                   aria-label="Outcome"
                   :options="[
                     { value: '', label: 'All' },
-                    ...['untagged_assigned', 'untagged_crossmatched', 'transfused'].map((value) => ({ value, label: UNIT_TAG_STATUS_LABELS[value] })),
+                    ...TAG_OUTCOMES.map((value) => ({ value, label: UNIT_TAG_STATUS_LABELS[value] })),
+                  ]"
+                />
+              </label>
+              <label class="filter-field">
+                <span class="filter-field__label">Reason</span>
+                <SelectField
+                  v-model="eventFilters.untagReason"
+                  size="sm"
+                  aria-label="Reason"
+                  :options="[
+                    { value: '', label: 'All' },
+                    ...Object.entries(UNTAG_REASON_LABELS).map(([value, label]) => ({ value, label })),
                   ]"
                 />
               </label>
@@ -700,7 +733,9 @@
               </ol>
               <p v-else-if="eventsError" class="drawer-muted drawer-muted--pad">{{ eventsError }}</p>
               <p v-else-if="!events.length && !eventsLoading" class="drawer-muted drawer-muted--pad">
-                No ended tags yet. Released and transfused bags appear here, newest first.
+                {{ eventFilters.search.trim() || eventFilters.status || eventFilters.untagReason
+                  ? 'No ended tags match these filters.'
+                  : 'No ended tags yet. Released and transfused bags appear here, newest first.' }}
               </p>
               <ol class="activity-list">
                 <li v-for="event in events" :key="event.id" class="activity-item">
@@ -767,6 +802,21 @@
         <strong>Untagged Assigned</strong> and is available again at once.
       </template>
     </HospitalUnitReasonDialog>
+
+    <HospitalUnitReasonDialog
+      v-if="dialog?.kind === 'reserve'"
+      :title="`Reserve ${bagLabel(dialog.unit)} for a blood donor partner`"
+      label="Blood donor partner"
+      confirm-label="Reserve bag"
+      icon="lock"
+      :danger="false"
+      single-line
+      :maxlength="150"
+      :busy="dialogBusy"
+      :error="dialogError"
+      @confirm="runReserve"
+      @close="closeDialog"
+    />
 
     <HospitalUnitReasonDialog
       v-if="dialog?.kind === 'discard'"
@@ -858,6 +908,7 @@ import {
   TAG_STAGE_LABELS,
   UNIT_REFUSAL_MESSAGES,
   UNIT_TAG_STATUS_LABELS,
+  UNTAG_REASON_LABELS,
 } from '~/types/hospitalInventory'
 import { actionsFor, deadlineTier, formatRemaining, remainingMs, serverSkew } from '~/utils/tagDeadline'
 import { typeHealthByCode } from '~/utils/stockThreshold'
@@ -875,15 +926,24 @@ const ACTIONS = {
   crossmatch: { label: 'Record crossmatch', icon: 'flask-conical' },
   transfuse: { label: 'Record transfusion', icon: 'blood-drop' },
   release: { label: 'Release tag', icon: 'user-x' },
+  reserve: { label: 'Reserve for blood donor partner', icon: 'lock' },
+  unreserve: { label: 'Release reservation', icon: 'unlock' },
   return: { label: 'Back in storage', icon: 'refresh-cw' },
   discard: { label: 'Discard', icon: 'trash-2' },
 }
 
-/** The Status filter: each status in lifecycle order, with both tag stages together after them. */
+/**
+ * The Status filter: each status in lifecycle order, with both tag stages
+ * together after them, then the untagged bags reserved for a donor partner.
+ */
 const STATUS_OPTIONS = [
   ...HOSPITAL_UNIT_STATUSES.map((value) => ({ value, label: HOSPITAL_UNIT_STATUS_LABELS[value] })),
   { value: 'tagged', label: 'Tagged (either stage)' },
+  { value: 'reserved', label: 'Reserved for partner' },
 ]
+
+/** Where a bag still is in the blood bank, so a partner reservation on it can be released. */
+const ON_HAND = ['available', 'tag_assigned', 'tag_crossmatched', 'pending_return']
 
 /** How long after a deadline passes to look again: the sweep runs every minute. */
 const SWEEP_GRACE_MS = 65_000
@@ -1157,7 +1217,7 @@ async function loadUnits(page = unitsMeta.page, { quiet = false } = {}) {
 const unitRows = computed(() =>
   units.value.map((unit) => ({
     ...unit,
-    tag: hospitalUnitStatusTag(unit.status, unit.days_remaining),
+    tag: hospitalUnitStatusTag(unit.status, unit.days_remaining, Boolean(unit.partner_reservation)),
     remaining: hospitalRemainingDaysTag(unit.status, unit.days_remaining),
   })),
 )
@@ -1240,18 +1300,32 @@ function rowClass(unit) {
 const anyOverdue = computed(() => [...units.value, drawerUnit.value].some((unit) => unit?.active_tag && remainingFor(unit) <= 0))
 
 // --- What this role may do to a bag ---
-/** The tag steps this role may take on a bag; discard is offered apart. */
+/**
+ * The tag steps this role may take on a bag; discard is offered apart.
+ *
+ * An untagged bag in date may be reserved for a blood donor partner (project
+ * owner, 2026-11-07), and a reserved one released while it is still here.
+ */
 function handleActions(unit) {
-  return canHandle.value ? actionsFor(unit.status, unit.bag_expired).filter((action) => action !== 'discard') : []
+  if (!canHandle.value) return []
+
+  const reserved = Boolean(unit.partner_reservation)
+
+  return [
+    ...actionsFor(unit.status, unit.bag_expired).filter((action) => action !== 'discard'),
+    ...(!reserved && unit.status === 'available' && !unit.bag_expired ? ['reserve'] : []),
+    ...(reserved && ON_HAND.includes(unit.status) ? ['unreserve'] : []),
+  ]
 }
 
 function canDiscardRow(unit) {
   return canDiscard.value && actionsFor(unit.status, unit.bag_expired).includes('discard')
 }
 
-// Past a deadline only a release is still taken: the sweep is about to end the tag.
+// Past a deadline only releases are still taken: the sweep is about to end the tag.
 function actionBlocked(action, unit) {
-  return busyUnit.value === unit.unit_id || (action !== 'release' && Boolean(unit.active_tag) && remainingFor(unit) <= 0)
+  return busyUnit.value === unit.unit_id
+    || (!['release', 'unreserve'].includes(action) && Boolean(unit.active_tag) && remainingFor(unit) <= 0)
 }
 
 // --- Row action menu ---
@@ -1275,7 +1349,9 @@ const drawerTags = ref([])
 const drawerTagsLoading = ref(false)
 const drawerTagsError = ref('')
 
-const drawerTag = computed(() => (drawerUnit.value ? hospitalUnitStatusTag(drawerUnit.value.status, drawerUnit.value.days_remaining) : null))
+const drawerTag = computed(() => (drawerUnit.value
+  ? hospitalUnitStatusTag(drawerUnit.value.status, drawerUnit.value.days_remaining, Boolean(drawerUnit.value.partner_reservation))
+  : null))
 const drawerRemaining = computed(() => {
   const unit = drawerUnit.value
   if (!unit || unit.days_remaining === null || unit.days_remaining === undefined) return ''
@@ -1364,7 +1440,12 @@ const eventsPage = ref(0)
 const eventsLastPage = ref(1)
 const eventsLoading = ref(false)
 const eventsError = ref('')
-const eventFilters = reactive({ search: '', status: '' })
+
+// The dashboard's Untagged tiles open this drawer on the tags they count.
+const TAG_OUTCOMES = ['untagged_assigned', 'untagged_crossmatched', 'transfused']
+const startTagStatus = TAG_OUTCOMES.includes(route.query.tag_status) ? route.query.tag_status : ''
+const startUntagReason = Object.keys(UNTAG_REASON_LABELS).includes(route.query.untag_reason) ? route.query.untag_reason : ''
+const eventFilters = reactive({ search: '', status: startTagStatus, untagReason: startUntagReason })
 
 let eventsTicket = 0
 async function loadEvents(page) {
@@ -1376,6 +1457,7 @@ async function loadEvents(page) {
     const response = await hospitalService.tagEvents({
       search: eventFilters.search.trim() || undefined,
       status: eventFilters.status || undefined,
+      untag_reason: eventFilters.untagReason || undefined,
       page,
       per_page: 20,
     })
@@ -1403,7 +1485,7 @@ function openTagHistory() {
 }
 
 let eventsSearchTimer = null
-watch(() => eventFilters.status, () => { if (tagHistoryOpen.value) loadEvents(1) })
+watch(() => [eventFilters.status, eventFilters.untagReason], () => { if (tagHistoryOpen.value) loadEvents(1) })
 watch(() => eventFilters.search, () => {
   clearTimeout(eventsSearchTimer)
   eventsSearchTimer = setTimeout(() => { if (tagHistoryOpen.value) loadEvents(1) }, 300)
@@ -1445,6 +1527,12 @@ const confirmCopy = computed(() => {
         body: 'Confirm only once the bag is back in the blood bank\'s storage. It becomes available to tag again.',
         action: 'Confirm return',
       }
+    case 'unreserve':
+      return {
+        title: `Release the reservation on ${bagLabel(value.unit)}?`,
+        body: `${value.unit.partner_reservation?.partner ?? 'The partner'} will no longer hold this bag.`,
+        action: 'Release reservation',
+      }
     default:
       return null
   }
@@ -1474,11 +1562,16 @@ async function runDiscard(reason) {
   await perform((unit) => hospitalService.discardUnit(unit.unit_id, reason))
 }
 
+async function runReserve(partner) {
+  await perform((unit) => hospitalService.reserveUnit(unit.unit_id, partner))
+}
+
 async function runConfirm() {
   const calls = {
     crossmatch: (unit) => hospitalService.crossmatchUnit(unit.unit_id),
     transfuse: (unit) => hospitalService.transfuseUnit(unit.unit_id),
     return: (unit) => hospitalService.confirmUnitReturn(unit.unit_id),
+    unreserve: (unit) => hospitalService.unreserveUnit(unit.unit_id),
   }
 
   await perform(calls[dialog.value.kind])
@@ -1634,6 +1727,7 @@ let ticker = null
 
 onMounted(async () => {
   readShape()
+  if (startTagStatus || startUntagReason) openTagHistory()
   await loadReference()
   await Promise.all([loadSummary(), loadOverview(), loadUnits(1)])
   lastUpdated.value = new Date()
@@ -1685,6 +1779,9 @@ onBeforeUnmount(() => {
   --inv-ok-fill: #1BAF7A;
   --inv-warn-fill: #EDA100;
   --inv-crit-fill: #DC2626;
+  /* Reserved for a blood donor partner: the Inventory Report's purple. */
+  --inv-partner: #7B1FA2;
+  --inv-partner-fill: #9C27B0;
   --inv-action: var(--rb-primary);
   --inv-action-hover: var(--rb-primary-hover);
   --inv-action-text: var(--rb-primary-text);
@@ -1700,6 +1797,8 @@ onBeforeUnmount(() => {
   --inv-ok-fill: #199E70;
   --inv-warn-fill: #C98500;
   --inv-crit-fill: #EF4444;
+  --inv-partner: #D8A8F0;
+  --inv-partner-fill: #BA68C8;
   color-scheme: dark;
 }
 .tone--success { --tone: var(--inv-ok); --tone-fill: var(--inv-ok-fill); }
@@ -1707,6 +1806,7 @@ onBeforeUnmount(() => {
 .tone--danger { --tone: var(--inv-crit); --tone-fill: var(--inv-crit-fill); }
 .tone--neutral { --tone: var(--inv-muted); --tone-fill: var(--inv-muted); }
 .tone--muted { --tone: var(--inv-faint); --tone-fill: var(--inv-faint); }
+.tone--partner { --tone: var(--inv-partner); --tone-fill: var(--inv-partner-fill); }
 
 /* The page keeps the app's shared column. Its background is carried past it
    to the content area's edges by a shadow, not clip-path: a clip would also
@@ -1978,6 +2078,9 @@ onBeforeUnmount(() => {
   color: var(--tone); background: color-mix(in srgb, var(--tone-fill) 14%, transparent);
 }
 .countdown.tone--neutral { color: var(--inv-text); background: var(--inv-elevated); }
+/* The blood donor partner a bag is held for, in the report's purple. */
+.partner-line { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--inv-partner); white-space: normal; }
+.drawer-info-grid dd.partner-line--strong { margin-top: 0; font-weight: 600; color: var(--inv-partner); }
 
 .th-sort {
   display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none;
@@ -2064,8 +2167,8 @@ onBeforeUnmount(() => {
 .detail-drawer__body--flush { padding: 0; gap: 0; }
 .detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--inv-border); }
 .detail-drawer__footer { justify-content: flex-end; }
-.drawer-filters .search-field { flex: 1 1 260px; }
-.drawer-filters .filter-field { flex: 0 0 200px; }
+.drawer-filters .search-field { flex: 1 1 100%; }
+.drawer-filters .filter-field { flex: 1 1 200px; }
 .drawer-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 14px 22px; border-bottom: 1px solid var(--inv-border); }
 .drawer-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--inv-muted); margin: 0 0 10px; }
 .drawer-info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 14px; margin: 0; }

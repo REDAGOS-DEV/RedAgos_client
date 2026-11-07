@@ -57,39 +57,53 @@ describe('the questionnaire drawer', () => {
 
   it('says plainly that it is not the on-site screening', () => {
     // The staff's own vitals form sits centimetres away on the same page.
-    // The chip names what is read-only rather than claiming the whole drawer
-    // is, now that the officer's own margin boxes sit at the top of it.
     expect(drawer).toContain("Donor's answers are read only")
     expect(drawer).toContain("data?.notice")
   })
 
-  it("leaves the donor's own declaration read-only", () => {
-    // The drawer holds two things by two authors. Sections I-A to I-C are the
-    // donor's, made days ago in the app, and nothing at the counter may edit
-    // them. The four margin boxes above the tabs are the officer's, asked in
-    // person — they are the single exception, and it is bounded here.
-    const donorSections = drawer.slice(drawer.indexOf('<nav class="dhq__tabs"'))
+  it('no longer asks Sleep, Meal, Meds or Allergies (project owner, 2026-11-06)', () => {
+    const template = drawer.slice(0, drawer.indexOf('<script setup>'))
 
-    expect(donorSections).not.toMatch(/<input/)
-    expect(donorSections).not.toContain('v-model')
-    expect(donorSections).not.toContain('$emit')
+    expect(template).not.toMatch(/<input/)
+    expect(template).not.toContain('v-model')
+    expect(template).not.toContain('Ask the donor')
+    expect(drawer).not.toContain('update-intake')
   })
 
-  it('never writes into the intake object it was handed', () => {
-    // The counter owns that state, because the screening form has to send it
-    // and the two must not drift. The drawer asks for a change instead.
-    expect(drawer).not.toMatch(/v-model="intake/)
-    expect(drawer).toContain("$emit('update-intake'")
+  it('leaves personal data and consent read-only', () => {
+    // The physician changes the answers to Section I-B and nothing else. What
+    // the donor consented to in particular is never anyone else's to edit.
+    const personal = drawer.slice(drawer.indexOf('<!-- I-A -->'), drawer.indexOf('<!-- I-B -->'))
+    const consent = drawer.slice(drawer.indexOf('<!-- I-C -->'), drawer.indexOf('<footer'))
+
+    for (const panel of [personal, consent]) {
+      expect(panel).not.toContain('<button')
+      expect(panel).not.toContain('@click')
+    }
   })
 
-  it('carries no save or submit action of its own', () => {
-    // The margin boxes are saved with the screening, not on their own: a set
-    // of answers with no screening behind them would belong to nothing.
-    expect(drawer).not.toMatch(/@click="submit|@click="save/)
+  it('offers Yes and No only where the question was put to this donor', () => {
+    expect(drawer).toContain('v-if="amendable && question.applicable"')
+    expect(drawer).toContain('role="radiogroup"')
   })
 
-  it('will not take intake answers before there is a visit to record them against', () => {
-    expect(drawer).toContain(':disabled="!canEditIntake"')
+  it('stops offering them once the answers have lapsed', () => {
+    expect(drawer).toContain('props.canAmend && !props.data?.is_expired')
+  })
+
+  it('says what the donor declared on a row that was changed', () => {
+    expect(drawer).toContain('question.amendment.donor_answer_label')
+    expect(component('DonorQuestionnaireSheet.vue')).toContain('question.amendment.donor_answer_label')
+  })
+
+  it('saves changes together, and asks before closing on unsaved ones', () => {
+    expect(drawer).toContain('bloodCenterService.amendQuestionnaireAnswers')
+    expect(drawer).toContain("emit('amended'")
+    expect(drawer).toContain('Discard the changed answers?')
+    expect(drawer).toContain('@click.self="requestClose"')
+    expect(drawer).toContain('@keydown.esc="requestClose"')
+    expect(drawer).toContain('v-focus-trap')
+    expect(drawer).not.toContain("$emit('close')")
   })
 
   it('prints a field the donor never supplied as absent rather than empty', () => {
@@ -168,5 +182,33 @@ describe('the prior-deferral notice', () => {
     expect(notice).toContain('outcome_label')
     expect(notice).not.toContain('permanently_deferred')
     expect(notice).not.toContain('indefinite_deferral')
+  })
+})
+
+describe('the Donation counter and the questionnaire', () => {
+  const page = readFileSync(path.join(root, 'app/pages/blood-center/donation.vue'), 'utf8')
+  const submit = page.slice(page.indexOf('async function submitScreening'), page.indexOf('async function submitCollection'))
+  const correctionAt = submit.indexOf("correcting.value === 'screening'")
+
+  it('lets only the physician change answers, and only until the screening is saved', () => {
+    expect(page).toContain("const canAmendQuestionnaire = computed(() => canScreen.value && stage.value === 'screening')")
+    expect(page).toContain(':can-amend="canAmendQuestionnaire"')
+    expect(page).toContain('@amended="questionnaire = $event"')
+  })
+
+  it('does not ask them for a new screening', () => {
+    expect(correctionAt).toBeGreaterThan(-1)
+    expect(submit.slice(0, correctionAt)).not.toContain("'sleep'")
+    expect(page).not.toContain('intakeForm')
+  })
+
+  it('keeps what was saved through a correction', () => {
+    // The server writes a missing field as empty and a correction replaces the
+    // whole screening, so leaving them out would erase them on approval.
+    const correction = submit.slice(correctionAt)
+
+    expect(correction).toContain("['sleep', 'meal', 'meds', 'allergies']")
+    expect(correction).toContain('payload[key] = saved[key]')
+    expect(correction.indexOf('payload[key] = saved[key]')).toBeLessThan(correction.indexOf('correction.value ='))
   })
 })
