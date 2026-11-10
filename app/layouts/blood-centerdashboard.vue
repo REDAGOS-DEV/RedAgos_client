@@ -325,6 +325,9 @@
       </main>
 
     </div>
+
+    <!-- A phone or small tablet: made for a desktop or laptop (2026-11-11). -->
+    <DesktopOnlyNotice portal="blood center portal" />
   </div>
 </template>
 
@@ -335,6 +338,7 @@ import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useSidebar } from '~/composables/useSidebar.js'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DesktopOnlyNotice from '~/components/common/DesktopOnlyNotice.vue'
 import BloodCenterNotificationBell from '~/components/BloodCenter/NotificationBell.vue'
 import { HELP_GUIDES, guideVisible, searchGuides } from '~/utils/bloodCenterHelp'
 import { useAccentTheme } from '~/composables/useAccentTheme'

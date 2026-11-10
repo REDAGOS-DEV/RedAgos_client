@@ -6,105 +6,98 @@
       </div>
     </header>
 
-    <!-- The verified context, held for the whole visit. -->
-    <section v-if="donor" class="donor-bar" aria-label="Verified donor">
-      <div class="donor-bar__identity">
-        <span class="donor-bar__avatar">{{ initials }}</span>
-        <div>
-          <p class="donor-bar__name">{{ donor.full_name }}</p>
-          <p class="donor-bar__meta">
-            {{ donor.donor_code }}
-            <template v-if="donor.blood_type"> · {{ donor.blood_type }}</template>
-            <template v-if="donor.phone"> · {{ donor.phone }}</template>
-          </p>
+    <!-- The verified context, held for the whole visit: who, the visit's facts
+         once each, and where the visit stands. -->
+    <section v-if="donor" class="donor-card" aria-label="Verified donor">
+      <div class="donor-bar">
+        <div class="donor-bar__identity">
+          <span class="donor-bar__avatar">{{ initials }}</span>
+          <div class="donor-bar__who">
+            <p class="donor-bar__name">
+              {{ donor.full_name }}
+              <span v-if="donor.blood_type" class="donor-bar__blood" title="Blood group">{{ donor.blood_type }}</span>
+            </p>
+            <p class="donor-bar__meta">
+              {{ donor.donor_code }}
+              <template v-if="donor.phone"> · {{ donor.phone }}</template>
+            </p>
+          </div>
         </div>
+
+        <div class="donor-bar__facts">
+          <template v-if="appointment">
+            <div class="fact">
+              <span class="fact__label">Appointment</span>
+              <span class="fact__value">{{ appointmentLabel }}</span>
+            </div>
+            <div class="fact">
+              <span class="fact__label">Booking</span>
+              <span class="pill" :class="appointmentPillClass">{{ appointment.status_label }}</span>
+            </div>
+          </template>
+          <!-- How they came, until the donation's own type says it. -->
+          <div v-else-if="!donation?.donation_type" class="fact">
+            <span class="fact__label">Arrival</span>
+            <span class="fact__value">{{ arrival === 'qr' ? 'Donor Portal QR' : 'Walk-in' }}</span>
+          </div>
+          <div class="fact">
+            <span class="fact__label">Donation</span>
+            <span class="pill" :class="donationPillClass">{{ donation?.status_label || 'Not opened' }}</span>
+          </div>
+          <div v-if="donation?.donation_type" class="fact">
+            <span class="fact__label">Type</span>
+            <span class="pill pill--kind">{{ donation.donation_type_label }}</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn" :class="{ 'btn--danger-soft': stage !== 'done' }" :disabled="busy" @click="finishVisit">
+          {{ stage === 'done' ? 'Next donor' : 'Cancel visit' }}
+        </button>
       </div>
 
-      <div class="donor-bar__facts">
-        <div class="fact">
-          <span class="fact__label">Appointment</span>
-          <span class="fact__value">{{ appointmentLabel }}</span>
-        </div>
-        <div class="fact">
-          <span class="fact__label">Status</span>
-          <span class="pill" :class="appointmentPillClass">{{ appointment?.status_label || 'Walk-in' }}</span>
-        </div>
-        <div class="fact">
-          <span class="fact__label">Donation</span>
-          <span class="pill" :class="donationPillClass">{{ donation?.status_label || 'Not opened' }}</span>
-        </div>
-        <div v-if="donation?.donation_type" class="fact">
-          <span class="fact__label">Type</span>
-          <span class="pill pill--kind">{{ donation.donation_type_label }}</span>
-        </div>
-      </div>
+      <!-- A booked donor's booking, in one line. -->
+      <p v-if="appointment && (appointment.event || appointment.booked_at)" class="donor-card__booking">
+        <template v-if="appointment.event">
+          <AssetIcon name="route" :size="13" />
+          {{ appointment.event.name }}<template v-if="appointment.event.location"> · {{ appointment.event.location }}</template>
+        </template>
+        <span v-if="appointment.booked_at" class="donor-card__booked">Booked {{ longDate(appointment.booked_at) }}<template v-if="arrival === 'qr'"> in the Donor Portal</template></span>
+      </p>
 
-      <button type="button" class="btn" :disabled="busy" @click="finishVisit">
-        {{ stage === 'done' ? 'Next donor' : 'Cancel visit' }}
-      </button>
+      <!-- Progress through the one continuous transaction. -->
+      <ol class="steps" aria-label="Visit progress">
+        <li v-for="step in steps" :key="step.key" class="step" :class="step.state">
+          <span class="step__dot">
+            <AssetIcon v-if="step.state === 'step--done'" name="check" :size="12" />
+            <template v-else>{{ step.index }}</template>
+          </span>
+          <span class="step__label">{{ step.label }}</span>
+        </li>
+      </ol>
     </section>
 
     <BloodCenterPriorDeferralNotice v-if="priorDeferral" :deferral="priorDeferral" />
 
     <!--
-      How the donor came in, and their questionnaire. A booked donor brings the
-      booking and the DHQ they answered in the Donor Portal, which the desk
-      prints to travel with them; a walk-in answers the DHQ here.
+      The questionnaire, once: whether one is on file, and every action on it.
+      A booked donor brings the DHQ they answered in the Donor Portal, which
+      the desk prints to travel with them; a walk-in answers it here.
     -->
-    <section v-if="donor" class="visit" aria-label="Booking and questionnaire">
-      <div class="visit__panel">
-        <p class="visit__label">
-          <AssetIcon :name="arrival === 'qr' ? 'qr-code' : 'user'" :size="14" />
-          {{ arrival === 'qr' ? (appointment ? 'Booked in the Donor Portal' : 'Donor Portal QR') : appointment ? 'Booked donor' : 'Walk-in donor' }}
-        </p>
-
-        <dl v-if="appointment" class="visit__facts">
-          <div>
-            <dt>Appointment</dt>
-            <dd>{{ longDateTime(appointment.appointment_datetime) }}</dd>
-          </div>
-          <div v-if="appointment.booked_at">
-            <dt>Booked on</dt>
-            <dd>{{ longDate(appointment.booked_at) }}</dd>
-          </div>
-          <div v-if="appointment.event">
-            <dt>Donation drive</dt>
-            <dd>
-              {{ appointment.event.name }}
-              <span v-if="appointment.event.location" class="visit__muted">· {{ appointment.event.location }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Booking status</dt>
-            <dd><span class="pill" :class="appointmentPillClass">{{ appointment.status_label }}</span></dd>
-          </div>
-        </dl>
-
-        <p v-else class="visit__text">
-          <template v-if="arrival === 'qr'">No appointment is booked here today. The donation opens as a walk-in.</template>
-          <template v-else>No booking. Open the donation, then the donor completes the health questionnaire onsite.</template>
-        </p>
-      </div>
-
-      <div class="visit__panel" :class="{ 'visit__panel--todo': !dhqOnFile }">
-        <p class="visit__label">
-          <AssetIcon name="clipboard-list" :size="14" />
-          Health questionnaire (DHQ)
-        </p>
-
-        <template v-if="dhqOnFile">
-          <p class="visit__text">
-            <AssetIcon name="circle-check-big" :size="14" class="visit__ok" />
-            {{ dhqSourceLine }}
-          </p>
-          <p class="visit__muted">
-            Valid until {{ longDate(questionnaireMeta.valid_until) }}
-            · {{ questionnaireMeta.consent_captured ? 'Consent given' : 'No consent on file' }}
-          </p>
-        </template>
-
-        <template v-else>
-          <p class="visit__text">
+    <section v-if="donor" class="dhq-card" :class="{ 'dhq-card--todo': !dhqOnFile }" aria-label="Health questionnaire">
+      <div class="dhq-card__main">
+        <span class="dhq-card__icon" aria-hidden="true">
+          <AssetIcon :name="dhqOnFile ? 'circle-check-big' : 'clipboard-list'" :size="18" />
+        </span>
+        <div class="dhq-card__text">
+          <p class="dhq-card__label">Health questionnaire (DHQ)</p>
+          <template v-if="dhqOnFile">
+            <p class="dhq-card__status">{{ dhqSourceLine }}</p>
+            <p class="dhq-card__meta">
+              <template v-if="questionnaireMeta.question_version">DHQ v{{ questionnaireMeta.question_version }} · </template>Valid until {{ longDate(questionnaireMeta.valid_until) }}
+              · <span :class="{ 'dhq-card__warn': !questionnaireMeta.consent_captured }">{{ questionnaireMeta.consent_captured ? 'Consent given' : 'No consent on file' }}</span>
+            </p>
+          </template>
+          <p v-else class="dhq-card__status">
             <template v-if="questionnaireMeta?.available">
               The questionnaire on file is past its validity date. The donor answers it again onsite.
             </template>
@@ -115,40 +108,55 @@
               Not completed in the Donor Portal. The donor can answer it onsite here, or on the paper form.
             </template>
           </p>
-        </template>
-
-        <div class="visit__actions">
-          <button
-            v-if="canRecordQuestionnaire && !dhqOnFile"
-            type="button"
-            class="btn btn--primary btn--small"
-            :disabled="!donation || isClosed"
-            @click="onsiteOpen = true"
-          >
-            <AssetIcon name="clipboard-plus" :size="13" />
-            Start DHQ onsite
-          </button>
-
-          <button
-            v-if="canPrintQuestionnaire && questionnaireMeta?.available"
-            type="button"
-            class="btn btn--small"
-            :class="{ 'btn--primary': dhqOnFile && arrival === 'qr' && !canReadQuestionnaire }"
-            @click="printQuestionnaire"
-          >
-            <AssetIcon name="printer" :size="13" />
-            Print DHQ
-          </button>
-
-          <button
-            v-if="canRecordQuestionnaire && dhqOnFile && donation && !isClosed"
-            type="button"
-            class="btn btn--small btn--ghost"
-            @click="onsiteOpen = true"
-          >
-            Answer again onsite
-          </button>
         </div>
+      </div>
+
+      <div class="dhq-card__actions">
+        <button
+          v-if="canRecordQuestionnaire && !dhqOnFile"
+          type="button"
+          class="btn btn--primary btn--small"
+          :disabled="!donation || isClosed"
+          @click="onsiteOpen = true"
+        >
+          <AssetIcon name="clipboard-plus" :size="13" />
+          Start DHQ onsite
+        </button>
+
+        <button
+          v-if="canPrintQuestionnaire && questionnaireMeta?.available"
+          type="button"
+          class="btn btn--small"
+          :class="{ 'btn--primary': dhqOnFile && arrival === 'qr' && !canReadQuestionnaire }"
+          @click="printQuestionnaire"
+        >
+          <AssetIcon name="printer" :size="13" />
+          Print DHQ
+        </button>
+
+        <button
+          v-if="canRecordQuestionnaire && dhqOnFile && donation && !isClosed"
+          type="button"
+          class="btn btn--small btn--ghost"
+          @click="onsiteOpen = true"
+        >
+          Answer again onsite
+        </button>
+
+        <!--
+          The donor's declared health answers are the physician's to read. The
+          receptionist and the chair see that the visit exists, not what the donor
+          declared.
+        -->
+        <BloodCenterDonorQuestionnaireSummary
+          v-if="donor && canReadQuestionnaire"
+          compact
+          :meta="questionnaireMeta"
+          :flagged-count="flaggedCount"
+          :loading="questionnaireLoading"
+          @open="openQuestionnaire"
+          @refresh="refreshQuestionnaire"
+        />
       </div>
     </section>
 
@@ -158,20 +166,6 @@
       :donor-name="donor.full_name"
       @close="onsiteOpen = false"
       @recorded="onQuestionnaireRecorded"
-    />
-
-    <!--
-      The donor's declared health answers are the physician's to read. The
-      receptionist and the chair see that the visit exists, not what the donor
-      declared.
-    -->
-    <BloodCenterDonorQuestionnaireSummary
-      v-if="donor && canReadQuestionnaire"
-      :meta="questionnaireMeta"
-      :flagged-count="flaggedCount"
-      :loading="questionnaireLoading"
-      @open="openQuestionnaire"
-      @refresh="refreshQuestionnaire"
     />
 
     <p v-if="questionnaireError" class="alert alert--error" role="alert">{{ questionnaireErrorText }}</p>
@@ -185,17 +179,6 @@
       @print="printQuestionnaire"
       @amended="questionnaire = $event"
     />
-
-    <!-- Progress through the one continuous transaction. -->
-    <ol v-if="donor" class="steps" aria-label="Visit progress">
-      <li v-for="step in steps" :key="step.key" class="step" :class="step.state">
-        <span class="step__dot">
-          <AssetIcon v-if="step.state === 'step--done'" name="check" :size="12" />
-          <template v-else>{{ step.index }}</template>
-        </span>
-        <span class="step__label">{{ step.label }}</span>
-      </li>
-    </ol>
 
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
@@ -1024,16 +1007,6 @@ function longDate(value) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function longDateTime(value) {
-  if (!value) return '—'
-
-  const d = new Date(value)
-
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
 async function submitScreening(outcome) {
   const payload = { outcome }
 
@@ -1280,15 +1253,20 @@ function finishVisit() {
  * recessed surface the page background uses, so the white stage cards below
  * come forward without this needing an accent stripe to shout with.
  */
+/* The donor, the visit's facts and its steps: one card, the page's spine. */
+.donor-card {
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+}
+
 .donor-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 12px;
-  background: var(--rb-surface-alt);
+  gap: 1rem 1.5rem;
+  padding: 16px 20px;
 }
 
 .donor-bar__identity {
@@ -1302,8 +1280,8 @@ function finishVisit() {
 .donor-bar__avatar {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border-radius: 50%;
   background: rgba(var(--rb-primary-rgb), 0.12);
@@ -1312,12 +1290,46 @@ function finishVisit() {
   font-weight: 700;
 }
 
+.donor-bar__who { min-width: 0; }
+
 .donor-bar__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
   margin: 0;
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
   color: var(--rb-text-primary);
 }
+
+.donor-bar__blood {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-surface-alt);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.donor-card__booking {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0 20px 12px 78px;
+  font-size: 12.5px;
+  color: var(--rb-text-secondary);
+}
+.donor-card__booking :deep(.asset-icon) { color: var(--rb-text-muted); }
+.donor-card__booked { color: var(--rb-text-muted); }
 
 .donor-bar__meta {
   margin: 0.1rem 0 0;
@@ -1328,7 +1340,7 @@ function finishVisit() {
 .donor-bar__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.1rem;
+  gap: 1.5rem;
 }
 
 .fact { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -1362,14 +1374,27 @@ function finishVisit() {
 .pill--rejected { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); border-color: transparent; }
 
 /* --- progress --- */
+/* The steps close the donor card, joined by a line that fills as they go. */
 .steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.2rem;
+  align-items: center;
+  gap: 0.5rem 0;
   margin: 0;
-  padding: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--rb-border);
   list-style: none;
 }
+.step + .step::before {
+  content: '';
+  width: 36px;
+  height: 2px;
+  margin: 0 12px;
+  border-radius: 2px;
+  background: var(--rb-border-strong);
+}
+.step--done + .step::before,
+.step--done + .step--current::before { background: var(--rb-success); }
 
 .step { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; }
 
@@ -1428,63 +1453,42 @@ function finishVisit() {
 }
 
 /* --- booking and questionnaire --- */
-.visit {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.visit__panel {
+/* --- the questionnaire, once --- */
+.dhq-card {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0.9rem 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px 20px;
   border: 1px solid var(--rb-border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--rb-surface);
 }
 
-.visit__panel--todo {
+/* Nothing on file yet: the card asks for it. */
+.dhq-card--todo {
   border-color: rgba(var(--rb-warning-rgb), 0.45);
   background: rgba(var(--rb-warning-rgb), 0.06);
 }
 
-.visit__label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--rb-text-secondary);
+.dhq-card__main { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 22rem; }
+.dhq-card__icon {
+  display: grid; flex-shrink: 0; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text);
 }
+.dhq-card--todo .dhq-card__icon { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
+.dhq-card__text { min-width: 0; }
+.dhq-card__label { margin: 0 0 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.dhq-card__status { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--rb-text-primary); }
+.dhq-card__meta { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.dhq-card__warn { color: var(--rb-warning-text); font-weight: 700; }
+.dhq-card__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.dhq-card__actions .btn { gap: 6px; }
 
-.visit__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 8px 16px;
-  margin: 0;
-}
-
-.visit__facts dt { font-size: 11.5px; color: var(--rb-text-secondary); }
-.visit__facts dd { margin: 2px 0 0; font-size: 13.5px; color: var(--rb-text-primary); }
-
-.visit__text {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--rb-text-primary);
-}
-
-.visit__ok { color: var(--rb-success); flex: none; margin-top: 2px; }
-.visit__muted { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.visit__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 2px; }
-.visit__actions .btn { gap: 6px; }
+/* Cancel visit: a way out, not an alarm. Doubled class: .btn's own rules come later. */
+.btn.btn--danger-soft { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.4); }
+.btn.btn--danger-soft:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.06); border-color: rgba(var(--rb-accent-rgb), 0.6); }
 
 /* --- forms --- */
 .vitals {
@@ -1763,10 +1767,6 @@ function finishVisit() {
 }
 
 .done-facts strong { color: var(--rb-text-primary); }
-
-@media (max-width: 900px) {
-  .visit { grid-template-columns: minmax(0, 1fr); }
-}
 
 @media (max-width: 480px) {
   .bags { grid-template-columns: minmax(0, 1fr); }

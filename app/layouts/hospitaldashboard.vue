@@ -272,6 +272,9 @@
         <slot />
       </main>
     </div>
+
+    <!-- A phone or small tablet: made for a desktop or laptop (2026-11-11). -->
+    <DesktopOnlyNotice portal="hospital blood bank portal" />
   </div>
 </template>
 
@@ -282,6 +285,7 @@ import { useUser } from '@/composables/useUser'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import DesktopOnlyNotice from '~/components/common/DesktopOnlyNotice.vue'
 import HospitalSidebar from '~/components/Hospital/Sidebar.vue'
 import HospitalNotificationBell from '~/components/Hospital/NotificationBell.vue'
 import { hospitalGuidesFor, searchHospitalGuides } from '~/utils/hospitalHelp'
