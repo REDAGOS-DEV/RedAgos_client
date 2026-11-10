@@ -299,6 +299,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       // For everyone; Settings first, then Help Center (2026-10-27).
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
+      // Your own audit trail: the Settings page's Activity tab, one click away (2026-11-11).
+      { label: 'My activity', path: '/blood-center/settings?tab=activity', icon: 'history', keywords: 'my activity audit log history sign in login device ip who what when' },
       // Reached from the bell's "View all"; named here for the breadcrumb and search (2026-10-31).
       { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', hidden: true, keywords: 'notifications alerts inbox unread emergency messages' },
       { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
@@ -373,6 +375,12 @@ export function useBloodCenterNav() {
       .filter((item): item is BloodCenterNavItem => Boolean(item))
   )
 
+  /** Pages off the sidebar, with the pages above them (top first). */
+  const SUB_PAGES: { match: RegExp, label: string, parents: string[] }[] = [
+    { match: /^\/blood-center\/paper-records\/?$/, label: 'Paper Records', parents: ['/blood-center/donations'] },
+    { match: /^\/blood-center\/paper-records\/[^/]+$/, label: 'Sheet', parents: ['/blood-center/donations', '/blood-center/paper-records'] },
+  ]
+
   /**
    * Look up a nav item's label, for the header breadcrumb.
    */
@@ -404,5 +412,26 @@ export function useBloodCenterNav() {
     return NAV_GROUPS.find((group) => group.items.some((item) => item.path.split('?')[0] === base))?.label ?? ''
   }
 
-  return { navGroups, searchablePages, userMenuItems, labelForPath, sectionForPath, can }
+  /**
+   * The header breadcrumb as links: department, then each page above this one,
+   * then this page. Pages kept out of the sidebar (Paper Records and its
+   * sheets) name the nav page they sit under, so the trail still leads back.
+   * `current` replaces the last label (a sheet passes its own code).
+   */
+  function trailForPath(path: string, current = ''): { label: string, to?: string }[] {
+    const base = path.split('?')[0]!
+    const sub = SUB_PAGES.find((page) => page.match.test(base))
+    const parents = sub ? sub.parents : []
+    const anchor = parents[0] ?? path
+    const section = sectionForPath(anchor)
+    const own = current || (sub ? sub.label : labelForPath(path))
+
+    return [
+      ...(section ? [{ label: section }] : []),
+      ...parents.map((to) => ({ label: labelForPath(to) || SUB_PAGES.find((page) => page.match.test(to))?.label || '', to })),
+      ...(own ? [{ label: own }] : []),
+    ].filter((crumb) => crumb.label)
+  }
+
+  return { navGroups, searchablePages, userMenuItems, labelForPath, sectionForPath, trailForPath, can }
 }

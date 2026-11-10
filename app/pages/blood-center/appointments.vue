@@ -76,7 +76,7 @@
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <SkeletonRows :columns="7" :rows="6" />
+              <SkeletonRows :columns="7" :rows="6" :cell-classes="['c-id', 'c-donor', 'c-date', 'c-slot', 'c-place', 'c-status', 'c-actions']" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -101,18 +101,35 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="row in rows" :key="row.id" class="appt-row" :class="{ 'appt-row--today': row.date === todayIso }">
+              <tr
+                v-for="row in rows"
+                :key="row.id"
+                class="appt-row"
+                :class="{ 'appt-row--today': row.date === todayIso }"
+                tabindex="0"
+                :aria-label="`Open appointment ${row.code}`"
+                @click="detail = row"
+                @keydown.enter.self="detail = row"
+              >
                 <td class="c-id"><span class="code">{{ row.code }}</span></td>
                 <td class="c-donor">
-                  <div class="donor">
-                    <span class="donor__name">{{ row.donor?.full_name || 'Unknown donor' }}</span>
-                    <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
+                  <div class="person">
+                    <PersonAvatar :name="row.donor?.full_name" />
+                    <div class="person__text">
+                      <div class="donor">
+                        <span class="donor__name">{{ row.donor?.full_name || 'Unknown donor' }}</span>
+                        <span v-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
+                      </div>
+                      <span v-if="row.booked_by" class="sub" :title="row.notes || undefined">
+                        Booked by {{ row.booked_by }}<template v-if="row.notes"> · has a note</template>
+                      </span>
+                    </div>
                   </div>
-                  <span v-if="row.booked_by" class="sub" :title="row.notes || undefined">
-                    Booked by {{ row.booked_by }}<template v-if="row.notes"> · has a note</template>
-                  </span>
                 </td>
-                <td class="c-date nowrap">{{ formatShortDate(row.date) }}</td>
+                <td class="c-date nowrap">
+                  {{ formatShortDate(row.date) }}
+                  <span v-if="row.date === todayIso" class="today-tag">Today</span>
+                </td>
                 <td class="c-slot nowrap">{{ row.slot_start }} - {{ row.slot_end }}</td>
                 <td class="c-place">{{ row.place }}</td>
                 <td class="c-status">
@@ -121,11 +138,14 @@
                     {{ row.status_label }}
                   </span>
                 </td>
-                <td class="c-actions">
+                <td class="c-actions" @click.stop>
                   <!-- A scheduled row always shows its four actions, as the
                        mock-up does; one that does not apply yet is greyed out
                        and says why. The server's `can` decides which. -->
                   <div class="row-actions">
+                    <button type="button" class="icon-btn" :aria-label="`View ${row.code}`" title="View" @click="detail = row">
+                      <AssetIcon name="eye" :size="15" />
+                    </button>
                     <button
                       v-if="canVerify && (row.status === 'scheduled' || row.status === 'confirmed')"
                       type="button"
@@ -140,11 +160,12 @@
                     <NuxtLink
                       v-if="row.can.open_counter && canOpenCounter"
                       to="/blood-center/donation"
-                      class="icon-btn"
+                      class="act-btn"
                       :aria-label="`Open the donation counter for ${row.donor?.full_name}`"
                       title="In progress: open the donation counter"
                     >
-                      <AssetIcon name="arrow-right" :size="15" />
+                      Continue
+                      <AssetIcon name="arrow-right" :size="14" />
                     </NuxtLink>
                     <button
                       v-if="canVerify && (row.status === 'scheduled' || row.status === 'confirmed')"
@@ -187,7 +208,9 @@
         </div>
 
         <footer class="pager">
-          <span class="pager__info">{{ pager.total }} record(s)</span>
+          <span class="pager__info">
+            <template v-if="pager.total">Showing {{ pageFrom }}–{{ pageTo }} of </template>{{ pager.total }} record(s)
+          </span>
           <div class="pager__btns">
             <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loading" @click="load(pager.page - 1)">
               <AssetIcon name="chevron-left" :size="14" />
@@ -203,32 +226,81 @@
       </section>
     </div>
 
-    <!-- ============ CONFIRM ============ -->
-    <Transition name="modal">
-      <div v-if="confirm.open" class="modal-overlay" @click.self="closeConfirm">
-        <div class="modal-card modal-card--sm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
-          <div class="modal-card__header">
-            <h2 id="confirm-title" class="modal-card__title">
-              <AssetIcon name="triangle-alert" :size="17" />
-              {{ confirmCopy.title }}
-            </h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="closeConfirm">
-              <AssetIcon name="x" :size="18" />
-            </button>
+    <!-- ============ DETAIL ============ -->
+    <CenterModal v-if="detail" :title="`Appointment ${detail.code}`" eyebrow="Appointment" size="md" @close="detail = null">
+      <template #meta>
+        <span class="badge" :class="`badge--${appointmentTone(detail.status, detail.status_label)}`">
+          <span class="badge__dot" aria-hidden="true" />
+          {{ detail.status_label }}
+        </span>
+        <span v-if="detail.date === todayIso" class="today-tag">Today</span>
+      </template>
+
+      <div class="dd">
+        <div class="dd-donor">
+          <PersonAvatar size="lg" :name="detail.donor?.full_name" />
+          <div class="dd-donor__text">
+            <p class="dd-name">{{ detail.donor?.full_name || 'Unknown donor' }}</p>
+            <p class="dd-sub">
+              {{ detail.donor?.donor_code }}<template v-if="detail.donor?.phone"> · {{ formatPhone(detail.donor.phone) }}</template>
+            </p>
           </div>
-          <div class="modal-card__body">
-            <p id="confirm-text" class="modal-text">{{ confirmCopy.text }}</p>
-            <p v-if="confirm.error" class="form-error" role="alert">{{ confirm.error }}</p>
-          </div>
-          <div class="modal-card__footer">
-            <button type="button" class="btn-outline" @click="closeConfirm">Back</button>
-            <button type="button" class="btn-primary" :class="{ 'btn-primary--danger': confirm.action === 'delete' }" :disabled="confirm.busy" @click="runConfirmed">
-              {{ confirm.busy ? 'Working…' : confirmCopy.button }}
-            </button>
-          </div>
+          <span v-if="detail.donor?.blood_type" class="blood dd-blood" title="Blood group">{{ detail.donor.blood_type }}</span>
         </div>
+
+        <dl class="facts">
+          <div class="fact">
+            <dt>Date</dt>
+            <dd>{{ formatShortDate(detail.date) }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Slot</dt>
+            <dd>{{ detail.slot_start }} - {{ detail.slot_end }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Drive / Center</dt>
+            <dd>
+              {{ detail.place || '—' }}
+              <span class="fact__sub">{{ detail.drive ? 'Mobile blood drive' : 'At the centre' }}</span>
+            </dd>
+          </div>
+          <div class="fact">
+            <dt>Booked by</dt>
+            <dd>
+              {{ detail.booked_by || 'The donor, in the portal' }}
+              <span v-if="detail.booked_at" class="fact__sub">{{ formatShortDate(detail.booked_at) }}</span>
+            </dd>
+          </div>
+        </dl>
+
+        <section v-if="detail.notes">
+          <h3 class="dd-section__title">Notes</h3>
+          <p class="dd-note">{{ detail.notes }}</p>
+        </section>
       </div>
-    </Transition>
+
+      <template #actions>
+        <button type="button" class="btn-outline" @click="detail = null">Close</button>
+        <NuxtLink v-if="detail.can.open_counter && canOpenCounter" to="/blood-center/donation" class="btn-primary">
+          Continue at the counter
+          <AssetIcon name="arrow-right" :size="14" />
+        </NuxtLink>
+      </template>
+    </CenterModal>
+
+    <!-- ============ CONFIRM ============ -->
+    <CenterModal v-if="confirm.open" :title="confirmCopy.title" size="sm" @close="closeConfirm">
+      <div class="dd-form">
+        <p id="confirm-text" class="dd-text">{{ confirmCopy.text }}</p>
+        <p v-if="confirm.error" class="form-error" role="alert">{{ confirm.error }}</p>
+      </div>
+      <template #actions>
+        <button type="button" class="btn-outline" @click="closeConfirm">Back</button>
+        <button type="button" class="btn-primary" :class="{ 'btn-primary--danger': confirm.action === 'delete' }" :disabled="confirm.busy" @click="runConfirmed">
+          {{ confirm.busy ? 'Working…' : confirmCopy.button }}
+        </button>
+      </template>
+    </CenterModal>
 
     <!-- ============ NEW APPOINTMENT ============ -->
     <Transition name="modal">
@@ -372,6 +444,8 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { APPOINTMENT_STATUSES, appointmentTone, exactIdentifier, isoDaysFromToday, slotOptionLabel } from '~/utils/appointments'
 import { eligibilityBadge, formatPhone, formatShortDate } from '~/utils/donorRecords'
@@ -433,6 +507,11 @@ useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
+const pageFrom = computed(() => (pager.total ? (pager.page - 1) * PER_PAGE + 1 : 0))
+const pageTo = computed(() => Math.min(pager.page * PER_PAGE, pager.total))
+
+/** The booking whose record is open. */
+const detail = ref(null)
 
 const search = ref('')
 const fromDate = ref('')
@@ -547,6 +626,7 @@ const confirmCopy = computed(() => {
 })
 
 function ask(action, row) {
+  detail.value = null
   Object.assign(confirm, { open: true, action, row, busy: false, error: '' })
 }
 
@@ -1024,20 +1104,27 @@ onPageReturn(() => load(pager.page))
 
 .appt-table tbody tr:last-child td { border-bottom: 0; }
 .appt-row { transition: background 0.12s ease; }
-.appt-row:hover { background: var(--rb-surface-hover); }
+.appt-row:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
 
-/* Today's bookings carry a marker on the edge, never a filled row. */
-.appt-row--today td:first-child { box-shadow: inset 3px 0 0 var(--rb-primary); }
+/* Today's bookings: a faint wash and a "Today" tag, no edge line. */
+.appt-row--today { background: rgba(var(--rb-primary-rgb), 0.03); }
+.appt-row--today:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
+.today-tag {
+  display: inline-block; margin-top: 3px; padding: 0 7px; border-radius: 999px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+}
+.c-date .today-tag { display: table; }
 
 .c-id { width: 128px; }
 .c-date { width: 118px; }
 .c-slot { width: 118px; }
 .c-status { width: 124px; }
-.c-actions { width: 180px; }
+.c-actions { width: 220px; }
 
 /* Too narrow for both names: the place goes, the donor stays. */
 @container (max-width: 860px) {
-  .c-place { display: none; }
+  .c-place, .appt-table tbody :deep(td.c-place) { display: none; }
 }
 
 .code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
@@ -1085,7 +1172,6 @@ onPageReturn(() => load(pager.page))
 .badge--crit { --tone: var(--rb-accent); }
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
-.row-actions { display: flex; gap: 6px; }
 
 .icon-btn {
   display: grid;
@@ -1326,6 +1412,65 @@ onPageReturn(() => load(pager.page))
   .skeleton,
   .spin { animation: none !important; }
 }
+
+/* ---------- Rows, as on Donations ---------- */
+.appt-row { cursor: pointer; }
+.appt-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.person__text { min-width: 0; }
+.person__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.person__hidden { color: var(--rb-text-secondary); }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+
+/* The row's next step, said in words. */
+.act-btn {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-family: inherit; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap;
+  cursor: pointer; transition: background 0.12s ease;
+}
+.act-btn:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.12); }
+.act-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- Record dialog ---------- */
+.dd { display: flex; flex-direction: column; gap: 18px; }
+.dd-donor { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); }
+.dd-donor__text { flex: 1; min-width: 0; }
+.dd-name { margin: 0; font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.dd-sub { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+.dd-blood { min-width: 44px; padding: 4px 10px; font-size: 13px; }
+.dd-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--rb-surface-alt); font-size: 13px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.dd-section__title { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding-top: 16px; border-top: 1px solid var(--rb-border); }
+.fact { min-width: 0; }
+.fact--full { grid-column: 1 / -1; }
+.fact dt { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); }
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.fact__sub { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.dd-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.dd-form { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- Dialog shell, as the system's CenterModal draws it ----------
+   These dialogs stack (Email and Edit open over the profile), so they keep
+   their own overlay; only the look follows CenterModal. */
+.modal-overlay { background: rgba(15, 23, 42, 0.5); }
+.modal-card { border-radius: 18px; box-shadow: 0 28px 70px -24px rgba(15, 23, 42, 0.55); }
+.modal-card__header { align-items: center; padding: 18px 24px 16px; }
+.modal-card__title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.modal-card__title :deep(.asset-icon) { display: none; }
+.modal-card__close {
+  display: grid; flex-shrink: 0; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--rb-border-strong); border-radius: 10px;
+  background: var(--rb-surface); color: var(--rb-text-secondary);
+}
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.modal-card__body { padding: 20px 24px 24px; }
+.modal-card__footer { padding: 14px 24px; }
+
+/* Loading rows as tall as the real ones (measured at 1366px), so nothing jumps. */
+.appt-table tbody :deep(tr[aria-hidden="true"] td) { height: 65px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+.appt-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 </style>
 
 <style scoped>

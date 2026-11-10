@@ -2,13 +2,7 @@
   <div class="paper-page">
     <div class="paper-inner">
       <header class="header-row">
-        <div>
-          <NuxtLink to="/blood-center/donations" class="back-link">
-            <AssetIcon name="chevron-left" :size="14" />
-            Donations
-          </NuxtLink>
-          <h1 class="page-title">Paper Records</h1>
-        </div>
+        <h1 class="page-title">Paper Records</h1>
         <button type="button" class="btn-primary" @click="openNewSheet()">
           <AssetIcon name="plus" :size="15" />
           New sheet
@@ -533,21 +527,8 @@ onPageReturn(async () => {
 }
 
 /* ---------- Header and buttons ---------- */
-.header-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.header-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-
-.back-link:hover { color: var(--rb-primary-text); }
 
 .btn-primary,
 .btn-outline {
@@ -597,7 +578,6 @@ onPageReturn(async () => {
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .btn-link:focus-visible,
-.back-link:focus-visible,
 .icon-btn:focus-visible,
 .modal-card__close:focus-visible {
   outline: none;

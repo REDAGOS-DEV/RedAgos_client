@@ -445,7 +445,9 @@ const NAV_GROUPS = [
     items: [
       { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
       { label: 'Help Center', path: '/hospital/help', icon: 'help-circle' },
-      { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
+      { label: 'Settings', path: '/hospital/settings', icon: 'settings' },
+      // Your own audit trail: the Settings page's Activity tab, one click away (2026-11-11).
+      { label: 'My activity', path: '/hospital/settings?tab=activity', icon: 'history' }
     ]
   }
 ]
@@ -551,7 +553,16 @@ onMounted(async () => {
 const hoveredPath = ref(null)
 
 // A page under a nav item (a weekly request, a new delivery) keeps its parent lit.
-const isActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
+const queryMatches = (query) => [...new URLSearchParams(query)].every(([key, value]) => route.query[key] === value)
+const isActive = (path) => {
+  const [base, query] = path.split('?')
+  if (query) return route.path === base && queryMatches(query)
+  if (route.path !== base && !route.path.startsWith(`${base}/`)) return false
+  return !navGroups.value.some((group) => group.items.some((item) => {
+    const [itemBase, itemQuery] = item.path.split('?')
+    return itemQuery && itemBase === base && route.path === base && queryMatches(itemQuery)
+  }))
+}
 
 // Current page: soft pill with blue text (the icon chip carries the strong
 // colour, see .is-current in the styles). Hover: a light grey.
