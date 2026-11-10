@@ -154,7 +154,7 @@
     </footer>
 
     <!-- Reason modal — gikinahanglan sa reject (required|max:255). -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="modal.open" class="modal-overlay" @click.self="closeModal">
         <div class="modal">
           <h2>{{ modal.title }}</h2>
@@ -192,7 +192,7 @@
 
     <!-- Create Facility. The facility and its first account are one submission
          because the server creates them in one transaction. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="create.open" class="modal-overlay" @click.self="closeCreate">
         <form class="modal modal-wide" @submit.prevent="submitCreate">
           <h2>Create facility</h2>
@@ -396,6 +396,10 @@ import { adminService } from '~/api/admin/AdminService'
 import { useUser } from '~/composables/useUser'
 import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+// Kept alive: its dialog is off screen while the page is away (see useKeptAlive).
+const pageHidden = usePageHidden()
 
 definePageMeta({
   middleware: 'auth',

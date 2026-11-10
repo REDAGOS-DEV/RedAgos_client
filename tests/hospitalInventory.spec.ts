@@ -31,7 +31,7 @@ describe('the hospital inventory page', () => {
   const labels = source('app/types/hospitalInventory.ts')
 
   it('is a hospital portal page every hospital role may read', () => {
-    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })")
+    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })")
   })
 
   it('offers the bag actions only to the roles that hold them', () => {
@@ -137,7 +137,7 @@ describe('the hospital Stock Intake page', () => {
   const page = source('app/pages/hospital/stock-intake.vue')
 
   it('is a page of its own, for the roles that stock bags in', () => {
-    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in' })")
+    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in', keepalive: true })")
     expect(page).toContain("can('hospital.inventory.discard')")
   })
 
@@ -191,7 +191,7 @@ describe('the hospital Inventory Report', () => {
   const page = source('app/pages/hospital/inventory-report.vue')
 
   it('is a hospital portal page every hospital role may read', () => {
-    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })")
+    expect(page).toContain("definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })")
   })
 
   it('is set up first and generated on request, never on arrival (project owner, 2026-10-28)', () => {

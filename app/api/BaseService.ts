@@ -42,6 +42,36 @@ export function resolveApiAssetURL(path: string | null | undefined): string | nu
   return /^https?:\/\//i.test(base) ? new URL(path, base).toString() : path;
 }
 
+/**
+ * Shared GETs still in flight, by sharedRequestKey(). See requestShared().
+ * An entry is removed the moment its request settles.
+ */
+const sharedRequests = new Map<string, Promise<unknown>>();
+
+/**
+ * What makes two GETs the same request: the path, the query (whatever order
+ * its keys were written in, undefined ones left out, as $fetch leaves them
+ * out), and the session's token, so two sign-ins never share a reply.
+ */
+export function sharedRequestKey(url: string, params: Record<string, unknown>, token: string | null): string {
+  const query = Object.keys(params)
+    .filter((name) => params[name] !== undefined)
+    .sort()
+    .map((name) => [name, params[name]]);
+
+  return JSON.stringify([url, query, token ?? ""]);
+}
+
+/** Let every later read start its own request. Replies already on their way still reach their callers. */
+export function forgetSharedRequests(): void {
+  sharedRequests.clear();
+}
+
+/** How many shared reads are in flight. For tests. */
+export function sharedRequestsInFlight(): number {
+  return sharedRequests.size;
+}
+
 export class BaseService {
   async request<T>(
     url: string,
@@ -86,12 +116,16 @@ export class BaseService {
       timeout: 30_000,
     };
  
-    if (method.toUpperCase() === "GET") {
-      config.params = params;
-    } else {
+    const writes = method.toUpperCase() !== "GET";
+
+    if (writes) {
       config.body = params;
+      // Nothing sent from now on may join a read sent before this write.
+      forgetSharedRequests();
+    } else {
+      config.params = params;
     }
- 
+
     try {
       // Counted on the client so the "Launching Workspace" screen knows when
       // the portal's first data is in (api/activity.ts).
@@ -138,7 +172,44 @@ export class BaseService {
       }
 
       throw requestError;
+    } finally {
+      // A write changes what a shared read would say. Once it lands, a read
+      // asked for afterwards starts afresh instead of joining one sent
+      // before it (requestShared).
+      if (writes) forgetSharedRequests();
     }
+  }
+
+  /**
+   * A GET that shares an identical request already in flight.
+   *
+   * For the summary reads that several parts of a screen ask for at the same
+   * moment: the sidebar's counts, a dashboard's task strip and the page
+   * itself. Shared only when the path, the query and the signed-in session
+   * all match. Each caller gets its own copy of the reply, so one cannot
+   * change what another holds.
+   *
+   * Not a cache: nothing is kept once the request settles, so the next call
+   * always reaches the server.
+   */
+  async requestShared<T>(url: string, params: Record<string, unknown> = {}): Promise<T> {
+    const token = import.meta.client ? localStorage.getItem("_token") : null;
+    const key = sharedRequestKey(url, params, token);
+
+    let pending = sharedRequests.get(key) as Promise<T> | undefined;
+
+    if (!pending) {
+      const started = this.request<T>(url, "GET", params);
+      const forget = () => {
+        if (sharedRequests.get(key) === started) sharedRequests.delete(key);
+      };
+
+      started.then(forget, forget);
+      sharedRequests.set(key, started);
+      pending = started;
+    }
+
+    return structuredClone(await pending);
   }
 
   /**

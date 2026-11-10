@@ -181,6 +181,7 @@ describe('a reactive result waits for a second person', () => {
     expect(sidebar).toContain('useBloodCenterTasks()')
     expect(tasks).toContain("can('lab.verify_serology')")
     expect(tasks).toContain('counsellingReferralsSummary()')
-    expect(sidebar).toContain('watch(badgeRefresh, () => loadCounts())')
+    // A bump after a change queues a fresh count, even over one already running.
+    expect(sidebar).toContain('watch(badgeRefresh, () => loadTaskCounts({ afterChange: true }))')
   })
 })

@@ -207,11 +207,13 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import { PERIOD_PRESETS, periodFor, periodLabel } from '~/utils/reportPeriod'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.view',
+  keepalive: true,
 })
 
 useHead({ title: 'Statements · RedAgos' })
@@ -255,9 +257,12 @@ const invoices = computed(() => statement.value?.invoices ?? [])
 const activity = computed(() => statement.value?.activity ?? [])
 const params = computed(() => ({ hospital_id: hospitalId.value, from: from.value, to: to.value }))
 
-async function load() {
+// `quiet`, on return to this kept-alive page: no skeleton over the statement on screen.
+async function load(options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
   if (!hospitalId.value || !from.value || !to.value) return
-  loading.value = true
+  if (!quiet) loading.value = true
   error.value = ''
 
   try {
@@ -328,6 +333,8 @@ async function print() {
 }
 
 onMounted(loadHospitals)
+// Kept alive: back here, the same hospital and period reload in place.
+onPageReturn(() => load({ quiet: true }))
 </script>
 
 <style scoped>

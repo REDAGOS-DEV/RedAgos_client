@@ -467,8 +467,9 @@ import ListPager from '~/components/common/ListPager.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { orderDashboardTypes } from '~/utils/inventoryDashboard'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })
 
 const LAYOUTS = [
   { value: 'type', label: 'One sheet per type', icon: 'layout-grid' },
@@ -720,6 +721,10 @@ onMounted(() => {
   // The archive's count shows on its tab from the start.
   loadHistory(1)
 })
+
+// Kept alive: back here, the archive's page reloads in place. The report's
+// choices stay as they were set.
+onPageReturn(() => loadHistory(historyPage.value || 1))
 
 // ── Drawing ──
 function jumpTo(index) {

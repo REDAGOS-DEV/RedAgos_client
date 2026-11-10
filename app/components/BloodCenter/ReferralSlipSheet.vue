@@ -4,7 +4,7 @@
     the page: one 100 × 150 mm slip, in the same waybill shape as the bag
     labels, for the watcher to carry to the next blood centre.
   -->
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <div class="referral-slip-sheet" aria-hidden="true">
       <article v-if="slip" class="rs">
         <div class="rs__box">
@@ -74,6 +74,9 @@
 <script setup>
 import QRCode from 'qrcode'
 import { labelDate } from '~/utils/bagLabels'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+const pageHidden = usePageHidden()
 
 const { slip } = useReferralSlip()
 

@@ -240,6 +240,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import { correctionKind } from '~/utils/correctionKinds'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * Correction requests: the caller's own, and — for a department's head —
@@ -256,6 +257,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'corrections.request',
+  keepalive: true,
 })
 
 useHead({ title: 'Corrections · RedAgos' })
@@ -459,6 +461,8 @@ async function decide(item, action) {
 }
 
 onMounted(load)
+// Kept alive: back here, the list reloads in place (the skeleton shows only over an empty one).
+onPageReturn(load)
 </script>
 
 <style scoped>

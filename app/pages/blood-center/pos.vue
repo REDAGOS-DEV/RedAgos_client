@@ -279,13 +279,25 @@
             </dl>
             <template v-else>
               <dl class="summary">
-                <div><dt>Total amount</dt><dd>{{ pesos(bill.total_amount) }}</dd></div>
-                <div class="subsidy-row">
+                <div><dt>Total amount</dt><dd>{{ pesos(bill.subtotal ?? bill.total_amount) }}</dd></div>
+                <!-- One discount per bill: the government subsidy, or one of the centre's own. -->
+                <div v-if="bill.discount" class="discount-row">
                   <dt>
-                    Government subsidy
-                    <button v-if="canPay" type="button" class="link-btn link-btn--inline" @click="openSubsidy">Apply</button>
+                    Discount: {{ bill.discount.name }}
+                    <button v-if="bill.discount_removable && !done && !discountOpen && !removingDiscount" type="button" class="link-btn link-btn--inline" @click="openRemoveDiscount">Remove</button>
                   </dt>
-                  <dd>− {{ pesos(bill.is_subsidised ? bill.total_amount : 0) }}</dd>
+                  <dd>− {{ pesos(bill.discount.amount) }}</dd>
+                </div>
+                <div v-else-if="bill.is_subsidised" class="discount-row">
+                  <dt>Government subsidy</dt>
+                  <dd>− {{ pesos(bill.total_amount) }}</dd>
+                </div>
+                <div v-else class="discount-row">
+                  <dt>
+                    Discount
+                    <button v-if="canPay" type="button" class="link-btn link-btn--inline" @click="openDiscount">Apply</button>
+                  </dt>
+                  <dd>− {{ pesos(0) }}</dd>
                 </div>
                 <div v-if="Number(bill?.collected) > 0"><dt>Already paid</dt><dd>− {{ pesos(bill.collected) }}</dd></div>
                 <div v-for="(p, i) in parts" :key="i" class="part-row">
@@ -299,17 +311,66 @@
                 </div>
               </dl>
 
-              <!-- The subsidy waives the whole bill; it is a decision, not a payment. -->
-              <div v-if="subsidyOpen" class="subsidy-form">
-                <p class="subsidy-title">Apply the government subsidy</p>
-                <p v-if="Number(bill.collected) > 0" class="quiet">
+              <!-- A discount is a decision, not a payment. The subsidy waives the
+                   whole bill; the centre's own take a percentage or an amount off. -->
+              <div v-if="discountOpen" class="discount-form">
+                <p id="discount-title" class="discount-title">Apply a discount</p>
+                <div class="discount-choices" role="radiogroup" aria-labelledby="discount-title">
+                  <button
+                    v-for="choice in discountChoices"
+                    :key="choice.key"
+                    type="button"
+                    role="radio"
+                    class="discount-choice"
+                    :class="{ 'discount-choice--on': discountChoice === choice.key }"
+                    :aria-checked="discountChoice === choice.key"
+                    @click="chooseDiscount(choice.key)"
+                  >
+                    <span class="discount-choice__name">{{ choice.name }}</span>
+                    <span class="discount-choice__label">{{ choice.label }}</span>
+                  </button>
+                </div>
+                <p v-if="discountPreview" class="discount-preview">{{ discountPreview }}</p>
+                <p v-if="choiceIsSubsidy && Number(bill.collected) > 0" class="quiet">
                   The {{ pesos(bill.collected) }} already paid stays on record; any refund is settled outside RedAgos.
                 </p>
-                <input v-model.trim="subsidyReason" type="text" maxlength="255" class="input" placeholder="Reason (optional), e.g. DOH allocation" aria-label="Reason for the subsidy">
-                <p v-if="subsidyError" class="field-error">{{ subsidyError }}</p>
+                <input
+                  v-if="discountChoice"
+                  ref="discountNoteInput"
+                  v-model.trim="discountNote"
+                  type="text"
+                  maxlength="255"
+                  class="input"
+                  :placeholder="choiceIsSubsidy ? 'Reason (optional), e.g. DOH allocation' : 'Note, e.g. Senior Citizen ID number'"
+                  :aria-label="choiceIsSubsidy ? 'Reason for the subsidy' : 'Note for the discount'"
+                  :aria-required="!choiceIsSubsidy"
+                  @keydown.enter.prevent="submitDiscount"
+                >
+                <p v-if="discountError" class="field-error">{{ discountError }}</p>
                 <div class="pair">
-                  <button type="button" class="btn btn-outline" :disabled="saving" @click="subsidyOpen = false">Cancel</button>
-                  <button type="button" class="btn btn-primary" :disabled="saving" @click="submitSubsidy">{{ saving ? 'Applying…' : 'Apply subsidy' }}</button>
+                  <button type="button" class="btn btn-outline" :disabled="saving" @click="discountOpen = false">Cancel</button>
+                  <button type="button" class="btn btn-primary" :disabled="saving || !discountChoice" @click="submitDiscount">{{ saving ? 'Applying…' : 'Apply' }}</button>
+                </div>
+              </div>
+
+              <!-- Taking a discount back off, before anything is paid or dispatched. -->
+              <div v-if="removingDiscount && bill.discount" class="discount-form">
+                <p class="discount-title">Remove the {{ bill.discount.name }} discount</p>
+                <input
+                  ref="removeReasonInput"
+                  v-model.trim="removeReason"
+                  type="text"
+                  maxlength="255"
+                  class="input"
+                  placeholder="Reason, e.g. applied to the wrong patient"
+                  aria-label="Reason for removing the discount"
+                  aria-required="true"
+                  @keydown.enter.prevent="submitRemoveDiscount"
+                >
+                <p v-if="removeError" class="field-error">{{ removeError }}</p>
+                <div class="pair">
+                  <button type="button" class="btn btn-outline" :disabled="saving" @click="removingDiscount = false">Cancel</button>
+                  <button type="button" class="btn btn-primary" :disabled="saving || removeReason.length < 3" @click="submitRemoveDiscount">{{ saving ? 'Removing…' : 'Remove' }}</button>
                 </div>
               </div>
             </template>
@@ -603,11 +664,14 @@ import {
   splitEntry,
   takesPayment,
 } from '~/utils/billing'
+import { onPageReturn } from '~/composables/useKeptAlive'
+import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.record_payment',
+  keepalive: true,
 })
 
 const route = useRoute()
@@ -810,17 +874,27 @@ async function searchNow(which) {
   }
 }
 
-async function loadQueue() {
-  queueLoading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the queue on screen.
+// Newest reply wins: a refresh started before a switch of category or a
+// payment never overwrites the queue they loaded.
+const queueLatest = createLatest()
+
+async function loadQueue(options = {}) {
+  // The background refresh keeps the queue it has if it fails; the next one retries.
+  const background = options?.background === true
+  const ticket = queueLatest.begin()
+  if (options?.quiet !== true) queueLoading.value = true
 
   try {
-    queue.value = category.value === 'patient'
+    const next = category.value === 'patient'
       ? ((await bloodCenterService.counterQueue())?.data ?? []).map(fromCounter)
       : ((await bloodCenterService.billings({ category: 'weekly', status: 'statement_only' }))?.data ?? []).map(fromStatement)
+
+    if (queueLatest.isCurrent(ticket)) queue.value = next
   } catch {
-    queue.value = []
+    if (!background && queueLatest.isCurrent(ticket)) queue.value = []
   } finally {
-    queueLoading.value = false
+    if (queueLatest.isCurrent(ticket)) queueLoading.value = false
   }
 }
 
@@ -882,11 +956,14 @@ async function selectBill(requestId) {
   billLoading.value = true
   done.value = null
   payError.value = ''
-  subsidyOpen.value = false
+  discountOpen.value = false
+  removingDiscount.value = false
   paymentReady.value = false
 
   try {
-    bill.value = (await bloodCenterService.billingForRequest(requestId))?.billing ?? null
+    const res = await bloodCenterService.billingForRequest(requestId)
+    bill.value = res?.billing ?? null
+    offeredDiscounts.value = res?.discounts ?? []
     category.value = bill.value?.is_statement_only ? 'weekly' : 'patient'
     payTab.value = category.value === 'weekly' ? 'settle' : 'method'
     resetPayment()
@@ -918,14 +995,17 @@ function proceedToPayment() {
 
 function backToDetails() {
   paymentReady.value = false
-  subsidyOpen.value = false
+  discountOpen.value = false
+  removingDiscount.value = false
   nextTick(() => proceedBtn.value?.focus())
 }
 
-// The bill again after the subsidy or a settlement, staying on the payment step.
+// The bill again after a discount or a settlement, staying on the payment step.
 async function refreshBill() {
   try {
-    bill.value = (await bloodCenterService.billingForRequest(bill.value.request_id))?.billing ?? bill.value
+    const res = await bloodCenterService.billingForRequest(bill.value.request_id)
+    bill.value = res?.billing ?? bill.value
+    if (res?.discounts) offeredDiscounts.value = res.discounts
   } catch {
     // The next pick reloads it.
   }
@@ -984,7 +1064,7 @@ const cashChips = computed(() => {
 })
 
 // Only a bill with something due can be paid, on the payment step, and not while the subsidy is being decided.
-const canPay = computed(() => paymentReady.value && Boolean(bill.value) && takes.value && !subsidyOpen.value && !(shiftsEnabled.value && !shift.value))
+const canPay = computed(() => paymentReady.value && Boolean(bill.value) && takes.value && !discountOpen.value && !removingDiscount.value && !(shiftsEnabled.value && !shift.value))
 // The amount entered meets what is left (cash may go beyond it, as change).
 const canComplete = computed(() => {
   if (!canPay.value || !(entry.value.remaining > 0) || !(entry.value.paid > 0)) return false
@@ -1004,7 +1084,7 @@ const footAction = computed(() => {
 
   if (weekly.value) return !bill.value.settlement && bill.value.request?.is_closed ? 'settle' : null
 
-  if (subsidyOpen.value || !takes.value || (shiftsEnabled.value && !shift.value)) return null
+  if (discountOpen.value || removingDiscount.value || !takes.value || (shiftsEnabled.value && !shift.value)) return null
 
   return entry.value.short > 0 ? 'add' : 'pay'
 })
@@ -1114,35 +1194,125 @@ function nextCustomer() {
   scanQuery.value = ''
   patientQuery.value = ''
   results.value = []
-  subsidyOpen.value = false
+  discountOpen.value = false
+  removingDiscount.value = false
   payTab.value = category.value === 'weekly' ? 'settle' : 'method'
   resetPayment()
   nextTick(() => scanInput.value?.focus())
 }
 
-/* THE GOVERNMENT SUBSIDY: waives the whole bill */
+/*
+ * DISCOUNTS (project owner, 2026-11-10). One per bill: the government
+ * subsidy, which waives the whole bill, or one of the centre's own, a
+ * percentage or an amount off (kept on the Discounts page). The centre's own
+ * need a note, such as the ID number, and only before anything is paid; the
+ * subsidy may still be applied to a part-paid bill, as before.
+ */
 const saving = ref(false)
-const subsidyOpen = ref(false)
-const subsidyReason = ref('')
-const subsidyError = ref('')
+const discountOpen = ref(false)
+const discountChoice = ref(null)
+const discountNote = ref('')
+const discountError = ref('')
+const discountNoteInput = ref(null)
+// The centre's switched-on discounts, sent with the bill.
+const offeredDiscounts = ref([])
 
-function openSubsidy() {
-  subsidyOpen.value = true
-  subsidyReason.value = ''
-  subsidyError.value = ''
+const SUBSIDY = 'subsidy'
+
+const discountChoices = computed(() => [
+  { key: SUBSIDY, name: 'Government subsidy', label: 'Whole bill' },
+  ...(Number(bill.value?.collected) > 0
+    ? []
+    : offeredDiscounts.value.map((d) => ({ key: `discount-${d.id}`, id: d.id, name: d.name, label: d.label, kind: d.kind, value: d.value }))),
+])
+
+const chosenDiscount = computed(() => discountChoices.value.find((choice) => choice.key === discountChoice.value) ?? null)
+const choiceIsSubsidy = computed(() => discountChoice.value === SUBSIDY)
+
+/** What the chosen discount would take off, as the server will work it out. */
+const discountPreview = computed(() => {
+  const choice = chosenDiscount.value
+  const subtotal = Number(bill.value?.subtotal ?? bill.value?.total_amount ?? 0)
+  if (!choice || choice.key === SUBSIDY || !(subtotal > 0)) return ''
+
+  const centavos = Math.round(subtotal * 100)
+  const off = Math.min(centavos, choice.kind === 'percentage'
+    ? Math.round((centavos * Math.round(choice.value * 100)) / 10000)
+    : Math.round(choice.value * 100))
+
+  return `${pesos(off / 100)} off · ${pesos((centavos - off) / 100)} to pay`
+})
+
+function openDiscount() {
+  removingDiscount.value = false
+  discountOpen.value = true
+  discountChoice.value = null
+  discountNote.value = ''
+  discountError.value = ''
 }
 
-async function submitSubsidy() {
-  subsidyError.value = ''
+function chooseDiscount(key) {
+  discountChoice.value = key
+  discountError.value = ''
+  nextTick(() => discountNoteInput.value?.focus())
+}
+
+async function submitDiscount() {
+  const choice = chosenDiscount.value
+  if (!choice || saving.value) return
+
+  discountError.value = ''
+  if (!choiceIsSubsidy.value && discountNote.value.length < 2) {
+    discountError.value = 'Write a note for the discount, such as the ID number.'
+    discountNoteInput.value?.focus()
+    return
+  }
+
   saving.value = true
 
   try {
-    await bloodCenterService.applySubsidy(bill.value.request_id, subsidyReason.value || undefined)
-    toast('Subsidy Applied', 'success', 'The bill is met by government funding and the units can be released.')
-    subsidyOpen.value = false
+    if (choiceIsSubsidy.value) {
+      await bloodCenterService.applySubsidy(bill.value.request_id, discountNote.value || undefined)
+      toast('Subsidy Applied', 'success', 'The bill is met by government funding and the units can be released.')
+    } else {
+      const res = await bloodCenterService.applyDiscount(bill.value.request_id, choice.id, discountNote.value)
+      toast('Discount Applied', 'success', res?.message || `${choice.name} applied.`)
+    }
+    discountOpen.value = false
     await Promise.all([refreshBill(), loadQueue()])
   } catch (err) {
-    subsidyError.value = err?.message || 'Could not apply the subsidy.'
+    discountError.value = err?.message || 'Could not apply the discount.'
+  } finally {
+    saving.value = false
+  }
+}
+
+const removingDiscount = ref(false)
+const removeReason = ref('')
+const removeError = ref('')
+const removeReasonInput = ref(null)
+
+function openRemoveDiscount() {
+  discountOpen.value = false
+  removingDiscount.value = true
+  removeReason.value = ''
+  removeError.value = ''
+  nextTick(() => removeReasonInput.value?.focus())
+}
+
+async function submitRemoveDiscount() {
+  if (removeReason.value.length < 3 || saving.value) return
+
+  removeError.value = ''
+  saving.value = true
+
+  try {
+    const res = await bloodCenterService.removeDiscount(bill.value.request_id, removeReason.value)
+    toast('Discount Removed', 'success', res?.message || 'The discount was removed.')
+    removingDiscount.value = false
+    await Promise.all([refreshBill(), loadQueue()])
+  } catch (err) {
+    removeError.value = err?.message || 'Could not remove the discount.'
   } finally {
     saving.value = false
   }
@@ -1206,13 +1376,32 @@ watch(method, (value) => {
   tendered.value = value === 'cash' || !bill.value ? null : entry.value.remaining
 })
 
+let appliedRequest = 0
+
 onMounted(async () => {
   await Promise.all([loadShift(), loadQueue()])
 
   // From a statement: "Take payment" opens the bill here.
   const preset = Number(route.query.request)
+  appliedRequest = preset
   if (preset) await selectBill(preset)
   else scanInput.value?.focus()
+})
+
+/*
+ * Kept alive. Back here, the shift and the queue reload in place. A statement's
+ * "Take payment" for another bill (?request=) opens that bill, which starts its
+ * payment afresh; otherwise the bill on screen is read again, in case it was
+ * paid at another counter meanwhile.
+ */
+onPageReturn(async () => {
+  const preset = Number(route.query.request) || 0
+  await Promise.all([loadShift(), loadQueue({ quiet: true })])
+  const linked = preset && preset !== appliedRequest
+  appliedRequest = preset
+  if (linked) return selectBill(preset)
+  if (bill.value && !done.value) return refreshBill()
+  if (!bill.value) scanInput.value?.focus()
 })
 
 function onCounterKeys(e) {
@@ -1227,6 +1416,30 @@ function onCounterKeys(e) {
   }
 }
 onMounted(() => window.addEventListener('keydown', onCounterKeys))
+// Away, '/', F2 and Escape belong to the page on screen.
+onDeactivated(() => window.removeEventListener('keydown', onCounterKeys))
+onActivated(() => window.addEventListener('keydown', onCounterKeys))
+
+/*
+ * The waiting queue kept current while the counter is open, so a bill raised
+ * at Issuance shows up without a reload: every 60 seconds while this page and
+ * the tab are in view, and when the tab comes back. Only the queue: the bill
+ * on screen and the payment being taken are left as they are, and nothing
+ * runs while a payment is being entered or recorded, the subsidy dialog is
+ * open, or a shift is being opened or closed. Neither queue route is
+ * throttled or writes an audit entry on a read; the patient search, which is
+ * throttled, is never refreshed this way.
+ */
+useLiveRefresh(() => loadQueue({ quiet: true, background: true }), {
+  intervalMs: 60_000,
+  pauseWhen: () => paymentReady.value
+    || recording.value
+    || saving.value
+    || discountOpen.value
+    || removingDiscount.value
+    || openingShift.value
+    || closingShift.value,
+})
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
@@ -1472,7 +1685,7 @@ onBeforeUnmount(() => {
 .summary dl div, dl.summary div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; }
 .summary dt { color: var(--rb-text-secondary); display: flex; align-items: center; gap: 6px; }
 .summary dd { margin: 0; font-weight: 600; color: var(--rb-text-primary); }
-.subsidy-row dt, .subsidy-row dd { color: var(--rb-success-text) !important; }
+.discount-row dt, .discount-row dd { color: var(--rb-success-text) !important; }
 .summary-due { padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--rb-border-strong); }
 .summary-due dt { color: var(--rb-text-primary) !important; font-weight: 700; }
 .summary-due dd { font-size: 15px; font-weight: 800 !important; }
@@ -1540,8 +1753,22 @@ onBeforeUnmount(() => {
 .ref-copy:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-.subsidy-form { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(var(--rb-success-rgb), .3); background: rgba(var(--rb-success-rgb), .05); }
-.subsidy-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-success-text); }
+.discount-form { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(var(--rb-success-rgb), .3); background: rgba(var(--rb-success-rgb), .05); }
+.discount-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--rb-success-text); }
+/* The choices, as the method tiles: one picked at a time, nothing picked at first. */
+.discount-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.discount-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border-radius: 10px;
+  border: 1px solid var(--rb-border); background: var(--rb-surface); color: var(--rb-text-primary);
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s var(--rb-ease-out), background-color .15s var(--rb-ease-out);
+}
+.discount-choice:hover { border-color: rgba(var(--rb-primary-rgb), .45); }
+.discount-choice--on { border-color: var(--rb-primary); background: var(--rb-primary); color: #fff; }
+.discount-choice:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.discount-choice__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; }
+.discount-choice__label { font-size: 11.5px; font-variant-numeric: tabular-nums; opacity: .85; }
+.discount-preview { margin: 0; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--rb-text-primary); }
 
 .nothing-due { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; color: var(--rb-success-text); background: rgba(var(--rb-success-rgb), .07); border: 1px solid rgba(var(--rb-success-rgb), .25); }
 .nothing-due strong { display: block; font-size: 13px; }

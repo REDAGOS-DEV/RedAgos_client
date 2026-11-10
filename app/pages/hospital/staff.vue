@@ -319,10 +319,11 @@ import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { useListPager } from '~/composables/useListPager'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const { can } = useUser()
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.staff.manage', keepalive: true })
 
 useHead({ title: 'Staff' })
 
@@ -586,6 +587,9 @@ async function submitAdd() {
 }
 
 onMounted(load)
+
+// Kept alive: back here, the list reloads in place.
+onPageReturn(refresh)
 
 </script>
 

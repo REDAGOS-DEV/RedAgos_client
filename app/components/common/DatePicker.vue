@@ -34,7 +34,7 @@
       <AssetIcon name="chevron-down" :size="iconSize" class="dp-trigger-chevron" />
     </button>
 
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="dp-pop">
         <div
           v-if="open"
@@ -142,6 +142,7 @@
 
 <script setup lang="ts">
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
 
 const props = withDefaults(defineProps<{
   /** 'YYYY-MM-DD', or '' when empty. Same as <input type="date">. */
@@ -172,6 +173,8 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+const pageHidden = usePageHidden()
 
 // ── Date helpers (local time; a bare 'YYYY-MM-DD' through new Date() is
 //    UTC and shows the previous day west of Greenwich) ──

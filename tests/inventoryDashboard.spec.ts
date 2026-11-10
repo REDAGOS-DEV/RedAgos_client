@@ -213,7 +213,8 @@ describe('the inventory page', () => {
   })
 
   it('fills its panels from real endpoints, failing each one on its own', () => {
-    expect(page).toContain('bloodCenterService.inventorySummary()')
+    // Without the seven-day trend, which this page never draws.
+    expect(page).toContain('bloodCenterService.inventorySummary({ trend: false })')
     expect(page).toContain('bloodCenterService.inventory({ expiring_within_days: 7, per_page: 6 }).catch(() => null)')
     expect(page).toContain('bloodCenterService.inventoryActivity({ per_page: 6 }).catch(() => null)')
   })

@@ -104,10 +104,11 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { useHospitalUnreadCount } from '~/composables/useHospitalUnreadCount'
 import { groupNotifications, normalizeHospitalNotification } from '~/utils/hospitalNotifications'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const { can } = useUser()
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', keepalive: true })
 
 const router = useRouter()
 const toast = useToast()
@@ -273,6 +274,9 @@ onMounted(() => {
   readShape()
   loadNotifications()
 })
+
+// Kept alive: back here, the page on screen reloads in place.
+onPageReturn(() => loadNotifications(meta.value.page))
 </script>
 
 <!-- The page's parts: the blood centre's Donor Management structure (project owner, 2026-10-30). -->

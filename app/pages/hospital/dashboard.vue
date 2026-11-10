@@ -223,10 +223,11 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const { can } = useUser()
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', keepalive: true })
 
 const router = useRouter()
 const goTo = (path) => router.push(path)
@@ -438,7 +439,7 @@ const thresholds = ref(null)
 const thresholdsLoading = ref(true)
 const lowStock = computed(() => thresholds.value?.low ?? [])
 
-onMounted(async () => {
+async function loadThresholds() {
   try {
     thresholds.value = await hospitalService.stockThresholds()
   } catch (err) {
@@ -446,9 +447,14 @@ onMounted(async () => {
   } finally {
     thresholdsLoading.value = false
   }
-})
+}
 
-onMounted(async () => {
+onMounted(loadThresholds)
+
+// `loading` is true only until the first answer, so a reload on return draws
+// over the figures on screen instead of the skeleton.
+async function loadDashboard() {
+  loadError.value = ''
   try {
     // // Dev note: dashboard() kay mag-return unta og
     // // { units_available, pending_requests, approved_requests, completed_today,
@@ -485,7 +491,12 @@ onMounted(async () => {
 
     loading.value = false
   }
-})
+}
+
+onMounted(loadDashboard)
+
+// Kept alive: back here, both reload.
+onPageReturn(() => Promise.all([loadThresholds(), loadDashboard()]))
 </script>
 
 <style scoped>

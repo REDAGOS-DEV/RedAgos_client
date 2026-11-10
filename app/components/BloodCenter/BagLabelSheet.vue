@@ -3,23 +3,25 @@
     Hidden on screen. When useLabelPrint() prints, this is the only thing on the
     page: one 100 × 150 mm label per printed page, laid out like a courier
     waybill (project owner, 2026-10-19) for a 4 × 6 in thermal label printer.
+    Headed by the centre's name; a marked box takes the donation's barcode
+    sticker in place of a printed code (project owner, 2026-11-10).
+    Two pages carry one (Laboratory, Processed) and both may be kept alive:
+    only the shown page's sheet is on <body>, or a print came out twice.
   -->
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <div class="bag-label-sheet" aria-hidden="true">
       <template v-if="sheet.variant === 'base'">
         <article v-for="label in sheet.labels" :key="label.bag_number" class="bag-label bag-label--base">
           <div class="wb">
             <header class="wb__head">
-              <span class="wb__brand">RedAgos</span>
+              <span class="wb__centre">{{ centreOf(label) }}</span>
               <span class="wb__kind">BASE LABEL</span>
             </header>
 
             <p class="bag-label__hold">QUARANTINE — NOT FOR ISSUE</p>
 
             <section class="wb__id">
-              <svg class="wb__qr" :viewBox="`0 0 ${qrFor(label.bag_number).size} ${qrFor(label.bag_number).size}`" shape-rendering="crispEdges">
-                <path :d="qrFor(label.bag_number).path" fill="#000" />
-              </svg>
+              <div class="wb__sticker"><span>AFFIX BARCODE STICKER</span></div>
               <div class="wb__id-text">
                 <p class="wb__caption">BAG NO.</p>
                 <p class="bag-label__number">{{ label.bag_number }}</p>
@@ -45,17 +47,12 @@
         <article v-for="label in sheet.labels" :key="label.unit_id" class="bag-label bag-label--final">
           <div class="wb">
             <header class="wb__head">
-              <span class="wb__brand">
-                RedAgos
-                <small v-if="label.facility" class="wb__facility">{{ label.facility }}</small>
-              </span>
+              <span class="wb__centre">{{ centreOf(label) }}</span>
               <span class="wb__kind">BLOOD UNIT</span>
             </header>
 
             <section class="wb__id">
-              <svg class="wb__qr" :viewBox="`0 0 ${qrFor(label.unit_id).size} ${qrFor(label.unit_id).size}`" shape-rendering="crispEdges">
-                <path :d="qrFor(label.unit_id).path" fill="#000" />
-              </svg>
+              <div class="wb__sticker"><span>AFFIX BARCODE STICKER</span></div>
               <div class="wb__id-text">
                 <p class="wb__caption">UNIT NO.</p>
                 <p class="bag-label__number">{{ label.unit_id }}</p>
@@ -110,34 +107,24 @@
 </template>
 
 <script setup>
-import QRCode from 'qrcode'
 import { labelDate } from '~/utils/bagLabels'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+const pageHidden = usePageHidden()
 
 const { sheet } = useLabelPrint()
+const { user } = useUser()
 
 /*
- * Each label carries a QR of its own unit (or bag) number, as a waybill
- * carries its tracking number. Built synchronously, so it is on the page
- * before useLabelPrint() opens the print dialog; an image made async could
- * print blank.
+ * The label is headed by the blood centre's name alone, not RedAgos (project
+ * owner, 2026-11-10). A final label names the donation's centre, as the server
+ * sends it; a base label carries no centre, so it takes the signed-in staff
+ * member's: Processing only reaches its own centre's donations.
  */
-const qrCache = new Map()
+const ownCentre = computed(() => user.value?.facility?.facility_name || user.value?.facility?.name || '')
 
-function qrFor(text) {
-  if (!qrCache.has(text)) {
-    const { size, data } = QRCode.create(String(text), { errorCorrectionLevel: 'M' }).modules
-    let path = ''
-
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        if (data[y * size + x]) path += `M${x} ${y}h1v1h-1z`
-      }
-    }
-
-    qrCache.set(text, { size, path })
-  }
-
-  return qrCache.get(text)
+function centreOf(label) {
+  return label.facility || ownCentre.value
 }
 
 const printedOn = computed(() => (sheet.value.labels.length ? labelDate(new Date().toISOString()) : ''))
@@ -206,20 +193,40 @@ const printedOn = computed(() => (sheet.value.labels.length ? labelDate(new Date
     color: #fff;
   }
 
-  .wb__brand { display: flex; flex-direction: column; font-size: 13pt; font-weight: 800; line-height: 1.1; }
-  .wb__facility { font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .wb__kind { font-size: 9pt; font-weight: 800; letter-spacing: 0.08em; }
+  /* The centre's name, which can run to two lines; the kind keeps its width. */
+  .wb__centre {
+    min-width: 0;
+    font-size: 10pt;
+    font-weight: 800;
+    line-height: 1.15;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .wb__kind { flex-shrink: 0; font-size: 9pt; font-weight: 800; letter-spacing: 0.08em; }
 
   .wb__id {
-    display: grid;
-    grid-template-columns: 30mm 1fr;
-    align-items: center;
-    gap: 3mm;
+    display: flex;
+    flex-direction: column;
+    gap: 2mm;
     padding: 3mm;
     border-bottom: 0.4mm solid #000;
   }
 
-  .wb__qr { display: block; width: 30mm; height: 30mm; }
+  /* Where the donation's pre-printed barcode sticker goes, like the barcode
+     on a waybill. The label prints no barcode of its own. */
+  .wb__sticker {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 22mm;
+    border: 0.4mm dashed #000;
+    font-size: 6.5pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+
   .wb__id-text { min-width: 0; display: flex; flex-direction: column; gap: 1mm; }
 
   .wb__caption { font-size: 6.5pt; font-weight: 800; letter-spacing: 0.08em; }

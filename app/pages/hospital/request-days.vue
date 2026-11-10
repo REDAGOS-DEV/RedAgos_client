@@ -245,8 +245,9 @@ import { hospitalService } from '~/api/hospital/HospitalService'
 import { useListPager } from '~/composables/useListPager'
 import { RECEIVING_REFUSAL_MESSAGES, WEEKDAY_LABELS, WEEKDAYS } from '~/types/receiving'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view', keepalive: true })
 
 useHead({ title: 'Request Days · RedAgos' })
 
@@ -291,6 +292,9 @@ onMounted(() => {
   loadSchedules()
   loadFacilities()
 })
+
+// Kept alive: back here, the list reloads in place; an open dialog keeps its fields.
+onPageReturn(refresh)
 
 
 async function loadSchedules() {

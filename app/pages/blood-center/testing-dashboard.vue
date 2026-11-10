@@ -253,6 +253,7 @@ import { dayMonth, niceScale, weekday } from '~/utils/collectionDashboard'
 import { ageLabel, durationLabel, panelPeak, panelTotals } from '~/utils/testingDashboard'
 import { smoothPath } from '~/utils/smoothPath'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 /**
  * The Testing department's dashboard (project owner, 2026-10-22): what waits
@@ -268,6 +269,7 @@ definePageMeta({
   layout: 'blood-centerdashboard',
   // As on the server: the marker split is for those who record the markers.
   requires: 'lab.record_serology',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -416,15 +418,19 @@ const curve = computed(() => {
 let timer = null
 
 // Refreshes once a minute while the tab is visible, and as soon as it is shown again.
+// Kept alive: nothing reloads while away; back here, a reload straight away.
+const pageHidden = usePageHidden()
+onPageReturn(load)
+
 function onVisibility() {
-  if (document.visibilityState === 'visible') load()
+  if (document.visibilityState === 'visible' && !pageHidden.value) load()
 }
 
 onMounted(async () => {
   await load()
 
   timer = setInterval(() => {
-    if (document.visibilityState === 'visible') load()
+    if (document.visibilityState === 'visible' && !pageHidden.value) load()
   }, REFRESH_MS)
   document.addEventListener('visibilitychange', onVisibility)
 })

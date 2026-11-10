@@ -31,6 +31,7 @@ definePageMeta({
   layout: 'blood-centerdashboard',
   // The same list as the sidebar's link (FORECAST_ABILITIES).
   requires: ['inventory.view', 'donations.view', 'lab.record_components', 'lab.record_serology', 'billing.record_payment'],
+  keepalive: true,
 })
 
 const { can } = useUser()

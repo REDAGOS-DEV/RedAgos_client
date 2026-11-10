@@ -247,7 +247,8 @@ describe('the receiving routes and pages', () => {
       ['app/pages/hospital/receiving/weekly/new.vue', 'hospital.requests.manage'],
       ['app/pages/hospital/receiving/weekly/[id].vue', 'hospital.requests.view'],
     ]) {
-      expect(source(page)).toContain(`definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: '${ability}' })`)
+      // The lists are kept alive between visits (`, keepalive: true`); the forms and the record are not.
+      expect(source(page)).toContain(`definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: '${ability}'`)
     }
   })
 })

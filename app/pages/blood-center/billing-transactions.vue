@@ -150,11 +150,13 @@ import SelectField from '~/components/common/SelectField.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { RECORDED_METHODS, journalAmount, pesos, saveBlob, transactionTone } from '~/utils/billing'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.record_payment',
+  keepalive: true,
 })
 
 const TYPES = [
@@ -164,6 +166,8 @@ const TYPES = [
   { value: 'payment_correction', label: 'Payment correction' },
   { value: 'payment_void', label: 'Payment void' },
   { value: 'subsidy', label: 'Government subsidy' },
+  { value: 'discount', label: 'Discount' },
+  { value: 'discount_reversal', label: 'Discount removed' },
   { value: 'external_settlement', label: 'Settled by hospital' },
   { value: 'opening_balance', label: 'Opening balance' },
 ]
@@ -257,8 +261,11 @@ const groups = computed(() => {
   return list
 })
 
-async function load(page = 1) {
-  loading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the rows on screen.
+async function load(page = 1, options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loading.value = true
   error.value = ''
 
   try {
@@ -300,6 +307,7 @@ async function exportCsv() {
 }
 
 onMounted(() => load())
+onPageReturn(() => load(meta.current_page, { quiet: true }))
 </script>
 
 <style scoped>

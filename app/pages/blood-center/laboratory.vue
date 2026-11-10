@@ -463,13 +463,15 @@
 </template>
 
 <script setup>
-import { h, nextTick, onBeforeUnmount } from 'vue'
+import { h, nextTick, onActivated, onBeforeUnmount, onDeactivated } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorTitle } from '~/utils/donorLabel'
 import { baseLabelsFrom, finalLabelsFrom } from '~/utils/bagLabels'
+import { onPageReturn } from '~/composables/useKeptAlive'
+import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
 /**
  * The Processing department's side of a donation.
@@ -489,6 +491,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'lab.record_components',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -608,6 +611,9 @@ function onSlash(e) {
 }
 onMounted(() => window.addEventListener('keydown', onSlash))
 onBeforeUnmount(() => window.removeEventListener('keydown', onSlash))
+// Kept alive: away, "/" belongs to the page on screen.
+onDeactivated(() => window.removeEventListener('keydown', onSlash))
+onActivated(() => window.addEventListener('keydown', onSlash))
 
 // ── How long a unit has waited since its draw ──
 const drawnAt = (row) => row.collection?.ended_at || row.collection?.started_at || row.donation_date
@@ -864,20 +870,32 @@ async function loadCounts() {
   counts.value = next
 }
 
-async function loadQueue() {
-  loadingQueue.value = true
-  error.value = null
+// Newest reply wins: a refresh started before a filter change never
+// overwrites the list that change loaded.
+const queueLatest = createLatest()
+
+// `quiet`, on return to this kept-alive page and for the background refresh:
+// no skeleton over the queue on screen, and a failure keeps the queue as it is.
+async function loadQueue(options = {}) {
+  const quiet = options?.quiet === true
+  const ticket = queueLatest.begin()
+  if (!quiet) {
+    loadingQueue.value = true
+    error.value = null
+  }
   loadCounts()
 
   try {
     const res = await service.laboratoryQueue(queueParams(statusFilter.value))
+    if (!queueLatest.isCurrent(ticket)) return
 
     queue.value = res?.data ?? []
     queueTotal.value = Number.isInteger(res?.total) ? res.total : queue.value.length
+    error.value = null
   } catch (err) {
-    error.value = messageFor(err)
+    if (!quiet && queueLatest.isCurrent(ticket)) error.value = messageFor(err)
   } finally {
-    loadingQueue.value = false
+    if (queueLatest.isCurrent(ticket)) loadingQueue.value = false
   }
 }
 
@@ -967,15 +985,44 @@ async function submitReject() {
   }
 }
 
+// ?donation= from the Processed list: a processed unit is off the queue, but
+// its breakdown is viewed and its labels reprinted here.
+let appliedDonation = 0
+function linkedDonation() {
+  const wanted = Number(route.query.donation)
+  return Number.isInteger(wanted) && wanted > 0 ? wanted : 0
+}
+
 onMounted(async () => {
   await loadReference()
   await loadQueue()
 
-  // ?donation= from the Processed list: a processed unit is off the queue, but
-  // its breakdown is viewed and its labels reprinted here.
-  const wanted = Number(route.query.donation)
-  if (Number.isInteger(wanted) && wanted > 0) await openDonation(wanted)
+  appliedDonation = linkedDonation()
+  if (appliedDonation) await openDonation(appliedDonation)
 })
+
+/*
+ * Kept alive. Back here, the queue and its counts reload in place and the unit
+ * on the bench keeps what was entered; a link to another unit opens that one
+ * instead, on a cleared form (adopt).
+ */
+onPageReturn(async () => {
+  await loadQueue({ quiet: true })
+
+  const linked = linkedDonation()
+  const fresh = linked && linked !== appliedDonation
+  appliedDonation = linked
+  if (fresh) await openDonation(linked)
+})
+
+/*
+ * The queue and its counts kept current while the page is open: every 30
+ * seconds while this page and the tab are in view, and when the tab comes
+ * back. Only the list: the unit on the bench, and what was entered for it,
+ * are left as they are. Not while a save is running. The queue route is
+ * unthrottled and writes no audit entry on a read.
+ */
+useLiveRefresh(() => loadQueue({ quiet: true }), { intervalMs: 30_000, pauseWhen: () => busy.value })
 </script>
 
 <style scoped>

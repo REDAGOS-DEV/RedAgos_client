@@ -332,13 +332,15 @@ import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { DONATION_STATUS_FILTERS, donationTone } from '~/utils/donationRecords'
 import { formatShortDate, orderBloodGroups } from '~/utils/donorRecords'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   // Every role at the counter holds it, and no one outside the department.
   requires: 'donations.view',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -529,6 +531,18 @@ onBeforeUnmount(() => {
   clearTimeout(searchTimer)
   window.removeEventListener('keydown', onKeydown)
 })
+
+/*
+ * Kept alive. Away, Escape belongs to the page on screen, and the Scan QR
+ * popup closes, which turns the camera off: left open, it would keep filming
+ * behind the next page. Back, the list reloads in place.
+ */
+onDeactivated(() => {
+  window.removeEventListener('keydown', onKeydown)
+  scanning.value = false
+})
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => load(pager.page))
 </script>
 
 <style scoped>

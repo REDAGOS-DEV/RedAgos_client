@@ -332,6 +332,8 @@ import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
+import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
 /**
  * Issuance books the bags Processing hands over into stock. Processing keeps
@@ -363,6 +365,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'inventory.create',
+  keepalive: true,
 })
 
 // The server caps one intake request at 10 units, so a donation separated into
@@ -570,18 +573,29 @@ async function run(work) {
   }
 }
 
-async function loadQueue() {
-  loadingQueue.value = true
-  error.value = null
+// `quiet`, on return to this kept-alive page: no skeleton over the queue on screen.
+// Newest reply wins: a refresh started before a scan or a booking never
+// overwrites the list they loaded.
+const queueLatest = createLatest()
+
+async function loadQueue(options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  // The background refresh: a failure keeps the queue and says nothing, the next one retries.
+  const background = options?.background === true
+  const ticket = queueLatest.begin()
+  if (!quiet) loadingQueue.value = true
+  if (!background) error.value = null
 
   try {
     const res = await service.inventoryIntakeQueue(activeBarcode.value ? { barcode: activeBarcode.value } : {})
+    if (!queueLatest.isCurrent(ticket)) return
 
     queue.value = res?.data ?? []
   } catch (err) {
-    error.value = messageFor(err)
+    if (!background && queueLatest.isCurrent(ticket)) error.value = messageFor(err)
   } finally {
-    loadingQueue.value = false
+    if (queueLatest.isCurrent(ticket)) loadingQueue.value = false
   }
 }
 
@@ -691,6 +705,24 @@ onMounted(async () => {
   await loadReference()
   await loadQueue()
 })
+
+// Kept alive: back here, the queue reloads in place and the scanner field has
+// the focus again. The donation being booked in stays open with what was typed,
+// unless it left the queue meanwhile (booked in from another screen).
+onPageReturn(async () => {
+  scanInput.value?.focus()
+  await loadQueue({ quiet: true })
+  if (selected.value && !queue.value.some((row) => row.donation_id === selected.value.donation_id)) selected.value = null
+})
+
+/*
+ * The queue kept current while the page is open: every 60 seconds while this
+ * page and the tab are in view, and when the tab comes back. Only the list:
+ * the donation being booked in stays open with what was typed, even if it
+ * leaves the queue, until staff close it. Not while a booking is being saved.
+ * The queue route is unthrottled and writes no audit entry on a read.
+ */
+useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs: 60_000, pauseWhen: () => busy.value })
 </script>
 
 <style scoped>

@@ -314,6 +314,7 @@ import { ageLabel, durationLabel } from '~/utils/testingDashboard'
 import { bagPeak, bagTotals, bagsPerUnit } from '~/utils/processingDashboard'
 import { smoothPath } from '~/utils/smoothPath'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 /**
  * The Processing department's dashboard (project owner, 2026-10-22): what
@@ -329,6 +330,7 @@ definePageMeta({
   layout: 'blood-centerdashboard',
   // As on the server: the department that records breakdowns.
   requires: 'lab.record_components',
+  keepalive: true,
 })
 
 /**
@@ -553,8 +555,12 @@ function onChartKey(event) {
 let timer = null
 
 // Refreshes once a minute while the tab is visible, and as soon as it is shown again.
+// Kept alive: nothing reloads while away; back here, a reload straight away.
+const pageHidden = usePageHidden()
+onPageReturn(load)
+
 function onVisibility() {
-  if (document.visibilityState === 'visible') load()
+  if (document.visibilityState === 'visible' && !pageHidden.value) load()
 }
 
 // The chart's box only exists once data has loaded; follow it rather than looking once.
@@ -572,7 +578,7 @@ onMounted(async () => {
   await load()
 
   timer = setInterval(() => {
-    if (document.visibilityState === 'visible') load()
+    if (document.visibilityState === 'visible' && !pageHidden.value) load()
   }, REFRESH_MS)
   document.addEventListener('visibilitychange', onVisibility)
 })

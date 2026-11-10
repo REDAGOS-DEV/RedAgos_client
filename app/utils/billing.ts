@@ -129,7 +129,11 @@ export interface StatementFigures {
   subtotal: number
   /** The government subsidy waives the whole charge, so it is the subtotal or nothing. */
   subsidy: number
-  /** What the statement charges once the subsidy is taken off. */
+  /** One of the centre's own discounts, taken off the subtotal; 0 when there is none. */
+  discount: number
+  /** The discount's name, as the invoice was issued with it. */
+  discountName: string | null
+  /** What the statement charges once the subsidy or the discount is taken off. */
   payable: number
   /** Received before the statement was issued. */
   paid: number
@@ -145,15 +149,18 @@ export interface StatementFigures {
  * outside RedAgos, so it never turns into a balance here.
  */
 export function statementFigures(
-  revision: Pick<StatementRevision, 'billing_status' | 'total_amount' | 'collected_at_issue' | 'amount_due'>,
+  revision: Pick<StatementRevision, 'billing_status' | 'total_amount' | 'collected_at_issue' | 'amount_due' | 'discount_name' | 'discount_amount'>,
 ): StatementFigures {
   const subtotal = centavos(revision.total_amount)
   const subsidy = revision.billing_status === 'subsidised' ? subtotal : 0
+  const discount = centavos(revision.discount_amount)
 
   return {
     subtotal: subtotal / 100,
     subsidy: subsidy / 100,
-    payable: (subtotal - subsidy) / 100,
+    discount: discount / 100,
+    discountName: discount > 0 ? (revision.discount_name ?? null) : null,
+    payable: (subtotal - subsidy - discount) / 100,
     paid: centavos(revision.collected_at_issue) / 100,
     balance: centavos(revision.amount_due) / 100,
   }
@@ -164,6 +171,9 @@ export interface LiveStatementTotals {
   subtotal: number
   /** The whole charge when the government subsidy met it, otherwise nothing. */
   subsidy: number
+  /** One of the centre's own discounts, taken off the subtotal; 0 when there is none. */
+  discount: number
+  discountName: string | null
   paid: number
   balance: number
 }
@@ -176,13 +186,17 @@ export interface LiveStatementTotals {
  * at the counter, whatever its total says.
  */
 export function liveStatementTotals(
-  statement: Pick<StatementDetail, 'status' | 'total_amount' | 'collected' | 'outstanding'>,
+  statement: Pick<StatementDetail, 'status' | 'total_amount' | 'collected' | 'outstanding' | 'subtotal' | 'discount'>,
 ): LiveStatementTotals {
-  const subtotal = centavos(statement.total_amount)
+  const discount = centavos(statement.discount?.amount)
+  // The lines' total: what the bill charges, with its discount put back.
+  const subtotal = statement.subtotal !== undefined ? centavos(statement.subtotal) : centavos(statement.total_amount) + discount
 
   return {
     subtotal: subtotal / 100,
     subsidy: statement.status === 'subsidised' ? subtotal / 100 : 0,
+    discount: discount / 100,
+    discountName: statement.discount?.name ?? null,
     paid: centavos(statement.collected) / 100,
     balance: centavos(statement.outstanding) / 100,
   }
@@ -201,7 +215,10 @@ export interface ReceiptFigures {
 export function receiptFigures(
   receipt: Pick<PaymentReceiptSummary, 'amount_paid' | 'balance_before' | 'balance_after' | 'statement'>,
 ): ReceiptFigures {
-  const total = receipt.statement ? centavos(receipt.statement.total_amount) : null
+  // What the invoice was for: its lines less any discount it was issued with.
+  const total = receipt.statement
+    ? centavos(receipt.statement.total_amount) - centavos(receipt.statement.discount_amount)
+    : null
   const before = centavos(receipt.balance_before)
 
   return {
@@ -345,6 +362,7 @@ export function transactionTone(type: TransactionType): 'success' | 'warning' | 
     case 'charge_adjustment':
       return 'warning'
     case 'subsidy':
+    case 'discount':
       return 'info'
     default:
       return 'muted'
@@ -376,6 +394,10 @@ export function journalStatus(
       return { label: 'Voided', tone: 'muted' }
     case 'subsidy':
       return { label: 'Subsidised', tone: 'purple' }
+    case 'discount':
+      return { label: 'Discounted', tone: 'purple' }
+    case 'discount_reversal':
+      return { label: 'Discount removed', tone: 'muted' }
     case 'external_settlement':
       return { label: 'Settled', tone: 'success' }
     default:

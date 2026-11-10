@@ -291,6 +291,10 @@ async function retryCamera() {
   await camera.start()
 }
 
+// On a kept-alive page (Profile), leaving closes the scanner: hidden, it would
+// keep the camera on and the page behind the next one locked.
+onDeactivated(handleClose)
+
 onMounted(async () => {
   // Locked because the scanner is fixed to the viewport: a page scrolling
   // underneath moves the guide out from under the rectangle being analysed.

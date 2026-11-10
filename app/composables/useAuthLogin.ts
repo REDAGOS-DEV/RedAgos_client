@@ -172,7 +172,15 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
     return raw
   }
 
-  async function login() {
+  /**
+   * `beforeHome` runs once signed in, under "Launching Workspace", before the
+   * portal opens: the registration page sends the ID photo it held there. Its
+   * failure is its own to report; it never undoes the sign-in.
+   */
+  async function login(options?: { beforeHome?: () => Promise<unknown> }) {
+    // Also bound straight to @submit and @verified, so `options` may be the
+    // event or the emitted value: only a function is taken from it.
+    const beforeHome = typeof options?.beforeHome === 'function' ? options.beforeHome : undefined
     // `login`, not `email`: the server matches an email address, a donor
     // code (from the blood center desk's sign-in) or a username.
     const portal = config.value
@@ -180,7 +188,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
       login: email.value,
       password: password.value,
       ...(portal.role ? { role: portal.role } : {}),
-    } as any))
+    } as any), { beforeHome })
   }
 
   /** Sign in with Google (2026-10-30): the credential Google's button handed over. */
@@ -189,7 +197,10 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
   }
 
   /** One sign-in, by password or by Google: keep the token, then go home. */
-  async function signIn(request: () => Promise<any>, { google = false } = {}) {
+  async function signIn(
+    request: () => Promise<any>,
+    { google = false, beforeHome }: { google?: boolean, beforeHome?: () => Promise<unknown> } = {},
+  ) {
     const portal = config.value
     loading.value = true
     errorMessage.value = ''
@@ -214,6 +225,7 @@ export function useAuthLogin(portalKey: MaybeRefOrGetter<PortalKey>) {
       // Signed in: "Launching Workspace" covers loading the profile, the
       // portal and its first data, and fades out once that is done.
       workspace.begin()
+      if (beforeHome) await beforeHome().catch(() => {})
       await navigateTo(safeRedirect() ?? await portal.resolveHome(response))
       workspace.settle()
     } catch (error: any) {

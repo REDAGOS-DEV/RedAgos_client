@@ -417,7 +417,7 @@
     </div>
 
     <!-- ============ BAG DETAILS DRAWER ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="drawer-fade">
         <div v-if="drawerUnit" class="drawer-overlay inv-tones" @click.self="closeDetails">
           <aside
@@ -590,7 +590,7 @@
     </Teleport>
 
     <!-- ============ ALL ACTIVITY DRAWER ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="drawer-fade">
         <div v-if="activityDrawerOpen" class="drawer-overlay inv-tones" @click.self="activityDrawerOpen = false">
           <aside
@@ -659,7 +659,7 @@
 
     <!-- ============ TAG HISTORY DRAWER ============ -->
     <!-- Tags that ended — released, lapsed, or transfused — newest first. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="drawer-fade">
         <div v-if="tagHistoryOpen" class="drawer-overlay inv-tones" @click.self="tagHistoryOpen = false">
           <aside
@@ -832,7 +832,7 @@
       The bag leaves your stock for good. This cannot be undone.
     </HospitalUnitReasonDialog>
 
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="confirmCopy" class="modal-overlay inv-tones" @click.self="!dialogBusy && closeDialog()">
           <div
@@ -861,7 +861,7 @@
     </Teleport>
 
     <!-- Says what an action did, or why it did nothing. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="notice" class="inventory-toast inv-tones" role="status">
           <AssetIcon name="circle-alert" :size="15" />
@@ -915,8 +915,9 @@ import { typeHealthByCode } from '~/utils/stockThreshold'
 import { daysLeftLabel, orderDashboardTypes, pageWindow, timeAgo } from '~/utils/inventoryDashboard'
 import { hospitalActivityKindMeta, hospitalRemainingDaysTag, hospitalUnitStatusTag } from '~/utils/hospitalInventoryDashboard'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })
 
 const NuxtLinkComponent = resolveComponent('NuxtLink')
 
@@ -1473,8 +1474,10 @@ async function loadEvents(page) {
   }
 }
 
-// The page behind does not scroll under a dialog.
-watch(() => Boolean(drawerUnit.value || activityDrawerOpen.value || tagHistoryOpen.value), (open) => {
+// The page behind does not scroll under a dialog. Released while the page is
+// kept but not shown, or the next page could not scroll.
+const pageHidden = usePageHidden()
+watch(() => Boolean(drawerUnit.value || activityDrawerOpen.value || tagHistoryOpen.value) && !pageHidden.value, (open) => {
   document.body.style.overflow = open ? 'hidden' : ''
 })
 onBeforeUnmount(() => { document.body.style.overflow = '' })
@@ -1734,10 +1737,43 @@ onMounted(async () => {
   loading.value = false
   rememberShape()
 
-  ticker = setInterval(() => { now.value = Date.now() }, 30_000)
+  ticker = setInterval(() => { if (!pageHidden.value) now.value = Date.now() }, 30_000)
   pollTimer = setInterval(() => {
-    if (!document.hidden) refresh()
+    if (!document.hidden && !pageHidden.value) refresh()
   }, POLL_MS)
+})
+
+/*
+ * Kept alive: no polling while away. Back here, everything reloads in place,
+ * and a new link is applied as a first visit would: the dashboard's tiles send
+ * ?tag_status=, a patient's page ?status=, the type cards ?blood_type_id=.
+ */
+const LINK_KEYS = ['status', 'blood_type_id', 'tag_status', 'untag_reason']
+const linkKey = () => LINK_KEYS.map((key) => (typeof route.query[key] === 'string' ? route.query[key] : '')).join('|')
+let appliedLink = linkKey()
+
+function applyLink() {
+  const status = STATUS_OPTIONS.some((option) => option.value === route.query.status) ? route.query.status : ''
+  const bloodType = Number(route.query.blood_type_id) || ''
+  if (status || bloodType) {
+    // The watch on the filters reloads the list.
+    Object.assign(filters, { search: '', bloodTypeId: bloodType, componentId: '', expiryRisk: '', status, sort: 'recent' })
+  }
+
+  const tagStatus = TAG_OUTCOMES.includes(route.query.tag_status) ? route.query.tag_status : ''
+  const untagReason = Object.keys(UNTAG_REASON_LABELS).includes(route.query.untag_reason) ? route.query.untag_reason : ''
+  if (tagStatus || untagReason) {
+    Object.assign(eventFilters, { search: '', status: tagStatus, untagReason })
+    openTagHistory()
+  }
+}
+
+onPageReturn(() => {
+  now.value = Date.now()
+  const key = linkKey()
+  if (key !== appliedLink && key.replaceAll('|', '')) applyLink()
+  appliedLink = key
+  return refresh()
 })
 
 onBeforeUnmount(() => {

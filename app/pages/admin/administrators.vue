@@ -116,7 +116,7 @@
     </div>
 
     <!-- Create modal -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="modalOpen" class="modal-layer admins-modal" role="dialog" aria-modal="true" aria-label="Add administrator">
         <div class="overlay" @click="closeModal" />
 
@@ -256,6 +256,10 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { adminAccountService } from '~/api/admin/AdminAccountService'
 import { useUser } from '~/composables/useUser'
 import SelectField from '~/components/common/SelectField.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+// Kept alive: its dialog is off screen while the page is away (see useKeptAlive).
+const pageHidden = usePageHidden()
 
 definePageMeta({
   middleware: 'auth',

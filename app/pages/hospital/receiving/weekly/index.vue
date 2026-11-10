@@ -326,8 +326,9 @@ import { bloodTypeCodes, supplyPlanSummary } from '~/types/bloodRequest'
 import { WEEKLY_STATUS_TONES } from '~/types/receiving'
 import { badgeClass } from '~/utils/listBadge'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view', keepalive: true })
 
 const { can } = useUser()
 // Sending is Requesting Staff's and the Head's; the server refuses anyone else.
@@ -428,6 +429,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => clearTimeout(searchTimer))
+
+// Kept alive: back here, both reload in place.
+onPageReturn(refresh)
 
 async function refresh() {
   refreshing.value = true

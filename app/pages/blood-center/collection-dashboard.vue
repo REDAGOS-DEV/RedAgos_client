@@ -376,12 +376,14 @@ import {
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { smoothPath } from '~/utils/smoothPath'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   // Every role at the counter holds it, and nothing outside the department does.
   requires: 'donations.view',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -650,8 +652,12 @@ function onChartKey(event) {
 let timer = null
 
 // Refreshes once a minute while the tab is visible, and as soon as it is shown again.
+// Kept alive: nothing reloads while away; back here, a reload straight away.
+const pageHidden = usePageHidden()
+onPageReturn(load)
+
 function onVisibility() {
-  if (document.visibilityState === 'visible') load()
+  if (document.visibilityState === 'visible' && !pageHidden.value) load()
 }
 
 // The chart's box only exists once data has loaded, which may be a retry
@@ -670,7 +676,7 @@ onMounted(async () => {
   await load()
 
   timer = setInterval(() => {
-    if (document.visibilityState === 'visible') load()
+    if (document.visibilityState === 'visible' && !pageHidden.value) load()
   }, REFRESH_MS)
   document.addEventListener('visibilitychange', onVisibility)
 })

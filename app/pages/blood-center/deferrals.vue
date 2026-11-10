@@ -224,7 +224,8 @@ import {
   deferralStatusBadge,
 } from '~/utils/deferrals'
 import { formatShortDate } from '~/utils/donorRecords'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -232,6 +233,7 @@ definePageMeta({
   // The list carries deferral reasons: the clinical record's holder (the
   // screening physician), as the server's route demands.
   requires: 'donors.view_clinical',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -410,6 +412,12 @@ onBeforeUnmount(() => {
   clearTimeout(searchTimer)
   window.removeEventListener('keydown', onKeydown)
 })
+
+// Kept alive: away, Escape belongs to the page on screen; back, the list
+// reloads in place (the skeleton shows only over an empty one).
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => load(pager.page))
 </script>
 
 <style scoped>

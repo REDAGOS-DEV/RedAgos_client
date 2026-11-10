@@ -301,6 +301,7 @@
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * Processing's components: the shared catalogue, and this centre's shelf life for each.
@@ -319,6 +320,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'components.configure',
+  keepalive: true,
 })
 
 useHead({ title: 'Blood Components · RedAgos' })
@@ -561,6 +563,12 @@ async function submitAdd() {
 }
 
 onMounted(load)
+
+// Kept alive: back here, the list reloads, unless a shelf life is changed and
+// not saved, which a reload would wipe.
+onPageReturn(() => {
+  if (!dirtyRows.value.length) load()
+})
 </script>
 
 <style scoped>

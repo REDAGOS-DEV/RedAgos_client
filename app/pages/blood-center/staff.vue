@@ -407,11 +407,13 @@ import PhoneField from '~/components/common/PhoneField.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'staff.manage',
+  keepalive: true,
 })
 
 useHead({ title: 'Staff Accounts · RedAgos' })
@@ -583,8 +585,11 @@ function resetForm() {
   formError.value = ''
 }
 
-async function load() {
-  loading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the roster on screen.
+async function load(options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loading.value = true
 
   try {
     const params = { per_page: 100 }
@@ -648,6 +653,11 @@ async function submit() {
         payload.account_status = form.account_status
       }
 
+      // What the dialog showed for every field it sends, as the roster gave
+      // it: the server refuses the save if another Admin has changed any of
+      // them since, rather than putting their change back.
+      payload.expected = Object.fromEntries(Object.keys(payload).map((field) => [field, editing.value[field] ?? null]))
+
       await bloodCenterService.updateStaff(editing.value.uuid, payload)
 
       // An Admin who just stepped down can no longer open this page.
@@ -684,6 +694,15 @@ async function submit() {
     } else if (error?.status === 409) {
       // last_admin — ang facility mahibilin nga walay makadumala sa staff.
       formError.value = error.message
+
+      // Another Admin changed this account after the dialog opened. Read it
+      // again: the dialog keeps what was typed, now judged against what is
+      // stored, so saving again is a choice. The roster follows.
+      if (error?.data?.code === 'stale_edit' && editing.value) {
+        const fresh = await bloodCenterService.showStaff(editing.value.uuid).catch(() => null)
+        if (fresh?.uuid) editing.value = fresh
+        load()
+      }
     } else {
       formError.value = error?.message || 'Something went wrong.'
     }
@@ -808,6 +827,8 @@ function statusClass(row) {
 }
 
 onMounted(() => Promise.all([load(), loadCatalogue()]))
+// Kept alive: back here, the roster reloads in place; an open editor keeps its fields.
+onPageReturn(() => load({ quiet: true }))
 </script>
 
 <style scoped>

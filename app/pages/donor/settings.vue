@@ -273,7 +273,7 @@
         </template>
 
         <!-- Delete account confirmation -->
-        <Teleport to="body">
+        <Teleport to="body" :disabled="pageHidden">
             <Transition name="modal-fade">
                 <div v-if="confirmDeleteOpen" class="modal-backdrop settings-modal" @click.self="confirmDeleteOpen = false">
                     <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="delete-title">
@@ -321,6 +321,10 @@ import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import AppearancePicker from '~/components/common/AppearancePicker.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+// Kept alive: its dialog is off screen while the page is away (see useKeptAlive).
+const pageHidden = usePageHidden()
 
 
 const router = useRouter()

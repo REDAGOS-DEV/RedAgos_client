@@ -247,7 +247,7 @@
 
     <HospitalAddBloodUnitDialog v-if="addingUnit" @added="onUnitAdded" @close="addingUnit = false" />
 
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="toast-fade">
         <div v-if="notice" class="inventory-toast inv-tones" role="status">
           <AssetIcon name="circle-alert" :size="15" />
@@ -285,8 +285,9 @@ import { hospitalRemainingDaysTag } from '~/utils/hospitalInventoryDashboard'
 import { badgeClass } from '~/utils/listBadge'
 import { matchStockInScan } from '~/utils/stockIn'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.stock_in', keepalive: true })
 
 /*
  * Stock-in is the inventory staff's and the Head's (hospital roles, project
@@ -580,11 +581,18 @@ const lastUpdatedLabel = computed(() => (lastUpdated.value
 const POLL_MS = 60_000
 let pollTimer = null
 
+// Kept alive: no polling while away; back here, a refresh straight away.
+const pageHidden = usePageHidden()
+
 onMounted(() => {
   refresh()
   pollTimer = setInterval(() => {
-    if (!document.hidden && !stockingIn.value) refresh()
+    if (!document.hidden && !pageHidden.value && !stockingIn.value) refresh()
   }, POLL_MS)
+})
+
+onPageReturn(() => {
+  if (!stockingIn.value) refresh()
 })
 
 onBeforeUnmount(() => {

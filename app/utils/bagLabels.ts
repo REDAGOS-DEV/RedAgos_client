@@ -12,10 +12,11 @@
  * printed for a bag that is not.
  *
  * Both print as a 100 × 150 mm courier-style waybill (project owner,
- * 2026-10-19), with a QR of the bag or unit number beside it in large type.
- * No 1-D barcode: every bag already carries the donation's pre-printed
- * sticker, and the bag number is that sticker plus the component. Neither
- * names the donor.
+ * 2026-10-19), headed by the centre's name, with a marked box for the
+ * donation's pre-printed barcode sticker and the bag or unit number under it
+ * in large type (project owner, 2026-11-10). The label prints no code of its
+ * own: the bag number is that sticker plus the component. Neither names the
+ * donor.
  */
 
 export type LabelVariant = 'base' | 'final'

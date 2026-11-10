@@ -511,6 +511,7 @@ import SelectField from '~/components/common/SelectField.vue'
 import { FORECAST_ABILITIES } from '~/composables/useBloodCenterNav'
 import { smoothPath } from '~/utils/smoothPath'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const props = defineProps({
   /** 'centre' (reports.view_all) or 'collection' (donations.view). */
@@ -593,6 +594,8 @@ async function load() {
 }
 watch([from, to], load)
 onMounted(load)
+// On a kept-alive page: back there, the same period reloads over the report on screen.
+onPageReturn(load)
 
 const fmtDay = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const fmtWhen = at => (at ? new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')

@@ -67,7 +67,16 @@ describe('billing documents', () => {
   })
 
   it('prints an unpaid statement as payable in full', () => {
-    expect(statementFigures(revision())).toEqual({ subtotal: 1000, subsidy: 0, payable: 1000, paid: 0, balance: 1000 })
+    expect(statementFigures(revision())).toEqual({ subtotal: 1000, subsidy: 0, discount: 0, discountName: null, payable: 1000, paid: 0, balance: 1000 })
+  })
+
+  it('takes a discount of the centre off what the invoice charges', () => {
+    const f = statementFigures(revision({ discount_name: 'Senior Citizen', discount_amount: '200.00', amount_due: '800.00' }))
+
+    expect(f.discount).toBe(200)
+    expect(f.discountName).toBe('Senior Citizen')
+    expect(f.payable).toBe(800)
+    expect(f.balance).toBe(800)
   })
 
   it('takes earlier payments off the balance but not off the amount payable', () => {
@@ -169,10 +178,23 @@ describe('the journal', () => {
 describe('the statement and receipt pages', () => {
   it('takes the balance from the server, so a subsidised bill owes nothing', () => {
     expect(liveStatementTotals({ status: 'partial', total_amount: 1800, collected: 500, outstanding: '1300.00' }))
-      .toEqual({ subtotal: 1800, subsidy: 0, paid: 500, balance: 1300 })
+      .toEqual({ subtotal: 1800, subsidy: 0, discount: 0, discountName: null, paid: 500, balance: 1300 })
 
     expect(liveStatementTotals({ status: 'subsidised', total_amount: 900, collected: 0, outstanding: '0.00' }))
-      .toEqual({ subtotal: 900, subsidy: 900, paid: 0, balance: 0 })
+      .toEqual({ subtotal: 900, subsidy: 900, discount: 0, discountName: null, paid: 0, balance: 0 })
+  })
+
+  it('shows the discount on a live bill against the lines it was taken off', () => {
+    const totals = liveStatementTotals({
+      status: 'unpaid',
+      total_amount: 1200,
+      subtotal: 1500,
+      discount: { name: 'Senior Citizen', kind: 'percentage', value: 20, amount: 300, note: 'OSCA 1', applied_at: null },
+      collected: 0,
+      outstanding: '1200.00',
+    })
+
+    expect(totals).toEqual({ subtotal: 1500, subsidy: 0, discount: 300, discountName: 'Senior Citizen', paid: 0, balance: 1200 })
   })
 
   it('works out what was paid before a receipt from the balance it was made against', () => {
@@ -185,6 +207,17 @@ describe('the statement and receipt pages', () => {
 
     expect(receiptFigures(receipt)).toEqual({ total: 1800, paidBefore: 500, paid: 400, remaining: 900 })
     expect(receiptFigures({ ...receipt, statement: null })).toMatchObject({ total: null, paidBefore: null, remaining: 900 })
+  })
+
+  it('never counts the discount on the invoice of a receipt as money already paid', () => {
+    const receipt = {
+      amount_paid: '1200.00',
+      balance_before: '1200.00',
+      balance_after: '0.00',
+      statement: { document_number: 'INV-1-000003', revision_number: 1, total_amount: '1500.00', discount_name: 'Senior Citizen', discount_amount: '300.00', amount_due: '1200.00' },
+    }
+
+    expect(receiptFigures(receipt)).toEqual({ total: 1200, paidBefore: 0, paid: 1200, remaining: 0 })
   })
 })
 

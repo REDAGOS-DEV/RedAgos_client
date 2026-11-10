@@ -142,7 +142,7 @@ import {
 } from '~/utils/hospitalHelp'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', keepalive: true })
 
 const route = useRoute()
 const router = useRouter()

@@ -13,6 +13,11 @@
     <!-- What waits for this person now (useBloodCenterTasks), first on every dashboard. -->
     <TaskStrip class="needs-you" />
 
+    <p v-if="sweepWarning" class="sweep-warning" role="alert">
+      <AssetIcon name="triangle-alert" :size="15" />
+      <span>{{ sweepWarning }}</span>
+    </p>
+
     <!-- ============ HEADLINE LEVELS ============ -->
     <section class="kpis" aria-label="Stock at a glance" :aria-busy="loading">
       <template v-if="loading">
@@ -380,13 +385,16 @@ import ForecastWeekChart from '~/components/BloodCenter/ForecastWeekChart.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { niceScale } from '~/utils/collectionDashboard'
 import { stockSparkline, stockTypeAlert, stockTypeCards, stockWeekChange } from '~/utils/issuanceDashboard'
+import { expirySweepWarning } from '~/utils/expirySweep'
 import { REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import { smoothPath } from '~/utils/smoothPath'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'inventory.create',
+  keepalive: true,
 })
 
 useHead({ title: 'Issuance · RedAgos' })
@@ -399,6 +407,9 @@ const { can } = useUser()
 // GET /blood-center/inventory/summary, and the request queue's summary and
 // first open page. A failure leaves that part empty rather than breaking the page.
 const summary = ref(null)
+// Shown when the nightly expiry check is overdue: until it runs, units past
+// their date are still counted as available here.
+const sweepWarning = computed(() => expirySweepWarning(summary.value?.expiry_sweep))
 const requests = ref(null)
 const requestList = ref(null)
 // The facility's minimums against its stock. Supplementary, like the rest: a
@@ -436,9 +447,8 @@ const demand = computed(() => {
   }
 })
 
-onMounted(async () => {
-  hydrated.value = true
-
+/** Everything on the page. `loading` covers the first visit only, so a reload draws over what is shown. */
+async function load() {
   const [inventoryResult, requestResult, listResult, thresholdResult, forecastResult] = await Promise.allSettled([
     bloodCenterService.inventorySummary(),
     canSeeRequests.value ? bloodCenterService.incomingRequestsSummary() : Promise.resolve(null),
@@ -468,7 +478,15 @@ onMounted(async () => {
   }
 
   loading.value = false
+}
+
+onMounted(() => {
+  hydrated.value = true
+  load()
 })
+
+// Kept alive: back here, everything reloads in place.
+onPageReturn(load)
 
 function formatCount(value) {
   return Number(value ?? 0).toLocaleString('en-US')
@@ -1094,6 +1112,14 @@ const trendLabel = computed(() => `Stock over the last ${trend.value.length} day
 
 /* ===== Refresh (project owner, 2026-10-24) ===== */
 .needs-you { margin-bottom: 16px; }
+
+/* Neutral like the threshold banner: the state is the icon's colour alone. */
+.sweep-warning {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 14px; border-radius: 10px;
+  background: var(--rb-surface); border: 1px solid var(--rb-border); color: var(--rb-text-primary); font-size: 13px;
+}
+.sweep-warning :deep(svg) { flex-shrink: 0; color: var(--iss-warn); }
+.sweep-warning span { flex: 1; }
 
 .kpi__spark-area { fill: var(--kpi-mark); opacity: 0.14; stroke: none; }
 

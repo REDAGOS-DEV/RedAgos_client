@@ -77,7 +77,7 @@
     </Transition>
 
     <!-- Teleported to <body>, as PhoneField's list is, so dialogs and scroll boxes cannot clip it. -->
-    <Teleport v-if="typePicker" to="body">
+    <Teleport v-if="typePicker" to="body" :disabled="pageHidden">
       <Transition name="idf-pop">
         <ul
           v-if="open"
@@ -115,6 +115,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
 import {
   VALID_ID_TYPE_OPTIONS,
   cleanIdNumber,
@@ -163,6 +164,8 @@ const props = withDefaults(defineProps<{
   ariaLabel: undefined,
   size: 'md',
 })
+
+const pageHidden = usePageHidden()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]

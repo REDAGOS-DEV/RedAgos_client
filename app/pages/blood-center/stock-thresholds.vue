@@ -26,6 +26,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'inventory.view',
+  keepalive: true,
 })
 
 useHead({ title: 'Stock Thresholds · RedAgos' })

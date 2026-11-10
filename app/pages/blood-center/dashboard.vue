@@ -404,7 +404,7 @@
     </div>
 
     <!-- Confirm process/fulfill modal -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="confirmModalOpen" class="modal-overlay" @click.self="closeConfirmModal">
           <div class="modal-card" role="dialog" v-focus-trap aria-modal="true">
@@ -453,11 +453,13 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'reports.view_all',
+  keepalive: true,
 })
 
 const { user, can } = useUser()
@@ -788,7 +790,7 @@ const exportReport = async () => {
 // Supplementary: a failure leaves no banner.
 const lowStock = ref([])
 
-onMounted(async () => {
+async function loadLowStock() {
   // Read behind inventory.view; the Admin does not hold it.
   if (!canViewInventory.value) return
 
@@ -797,9 +799,13 @@ onMounted(async () => {
   } catch (err) {
     console.error('Failed to load stock thresholds:', err)
   }
-})
+}
 
-onMounted(async () => {
+onMounted(loadLowStock)
+
+// `loading` is true only until the first answer, so a reload on return draws
+// over the figures on screen instead of the skeleton.
+async function loadOverview() {
   try {
     // Dev note: gikan sa /blood-center/dashboard-summary, /inventory, /hospital-requests,
     // /inventory-trends, /component-distribution, /near-expiry, /donations, /activity-log endpoints.
@@ -836,7 +842,13 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadOverview)
+
+// Kept alive: back here, both reload; the confirm dialog is off screen while away.
+onPageReturn(() => Promise.all([loadLowStock(), loadOverview()]))
+const pageHidden = usePageHidden()
 </script>
 
 <style scoped>

@@ -148,6 +148,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
 import StockLevelCard from '~/components/common/StockLevelCard.vue'
 import StockThresholdGrid from '~/components/common/StockThresholdGrid.vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 import type {
   SaveStockThresholdsPayload,
   StockLevelRow,
@@ -363,7 +364,17 @@ async function save(level: ThresholdLevel): Promise<void> {
 
     const count = thresholds.length
     feedback[level] = { kind: 'success', text: `Saved ${count} change${count === 1 ? '' : 's'} to the ${LEVEL_NAMES[level]}.` }
-  } catch (err) {
+  } catch (err: any) {
+    // Someone saved levels after this table loaded. Read them in: the watch
+    // below keeps every edit made here and takes their levels everywhere
+    // else, so saving again is a choice made against what is now stored.
+    if (err?.data?.code === 'stale_edit') {
+      await loadStatus(true)
+      feedback[level] = { kind: 'error', text: failure(err, 'Someone else changed these levels. Check them and save again.') }
+
+      return
+    }
+
     feedback[level] = {
       kind: 'error',
       text: `${failure(err, `The ${LEVEL_NAMES[level]} could not be saved.`)} Your changes are still here; try again.`,
@@ -377,16 +388,25 @@ async function save(level: ThresholdLevel): Promise<void> {
 watch(() => status.value?.cells, () => seed(LEVELS), { immediate: true })
 
 let timer: ReturnType<typeof setInterval> | null = null
+const pageHidden = usePageHidden()
+
+/** A quiet refresh, unless it would re-seed a table under the person typing. */
+function poll(): void {
+  if (!dirty.value && savingLevel.value === null && !busy.value) void loadStatus(true)
+}
 
 onMounted(() => {
   void loadStatus(false)
 
   // Keep the counts current, but never while there are unsaved edits or a save
   // in flight: the tables would be re-seeded underneath the person typing.
+  // Nor while the page is kept but not shown; it refreshes on return instead.
   timer = setInterval(() => {
-    if (!dirty.value && savingLevel.value === null && !busy.value) void loadStatus(true)
+    if (!pageHidden.value) poll()
   }, POLL_MS)
 })
+
+onPageReturn(poll)
 
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer)

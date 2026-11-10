@@ -835,7 +835,8 @@ import {
   unlistedLookup,
 } from '~/utils/donorRecords'
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -843,6 +844,7 @@ definePageMeta({
   // donors.view_contact, which Recruitment also holds: the server answers them
   // with a contact list, and the profile and history below stay hidden.
   requires: 'donors.view_contact',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -1585,6 +1587,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   resetPhoto()
 })
+
+// Kept alive: away, Escape belongs to the page on screen; back, the list
+// reloads in place. An open record or form stays as it was.
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => loadDonors(pager.page))
 </script>
 
 <style scoped>

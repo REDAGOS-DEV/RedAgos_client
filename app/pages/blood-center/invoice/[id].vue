@@ -310,10 +310,10 @@
                 <small v-if="dueNote" class="due-note">{{ dueNote }}</small>
                 <!-- How much of the bill is in: shown only on a patient bill with something to collect. -->
                 <div v-if="paidShare !== null" class="due-meter">
-                  <div class="meter" role="img" :aria-label="`${pesos(totals.paid)} of ${pesos(totals.subtotal)} paid`">
+                  <div class="meter" role="img" :aria-label="`${pesos(totals.paid)} of ${pesos(payableTotal)} paid`">
                     <span :style="{ width: `${paidShare}%` }" />
                   </div>
-                  <p>{{ pesos(totals.paid) }} of {{ pesos(totals.subtotal) }} paid</p>
+                  <p>{{ pesos(totals.paid) }} of {{ pesos(payableTotal) }} paid</p>
                 </div>
               </div>
 
@@ -716,16 +716,20 @@ const totalRows = computed(() => {
   return [
     { label: 'Subtotal', value: pesos(t.subtotal) },
     ...(t.subsidy > 0 ? [{ label: 'Government subsidy', value: `− ${pesos(t.subsidy)}`, tone: 'purple' }] : []),
+    ...(t.discount > 0 ? [{ label: t.discountName ? `Discount: ${t.discountName}` : 'Discount', value: `− ${pesos(t.discount)}`, tone: 'purple' }] : []),
     { label: 'Paid to date', value: t.paid > 0 ? `− ${pesos(t.paid)}` : pesos(0) },
     { label: 'Balance due', value: pesos(t.balance), emphasis: true, tone: t.balance > 0 ? 'danger' : 'success' },
   ]
 })
 
+// What the patient pays in all: the lines, less any discount.
+const payableTotal = computed(() => totals.value.subtotal - totals.value.discount)
+
 // How much of a patient bill is in, for the meter under the amount due.
 const paidShare = computed(() => {
   const t = totals.value
-  if (weekly.value || statement.value?.is_subsidised || !(t.subtotal > 0)) return null
-  return Math.min(100, Math.round((t.paid / t.subtotal) * 100))
+  if (weekly.value || statement.value?.is_subsidised || !(payableTotal.value > 0)) return null
+  return Math.min(100, Math.round((t.paid / payableTotal.value) * 100))
 })
 
 const dueTone = computed(() => {

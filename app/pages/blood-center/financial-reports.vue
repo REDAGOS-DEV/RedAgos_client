@@ -249,11 +249,13 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import { PERIOD_PRESETS, periodFor, periodLabel } from '~/utils/reportPeriod'
 import { smoothPath } from '~/utils/smoothPath'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'reports.financial',
+  keepalive: true,
 })
 
 useHead({ title: 'Financial Reports · RedAgos' })
@@ -309,6 +311,8 @@ async function downloadPdf() {
 
 watch([from, to], load)
 onMounted(load)
+// Kept alive: back here, the same period reloads over the report on screen.
+onPageReturn(load)
 
 // -- Each figure's small picture (2026-10-31) --
 const RING15 = 2 * Math.PI * 15
@@ -345,6 +349,9 @@ const figures = computed(() => {
     // The part of what was invoiced that the subsidy met.
     { label: 'Subsidised', raw: Number(s?.subsidised), icon: 'shield-check', tone: 'green', value: pesos(s?.subsidised), note: count(r?.subsidies?.count, 'request', 'requests'),
       ring: partOf(s?.subsidised, s?.invoiced) },
+    // The part of what was invoiced that the centre's own discounts took off.
+    { label: 'Discounted', raw: Number(s?.discounted), icon: 'tags', tone: 'green', value: pesos(s?.discounted), note: count(r?.discounts?.count, 'request', 'requests'),
+      ring: partOf(s?.discounted, s?.invoiced) },
     // Settled, of what hospitals were asked for (settled plus still owed).
     { label: 'Settled by hospitals', raw: Number(s?.settled_by_hospitals), icon: 'building-2', tone: 'purple', value: pesos(s?.settled_by_hospitals), note: count(r?.receivables?.settlements?.count, 'settlement', 'settlements'),
       ring: partOf(s?.settled_by_hospitals, Number(s?.settled_by_hospitals ?? 0) + hospitalsOwe) },
@@ -407,7 +414,7 @@ function share(amount, max) {
 
 /* One strip of figures, divided rather than boxed. */
 .figures {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 0;
   background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; overflow: hidden;
 }
 .figure { display: flex; flex-direction: column; gap: 2px; padding: 16px 18px; border-left: 1px solid var(--rb-border); min-width: 0; }

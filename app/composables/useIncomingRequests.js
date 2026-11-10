@@ -1,4 +1,5 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { createLatest } from '~/composables/useLiveRefresh'
 import { REQUEST_STATUS_LABELS, REQUEST_STATUS_TONES } from '~/types/bloodRequest'
 
 /**
@@ -77,33 +78,68 @@ export const useIncomingRequests = () => {
     )
   }
 
-  async function fetchRequests(page = 1) {
-    isLoading.value = true
-    error.value = null
+  // Newest reply wins: a background refresh that answers after a filter
+  // change or an action never overwrites what they loaded.
+  const listLatest = createLatest()
+  const summaryLatest = createLatest()
+  // Loads that show the busy state. A quiet one never does.
+  let loudLoads = 0
+
+  /**
+   * Load one page of the queue with the filters applied.
+   *
+   * `quiet` is the background refresh: no busy state, and a failure keeps the
+   * rows on screen rather than emptying the queue, since a missed refresh is
+   * retried by the next. Resolves true when its reply was applied.
+   */
+  async function fetchRequests(page = 1, { quiet = false } = {}) {
+    const ticket = listLatest.begin()
+
+    if (!quiet) {
+      loudLoads++
+      isLoading.value = true
+      error.value = null
+    }
 
     try {
       const response = await bloodCenterService.incomingRequests({ ...activeFilters(), page, per_page: PER_PAGE })
+      if (!listLatest.isCurrent(ticket)) return false
+
       requests.value = response?.data ?? []
       meta.value = {
         current_page: response?.current_page ?? 1,
         last_page: response?.last_page ?? 1,
         total: response?.total ?? 0,
       }
+      error.value = null
+
+      return true
     } catch (err) {
-      error.value = err?.message ?? 'Could not load incoming requests.'
-      requests.value = []
+      if (!quiet && listLatest.isCurrent(ticket)) {
+        error.value = err?.message ?? 'Could not load incoming requests.'
+        requests.value = []
+      }
+
+      return false
     } finally {
-      isLoading.value = false
+      if (!quiet) {
+        loudLoads--
+        isLoading.value = loudLoads > 0
+      }
     }
   }
 
-  async function fetchSummary() {
+  async function fetchSummary({ quiet = false } = {}) {
+    const ticket = summaryLatest.begin()
+
     try {
-      summary.value = await bloodCenterService.incomingRequestsSummary()
+      const next = await bloodCenterService.incomingRequestsSummary()
+      if (summaryLatest.isCurrent(ticket)) summary.value = next
     } catch {
       // A failed counter must not blank the queue itself, which is the part
-      // staff actually need. The cards fall back to their empty state.
-      summary.value = null
+      // staff actually need. The cards fall back to their empty state, except
+      // after a background refresh, which keeps the last counts.
+      if (!quiet && summaryLatest.isCurrent(ticket)) summary.value = null
     }
   }
 

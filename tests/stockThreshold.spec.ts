@@ -132,7 +132,7 @@ describe('drafts and what gets saved', () => {
     edited[cellKey(1, 10)]!.minimum = '15'
 
     expect(diffCritical(cells, edited)).toEqual([
-      { blood_type_id: 1, component_id: 10, minimum_units: 15, alerts_enabled: true },
+      { blood_type_id: 1, component_id: 10, minimum_units: 15, alerts_enabled: true, expected: { minimum_units: 10, alerts_enabled: true } },
     ])
   })
 
@@ -142,7 +142,7 @@ describe('drafts and what gets saved', () => {
     edited[cellKey(1, 10)]!.par = '25'
 
     // The PAR table leaves the critical level out, so the server keeps it...
-    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: 25 }])
+    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: 25, expected: { par_units: 20 } }])
     // ...and a PAR edit is not a change to the critical table.
     expect(diffCritical(cells, edited)).toEqual([])
 
@@ -158,7 +158,7 @@ describe('drafts and what gets saved', () => {
     const edited = drafts(cells)
     edited[cellKey(1, 10)]!.par = ''
 
-    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: null }])
+    expect(diffPar(cells, edited)).toEqual([{ blood_type_id: 1, component_id: 10, par_units: null, expected: { par_units: 20 } }])
   })
 
   it('sends a null minimum to clear a threshold that exists', () => {
@@ -167,7 +167,7 @@ describe('drafts and what gets saved', () => {
     edited[cellKey(1, 10)]!.minimum = ''
 
     expect(diffCritical(cells, edited)).toEqual([
-      { blood_type_id: 1, component_id: 10, minimum_units: null, alerts_enabled: true },
+      { blood_type_id: 1, component_id: 10, minimum_units: null, alerts_enabled: true, expected: { minimum_units: 10, alerts_enabled: true } },
     ])
   })
 
@@ -177,8 +177,20 @@ describe('drafts and what gets saved', () => {
     edited[cellKey(1, 10)]!.alerts_enabled = false
 
     expect(diffCritical(cells, edited)).toEqual([
-      { blood_type_id: 1, component_id: 10, minimum_units: 10, alerts_enabled: false },
+      { blood_type_id: 1, component_id: 10, minimum_units: 10, alerts_enabled: false, expected: { minimum_units: 10, alerts_enabled: true } },
     ])
+  })
+
+  it('says what each change was made against, as loaded, not as typed', () => {
+    const cells = [cell({ minimum_units: 8, par_units: 30, alerts_enabled: false })]
+    const edited = drafts(cells)
+    edited[cellKey(1, 10)]!.minimum = '12'
+    edited[cellKey(1, 10)]!.par = '40'
+
+    // The server refuses a save whose levels someone else has changed since
+    // they were loaded, so each table names exactly the levels it touches.
+    expect(diffCritical(cells, edited)[0]!.expected).toEqual({ minimum_units: 8, alerts_enabled: false })
+    expect(diffPar(cells, edited)[0]!.expected).toEqual({ par_units: 30 })
   })
 
   it('never creates a row from a toggle on a cell that has no minimum', () => {

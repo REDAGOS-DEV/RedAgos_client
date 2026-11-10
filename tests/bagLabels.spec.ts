@@ -155,10 +155,17 @@ describe('the printed label', () => {
     expect(sheet).toMatch(/\.bag-label \{[^}]*width: 100mm;[^}]*height: 150mm;/)
   })
 
-  it('carries a QR of its own unit or bag number, built before the print dialog opens', () => {
-    expect(sheet).toContain("QRCode.create(String(text), { errorCorrectionLevel: 'M' })")
-    expect(sheet).toContain(':d="qrFor(label.unit_id).path"')
-    expect(sheet).toContain(':d="qrFor(label.bag_number).path"')
+  it('marks where the barcode sticker goes and prints no QR (project owner, 2026-11-10)', () => {
+    expect(sheet.match(/class="wb__sticker"/g)).toHaveLength(2)
+    expect(sheet).not.toContain('qrcode')
+    expect(sheet).not.toContain('qrFor(')
+  })
+
+  it('is headed by the centre name only, not RedAgos (project owner, 2026-11-10)', () => {
+    const template = sheet.split('<script')[0]!
+
+    expect(template).not.toContain('RedAgos')
+    expect(template.match(/\{\{ centreOf\(label\) \}\}/g)).toHaveLength(2)
   })
 })
 

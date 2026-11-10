@@ -258,13 +258,15 @@ import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { formatShortDate } from '~/utils/donorRecords'
 import { daysSinceDrive, sheetSummary } from '~/utils/paperDonations'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   // Every Collection role and the head: whoever ran the drive types it in.
   requires: 'donations.record_paper',
+  keepalive: true,
 })
 
 /**
@@ -457,16 +459,32 @@ function onKeydown(event) {
   else if (form.open) closeNewSheet()
 }
 
+// From a completed drive on the Drives page (?drive=): open its sheet straight away.
+let appliedDrive = ''
+function openFromLink() {
+  const drive = route.query.drive ? String(route.query.drive) : ''
+  const fresh = drive && drive !== appliedDrive
+  appliedDrive = drive
+  if (fresh) openNewSheet(route.query.drive)
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   await Promise.all([load(), loadOptions()])
-
-  // From a completed drive on the Drives page: open its sheet straight away.
-  if (route.query.drive) openNewSheet(route.query.drive)
+  openFromLink()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+})
+
+// Kept alive: away, Escape belongs to the page on screen; back, the list
+// reloads in place, and another drive's link opens its sheet.
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(async () => {
+  await load(pager.page)
+  openFromLink()
 })
 </script>
 

@@ -83,10 +83,12 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import NotificationItem from '~/components/BloodCenter/NotificationItem.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { EMPTY_BY_DEPARTMENT, groupByDay, safeRoute, tabsFor } from '~/utils/staffNotifications'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
+  keepalive: true,
 })
 
 const PER_PAGE = 20
@@ -179,6 +181,9 @@ onMounted(() => {
   load()
   loadTopics()
 })
+
+// Kept alive: back here, the first page reloads in place (the skeleton shows only over an empty list).
+onPageReturn(() => load())
 </script>
 
 <style scoped>
