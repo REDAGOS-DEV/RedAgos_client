@@ -384,10 +384,12 @@ import BloodCenterBookingScheduleCard from '~/components/BloodCenter/BookingSche
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: 'auth',
   layout: 'blood-centerdashboard',
+  keepalive: true,
 })
 
 /**
@@ -467,7 +469,16 @@ const tabs = computed(() => [
 // ?tab=center opens a tab directly, as the Donors page's email dialog links to
 // the donor email templates. A tab the viewer cannot see falls back to profile.
 const route = useRoute()
-const activeTab = ref(tabs.value.some((tab) => tab.id === route.query.tab) ? String(route.query.tab) : 'profile')
+const tabFromLink = () => (tabs.value.some((tab) => tab.id === route.query.tab) ? String(route.query.tab) : null)
+const activeTab = ref(tabFromLink() ?? 'profile')
+
+// Kept alive, with nothing reloaded on return: these are your own settings,
+// only changed here, and a reload would wipe what you had typed and not saved.
+// A link to one tab (?tab=, as the bell's gear sends) still opens it.
+onPageReturn(() => {
+  const tab = tabFromLink()
+  if (tab) activeTab.value = tab
+})
 
 function initials(name) {
   if (!name) return '?'

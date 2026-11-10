@@ -290,6 +290,7 @@ import { FORECAST_ABILITIES } from '~/composables/useBloodCenterNav'
 import { niceScale } from '~/utils/collectionDashboard'
 import { smoothPath } from '~/utils/smoothPath'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const { user, can } = useUser()
 const facilityName = computed(() => user.value?.facility?.facility_name || 'Your blood center')
@@ -360,6 +361,8 @@ async function load() {
 }
 watch([from, to], load)
 onMounted(load)
+// On a kept-alive page: back there, the same period reloads over the report on screen.
+onPageReturn(load)
 
 const fmtDay = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const fmtWeekday = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })

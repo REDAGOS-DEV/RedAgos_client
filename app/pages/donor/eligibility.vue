@@ -608,7 +608,7 @@
         </template>
 
         <!-- The review step: everything about to be sent, read-only. -->
-        <Teleport to="body">
+        <Teleport to="body" :disabled="pageHidden">
             <Transition name="modal-fade">
                 <div v-if="showReview" class="modal-backdrop eligibility-modal" @click.self="showReview = false">
                     <div class="modal-card modal-card--review" role="dialog" v-focus-trap aria-modal="true"
@@ -648,7 +648,7 @@
             "passed" ug walay "deferred" -- kay ang blood center na ang mo-basa
             sa mga tubag ug mo-desisyon didto sa counter.
         -->
-        <Teleport to="body">
+        <Teleport to="body" :disabled="pageHidden">
             <Transition name="modal-fade">
                 <div v-if="showPassedModal" class="modal-backdrop eligibility-modal" @click.self="showPassedModal = false">
                     <div class="modal-card" role="dialog" v-focus-trap aria-modal="true" aria-labelledby="epm-title">
@@ -701,6 +701,10 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { donorService } from '~/api/donor/DonorService'
 import QRCode from 'qrcode'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+// Kept alive: its dialog is off screen while the page is away (see useKeptAlive).
+const pageHidden = usePageHidden()
 
 
 const router = useRouter()

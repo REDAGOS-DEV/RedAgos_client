@@ -236,6 +236,7 @@ import TaskStrip from '~/components/BloodCenter/TaskStrip.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { niceScale } from '~/utils/collectionDashboard'
 import { smoothPath } from '~/utils/smoothPath'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 /**
  * The Billing department's dashboard (project owner, 2026-10-27): today at
@@ -249,6 +250,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.record_payment',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -285,10 +287,13 @@ async function load() {
 }
 
 let timer = null
+// Kept alive: no polling while away; back here, a reload straight away.
+const pageHidden = usePageHidden()
 onMounted(() => {
   load()
-  timer = setInterval(() => { if (document.visibilityState === 'visible') load() }, 60_000)
+  timer = setInterval(() => { if (document.visibilityState === 'visible' && !pageHidden.value) load() }, 60_000)
 })
+onPageReturn(load)
 onBeforeUnmount(() => clearInterval(timer))
 
 const t = computed(() => data.value?.today ?? {})

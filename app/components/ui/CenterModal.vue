@@ -2,9 +2,9 @@
   <!--
     A dialog in the middle of the screen (project owner, 2026-11-01): the header
     stays, the body scrolls, the footer holds the actions. On the body, above the
-    portal's top bar.
+    portal's top bar. Back inside its page while that page is kept but not shown.
   -->
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <Transition name="center-modal" appear>
       <div v-if="open" class="cm" @mousedown.self="$emit('close')">
         <div
@@ -38,6 +38,7 @@
 
 <script setup>
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
 
 const props = defineProps({
   open: { type: Boolean, default: true },
@@ -51,9 +52,12 @@ defineEmits(['close'])
 
 const titleId = useId()
 
-// The page behind does not scroll under the dialog.
-watch(() => props.open, (open) => {
-  if (typeof document !== 'undefined') document.body.style.overflow = open ? 'hidden' : ''
+const pageHidden = usePageHidden()
+
+// The page behind does not scroll under the dialog. Released while its page is
+// kept but not shown, or the next page could not scroll.
+watch(() => props.open && !pageHidden.value, (lock) => {
+  if (typeof document !== 'undefined') document.body.style.overflow = lock ? 'hidden' : ''
 }, { immediate: true })
 onBeforeUnmount(() => { document.body.style.overflow = '' })
 </script>

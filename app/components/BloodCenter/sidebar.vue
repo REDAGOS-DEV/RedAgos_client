@@ -522,9 +522,27 @@ onMounted(loadUser)
 
 // A page that changes what waits (a verification, a referral moved on) bumps
 // this, so the counts follow without a reload: the layout keeps the sidebar
-// mounted across pages.
+// mounted across pages. It queues a fresh load even if one is running, which
+// may have counted before the change.
 const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
-watch(badgeRefresh, () => loadCounts())
+watch(badgeRefresh, () => loadTaskCounts({ afterChange: true }))
+
+// What colleagues changed: re-counted as you move between pages and when you
+// come back to the tab, at most once a minute. In the background mode, which
+// never reads a throttled list on a schedule; those two counts follow the
+// full loads (sign-in, a dashboard's strip, the bump above).
+const BADGE_REFRESH_GAP_MS = 60_000
+let lastBadgeRefresh = Date.now()
+
+function refreshBadgesQuietly() {
+  if (document.visibilityState !== 'visible' || Date.now() - lastBadgeRefresh < BADGE_REFRESH_GAP_MS) return
+  lastBadgeRefresh = Date.now()
+  void loadTaskCounts({ background: true })
+}
+
+watch(() => route.path, refreshBadgesQuietly)
+onMounted(() => document.addEventListener('visibilitychange', refreshBadgesQuietly))
+onUnmounted(() => document.removeEventListener('visibilitychange', refreshBadgesQuietly))
 
 const hoveredPath = ref(null)
 

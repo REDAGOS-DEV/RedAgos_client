@@ -14,6 +14,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'requests.release',
+  keepalive: true,
 })
 
 useHead({ title: 'For Dispatch · RedAgos' })

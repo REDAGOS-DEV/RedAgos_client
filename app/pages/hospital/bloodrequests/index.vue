@@ -461,15 +461,16 @@ import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { useListPager } from '~/composables/useListPager'
 import { badgeClass } from '~/utils/listBadge'
 import { componentSummary, requestStatusLabel } from '~/types/bloodRequest'
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { canCancelTransfusion, transfusionProgressLabel } from '~/utils/transfusionSourcing'
 import SelectField from '~/components/common/SelectField.vue'
 import HospitalReceiveDeliveryDialog from '~/components/Hospital/ReceiveDeliveryDialog.vue'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.requests.view', keepalive: true })
 
 const router = useRouter()
 const route = useRoute()
@@ -875,6 +876,12 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
+
+// Kept alive: away, Escape belongs to the page on screen; back, the list
+// reloads in place.
+onDeactivated(() => window.removeEventListener('keydown', handleGlobalKeydown))
+onActivated(() => window.addEventListener('keydown', handleGlobalKeydown))
+onPageReturn(refresh)
 </script>
 
 <!-- The list: the blood centre's Donor Management structure (project owner, 2026-10-30). -->

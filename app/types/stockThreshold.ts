@@ -63,6 +63,16 @@ export interface StockThresholdInput {
   minimum_units?: number | null
   par_units?: number | null
   alerts_enabled?: boolean
+  /**
+   * What the table showed for the levels this change touches, when it
+   * loaded. The server refuses the save (409 stale_edit) if someone has
+   * changed them since, rather than replacing their change.
+   */
+  expected?: {
+    minimum_units?: number | null
+    par_units?: number | null
+    alerts_enabled?: boolean
+  }
 }
 
 export interface SaveStockThresholdsPayload {

@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <div class="modal-overlay" @click.self="$emit('close')">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="count-title">
         <h2 id="count-title" class="modal-title">Close Shift {{ shift.session_number }}</h2>
@@ -56,6 +56,9 @@
  */
 import type { CashShift } from '~/types/bloodRequest'
 import { CASH_DENOMINATIONS, cashCountTotal, pesos, shiftVariance } from '~/utils/billing'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+const pageHidden = usePageHidden()
 
 const props = defineProps<{
   shift: CashShift

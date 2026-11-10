@@ -342,8 +342,9 @@ import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { useUser } from '~/composables/useUser'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', keepalive: true })
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: 'user' },
@@ -357,7 +358,16 @@ const TABS = [
 const CREDENTIAL_OPTIONS = ['RMT', 'RN', 'MD']
 
 const route = useRoute()
-const activeTab = ref(TABS.some((tab) => tab.id === route.query.tab) ? String(route.query.tab) : 'profile')
+const tabFromLink = () => (TABS.some((tab) => tab.id === route.query.tab) ? String(route.query.tab) : null)
+const activeTab = ref(tabFromLink() ?? 'profile')
+
+// Kept alive, with nothing reloaded on return: this is your own account, only
+// changed here, and a reload would wipe what you had typed and not saved. A
+// link to one tab (?tab=) still opens it.
+onPageReturn(() => {
+  const tab = tabFromLink()
+  if (tab) activeTab.value = tab
+})
 
 const loading = ref(true)
 const { user: sessionUser, fetchUser, updateAvatar, logout } = useUser()

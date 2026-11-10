@@ -129,12 +129,14 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import DateRangeFilter from '~/components/common/DateRangeFilter.vue'
 import { auditTypeTone } from '~/utils/auditLog'
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   // The Blood Center Admin's alone (project owner, 2026-10-21).
   requires: 'audit.view',
+  keepalive: true,
 })
 
 /**
@@ -219,6 +221,9 @@ function clearFilters() {
 onMounted(() => {
   load()
 })
+
+// Kept alive: back here, the page on screen reloads in place.
+onPageReturn(() => load(pager.page))
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)

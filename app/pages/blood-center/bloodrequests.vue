@@ -775,7 +775,7 @@ import WalkInRequestDialog from '~/components/BloodCenter/WalkInRequestDialog.vu
 import UnitPickerDialog from '~/components/BloodCenter/UnitPickerDialog.vue'
 import SupplyPlanDialog from '~/components/BloodCenter/SupplyPlanDialog.vue'
 import ReferralSlipSheet from '~/components/BloodCenter/ReferralSlipSheet.vue'
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { useIncomingRequests } from '~/composables/useIncomingRequests'
 import {
   bloodTypeCodes,
@@ -790,9 +790,12 @@ import {
 import { formatShortDate } from '~/utils/donorRecords'
 import { formatPhoneNumber } from '~/utils/phone'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
+import { useLiveRefresh } from '~/composables/useLiveRefresh'
 
 definePageMeta({ middleware: ['auth', 'department'], layout: 'blood-centerdashboard',
   requires: 'requests.view',
+  keepalive: true,
 })
 
 // Two abilities split this queue. Tagging units for a patient's request
@@ -1602,6 +1605,38 @@ onBeforeUnmount(() => {
   clearTimeout(searchDebounce)
   window.removeEventListener('keydown', onKeydown)
 })
+
+/*
+ * Kept alive. Away, Escape belongs to the page on screen. Back, the queue and
+ * its counts reload in place, on the tab a link names (?type=) if it names
+ * the other one; the open request's drawer stays as it was.
+ */
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => {
+  const linked = PURPOSE_TABS.find((tab) => tab.query === route.query.type)?.value
+  if (linked && linked !== purposeTab.value) {
+    purposeTab.value = linked
+    return Promise.all([loadRequests(), fetchSummary()])
+  }
+  return handleRefresh()
+})
+
+/*
+ * Kept current while it is open, so an emergency request a hospital sends
+ * shows up for whoever is already looking: the page of the list on screen and
+ * the counts, quietly, every 15 seconds while this page and the tab are in
+ * view, and when the tab comes back. Never while an action is running. The
+ * open request's drawer and any dialog keep their own copy and are left
+ * alone. Both routes are unthrottled and write no audit entry on a read.
+ */
+useLiveRefresh(async () => {
+  const [listed] = await Promise.all([
+    fetchRequests(meta.value.current_page, { quiet: true }),
+    fetchSummary({ quiet: true }),
+  ])
+  if (listed) lastUpdatedAt.value = new Date()
+}, { intervalMs: 15_000, pauseWhen: () => isActing.value })
 </script>
 
 <style scoped>

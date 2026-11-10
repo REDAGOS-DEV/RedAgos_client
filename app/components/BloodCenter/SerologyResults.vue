@@ -481,7 +481,8 @@ import {
   readingLabel,
   readingsOf,
 } from '~/utils/serologyResults'
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * TTI Testing's results list (project owner, 2026-10-18): every serology
@@ -784,8 +785,16 @@ function onKeydown(event) {
   if (event.key === 'Escape' && editing.value) closeEdit()
 }
 
-onMounted(async () => {
-  window.addEventListener('keydown', onKeydown)
+// What the link that opened the page asks for: an outcome, a donation, or '' for neither.
+function linkKey() {
+  return props.initialOutcome || props.initialDonation ? `${props.initialOutcome}|${props.initialDonation ?? ''}` : ''
+}
+
+let appliedLink = linkKey()
+
+async function openFromLink() {
+  appliedLink = linkKey()
+  if (OUTCOME_FILTERS.some((option) => option.value === props.initialOutcome)) outcome.value = props.initialOutcome
 
   // Sent here for one donation: find it, and open it.
   const wanted = Number(props.initialDonation)
@@ -795,6 +804,22 @@ onMounted(async () => {
 
   const row = rows.value.find((entry) => entry.donation_id === wanted)
   if (row) openEdit(row)
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  openFromLink()
+})
+
+// The page is kept alive. Away, Escape is not this list's; back, the list
+// reloads in place, or opens what a new link asks for.
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => {
+  const key = linkKey()
+  if (key && key !== appliedLink) return openFromLink()
+  appliedLink = key
+  return load(pager.page)
 })
 
 onBeforeUnmount(() => {

@@ -230,6 +230,8 @@ describe('Component Processing after the move', () => {
 
   it('opens the unit the Processed list sent it, for a correction or a reprint', () => {
     expect(page).toContain('const wanted = Number(route.query.donation)')
-    expect(page).toContain('await openDonation(wanted)')
+    // On the first visit, and on a return to the kept-alive bench with another unit's link.
+    expect(page).toContain('if (appliedDonation) await openDonation(appliedDonation)')
+    expect(page).toContain('if (fresh) await openDonation(linked)')
   })
 })

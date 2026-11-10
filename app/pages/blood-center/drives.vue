@@ -405,11 +405,13 @@ import {
   drivesFor,
   registrationClosed,
 } from '~/utils/drives'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'drives.manage',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -688,6 +690,8 @@ async function loadDrives() {
 }
 
 onMounted(loadDrives)
+// Kept alive: back here, the drives reload in place (`loading` covers the first visit only).
+onPageReturn(loadDrives)
 </script>
 
 <style scoped>

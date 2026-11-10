@@ -302,6 +302,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import RequestFulfilmentTable from '~/components/common/RequestFulfilmentTable.vue'
 import { bloodTypeSummary, componentSummary, PRIORITY_LABELS, REQUEST_STATUS_TONES, requestStatusLabel } from '~/types/bloodRequest'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const { can } = useUser()
 /**
@@ -318,6 +319,7 @@ definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
   requires: 'hospital.requests.view',
+  keepalive: true,
 })
 
 const route = useRoute()
@@ -343,14 +345,28 @@ const {
 const showRecentDropdown = ref(false)
 const isRefreshing = ref(false)
 
+// Allow deep-linking: /hospital/track-requests?ref=BBR-2026-000125
+let appliedRef = ''
+function openFromLink() {
+  const prefill = typeof route.query.ref === 'string' ? route.query.ref : ''
+  const fresh = prefill && prefill !== appliedRef
+  appliedRef = prefill
+  if (!fresh) return false
+  referenceInput.value = prefill
+  searchByReference(prefill)
+  return true
+}
+
 onMounted(() => {
   fetchRecent()
-  // Allow deep-linking: /hospital/track-requests?ref=BBR-2026-000125
-  const prefill = route.query.ref
-  if (prefill) {
-    referenceInput.value = prefill
-    searchByReference(prefill)
-  }
+  openFromLink()
+})
+
+// Kept alive: back here, the recent list reloads, and the request on screen
+// is looked up again, unless a new link asks for another.
+onPageReturn(() => {
+  fetchRecent()
+  if (!openFromLink()) handleRefresh()
 })
 
 /*

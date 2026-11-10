@@ -154,6 +154,7 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 definePageMeta({
   middleware: 'auth',
   layout: 'blood-centerdashboard',
+  keepalive: true,
 })
 
 const route = useRoute()

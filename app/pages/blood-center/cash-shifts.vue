@@ -159,11 +159,13 @@ import { journalAmount, pesos, saveBlob, shiftVariance, transactionTone } from '
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.record_payment',
+  keepalive: true,
 })
 
 const route = useRoute()
@@ -209,8 +211,11 @@ function varianceTone(shift) {
   return `tone--${shiftVariance(shift?.variance ?? shift?.figures?.variance).tone}`
 }
 
-async function load(page = 1) {
-  loading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the rows on screen.
+async function load(page = 1, options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loading.value = true
 
   try {
     const response = await bloodCenterService.cashShifts({
@@ -278,12 +283,24 @@ async function closeForCashier(payload) {
 
 watch([status, from, to], () => load())
 
+let appliedShift = 0
+
 onMounted(async () => {
   await load()
 
   const preset = Number(route.query.shift)
+  appliedShift = preset
   if (preset) await select(preset)
   else if (shifts.value[0]) await select(shifts.value[0].id)
+})
+
+// Kept alive: back here, the list reloads in place, and a link to another
+// shift (?shift=) opens it.
+onPageReturn(async () => {
+  await load(meta.current_page, { quiet: true })
+  const preset = Number(route.query.shift)
+  if (preset && preset !== appliedShift) await select(preset)
+  appliedShift = preset
 })
 </script>
 

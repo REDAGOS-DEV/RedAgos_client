@@ -193,6 +193,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { DEFERRAL_CODE_MAX, isValidDeferralCode, nextDeferralCode, normaliseDeferralCode, sortDeferralCodes } from '~/utils/deferralCodes'
 import { formatShortDate } from '~/utils/donorRecords'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * The centre's deferral codes (project owner, 2026-10-24).
@@ -212,6 +213,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: ['deferrals.configure', 'donors.view_clinical'],
+  keepalive: true,
 })
 
 useHead({ title: 'Deferral Codes · RedAgos' })
@@ -343,6 +345,9 @@ async function saveEdit(row) {
     ...(code !== row.code ? { code } : {}),
     ...(reason !== row.reason ? { reason } : {}),
   }
+  // What the row showed for the fields this save changes: the server refuses
+  // it if someone has changed them since, rather than replacing their change.
+  payload.expected = Object.fromEntries(Object.keys(payload).map((field) => [field, row[field]]))
 
   savingId.value = row.id
   Object.keys(editErrors).forEach((key) => delete editErrors[key])
@@ -361,6 +366,7 @@ async function saveEdit(row) {
     if (errors) {
       Object.assign(editErrors, errors)
     } else {
+      await reloadIfStale(err)
       bannerKind.value = 'error'
       banner.value = firstError(err, 'The code could not be saved.')
     }
@@ -374,11 +380,12 @@ async function toggleRetired(row) {
   banner.value = ''
 
   try {
-    const res = await bloodCenterService.updateDeferralCode(row.id, { retired: !row.retired })
+    const res = await bloodCenterService.updateDeferralCode(row.id, { retired: !row.retired, expected: { retired: row.retired } })
     if (res?.data) replaceRow(res.data)
     bannerKind.value = 'success'
     banner.value = res?.message || 'Saved.'
   } catch (err) {
+    await reloadIfStale(err)
     bannerKind.value = 'error'
     banner.value = firstError(err, 'The code could not be changed.')
   } finally {
@@ -386,7 +393,18 @@ async function toggleRetired(row) {
   }
 }
 
+/**
+ * Someone changed the code after this list loaded: read the list again, so
+ * what it shows is what is stored. A code being edited stays open with what
+ * was typed, and saving it again is judged against the new values.
+ */
+async function reloadIfStale(err) {
+  if (err?.data?.code === 'stale_edit') await load()
+}
+
 onMounted(load)
+// Kept alive: back here, the list reloads in place (the skeleton shows only over an empty one).
+onPageReturn(load)
 </script>
 
 <style scoped>

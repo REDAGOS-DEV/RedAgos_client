@@ -151,6 +151,7 @@ export function diffCritical(
           component_id: cell.component_id,
           minimum_units: minimumOf(draft),
           alerts_enabled: draft.alerts_enabled,
+          expected: { minimum_units: cell.minimum_units, alerts_enabled: cell.alerts_enabled },
         }]
       : []
   })
@@ -165,7 +166,12 @@ export function diffPar(
     const draft = drafts[cellKey(cell.blood_type_id, cell.component_id)]
 
     return draft && isChanged('par', cell, draft)
-      ? [{ blood_type_id: cell.blood_type_id, component_id: cell.component_id, par_units: parOf(draft) }]
+      ? [{
+          blood_type_id: cell.blood_type_id,
+          component_id: cell.component_id,
+          par_units: parOf(draft),
+          expected: { par_units: cell.par_units },
+        }]
       : []
   })
 }

@@ -229,7 +229,9 @@ describe('the paper records pages', () => {
     expect(donations).toContain('to="/blood-center/paper-records"')
     expect(donations).toContain("v-if=\"row.source === 'paper'\"")
     expect(drives).toContain(':to="`/blood-center/paper-records?drive=${drive.id}`"')
-    expect(list).toContain('if (route.query.drive) openNewSheet(route.query.drive)')
+    // On the first visit and on a return to the kept-alive list with another drive's link.
+    expect(list).toContain('if (fresh) openNewSheet(route.query.drive)')
+    expect(list).toContain('openFromLink()')
   })
 
   it('finds the donor through the counter\'s own search and exact lookup', () => {

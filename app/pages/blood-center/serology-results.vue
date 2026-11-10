@@ -44,6 +44,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'lab.record_serology',
+  keepalive: true,
 })
 
 const route = useRoute()

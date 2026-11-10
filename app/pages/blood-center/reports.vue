@@ -521,12 +521,14 @@ import SelectField from '~/components/common/SelectField.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import BloodCenterCentreReports from '~/components/BloodCenter/CentreReports.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
     middleware: ['auth', 'department'],
     layout: 'blood-centerdashboard',
   // The same list as the sidebar's link (REPORTS_ABILITIES).
   requires: ['reports.view_all', 'donations.view', 'lab.record_serology', 'lab.record_immunohematology'],
+  keepalive: true,
 })
 
 /**
@@ -1165,6 +1167,11 @@ onMounted(async () => {
     if (canViewAll.value || canViewCollection.value || canViewTesting.value) return
     await loadAll()
     initialLoading.value = false
+})
+
+// Kept alive: back here, the figures reload (the centre reports above reload themselves).
+onPageReturn(() => {
+    if (!initialLoading.value) loadAll()
 })
 </script>
 

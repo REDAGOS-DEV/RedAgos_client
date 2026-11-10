@@ -135,11 +135,13 @@ import PageHeader from '~/components/ui/PageHeader.vue'
 import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { hospitalService } from '~/api/hospital/HospitalService'
 import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'hospital-portal'],
   layout: 'hospitaldashboard',
   requires: 'hospital.requests.view',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -235,6 +237,8 @@ function formatDate(value) {
 }
 
 onMounted(loadReference)
+// Kept alive: back here, the same search is asked again, over the last answer.
+onPageReturn(search)
 onUnmounted(() => clearTimeout(typingTimer))
 </script>
 

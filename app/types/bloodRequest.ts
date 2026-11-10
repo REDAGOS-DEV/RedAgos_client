@@ -112,8 +112,12 @@ export type TransactionType =
   | 'payment_correction'
   | 'payment_void'
   | 'subsidy'
+  | 'subsidy_reversal'
   | 'external_settlement'
   | 'opening_balance'
+  /** One of the centre's own discounts taken off a bill, and taken back off. */
+  | 'discount'
+  | 'discount_reversal'
 export type TransactionChannel = 'counter' | 'gateway' | 'outside' | 'system'
 
 export interface FacilityStub {
@@ -524,6 +528,51 @@ export interface Billing {
   billing_date: string | null
   /** Set once the hospital settled a weekly bill outside RedAgos. */
   settlement?: { settled_at: string | null; reference: string | null; note: string | null } | null
+  /** What the lines come to before any discount; total_amount is after it. */
+  subtotal?: number
+  /** One of the centre's own discounts, as copied onto this bill when applied. */
+  discount?: BillDiscount | null
+}
+
+/** A discount on a bill: the centre's discount as it stood when it was applied. */
+export interface BillDiscount {
+  name: string
+  kind: 'percentage' | 'fixed'
+  value: number
+  /** What it takes off now, in pesos. */
+  amount: number
+  note: string | null
+  applied_at: string | null
+}
+
+/** One of the centre's discounts, as the Discounts page lists it. */
+export interface BillingDiscountRow {
+  id: number
+  name: string
+  kind: 'percentage' | 'fixed'
+  value: number
+  is_active: boolean
+  /** "20% off" or "₱500.00 off". */
+  label: string
+  updated_at: string | null
+  updated_by: string | null
+}
+
+/** A discount as the Discounts page saves it. */
+export interface BillingDiscountPayload {
+  name: string
+  kind: 'percentage' | 'fixed'
+  value: number
+}
+
+/** One of the centre's discounts, as the counter offers it. */
+export interface DiscountChoice {
+  id: number
+  name: string
+  kind: 'percentage' | 'fixed'
+  value: number
+  /** "20% off" or "₱500.00 off". */
+  label: string
 }
 
 /** One payment on a statement, as GET …/billings/{id}/payments lists it to whoever may record payments. */
@@ -671,6 +720,10 @@ export interface CounterBill {
   /** Only on GET /pos/bills/{id}. */
   lines?: StatementLine[]
   billing?: Billing
+  /** Only on GET /pos/bills/{id}: the centre's switched-on discounts, offered beside the subsidy. */
+  discounts?: DiscountChoice[]
+  /** Only on GET /pos/bills/{id}: the bill's discount can still come off (nothing paid or dispatched). */
+  discount_removable?: boolean
 }
 
 /** One frozen line of an issued statement. Amounts are decimal strings. */
@@ -695,7 +748,13 @@ export interface StatementRevision {
   /** Issued after payment was deferred, so payable once the units have gone. */
   payment_deferred: boolean
   currency: string
+  /** What the lines come to; a discount, when there is one, is taken off it. */
   total_amount: string
+  /** The discount the invoice was issued with. Absent on invoices from before discounts. */
+  discount_name?: string | null
+  discount_amount?: string | null
+  /** What the invoice is for after its discount. */
+  net_amount?: string
   collected_at_issue: string
   amount_due: string
   issued_at: string | null
@@ -749,7 +808,15 @@ export interface PaymentReceiptSummary {
   received_by?: string | null
   issuing_facility?: BillingFacilityCard | null
   request?: { reference_number: string | null; patient_name: string | null; requesting_facility: string | null } | null
-  statement?: { document_number: string; revision_number: number; total_amount: string; amount_due: string } | null
+  statement?: {
+    document_number: string
+    revision_number: number
+    total_amount: string
+    /** The discount the invoice was issued with; absent on receipts from before discounts. */
+    discount_name?: string | null
+    discount_amount?: string | null
+    amount_due: string
+  } | null
   payment?: {
     method_label: string | null
     source: PaymentSource | null

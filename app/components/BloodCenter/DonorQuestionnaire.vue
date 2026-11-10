@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <div class="dhq-overlay" role="dialog" aria-modal="true" :aria-label="title" @click.self="requestClose">
       <section class="dhq" @keydown.esc="requestClose">
         <header class="dhq__header">
@@ -202,6 +202,9 @@
  */
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { formatPhoneNumber } from '~/utils/phone'
+import { usePageHidden } from '~/composables/useKeptAlive'
+
+const pageHidden = usePageHidden()
 
 const props = defineProps({
   data: { type: Object, default: null },
@@ -359,6 +362,11 @@ function longDate(value) {
 
 onMounted(() => {
   document.body.style.overflow = 'hidden'
+})
+
+// Released while its page is kept but not shown, or the next page could not scroll.
+watch(pageHidden, (hidden) => {
+  document.body.style.overflow = hidden ? '' : 'hidden'
 })
 
 onBeforeUnmount(() => {

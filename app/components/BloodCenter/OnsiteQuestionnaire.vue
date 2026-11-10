@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="pageHidden">
     <div class="onsite-overlay" role="dialog" aria-modal="true" aria-labelledby="onsite-title">
       <section class="onsite" @keydown.esc="requestClose">
         <header class="onsite__header">
@@ -184,6 +184,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { usePageHidden } from '~/composables/useKeptAlive'
 
 /**
  * The questionnaire, answered onsite on the counter's device.
@@ -201,6 +202,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'recorded'])
+
+const pageHidden = usePageHidden()
 
 const form = ref(null)
 const loading = ref(false)
@@ -373,6 +376,11 @@ function longDate(value) {
 onMounted(() => {
   document.body.style.overflow = 'hidden'
   load()
+})
+
+// Released while its page is kept but not shown, or the next page could not scroll.
+watch(pageHidden, (hidden) => {
+  document.body.style.overflow = hidden ? '' : 'hidden'
 })
 
 onBeforeUnmount(() => {

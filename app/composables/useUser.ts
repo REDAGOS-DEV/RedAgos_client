@@ -1,10 +1,25 @@
 import { authService } from '~/api/auth/AuthService'
-import { resolveApiAssetURL, resolveApiBaseURL } from '~/api/BaseService'
+import { forgetSharedRequests, resolveApiAssetURL, resolveApiBaseURL } from '~/api/BaseService'
 import type { AppUser, CorrectionSubject } from '~/types/user'
 
 // Client-only, kay ang ensureUser() mo-bail dayon sa server. Gi-butang sa gawas
 // sa composable aron usa ra ka request bisan pila ka caller ang mo-dungan.
 let inFlight: Promise<void> | null = null
+
+/**
+ * What other composables keep about the signed-in person, by useState key,
+ * with the value it starts from: put back by clearSession(). Signing out
+ * reloads the page, which empties all of it anyway; an expired session
+ * goes to the login screen without a reload, and the next person to sign in
+ * in that tab must not start from the last one's counts or Admin summary.
+ */
+export const PER_USER_STATE: Record<string, () => unknown> = {
+  'blood-center-task-counts': () => ({}),
+  'blood-center-task-loaded': () => false,
+  'blood-center-admin-overview': () => null,
+  'hospital-unread-count': () => 0,
+  'donor-unread-count': () => 0,
+}
 
 export function useUser() {
   // Ang explicit nga type mao ang nagpalihok sa `user.roles` sa mga caller.
@@ -13,6 +28,10 @@ export function useUser() {
   // nakit-an sa unang typecheck sa portal middleware.
   const user = useState<AppUser | null>('app-user', () => null)
   const loading = useState<boolean>('app-user-loading', () => true)
+  // Taken now, while the Nuxt context is at hand: clearSession() may run later
+  // from a 401 handler, outside it.
+  const perUserState = Object.entries(PER_USER_STATE)
+    .map(([key, empty]) => ({ state: useState<unknown>(key, empty), empty }))
 
   async function fetchUser(): Promise<void> {
     loading.value = true
@@ -188,6 +207,9 @@ export function useUser() {
     localStorage.removeItem('donor-qr-code')
     inFlight = null
     clearUser()
+    for (const { state, empty } of perUserState) state.value = empty()
+    // Reads still out for this session are never handed to the next.
+    forgetSharedRequests()
   }
 
   /**

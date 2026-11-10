@@ -230,6 +230,7 @@ import {
 import PageHeader from '~/components/ui/PageHeader.vue'
 import StatStrip from '~/components/ui/StatStrip.vue'
 import StatItem from '~/components/ui/StatItem.vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 /**
  * The Daily Blood Stock Inventory: Issuance's live view and printable sheet,
@@ -244,6 +245,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'inventory.stock_report',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -277,7 +279,9 @@ const outOfStock = computed(() => typeTotals.value.filter((t) => t.total === 0).
 /* --- "updated N min ago" --- */
 const now = ref(Date.now())
 let clock = null
-onMounted(() => { clock = setInterval(() => { now.value = Date.now() }, 30_000) })
+// Kept alive: the clock rests while the page is away.
+const pageHidden = usePageHidden()
+onMounted(() => { clock = setInterval(() => { if (!pageHidden.value) now.value = Date.now() }, 30_000) })
 onBeforeUnmount(() => clearInterval(clock))
 
 const updatedAgo = computed(() => {
@@ -367,6 +371,8 @@ async function download() {
 }
 
 onMounted(load)
+// Kept alive: back here, the report reloads over the one on screen.
+onPageReturn(load)
 </script>
 
 <style scoped>

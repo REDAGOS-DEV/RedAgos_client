@@ -62,6 +62,39 @@ const TASKS: TaskDef[] = [
 const localDay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
+/**
+ * `full` reads every count. `background` (the sidebar's refresh as you move
+ * between pages or come back to the tab) leaves out the two read from
+ * throttled lists, results to verify and units to hand over, and keeps
+ * their last value: a throttled route is never read on a schedule.
+ */
+type LoadMode = 'full' | 'background'
+
+/** The task counts that come from throttled routes. */
+const THROTTLED_KEYS = ['verification', 'handover'] as const
+
+interface Flight {
+  token: string | null
+  mode: LoadMode
+  again: LoadMode | null
+  done: Promise<void>
+}
+
+/** The load running now, shared by every caller. Outside the composable so there is one. */
+let flight: Flight | null = null
+
+/** The signed-in session, so a load started for one never lands in another's counts. */
+const sessionToken = (): string | null => (import.meta.client ? localStorage.getItem('_token') : null)
+
+const wider = (a: LoadMode | null, b: LoadMode): LoadMode => (a === 'full' || b === 'full' ? 'full' : 'background')
+
+export interface LoadTaskOptions {
+  /** The sidebar's own refresh: skips the throttled counts. */
+  background?: boolean
+  /** The caller has just changed something a running load may have read before it. */
+  afterChange?: boolean
+}
+
 export function useBloodCenterTasks() {
   const counts = useState<Counts>('blood-center-task-counts', () => ({}))
   const loaded = useState<boolean>('blood-center-task-loaded', () => false)
@@ -69,9 +102,51 @@ export function useBloodCenterTasks() {
   const adminOverview = useState<any>('blood-center-admin-overview', () => null)
   const { can } = useUser()
 
-  async function load(): Promise<void> {
+  /**
+   * Read the counts the signed-in person may see.
+   *
+   * One load at a time. A caller that arrives while one runs joins it, so the
+   * sidebar and a dashboard's strip mounting together ask the server once.
+   * A caller that has just changed something (`afterChange`), or that wants
+   * more than a running background load reads, queues one more load after it
+   * instead of taking the older answer.
+   */
+  function load(options: LoadTaskOptions = {}): Promise<void> {
+    const mode: LoadMode = options.background ? 'background' : 'full'
+    const token = sessionToken()
+
+    if (flight && flight.token === token) {
+      const covered = !options.afterChange && (flight.mode === 'full' || mode === 'background')
+      if (!covered) flight.again = wider(flight.again, mode)
+
+      return flight.done
+    }
+
+    const current: Flight = { token, mode, again: null, done: Promise.resolve() }
+    flight = current
+
+    current.done = (async () => {
+      try {
+        let next: LoadMode | null = mode
+
+        while (next) {
+          current.mode = next
+          current.again = null
+          await loadOnce(next, token)
+          next = current.again
+        }
+      } finally {
+        if (flight === current) flight = null
+      }
+    })()
+
+    return current.done
+  }
+
+  async function loadOnce(mode: LoadMode, token: string | null): Promise<void> {
     const next: Counts = {}
     const jobs: Promise<unknown>[] = []
+    let overview: any = adminOverview.value
 
     if (can('requests.view')) {
       jobs.push(bloodCenterService.incomingRequestsSummary().then((summary) => {
@@ -90,7 +165,7 @@ export function useBloodCenterTasks() {
         next.corrections = review?.total ?? 0
       }))
     }
-    if (can('lab.verify_serology')) {
+    if (can('lab.verify_serology') && mode === 'full') {
       jobs.push(Promise.all([
         bloodCenterService.serologyResults({ outcome: 'awaiting_verification', per_page: 1 }),
         bloodCenterService.serologyResults({ outcome: 'correction_pending', per_page: 1 }),
@@ -105,7 +180,7 @@ export function useBloodCenterTasks() {
       }))
     }
     // Counted for the one role that hands units over.
-    if (can('lab.update_status') && can('lab.record_components')) {
+    if (can('lab.update_status') && can('lab.record_components') && mode === 'full') {
       jobs.push(bloodCenterService.processedDonations({ status: 'awaiting_handover', per_page: 1 }).then((waiting) => {
         next.handover = waiting?.total ?? 0
       }))
@@ -114,13 +189,14 @@ export function useBloodCenterTasks() {
       jobs.push(bloodCenterService.stockThresholds().then((status) => {
         next.lowStock = status?.totals?.low ?? 0
       }))
-      jobs.push(bloodCenterService.inventorySummary().then((summary) => {
-        next.expiring = Number(summary?.near_expiry?.within_3_days ?? 0)
+      // The near-expiry figures alone, not the whole inventory summary.
+      jobs.push(bloodCenterService.inventoryNearExpiry().then((result) => {
+        next.expiring = Number(result?.near_expiry?.within_3_days ?? 0)
       }))
     }
     if (can('staff.manage')) {
       jobs.push(bloodCenterService.adminOverview().then((data) => {
-        adminOverview.value = data ?? null
+        overview = data ?? null
         next.coverageGaps = data?.needs?.coverage_gaps ?? 0
         next.unassigned = data?.needs?.unassigned ?? 0
         next.pendingActivation = data?.needs?.pending_activation ?? 0
@@ -140,6 +216,16 @@ export function useBloodCenterTasks() {
       if (result.status === 'rejected') console.error(result.reason)
     }
 
+    // Signed out, or someone else signed in, while this was out.
+    if (sessionToken() !== token) return
+
+    if (mode === 'background') {
+      for (const key of THROTTLED_KEYS) {
+        if (key in counts.value) next[key] = counts.value[key]!
+      }
+    }
+
+    adminOverview.value = overview
     counts.value = next
     loaded.value = true
   }

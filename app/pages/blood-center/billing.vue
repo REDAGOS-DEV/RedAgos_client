@@ -202,11 +202,13 @@ import BillingBadge from '~/components/BloodCenter/BillingBadge.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, statementStamp, takesPayment } from '~/utils/billing'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.view',
+  keepalive: true,
 })
 
 const { can } = useUser()
@@ -346,8 +348,11 @@ watch(category, () => {
 })
 watch(activeTab, () => load())
 
-async function load(page = 1) {
-  loading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the rows on screen.
+async function load(page = 1, options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loading.value = true
   error.value = ''
 
   const params = { category: category.value, page }
@@ -382,6 +387,18 @@ async function refreshAll() {
 }
 
 onMounted(() => Promise.all([load(), loadSummary()]))
+
+// Kept alive. Back here, the invoices reload in place, unless a link asks for
+// the other category (Statements sends ?category=weekly): the watch on
+// `category` loads that instead.
+onPageReturn(() => {
+  const wanted = route.query.category === 'weekly' ? 'weekly' : route.query.category === 'patient' ? 'patient' : null
+  if (wanted && wanted !== category.value) {
+    category.value = wanted
+    return loadSummary()
+  }
+  return Promise.all([load(meta.current_page, { quiet: true }), loadSummary()])
+})
 </script>
 
 <style scoped>

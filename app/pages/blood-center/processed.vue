@@ -629,6 +629,7 @@ import {
   labelsBlockedText,
   labelsErrorText,
 } from '~/utils/processedDonations'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * Processing's Processed list (project owner, 2026-10-19): every unit with a
@@ -679,6 +680,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'lab.record_components',
+  keepalive: true,
 })
 
 const route = useRoute()
@@ -1012,19 +1014,40 @@ function onKeydown(event) {
   if (event.key === 'Escape' && open.value) closeRow()
 }
 
-onMounted(async () => {
-  window.addEventListener('keydown', onKeydown)
+// What the link that opened the page asks for: a status, a unit, how to open it.
+const linkKey = () => ['status', 'donation', 'open'].map((key) => (typeof route.query[key] === 'string' ? route.query[key] : '')).join('|')
+let appliedLink = ''
+
+async function openFromLink() {
+  appliedLink = linkKey()
+  if (STATUS_FILTERS.some((option) => option.value === route.query.status)) status.value = route.query.status
 
   // Sent here for one unit: find it, and open it on what the link asked for —
   // its breakdown (&open=edit), or else its hand-over when that is still to do.
   const wanted = Number(route.query.donation)
   if (Number.isInteger(wanted) && wanted > 0) search.value = `DON-${wanted}`
 
-  loadCatalogue()
   await load()
 
   const row = rows.value.find((entry) => entry.donation_id === wanted)
   if (row) openRow(row, route.query.open === 'edit' ? editMode(row) : (row.can?.hand_over ? 'handover' : 'view'))
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  loadCatalogue()
+  openFromLink()
+})
+
+// Kept alive. Away, Escape belongs to the page on screen. Back, the list
+// reloads in place, or opens what a new link asks for.
+onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => window.addEventListener('keydown', onKeydown))
+onPageReturn(() => {
+  const key = linkKey()
+  if (key !== appliedLink && key.replaceAll('|', '')) return openFromLink()
+  appliedLink = key
+  return load(pager.page)
 })
 
 async function loadCatalogue() {

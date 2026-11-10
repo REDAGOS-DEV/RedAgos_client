@@ -140,11 +140,13 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { pesos, saveBlob } from '~/utils/billing'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.record_payment',
+  keepalive: true,
 })
 
 const STATUSES = [
@@ -172,8 +174,11 @@ const downloadingId = ref(null)
 
 const filtered = computed(() => Boolean(search.value.trim() || status.value || from.value || to.value))
 
-async function load(page = 1) {
-  loading.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the rows on screen.
+async function load(page = 1, options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loading.value = true
   error.value = ''
 
   try {
@@ -243,6 +248,7 @@ async function download(receipt) {
 }
 
 onMounted(() => load())
+onPageReturn(() => load(meta.current_page, { quiet: true }))
 </script>
 
 <style scoped>

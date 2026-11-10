@@ -134,8 +134,9 @@ describe('Fulfillment\'s payment notice', () => {
     expect(page).toContain(`v-if="!gateFor(request).ok && can('billing.record_payment')" to="/blood-center/billing"`)
   })
 
-  it('places scheduled subsidy, discount and promo control under Management', () => {
+  it('keeps the centre discounts beside the prices, for Billing alone, and no billing programmes', () => {
     const nav = readFileSync(path.join(root, 'app/composables/useBloodCenterNav.ts'), 'utf8')
-    expect(nav).toMatch(/label: 'Billing Programs'[\s\S]*?path: '\/blood-center\/billing-programs'[\s\S]*?requires: 'billing\.prices'/)
+    expect(nav).toMatch(/label: 'Discounts', path: '\/blood-center\/discounts'[\s\S]*?requires: 'billing\.prices'/)
+    expect(nav).not.toContain('billing-programs')
   })
 })

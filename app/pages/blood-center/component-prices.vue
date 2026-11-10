@@ -158,13 +158,6 @@
       </div>
     </section>
 
-    <!-- 8. Subsidies and discounts live beside the prices. -->
-    <p v-if="rows.length" class="aside-note">
-      <AssetIcon name="badge-check" :size="14" />
-      A subsidy or discount on these prices is set up in
-      <NuxtLink to="/blood-center/billing-programs">Billing Programs</NuxtLink>.
-    </p>
-
     <!-- 6. Save within reach while changes are pending. -->
     <Transition name="savebar">
       <div v-if="dirtyCount" class="savebar" role="region" aria-label="Unsaved changes">
@@ -186,6 +179,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * What a blood centre charges per unit of each component: the Billing
@@ -206,6 +200,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'billing.prices',
+  keepalive: true,
 })
 
 useHead({ title: 'Component Prices · RedAgos' })
@@ -429,11 +424,17 @@ async function load() {
   }
 }
 
-/** The line sent for one row. A No charge line carries no price. */
+/**
+ * The line sent for one row. A No charge line carries no price.
+ *
+ * `loaded_price` is the price this page was showing for the row (null when
+ * never set, 0 for no charge): the server refuses the save if someone has
+ * changed it since, rather than putting their price back.
+ */
 function lineFor(row) {
   const noCharge = drafts[row.id].noCharge
 
-  return { component_id: row.id, no_charge: noCharge, price: noCharge ? null : draftPrice(row) }
+  return { component_id: row.id, no_charge: noCharge, price: noCharge ? null : draftPrice(row), loaded_price: row.price }
 }
 
 /**
@@ -445,6 +446,34 @@ function lineFor(row) {
  */
 async function showRefusal(err, sent) {
   const data = err?.data ?? {}
+
+  // Someone saved prices after this page loaded. The list is reloaded: rows
+  // left untouched here take the new prices, rows changed here keep what was
+  // typed and say what the other person saved, so saving again is a choice.
+  if (data.code === 'stale_edit') {
+    const changedHere = new Set(rows.value.filter(isDirty).map((row) => row.id))
+    const res = await bloodCenterService.componentPrices().catch(() => null)
+
+    if (res?.data) {
+      rows.value = res.data
+      rows.value.forEach((row) => {
+        if (!changedHere.has(row.id) || !drafts[row.id]) seedDraft(row)
+      })
+    }
+
+    ;(data.components ?? []).forEach((id) => {
+      const row = rows.value.find((r) => r.id === id)
+
+      if (row && changedHere.has(id)) {
+        setError(row, { kind: 'stale', message: `Changed by someone else to ${savedLabel(row)}. Save again to replace it.` })
+      }
+    })
+
+    bannerKind.value = 'error'
+    banner.value = firstError(err, 'Someone else changed these prices. Check them and save again.')
+
+    return
+  }
 
   if (data.code === 'prices_incomplete' && Array.isArray(data.components)) {
     if (data.components.some((id) => !rows.value.some((row) => row.id === id))) {
@@ -513,6 +542,12 @@ async function saveAll() {
 }
 
 onMounted(load)
+
+// Kept alive: back here, the prices reload, unless some are changed and not
+// saved, which a reload would wipe.
+onPageReturn(() => {
+  if (!dirtyCount.value) load()
+})
 </script>
 
 <style scoped>
@@ -717,7 +752,7 @@ onMounted(load)
 
 /* ===== Refresh (project owner, 2026-10-27) ===== */
 .prices-page { padding-bottom: 96px; }
-.prices-page > .card, .tally, .aside-note, .alert { width: 100%; }
+.prices-page > .card, .tally, .alert { width: 100%; }
 .card { border-radius: 16px; }
 
 /* Where the list stands. */
@@ -773,9 +808,6 @@ onMounted(load)
 .cp-empty__text { max-width: 480px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--rb-text-secondary); text-wrap: pretty; }
 .cp-empty .btn { margin-top: 6px; text-decoration: none; }
 
-.aside-note { margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
-.aside-note a { font-weight: 600; color: var(--rb-primary-text); }
-.aside-note :deep(.asset-icon) { margin-right: 4px; vertical-align: -2px; }
 
 /* Save within reach. */
 .savebar {

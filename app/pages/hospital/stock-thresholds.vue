@@ -24,7 +24,7 @@ import { hospitalPageSubtitle } from '~/utils/hospitalPageSubtitles'
 
 const { can } = useUser()
 
-definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view' })
+definePageMeta({ middleware: ['auth', 'hospital-portal'], layout: 'hospitaldashboard', requires: 'hospital.inventory.view', keepalive: true })
 
 useHead({ title: 'Stock Thresholds · RedAgos' })
 </script>

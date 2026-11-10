@@ -1,6 +1,8 @@
 import BaseService from '../BaseService'
 import type {
   Billing,
+  BillingDiscountPayload,
+  BillingDiscountRow,
   BillingSummary,
   BloodRequest,
   CashShift,
@@ -448,7 +450,13 @@ class BloodCenterService extends BaseService {
   }
 
   /** Any of { code, reason, retired }. The code changes only while no record carries it. */
-  async updateDeferralCode(id: number, payload: { code?: string, reason?: string, retired?: boolean }): Promise<any> {
+  /** `expected`: what the row showed for the fields being changed; refused 409 stale_edit if someone changed them since. */
+  async updateDeferralCode(id: number, payload: {
+    code?: string
+    reason?: string
+    retired?: boolean
+    expected?: { code?: string, reason?: string | null, retired?: boolean }
+  }): Promise<any> {
     return this.request(`${this.resource}/deferral-codes/${id}`, 'PATCH', payload)
   }
 
@@ -677,23 +685,39 @@ class BloodCenterService extends BaseService {
    * an explicit no charge; the server writes nothing unless every component
    * ends up with one or the other (422 `prices_incomplete`).
    */
+  /** `loaded_price`: what the page showed for the line; refused 409 stale_edit if someone changed it since. */
   async saveComponentPrices(payload: {
-    prices: Array<{ component_id: number, no_charge: boolean, price: number | null }>
+    prices: Array<{ component_id: number, no_charge: boolean, price: number | null, loaded_price?: number | null }>
   }): Promise<any> {
     return this.request(`${this.resource}/component-prices`, 'PUT', payload)
   }
 
-  /** Billing Supervisor's dated subsidy, discount and promo register. */
-  async billingPrograms(): Promise<any> {
-    return this.request(`${this.resource}/billing-programs`, 'GET')
+  // --- Discounts ---
+  //
+  // The centre's own discounts, kept by Billing (billing.prices) and offered
+  // at the counter beside the government subsidy. Each is a percentage or a
+  // fixed peso amount, switched on or off.
+
+  async billingDiscounts(): Promise<{ data: BillingDiscountRow[] }> {
+    return this.request(`${this.resource}/billing-discounts`, 'GET')
   }
 
-  async createBillingProgram(payload: Record<string, any>): Promise<any> {
-    return this.request(`${this.resource}/billing-programs`, 'POST', payload)
+  async createBillingDiscount(payload: BillingDiscountPayload): Promise<{ message: string; data: BillingDiscountRow }> {
+    return this.request(`${this.resource}/billing-discounts`, 'POST', payload)
   }
 
-  async updateBillingProgram(programId: number, payload: Record<string, any>): Promise<any> {
-    return this.request(`${this.resource}/billing-programs/${programId}`, 'PUT', payload)
+  async updateBillingDiscount(discountId: number, payload: BillingDiscountPayload & { is_active: boolean }): Promise<{ message: string; data: BillingDiscountRow }> {
+    return this.request(`${this.resource}/billing-discounts/${discountId}`, 'PUT', payload)
+  }
+
+  /** Take one of the centre's discounts off a patient's bill, at the counter. The note is required. */
+  async applyDiscount(requestId: number | string, discountId: number, note: string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/discount`, 'POST', { discount_id: discountId, note })
+  }
+
+  /** Take a bill's discount back off, before anything is paid or dispatched. */
+  async removeDiscount(requestId: number | string, reason: string): Promise<any> {
+    return this.request(`/blood-center/billings/${requestId}/discount`, 'DELETE', { reason })
   }
 
   // --- Facility logo (Blood Center Admin only) ---
@@ -727,8 +751,19 @@ class BloodCenterService extends BaseService {
     return this.request(`${this.resource}/inventory`, 'GET', params)
   }
 
-  async inventorySummary(): Promise<any> {
-    return this.request(`${this.resource}/inventory/summary`, 'GET')
+  /**
+   * The stock at a glance. `trend: false` leaves out the seven-day trend,
+   * which only the Issuance dashboard draws and which costs the server a
+   * pass over the whole unit history. Shared with an identical read already
+   * in flight (requestShared).
+   */
+  async inventorySummary(options: { trend?: boolean } = {}): Promise<any> {
+    return this.requestShared(`${this.resource}/inventory/summary`, options.trend === false ? { trend: 0 } : {})
+  }
+
+  /** Only the near-expiry counts, for the task counts. Shared like the summary. */
+  async inventoryNearExpiry(): Promise<any> {
+    return this.requestShared(`${this.resource}/inventory/near-expiry`)
   }
 
   // The centre's own stock movements, newest first; `unit_id` narrows it to
@@ -744,7 +779,7 @@ class BloodCenterService extends BaseService {
   // Center Admin (`inventory.thresholds`) save.
 
   async stockThresholds(): Promise<StockThresholdStatus> {
-    return this.request<StockThresholdStatus>(`${this.resource}/inventory/thresholds`, 'GET')
+    return this.requestShared<StockThresholdStatus>(`${this.resource}/inventory/thresholds`)
   }
 
   async saveStockThresholds(payload: SaveStockThresholdsPayload): Promise<StockThresholdStatus> {
@@ -876,9 +911,9 @@ class BloodCenterService extends BaseService {
     return this.requestBlob(`${this.resource}/blood-requests/export${query ? `?${query}` : ''}`)
   }
 
-  /** Queue counters for the dashboard. */
+  /** Queue counters for the dashboard. Shared with an identical read already in flight. */
   async incomingRequestsSummary(): Promise<any> {
-    return this.request('/blood-center/blood-requests/summary', 'GET')
+    return this.requestShared('/blood-center/blood-requests/summary')
   }
 
   /** One request, with the live stock that could fill it. Holds nothing. */

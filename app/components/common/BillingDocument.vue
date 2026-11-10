@@ -154,6 +154,9 @@
             <div v-if="figures.subsidy > 0" class="bal-row bal-row--less">
               <span>Government subsidy</span><strong>− {{ pesos(figures.subsidy) }}</strong>
             </div>
+            <div v-if="figures.discount > 0" class="bal-row bal-row--less">
+              <span>Discount{{ figures.discountName ? `: ${figures.discountName}` : '' }}</span><strong>− {{ pesos(figures.discount) }}</strong>
+            </div>
             <template v-if="figures.paid > 0 && figures.subsidy === 0">
               <div class="bal-row bal-row--this">
                 <span>{{ revision.statement_only ? 'Amount billed' : 'Amount payable' }}</span><strong>{{ pesos(figures.payable) }}</strong>

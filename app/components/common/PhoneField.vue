@@ -48,7 +48,7 @@
     >
 
     <!-- Teleported to <body>, as SelectField's list is, so dialogs and scroll boxes cannot clip it. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="pf-pop">
         <ul
           v-if="open"
@@ -88,6 +88,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
 import phFlag from '~/assets/flags/ph.svg?raw'
 import {
   PHONE_COUNTRIES,
@@ -127,6 +128,8 @@ const props = withDefaults(defineProps<{
   ariaLabel: undefined,
   size: 'md',
 })
+
+const pageHidden = usePageHidden()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]

@@ -540,6 +540,7 @@ import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import ForecastWeekChart from '~/components/BloodCenter/ForecastWeekChart.vue'
 import { smoothPath } from '~/utils/smoothPath'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const STATUS = { short: 'Short', watch: 'Watch', ok: 'Enough' }
@@ -548,8 +549,9 @@ const data = ref(null)
 const loading = ref(true)
 const error = ref('')
 
-async function load() {
-  loading.value = true
+// `quiet`, on return to a kept-alive page: no skeleton over the forecast on screen.
+async function load(options = {}) {
+  if (options?.quiet !== true) loading.value = true
   error.value = ''
   try {
     data.value = await bloodCenterService.forecast()
@@ -560,6 +562,7 @@ async function load() {
   }
 }
 onMounted(load)
+onPageReturn(() => load({ quiet: true }))
 
 const num = v => (v === null || v === undefined ? '—' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }))
 const peso = v => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(v || 0)

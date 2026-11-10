@@ -444,6 +444,8 @@ import {
   reactiveMarkers,
   serologyPayload,
 } from '~/utils/serology'
+import { onPageReturn } from '~/composables/useKeptAlive'
+import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
 /**
  * The testing page: Section II's Immunohematology and Serology tables.
@@ -465,6 +467,7 @@ definePageMeta({
   layout: 'blood-centerdashboard',
   // Either laboratory section opens the page.
   requires: ['lab.record_serology', 'lab.record_immunohematology'],
+  keepalive: true,
 })
 
 const route = useRoute()
@@ -577,7 +580,12 @@ const activeBarcode = ref('')
  * Load the queue. Quiet after a save, with a unit open beside it: the list is
  * brought up to date without blanking to the loading placeholder.
  */
-async function loadQueue({ quiet = false } = {}) {
+// Newest reply wins: a refresh started before a scan or a save never
+// overwrites the list they loaded.
+const queueLatest = createLatest()
+
+async function loadQueue({ quiet = false, background = false } = {}) {
+  const ticket = queueLatest.begin()
   if (!quiet) loadingQueue.value = true
 
   try {
@@ -585,12 +593,14 @@ async function loadQueue({ quiet = false } = {}) {
     if (activeBarcode.value) params.barcode = activeBarcode.value
 
     const res = await service.laboratoryQueue(params)
+    if (!queueLatest.isCurrent(ticket)) return
 
     queue.value = (res?.data ?? []).map(blindFor)
   } catch (err) {
-    error.value = messageFor(err)
+    // A background refresh that fails keeps the queue and says nothing: the next one retries.
+    if (!background && queueLatest.isCurrent(ticket)) error.value = messageFor(err)
   } finally {
-    loadingQueue.value = false
+    if (queueLatest.isCurrent(ticket)) loadingQueue.value = false
   }
 }
 
@@ -965,22 +975,64 @@ async function run(work) {
   }
 }
 
-onMounted(async () => {
-  // The results and referrals were tabs here. A notification sent before they
-  // moved still links to ?tab=.
+/**
+ * The results and referrals were tabs here. A notification sent before they
+ * moved still links to ?tab=; it is sent on, and true is returned.
+ */
+function redirectOldTab() {
   if (route.query.tab === 'results') {
     const outcome = typeof route.query.outcome === 'string' ? `?outcome=${encodeURIComponent(route.query.outcome)}` : ''
-    return navigateTo(`/blood-center/serology-results${outcome}`, { replace: true })
+    navigateTo(`/blood-center/serology-results${outcome}`, { replace: true })
+    return true
   }
-  if (route.query.tab === 'referrals') return navigateTo('/blood-center/counselling-referrals', { replace: true })
+  if (route.query.tab === 'referrals') {
+    navigateTo('/blood-center/counselling-referrals', { replace: true })
+    return true
+  }
+  return false
+}
+
+// Arrived from the Processing page's "Open on the Testing page" (?donation=).
+let appliedDonation = 0
+function linkedDonation() {
+  const linked = Number(route.query.donation)
+  return Number.isInteger(linked) && linked > 0 ? linked : 0
+}
+
+onMounted(async () => {
+  if (redirectOldTab()) return
 
   await loadReference()
   await loadQueue()
 
-  // Arrived from the Processing page's "Open on the Testing page".
-  const linked = Number(route.query.donation)
-  if (Number.isInteger(linked) && linked > 0) await openDonation(linked)
+  appliedDonation = linkedDonation()
+  if (appliedDonation) await openDonation(appliedDonation)
 })
+
+/*
+ * Kept alive. Back here, the queue reloads in place and the unit on the bench
+ * keeps what was entered; a link to another unit opens that one instead, its
+ * forms filled from the record (adopt), never from the last unit's entries.
+ */
+onPageReturn(async () => {
+  if (redirectOldTab()) return
+
+  await loadQueue({ quiet: true })
+
+  const linked = linkedDonation()
+  const fresh = linked && linked !== appliedDonation
+  appliedDonation = linked
+  if (fresh) await openDonation(linked)
+})
+
+/*
+ * The queue kept current while the page is open: every 30 seconds while this
+ * page and the tab are in view, and when the tab comes back. Only the list:
+ * the unit on the bench, and the typing and serology entered for it, are left
+ * as they are. Not while a save is running. The queue route is unthrottled
+ * and writes no audit entry on a read.
+ */
+useLiveRefresh(() => loadQueue({ quiet: true, background: true }), { intervalMs: 30_000, pauseWhen: () => busy.value })
 </script>
 
 <style scoped>

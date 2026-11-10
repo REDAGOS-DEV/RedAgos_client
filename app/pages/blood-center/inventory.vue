@@ -24,6 +24,11 @@
         <button type="button" class="link-btn" @click="refreshAll()">Try again</button>
       </p>
 
+      <p v-if="sweepWarning" class="load-error load-error--warn" role="alert">
+        <AssetIcon name="triangle-alert" :size="15" />
+        <span>{{ sweepWarning }}</span>
+      </p>
+
       <!-- ============ KPI ROW ============ -->
       <section class="kpi-row" aria-label="Inventory at a glance">
         <component
@@ -429,7 +434,7 @@
     </div>
 
     <!-- ============ UNIT DETAILS DRAWER ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="drawer-fade">
         <div v-if="drawerUnit" class="drawer-overlay inv-tones" @click.self="closeDetails">
           <aside
@@ -511,7 +516,7 @@
     </Teleport>
 
     <!-- ============ ALL ACTIVITY DRAWER ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="drawer-fade">
         <div v-if="activityDrawerOpen" class="drawer-overlay inv-tones" @click.self="activityDrawerOpen = false">
           <aside
@@ -566,7 +571,7 @@
     </Teleport>
 
     <!-- ============ EDIT UNIT MODAL ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="batchModalOpen" class="modal-overlay inv-tones" @click.self="closeBatchModal">
           <div class="modal-card modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="edit-unit-title" v-focus-trap @dialog-escape="closeBatchModal">
@@ -607,7 +612,7 @@
     </Teleport>
 
     <!-- ============ DISCARD MODAL ============ -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="discardTarget" class="modal-overlay inv-tones" @click.self="closeDiscard">
           <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="discard-title" v-focus-trap @dialog-escape="closeDiscard">
@@ -645,7 +650,7 @@
     </Teleport>
 
     <!-- Says what an action did, or why it did nothing. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="modal-fade">
         <div v-if="notice" class="inventory-toast" role="status">
           <AssetIcon name="circle-alert" :size="15" />
@@ -681,6 +686,7 @@ import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, r
 import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { typeHealthByCode } from '~/utils/stockThreshold'
+import { expirySweepWarning } from '~/utils/expirySweep'
 import {
   activityKindMeta,
   daysLeftLabel,
@@ -693,11 +699,13 @@ import {
   unitAvailability,
   unitStatusTag,
 } from '~/utils/inventoryDashboard'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 
 definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'inventory.view',
+  keepalive: true,
 })
 
 const NuxtLinkComponent = resolveComponent('NuxtLink')
@@ -734,6 +742,9 @@ const storageLocationOptions = ref([])
 
 // --- Overview: summary, minimums, expiring units, activity ---
 const summary = ref(null)
+// Shown when the nightly expiry check is overdue: until it runs, units past
+// their date are still counted as available here.
+const sweepWarning = computed(() => expirySweepWarning(summary.value?.expiry_sweep))
 const thresholds = ref(null)
 // The facility's minimums against its stock. Supplementary: the page works
 // without them, so a failed load just leaves the cards ungraded.
@@ -777,7 +788,8 @@ async function loadReference() {
 
 async function loadOverview() {
   const [summaryData, thresholdData, expiring, recent] = await Promise.all([
-    bloodCenterService.inventorySummary().catch((err) => {
+    // No seven-day trend: this page never draws it, and it refreshes every minute.
+    bloodCenterService.inventorySummary({ trend: false }).catch((err) => {
       console.error('Failed to load the inventory summary:', err)
       return null
     }),
@@ -1384,6 +1396,9 @@ async function refreshAll({ quiet = false } = {}) {
 // only while the tab is in view.
 const POLL_MS = 60_000
 let pollTimer = null
+// Kept alive: no polling while away; back here, a quiet refresh straight away.
+// Its dialogs and drawers are off screen while away.
+const pageHidden = usePageHidden()
 
 onMounted(async () => {
   await loadReference()
@@ -1391,9 +1406,15 @@ onMounted(async () => {
   loading.value = false
 
   pollTimer = setInterval(() => {
+    if (pageHidden.value) return
     now.value = Date.now()
     if (!document.hidden) refreshAll({ quiet: true })
   }, POLL_MS)
+})
+
+onPageReturn(() => {
+  now.value = Date.now()
+  return refreshAll({ quiet: true })
 })
 
 onBeforeUnmount(() => {
@@ -1514,6 +1535,7 @@ onBeforeUnmount(() => {
 }
 .load-error :deep(svg) { color: var(--inv-crit); }
 .load-error span { flex: 1; }
+.load-error--warn :deep(svg) { flex-shrink: 0; color: var(--inv-warn); }
 
 /* Buttons: one inverted primary, the rest outlined. */
 .btn-primary {

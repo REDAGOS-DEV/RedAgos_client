@@ -289,7 +289,7 @@
     </div>
 
     <!-- DISPATCH CONFIRM -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="dispatchFor" class="modal-overlay" @click.self="closeDispatch">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dispatch-title">
           <h2 id="dispatch-title" class="modal-title">Dispatch Units</h2>
@@ -329,7 +329,7 @@
     </Teleport>
 
     <!-- DISPATCH A REPLENISHMENT ORDER: the bags are picked and recorded as it goes (project owner, 2026-11-07). -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <UnitPickerDialog
         v-if="orderFor"
         ref="orderPickerRef"
@@ -377,7 +377,7 @@
     </Teleport>
 
     <!-- DEFERRED PAYMENT -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="deferFor" class="modal-overlay" @click.self="closeDefer">
         <div
           v-focus-trap
@@ -407,7 +407,7 @@
     </Teleport>
 
     <!-- CORRECT A DISPATCH RECORD. Steps aside while the request is reviewed: its overlay sits above the dialog's. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="correctFor && !dispatchCorrection" class="modal-overlay" @click.self="closeCorrect">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="correct-title">
           <h2 id="correct-title" class="modal-title">Correct Dispatch Record</h2>
@@ -448,7 +448,7 @@
     />
 
     <!-- RETURN TO STOCK -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <div v-if="returnFor" class="modal-overlay" @click.self="closeReturn">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="return-title">
           <h2 id="return-title" class="modal-title">Return Units to Stock</h2>
@@ -492,6 +492,8 @@ import { pesos } from '~/utils/billing'
 import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
+import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
 /*
  * The fulfilment board (2026-10-31), shared by two pages split on the invoice:
@@ -567,27 +569,87 @@ async function showFocused() {
   }
 }
 
-async function load() {
-  loading.value = true
+/**
+ * `quiet` is the return to this page: the queue is rebuilt out of sight and
+ * swapped in whole, over the one on screen, with no skeleton. A quiet failure
+ * keeps what is on screen.
+ */
+// Newest reply wins: a load started before a tab change or an action never
+// overwrites what they loaded.
+const listLatest = createLatest()
+
+// Each request as the list last gave it, to tell which rows the background
+// refresh needs to expand again.
+const lastSeen = new Map()
+
+function blankRow(raw) {
+  lastSeen.set(raw.id, JSON.stringify(raw))
+
+  return { ...raw, allocations: [], selected: [], loadingUnits: true, billing: null, detail: null }
+}
+
+async function load(options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  const ticket = listLatest.begin()
+  if (!quiet) loading.value = true
   error.value = ''
 
   try {
     const response = await bloodCenterService.incomingRequests({ ...queueFilters(), per_page: 25 })
-    const rows = response?.data ?? []
+    if (!listLatest.isCurrent(ticket)) return
 
-    requests.value = rows.map((r) => ({ ...r, allocations: [], selected: [], loadingUnits: true, billing: null, detail: null }))
+    const rows = (response?.data ?? []).map(blankRow)
+
+    if (!quiet) requests.value = rows
 
     // The queue projection counts holds but does not carry the bags. Each row
     // is filled in from the review endpoint, which does — and which also
     // returns the statement the release gate reads.
-    await Promise.all(requests.value.map(loadUnits))
+    await Promise.all((quiet ? rows : requests.value).map(loadUnits))
+
+    if (quiet && listLatest.isCurrent(ticket)) requests.value = rows
   } catch (err) {
+    if (!listLatest.isCurrent(ticket)) return
     error.value = err?.message || 'Could not load the dispatch queue.'
-    requests.value = []
+    if (!quiet) requests.value = []
   } finally {
-    loading.value = false
+    if (listLatest.isCurrent(ticket)) loading.value = false
   }
   showFocused()
+}
+
+/**
+ * The background refresh: the list alone, and the bags and statement only of
+ * the requests that changed or are new. A request that reads as it did keeps
+ * its row, units picked included, so the refresh costs one request when
+ * nothing moved. Nothing is shown as loading, and a failure keeps the queue
+ * on screen.
+ */
+async function refreshQuietly() {
+  const ticket = listLatest.begin()
+
+  try {
+    const response = await bloodCenterService.incomingRequests({ ...queueFilters(), per_page: 25 })
+    if (!listLatest.isCurrent(ticket)) return
+
+    const kept = new Map(requests.value.map((row) => [row.id, row]))
+    const expand = []
+    const rows = (response?.data ?? []).map((raw) => {
+      const row = kept.get(raw.id)
+      if (row && lastSeen.get(raw.id) === JSON.stringify(raw)) return row
+
+      const fresh = blankRow(raw)
+      expand.push(fresh)
+
+      return fresh
+    })
+
+    await Promise.all(expand.map(loadUnits))
+    if (listLatest.isCurrent(ticket)) requests.value = rows
+  } catch {
+    // A missed refresh is retried by the next one.
+  }
 }
 
 async function loadUnits(request) {
@@ -1001,6 +1063,30 @@ async function confirmReturn() {
 }
 
 onMounted(load)
+
+// Kept alive (fulfillment.vue, dispatch.vue): back here, the queue reloads
+// quietly, and an Issue button's ?request= is marked again.
+onPageReturn(() => load({ quiet: true }))
+const pageHidden = usePageHidden()
+
+/*
+ * Kept current while it is open: every 30 seconds while this page and the tab
+ * are in view, and when the tab comes back. Paused while anything is in hand:
+ * an action running, a dialog open, or units ticked on any request, which a
+ * refresh must not undo. The list route is unthrottled and writes no audit
+ * entry on a read; neither do the review and statement reads of a changed row.
+ */
+useLiveRefresh(refreshQuietly, {
+  intervalMs: 30_000,
+  pauseWhen: () => busyId.value !== null
+    || dispatchFor.value !== null
+    || orderFor.value !== null
+    || deferFor.value !== null
+    || correctFor.value !== null
+    || dispatchCorrection.value !== null
+    || returnFor.value !== null
+    || requests.value.some((row) => row.selected?.length > 0),
+})
 </script>
 
 <style scoped>

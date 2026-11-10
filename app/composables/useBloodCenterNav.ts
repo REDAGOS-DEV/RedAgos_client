@@ -255,12 +255,13 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // (2026-10-27): one link, two tabs on the pages (PaymentsTabs).
       { label: 'Payments', path: '/blood-center/receipts', icon: 'receipt', requires: 'billing.record_payment', alsoActiveOn: ['/blood-center/billing-transactions'], keywords: 'payments receipt acknowledgement ar reprint print 80mm pdf void transactions journal ledger history export csv correction' },
       { label: 'Payments', path: '/blood-center/billing-transactions', icon: 'list', requires: 'billing.record_payment', hidden: true },
-      // Last, together: the prices and the programs that change them, the
+      // Last, together: the prices and the discounts taken off them, the
       // Billing Supervisor's alone (billing.prices).
       { label: 'Component Prices', path: '/blood-center/component-prices', icon: 'sliders-horizontal', requires: 'billing.prices', keywords: 'price pricing component fee charge unit cost peso settings' },
-      // Scheduled subsidies, discounts and promos, beside the prices they
-      // change (2026-10-27; they were under Management).
-      { label: 'Billing Programs', path: '/blood-center/billing-programs', icon: 'tags', requires: 'billing.prices', keywords: 'subsidy discount promo effective date schedule billing relief' },
+      // The centre's own discounts, offered at the counter beside the
+      // government subsidy (project owner, 2026-11-10; it replaced the dated
+      // Billing Programs).
+      { label: 'Discounts', path: '/blood-center/discounts', icon: 'tags', requires: 'billing.prices', keywords: 'discount senior citizen pwd percentage percent fixed peso off promo subsidy' },
     ],
     // Not Issuance's (project owner, 2026-10-19). Its officer and dispatch
     // coordinator keep billing.view, read-only, because Fulfillment reads each

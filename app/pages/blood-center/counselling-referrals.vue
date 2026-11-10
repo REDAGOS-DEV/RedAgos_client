@@ -206,6 +206,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import { donorTitle } from '~/utils/donorLabel'
+import { onPageReturn } from '~/composables/useKeptAlive'
 
 /**
  * Counselling referrals: the follow-up the donor consented to in Section I-C,
@@ -229,6 +230,7 @@ definePageMeta({
   middleware: ['auth', 'department'],
   layout: 'blood-centerdashboard',
   requires: 'lab.referrals',
+  keepalive: true,
 })
 
 const { user } = useUser()
@@ -274,8 +276,11 @@ function nextStatuses(status) {
   return STATUS_ORDER.slice(STATUS_ORDER.indexOf(status) + 1)
 }
 
-async function loadReferrals() {
-  loadingReferrals.value = true
+// `quiet`, on return to this kept-alive page: no skeleton over the list on screen.
+async function loadReferrals(options = {}) {
+  // Read, not destructured: an event or watch handing its own value in may hand in null.
+  const quiet = options?.quiet === true
+  if (!quiet) loadingReferrals.value = true
 
   try {
     const res = await service.counsellingReferrals({ status: referralFilter.value })
@@ -401,6 +406,7 @@ async function run(work) {
 }
 
 onMounted(loadReferrals)
+onPageReturn(() => loadReferrals({ quiet: true }))
 </script>
 
 <style scoped>

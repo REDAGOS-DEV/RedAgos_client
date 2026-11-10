@@ -33,7 +33,7 @@
     </button>
 
     <!-- Teleported to <body>, as DatePicker's panel is, so dialogs and scroll boxes cannot clip it. -->
-    <Teleport to="body">
+    <Teleport to="body" :disabled="pageHidden">
       <Transition name="sf-pop">
         <ul
           v-if="open"
@@ -74,6 +74,7 @@
 
 <script setup lang="ts">
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import { usePageHidden } from '~/composables/useKeptAlive'
 
 /** A value a native <select> could carry, plus null for "nothing chosen". */
 export type SelectFieldValue = string | number | boolean | null
@@ -111,6 +112,8 @@ const props = withDefaults(defineProps<{
   emptyText: 'Nothing to choose',
   size: 'md',
 })
+
+const pageHidden = usePageHidden()
 
 const emit = defineEmits<{
   'update:modelValue': [value: SelectFieldValue]
