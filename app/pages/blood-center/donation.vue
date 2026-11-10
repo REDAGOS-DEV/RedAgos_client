@@ -485,15 +485,20 @@
           <input v-model.number="collectionForm.volume_ml" type="number" class="field__input" placeholder="mL" >
         </label>
 
-        <label class="field">
-          <span class="field__label">Other phlebotomist</span>
-          <input v-model="collectionForm.phlebotomist_name" type="text" class="field__input" autocomplete="off" maxlength="120" >
-        </label>
+        <!-- Picked from the centre's staff who draw blood; Other types one (2026-11-11). -->
+        <div class="field" :title="`On the record: ${phlebotomistName}`">
+          <span class="field__label">Phlebotomist</span>
+          <StaffNamePicker
+            v-model="collectionForm.phlebotomist_name"
+            :staff="phlebotomists"
+            self-is-empty
+            :empty-label="selfPhlebotomistLabel"
+            other-label="Other phlebotomist (type a name)"
+            other-placeholder="As on the bag record"
+            aria-label="Phlebotomist"
+          />
+        </div>
       </div>
-
-      <p class="card__hint">
-        Phlebotomist: <strong>{{ phlebotomistName }}</strong>
-      </p>
 
       <ul v-if="collectionAttempted && collectionProblems.length" class="problems" role="alert">
         <li v-for="problem in collectionProblems" :key="problem">{{ problem }}</li>
@@ -630,6 +635,8 @@
 </template>
 
 <script setup>
+import StaffNamePicker from '~/components/common/StaffNamePicker.vue'
+import { usePhlebotomists } from '~/composables/usePhlebotomists'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterDonorQuestionnaire from '~/components/BloodCenter/DonorQuestionnaire.vue'
 import BloodCenterDonorQuestionnaireSummary from '~/components/BloodCenter/DonorQuestionnaireSummary.vue'
@@ -890,6 +897,15 @@ const startedInput = ref(null)
 watch(stage, (now) => {
   if (now === 'collection') nextTick(() => barcodeInput.value?.focus())
 })
+
+// The picker's empty choice: whoever recorded the bag when correcting it,
+// else the one signed in.
+const selfPhlebotomistLabel = computed(() => (correcting.value === 'collection' && donation.value?.collection?.recorded_by)
+  ? donation.value.collection.recorded_by
+  : `${user.value?.full_name || [user.value?.first_name, user.value?.last_name].filter(Boolean).join(' ') || 'You'} (you)`)
+
+const { phlebotomists, loadPhlebotomists } = usePhlebotomists()
+onMounted(() => { if (canCollect.value) loadPhlebotomists() })
 
 // A correction falls back on whoever recorded the bag, not on whoever is
 // correcting it now.

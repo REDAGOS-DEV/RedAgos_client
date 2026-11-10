@@ -176,10 +176,16 @@
                 <span class="form-label">Screened by <span class="form-optional">default</span></span>
                 <input v-model="form.screened_by_name" type="text" class="form-input" maxlength="120" placeholder="As written on the paper">
               </label>
-              <label class="field">
+              <div class="field">
                 <span class="form-label">Phlebotomist <span class="form-optional">default</span></span>
-                <input v-model="form.phlebotomist_name" type="text" class="form-input" maxlength="120" placeholder="As written on the paper">
-              </label>
+                <StaffNamePicker
+                  v-model="form.phlebotomist_name"
+                  :staff="phlebotomists"
+                  empty-label="Not written"
+                  other-placeholder="As written on the paper"
+                  aria-label="Phlebotomist"
+                />
+              </div>
             </div>
 
             <label class="check">
@@ -249,11 +255,17 @@ import SkeletonRows from '~/components/ui/SkeletonRows.vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import StaffNamePicker from '~/components/common/StaffNamePicker.vue'
+import { usePhlebotomists } from '~/composables/usePhlebotomists'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { formatShortDate } from '~/utils/donorRecords'
 import { daysSinceDrive, sheetSummary } from '~/utils/paperDonations'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
+
+// The Phlebotomist picker's choices (2026-11-11).
+const { phlebotomists, loadPhlebotomists } = usePhlebotomists()
+onMounted(() => loadPhlebotomists())
 
 definePageMeta({
   middleware: ['auth', 'department'],

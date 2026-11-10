@@ -1,9 +1,10 @@
 <template>
   <div class="laboratory">
     <!--
-      Rebuilt from the owner's mock-up (2026-10-22): the list on the left as
-      tall as the bench, and the bench always shown — Component separation
-      and the rejection — locked until a unit is picked.
+      One thing at a time (project owner, 2026-11-11): the queue fills the page
+      when it opens; picking or scanning a unit opens its bench in the queue's
+      place, with the way back to the queue at its head. ?donation= holds the
+      unit open, so a reload or the browser's Back keeps the staff's place.
     -->
     <!-- No icon, steps or card of Testing's outcome (project owner, 2026-10-22). -->
     <header class="laboratory__header">
@@ -13,8 +14,8 @@
     <p v-if="error" class="alert alert--error" role="alert">{{ error }}</p>
     <p v-else-if="notice" class="alert alert--notice" role="status">{{ notice }}</p>
 
-    <div class="workspace">
-      <aside class="queue-panel" aria-label="Donation units">
+    <div class="workspace" :class="{ 'workspace--unit': selected }">
+      <aside v-show="!selected" class="queue-panel" aria-label="Donation units">
         <div class="queue-panel__head">
           <h2 class="queue-panel__title">
             Donation units
@@ -32,6 +33,7 @@
           </button>
         </div>
 
+        <div class="queue-toolbar">
         <!-- Scan a bag's barcode to open its unit; typing narrows the list (2026-10-28). -->
         <form class="scan" role="search" @submit.prevent="scanOpen">
           <AssetIcon name="scan-line" :size="16" class="scan__icon" />
@@ -48,21 +50,24 @@
         </form>
         <p v-if="scanMiss" class="scan__miss" role="status">No unit with barcode {{ scanMiss }}.</p>
 
-        <!-- The status filter as chips, each with how many units it holds. -->
+        <!-- The status filter as chips, each with how many units it holds: the
+             work to do first, then what is done, apart as History. -->
         <div class="status-chips" role="group" aria-label="Show">
-          <button
-            v-for="option in STATUS_OPTIONS"
-            :key="option.value || 'awaiting'"
-            type="button"
-            class="status-chip"
-            :class="{ 'status-chip--on': statusFilter === option.value }"
-            :aria-pressed="statusFilter === option.value"
-            :title="option.title"
-            @click="setStatusFilter(option.value)"
-          >
-            {{ option.label }}
-            <span class="status-chip__count">{{ counts[option.value] ?? '·' }}</span>
-          </button>
+          <template v-for="option in STATUS_OPTIONS" :key="option.value || 'awaiting'">
+            <span v-if="option.value === 'completed'" class="status-chips__sep" aria-hidden="true">History</span>
+            <button
+              type="button"
+              class="status-chip"
+              :class="{ 'status-chip--on': statusFilter === option.value }"
+              :aria-pressed="statusFilter === option.value"
+              :title="option.title"
+              @click="setStatusFilter(option.value)"
+            >
+              {{ option.label }}
+              <span class="status-chip__count">{{ counts[option.value] ?? '·' }}</span>
+            </button>
+          </template>
+        </div>
         </div>
 
         <ul v-if="loadingQueue" class="qlist" aria-busy="true">
@@ -89,80 +94,95 @@
           No unit on this list matches “{{ scanQuery }}”. Press Enter to look it up by barcode.
         </p>
 
-        <ul v-else class="qlist">
-          <li v-for="row in shownQueue" :key="row.id">
-            <button
-              type="button"
-              class="qitem"
-              :class="{ 'qitem--on': selected?.id === row.id }"
-              :aria-current="selected?.id === row.id ? 'true' : undefined"
-              :disabled="busy"
-              @click="openDonation(row.id)"
-            >
-              <span class="qitem__top">
-                <span class="qitem__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
-                <span v-if="!['completed', 'rejected'].includes(row.status)" class="age" :class="`age--${ageTone(row)}`" :title="`Drawn ${formatDate(drawnAt(row))}`">
-                  <AssetIcon name="clock" :size="11" />
-                  {{ ageText(row) }}
-                </span>
-                <span v-else class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
-              </span>
-              <span class="qitem__meta">
-                #{{ row.id }} · {{ row.volume_ml ? `${row.volume_ml} mL` : 'volume not recorded' }} · {{ formatDate(row.donation_date) }}
-              </span>
-              <span v-if="!['completed', 'rejected'].includes(row.status)" class="checks">
-                <span class="check" :class="`check--${row.components?.length ? 'done' : 'todo'}`">
-                  <AssetIcon :name="row.components?.length ? 'check' : 'circle'" :size="11" />
-                  Separated
-                </span>
-                <span class="check" :class="`check--${testingState(row)}`">
-                  <AssetIcon :name="testingState(row) === 'done' ? 'check' : testingState(row) === 'fail' ? 'x' : 'clock'" :size="11" />
-                  Testing
-                </span>
-              </span>
-              <span class="qitem__next">
-                <AssetIcon name="arrow-right" :size="12" />
-                {{ nextStepFor(row) }}
-              </span>
-            </button>
-          </li>
-        </ul>
+        <div v-else class="qtable-wrap">
+          <table class="qtable">
+            <caption class="sr-only">Donation units for Processing</caption>
+            <thead>
+              <tr>
+                <th scope="col">Unit</th>
+                <th scope="col">Volume</th>
+                <th scope="col">Collected</th>
+                <th scope="col">Age</th>
+                <th scope="col">Progress</th>
+                <th scope="col">Next step</th>
+                <th scope="col" class="end"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in shownQueue"
+                :key="row.id"
+                class="qrow"
+                tabindex="0"
+                :aria-label="`Open ${donorTitle(row.donor, row.collection?.donation_barcode, row.id)}`"
+                @click="!busy && openDonation(row.id)"
+                @keydown.enter.self="!busy && openDonation(row.id)"
+              >
+                <td>
+                  <span class="qrow__name">{{ donorTitle(row.donor, row.collection?.donation_barcode, row.id) }}</span>
+                  <span class="qrow__sub">#{{ row.id }}</span>
+                </td>
+                <td class="nowrap">{{ row.volume_ml ? `${row.volume_ml} mL` : 'Not recorded' }}</td>
+                <td class="nowrap">{{ formatDate(row.donation_date) }}</td>
+                <td>
+                  <span v-if="!['completed', 'rejected'].includes(row.status)" class="age" :class="`age--${ageTone(row)}`" :title="`Drawn ${formatDate(drawnAt(row))}`">
+                    <AssetIcon name="clock" :size="11" />
+                    {{ ageText(row) }}
+                  </span>
+                  <span v-else class="pill" :class="pillClass(row.status)">{{ row.status_label }}</span>
+                </td>
+                <td>
+                  <span v-if="!['completed', 'rejected'].includes(row.status)" class="checks">
+                    <span class="check" :class="`check--${row.components?.length ? 'done' : 'todo'}`">
+                      <AssetIcon :name="row.components?.length ? 'check' : 'circle'" :size="11" />
+                      Separated
+                    </span>
+                    <span class="check" :class="`check--${testingState(row)}`">
+                      <AssetIcon :name="testingState(row) === 'done' ? 'check' : testingState(row) === 'fail' ? 'x' : 'clock'" :size="11" />
+                      Testing
+                    </span>
+                  </span>
+                  <span v-else class="muted">—</span>
+                </td>
+                <td class="qrow__next">{{ nextStepFor(row) }}</td>
+                <td class="end">
+                  <span class="qrow__open">
+                    Open
+                    <AssetIcon name="arrow-right" :size="14" />
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </aside>
 
-      <section class="bench" aria-live="polite">
-        <!-- COMPONENT SEPARATION. Ctrl+Enter records the bags added (2026-10-28). -->
-        <section class="card" @keydown.ctrl.enter.prevent="recordByKey" @keydown.meta.enter.prevent="recordByKey">
-          <div class="sep__head">
-            <h2 class="card__title">Component separation</h2>
-
-            <div class="picked" :class="{ 'picked--empty': !selected }">
-              <span class="picked__icon"><BagIcon class="picked__bag" /></span>
-              <div class="picked__text">
-                <span class="picked__label">{{ selected ? 'Selected unit' : 'No unit open' }}</span>
-                <span class="picked__value">
-                  {{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}
-                  <span v-if="selected" class="picked__meta">
-                    · #{{ selected.id }} · {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
-                  </span>
+      <section v-if="selected" class="bench" aria-live="polite">
+        <!-- The unit on the bench: where it came from and where it stands. -->
+        <header class="unit-head">
+          <button type="button" class="unit-head__back" :disabled="busy" @click="backToQueue">
+            <AssetIcon name="chevron-left" :size="15" />
+            Back to queue
+          </button>
+          <div class="unit-head__main">
+            <span class="unit-head__icon"><BagIcon class="picked__bag" /></span>
+            <div class="unit-head__text">
+              <p class="unit-head__title">
+                {{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}
+                <span class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
+                <span v-if="!isFinal" class="age" :class="`age--${ageTone(selected)}`" :title="`Drawn ${formatDate(drawnAt(selected))}`">
+                  <AssetIcon name="clock" :size="11" />
+                  {{ ageText(selected) }}
                 </span>
-              </div>
-              <span v-if="selected" class="pill" :class="pillClass(selected.status)">{{ selected.status_label }}</span>
-              <button
-                v-if="selected"
-                type="button"
-                class="icon-btn"
-                :disabled="busy"
-                aria-label="Close this unit"
-                title="Close"
-                @click="backToQueue"
-              >
-                <AssetIcon name="x" :size="16" />
-              </button>
+              </p>
+              <p class="unit-head__meta">
+                #{{ selected.id }} · {{ selected.volume_ml ? `${selected.volume_ml} mL` : 'volume not recorded' }}
+                · collected {{ formatDate(drawnAt(selected)) }}
+              </p>
             </div>
           </div>
-
           <!-- Where this unit is on the bench, in the dashboard's order (2026-10-28). -->
-          <ol v-if="selected && selected.status !== 'rejected'" class="unit-steps" aria-label="This unit's steps">
+          <ol v-if="selected.status !== 'rejected'" class="unit-steps" aria-label="This unit's steps">
             <li
               v-for="(step, i) in unitSteps"
               :key="step.key"
@@ -177,6 +197,13 @@
               <span class="unit-step__label">{{ step.label }}</span>
             </li>
           </ol>
+        </header>
+
+        <!-- COMPONENT SEPARATION. Ctrl+Enter records the bags added (2026-10-28). -->
+        <section class="card" @keydown.ctrl.enter.prevent="recordByKey" @keydown.meta.enter.prevent="recordByKey">
+          <div class="sep__head">
+            <h2 class="card__title">Component separation</h2>
+          </div>
 
           <!-- Terminal: nothing left to record -->
           <div v-if="isFinal" class="outcome" :class="selected.status === 'completed' ? 'outcome--success' : 'outcome--rejected'">
@@ -284,6 +311,7 @@
           <fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">
             <!-- The usual components one click away; the list holds them all. -->
             <div v-if="components.length" class="quick" role="group" aria-label="Pick a component">
+              <span class="quick__label">Quick pick</span>
               <button
                 v-for="c in components"
                 :key="c.id"
@@ -374,26 +402,35 @@
             </div>
 
             <!-- Information only: nothing here decides what a bag should hold. -->
-            <div v-if="declaredVolume > 0" class="meter">
+            <div v-if="declaredVolume > 0 || selected?.volume_ml" class="meter">
+              <!-- What is left to place; the footer says what is placed. -->
               <p class="card__hint">
-                {{ declaredVolume }} mL across {{ componentRows.length }} bag(s)<template v-if="selected?.volume_ml">.
-                  {{ selected.volume_ml }} mL was collected</template>.
+                <template v-if="selected?.volume_ml">
+                  <strong class="meter__num">{{ Math.max(0, selected.volume_ml - declaredVolume) }} mL left</strong>
+                  of {{ selected.volume_ml }} mL collected<template v-if="declaredVolume > selected.volume_ml"> · {{ declaredVolume - selected.volume_ml }} mL over</template>
+                </template>
+                <template v-else>{{ declaredVolume }} mL across {{ componentRows.length }} bag(s)</template>
               </p>
               <span v-if="selected?.volume_ml" class="meter__track" aria-hidden="true">
                 <span class="meter__fill" :style="{ width: `${Math.min(100, (declaredVolume / selected.volume_ml) * 100)}%` }" />
               </span>
             </div>
 
-            <button
-              type="button"
-              class="btn btn--primary btn--block"
-              :disabled="busy || !validComponents"
-              @click="submitComponents"
-            >
-              <AssetIcon name="file-text" :size="16" />
-              Record components
-              <kbd class="btn-kbd" aria-hidden="true">Ctrl ↵</kbd>
-            </button>
+            <div class="bags__submit">
+              <p class="bags__summary">
+                {{ componentRows.length }} bag(s) · {{ declaredVolume }} mL<template v-if="selected?.volume_ml"> of {{ selected.volume_ml }} mL</template>
+              </p>
+              <button
+                type="button"
+                class="btn btn--primary"
+                :disabled="busy || !validComponents"
+                @click="submitComponents"
+              >
+                <AssetIcon name="file-text" :size="16" />
+                Record components
+                <kbd class="btn-kbd" aria-hidden="true">Ctrl ↵</kbd>
+              </button>
+            </div>
           </fieldset>
 
           <!-- What comes next, one click away (2026-10-28). -->
@@ -463,7 +500,7 @@
 </template>
 
 <script setup>
-import { h, nextTick, onActivated, onBeforeUnmount, onDeactivated } from 'vue'
+import { h, nextTick, onActivated, onBeforeUnmount, onDeactivated, watch } from 'vue'
 import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import BloodCenterBagLabelSheet from '~/components/BloodCenter/BagLabelSheet.vue'
@@ -496,6 +533,7 @@ definePageMeta({
 
 const { can } = useUser()
 const route = useRoute()
+const router = useRouter()
 
 // The sidebar counts units waiting for their hand-over; recording a breakdown adds one.
 const badgeRefresh = useState('blood-center-badge-refresh', () => 0)
@@ -936,15 +974,44 @@ async function openDonation(id) {
 
   notice.value = null
   adopt(res.data ?? res)
+  showUnitInAddress(id)
+}
+
+// The open unit in the address: Back returns to the queue, a reload keeps it.
+// From the queue it is a new entry; from one unit to the next it replaces.
+function showUnitInAddress(id) {
+  appliedDonation = Number(id)
+  if (linkedDonation() === Number(id)) return
+  const query = { ...route.query, donation: String(id) }
+  if (linkedDonation()) router.replace({ query })
+  else router.push({ query })
 }
 
 function backToQueue() {
-  // Clears the bags too: the locked form shows empty, not the last unit's.
+  // Clears the bags too, so the next unit opens on an empty form.
   adopt(null)
   error.value = null
   notice.value = null
+  appliedDonation = 0
+  if (linkedDonation()) {
+    const { donation: _open, ...rest } = route.query
+    router.push({ query: rest })
+  }
   loadQueue()
 }
+
+// The browser's Back and Forward move between the queue and a unit.
+watch(() => route.query.donation, () => {
+  if (route.path !== '/blood-center/laboratory') return
+  const linked = linkedDonation()
+  if (!linked && selected.value) {
+    adopt(null)
+    appliedDonation = 0
+    loadQueue({ quiet: true })
+  } else if (linked && linked !== selected.value?.id && !busy.value) {
+    openDonation(linked)
+  }
+})
 
 async function submitComponents() {
   const payload = componentRows.value
@@ -1573,4 +1640,70 @@ useLiveRefresh(() => loadQueue({ quiet: true }), { intervalMs: 30_000, pauseWhen
 .up-next__btn { flex: none; gap: 6px; }
 .btn-kbd { margin-left: 8px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .2); font-family: var(--rb-font-mono); font-size: 11px; font-weight: 600; }
 .btn--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }
+
+/* ---------- One thing at a time: the queue, or one unit's bench ---------- */
+.workspace { grid-template-columns: minmax(0, 1fr) !important; gap: 18px; }
+.queue-panel { position: static; max-height: none; border-radius: 16px; }
+.queue-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 0 18px 14px; border-bottom: 1px solid var(--rb-border); }
+.queue-toolbar .scan { flex: 0 1 340px; margin: 0; }
+.queue-toolbar .status-chips { flex: 1 1 auto; flex-wrap: wrap; align-items: center; padding: 0; border: 0; }
+.status-chips__sep { margin: 0 2px 0 10px; padding-left: 12px; border-left: 1px solid var(--rb-border); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-muted); }
+.queue-panel > .scan__miss { margin: 10px 18px 0; }
+
+.qtable-wrap { overflow-x: auto; }
+.qtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.qtable thead th {
+  padding: 10px 14px; background: var(--rb-surface-alt); border-bottom: 1px solid var(--rb-border); text-align: left;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); white-space: nowrap;
+}
+.qtable th:first-child, .qtable td:first-child { padding-left: 20px; }
+.qtable th:last-child, .qtable td:last-child { padding-right: 20px; }
+.qtable tbody td { padding: 12px 14px; border-bottom: 1px solid var(--rb-border); vertical-align: middle; }
+.qtable tbody tr:last-child td { border-bottom: 0; }
+.qtable .end { text-align: right; }
+.qtable .nowrap { white-space: nowrap; }
+.qrow { cursor: pointer; transition: background 0.12s ease; }
+.qrow:hover { background: rgba(var(--rb-primary-rgb), 0.05); }
+.qrow:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.qrow__name { display: block; font-weight: 700; color: var(--rb-text-primary); white-space: nowrap; }
+.qrow__sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--rb-text-secondary); }
+.qrow__next { font-size: 12.5px; font-weight: 600; color: var(--rb-primary-text); }
+.qrow__open {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.qrow:hover .qrow__open { background: rgba(var(--rb-primary-rgb), 0.12); }
+.muted { color: var(--rb-text-secondary); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* The unit's head: the way back, who it is, where it stands. */
+.unit-head {
+  display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 14px;
+  border: 1px solid var(--rb-border); border-radius: 16px; background: var(--rb-surface);
+}
+.unit-head__back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px 4px 4px; margin-left: -4px;
+  border: 0; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--rb-text-secondary); cursor: pointer;
+}
+.unit-head__back:hover:not(:disabled) { background: var(--rb-surface-hover); color: var(--rb-primary-text); }
+.unit-head__back:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.unit-head__main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.unit-head__icon { display: grid; flex-shrink: 0; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
+.unit-head__text { min-width: 0; }
+.unit-head__title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: var(--rb-text-primary); }
+.unit-head__meta { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.unit-head .unit-steps { max-width: 760px; margin: 0; padding-top: 12px; border-top: 1px solid var(--rb-border); }
+
+/* Quick pick: buttons that read as buttons. */
+.quick { align-items: center; }
+.quick__label { margin-right: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-muted); }
+.meter__num { font-weight: 800; color: var(--rb-text-primary); }
+
+/* Record components stays in view at the foot of the bench. */
+.bags__submit {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 4px -20px 0; padding: 12px 20px; border-top: 1px solid var(--rb-border); border-bottom: 1px solid var(--rb-border); background: var(--rb-surface);
+}
+.bags__summary { margin: 0; font-size: 13px; font-weight: 600; color: var(--rb-text-secondary); font-variant-numeric: tabular-nums; }
 </style>
