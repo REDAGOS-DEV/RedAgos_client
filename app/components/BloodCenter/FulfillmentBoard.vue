@@ -27,9 +27,9 @@
         <button class="ui-btn ui-btn--sm" @click="load">Retry</button>
       </div>
 
-      <!-- TABS on the left, the three unit states on the right -->
-      <div class="tabbar fade-in" style="--delay:40ms">
-        <div v-if="forDispatch" class="tabs" role="tablist" aria-label="Dispatch queue">
+      <!-- TABS (For Dispatch only); each card counts its own units by state. -->
+      <div v-if="forDispatch" class="tabbar fade-in" style="--delay:40ms">
+        <div class="tabs" role="tablist" aria-label="Dispatch queue">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -45,15 +45,44 @@
           </button>
         </div>
 
-        <div class="legend" aria-label="Unit states">
-          <span class="legend-step"><span class="dot dot--allocated" />Tagged</span>
-          <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
-          <span class="legend-step"><span class="dot dot--released" />Released</span>
-          <AssetIcon name="chevron-right" :size="13" class="legend-arrow" />
-          <span class="legend-step"><span class="dot dot--received" />Received</span>
-          <span class="legend-note" title="Receipt is confirmed by the hospital, not here.">
-            <AssetIcon name="info" :size="13" />
-          </span>
+      </div>
+
+      <!--
+        What to do first (project owner, 2026-11-11): one search, a few
+        filters each with how many it holds, and the order to work them in.
+        Most urgent first by default: STAT, then the soonest needed, then the
+        units closest to expiry, then whoever has waited longest.
+      -->
+      <div v-if="!loading && requests.length" class="fx-tools fade-in" style="--delay:60ms">
+        <label class="fx-search">
+          <AssetIcon name="search" :size="15" class="fx-search__icon" />
+          <input
+            v-model="search"
+            type="search"
+            class="fx-search__input"
+            placeholder="Search reference or hospital…"
+            aria-label="Search by reference or hospital"
+          >
+        </label>
+        <div class="fx-chips" role="group" aria-label="Show">
+          <button
+            v-for="f in filterChips"
+            :key="f.key"
+            type="button"
+            class="fx-chip"
+            :class="[`fx-chip--${f.tone}`, { 'fx-chip--on': show === f.key, 'fx-chip--zero': !f.count }]"
+            :aria-pressed="show === f.key"
+            @click="show = show === f.key ? 'all' : f.key"
+          >
+            {{ f.label }}
+            <span class="fx-chip__count">{{ f.count }}</span>
+          </button>
+        </div>
+        <div class="fx-sort">
+          <span class="fx-sort__label">Group</span>
+          <SelectField v-model="groupBy" class="fx-sort__sel fx-sort__sel--group" size="sm" aria-label="Group requests by" :options="GROUPINGS" />
+          <span class="fx-sort__label">Sort</span>
+          <SelectField v-model="sortBy" class="fx-sort__sel" size="sm" aria-label="Sort requests" :options="SORTS" />
         </div>
       </div>
 
@@ -81,9 +110,36 @@
         />
       </div>
 
-      <div v-else class="request-list">
+      <div v-else-if="!shown.length" class="card">
+        <EmptyState
+          icon="search-x"
+          title="No requests match"
+          description="Try another reference or hospital, or show every request."
+        >
+          <button type="button" class="ui-btn ui-btn--sm" @click="clearFilters">Show all</button>
+        </EmptyState>
+      </div>
+
+      <div v-else class="request-groups">
+        <section v-for="group in groups" :key="group.key" class="fx-group" :aria-label="group.label || 'Requests'">
+          <!-- A group's head: what it holds and how many; it folds away. -->
+          <button
+            v-if="group.label"
+            type="button"
+            class="fx-group__head"
+            :aria-expanded="!folded.has(group.key)"
+            @click="toggleGroup(group.key)"
+          >
+            <AssetIcon :name="folded.has(group.key) ? 'chevron-right' : 'chevron-down'" :size="15" class="fx-group__chev" />
+            <span class="fx-group__dot" :class="`fx-group__dot--${group.tone}`" aria-hidden="true" />
+            <span class="fx-group__title">{{ group.label }}</span>
+            <span class="fx-group__count">{{ group.items.length }}</span>
+            <span v-if="group.hint" class="fx-group__hint">{{ group.hint }}</span>
+          </button>
+
+      <div v-show="!folded.has(group.key)" class="request-list">
         <article
-          v-for="request in requests"
+          v-for="request in group.items"
           :id="`request-${request.id}`"
           :key="request.id"
           class="card request-card fade-in"
@@ -93,6 +149,10 @@
             <div>
               <div class="request-title">
                 <span class="mono">{{ request.reference_number }}</span>
+                <span v-if="request.id === nextUpId" class="tag tag--next">
+                  <AssetIcon name="flag" :size="11" />
+                  Next up
+                </span>
                 <span v-if="request.is_emergency" class="tag tag--stat">STAT</span>
                 <span v-if="request.is_walk_in" class="tag tag--walk-in">Walk-in</span>
                 <span
@@ -109,6 +169,21 @@
                   {{ request.quantity }} unit{{ request.quantity === 1 ? '' : 's' }} requested<template v-if="request.committed_quantity != null">, {{ request.committed_quantity }} committed</template>
                 </span>
               </p>
+              <!-- When it came in, and when it is needed: the reasons for its place in the list. -->
+              <p class="request-when">
+                <span v-if="request.request_date" class="when">
+                  <AssetIcon name="clock" :size="13" />
+                  Received {{ formatWhen(request.request_date) }}<template v-if="waitingFor(request)"> · waiting {{ waitingFor(request) }}</template>
+                </span>
+                <span v-if="neededBy(request)" class="when" :class="{ 'when--soon': isSoon(neededBy(request)) }">
+                  <AssetIcon name="calendar" :size="13" />
+                  Needed by {{ formatWhen(neededBy(request)) }}
+                </span>
+                <span v-if="expiringCount(request)" class="when when--soon">
+                  <AssetIcon name="triangle-alert" :size="13" />
+                  {{ expiringCount(request) }} unit{{ expiringCount(request) === 1 ? '' : 's' }} expiring within 7 days
+                </span>
+              </p>
               <!-- A replenishment order's hand-over, as the center confirmed it (project owner, 2026-10-29). -->
               <p v-if="request.supply_plan" class="handover">
                 <AssetIcon :name="request.supply_plan.handover_method === 'delivery' ? 'truck' : 'hospital'" :size="14" />
@@ -117,7 +192,7 @@
               </p>
             </div>
 
-            <!-- The same three states as the legend, in its colours. -->
+            <!-- Tagged, released, received: the three states a unit goes through, each in its colour. -->
             <div class="request-counts">
               <!-- Only a patient's request is tagged; an order's units are picked as it goes. -->
               <span v-if="!isOrder(request)" class="count count--allocated">
@@ -128,7 +203,7 @@
                 <span class="dot dot--released" />
                 <strong>{{ request.fulfilled_quantity ?? 0 }}</strong> released
               </span>
-              <span class="count count--received">
+              <span class="count count--received" title="Receipt is confirmed by the hospital, not here.">
                 <span class="dot dot--received" />
                 <strong>{{ request.received_count }}</strong> received
               </span>
@@ -285,6 +360,8 @@
             </span>
           </footer>
         </article>
+      </div>
+        </section>
       </div>
     </div>
 
@@ -492,6 +569,7 @@ import { pesos } from '~/utils/billing'
 import DateTimeField from '~/components/common/DateTimeField.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
+import SelectField from '~/components/common/SelectField.vue'
 import { onPageReturn, usePageHidden } from '~/composables/useKeptAlive'
 import { createLatest, useLiveRefresh } from '~/composables/useLiveRefresh'
 
@@ -725,6 +803,207 @@ function gateFor(request) {
     canDefer: true,
     message: `${owedOn(request)} outstanding. Settle it first, or issue now with deferred payment.`,
   }
+}
+
+/* FIND, FILTER AND ORDER (project owner, 2026-11-11), on the queue as loaded */
+const search = ref('')
+const show = ref('all')
+const sortBy = ref('urgent')
+
+const groupBy = ref('priority')
+// Groups folded away, by key; open again on another grouping.
+const folded = ref(new Set())
+watch(groupBy, () => { folded.value = new Set() })
+
+function toggleGroup(key) {
+  const next = new Set(folded.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  folded.value = next
+}
+
+const GROUPINGS = [
+  { value: 'priority', label: 'Priority' },
+  { value: 'status', label: 'Status' },
+  { value: 'handover', label: 'Hand-over' },
+  { value: 'type', label: 'Request type' },
+  { value: 'hospital', label: 'Hospital' },
+  { value: 'none', label: 'No grouping' },
+]
+
+const SORTS = [
+  { value: 'urgent', label: 'Most urgent first' },
+  { value: 'status', label: 'Status' },
+  { value: 'needed', label: 'Needed soonest' },
+  { value: 'expiry', label: 'Units expiring first' },
+  { value: 'oldest', label: 'Waiting longest' },
+  { value: 'newest', label: 'Newest first' },
+]
+
+const time = (iso) => (iso ? new Date(iso).getTime() : NaN)
+const orLast = (value) => (Number.isNaN(value) ? Infinity : value)
+
+/** When the hospital needs it: the time it set, or a confirmed order's hand-over. */
+function neededBy(request) {
+  return request.transfusion_request?.needed_by ?? request.supply_plan?.scheduled_at ?? null
+}
+
+/** Within the next 24 hours, or already past. */
+function isSoon(iso) {
+  const at = time(iso)
+  return !Number.isNaN(at) && at - Date.now() <= 86_400_000
+}
+
+function isToday(iso) {
+  const at = iso ? new Date(iso) : null
+  return Boolean(at) && at.toDateString() === new Date().toDateString()
+}
+
+/** Due today, or already past due. */
+function dueToday(iso) {
+  return isToday(iso) || (Boolean(iso) && time(iso) < Date.now())
+}
+
+/** The soonest expiry among the bags still held for it. */
+function earliestExpiry(request) {
+  const dates = taggedUnits(request).map((a) => time(a.expiry_date)).filter((d) => !Number.isNaN(d))
+  return dates.length ? Math.min(...dates) : Infinity
+}
+
+function expiringCount(request) {
+  return taggedUnits(request).filter((a) => isExpiringSoon(a.expiry_date)).length
+}
+
+function waitingFor(request) {
+  const at = time(request.request_date)
+  if (Number.isNaN(at)) return ''
+  const minutes = Math.max(0, Math.floor((Date.now() - at) / 60000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  return hours < 48 ? `${hours} h` : `${Math.floor(hours / 24)} days`
+}
+
+const FILTERS = [
+  { key: 'stat', label: 'STAT', tone: 'crit', test: (r) => r.is_emergency },
+  { key: 'today', label: 'Needed today', tone: 'warn', test: (r) => dueToday(neededBy(r)) },
+  { key: 'expiring', label: 'Expiring units', tone: 'warn', test: (r) => expiringCount(r) > 0 },
+  { key: 'walk_in', label: 'Walk-in', tone: 'info', test: (r) => r.is_walk_in },
+  { key: 'orders', label: 'Replenishment', tone: 'info', test: (r) => isOrder(r), dispatchOnly: true },
+]
+
+const searched = computed(() => {
+  const term = search.value.trim().toLowerCase()
+  if (!term) return requests.value
+  return requests.value.filter((r) => [r.reference_number, r.requesting_facility?.name, r.weekly_request?.reference_number]
+    .some((text) => String(text ?? '').toLowerCase().includes(term)))
+})
+
+const filterChips = computed(() => [
+  { key: 'all', label: 'All', tone: 'neutral', count: searched.value.length },
+  ...FILTERS.filter((f) => !f.dispatchOnly || forDispatch.value)
+    .map((f) => ({ ...f, count: searched.value.filter(f.test).length })),
+])
+
+const ORDERS = {
+  urgent: (a, b) => Number(Boolean(b.is_emergency)) - Number(Boolean(a.is_emergency))
+    || orLast(time(neededBy(a))) - orLast(time(neededBy(b)))
+    || earliestExpiry(a) - earliestExpiry(b)
+    || orLast(time(a.request_date)) - orLast(time(b.request_date)),
+  needed: (a, b) => orLast(time(neededBy(a))) - orLast(time(neededBy(b))) || ORDERS.urgent(a, b),
+  expiry: (a, b) => earliestExpiry(a) - earliestExpiry(b) || ORDERS.urgent(a, b),
+  status: (a, b) => statusRank(a) - statusRank(b) || ORDERS.urgent(a, b),
+  oldest: (a, b) => orLast(time(a.request_date)) - orLast(time(b.request_date)),
+  newest: (a, b) => orLast(-time(a.request_date)) - orLast(-time(b.request_date)),
+}
+
+const shown = computed(() => {
+  const filter = FILTERS.find((f) => f.key === show.value)
+  const list = filter ? searched.value.filter(filter.test) : [...searched.value]
+  return list.sort(ORDERS[sortBy.value] ?? ORDERS.urgent)
+})
+
+/* GROUPS: each grouping names its groups in the order they are worked. */
+const STATUS_ORDER = ['pending', 'processing', 'partial', 'fulfilled', 'rejected', 'cancelled']
+
+function statusRank(request) {
+  const at = STATUS_ORDER.indexOf(request.status)
+  return at === -1 ? STATUS_ORDER.length : at
+}
+
+/** Who takes the units, as the dispatcher plans the day around it. */
+function handoverKind(request) {
+  if (request.is_walk_in) return 'walk_in'
+  return request.supply_plan?.handover_method ?? 'unset'
+}
+
+const GROUP_DEFS = {
+  priority: {
+    of: (r) => (r.is_emergency ? 'stat' : dueToday(neededBy(r)) ? 'today' : neededBy(r) ? 'scheduled' : 'routine'),
+    groups: [
+      { key: 'stat', label: 'STAT', tone: 'crit', hint: 'Send these first' },
+      { key: 'today', label: 'Needed today', tone: 'warn', hint: 'Due within the day' },
+      { key: 'scheduled', label: 'Scheduled', tone: 'info', hint: 'A later hand-over' },
+      { key: 'routine', label: 'Routine', tone: 'neutral', hint: '' },
+    ],
+  },
+  status: {
+    of: (r) => r.status ?? 'other',
+    groups: () => STATUS_ORDER.concat('other').map((key) => ({
+      key,
+      label: key === 'other' ? 'Other' : requestStatusLabel({ status: key, is_open: true }),
+      tone: { pending: 'warn', processing: 'info', partial: 'info', fulfilled: 'ok', rejected: 'crit' }[key] ?? 'neutral',
+    })),
+  },
+  handover: {
+    of: handoverKind,
+    groups: [
+      { key: 'walk_in', label: 'Watcher collects', tone: 'info', hint: 'Walk-ins, handed over at the counter' },
+      { key: 'pickup', label: 'Hospital picks up', tone: 'info', hint: '' },
+      { key: 'delivery', label: 'We deliver', tone: 'ok', hint: '' },
+      { key: 'unset', label: 'Hand-over not set', tone: 'neutral', hint: '' },
+    ],
+  },
+  type: {
+    of: (r) => (r.weekly_request ? 'weekly' : isOrder(r) ? 'order' : 'patient'),
+    groups: [
+      { key: 'patient', label: 'Patient requests', tone: 'crit', hint: '' },
+      { key: 'order', label: 'Replenishment orders', tone: 'info', hint: '' },
+      { key: 'weekly', label: 'Weekly requests', tone: 'neutral', hint: 'One delivery each' },
+    ],
+  },
+}
+
+const groups = computed(() => {
+  const list = shown.value
+  if (groupBy.value === 'none') return [{ key: 'all', label: '', items: list }]
+
+  if (groupBy.value === 'hospital') {
+    const byName = new Map()
+    for (const r of list) {
+      const name = r.requesting_facility?.name || 'Hospital not recorded'
+      if (!byName.has(name)) byName.set(name, [])
+      byName.get(name).push(r)
+    }
+    // The hospital whose most urgent request leads, first.
+    return [...byName.entries()].map(([name, items]) => ({ key: `h:${name}`, label: name, tone: 'neutral', items }))
+  }
+
+  const def = GROUP_DEFS[groupBy.value] ?? GROUP_DEFS.priority
+  const named = typeof def.groups === 'function' ? def.groups() : def.groups
+  return named
+    .map((g) => ({ ...g, items: list.filter((r) => def.of(r) === g.key) }))
+    .filter((g) => g.items.length)
+})
+
+// The one to start on: the most urgent of what is shown, whatever the grouping.
+const nextUpId = computed(() => {
+  if (shown.value.length < 2) return null
+  return [...shown.value].sort(ORDERS.urgent)[0]?.id ?? null
+})
+
+function clearFilters() {
+  search.value = ''
+  show.value = 'all'
 }
 
 /** A replenishment order: nothing is tagged for it, its units are picked at dispatch. */
@@ -1097,7 +1376,77 @@ useLiveRefresh(refreshQuietly, {
 /* The shared PageHeader, with the space below it the old header kept. */
 .fx-inner > .ph { margin-bottom: 16px; }
 
-/* tabs + legend */
+/* tabs */
+/* Find, filter and order: one row above the requests. */
+.fx-tools {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 14px; padding: 12px 14px;
+  border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface);
+}
+.fx-search { position: relative; flex: 0 1 280px; min-width: 200px; }
+.fx-search__icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-secondary); pointer-events: none; }
+.fx-search__input {
+  width: 100%; height: 36px; padding: 0 12px 0 34px; border: 1px solid var(--rb-border-strong); border-radius: 10px;
+  background: var(--rb-surface); color: var(--rb-text-primary); font: inherit; font-size: 13px;
+}
+.fx-search__input::placeholder { color: var(--rb-placeholder); }
+.fx-search__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.fx-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.fx-chip {
+  --tone: var(--rb-text-secondary);
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 6px 0 12px; border: 1px solid var(--rb-border);
+  border-radius: 999px; background: var(--rb-surface); color: var(--rb-text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.fx-chip:hover { color: var(--rb-text-primary); border-color: var(--rb-border-strong); }
+.fx-chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.fx-chip__count {
+  min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-primary);
+  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.fx-chip--crit { --tone: var(--rb-accent); }
+.fx-chip--warn { --tone: var(--rb-warning); }
+.fx-chip--info { --tone: var(--rb-primary); }
+.fx-chip--crit:not(.fx-chip--zero) .fx-chip__count { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
+.fx-chip--zero { color: var(--rb-text-muted); }
+.fx-chip--zero .fx-chip__count { color: var(--rb-text-muted); }
+.fx-chip--on { border-color: var(--rb-primary); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.fx-chip--on .fx-chip__count { background: var(--rb-primary); color: #fff; }
+.fx-sort { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.fx-sort__label { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.fx-sort__sel { width: 190px; }
+.fx-sort__sel--group { width: 160px; }
+.fx-sort__label + .fx-sort__sel + .fx-sort__label { margin-left: 6px; }
+
+/* Groups: a quiet head over its cards, folding away. */
+.request-groups { display: flex; flex-direction: column; gap: 18px; }
+.fx-group { display: flex; flex-direction: column; gap: 10px; }
+.fx-group__head {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 2px; border: 0; background: none;
+  color: var(--rb-text-primary); font: inherit; text-align: left; cursor: pointer;
+}
+.fx-group__head:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); border-radius: 8px; }
+.fx-group__chev { color: var(--rb-text-secondary); flex-shrink: 0; }
+.fx-group__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rb-text-muted); flex-shrink: 0; }
+.fx-group__dot--crit { background: var(--rb-accent); }
+.fx-group__dot--warn { background: var(--rb-warning); }
+.fx-group__dot--info { background: var(--rb-primary); }
+.fx-group__dot--ok { background: var(--rb-success); }
+.fx-group__title { font-size: 14px; font-weight: 700; }
+.fx-group__count {
+  min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--rb-surface-alt); border: 1px solid var(--rb-border);
+  font-size: 11.5px; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.fx-group__hint { font-size: 12px; color: var(--rb-text-secondary); }
+
+/* Why a request sits where it does. */
+.request-when { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+.when { display: inline-flex; align-items: center; gap: 5px; }
+.when--soon { color: var(--rb-warning-text); font-weight: 600; }
+.tag--next {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+
 .tabbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .tabs { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; border: 1px solid var(--rb-border); background: var(--rb-surface); }
 .tab {
@@ -1109,10 +1458,6 @@ useLiveRefresh(refreshQuietly, {
 .tab:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: 2px; }
 .tab__count { min-width: 20px; padding: 0 7px; border-radius: 999px; background: #fff; color: var(--rb-primary); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 
-.legend { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--rb-text-secondary); flex-wrap: wrap; }
-.legend-step { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--rb-text-primary); }
-.legend-arrow { color: var(--rb-text-muted); }
-.legend-note { display: inline-flex; margin-left: 2px; color: var(--rb-text-secondary); cursor: help; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot--allocated { background: var(--rb-warning); }
 .dot--released { background: var(--rb-primary); }
@@ -1133,7 +1478,7 @@ useLiveRefresh(refreshQuietly, {
 .card { background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 14px; }
 .request-list { display: flex; flex-direction: column; gap: 14px; }
 .request-card { padding: 16px 18px; box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03); }
-.request-card--stat { border-color: rgba(var(--rb-accent-rgb), 0.35); box-shadow: inset 3px 0 0 var(--rb-accent); }
+.request-card--stat { border-color: rgba(var(--rb-accent-rgb), 0.35); }
 
 .request-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .request-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

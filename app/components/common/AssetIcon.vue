@@ -92,6 +92,7 @@ import pipette from '~/assets/icons/pipette.svg?raw'
 import pencil from '~/assets/icons/pencil.svg?raw'
 import phone from '~/assets/icons/phone.svg?raw'
 import philippinePeso from '~/assets/icons/philippine-peso.svg?raw'
+import minus from '~/assets/icons/minus.svg?raw'
 import plus from '~/assets/icons/plus.svg?raw'
 import printer from '~/assets/icons/printer.svg?raw'
 import qrCode from '~/assets/icons/qr-code.svg?raw'
@@ -218,6 +219,7 @@ const icons = {
   pencil,
   phone,
   'philippine-peso': philippinePeso,
+  minus,
   plus,
   printer,
   'qr-code': qrCode,

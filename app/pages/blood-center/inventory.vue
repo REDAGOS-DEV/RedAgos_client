@@ -66,14 +66,29 @@
             <div>
               <h2 id="types-title" class="panel-title">Blood Type Availability</h2>
             </div>
-            <ul class="legend" aria-label="Legend">
+            <div class="types-tools">
+            <ul v-if="availabilityOpen" class="legend" aria-label="Legend">
               <li class="tone--success"><span class="legend__dot" />Healthy</li>
               <li class="tone--warning"><span class="legend__dot" />Low Stock</li>
               <li class="tone--danger"><span class="legend__dot" />Critical</li>
               <li><span class="rare-chip">Rare</span>Rh-negative</li>
             </ul>
+            <!-- One + / − shows or hides every blood type's box (advisor, 2026-11-11). -->
+            <button
+              type="button"
+              class="types-all"
+              :aria-expanded="availabilityOpen"
+              aria-controls="types-body"
+              :aria-label="availabilityOpen ? 'Hide blood type availability' : 'Show blood type availability'"
+              :title="availabilityOpen ? 'Hide' : 'Show'"
+              @click="setAvailabilityOpen(!availabilityOpen)"
+            >
+              <AssetIcon :name="availabilityOpen ? 'minus' : 'plus'" :size="16" />
+            </button>
+            </div>
           </header>
 
+          <div v-if="availabilityOpen" id="types-body">
           <p v-if="!loading && !anyMinimumSet" class="types-hint">
             <AssetIcon name="info" :size="14" />
             <span>No critical level is set yet, so no type is graded.</span>
@@ -145,6 +160,7 @@
                 </span>
               </span>
             </button>
+          </div>
           </div>
         </section>
 
@@ -401,7 +417,8 @@
               <span class="side-title__icon"><AssetIcon name="activity" :size="15" /></span>
               Recent Activity
             </h2>
-            <button type="button" class="link-btn" @click="openActivityDrawer">View All</button>
+            <!-- Everything, filtered, on its own page (2026-11-11). -->
+            <NuxtLink to="/blood-center/inventory-history" class="link-btn">View All</NuxtLink>
           </header>
 
           <SkeletonList v-if="loading" :rows="3" />
@@ -433,142 +450,72 @@
       </div>
     </div>
 
-    <!-- ============ UNIT DETAILS DRAWER ============ -->
-    <Teleport to="body" :disabled="pageHidden">
-      <Transition name="drawer-fade">
-        <div v-if="drawerUnit" class="drawer-overlay inv-tones" @click.self="closeDetails">
-          <aside
-            class="detail-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="unit-drawer-title"
-            v-focus-trap
-            @dialog-escape="closeDetails"
-          >
-            <header class="detail-drawer__header">
-              <div>
-                <p class="detail-drawer__eyebrow">{{ drawerUnit.id }}</p>
-                <h2 id="unit-drawer-title" class="detail-drawer__title">
-                  {{ displayType(drawerUnit.blood_type) }} &middot; {{ drawerUnit.component }}
-                </h2>
-              </div>
-              <button type="button" class="modal-close" aria-label="Close" @click="closeDetails">
-                <AssetIcon name="x" :size="16" />
-              </button>
-            </header>
+    <!--
+      UNIT DETAILS: centred, like the portal's other records (project owner,
+      2026-11-11; it was a side drawer). Edit and Discard open over it.
+    -->
+    <CenterModal
+      v-if="drawerUnit"
+      :title="`${displayType(drawerUnit.blood_type)} · ${drawerUnit.component}`"
+      :eyebrow="drawerUnit.id"
+      size="md"
+      @close="closeDetails"
+    >
+      <template #meta>
+        <!-- The page's tokens, which a teleported dialog does not inherit. -->
+        <span class="inv-tones unit-modal__meta">
+          <span class="badge" :class="`tone--${drawerTag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ drawerTag.label }}</span>
+          <span v-if="drawerRemaining" class="unit-modal__left">{{ drawerRemaining }}</span>
+        </span>
+      </template>
 
-            <div class="detail-drawer__body">
-              <section>
-                <p class="drawer-section-title">Unit</p>
-                <dl class="drawer-info-grid">
-                  <div><dt>Blood Type</dt><dd>{{ displayType(drawerUnit.blood_type) }}</dd></div>
-                  <div><dt>Component</dt><dd>{{ drawerUnit.component }}</dd></div>
-                  <div><dt>Volume</dt><dd>{{ drawerUnit.volume_ml ? `${drawerUnit.volume_ml} mL` : '—' }}</dd></div>
-                  <div>
-                    <dt>Status</dt>
-                    <dd><span class="badge" :class="`tone--${drawerTag.tone}`"><span class="badge__dot" aria-hidden="true" />{{ drawerTag.label }}</span></dd>
-                  </div>
-                  <div><dt>Collection Date</dt><dd>{{ formatLongDate(drawerUnit.collected_at) }}</dd></div>
-                  <div>
-                    <dt>Expiry Date</dt>
-                    <dd>
-                      {{ formatLongDate(drawerUnit.expiry_date) }}
-                      <span class="drawer-note">{{ drawerRemaining }}</span>
-                    </dd>
-                  </div>
-                  <div><dt>Storage Location</dt><dd>{{ drawerUnit.storage_location || 'Not set' }}</dd></div>
-                  <div><dt>Donation</dt><dd>{{ drawerUnit.donation_id ? `#${drawerUnit.donation_id}` : '—' }}</dd></div>
-                  <div><dt>Booked In</dt><dd>{{ formatDateTime(drawerUnit.recorded_at) || '—' }}</dd></div>
-                  <div v-if="drawerUnit.discard_reason" class="drawer-info-grid__wide"><dt>Discard Reason</dt><dd>{{ drawerUnit.discard_reason }}</dd></div>
-                </dl>
-              </section>
+      <div class="inv-tones unit-modal">
+        <section>
+          <p class="drawer-section-title">Unit</p>
+          <dl class="drawer-info-grid unit-modal__grid">
+            <div><dt>Blood Type</dt><dd>{{ displayType(drawerUnit.blood_type) }}</dd></div>
+            <div><dt>Component</dt><dd>{{ drawerUnit.component }}</dd></div>
+            <div><dt>Volume</dt><dd>{{ drawerUnit.volume_ml ? `${drawerUnit.volume_ml} mL` : '—' }}</dd></div>
+            <div><dt>Collection Date</dt><dd>{{ formatLongDate(drawerUnit.collected_at) }}</dd></div>
+            <div><dt>Expiry Date</dt><dd>{{ formatLongDate(drawerUnit.expiry_date) }}</dd></div>
+            <div><dt>Storage Location</dt><dd>{{ drawerUnit.storage_location || 'Not set' }}</dd></div>
+            <div><dt>Donation</dt><dd>{{ drawerUnit.donation_id ? `#${drawerUnit.donation_id}` : '—' }}</dd></div>
+            <div><dt>Booked In</dt><dd>{{ formatDateTime(drawerUnit.recorded_at) || '—' }}</dd></div>
+            <div v-if="drawerUnit.discard_reason" class="drawer-info-grid__wide"><dt>Discard Reason</dt><dd>{{ drawerUnit.discard_reason }}</dd></div>
+          </dl>
+        </section>
 
-              <section>
-                <p class="drawer-section-title">Movement History</p>
-                <p v-if="drawerHistoryLoading" class="drawer-muted">Loading…</p>
-                <p v-else-if="drawerHistoryError" class="drawer-muted">{{ drawerHistoryError }}</p>
-                <p v-else-if="!drawerHistory.length" class="drawer-muted">No recorded movement yet.</p>
-                <ol v-else class="history-list">
-                  <li v-for="item in drawerHistory" :key="item.id" class="history-list__item">
-                    <span class="activity-item__icon activity-item__icon--sm" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
-                      <AssetIcon :name="activityKindMeta(item.kind).icon" :size="13" />
-                    </span>
-                    <span class="history-list__body">
-                      <strong>{{ activityKindMeta(item.kind).label }}</strong>
-                      <span>{{ formatDateTime(item.at) }} &middot; {{ item.actor || 'System' }}</span>
-                    </span>
-                  </li>
-                </ol>
-              </section>
-            </div>
+        <section>
+          <p class="drawer-section-title">Movement History</p>
+          <p v-if="drawerHistoryLoading" class="drawer-muted">Loading…</p>
+          <p v-else-if="drawerHistoryError" class="drawer-muted">{{ drawerHistoryError }}</p>
+          <p v-else-if="!drawerHistory.length" class="drawer-muted">No recorded movement yet.</p>
+          <ol v-else class="history-list unit-modal__history">
+            <li v-for="item in drawerHistory" :key="item.id" class="history-list__item">
+              <span class="activity-item__icon activity-item__icon--sm" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
+                <AssetIcon :name="activityKindMeta(item.kind).icon" :size="13" />
+              </span>
+              <span class="history-list__body">
+                <strong>{{ activityKindMeta(item.kind).label }}</strong>
+                <span>{{ formatDateTime(item.at) }} &middot; {{ item.actor || 'System' }}</span>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </div>
 
-            <footer v-if="drawerActions" class="detail-drawer__footer">
-              <button v-if="canChangeUnit && isEditable(drawerUnit)" type="button" class="btn-outline" @click="fromDrawer('edit')">
-                <AssetIcon name="pencil" :size="14" /> {{ canEditUnit ? 'Edit Unit' : 'Request Correction' }}
-              </button>
-              <button v-if="canDiscardUnits && isDiscardable(drawerUnit)" type="button" class="btn-outline btn-outline--danger" @click="fromDrawer('discard')">
-                <AssetIcon name="trash-2" :size="14" /> Discard
-              </button>
-            </footer>
-          </aside>
+      <template v-if="drawerActions" #actions>
+        <div class="inv-tones unit-modal__actions">
+        <button v-if="canDiscardUnits && isDiscardable(drawerUnit)" type="button" class="btn-outline btn-outline--danger" @click="fromDrawer('discard')">
+          <AssetIcon name="trash-2" :size="14" /> Discard
+        </button>
+        <button v-if="canChangeUnit && isEditable(drawerUnit)" type="button" class="btn-outline" @click="fromDrawer('edit')">
+          <AssetIcon name="pencil" :size="14" /> {{ canEditUnit ? 'Edit Unit' : 'Request Correction' }}
+        </button>
         </div>
-      </Transition>
-    </Teleport>
+      </template>
+    </CenterModal>
 
-    <!-- ============ ALL ACTIVITY DRAWER ============ -->
-    <Teleport to="body" :disabled="pageHidden">
-      <Transition name="drawer-fade">
-        <div v-if="activityDrawerOpen" class="drawer-overlay inv-tones" @click.self="activityDrawerOpen = false">
-          <aside
-            class="detail-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="activity-drawer-title"
-            v-focus-trap
-            @dialog-escape="activityDrawerOpen = false"
-          >
-            <header class="detail-drawer__header">
-              <div>
-                <p class="detail-drawer__eyebrow">{{ facilityLabel }}</p>
-                <h2 id="activity-drawer-title" class="detail-drawer__title">Inventory Activity</h2>
-              </div>
-              <button type="button" class="modal-close" aria-label="Close" @click="activityDrawerOpen = false">
-                <AssetIcon name="x" :size="16" />
-              </button>
-            </header>
-
-            <div class="detail-drawer__body detail-drawer__body--flush">
-              <p v-if="allActivityError" class="drawer-muted drawer-muted--pad">{{ allActivityError }}</p>
-              <p v-else-if="!allActivity.length && !allActivityLoading" class="drawer-muted drawer-muted--pad">No stock has moved yet.</p>
-              <ol class="activity-list">
-                <li v-for="item in allActivity" :key="item.id" class="activity-item">
-                  <span class="activity-item__icon" :class="`tone--${activityKindMeta(item.kind).tone}`" aria-hidden="true">
-                    <AssetIcon :name="activityKindMeta(item.kind).icon" :size="16" />
-                  </span>
-                  <span class="activity-item__body">
-                    <span class="activity-item__title">{{ activityKindMeta(item.kind).label }}</span>
-                    <span class="activity-item__meta">
-                      <span class="mono">{{ item.unit_id }}</span>
-                      <span class="type-text">{{ displayType(item.blood_type) }}</span>
-                      <span>{{ item.component }}</span>
-                    </span>
-                  </span>
-                  <span class="activity-item__when">
-                    <time :datetime="item.at">{{ formatDateTime(item.at) }}</time>
-                    <span>{{ item.actor || 'System' }}</span>
-                  </span>
-                </li>
-              </ol>
-              <div v-if="allActivityPage < allActivityLastPage || allActivityLoading" class="drawer-more">
-                <button type="button" class="btn-outline btn-outline--sm" :disabled="allActivityLoading" @click="loadAllActivity(allActivityPage + 1)">
-                  {{ allActivityLoading ? 'Loading…' : 'Load more' }}
-                </button>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </Transition>
-    </Teleport>
 
     <!-- ============ EDIT UNIT MODAL ============ -->
     <Teleport to="body" :disabled="pageHidden">
@@ -682,6 +629,7 @@ import DatePicker from '~/components/common/DatePicker.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import BloodCenterCorrectionRequestDialog from '~/components/BloodCenter/CorrectionRequestDialog.vue'
 import LowStockBanner from '~/components/common/LowStockBanner.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, resolveComponent } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
@@ -710,11 +658,10 @@ definePageMeta({
 
 const NuxtLinkComponent = resolveComponent('NuxtLink')
 
-const { user, can, canFile } = useUser()
+const { can, canFile } = useUser()
 
 // Every number on this page is the signed-in account's own centre: the server
 // resolves the facility from the session, never from anything sent from here.
-const facilityLabel = computed(() => user.value?.facility?.facility_name || user.value?.facility_name || 'your blood center')
 
 // A unit is edited directly only by whoever holds inventory.update (the
 // Inventory Control Officer). The IT Data Entry Clerk files a correction
@@ -826,7 +773,7 @@ const availableTotal = computed(() => {
 })
 
 const anyMinimumSet = computed(() => stockCells.value.some((cell) => cell.minimum_units !== null))
-const typesBelowMinimum = computed(() => typeCards.value.filter((card) => card.level === 'low' || card.level === 'critical').length)
+const outOfStock = computed(() => lowStock.value.filter((cell) => cell.status === 'critical').length)
 
 const kpis = computed(() => {
   const added = summary.value?.released_last_7_days ?? 0
@@ -844,13 +791,16 @@ const kpis = computed(() => {
     {
       key: 'critical',
       label: 'Critical Low Stock',
-      value: anyMinimumSet.value ? formatCount(typesBelowMinimum.value) : '—',
-      sub: anyMinimumSet.value
-        ? `type${typesBelowMinimum.value === 1 ? '' : 's'} below critical level`
-        : 'No critical levels set',
+      // Stocks (a blood type's component), as the banner below counts them.
+      value: anyMinimumSet.value ? formatCount(lowStock.value.length) : '—',
+      sub: !anyMinimumSet.value
+        ? 'No critical levels set'
+        : outOfStock.value
+          ? `${outOfStock.value} out of stock`
+          : `stock${lowStock.value.length === 1 ? '' : 's'} below critical level`,
       icon: 'triangle-alert',
       // State rides on the icon alone: every card shares one surface.
-      tone: !anyMinimumSet.value ? 'muted' : typesBelowMinimum.value > 0 ? 'danger' : 'success',
+      tone: !anyMinimumSet.value ? 'muted' : lowStock.value.length > 0 ? 'danger' : 'success',
       to: '/blood-center/stock-thresholds',
     },
     {
@@ -1166,34 +1116,6 @@ function fromDrawer(action) {
 }
 
 // --- All activity drawer ---
-const activityDrawerOpen = ref(false)
-const allActivity = ref([])
-const allActivityPage = ref(0)
-const allActivityLastPage = ref(1)
-const allActivityLoading = ref(false)
-const allActivityError = ref('')
-
-async function loadAllActivity(page) {
-  allActivityLoading.value = true
-  allActivityError.value = ''
-  try {
-    const response = await bloodCenterService.inventoryActivity({ page, per_page: 20 })
-    allActivity.value = page === 1 ? (response?.data ?? []) : [...allActivity.value, ...(response?.data ?? [])]
-    allActivityPage.value = response?.current_page ?? page
-    allActivityLastPage.value = response?.last_page ?? page
-  } catch (err) {
-    console.error('Failed to load inventory activity:', err)
-    allActivityError.value = 'Activity could not be loaded.'
-  } finally {
-    allActivityLoading.value = false
-  }
-}
-
-function openActivityDrawer() {
-  activityDrawerOpen.value = true
-  loadAllActivity(1)
-}
-
 // --- Edit unit modal ---
 const batchModalOpen = ref(false)
 const batchSubmitting = ref(false)
@@ -1422,6 +1344,20 @@ onBeforeUnmount(() => {
   clearTimeout(searchTimer)
   clearTimeout(noticeTimer)
 })
+
+// ── Blood Type Availability: one + / − for the whole section (advisor, 2026-11-11) ──
+// Hidden at first; this viewer's choice is remembered in this browser.
+const AVAILABILITY_OPEN_KEY = 'redagos:inventory-availability-open'
+const availabilityOpen = ref(false)
+
+function setAvailabilityOpen(open) {
+  availabilityOpen.value = open
+  try { localStorage.setItem(AVAILABILITY_OPEN_KEY, open ? '1' : '0') } catch { /* nothing to keep it in */ }
+}
+
+onMounted(() => {
+  try { availabilityOpen.value = localStorage.getItem(AVAILABILITY_OPEN_KEY) === '1' } catch { /* hidden, the default */ }
+})
 </script>
 
 <style scoped>
@@ -1511,7 +1447,7 @@ onBeforeUnmount(() => {
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .spin-icon, .detail-drawer, .gauge__fill, .kpi, .type-card { animation: none !important; transition: none !important; }
+  .skeleton, .spin-icon, .gauge__fill, .kpi, .type-card { animation: none !important; transition: none !important; }
 }
 
 /* Focus: the strongest ink, on any surface. */
@@ -1534,7 +1470,13 @@ onBeforeUnmount(() => {
   background: var(--inv-surface); border: 1px solid var(--inv-border); color: var(--inv-text); font-size: 13px;
 }
 .load-error :deep(svg) { color: var(--inv-crit); }
-.load-error span { flex: 1; }
+/* The text takes the room, never the icon (also a span). */
+.load-error > span:not(.asset-icon) { flex: 1; line-height: 1.45; }
+.load-error > .asset-icon { flex-shrink: 0; }
+.load-error--warn {
+  /* State colour on the edge and the icon only, never the fill (this page's rule). */
+  gap: 10px; padding: 11px 14px; border-color: rgba(var(--rb-warning-rgb), 0.45); color: var(--inv-text);
+}
 .load-error--warn :deep(svg) { flex-shrink: 0; color: var(--inv-warn); }
 
 /* Buttons: one inverted primary, the rest outlined. */
@@ -1842,20 +1784,6 @@ onBeforeUnmount(() => {
 .inv-page :deep(.low-banner__link) { color: var(--inv-action-text); font-weight: 600; }
 
 /* Drawers */
-.drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.5); }
-.detail-drawer {
-  width: clamp(400px, 32vw, 500px); max-width: 100%; height: 100%; display: flex; flex-direction: column;
-  background: var(--inv-surface); border-left: 1px solid var(--inv-border); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.3);
-  animation: drawer-slide-in 0.25s ease; font-family: var(--rb-font-sans); color: var(--inv-text);
-}
-@keyframes drawer-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.detail-drawer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--inv-border); }
-.detail-drawer__eyebrow { font-family: var(--rb-font-mono); font-size: 11.5px; color: var(--inv-muted); margin: 0 0 3px; }
-.detail-drawer__title { font-size: 16px; font-weight: 600; color: var(--inv-text); margin: 0; }
-.detail-drawer__body { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 22px; }
-.detail-drawer__body--flush { padding: 0; gap: 0; }
-.detail-drawer__footer { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--inv-border); }
-.detail-drawer__footer .btn-outline { flex: 1 1 30%; }
 .drawer-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--inv-muted); margin: 0 0 10px; }
 .drawer-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 0; }
 .drawer-info-grid dt { font-size: 11.5px; color: var(--inv-muted); margin-bottom: 3px; }
@@ -1869,8 +1797,6 @@ onBeforeUnmount(() => {
 .history-list__item { display: flex; align-items: flex-start; gap: 10px; }
 .history-list__body { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--inv-muted); }
 .history-list__body strong { font-size: 13px; font-weight: 500; color: var(--inv-text); }
-.drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.2s ease; }
-.drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 
 /* Modals */
 .modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.5); }
@@ -1883,7 +1809,6 @@ onBeforeUnmount(() => {
   position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent;
   color: var(--inv-muted); display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.detail-drawer__header .modal-close { position: static; flex-shrink: 0; }
 .modal-close:hover { background: var(--inv-hover); color: var(--inv-text); }
 .modal-title { font-size: 16px; font-weight: 600; color: var(--inv-text); margin: 4px 32px 6px 0; }
 .modal-subtitle { font-size: 12.5px; line-height: 1.55; color: var(--inv-muted); margin: 0 0 18px; }
@@ -1996,8 +1921,32 @@ onBeforeUnmount(() => {
   .inv-page { padding: 16px 16px 32px; }
   .filter-field { flex: 1 1 calc(50% - 5px); }
   .form-row { grid-template-columns: 1fr; }
-  .detail-drawer { width: 100%; }
-  .detail-drawer__footer .btn-outline { flex: 1 1 100%; }
 }
 .inv-skeleton { padding: 16px 20px; }
+
+/* ---------- Components behind + ---------- */
+.types-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 16px; }
+.types-all {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--rb-border-strong); border-radius: 8px;
+  background: var(--rb-surface); font: inherit; font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); cursor: pointer;
+}
+.types-all:hover { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); }
+.types-all:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.types-all[aria-expanded="true"] { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06); }
+/* Closed, the head alone: no padding left for a body that is not there. */
+.types-panel:not(:has(#types-body)) .panel-head { border-bottom: 0; }
+
+/* Each card as tall as what it shows: an open one does not stretch its row. */
+.type-grid { align-items: start; }
+
+
+
+/* Unit details, centred (2026-11-11): the facts in three columns, then the history. */
+.unit-modal { display: flex; flex-direction: column; gap: 24px; font-family: var(--rb-font-sans); color: var(--inv-text); }
+.unit-modal__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 20px; }
+.unit-modal__grid dd { font-size: 13.5px; }
+.unit-modal__meta { display: inline-flex; align-items: center; gap: 10px; background: transparent; }
+.unit-modal__actions { display: flex; justify-content: flex-end; gap: 10px; width: 100%; background: transparent; }
+.unit-modal__left { font-size: 12px; color: var(--inv-muted, var(--rb-text-secondary)); }
+.unit-modal__history { padding-left: 2px; }
 </style>

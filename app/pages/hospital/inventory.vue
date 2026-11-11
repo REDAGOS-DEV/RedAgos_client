@@ -1901,7 +1901,9 @@ onBeforeUnmount(() => {
 }
 .load-error :deep(svg) { color: var(--inv-crit); }
 .load-error--warning :deep(svg) { color: var(--inv-warn); }
-.load-error span { flex: 1; }
+/* The text takes the room, never the icon (also a span). */
+.load-error > span:not(.asset-icon) { flex: 1; line-height: 1.45; }
+.load-error > .asset-icon { flex-shrink: 0; }
 
 /* Buttons: one blue primary, the rest outlined. */
 .btn-primary {

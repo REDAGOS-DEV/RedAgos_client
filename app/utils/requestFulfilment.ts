@@ -172,9 +172,7 @@ export interface WalkInForm {
   }
   bloodTypeId: number | null
   urgency: UrgencyLevel
-  attendingPhysician: string
   patientWard: string
-  patientRecordNumber: string
   lines: WalkInLine[]
   representative: {
     name: string
@@ -200,9 +198,7 @@ export function blankWalkInForm(): WalkInForm {
     patient: { surname: '', firstName: '', middleName: '', age: null, sex: '' },
     bloodTypeId: null,
     urgency: 'routine',
-    attendingPhysician: '',
     patientWard: '',
-    patientRecordNumber: '',
     lines: [blankLine()],
     representative: { name: '', relationship: '', contact: '', idType: '', idNumber: '' },
     duplicateAcknowledgement: '',
@@ -345,9 +341,7 @@ export function buildWalkInPayload(form: WalkInForm): CreateWalkInPayload {
     ...(form.hospitalId ? { hospital_id: Number(form.hospitalId) } : { hospital_name: form.hospitalName.trim() }),
     urgency_level: form.urgency,
     presented_reference: optional(form.presentedReference),
-    attending_physician: optional(form.attendingPhysician),
     patient_ward: optional(form.patientWard),
-    patient_record_number: optional(form.patientRecordNumber),
     items: lines.map((line) => continuing
       ? { transfusion_request_item_id: Number(line.requirementItemId), quantity: Number(line.quantity) }
       : {

@@ -445,9 +445,8 @@ const NAV_GROUPS = [
     items: [
       { label: 'Staff', path: '/hospital/staff', icon: 'id-card', requires: 'hospital.staff.manage' },
       { label: 'Help Center', path: '/hospital/help', icon: 'help-circle' },
-      { label: 'Settings', path: '/hospital/settings', icon: 'settings' },
-      // Your own audit trail: the Settings page's Activity tab, one click away (2026-11-11).
-      { label: 'My activity', path: '/hospital/settings?tab=activity', icon: 'history' }
+      // My activity is the Settings page's Activity tab; not in the sidebar (project owner, 2026-11-11).
+      { label: 'Settings', path: '/hospital/settings', icon: 'settings' }
     ]
   }
 ]

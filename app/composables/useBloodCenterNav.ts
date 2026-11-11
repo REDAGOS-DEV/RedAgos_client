@@ -169,6 +169,8 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
       // Processing's own (project owner, 2026-10-22): the department that records breakdowns.
       { label: 'Processing Dashboard', path: '/blood-center/processing-dashboard', icon: 'layout-dashboard', requires: 'lab.record_components', keywords: 'home processing component separation bags breakdown labels hand over turnaround trend' },
       { label: 'Issuance Dashboard', path: '/blood-center/storage', icon: 'warehouse', requires: 'inventory.create', keywords: 'issuance storage stock units release' },
+      // Every stock movement and request update, filtered (project owner, 2026-11-11).
+      { label: 'Inventory History', path: '/blood-center/inventory-history', icon: 'activity', requires: 'inventory.view', keywords: 'inventory history activity movements issued booked in discarded expired released reserved requests fulfilled log' },
       // Billing's own (project owner, 2026-10-27): the counter's day, what is owed, collections.
       { label: 'Billing Dashboard', path: '/blood-center/billing-dashboard', icon: 'layout-dashboard', requires: 'billing.record_payment', keywords: 'home billing counter collected today owed outstanding aging collections method hospitals settle payments forecast' },
     ],
@@ -299,8 +301,9 @@ const NAV_GROUPS: BloodCenterNavGroup[] = [
     items: [
       // For everyone; Settings first, then Help Center (2026-10-27).
       { label: 'Settings', path: '/blood-center/settings', icon: 'settings', keywords: 'profile password preferences' },
-      // Your own audit trail: the Settings page's Activity tab, one click away (2026-11-11).
-      { label: 'My activity', path: '/blood-center/settings?tab=activity', icon: 'history', keywords: 'my activity audit log history sign in login device ip who what when' },
+      // Your own audit trail, on the Settings page's Activity tab: not in the
+      // sidebar (project owner, 2026-11-11), still found by search.
+      { label: 'My activity', path: '/blood-center/settings?tab=activity', icon: 'history', hidden: true, keywords: 'my activity audit log history sign in login device ip who what when' },
       // Reached from the bell's "View all"; named here for the breadcrumb and search (2026-10-31).
       { label: 'Notifications', path: '/blood-center/notifications', icon: 'bell', hidden: true, keywords: 'notifications alerts inbox unread emergency messages' },
       { label: 'Help Center', path: '/blood-center/help', icon: 'life-buoy', keywords: 'help guide how to faq questions glossary support manual' },
