@@ -501,7 +501,9 @@ onPageReturn(() => {
 .who { display: flex; align-items: center; gap: 10px; }
 .who-avatar { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--rb-primary-text); background: rgba(var(--rb-primary-rgb), .1); }
 .row-actions { text-align: right; white-space: nowrap; }
-.row-actions .btn + .btn { margin-left: 6px; }
+/* The buttons are ui-btn: the old .btn rule never reached them, so they touched. */
+.row-actions .btn + .btn,
+.row-actions .ui-btn + .ui-btn { margin-left: 8px; }
 .num { text-align: right !important; white-space: nowrap; }
 .nowrap { white-space: nowrap; }
 .strong { font-weight: 700; }

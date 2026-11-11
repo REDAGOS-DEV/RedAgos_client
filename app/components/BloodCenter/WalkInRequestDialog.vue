@@ -189,27 +189,13 @@
                   :options="reference.components.map((component) => ({ value: component.id, label: component.name }))"
                   placeholder="Select"
                   :disabled="isContinuing"
-                  @change="line.indicationCode = ''"
                 />
               </label>
               <label class="field field--narrow">
                 <span class="field__label">Units{{ line.maxQuantity !== null ? ` (max ${line.maxQuantity})` : '' }}</span>
                 <input v-model="line.quantity" type="number" min="1" :max="line.maxQuantity ?? 100" class="field__input">
               </label>
-              <template v-if="!isContinuing">
-                <label v-if="indicationsFor(line).length" class="field field--grow">
-                  <span class="field__label">Indication</span>
-                  <SelectField
-                    v-model="line.indicationCode"
-                    :options="indicationsFor(line).map((code) => ({ value: code.code, label: `${code.label} — ${code.description}` }))"
-                    placeholder="Select the clinical indication"
-                  />
-                </label>
-                <label v-if="needsExplanation(line)" class="field field--grow">
-                  <span class="field__label">Specify</span>
-                  <input v-model="line.indicationOther" class="field__input" maxlength="255">
-                </label>
-              </template>
+              <!-- No indication on a walk-in (project owner, 2026-11-11): the watcher's paperwork is the hospital's. -->
               <!-- A continuing watcher may carry only some of what is unallocated. -->
               <button
                 v-if="form.lines.length > 1"
@@ -492,14 +478,6 @@ function useAsContinuation(match) {
 
 function undoContinuation() {
   form.value = clearContinuation(form.value)
-}
-
-function indicationsFor(line) {
-  return reference.value?.components.find((component) => component.id === line.componentId)?.indication_codes ?? []
-}
-
-function needsExplanation(line) {
-  return indicationsFor(line).find((code) => code.code === line.indicationCode)?.requires_explanation ?? false
 }
 
 function componentName(id) {

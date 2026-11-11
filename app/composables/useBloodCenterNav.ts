@@ -382,6 +382,9 @@ export function useBloodCenterNav() {
   const SUB_PAGES: { match: RegExp, label: string, parents: string[] }[] = [
     { match: /^\/blood-center\/paper-records\/?$/, label: 'Paper Records', parents: ['/blood-center/donations'] },
     { match: /^\/blood-center\/paper-records\/[^/]+$/, label: 'Sheet', parents: ['/blood-center/donations', '/blood-center/paper-records'] },
+    // An invoice and a receipt: Invoices › RQ-5-0001, Payments › OR-000123 (2026-11-11).
+    { match: /^\/blood-center\/invoice\/[^/]+$/, label: 'Invoice', parents: ['/blood-center/billing'] },
+    { match: /^\/blood-center\/receipt\/[^/]+$/, label: 'Receipt', parents: ['/blood-center/receipts'] },
   ]
 
   /**

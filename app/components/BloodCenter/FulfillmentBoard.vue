@@ -54,6 +54,7 @@
         units closest to expiry, then whoever has waited longest.
       -->
       <div v-if="!loading && requests.length" class="fx-tools fade-in" style="--delay:60ms">
+        <div class="fx-tools__row">
         <label class="fx-search">
           <AssetIcon name="search" :size="15" class="fx-search__icon" />
           <input
@@ -64,6 +65,17 @@
             aria-label="Search by reference or hospital"
           >
         </label>
+        <div class="fx-sort">
+          <label class="fx-sort__field">
+            <span class="fx-sort__label">Group by</span>
+            <SelectField v-model="groupBy" class="fx-sort__sel fx-sort__sel--group" size="sm" aria-label="Group requests by" :options="GROUPINGS" />
+          </label>
+          <label class="fx-sort__field">
+            <span class="fx-sort__label">Sort by</span>
+            <SelectField v-model="sortBy" class="fx-sort__sel" size="sm" aria-label="Sort requests" :options="SORTS" />
+          </label>
+        </div>
+        </div>
         <div class="fx-chips" role="group" aria-label="Show">
           <button
             v-for="f in filterChips"
@@ -77,12 +89,6 @@
             {{ f.label }}
             <span class="fx-chip__count">{{ f.count }}</span>
           </button>
-        </div>
-        <div class="fx-sort">
-          <span class="fx-sort__label">Group</span>
-          <SelectField v-model="groupBy" class="fx-sort__sel fx-sort__sel--group" size="sm" aria-label="Group requests by" :options="GROUPINGS" />
-          <span class="fx-sort__label">Sort</span>
-          <SelectField v-model="sortBy" class="fx-sort__sel" size="sm" aria-label="Sort requests" :options="SORTS" />
         </div>
       </div>
 
@@ -192,22 +198,25 @@
               </p>
             </div>
 
-            <!-- Tagged, released, received: the three states a unit goes through, each in its colour. -->
-            <div class="request-counts">
-              <!-- Only a patient's request is tagged; an order's units are picked as it goes. -->
-              <span v-if="!isOrder(request)" class="count count--allocated">
-                <span class="dot dot--allocated" />
-                <strong>{{ Math.max(0, (request.allocated_count ?? 0) - (request.fulfilled_quantity ?? 0)) }}</strong> tagged
-              </span>
-              <span class="count count--released">
-                <span class="dot dot--released" />
-                <strong>{{ request.fulfilled_quantity ?? 0 }}</strong> released
-              </span>
-              <span class="count count--received" title="Receipt is confirmed by the hospital, not here.">
-                <span class="dot dot--received" />
-                <strong>{{ request.received_count }}</strong> received
-              </span>
-            </div>
+            <!--
+              The three state counts are gone (project owner, 2026-11-11): the
+              fulfilment and units tables below say the same. Waiting on the
+              hospital, the one figure that matters stays: how much arrived.
+            -->
+            <span
+              v-if="activeTab === 'awaiting_receipt'"
+              class="receipt-state"
+              :class="{ 'receipt-state--part': (request.received_count ?? 0) > 0 }"
+              title="Receipt is confirmed by the hospital, not here."
+            >
+              <AssetIcon :name="(request.received_count ?? 0) > 0 ? 'package-check' : 'clock'" :size="14" />
+              <template v-if="(request.received_count ?? 0) > 0">
+                Hospital confirmed {{ request.received_count }} of {{ request.fulfilled_quantity ?? 0 }}
+              </template>
+              <template v-else>
+                0 of {{ request.fulfilled_quantity ?? 0 }} confirmed
+              </template>
+            </span>
           </header>
 
           <!-- What was asked for beside what has been provided, per component. -->
@@ -1484,9 +1493,6 @@ useLiveRefresh(refreshQuietly, {
 .request-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .request-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--rb-text-secondary); margin: 5px 0 0; }
 .request-facility { font-weight: 600; color: var(--rb-text-primary); }
-.request-counts { display: flex; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); }
-.count { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
-.count strong { font-size: 14px; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
 
 .mono { font-family: var(--rb-font-mono); font-size: 12.5px; font-weight: 600; }
 .tag { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
@@ -1642,4 +1648,23 @@ useLiveRefresh(refreshQuietly, {
 
 /* The request its Issue button sent here. */
 .request-card--focus { border-color: rgba(var(--rb-primary-rgb), 0.55); box-shadow: 0 0 0 3px rgba(var(--rb-primary-rgb), 0.14), var(--rb-shadow-sm); scroll-margin-top: 88px; }
+
+/* ---------- The toolbar in two rows (2026-11-11) ---------- */
+.fx-tools { display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 0; padding: 0; overflow: hidden; }
+.fx-tools__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.fx-tools .fx-search { flex: 1 1 auto; max-width: 440px; }
+.fx-tools .fx-sort { gap: 12px; margin-left: auto; }
+.fx-sort__field { display: inline-flex; align-items: center; gap: 8px; }
+.fx-sort__label { white-space: nowrap; }
+.fx-tools .fx-chips { flex: none; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--rb-border); background: var(--rb-surface-alt); }
+.fx-tools .fx-chip { height: 30px; background: var(--rb-surface); }
+.fx-tools .fx-chip--on { background: rgba(var(--rb-primary-rgb), 0.08); }
+
+/* Waiting on the hospital: what has been confirmed of what went out. */
+.receipt-state {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid rgba(var(--rb-warning-rgb), 0.4); background: rgba(var(--rb-warning-rgb), 0.08);
+  color: var(--rb-warning-text); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+.receipt-state--part { border-color: rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.07); color: var(--rb-primary-text); }
 </style>

@@ -310,14 +310,8 @@ export function walkInStepProblems(form: WalkInForm, step: WalkInStep, component
       seen.add(line.componentId)
     }
 
-    // A continuing line carries the requirement's certified indication.
-    if (continuing || !component) continue
-
-    const codes = component.indication_codes ?? []
-    const chosen = codes.find((code) => code.code === line.indicationCode)
-
-    if (codes.length > 0 && !chosen) problems.push(`Select the indication for ${name}.`)
-    if (chosen?.requires_explanation && blank(line.indicationOther)) problems.push(`Specify the indication for ${name}.`)
+    // No indication is asked on a walk-in (project owner, 2026-11-11); the
+    // server no longer requires one there.
   }
 
   return problems
