@@ -12,7 +12,7 @@
     way to the code step, and a right code signs in with what was typed.
   -->
   <AuthShell :hero="hero" fit>
-    <EmailCodeStep v-if="needsVerification" :email="verificationEmail" @verified="login">
+    <EmailCodeStep v-if="needsVerification" :email="verificationEmail" @verified="login()">
       <template #footer>
         <p class="au-footer">
           <button type="button" class="au-link" @click="clearError">Back to sign in</button>
@@ -26,7 +26,7 @@
         <p>{{ copy.subtitle }}</p>
       </header>
 
-      <form class="au-form" @submit.prevent="login">
+      <form class="au-form" @submit.prevent="login()">
         <!-- Text, not email: the server also takes a donor code (from the blood
              center desk's sign-in) or a username. -->
         <div class="au-field">

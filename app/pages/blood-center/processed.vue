@@ -227,8 +227,10 @@
                     <AssetIcon :name="labelling === row.donation_id ? 'loader' : 'printer'" :size="15" :class="{ spin: labelling === row.donation_id }" />
                     <span v-if="row.label_state === 'awaiting_labels'" class="icon-btn__text">Print</span>
                   </button>
-                  <!-- The hand-over to Issuance (it was the last card on Component Processing). -->
-                  <template v-if="row.status === 'awaiting_handover'">
+                  <!-- The hand-over to Issuance (it was the last card on Component Processing).
+                       Only for whoever may complete or reject a unit (lab.update_status): the
+                       Processing Assistant never sees buttons it cannot use (2026-11-11). -->
+                  <template v-if="row.status === 'awaiting_handover' && canUpdateStatus">
                     <button
                       type="button"
                       class="btn-handover"
@@ -685,6 +687,8 @@ definePageMeta({
 
 const route = useRoute()
 const { can, user } = useUser()
+// Hand over and reject: the component technologist's, not the assistant's.
+const canUpdateStatus = computed(() => can('lab.update_status'))
 const canViewIdentity = computed(() => can('donors.view_identity'))
 // Processing's correction approver. Their own correction applies as it is filed.
 const isHead = computed(() => (user.value?.staff_roles ?? []).includes('component_technologist'))

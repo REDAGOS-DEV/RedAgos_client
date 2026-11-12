@@ -2,12 +2,7 @@
   <div class="st-page">
     <div class="st-inner">
 
-      <nav class="crumbs">
-        <NuxtLink to="/blood-center/billing">Invoices</NuxtLink>
-        <AssetIcon name="chevron-right" :size="14" />
-        <span aria-current="page">{{ statement?.request?.reference_number || 'Invoice' }}</span>
-      </nav>
-
+      <!-- The trail is in the header: Invoices › RQ-5-0001. -->
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form', 'list'], ['table']]" />
       </div>
@@ -530,6 +525,9 @@ function day(value) {
 
 /* THE STATEMENT */
 const statement = ref(null)
+// The header breadcrumb ends on this request's reference (Invoices › RQ-5-0001).
+const crumbCurrent = useState('bc-crumb-current', () => '')
+watch(() => statement.value?.request?.reference_number, (reference) => { crumbCurrent.value = reference ?? '' }, { immediate: true })
 const loading = ref(true)
 const loadError = ref('')
 const view = ref('details')
@@ -1014,10 +1012,6 @@ onMounted(loadAll)
 .st-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .st-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.crumbs { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--rb-text-secondary); }
-.crumbs a { color: var(--rb-text-secondary); text-decoration: none; }
-.crumbs a:hover { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 3px; }
-.crumbs span[aria-current] { color: var(--rb-text-primary); font-weight: 600; font-family: var(--rb-font-mono); }
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .kicker { margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--rb-primary-text); }

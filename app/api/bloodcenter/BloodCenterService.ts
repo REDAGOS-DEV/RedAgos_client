@@ -147,6 +147,14 @@ class BloodCenterService extends BaseService {
    * answers, without the scan. { data: { donor, appointment, open_donation,
    * health_questionnaire, prior_deferral } } (appointments.verify).
    */
+  /**
+   * The "Phlebotomist" choices, once the server lists them. Until it does this
+   * answers 404, and usePhlebotomists reads the names off donation records.
+   */
+  async collectionPhlebotomists(): Promise<any> {
+    return this.request(`${this.resource}/collection/phlebotomists`, 'GET')
+  }
+
   async counterArrival(donorUuid: string): Promise<any> {
     return this.request(`${this.resource}/collection/arrival/${donorUuid}`, 'GET')
   }

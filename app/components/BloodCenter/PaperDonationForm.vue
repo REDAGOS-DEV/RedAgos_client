@@ -242,10 +242,16 @@
             </label>
           </div>
 
-          <label class="pdf__field pdf__field--half">
+          <div class="pdf__field pdf__field--half">
             <span class="pdf__flabel">Phlebotomist</span>
-            <input v-model="form.phlebotomist_name" type="text" class="pdf__input" maxlength="120" placeholder="As written on the paper">
-          </label>
+            <StaffNamePicker
+              v-model="form.phlebotomist_name"
+              :staff="phlebotomists"
+              empty-label="Not written"
+              other-placeholder="As written on the paper"
+              aria-label="Phlebotomist"
+            />
+          </div>
 
           <label class="check">
             <input v-model="form.not_to_lab" type="checkbox">
@@ -291,6 +297,8 @@
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import SelectField from '~/components/common/SelectField.vue'
+import StaffNamePicker from '~/components/common/StaffNamePicker.vue'
+import { usePhlebotomists } from '~/composables/usePhlebotomists'
 import type { BloodTypeOption } from '~/utils/bloodType'
 import { OTHER_DEFERRAL, deferralCodeOptions, type DeferralCode } from '~/utils/deferralCodes'
 import {
@@ -300,7 +308,11 @@ import {
   paperRowProblems,
   type PaperSheet,
 } from '~/utils/paperDonations'
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+
+// The Phlebotomist picker's choices (2026-11-11).
+const { phlebotomists, loadPhlebotomists } = usePhlebotomists()
+onMounted(() => loadPhlebotomists())
 
 /**
  * One donor's paper record from a drive: who, the screening, and the bag.

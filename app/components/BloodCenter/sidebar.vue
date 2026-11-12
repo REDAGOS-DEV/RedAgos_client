@@ -566,7 +566,14 @@ const isActive = (path) => {
   if ((activeAliases.value[path] ?? []).some((alias) => alias.replace(/\/$/, '') === here)) return true
   const [base, query] = path.split('?')
   if (here !== base.replace(/\/$/, '')) return false
-  if (!query) return true
+  // A plain link gives way to a sibling whose query is the one on screen
+  // (Settings, while its Activity tab is open as My activity).
+  if (!query) {
+    return !navGroups.value.some((group) => group.items.some((item) => {
+      const [itemBase, itemQuery] = item.path.split('?')
+      return itemQuery && itemBase === base && [...new URLSearchParams(itemQuery)].every(([key, value]) => route.query[key] === value)
+    }))
+  }
   for (const [key, value] of new URLSearchParams(query)) {
     if (route.query[key] !== value) return false
   }

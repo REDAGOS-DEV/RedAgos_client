@@ -62,6 +62,10 @@
             {{ scanQuery.trim().length >= 2 ? 'Results' : 'Waiting' }}
             <span v-if="!queueLoading && scanQuery.trim().length < 2 && queue.length" class="count-chip">{{ queue.length }}</span>
           </h2>
+          <span v-if="!listLoading && owingTotal > 0" class="queue-total">
+            {{ pesos(owingTotal) }}
+            <small>{{ category === 'patient' ? 'due in all' : 'billed in all' }}</small>
+          </span>
         </div>
 
         <!-- Owed by different people: a patient at this counter, or a hospital by statement. -->
@@ -135,14 +139,36 @@
             :aria-selected="bill?.request_id === b.request_id"
             @click="selectBill(b.request_id)"
           >
+            <span class="q-row__avatar" aria-hidden="true"><AssetIcon :name="category === 'patient' ? 'user' : 'building-2'" :size="16" /></span>
             <span class="q-row__top">
-              <span class="mono strong">{{ b.reference_number }}</span>
-              <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
+              <span class="q-row__ref">
+                <span class="mono strong">{{ b.reference_number }}</span>
+                <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
+              </span>
+              <span class="q-row__date">
+                <template v-if="b.date">{{ formatShortDay(b.date) }}</template>
+                <span v-if="b.walkIn" class="q-row__tag">Walk-in</span>
+              </span>
             </span>
-            <span class="q-row__who">{{ b.who }}</span>
+            <span class="q-row__who">
+              <span class="q-row__name">{{ b.name || b.who }}</span>
+              <span v-if="b.place" class="q-row__place">{{ b.place }}</span>
+            </span>
+            <span class="q-row__what">
+              <span v-for="code in b.bloodTypes" :key="code" class="q-row__blood">{{ code }}</span>
+              <span v-if="b.purpose" class="q-row__purpose">{{ b.purpose }}</span>
+            </span>
+            <span class="q-row__status">
+              <span v-if="b.status_label" class="q-row__pill" :class="{ 'q-row__pill--clear': !b.owing }">{{ b.status_label }}</span>
+            </span>
             <span class="q-row__amount" :class="{ 'q-row__amount--clear': !b.owing }">
-              {{ b.owing ? pesos(b.amount) : b.status_label }}
-              <small v-if="b.owing">{{ b.amountWord }}</small>
+              {{ b.owing ? pesos(b.amount) : '—' }}
+              <small v-if="b.owing && b.paid > 0">{{ pesos(b.paid) }} paid of {{ pesos(b.total) }}</small>
+              <small v-else-if="b.owing">{{ b.amountWord }}</small>
+            </span>
+            <span class="q-row__open" aria-hidden="true">
+              Open
+              <AssetIcon name="arrow-right" :size="14" />
             </span>
           </button>
         </div>
@@ -903,6 +929,14 @@ function fromCounter(b) {
     reference_number: b.reference_number,
     is_emergency: b.is_emergency,
     who: `${b.patient_name || 'Patient'} · ${b.requesting_facility || '—'}`,
+    name: b.patient_name || 'Patient',
+    place: b.requesting_facility || '',
+    date: b.request_date,
+    walkIn: b.is_walk_in,
+    bloodTypes: b.blood_types ?? [],
+    purpose: b.purpose_label || '',
+    total: Number(b.total_amount) || 0,
+    paid: Number(b.collected) || 0,
     amount: b.outstanding,
     amountWord: b.is_payment_deferred ? 'deferred' : 'due',
     owing: b.takes_payment,
@@ -916,6 +950,14 @@ function fromStatement(s) {
     reference_number: s.request?.reference_number ?? '—',
     is_emergency: s.request?.is_emergency,
     who: s.request?.requesting_facility || '—',
+    name: s.request?.requesting_facility || '—',
+    place: s.request?.weekly_request?.reference_number ? `Weekly ${s.request.weekly_request.reference_number}` : 'Hospital invoice',
+    date: s.request?.request_date ?? s.created_at,
+    walkIn: false,
+    bloodTypes: s.request?.blood_types ?? [],
+    purpose: 'Replenishment',
+    total: Number(s.total_amount) || 0,
+    paid: Number(s.collected) || 0,
     amount: s.total_amount,
     amountWord: 'billed',
     owing: s.status === 'statement_only',
@@ -926,6 +968,16 @@ function fromStatement(s) {
 // The Waiting column: the queue, or the results once two letters are typed.
 const typing = computed(() => scanQuery.value.trim().length >= 2)
 const listRows = computed(() => (typing.value ? results.value : queue.value))
+/** "11 Nov", or "11 Nov 2025" from another year. */
+function formatShortDay(value) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return ''
+  const sameYear = date.getFullYear() === new Date().getFullYear()
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) })
+}
+
+// What the bills on the list owe together.
+const owingTotal = computed(() => listRows.value.reduce((sum, b) => sum + (b.owing ? Number(b.amount) || 0 : 0), 0))
 const listLoading = computed(() => (typing.value ? searching.value : queueLoading.value))
 const listHeading = computed(() => {
   if (typing.value) return 'Results'
@@ -2204,7 +2256,7 @@ onBeforeUnmount(() => {
 .counter--step-1 .queue > .field-error,
 .counter--step-1 .queue > .queue-list { grid-column: 1 / -1; }
 .counter--step-1 .queue .seg { align-self: center; }
-.counter--step-1 .queue-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-content: start; gap: 10px; margin-top: 4px; }
+.counter--step-1 .queue-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 /* Nothing waiting: said in the middle of the counter, with what comes next. */
 .counter--step-1 .queue-empty { grid-column: 1 / -1; min-height: 260px; justify-content: center; gap: 8px; }
 .queue-empty__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
@@ -2299,4 +2351,47 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .modal-enter-active, .modal-leave-active, .void-btn { transition: none; }
 }
+/* ---------- Waiting: one full row per bill (2026-11-11) ---------- */
+.queue-total { display: inline-flex; align-items: baseline; gap: 6px; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.queue-total small { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.counter--step-1 .q-row {
+  /* Fixed tracks, so every row's columns line up. */
+  grid-template-columns: 40px 180px minmax(0, 1.4fr) minmax(0, 1fr) 150px 170px 86px;
+  grid-template-areas: "avatar top who what status amount open";
+  gap: 0 18px; min-height: 64px; padding: 12px 16px; border-radius: 14px;
+}
+.q-row__avatar {
+  grid-area: avatar; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.counter--step-1 .q-row__top { font-size: 14px; }
+.counter--step-1 .q-row__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; white-space: normal; }
+.q-row__name { overflow: hidden; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+.q-row__place { overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.q-row__status { grid-area: status; }
+.q-row__pill {
+  display: inline-flex; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(var(--rb-warning-rgb), 0.4);
+  background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.q-row__pill--clear { border-color: rgba(var(--rb-success-rgb), 0.4); background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.counter--step-1 .q-row__amount { font-size: 15px; }
+.q-row__open {
+  grid-area: open; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 9px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+}
+.q-row:hover .q-row__open { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+
+/* The reference over its date; blood types and purpose in the middle. */
+.counter--step-1 .q-row__top { flex-direction: column; align-items: flex-start; gap: 3px; }
+.q-row__ref { display: inline-flex; align-items: center; gap: 6px; }
+.q-row__date { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); }
+.q-row__tag { padding: 0 7px; border-radius: 999px; background: rgba(var(--rb-purple-rgb), 0.12); color: var(--rb-purple-text); font-size: 10.5px; font-weight: 700; }
+.q-row__what { grid-area: what; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.q-row__blood {
+  display: inline-flex; justify-content: center; min-width: 38px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); font-size: 12px; font-weight: 700;
+}
+.q-row__purpose { font-size: 12px; color: var(--rb-text-secondary); white-space: nowrap; }
+.counter--step-1 .q-row__amount small { white-space: nowrap; }
 </style>

@@ -2,12 +2,7 @@
   <div class="rc-page">
     <div class="rc-inner">
 
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <NuxtLink to="/blood-center/receipts">Receipts</NuxtLink>
-        <AssetIcon name="chevron-right" :size="14" />
-        <span aria-current="page">{{ receipt?.receipt_number || 'Receipt' }}</span>
-      </nav>
-
+      <!-- The trail is in the header: Payments › OR-000123. -->
       <div v-if="loading" class="skeleton-stack">
         <PageSkeleton :sections="[['form'], ['table']]" />
       </div>
@@ -179,6 +174,9 @@ function when(iso) {
 }
 
 const receipt = ref(null)
+// The header breadcrumb ends on this receipt's number (Payments › OR-000123).
+const crumbCurrent = useState('bc-crumb-current', () => '')
+watch(() => receipt.value?.receipt_number, (number) => { crumbCurrent.value = number ?? '' }, { immediate: true })
 const paymentReference = ref(null)
 // A card payment's additional information (the cardholder's last name), like the reference, on screen only.
 const paymentInfo = ref(null)
@@ -279,10 +277,6 @@ onMounted(load)
 .rc-page { background: var(--rb-page-bg); font-family: var(--rb-font-sans); padding: 24px var(--rb-gutter, 24px) 40px; }
 .rc-inner { max-width: var(--rb-content-max, 1600px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
-.crumbs { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--rb-text-secondary); }
-.crumbs a { color: var(--rb-text-secondary); text-decoration: none; }
-.crumbs a:hover { color: var(--rb-primary-text); text-decoration: underline; text-underline-offset: 3px; }
-.crumbs span[aria-current] { color: var(--rb-text-primary); font-weight: 600; font-family: var(--rb-font-mono); }
 
 .doc-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 22px; font-weight: 800; color: var(--rb-text-primary); margin: 0; letter-spacing: -0.01em; }

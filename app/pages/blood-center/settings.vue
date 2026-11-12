@@ -270,6 +270,9 @@
       </section>
 
       <!-- ACCOUNT: sessions and account information -->
+      <!-- ACTIVITY: the user's own audit trail, in any portal. -->
+      <MyActivityCard v-if="activeTab === 'activity'" />
+
       <template v-if="activeTab === 'account'">
         <section class="card">
           <header class="card__head">
@@ -377,11 +380,12 @@ import { DEFAULT_ACCENT } from '~/utils/accentThemes'
 import ComboInput from '~/components/common/ComboInput.vue'
 import { authService } from '~/api/auth/AuthService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import MyActivityCard from '~/components/common/MyActivityCard.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
 import BloodCenterFacilityLogoCard from '~/components/BloodCenter/FacilityLogoCard.vue'
 import BloodCenterDonorEmailTemplatesCard from '~/components/BloodCenter/DonorEmailTemplatesCard.vue'
 import BloodCenterBookingScheduleCard from '~/components/BloodCenter/BookingScheduleCard.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useAccentTheme } from '~/composables/useAccentTheme'
 import { useDarkMode } from '~/composables/useDarkMode'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -461,6 +465,7 @@ const tabs = computed(() => [
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'account', label: 'Account', icon: 'monitor' },
+  { id: 'activity', label: 'Activity', icon: 'history' },
   ...(canDo('center.configure') ? [{ id: 'center', label: 'Blood Center', icon: 'building-2' }] : []),
   // When donors can book: the Admin's and the Medical Receptionist's (project owner, 2026-10-24).
   ...(canDo('booking.configure') ? [{ id: 'booking', label: 'Booking', icon: 'calendar' }] : []),
@@ -478,6 +483,21 @@ const activeTab = ref(tabFromLink() ?? 'profile')
 onPageReturn(() => {
   const tab = tabFromLink()
   if (tab) activeTab.value = tab
+})
+
+// The tab and the address follow each other, so a sidebar link to one tab
+// (My activity) opens it even from here, and the sidebar shows which is open.
+// Only on this page: kept alive, it must not answer another page's ?tab=.
+const router = useRouter()
+watch(() => route.query.tab, () => {
+  if (route.path !== '/blood-center/settings') return
+  const tab = tabFromLink()
+  if (tab && tab !== activeTab.value) activeTab.value = tab
+})
+watch(activeTab, (tab) => {
+  if (route.path !== '/blood-center/settings' || (route.query.tab ?? 'profile') === tab) return
+  const { tab: _old, ...rest } = route.query
+  router.replace({ query: tab === 'profile' ? rest : { ...rest, tab } })
 })
 
 function initials(name) {

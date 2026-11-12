@@ -5,11 +5,6 @@
     </div>
 
     <div v-else class="sheet-inner">
-      <NuxtLink to="/blood-center/paper-records" class="back-link">
-        <AssetIcon name="chevron-left" :size="14" />
-        Paper Records
-      </NuxtLink>
-
       <div v-if="loadError" class="banner banner--error" role="alert">
         <AssetIcon name="circle-alert" :size="16" />
         <p class="banner__text">{{ loadError }}</p>
@@ -214,6 +209,8 @@ const loadError = ref('')
 const notice = ref(null)
 useNoticeToast(notice)
 const sheet = ref(null)
+// The header breadcrumb ends on this sheet's code (Donations › Paper Records › PS-000001).
+const crumbCurrent = useState('bc-crumb-current', () => '')
 const rows = ref([])
 const justSavedId = ref(null)
 
@@ -247,6 +244,7 @@ async function load() {
     const res = await bloodCenterService.paperSheet(route.params.id)
     const { rows: list = [], ...rest } = res?.data ?? {}
     sheet.value = rest
+    crumbCurrent.value = rest.code ?? ''
     rows.value = list
   } catch (err) {
     loadError.value = err?.status === 404
@@ -368,19 +366,6 @@ onBeforeUnmount(() => {
 }
 
 /* ---------- Header ---------- */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--rb-text-secondary);
-  text-decoration: none;
-}
-
-.back-link:hover { color: var(--rb-primary-text); }
-
 .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; }
 .sheet-head__main { min-width: 0; }
 .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
@@ -448,7 +433,6 @@ onBeforeUnmount(() => {
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .btn-link:focus-visible,
-.back-link:focus-visible,
 .icon-btn:focus-visible,
 .modal-card__close:focus-visible {
   outline: none;
