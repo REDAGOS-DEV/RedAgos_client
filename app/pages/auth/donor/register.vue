@@ -277,63 +277,11 @@
             </div>
           </div>
 
-          <div class="au-field">
-            <span id="idPhoto-label" class="au-label">ID photo <span class="au-optional">Optional</span></span>
-            <input
-              ref="idPhotoInput"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              hidden
-              @change="onIdPhotoPicked"
-            >
-
-            <div v-if="idPhoto" class="rg-photo">
-              <img :src="idPhotoUrl" alt="Your ID photo" class="rg-photo__img">
-              <div class="rg-photo__meta">
-                <span class="rg-photo__name">{{ idPhoto.name }}</span>
-                <span class="rg-photo__size">{{ fileSize(idPhoto.size) }}</span>
-              </div>
-              <div class="rg-photo__actions">
-                <button
-                  ref="idPhotoChangeBtn"
-                  type="button"
-                  class="rg-photo__btn"
-                  aria-label="Change ID photo"
-                  :disabled="submitting"
-                  @click="pickIdPhoto"
-                >
-                  <AssetIcon name="refresh-cw" :size="14" />
-                  Change
-                </button>
-                <button
-                  type="button"
-                  class="rg-photo__btn rg-photo__btn--remove"
-                  aria-label="Remove ID photo"
-                  :disabled="submitting"
-                  @click="onRemoveIdPhoto"
-                >
-                  <AssetIcon name="trash-2" :size="14" />
-                  Remove
-                </button>
-              </div>
-            </div>
-
-            <button
-              v-else
-              ref="idPhotoUploadBtn"
-              type="button"
-              class="rg-drop"
-              :class="{ 'rg-drop--invalid': idPhotoError }"
-              aria-describedby="idPhoto-label"
-              :disabled="submitting"
-              @click="pickIdPhoto"
-            >
-              <span class="rg-drop__icon"><AssetIcon name="upload" :size="18" /></span>
-              <span>Upload ID photo</span>
-            </button>
-
-            <p v-if="idPhotoError" id="idPhoto-error" class="au-error" role="alert">{{ idPhotoError }}</p>
-          </div>
+          <!-- The ID photo is not asked for here (2026-11-11): the profile takes it after sign-in. -->
+          <p class="rg-later">
+            <AssetIcon name="id-card" :size="16" />
+            <span>You can add a photo of your ID later from your profile to finish setting up your account.</span>
+          </p>
 
           <div class="au-field">
             <label class="terms" :class="{ 'terms--invalid': errors.terms_accepted }">
@@ -365,16 +313,22 @@
             v-if="step > 1"
             type="button"
             class="au-btn au-btn--outline"
-            :disabled="submitting"
+            :disabled="busy"
             @click="onBack"
           >
             <AssetIcon name="arrow-left" :size="18" />
             Back
           </button>
-          <button type="submit" class="au-btn" :disabled="submitting">
+          <button type="submit" class="au-btn" :disabled="busy" :aria-busy="busy ? 'true' : undefined">
             <template v-if="!isLastStep">
-              Continue
-              <AssetIcon name="arrow-right" :size="18" />
+              <template v-if="checking">
+                <AssetIcon name="loader" :size="18" class="au-spinner" />
+                Checking...
+              </template>
+              <template v-else>
+                Continue
+                <AssetIcon name="arrow-right" :size="18" />
+              </template>
             </template>
             <template v-else>
               <AssetIcon
@@ -397,7 +351,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import AuthShell from '~/components/auth/AuthShell.vue'
 import AuthSelect from '~/components/auth/AuthSelect.vue'
@@ -408,7 +362,6 @@ import PhoneField from '~/components/common/PhoneField.vue'
 import { VALID_ID_TYPE_OPTIONS, idNumberProblem } from '~/utils/validId'
 import { authPhoto } from '~/utils/authPhotos'
 import { donorService } from '~/api/donor/DonorService'
-import { useToast } from '~/composables/useToast'
 import {
   BLOOD_TYPE_OPTIONS,
   REGISTRATION_GENDERS,
@@ -445,6 +398,8 @@ const validIdTypes = VALID_ID_TYPE_OPTIONS
 
 const registration = useDonorRegistration({
   register: payload => donorService.register(payload),
+  // Continue asks the server too (2026-11-11): a taken address is said on step 1.
+  checkStep: (at, payload) => donorService.checkRegistrationStep(at, payload),
 })
 const {
   form,
@@ -453,12 +408,12 @@ const {
   isLastStep,
   errors,
   submitting,
+  checking,
   submitError,
-  idPhoto,
-  idPhotoError,
 } = registration
 
-const toast = useToast()
+// Continue or Create account is waiting on the server.
+const busy = computed(() => submitting.value || checking.value)
 
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -501,7 +456,7 @@ async function focusFirstInvalid() {
 
 async function onSubmit() {
   if (!isLastStep.value) {
-    if (registration.next()) await focusStep()
+    if (await registration.next()) await focusStep()
     else await focusFirstInvalid()
     return
   }
@@ -527,73 +482,12 @@ async function onBack() {
   if (registration.back()) await focusStep()
 }
 
-/* ── The ID photo (optional) ── */
-
-const idPhotoInput = ref(null)
-const idPhotoUploadBtn = ref(null)
-const idPhotoChangeBtn = ref(null)
-const idPhotoUrl = ref('')
-
-// A preview of a government ID: the object URL is let go as soon as it is not shown.
-watch(idPhoto, (file) => {
-  if (idPhotoUrl.value) URL.revokeObjectURL(idPhotoUrl.value)
-  idPhotoUrl.value = file ? URL.createObjectURL(file) : ''
-})
-
-onBeforeUnmount(() => {
-  if (idPhotoUrl.value) URL.revokeObjectURL(idPhotoUrl.value)
-})
-
-function pickIdPhoto() {
-  idPhotoInput.value?.click()
-}
-
-async function onIdPhotoPicked(event) {
-  const input = event.target
-  const file = input.files?.[0]
-  // Emptied so the same file can be picked again after Remove.
-  input.value = ''
-  if (!file) return
-
-  if (registration.chooseIdPhoto(file)) {
-    await nextTick()
-    idPhotoChangeBtn.value?.focus()
-  }
-}
-
-async function onRemoveIdPhoto() {
-  registration.removeIdPhoto()
-  await nextTick()
-  idPhotoUploadBtn.value?.focus()
-}
-
-function fileSize(bytes) {
-  return bytes >= 1024 * 1024
-    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
-/**
- * The registration takes no file, so the photo goes up through the profile's
- * own upload once the new account is signed in. It is optional: a failure is
- * said, and never keeps the donor out of the portal.
- */
-async function sendHeldIdPhoto() {
-  try {
-    await registration.sendIdPhoto(data => donorService.submitIdentity(data))
-    toast.success('ID photo sent for review')
-  } catch {
-    toast.warning('Your ID photo was not sent', 'You can add it from your profile.')
-  }
-}
-
 /**
  * The address is verified: sign in with what was typed at registration.
  *
  * After a reload the password is gone (only the address is kept), and a
  * sign-in that fails for any reason leaves the donor on the sign-in screen
- * rather than here. The held ID photo goes with the page in both cases; it
- * can be added from the profile.
+ * rather than here.
  */
 async function continueToPortal() {
   clearPendingVerification()
@@ -604,7 +498,7 @@ async function continueToPortal() {
 
   signIn.email.value = registeredEmail.value
   signIn.password.value = form.password
-  await signIn.login({ beforeHome: idPhoto.value ? sendHeldIdPhoto : undefined })
+  await signIn.login()
 
   if (signIn.errorMessage.value) {
     return navigateTo('/auth/donor/login')
@@ -743,112 +637,20 @@ onMounted(() => {
   .au-field .au-idnum:focus-within { --idf-field: #fff; }
 }
 
-/* ── The ID photo ── */
-.rg-drop {
-  width: 100%;
-  min-height: 60px;
+/* ── The ID photo, later ── */
+.rg-later {
+  margin: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 1.5px dashed #C3D3E6;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: var(--au-radius);
-  background: var(--au-field);
-  color: var(--au-text);
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 150ms ease, background-color 150ms ease;
+  background: var(--au-accent-soft);
+  color: var(--au-text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
-.rg-drop:hover:not(:disabled) { border-color: var(--au-accent); background: var(--au-accent-soft); }
-.rg-drop--invalid { border-color: var(--au-danger); }
-.rg-drop:disabled { opacity: 0.6; cursor: not-allowed; }
-.rg-drop__icon {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--au-accent-text);
-  box-shadow: 0 1px 2px rgba(11, 31, 58, 0.06);
-}
-
-.rg-photo {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border: 1px solid var(--au-border);
-  border-radius: var(--au-radius);
-  background: var(--au-field);
-}
-.rg-photo__img {
-  width: 72px;
-  height: 52px;
-  display: block;
-  object-fit: cover;
-  border-radius: 8px;
-  background: var(--au-border);
-}
-.rg-photo__meta { display: grid; gap: 2px; min-width: 0; }
-.rg-photo__name {
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--au-text);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.rg-photo__size { font-size: 12.5px; color: var(--au-muted); }
-.rg-photo__actions { display: flex; gap: 6px; }
-.rg-photo__btn {
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: 1px solid var(--au-border);
-  border-radius: 9px;
-  background: #fff;
-  color: var(--au-text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 150ms ease, background-color 150ms ease;
-}
-.rg-photo__btn:hover:not(:disabled) { border-color: var(--au-accent); background: var(--au-accent-soft); }
-.rg-photo__btn--remove { color: var(--au-danger); }
-.rg-photo__btn--remove:hover:not(:disabled) { border-color: var(--au-danger); background: #FEF3F2; }
-.rg-photo__btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.rg-drop:focus-visible,
-.rg-photo__btn:focus-visible {
-  outline: 2px solid var(--au-accent);
-  outline-offset: 2px;
-}
-
-@media (max-width: 900px) {
-  .rg-drop,
-  .rg-photo { background: rgba(255, 255, 255, 0.8); }
-  .rg-drop { border-color: rgba(11, 42, 85, 0.2); }
-  .rg-photo { border-color: rgba(11, 42, 85, 0.12); }
-  .rg-drop--invalid { border-color: var(--au-danger); }
-}
-/* Phones: the buttons on their own row, wide enough for a thumb. */
-@media (max-width: 480px) {
-  .rg-photo { grid-template-columns: 64px minmax(0, 1fr); }
-  .rg-photo__img { width: 64px; height: 46px; }
-  .rg-photo__actions { grid-column: 1 / -1; }
-  .rg-photo__btn { flex: 1; height: 44px; }
-}
+.rg-later :deep(.asset-icon) { margin-top: 2px; flex-shrink: 0; color: var(--au-accent-text); }
 
 /* ── Brand panel perks ── */
 .perks {

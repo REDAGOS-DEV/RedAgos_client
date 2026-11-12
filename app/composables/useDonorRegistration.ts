@@ -6,12 +6,13 @@ import { VALID_ID_TYPE_OPTIONS, idNumberProblem, stripIdNumber } from '~/utils/v
  *
  *   1  Account            email, password, confirm password
  *   2  Personal details   names, birth date, gender, blood type
- *   3  Contact and ID     phone, address, valid ID (required), ID photo
- *                         (optional), terms, Create account
+ *   3  Contact and ID     phone, address, valid ID (required), terms,
+ *                         Create account
  *
- * Continue checks only the step on screen; Back checks nothing. Every value
- * lives in one form for the whole visit, so moving between the steps loses
- * nothing. Nothing reaches the server until Create account on step 3, and then
+ * Continue checks only the step on screen, here and then with the server
+ * (POST /donors/register/check, 2026-11-11), so an address already registered
+ * is said on step 1; Back checks nothing. Every value lives in one form for
+ * the whole visit, so moving between the steps loses nothing. Nothing reaches the server until Create account on step 3, and then
  * as one request with the same body as the one-page form sent, so no partial
  * account is ever made.
  *
@@ -19,9 +20,8 @@ import { VALID_ID_TYPE_OPTIONS, idNumberProblem, stripIdNumber } from '~/utils/v
  * The server still decides: whatever it refuses is shown on the field it names,
  * on that field's step.
  *
- * The ID photo is not part of the registration request, which takes JSON and
- * no file. It is held here and sent through the profile's own upload
- * (POST /donors/identity) once the new donor first signs in.
+ * The ID photo is not asked for here (2026-11-11): the page says it can be
+ * added later from the profile, whose own upload takes it.
  */
 
 export type RegistrationStep = 1 | 2 | 3
@@ -322,27 +322,21 @@ export function registrationPayload(form: DonorRegistrationForm): DonorRegistrat
   }
 }
 
-/* ── The ID photo ─────────────────────────────────────────────── */
-
-// StoreDonorIdentityRequest: jpg, png or webp, 4096 KB at most.
-export const ID_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
-export const ID_PHOTO_MAX_BYTES = 4 * 1024 * 1024
-
-/** Why a chosen file cannot be the ID photo, or '' when it can. */
-export function idPhotoProblem(file: { type: string, size: number }): string {
-  if (!(ID_PHOTO_TYPES as readonly string[]).includes(file.type)) {
-    return 'Choose a JPG, PNG or WEBP image.'
-  }
-  return file.size > ID_PHOTO_MAX_BYTES ? 'Your ID photo must be 4 MB or smaller.' : ''
+/**
+ * The server's fields on each step, for its step check
+ * (CheckDonorRegistrationStepRequest::STEP_FIELDS, with the confirmation the
+ * password's rule reads).
+ */
+const STEP_PAYLOAD_FIELDS: Record<RegistrationStep, (keyof DonorRegistrationPayload)[]> = {
+  1: ['email', 'password', 'password_confirmation'],
+  2: ['first_name', 'last_name', 'birth_date', 'gender', 'blood_type'],
+  3: ['phone', 'address', 'valid_id_type', 'valid_id_number', 'terms_accepted'],
 }
 
-/** The multipart body POST /donors/identity takes: the registered ID and its photo. */
-export function idPhotoSubmission(form: Pick<DonorRegistrationForm, 'validIdType' | 'validIdNumber'>, photo: Blob): FormData {
-  const data = new FormData()
-  data.append('valid_id_type', form.validIdType)
-  data.append('valid_id_number', form.validIdNumber)
-  data.append('valid_id_image', photo)
-  return data
+/** One step's part of the registration body, as its check sends it. */
+export function stepPayload(step: RegistrationStep, form: DonorRegistrationForm): Partial<DonorRegistrationPayload> {
+  const full = registrationPayload(form)
+  return Object.fromEntries(STEP_PAYLOAD_FIELDS[step].map(field => [field, full[field]]))
 }
 
 /* ── The form ─────────────────────────────────────────────────── */
@@ -350,20 +344,24 @@ export function idPhotoSubmission(form: Pick<DonorRegistrationForm, 'validIdType
 export interface UseDonorRegistrationOptions {
   /** Sends the registration: donorService.register. */
   register: (payload: DonorRegistrationPayload) => Promise<unknown>
+  /**
+   * Checks one step's fields with the server before Continue moves on
+   * (donorService.checkRegistrationStep): stores nothing, throws its 422.
+   */
+  checkStep?: (step: RegistrationStep, payload: Partial<DonorRegistrationPayload>) => Promise<unknown>
   /** Today, for the age check. */
   today?: () => Date
 }
 
-export function useDonorRegistration({ register, today = () => new Date() }: UseDonorRegistrationOptions) {
+export function useDonorRegistration({ register, checkStep, today = () => new Date() }: UseDonorRegistrationOptions) {
   const form = reactive(emptyRegistrationForm())
   const step = ref<RegistrationStep>(1)
   const errors = reactive<Partial<Record<RegistrationField, string>>>({})
   const submitting = ref(false)
+  // Continue waiting on the server's check of the step.
+  const checking = ref(false)
   // A refusal that names no field: the network, the rate limit, the server.
   const submitError = ref('')
-
-  const idPhoto = ref<File | null>(null)
-  const idPhotoError = ref('')
 
   const currentStep = computed(() => REGISTRATION_STEPS[step.value - 1]!)
   const isLastStep = computed(() => step.value === LAST_STEP)
@@ -398,18 +396,47 @@ export function useDonorRegistration({ register, today = () => new Date() }: Use
     return field ? REGISTRATION_RULES[field].inputId : null
   }
 
-  /** Continue: on to the next step if this one is complete. */
-  function next(): boolean {
-    if (isLastStep.value || submitting.value) return false
+  // What each step last passed the server with: Back then Continue on the
+  // same values does not ask again.
+  const passed: Partial<Record<RegistrationStep, string>> = {}
+
+  /**
+   * Continue: on to the next step once this one is complete here and, when
+   * the server is asked (checkStep), there too: an address already registered
+   * is said on step 1, not after the whole form.
+   */
+  async function next(): Promise<boolean> {
+    if (isLastStep.value || submitting.value || checking.value) return false
     submitError.value = ''
     if (!validateStep(step.value)) return false
-    step.value = (step.value + 1) as RegistrationStep
+
+    const at = step.value
+    if (checkStep) {
+      const payload = stepPayload(at, form)
+      const key = JSON.stringify(payload)
+      if (passed[at] !== key) {
+        checking.value = true
+        try {
+          await checkStep(at, payload)
+          passed[at] = key
+        } catch (error: any) {
+          if (!applyServerErrors(error)) {
+            submitError.value = error?.message || 'We could not check these details. Please try again.'
+          }
+          return false
+        } finally {
+          checking.value = false
+        }
+      }
+    }
+
+    step.value = (at + 1) as RegistrationStep
     return true
   }
 
   /** Back: no checks, and every value stays as it was. */
   function back(): boolean {
-    if (step.value === 1 || submitting.value) return false
+    if (step.value === 1 || submitting.value || checking.value) return false
     submitError.value = ''
     step.value = (step.value - 1) as RegistrationStep
     return true
@@ -467,32 +494,6 @@ export function useDonorRegistration({ register, today = () => new Date() }: Use
     }
   }
 
-  /** Takes a picked file as the ID photo, or says why it cannot be. */
-  function chooseIdPhoto(file: File | null | undefined): boolean {
-    if (!file) return false
-    const problem = idPhotoProblem(file)
-    idPhotoError.value = problem
-    if (problem) return false
-    idPhoto.value = file
-    return true
-  }
-
-  function removeIdPhoto() {
-    idPhoto.value = null
-    idPhotoError.value = ''
-  }
-
-  /**
-   * Sends the held photo with the registered ID through the profile's upload,
-   * once signed in. Nothing to send is not a failure.
-   */
-  async function sendIdPhoto(submitIdentity: (data: FormData) => Promise<unknown>): Promise<boolean> {
-    if (!idPhoto.value) return false
-    await submitIdentity(idPhotoSubmission(form, idPhoto.value))
-    idPhoto.value = null
-    return true
-  }
-
   return {
     form,
     step,
@@ -500,16 +501,12 @@ export function useDonorRegistration({ register, today = () => new Date() }: Use
     isLastStep,
     errors,
     submitting,
+    checking,
     submitError,
-    idPhoto,
-    idPhotoError,
     validateStep,
     firstInvalidInputId,
     next,
     back,
     submit,
-    chooseIdPhoto,
-    removeIdPhoto,
-    sendIdPhoto,
   }
 }
