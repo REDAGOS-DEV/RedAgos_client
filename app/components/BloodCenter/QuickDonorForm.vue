@@ -34,11 +34,14 @@
         <SelectField v-model="form.blood_type_id" aria-label="Blood type"
           :options="[{ value: '', label: 'Not typed' }, ...bloodTypes.map(bt => ({ value: String(bt.id), label: bt.code ?? bt.label }))]" />
       </label>
-      <label class="qd__field">
-        <span class="qd__label">Mobile number <span class="qd__optional">optional</span></span>
-        <PhoneField v-model="form.phone" size="sm" autocomplete="off" :invalid="Boolean(fieldError('phone'))" />
+      <div class="qd__field">
+        <div class="qd__label-row">
+          <label class="qd__label" for="qd-phone">Mobile number <span class="qd__optional">optional</span></label>
+          <PhoneKindToggle v-model="form.phone_shared" size="sm" :disabled="busy" />
+        </div>
+        <PhoneField id="qd-phone" v-model="form.phone" size="sm" autocomplete="off" :invalid="Boolean(fieldError('phone'))" />
         <span v-if="fieldError('phone')" class="qd__error">{{ fieldError('phone') }}</span>
-      </label>
+      </div>
       <label class="qd__field">
         <span class="qd__label">Email <span class="qd__optional">optional</span></span>
         <input v-model="form.email" type="email" class="qd__input" maxlength="255" autocomplete="off">
@@ -50,11 +53,24 @@
       </label>
     </div>
 
+    <!--
+      Shared typed for someone else's Personal number (project owner,
+      2026-11-12): saved as Shared once staff confirm.
+    -->
+    <div v-if="sharedPhoneMessage" class="qd__confirm" role="alertdialog" aria-labelledby="qd-confirm-text">
+      <AssetIcon name="triangle-alert" :size="17" class="qd__confirm-icon" />
+      <p id="qd-confirm-text" class="qd__confirm-text">{{ sharedPhoneMessage }}</p>
+      <div class="qd__confirm-actions">
+        <button type="button" class="qd__btn" :disabled="busy" @click="sharedPhoneMessage = ''">Cancel</button>
+        <button type="button" class="qd__btn qd__btn--primary" :disabled="busy" @click="submit(undefined, true)">Save as Shared</button>
+      </div>
+    </div>
+
     <p v-if="error" class="qd__alert" role="alert">{{ error }}</p>
 
     <div class="qd__actions">
       <button type="button" class="qd__btn" :disabled="busy" @click="emit('cancel')">Back to search</button>
-      <button type="submit" class="qd__btn qd__btn--primary" :disabled="busy || !ready">
+      <button type="submit" class="qd__btn qd__btn--primary" :disabled="busy || !ready || Boolean(sharedPhoneMessage)">
         {{ busy ? 'Registering…' : 'Register and use' }}
       </button>
     </div>
@@ -63,8 +79,10 @@
 
 <script setup lang="ts">
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
+import AssetIcon from '~/components/common/AssetIcon.vue'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
+import PhoneKindToggle from '~/components/common/PhoneKindToggle.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import type { BloodTypeOption } from '~/utils/bloodType'
 import { GENDER_OPTIONS, blankDonorForm, registerPayload } from '~/utils/donorRecords'
@@ -94,6 +112,8 @@ const form = reactive(blankDonorForm())
 const busy = ref(false)
 const error = ref('')
 const errors = ref<Record<string, string[]>>({})
+// The server's question when Shared is someone else's Personal number.
+const sharedPhoneMessage = ref('')
 const firstInput = ref<HTMLInputElement | null>(null)
 
 // A donor is at least 16 on the day; the server holds the real minimum.
@@ -111,7 +131,8 @@ function fieldError(key: string): string {
   return errors.value?.[key]?.[0] ?? ''
 }
 
-async function submit() {
+// Bound to @submit, so the first argument is the event.
+async function submit(_event?: Event, confirmSharedPhone = false) {
   if (!ready.value || busy.value) return
 
   busy.value = true
@@ -119,9 +140,16 @@ async function submit() {
   errors.value = {}
 
   try {
-    const res: any = await bloodCenterService.registerPaperDonor(registerPayload(form))
+    const res: any = await bloodCenterService.registerPaperDonor(registerPayload(form, { confirmSharedPhone }))
+    sharedPhoneMessage.value = ''
     emit('registered', res?.data ?? res)
   } catch (err: any) {
+    if (err?.data?.code === 'phone_personal_elsewhere') {
+      sharedPhoneMessage.value = err?.message || err?.data?.message || ''
+      return
+    }
+
+    sharedPhoneMessage.value = ''
     errors.value = err?.errors ?? {}
     error.value = Object.keys(errors.value).length ? '' : err?.message || 'The donor could not be registered.'
   } finally {
@@ -160,6 +188,8 @@ onMounted(() => {
 .qd__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .qd__field--wide { grid-column: span 2; }
 .qd__label { font-size: 12px; font-weight: 600; }
+/* A label with a control on its right: Mobile number | Personal · Shared. */
+.qd__label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 26px; }
 .qd__optional { margin-left: 3px; font-weight: 500; color: var(--rb-text-secondary); }
 .qd__error { font-size: 11.5px; color: var(--rb-accent-text); }
 
@@ -197,6 +227,20 @@ onMounted(() => {
   color: var(--rb-accent-text);
   font-size: 13px;
 }
+
+.qd__confirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(var(--rb-accent-rgb), 0.4);
+  border-radius: 10px;
+  background: rgba(var(--rb-accent-rgb), 0.05);
+}
+
+.qd__confirm-icon { color: var(--rb-accent-text); margin-top: 1px; }
+.qd__confirm-text { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.qd__confirm-actions { grid-column: 2; display: flex; gap: 8px; }
 
 .qd__actions { display: flex; justify-content: flex-end; gap: 8px; }
 

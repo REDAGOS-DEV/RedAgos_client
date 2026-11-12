@@ -199,6 +199,20 @@ describe('the Processed page', () => {
   })
 })
 
+describe('buttons a role cannot use (project owner, 2026-11-11)', () => {
+  it('shows hand-over and reject only to whoever may complete or reject a unit', () => {
+    const processed = source('app/pages/blood-center/processed.vue')
+    const bench = source('app/pages/blood-center/laboratory.vue')
+
+    // The Processing Assistant holds lab.record_components, never lab.update_status.
+    expect(processed).toContain("const canUpdateStatus = computed(() => can('lab.update_status'))")
+    expect(processed).toContain(`<template v-if="row.status === 'awaiting_handover' && canUpdateStatus">`)
+    expect(processed).toContain('<button v-if="open.row.can?.reject"')
+    expect(processed).toContain('<button v-if="open.row.can?.hand_over"')
+    expect(bench).toContain('v-if="!hasComponents && canUpdateStatus && !isFinal"')
+  })
+})
+
 describe('Component Processing after the move', () => {
   const page = source('app/pages/blood-center/laboratory.vue')
 

@@ -821,25 +821,23 @@ function driveWhen(drive) {
   return { today: true, badge: 'Today', tone: 'today' }
 }
 
-const driveFull = (drive) => drive.total_slots != null && (drive.registered ?? 0) >= drive.total_slots
 // Why Book is off, or '' when it isn't. One booking at a time, so not while
 // one stands either.
 function driveBlocked(drive) {
   if (currentAppointment.value) return 'You already have a booking'
   if (driveWhen(drive).ended) return 'This drive has ended'
-  if (driveFull(drive)) return 'This drive is full'
   return ''
 }
 
+// No booking limit at a drive (2026-11-12): how many are coming, not places left.
 function driveNote(drive) {
-  const left = Math.max((drive.total_slots ?? 0) - (drive.registered ?? 0), 0)
   const date = String(drive.date ?? '').slice(0, 10)
   if (driveWhen(drive).ended) return { text: 'This drive has ended', muted: true }
   if (nextEligibleDate.value && date < String(nextEligibleDate.value).slice(0, 10)) {
     return { text: 'Before your next eligible date', muted: true }
   }
-  if (!left) return { text: 'Full', muted: true }
-  return { text: `${left} slot${left === 1 ? '' : 's'} left`, muted: false }
+  const coming = drive.registered ?? 0
+  return { text: coming ? `${coming} pre-registered` : 'Open for booking', muted: false }
 }
 
 // ── Impact ──

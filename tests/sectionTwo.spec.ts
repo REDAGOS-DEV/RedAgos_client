@@ -84,7 +84,7 @@ describe('the phlebotomist box', () => {
   function box(overrides: Record<string, unknown> = {}) {
     return {
       blood_bag_type: 'double',
-      donation_barcode: 'SEG-0001',
+      donation_barcode: '1000001',
       started_time: '09:00',
       ended_time: '09:12',
       volume_ml: 450,
@@ -122,6 +122,13 @@ describe('the phlebotomist box', () => {
 
   it('is ready when every line of the box is filled', () => {
     expect(phlebotomyProblems(box(), day, later)).toEqual([])
+  })
+
+  it('takes a donation barcode of digits only', () => {
+    for (const barcode of ['SEG-0001', '1234-567', 'ABC123']) {
+      expect(phlebotomyProblems(box({ donation_barcode: barcode }), day, later))
+        .toEqual(['A donation barcode is numbers only, up to 30 digits.'])
+    }
   })
 
   it('names each missing line', () => {
@@ -272,11 +279,14 @@ describe('the Processing page', () => {
     expect(page).toContain("if (row.test_result?.is_legacy) return 'Needs serology from Testing'")
   })
 
-  it('shows its cards before a unit is picked, locked, with the list as tall as the bench and counts on the chips (project owner, 2026-10-22)', () => {
+  it('shows the queue first and one unit\'s bench in its place, held in the address, with counts on the chips (project owner, 2026-11-11)', () => {
     expect(page).not.toContain('Pick a unit to start')
+    expect(page).toContain('<aside v-show="!selected" class="queue-panel" aria-label="Donation units">')
+    expect(page).toContain('<section v-if="selected" class="bench" aria-live="polite">')
+    expect(page).toContain('Back to queue')
+    expect(page).toContain("const query = { ...route.query, donation: String(id) }")
     expect(page).toContain('<fieldset v-else-if="!hasComponents" class="bags" :disabled="!selected">')
     expect(page).toContain("{{ selected ? donorTitle(selected.donor, selected.collection?.donation_barcode, selected.id) : '—' }}")
-    expect(page).toContain('align-items: stretch;')
     // Each chip's count is its list's paginated total, one row asked for.
     expect(page).toContain('per_page: 1')
   })

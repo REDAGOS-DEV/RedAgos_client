@@ -5,21 +5,22 @@ import path from 'node:path'
 import {
   DRIVE_TABS,
   blankDriveForm,
-  countOrNull,
   driveActions,
   driveFormFrom,
   drivePayload,
   driveStatusLabel,
   drivesFor,
   driveTab,
+  movesBookings,
   registrationClosed,
   type Drive,
 } from '~/utils/drives'
 
 /**
- * Donation Drives, phase 1 of drive pre-registration: expected participants
- * beside the hard registration capacity, drafts and publishing, closing
- * registration, editing and cancelling, all wired to the server.
+ * Donation Drives (drive pre-registration): no booking limit and no estimate,
+ * one live pre-registered count (project owner, 2026-11-12), drafts and
+ * publishing, closing registration, editing and cancelling, all wired to the
+ * server.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -33,9 +34,8 @@ function drive(overrides: Partial<Drive> = {}): Drive {
     event_date: '2026-11-20',
     start_time: '08:00:00',
     end_time: '12:00:00',
-    capacity: 60,
-    expected_participants: 120,
     registered_count: 0,
+    pre_registered_count: 0,
     status: 'Upcoming',
     published_at: '2026-11-01T08:00:00+08:00',
     registration_open: true,
@@ -53,7 +53,6 @@ describe('drive tabs', () => {
 
   it('files drafts with the upcoming drives and keeps cancelled ones apart', () => {
     expect(driveTab({ status: 'Draft' })).toBe('upcoming')
-    expect(driveTab({ status: 'Full' })).toBe('upcoming')
     expect(driveTab({ status: 'Open' })).toBe('upcoming')
     expect(driveTab({ status: 'Completed' })).toBe('completed')
     expect(driveTab({ status: 'Cancelled' })).toBe('cancelled')
@@ -100,9 +99,15 @@ describe('drive row actions', () => {
     }
   })
 
-  it('fixes the date and hours once a donor is booked', () => {
-    expect(driveActions(drive({ registered_count: 0 })).scheduleLocked).toBe(false)
-    expect(driveActions(drive({ registered_count: 3 })).scheduleLocked).toBe(true)
+  it('warns only when an edit moves a drive someone is booked for', () => {
+    const form = { event_date: '2026-11-20', start_time: '08:00', end_time: '12:00' }
+    // Nobody booked: nothing to move.
+    expect(movesBookings(drive({ registered_count: 0 }), { ...form, event_date: '2026-11-27' })).toBe(false)
+    // Booked, same day and hours (the server's '08:00:00' is '08:00').
+    expect(movesBookings(drive({ registered_count: 3 }), form)).toBe(false)
+    expect(movesBookings(drive({ registered_count: 3 }), { ...form, event_date: '2026-11-27' })).toBe(true)
+    expect(movesBookings(drive({ registered_count: 3 }), { ...form, end_time: '15:00' })).toBe(true)
+    expect(movesBookings(null, form)).toBe(false)
   })
 
   it('shows Registration closed only on a published drive still to come', () => {
@@ -114,28 +119,20 @@ describe('drive row actions', () => {
 })
 
 describe('the drive form', () => {
-  it('starts with no capacity limit, no estimate, and publishing on', () => {
-    expect(blankDriveForm()).toMatchObject({ max_capacity: '', expected_participants: '', publish: true })
+  it('has no capacity or estimate, and publishes on save', () => {
+    expect(blankDriveForm()).not.toHaveProperty('max_capacity')
+    expect(blankDriveForm()).not.toHaveProperty('expected_participants')
+    expect(blankDriveForm()).toMatchObject({ publish: true })
   })
 
-  it('reads a blank count as null and anything else as a whole number', () => {
-    expect(countOrNull('')).toBeNull()
-    expect(countOrNull('  ')).toBeNull()
-    expect(countOrNull(null)).toBeNull()
-    expect(countOrNull('80')).toBe(80)
-    expect(countOrNull(120)).toBe(120)
-  })
-
-  it('sends capacity and expected participants as two separate figures', () => {
-    const form = { ...blankDriveForm(), name: ' Drive ', location: ' Gym ', event_date: '2026-11-20', max_capacity: '', expected_participants: '150' }
+  it('sends the drive details and nothing about places', () => {
+    const form = { ...blankDriveForm(), name: ' Drive ', location: ' Gym ', event_date: '2026-11-20' }
     expect(drivePayload(form, true)).toEqual({
       name: 'Drive',
       location: 'Gym',
       event_date: '2026-11-20',
       start_time: '08:00',
       end_time: '16:00',
-      max_capacity: null,
-      expected_participants: 150,
       assigned_staff: null,
       announcement: null,
       publish: true,
@@ -148,9 +145,7 @@ describe('the drive form', () => {
   })
 
   it('fills the form from a drive, times as HH:MM', () => {
-    expect(driveFormFrom(drive({ capacity: null }))).toMatchObject({
-      start_time: '08:00', end_time: '12:00', max_capacity: '', expected_participants: 120,
-    })
+    expect(driveFormFrom(drive())).toMatchObject({ start_time: '08:00', end_time: '12:00' })
   })
 })
 
@@ -166,10 +161,20 @@ describe('the Donation Drives page', () => {
     }
   })
 
-  it('names capacity as an optional limit beside expected participants', () => {
-    expect(page).not.toContain('Max donors')
-    expect(page).toContain('Registration capacity')
-    expect(page).toContain('Expected participants')
+  it('shows one live figure, pre-registered donors, and no capacity or estimate field', () => {
+    for (const gone of ['Max donors', 'Registration capacity', 'Expected participants', 'max_capacity', 'expected_participants']) {
+      expect(page).not.toContain(gone)
+    }
+    expect(page).toContain('Pre-registered donors')
+    expect(page).toContain('drive.pre_registered_count')
+  })
+
+  it('offers a new drive as a draft or published at once, and lets a booked drive move', () => {
+    expect(page).toContain('Save as draft')
+    expect(page).toContain('Create and publish')
+    expect(page).not.toContain('Publish to donors now')
+    expect(page).not.toContain('scheduleLocked')
+    expect(page).toContain('movesBookings(editingDrive, driveForm)')
   })
 
   it('asks in its own dialogs, with focus kept inside them', () => {

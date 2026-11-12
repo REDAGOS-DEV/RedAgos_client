@@ -1,8 +1,8 @@
 <template>
   <!--
-    Every portal's success and failure messages, at the top right under the top
-    bar, clear of the tables and pagers below (project owner, 2026-11-01). The
-    toast waits while the pointer is on it, so it can be read to the end.
+    Every portal's success and failure messages, at the bottom right, the newest
+    nearest the corner (project owner, 2026-11-11; they were at the top right).
+    The toast waits while the pointer is on it, so it can be read to the end.
   -->
   <div class="toaster" aria-live="polite">
     <TransitionGroup name="app-toast">
@@ -16,7 +16,7 @@
         @mouseleave="release(toast)"
       >
         <span class="app-toast__icon" aria-hidden="true">
-          <AssetIcon :name="ICONS[toast.tone]" :size="15" />
+          <AssetIcon :name="ICONS[toast.tone]" :size="18" />
         </span>
         <div class="app-toast__text">
           <p class="app-toast__title">{{ toast.title }}</p>
@@ -40,7 +40,7 @@
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import { useToast } from '~/composables/useToast'
 
-const ICONS = { success: 'check', error: 'x', warning: 'triangle-alert', info: 'info' }
+const ICONS = { success: 'check-circle', error: 'triangle-alert', warning: 'circle-alert', info: 'info' }
 
 const { toasts, dismiss } = useToast()
 
@@ -90,13 +90,13 @@ onUnmounted(() => clocks.forEach((clock) => clearTimeout(clock.timer)))
 <style scoped>
 .toaster {
   position: fixed;
-  top: 76px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   z-index: 400;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(380px, calc(100vw - 24px));
+  width: min(372px, calc(100vw - 24px));
   pointer-events: none;
 }
 
@@ -105,13 +105,18 @@ onUnmounted(() => clocks.forEach((clock) => clearTimeout(clock.timer)))
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 13px 12px 15px 14px;
+  gap: 14px;
+  padding: 16px 14px 16px 16px;
   overflow: hidden;
-  border: 1px solid var(--rb-border);
-  border-radius: 14px;
-  background: var(--rb-surface);
-  box-shadow: 0 18px 44px -18px rgba(15, 23, 42, 0.4), 0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(var(--toast-rgb), 0.13) 0%, rgba(var(--toast-rgb), 0.04) 60%, rgba(var(--toast-rgb), 0.02) 100%),
+    var(--rb-surface);
+  box-shadow:
+    0 18px 40px -16px rgba(var(--toast-rgb), 0.35),
+    0 8px 24px -12px rgba(15, 23, 42, 0.18),
+    inset 0 0 0 1px rgba(var(--toast-rgb), 0.08);
   font-family: var(--rb-font-sans);
   pointer-events: auto;
 }
@@ -123,15 +128,16 @@ onUnmounted(() => clocks.forEach((clock) => clearTimeout(clock.timer)))
   display: grid;
   flex: none;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgb(var(--toast-rgb));
-  color: #FFFFFF;
+  background: var(--rb-surface);
+  color: rgb(var(--toast-rgb));
+  box-shadow: 0 4px 12px -4px rgba(var(--toast-rgb), 0.45), 0 0 0 1px rgba(var(--toast-rgb), 0.08);
 }
 .app-toast__text { flex: 1; min-width: 0; padding-top: 2px; }
-.app-toast__title { margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; color: var(--rb-text-primary); }
-.app-toast__message { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; color: var(--rb-text-secondary); }
+.app-toast__title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; color: var(--rb-text-primary); }
+.app-toast__message { margin: 3px 0 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; color: var(--rb-text-secondary); }
 
 .app-toast__close {
   display: grid;
@@ -145,15 +151,15 @@ onUnmounted(() => clocks.forEach((clock) => clearTimeout(clock.timer)))
   color: var(--rb-text-secondary);
   cursor: pointer;
 }
-.app-toast__close:hover { background: var(--rb-surface-hover); color: var(--rb-text-primary); }
+.app-toast__close:hover { background: rgba(var(--toast-rgb), 0.1); color: var(--rb-text-primary); }
 .app-toast__close:focus-visible { outline: 2px solid var(--rb-primary); outline-offset: 1px; }
 
-/* How long is left: quiet, so the message is what is read. */
+/* How long is left: drawn invisibly, the card itself kept clean. */
 .app-toast__time {
   position: absolute;
   inset: auto 0 0;
   height: 2px;
-  background: rgba(var(--toast-rgb), 0.55);
+  background: transparent;
   transform-origin: left;
   animation: app-toast-time linear forwards;
 }
@@ -163,14 +169,28 @@ onUnmounted(() => clocks.forEach((clock) => clearTimeout(clock.timer)))
 .app-toast-enter-active { transition: opacity 0.2s ease, transform 0.26s cubic-bezier(0.16, 1, 0.3, 1); }
 .app-toast-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
 .app-toast-move { transition: transform 0.2s ease; }
-.app-toast-enter-from { opacity: 0; transform: translateX(18px); }
-.app-toast-leave-to { opacity: 0; transform: translateX(10px); }
+.app-toast-enter-from { opacity: 0; transform: translateY(14px) scale(0.98); }
+.app-toast-leave-to { opacity: 0; transform: translateX(16px); }
+
+html.dark .app-toast {
+  border-color: rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(180deg, rgba(var(--toast-rgb), 0.15) 0%, rgba(var(--toast-rgb), 0.05) 65%, rgba(var(--toast-rgb), 0.03) 100%),
+    var(--rb-surface);
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(var(--toast-rgb), 0.12);
+}
+html.dark .app-toast__icon { background: var(--rb-surface-alt); box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(var(--toast-rgb), 0.18); }
 
 @media (prefers-reduced-motion: reduce) {
   .app-toast-enter-active, .app-toast-leave-active, .app-toast-move { transition: none; }
   .app-toast__time { display: none; }
 }
 @media (max-width: 640px) {
-  .toaster { top: 68px; right: 12px; }
+  .toaster { bottom: 12px; right: 12px; }
 }
+</style>
+
+<style>
+/* While a dialog is open, the toasts rise clear of its footer buttons. */
+html:has([aria-modal="true"]) .toaster { bottom: 96px; }
 </style>

@@ -34,7 +34,6 @@
               @input="onSearchInput"
             >
           </label>
-          <SelectField v-model="outcome" class="sel-filter" size="sm" aria-label="Filter by result" :options="OUTCOME_FILTERS" @change="load()" />
         </div>
 
         <div class="toolbar__actions">
@@ -46,11 +45,29 @@
             <AssetIcon name="download" :size="14" />
             {{ exporting ? 'Exporting…' : 'Export' }}
           </button>
-          <button type="button" class="btn-outline btn-outline--accent" :disabled="loading" @click="load(pager.page)">
+          <button type="button" class="btn-outline" :disabled="loading" @click="load(pager.page)">
             <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
             Refresh
           </button>
         </div>
+      </div>
+
+      <!-- The result as chips, each with how many it holds: what needs a decision first. -->
+      <div class="outcome-chips" role="group" aria-label="Show results">
+        <button
+          v-for="option in OUTCOME_CHIPS"
+          :key="option.value || 'all'"
+          type="button"
+          class="outcome-chip"
+          :class="[{ [`outcome-chip--${option.tone}`]: counts[option.value] > 0 }, { 'outcome-chip--on': outcome === option.value }]"
+          :aria-pressed="outcome === option.value"
+          @click="setOutcome(option.value)"
+        >
+          {{ option.label }}
+          <!-- Still counting: an empty pill, not a stray dot. -->
+          <span v-if="counts[option.value] === undefined" class="outcome-chip__count outcome-chip__count--loading" aria-hidden="true" />
+          <span v-else class="outcome-chip__count">{{ counts[option.value] }}</span>
+        </button>
       </div>
 
       <div class="table-wrap" :class="{ 'table-wrap--busy': loading && rows.length }">
@@ -61,8 +78,8 @@
               <th scope="col" class="c-id">ID</th>
               <th scope="col" class="c-bag">Bag</th>
               <!-- Blind roles are told the blood type on the bag, never the person. -->
-              <th scope="col" class="c-donor">{{ canViewIdentity ? 'Donor' : 'Group' }}</th>
-              <th v-for="marker in markers" :key="marker.value" scope="col" class="c-marker">{{ markerHeading(marker.label) }}</th>
+              <th scope="col" class="c-donor" :class="{ 'c-donor--group': !canViewIdentity }">{{ canViewIdentity ? 'Donor' : 'Group' }}</th>
+              <th scope="col" class="c-panel">Panel</th>
               <th scope="col" class="c-overall" :aria-sort="sort === 'reactive_first' ? 'ascending' : 'none'">
                 <button type="button" class="th-sort" title="Reactive first" @click="toggleOverallSort">
                   Overall
@@ -106,6 +123,10 @@
               :key="row.id"
               class="tti-row"
               :class="{ 'tti-row--verify': row.awaiting_verification, 'tti-row--reactive': !row.awaiting_verification && row.outcome === 'reactive' }"
+              tabindex="0"
+              :aria-label="`Open serology for ${row.code}`"
+              @click="openEdit(row, defaultMode(row))"
+              @keydown.enter.self="openEdit(row, defaultMode(row))"
             >
               <td class="c-id"><span class="code">{{ row.code }}</span></td>
               <td class="c-bag">
@@ -121,16 +142,20 @@
                 <span v-else-if="row.donor?.blood_type" class="blood">{{ row.donor.blood_type }}</span>
                 <span v-else class="muted" title="Not typed yet">—</span>
               </td>
-              <td v-for="marker in markers" :key="marker.value" class="c-marker">
-                <span
-                  v-if="readingFor(row, marker.value)"
-                  class="res"
-                  :class="readingFor(row, marker.value) === 'reactive' ? 'res--reactive' : 'res--clear'"
-                >
-                  <span class="res__long">{{ readingFor(row, marker.value) === 'reactive' ? 'Reactive' : 'Non-reactive' }}</span>
-                  <span class="res__short" aria-hidden="true">{{ readingFor(row, marker.value) === 'reactive' ? 'R' : 'NR' }}</span>
+              <!-- The five markers as one strip: quiet when clear, red and named when reactive. -->
+              <td class="c-panel">
+                <span class="mk-strip">
+                  <span
+                    v-for="marker in markers"
+                    :key="marker.value"
+                    class="mk"
+                    :class="readingFor(row, marker.value) === 'reactive' ? 'mk--reactive' : (readingFor(row, marker.value) ? 'mk--clear' : 'mk--none')"
+                    :title="`${marker.label}: ${readingFor(row, marker.value) === 'reactive' ? 'Reactive' : (readingFor(row, marker.value) ? 'Non-reactive' : 'Not recorded')}`"
+                  >
+                    <AssetIcon v-if="readingFor(row, marker.value) === 'reactive'" name="circle-alert" :size="11" />
+                    {{ markerHeading(marker.label) }}
+                  </span>
                 </span>
-                <span v-else class="muted">—</span>
               </td>
               <td class="c-overall">
                 <!-- Saved as reactive, not yet verified: it has set nothing off. -->
@@ -151,7 +176,7 @@
                 {{ formatShortDate(row.recorded_at) }}
                 <span v-if="row.recorded_by" class="sub">{{ row.recorded_by }}</span>
               </td>
-              <td class="c-actions">
+              <td class="c-actions" @click.stop>
                 <div class="row-actions">
                   <button
                     type="button"
@@ -171,7 +196,8 @@
                     :title="editTitle(row)"
                     @click="openEdit(row, 'edit')"
                   >
-                    <AssetIcon name="pencil" :size="15" />
+                    <template v-if="row.can?.correct"><AssetIcon name="pencil" :size="15" /></template>
+                    <AssetIcon v-else name="lock" :size="14" />
                   </button>
                   <button
                     v-if="row.can?.verify || row.correction?.can_decide"
@@ -192,7 +218,9 @@
       </div>
 
       <footer class="pager">
-        <span class="pager__info">{{ pager.total }} result(s)</span>
+        <span class="pager__info">
+          <template v-if="pager.total">Showing {{ (pager.page - 1) * PER_PAGE + 1 }}–{{ Math.min(pager.page * PER_PAGE, pager.total) }} of </template>{{ pager.total }} result(s)
+        </span>
         <div class="pager__btns">
           <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loading" @click="load(pager.page - 1)">
             <AssetIcon name="chevron-left" :size="14" />
@@ -539,7 +567,40 @@ const search = ref('')
 const outcome = ref(OUTCOME_FILTERS.some((option) => option.value === props.initialOutcome) ? props.initialOutcome : '')
 const sort = ref('newest')
 
-const columnCount = computed(() => props.markers.length + 6)
+// ID, bag, group, panel, overall, tested, actions.
+const columnCount = computed(() => 7)
+
+// The chips, in the order a supervisor works them: what waits on a decision first.
+const CHIP_TONES = { '': 'neutral', awaiting_verification: 'warn', correction_pending: 'warn', reactive: 'crit', non_reactive: 'ok' }
+const CHIP_ORDER = ['', 'awaiting_verification', 'correction_pending', 'reactive', 'non_reactive']
+const OUTCOME_CHIPS = CHIP_ORDER
+  .map((value) => OUTCOME_FILTERS.find((option) => option.value === value))
+  .filter(Boolean)
+  .map((option) => ({ ...option, label: option.value ? option.label : 'All', tone: CHIP_TONES[option.value] }))
+
+// How many each chip holds under the same search: each list's total, one row asked for.
+const counts = ref({})
+
+async function loadCounts() {
+  const base = filterParams()
+  delete base.outcome
+  delete base.sort
+  const entries = await Promise.all(OUTCOME_CHIPS.map(async (option) => {
+    try {
+      const res = await bloodCenterService.serologyResults({ ...base, ...(option.value ? { outcome: option.value } : {}), page: 1, per_page: 1 })
+      return [option.value, res?.total ?? 0]
+    } catch {
+      return [option.value, undefined]
+    }
+  }))
+  counts.value = Object.fromEntries(entries)
+}
+
+function setOutcome(value) {
+  if (outcome.value === value) return
+  outcome.value = value
+  load()
+}
 const markerList = computed(() => {
   const names = props.markers.map((marker) => markerHeading(marker.label))
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join('')
@@ -588,6 +649,8 @@ async function load(page = 1) {
   loading.value = true
   loadError.value = ''
   try {
+    // The chips' counts follow the search, not the page.
+    if (page === 1) loadCounts()
     const res = await bloodCenterService.serologyResults({ ...filterParams(), page, per_page: PER_PAGE })
     // Blind unless the viewer may know who the donor is, whatever was sent.
     rows.value = (res?.data ?? []).map((row) => ({ ...row, donor: visibleDonor(row.donor, canViewIdentity.value) }))
@@ -1462,9 +1525,9 @@ onBeforeUnmount(() => {
 .res--reactive { background: var(--rb-accent); color: #fff; font-weight: 800; }
 
 /* Rows: reactive down the edge; one awaiting the supervisor tinted as well. */
-.tti-row--reactive td:first-child { box-shadow: inset 3px 0 0 var(--rb-accent); }
+/* A tint marks them, never an edge line. */
+.tti-row--reactive td { background: rgba(var(--rb-accent-rgb), 0.04); }
 .tti-row--verify td { background: rgba(var(--rb-warning-rgb), 0.06); }
-.tti-row--verify td:first-child { box-shadow: inset 3px 0 0 var(--rb-warning); }
 
 /* The supervisor's action, in words. */
 .c-actions { width: 168px; }
@@ -1474,6 +1537,54 @@ onBeforeUnmount(() => {
   .skeleton,
   .spin { animation: none !important; }
 }
+
+/* ---------- Result chips ---------- */
+/* The search and the chips are one filter band: one line under both, none between. */
+.toolbar { border-bottom: 0 !important; padding-bottom: 12px !important; }
+.outcome-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; border-bottom: 1px solid var(--rb-border); }
+.outcome-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 5px 4px 12px; border: 1px solid var(--rb-border-strong); border-radius: 999px;
+  background: var(--rb-surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--rb-text-secondary); cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.outcome-chip:hover { color: var(--rb-text-primary); border-color: var(--rb-border-hover); }
+.outcome-chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+/* Every count reads the same until it has something in it. */
+.outcome-chip__count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--rb-surface-alt); color: var(--rb-text-secondary); font-size: 11.5px; font-weight: 700; line-height: 1.5; text-align: center; font-variant-numeric: tabular-nums; }
+.outcome-chip--on { border-color: rgba(var(--rb-primary-rgb), 0.5); background: rgba(var(--rb-primary-rgb), 0.08); color: var(--rb-primary-text); }
+.outcome-chip--on .outcome-chip__count { background: rgba(var(--rb-primary-rgb), 0.14); color: var(--rb-primary-text); }
+.outcome-chip__count--loading { width: 22px; height: 17px; animation: count-pulse 1.2s ease-in-out infinite; }
+@keyframes count-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .outcome-chip__count--loading { animation: none; } }
+
+/* Waiting on a decision, or reactive, and not empty: the count itself says so. */
+.outcome-chip--warn .outcome-chip__count { background: rgba(var(--rb-warning-rgb), 0.16); color: var(--rb-warning-text); }
+.outcome-chip--crit .outcome-chip__count { background: rgba(var(--rb-accent-rgb), 0.12); color: var(--rb-accent-text); }
+
+/* ---------- The panel as one strip ---------- */
+/* The panel takes the room the five marker columns left; a blind Group column needs little. */
+.c-panel { width: auto; }
+.c-donor { width: 200px; }
+.c-donor--group { width: 84px; }
+.c-tested { width: 150px; }
+.mk-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.mk {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 6px; border: 1px solid transparent;
+  font-size: 11px; font-weight: 600; line-height: 1.6; white-space: nowrap;
+}
+.mk--clear { background: var(--rb-surface-alt); color: var(--rb-text-secondary); }
+.mk--none { border-style: dashed; border-color: var(--rb-border-strong); color: var(--rb-text-muted); }
+.mk--reactive { background: rgba(var(--rb-accent-rgb), 0.12); border-color: rgba(var(--rb-accent-rgb), 0.45); color: var(--rb-accent-text); font-weight: 800; }
+
+
+/* Rows open their record. */
+.tti-row { cursor: pointer; }
+.tti-row:hover { background: rgba(var(--rb-primary-rgb), 0.04); }
+.tti-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+
+/* One sort shows at a time: the other's arrow appears on hover only. */
+.th-sort__off { opacity: 0 !important; }
+.th-sort:hover .th-sort__off { opacity: 0.4 !important; }
 </style>
 
 <style scoped>

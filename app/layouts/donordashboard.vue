@@ -938,5 +938,45 @@ a, button {
   .valid-gate__title, .logo-name) {
   font-family: var(--rb-font-sans);
 }
+
+/*
+ * Fields a donor can tell are fields (project owner, 2026-11-11). The app's
+ * #E2E8F0 edge is about 1.2:1 on a white card, so a box read as plain text.
+ * Here every text box, dropdown and date gets a clear edge, a slight inset
+ * that reads as "type here", a darker edge on hover and the blue ring on
+ * focus. One place for the whole portal; the pages' own rules stay as the
+ * fallback. A locked field keeps its own look.
+ */
+.donor-portal {
+  --donor-field-border: #A3B0C2;
+  --donor-field-border-hover: #64748B;
+  --donor-field-bg: #FFFFFF;
+  --donor-field-inset: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+html.dark .donor-portal {
+  --donor-field-border: #556070;
+  --donor-field-border-hover: #8A94A3;
+  --donor-field-bg: rgba(255, 255, 255, 0.03);
+  --donor-field-inset: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.donor-portal .form-input.form-input:not(.form-input--locked),
+.donor-portal .sf:not(.sf--open) .sf-trigger.sf-trigger:not(.sf-trigger--invalid):not(:focus-visible),
+.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:not(.dp-trigger--invalid):not(:focus-visible) {
+  border-color: var(--donor-field-border);
+  background-color: var(--donor-field-bg);
+  box-shadow: var(--donor-field-inset);
+}
+.donor-portal .form-input.form-input:not(.form-input--locked):hover:not(:focus),
+.donor-portal .sf:not(.sf--open) .sf-trigger.sf-trigger:hover:not(:disabled):not(.sf-trigger--invalid):not(:focus-visible),
+.donor-portal .dp:not(.dp--open) .dp-trigger.dp-trigger:hover:not(.dp-trigger--invalid):not(:focus-visible) {
+  border-color: var(--donor-field-border-hover);
+}
+.donor-portal .form-input.form-input:not(.form-input--locked):focus {
+  outline: none;
+  border-color: var(--rb-primary);
+  box-shadow: var(--rb-focus-ring);
+}
+.donor-portal .form-input::placeholder { color: var(--rb-placeholder, #64748B); opacity: 1; }
 </style>
 

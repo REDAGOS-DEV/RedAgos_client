@@ -137,11 +137,11 @@ describe('the donation barcode', () => {
   const day = new Date(2026, 8, 26, 12)
   const later = new Date(2026, 8, 26, 18)
 
-  it('refuses what a bag number cannot hold, rather than quietly changing it', () => {
-    expect(phlebotomyProblems(box('SNB/2026/01'), day, later))
-      .toContain('A donation barcode is up to 30 letters, numbers and dashes.')
-    expect(phlebotomyProblems(box('A'.repeat(31)), day, later))
-      .toContain('A donation barcode is up to 30 letters, numbers and dashes.')
+  it('refuses anything but digits, rather than quietly changing it (project owner, 2026-11-11)', () => {
+    for (const barcode of ['SNB/2026/01', 'SEG-0001', '1234-567', '1'.repeat(31)]) {
+      expect(phlebotomyProblems(box(barcode), day, later))
+        .toContain('A donation barcode is numbers only, up to 30 digits.')
+    }
     expect(phlebotomyProblems(box('1234567'), day, later)).toEqual([])
   })
 })

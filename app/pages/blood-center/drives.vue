@@ -2,7 +2,7 @@
   <div class="drives-page">
     <div class="drives-inner">
       <!-- Header -->
-      <PageHeader title="Donation Drives">
+      <PageHeader title="Blood Donation Drives">
         <template #actions>
           <button type="button" class="ui-btn ui-btn--primary" @click="openCreateModal">
             <AssetIcon name="plus" :size="15" />
@@ -11,18 +11,87 @@
         </template>
       </PageHeader>
 
-      <!-- Figures, as on Inventory -->
-      <StatStrip :columns="3">
-        <StatItem :loading="loading" label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
-        <StatItem :loading="loading" label="Booked donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
-        <StatItem :loading="loading" label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
-      </StatStrip>
+      <!-- The month, day by day: a dot for each drive in its state's colour.
+           Picking a day lists that day's drives, whatever their state. -->
+      <section class="cal" aria-label="Drives by date">
+        <header class="cal__head">
+          <div class="cal__nav">
+            <button type="button" class="icon-btn" aria-label="Previous month" @click="shiftMonth(-1)">
+              <AssetIcon name="chevron-left" :size="15" />
+            </button>
+            <h2 class="cal__title">{{ monthLabel }}</h2>
+            <button type="button" class="icon-btn" aria-label="Next month" @click="shiftMonth(1)">
+              <AssetIcon name="chevron-right" :size="15" />
+            </button>
+            <button v-if="!onThisMonth" type="button" class="ui-btn ui-btn--sm" @click="goThisMonth">This month</button>
+          </div>
+          <!-- The month on show, in numbers: they follow the arrows. -->
+          <p class="cal__figs" aria-live="polite">
+            <span><strong>{{ loading ? '–' : monthFigures.drives }}</strong> {{ monthFigures.drives === 1 ? 'drive' : 'drives' }}</span>
+            <span><strong>{{ loading ? '–' : monthFigures.preRegistered }}</strong> pre-registered</span>
+            <span v-if="monthFigures.units !== null"><strong>{{ loading ? '–' : monthFigures.units }}</strong> {{ monthFigures.units === 1 ? 'unit' : 'units' }} collected in {{ monthOnly }}</span>
+          </p>
+        </header>
+
+        <div class="cal__strip">
+          <button
+            v-for="day in monthDays"
+            :key="day.iso"
+            type="button"
+            class="cal__day"
+            :class="{
+              'cal__day--today': day.iso === todayIso,
+              'cal__day--on': day.iso === selectedDate,
+              'cal__day--has': day.drives.length,
+              'cal__day--weekend': day.weekend,
+            }"
+            :aria-pressed="day.iso === selectedDate"
+            :aria-label="dayLabel(day)"
+            :title="day.drives.map((d) => d.name).join('\n') || undefined"
+            @click="pickDate(day.iso)"
+          >
+            <span class="cal__wd">{{ day.wd }}</span>
+            <span class="cal__num">{{ day.n }}</span>
+            <span class="cal__dots" aria-hidden="true">
+              <span v-for="d in day.drives.slice(0, 3)" :key="d.id" class="cal__dot" :class="`cal__dot--${calTone(d)}`" />
+            </span>
+          </button>
+        </div>
+
+        <footer class="cal__legend">
+          <span aria-hidden="true"><span class="cal__dot cal__dot--held" /> Held</span>
+          <span aria-hidden="true"><span class="cal__dot cal__dot--ahead" /> Upcoming</span>
+          <span aria-hidden="true"><span class="cal__dot cal__dot--draft" /> Draft</span>
+          <span aria-hidden="true"><span class="cal__dot cal__dot--cancelled" /> Cancelled</span>
+          <span v-if="monthHasDrives || loading" class="cal__legend-hint">Pick a day to see its drives</span>
+          <!-- The empty strip already says "none this month"; only the way out is worded. -->
+          <button v-else-if="nearestMonth" type="button" class="cal__jump cal__legend-hint" @click="monthCursor = nearestMonth.key">
+            {{ nearestMonth.label }} has {{ nearestMonth.count }} {{ nearestMonth.count === 1 ? 'drive' : 'drives' }}
+            <AssetIcon name="arrow-right" :size="12" />
+          </button>
+        </footer>
+      </section>
 
       <!-- Drive list -->
       <section class="panel">
         <div class="panel-header">
-          <div>
+          <div class="panel-header__lead">
             <h2 class="panel-title">Drives</h2>
+            <label v-if="drives.length" class="search">
+              <AssetIcon name="search" :size="15" class="search__icon" />
+              <input
+                v-model="search"
+                type="search"
+                class="search__input"
+                placeholder="Search drive / venue / staff…"
+                aria-label="Search drives by name, venue or assigned staff"
+              >
+            </label>
+            <button v-if="selectedDate" type="button" class="date-chip" :aria-label="`Show all drives, not only ${longDate(selectedDate)}`" @click="selectedDate = ''">
+              <AssetIcon name="calendar" :size="13" />
+              {{ shortDay(selectedDate) }}
+              <AssetIcon name="x" :size="13" />
+            </button>
           </div>
 
           <div class="seg" role="tablist" aria-label="Show drives">
@@ -32,9 +101,9 @@
               type="button"
               role="tab"
               class="seg__btn"
-              :class="{ 'seg__btn--on': view === tab.value }"
-              :aria-selected="view === tab.value"
-              @click="view = tab.value"
+              :class="{ 'seg__btn--on': !selectedDate && view === tab.value }"
+              :aria-selected="!selectedDate && view === tab.value"
+              @click="view = tab.value; selectedDate = ''"
             >
               {{ tab.label }}
               <span class="seg__count">{{ countFor(tab.value) }}</span>
@@ -60,10 +129,34 @@
           </button>
         </div>
 
+        <div v-else-if="!visibleDrives.length && selectedDate && !search.trim()" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
+          <p class="empty-state__title">No drives that day</p>
+          <p class="empty-state__text">Pick a day with a dot on the strip.</p>
+          <button type="button" class="ui-btn" @click="selectedDate = ''">Show all drives</button>
+        </div>
+
+        <div v-else-if="!visibleDrives.length && search.trim()" class="empty-state">
+          <span class="empty-state__icon"><AssetIcon name="search-x" :size="20" /></span>
+          <p class="empty-state__title">No drives match</p>
+          <p class="empty-state__text">Try another name, venue or staff member, or another tab.</p>
+          <button type="button" class="ui-btn" @click="search = ''">Clear search</button>
+        </div>
+
         <div v-else-if="!visibleDrives.length" class="empty-state">
           <span class="empty-state__icon"><AssetIcon name="calendar" :size="20" /></span>
           <p class="empty-state__title">{{ EMPTY_TAB[view].title }}</p>
           <p class="empty-state__text">{{ EMPTY_TAB[view].text }}</p>
+          <!-- The last drive held, so an empty Upcoming still says where things stand. -->
+          <p v-if="view === 'upcoming' && lastDrive" class="empty-state__last">
+            Last drive: <strong>{{ lastDrive.name }}</strong>, {{ formatShortDate(lastDrive.event_date) }} · {{ preRegisteredCount(lastDrive.pre_registered_count) }}
+          </p>
+          <!-- Create drive sits in the header; here, the way to the drives that exist. -->
+          <div v-if="view === 'upcoming' && countFor('completed')" class="empty-state__actions">
+            <button type="button" class="ui-btn" @click="view = 'completed'">
+              View completed ({{ countFor('completed') }})
+            </button>
+          </div>
         </div>
 
         <p v-if="actionError" class="form-error list-error" role="alert">{{ actionError }}</p>
@@ -74,6 +167,10 @@
             :key="drive.id"
             class="drive"
             :class="{ 'drive--done': drive.status === 'Completed' || drive.status === 'Cancelled', 'drive--today': drive.status === 'Open' }"
+            tabindex="0"
+            :aria-label="`Open ${drive.name}`"
+            @click="detail = drive"
+            @keydown.enter.self="detail = drive"
           >
             <!-- Calendar block: the date is what a drive is planned around. -->
             <div class="drive__date" aria-hidden="true">
@@ -85,10 +182,14 @@
             <div class="drive__body">
               <div class="drive__title-row">
                 <p class="drive__title">{{ drive.name }}</p>
-                <span class="status-badge" :class="`status-badge--${String(drive.status).toLowerCase()}`">
+                <span class="badge" :class="`badge--${statusTone(drive)}`">
+                  <span class="badge__dot" aria-hidden="true" />
                   {{ driveStatusLabel(drive) }}
                 </span>
-                <span v-if="registrationClosed(drive)" class="status-badge status-badge--closed">Registration closed</span>
+                <span v-if="registrationClosed(drive)" class="badge badge--warn">
+                  <span class="badge__dot" aria-hidden="true" />
+                  Registration closed
+                </span>
               </div>
 
               <p class="drive__facts">
@@ -104,10 +205,6 @@
                   <AssetIcon name="users" :size="13" />
                   {{ drive.assigned_staff }}
                 </span>
-                <span v-if="drive.expected_participants" class="drive__fact">
-                  <AssetIcon name="clipboard-list" :size="13" />
-                  Expected {{ drive.expected_participants }}
-                </span>
               </p>
 
               <p v-if="drive.status === 'Cancelled'" class="drive__note drive__note--cancelled">
@@ -116,32 +213,24 @@
               <p v-else-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
             </div>
 
-            <!-- Registrations against capacity -->
+            <!-- The one planning figure: bookings made ahead plus the link's list, live. -->
             <div class="drive__fill">
               <p class="drive__fill-head">
-                <strong>{{ drive.registered_count ?? 0 }}</strong>
-                <span>{{ drive.capacity ? `of ${drive.capacity} booked` : 'booked' }}</span>
-              </p>
-              <div class="progress-track">
-                <div
-                  class="progress-fill"
-                  :class="`progress-fill--${fillLevel(drive)}`"
-                  :style="{ width: `${Math.min(fillPercent(drive), 100)}%` }"
-                />
-              </div>
-              <p class="drive__fill-foot">
-                {{ drive.capacity ? `${Math.min(fillPercent(drive), 100)}% full` : 'No capacity limit' }}
+                <strong>{{ drive.pre_registered_count ?? 0 }}</strong>
+                <span>pre-registered</span>
               </p>
             </div>
 
-            <!-- What the drive's state allows (utils/drives driveActions); the server decides. -->
-            <div class="drive__actions">
+            <!-- What the drive's state allows (utils/drives driveActions); the server decides.
+                 The state's next step in words; Edit and Cancel as icons, as on Donations. -->
+            <div class="drive__actions" @click.stop>
               <button
                 v-if="driveActions(drive).publish"
                 type="button"
                 class="ui-btn ui-btn--sm ui-btn--primary"
                 @click="openPublishDialog(drive)"
               >
+                <AssetIcon name="send" :size="13" />
                 Publish
               </button>
               <button
@@ -149,8 +238,10 @@
                 type="button"
                 class="ui-btn ui-btn--sm"
                 :disabled="busyId === drive.id"
+                title="Stop new bookings; the ones held stand"
                 @click="setRegistration(drive, false)"
               >
+                <AssetIcon name="lock" :size="13" />
                 Close registration
               </button>
               <button
@@ -160,34 +251,161 @@
                 :disabled="busyId === drive.id"
                 @click="setRegistration(drive, true)"
               >
+                <AssetIcon name="unlock" :size="13" />
                 Reopen registration
               </button>
-              <button v-if="driveActions(drive).edit" type="button" class="ui-btn ui-btn--sm" @click="openEditModal(drive)">
-                <AssetIcon name="pencil" :size="13" />
-                Edit
-              </button>
-              <button
-                v-if="driveActions(drive).cancel"
-                type="button"
-                class="ui-btn ui-btn--sm ui-btn--ghost btn-ghost-danger"
-                @click="openCancelDialog(drive)"
+              <!-- The list people put themselves on through the drive's link. -->
+              <NuxtLink
+                v-if="drive.status !== 'Draft'"
+                :to="`/blood-center/drive-registrations/${drive.id}`"
+                class="ui-btn ui-btn--sm"
               >
-                Cancel
-              </button>
+                <AssetIcon name="users" :size="13" />
+                Registrations
+              </NuxtLink>
               <!-- A drive held on paper: type its records in once they are back. -->
               <NuxtLink
                 v-if="canRecordPaper && (drive.status === 'Completed' || drive.status === 'Open')"
                 :to="`/blood-center/paper-records?drive=${drive.id}`"
-                class="btn-small"
+                class="ui-btn ui-btn--sm"
+                title="Enter paper records"
               >
                 <AssetIcon name="file-text" :size="13" />
-                Enter paper records
+                Paper records
               </NuxtLink>
+              <button
+                v-if="driveActions(drive).edit"
+                type="button"
+                class="icon-btn"
+                :aria-label="`Edit ${drive.name}`"
+                title="Edit"
+                @click="openEditModal(drive)"
+              >
+                <AssetIcon name="pencil" :size="15" />
+              </button>
+              <button
+                v-if="driveActions(drive).cancel"
+                type="button"
+                class="icon-btn icon-btn--danger"
+                :aria-label="`Cancel ${drive.name}`"
+                title="Cancel this drive"
+                @click="openCancelDialog(drive)"
+              >
+                <AssetIcon name="x" :size="15" />
+              </button>
             </div>
           </li>
         </ul>
       </section>
     </div>
+
+    <!-- ============ DRIVE RECORD ============ -->
+    <CenterModal v-if="detail" :title="detail.name" eyebrow="Blood donation drive" size="md" @close="detail = null">
+      <template #meta>
+        <span class="badge" :class="`badge--${statusTone(detail)}`">
+          <span class="badge__dot" aria-hidden="true" />
+          {{ driveStatusLabel(detail) }}
+        </span>
+        <span v-if="registrationClosed(detail)" class="badge badge--warn">
+          <span class="badge__dot" aria-hidden="true" />
+          Registration closed
+        </span>
+      </template>
+
+      <div class="dd">
+        <div class="dd-when" :class="{ 'drive--today': detail.status === 'Open' }">
+          <div class="drive__date" aria-hidden="true">
+            <span class="drive__month">{{ dateParts(detail.event_date).month }}</span>
+            <span class="drive__day">{{ dateParts(detail.event_date).day }}</span>
+            <span class="drive__weekday">{{ dateParts(detail.event_date).weekday }}</span>
+          </div>
+          <div class="dd-when__text">
+            <p class="dd-when__date">{{ longDate(detail.event_date) }}</p>
+            <p class="dd-when__sub">
+              <template v-if="detail.start_time && detail.end_time">{{ timeLabel(detail.start_time) }} to {{ timeLabel(detail.end_time) }} · </template>{{ daysAway(detail.event_date) }}
+            </p>
+          </div>
+        </div>
+
+        <!-- The one planning figure, as on the row: no capacity, no estimate (2026-11-12). -->
+        <section aria-labelledby="dd-pre-registered">
+          <h3 id="dd-pre-registered" class="dd-section__title">Pre-registered donors</h3>
+          <p class="drive__fill-head">
+            <strong>{{ detail.pre_registered_count ?? 0 }}</strong>
+            <span>pre-registered</span>
+          </p>
+        </section>
+
+        <dl class="facts">
+          <div class="fact fact--full">
+            <dt>Venue</dt>
+            <dd>{{ detail.location || '—' }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Assigned staff</dt>
+            <dd>{{ detail.assigned_staff || 'Not assigned' }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Registration</dt>
+            <dd>
+              {{ registrationState(detail) }}
+              <span v-if="detail.registration_closed_at" class="fact__sub">Closed {{ formatShortDate(detail.registration_closed_at) }}</span>
+            </dd>
+          </div>
+        </dl>
+
+        <section v-if="detail.status === 'Cancelled' || detail.announcement" aria-labelledby="dd-note">
+          <h3 id="dd-note" class="dd-section__title">{{ detail.status === 'Cancelled' ? 'Why it was cancelled' : 'Message for donors' }}</h3>
+          <p class="dd-note" :class="{ 'dd-note--cancelled': detail.status === 'Cancelled' }">
+            {{ detail.status === 'Cancelled' ? (detail.cancellation_reason || 'No reason given.') : detail.announcement }}
+          </p>
+        </section>
+
+        <section aria-labelledby="dd-history">
+          <h3 id="dd-history" class="dd-section__title">History</h3>
+          <ol class="timeline">
+            <li v-for="step in driveSteps(detail)" :key="step.key" class="tl" :class="`tl--${step.state}`">
+              <span class="tl__dot" aria-hidden="true">
+                <AssetIcon v-if="step.state === 'done'" name="check" :size="11" />
+                <AssetIcon v-else-if="step.state === 'stop'" name="x" :size="11" />
+              </span>
+              <div class="tl__body">
+                <p class="tl__label">{{ step.label }}</p>
+                <p v-if="step.detail" class="tl__detail">{{ step.detail }}</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+      </div>
+
+      <template #actions>
+        <button type="button" class="ui-btn" @click="detail = null">Close</button>
+        <button v-if="driveActions(detail).edit" type="button" class="ui-btn" @click="editFromDetail">
+          <AssetIcon name="pencil" :size="14" />
+          Edit
+        </button>
+        <NuxtLink
+          v-if="canRecordPaper && (detail.status === 'Completed' || detail.status === 'Open')"
+          :to="`/blood-center/paper-records?drive=${detail.id}`"
+          class="ui-btn"
+        >
+          <AssetIcon name="file-text" :size="14" />
+          Paper records
+        </NuxtLink>
+        <NuxtLink
+          v-if="detail.status !== 'Draft'"
+          :to="`/blood-center/drive-registrations/${detail.id}`"
+          class="ui-btn"
+        >
+          <AssetIcon name="users" :size="14" />
+          Registrations
+        </NuxtLink>
+        <button v-if="driveActions(detail).publish" type="button" class="ui-btn ui-btn--primary" @click="publishFromDetail">
+          <AssetIcon name="send" :size="14" />
+          Publish
+        </button>
+      </template>
+    </CenterModal>
 
     <!-- Create drive modal -->
     <Transition name="modal">
@@ -217,38 +435,23 @@
 
             <div class="form-group">
               <label class="form-label" for="drive-date">Date</label>
-              <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" :disabled="scheduleLocked" />
+              <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" />
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="drive-start">Starts</label>
-                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required :disabled="scheduleLocked">
+                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required>
               </div>
               <div class="form-group">
                 <label class="form-label" for="drive-end">Ends</label>
-                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required :disabled="scheduleLocked">
+                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required>
               </div>
             </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="drive-expected">Expected participants <span class="form-optional">optional</span></label>
-                <input id="drive-expected" v-model="driveForm.expected_participants" type="number" min="1" inputmode="numeric" class="form-input" placeholder="e.g. 120">
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="drive-capacity">Registration capacity <span class="form-optional">optional</span></label>
-                <input
-                  id="drive-capacity"
-                  v-model="driveForm.max_capacity"
-                  type="number"
-                  :min="editingDrive?.registered_count || 1"
-                  inputmode="numeric"
-                  class="form-input"
-                  placeholder="No limit"
-                >
-              </div>
-            </div>
+            <p v-if="movesBookings(editingDrive, driveForm)" class="form-notice form-notice--warn" role="status">
+              <AssetIcon name="triangle-alert" :size="14" />
+              <span>{{ bookedLabel(editingDrive.registered_count) }} booked. Their bookings move with the drive, and everyone booked or on its list is notified.</span>
+            </p>
 
             <div class="form-group">
               <label class="form-label" for="drive-staff">Assigned staff <span class="form-optional">optional</span></label>
@@ -260,16 +463,20 @@
               <textarea id="drive-note" v-model="driveForm.announcement" class="form-textarea" rows="3" placeholder="e.g. Bring a valid ID and eat before donating." />
             </div>
 
-            <label v-if="!editingDrive" class="form-check">
-              <input v-model="driveForm.publish" type="checkbox">
-              <span>Publish to donors now</span>
-            </label>
-
             <div class="modal-actions">
               <button type="button" class="ui-btn" @click="closeCreateModal">Discard</button>
-              <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
-                {{ submitLabel }}
+              <button v-if="editingDrive" type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
+                {{ submitting ? 'Saving…' : 'Save changes' }}
               </button>
+              <!-- A new drive: kept as a draft, or published to donors at once. -->
+              <template v-else>
+                <button type="submit" class="ui-btn" :disabled="submitting" @click="driveForm.publish = false">
+                  {{ submitting && !driveForm.publish ? 'Saving…' : 'Save as draft' }}
+                </button>
+                <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting" @click="driveForm.publish = true">
+                  {{ submitting && driveForm.publish ? 'Publishing…' : 'Create and publish' }}
+                </button>
+              </template>
             </div>
           </form>
         </div>
@@ -392,8 +599,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
-import StatStrip from '~/components/ui/StatStrip.vue'
-import StatItem from '~/components/ui/StatItem.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import { formatShortDate } from '~/utils/donorRecords'
 import {
   DRIVE_TABS,
   blankDriveForm,
@@ -403,6 +610,7 @@ import {
   driveStatusLabel,
   driveTab,
   drivesFor,
+  movesBookings,
   registrationClosed,
 } from '~/utils/drives'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -427,7 +635,7 @@ const actionError = ref('')
 const busyId = ref(null)
 
 // Ang mga key dinhi kay pareho gyud sa mga column sa `mobile_events`, dili ang
-// UI labels ('venue', 'capacity'). Usa ra ka vocabulary sa tibuok wire, so
+// UI labels ('venue'). Usa ra ka vocabulary sa tibuok wire, so
 // walay translation layer nga pwede mag-drift sa server.
 const driveForm = reactive(blankDriveForm())
 
@@ -442,15 +650,6 @@ function resetDriveForm() {
 
 // The drive being edited, or null when the modal creates one.
 const editingDrive = ref(null)
-
-// Naay naka-book: ang petsa ug oras dili na mausab (server: drive_schedule_locked).
-const scheduleLocked = computed(() => Boolean(editingDrive.value) && driveActions(editingDrive.value).scheduleLocked)
-
-const submitLabel = computed(() => {
-  if (editingDrive.value) return submitting.value ? 'Saving…' : 'Save changes'
-  if (submitting.value) return 'Creating…'
-  return driveForm.publish ? 'Create and publish' : 'Save as draft'
-})
 
 function openCreateModal() {
   editingDrive.value = null
@@ -600,14 +799,15 @@ function bookedLabel(count) {
 
 // All values start empty/zero — populated only from the API response.
 const upcomingDrivesCount = ref(0)
-const totalRegistered = ref(0)
 const unitsCollectedMonth = ref(0)
+// Bags drawn at drives per month ("YYYY-MM" => count), or null from an older server.
+const unitsByMonth = ref(null)
 const drives = ref([])
 // drive shape: {
 //   id, name, facility_name, location, event_date, start_time, end_time,
-//   capacity (hard limit, null = none), expected_participants (estimate),
 //   registered_count (active bookings), assigned_staff, announcement,
-//   status: 'Draft' | 'Upcoming' | 'Open' | 'Full' | 'Completed' | 'Cancelled',
+//   status: 'Draft' | 'Upcoming' | 'Open' | 'Completed' | 'Cancelled',
+//   pre_registered_count (bookings made ahead + the link's list, live; no limit), registration_token (null while a draft),
 //   published_at, registration_open, registration_closed_at,
 //   cancelled_at, cancellation_reason,
 //   donor_preview: []   // always empty for now: no endpoint lists a drive's donors
@@ -629,15 +829,192 @@ function countFor(value) {
   return drives.value.filter((d) => driveTab(d) === value).length
 }
 
-const visibleDrives = computed(() => drivesFor(drives.value, view.value))
+const search = ref('')
 
-const nextDrive = computed(() => drivesFor(drives.value, 'upcoming')[0])
-
-const nextDriveLabel = computed(() => {
-  if (!nextDrive.value) return 'None scheduled'
-  const { month, day } = dateParts(nextDrive.value.event_date)
-  return `Next on ${month.charAt(0)}${month.slice(1).toLowerCase()} ${day}`
+// The tab's drives, narrowed by the search (name, venue or staff).
+const visibleDrives = computed(() => {
+  const term = search.value.trim().toLowerCase()
+  // A picked day lists every drive on it, whatever its state.
+  const list = selectedDate.value
+    ? drives.value.filter((d) => String(d.event_date).slice(0, 10) === selectedDate.value)
+    : drivesFor(drives.value, view.value)
+  if (!term) return list
+  return list.filter((d) => [d.name, d.location, d.assigned_staff].some((v) => String(v ?? '').toLowerCase().includes(term)))
 })
+
+/** The drive whose record is open. */
+const detail = ref(null)
+
+function editFromDetail() {
+  const drive = detail.value
+  detail.value = null
+  openEditModal(drive)
+}
+
+function publishFromDetail() {
+  const drive = detail.value
+  detail.value = null
+  openPublishDialog(drive)
+}
+
+/** The most recent drive held, for the empty Upcoming tab. */
+const lastDrive = computed(() => drivesFor(drives.value, 'completed')[0] ?? null)
+
+/** "1 pre-registered" / "3 pre-registered": the drive's one planning figure. */
+function preRegisteredCount(count) {
+  return `${count ?? 0} pre-registered`
+}
+
+/* ---------- the month strip ---------- */
+
+// The first of the month on show, as "YYYY-MM".
+const monthCursor = ref(todayIso.value.slice(0, 7))
+// A day picked on the strip ("YYYY-MM-DD"), or '' for the tabs' lists.
+const selectedDate = ref('')
+
+const onThisMonth = computed(() => monthCursor.value === todayIso.value.slice(0, 7))
+
+const monthLabel = computed(() =>
+  new Date(`${monthCursor.value}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+)
+
+function shiftMonth(step) {
+  const [y, m] = monthCursor.value.split('-').map(Number)
+  const d = new Date(y, m - 1 + step, 1)
+  monthCursor.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function goThisMonth() {
+  monthCursor.value = todayIso.value.slice(0, 7)
+}
+
+// Every day of the month with the drives held (or planned) on it.
+const monthDays = computed(() => {
+  const [y, m] = monthCursor.value.split('-').map(Number)
+  const count = new Date(y, m, 0).getDate()
+  const byDate = {}
+  for (const d of drives.value) (byDate[String(d.event_date).slice(0, 10)] ??= []).push(d)
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date(y, m - 1, i + 1)
+    const iso = `${monthCursor.value}-${String(i + 1).padStart(2, '0')}`
+    return {
+      iso,
+      n: i + 1,
+      wd: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2),
+      weekend: date.getDay() === 0 || date.getDay() === 6,
+      drives: byDate[iso] ?? [],
+    }
+  })
+})
+
+const monthOnly = computed(() => new Date(`${monthCursor.value}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long' }))
+
+// The month on show: its drives (a cancelled one is not a drive held), the
+// donors pre-registered for them, and the bags drawn at drives that month. An
+// older server sends this month's units only, so other months then leave units out.
+const monthFigures = computed(() => {
+  const inMonth = drives.value.filter((d) => String(d.event_date).slice(0, 7) === monthCursor.value && d.status !== 'Cancelled')
+  let units = null
+  if (unitsByMonth.value) units = unitsByMonth.value[monthCursor.value] ?? 0
+  else if (onThisMonth.value) units = unitsCollectedMonth.value
+  return {
+    drives: inMonth.length,
+    preRegistered: inMonth.reduce((sum, d) => sum + (d.pre_registered_count ?? 0), 0),
+    units,
+  }
+})
+
+const monthHasDrives = computed(() => monthDays.value.some((day) => day.drives.length))
+
+// With none on show, the closest month that has drives: the next one ahead
+// first, else the latest before.
+const nearestMonth = computed(() => {
+  const counts = {}
+  for (const d of drives.value) {
+    const key = String(d.event_date).slice(0, 7)
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  const keys = Object.keys(counts).sort()
+  const key = keys.find((k) => k > monthCursor.value) ?? [...keys].reverse().find((k) => k < monthCursor.value)
+  if (!key) return null
+  const label = new Date(`${key}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  return { key, label, count: counts[key] }
+})
+
+/** The dot's colour: held, still ahead, a draft, or cancelled. */
+function calTone(drive) {
+  if (drive.status === 'Cancelled') return 'cancelled'
+  if (drive.status === 'Completed') return 'held'
+  if (drive.status === 'Draft') return 'draft'
+  return 'ahead'
+}
+
+function pickDate(iso) {
+  selectedDate.value = selectedDate.value === iso ? '' : iso
+}
+
+/** "Tue, 10 Nov 2026". */
+function shortDay(iso) {
+  const d = new Date(`${iso}T00:00:00`)
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function dayLabel(day) {
+  const n = day.drives.length
+  return `${longDate(day.iso)}: ${n ? `${n} drive${n === 1 ? '' : 's'}` : 'no drives'}`
+}
+
+/** "Tuesday, 10 November 2026". */
+function longDate(value) {
+  const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return String(value ?? '')
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** Whole days from today: "Today", "In 4 days", "26 days ago". */
+function daysAway(value) {
+  const day = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  const today = new Date(`${todayIso.value}T00:00:00`)
+  const n = Math.round((day - today) / 86400000)
+  if (Number.isNaN(n)) return ''
+  if (n === 0) return 'Today'
+  if (n === 1) return 'Tomorrow'
+  if (n === -1) return 'Yesterday'
+  return n > 0 ? `In ${n} days` : `${-n} days ago`
+}
+
+function registrationState(drive) {
+  if (drive.status === 'Draft') return 'Not open: the drive is a draft'
+  if (drive.status === 'Cancelled') return 'Closed with the drive'
+  if (drive.status === 'Completed') return 'Ended with the drive'
+  return drive.registration_open ? 'Open to donors' : 'Closed to new bookings'
+}
+
+/**
+ * The drive's life so far, from what the record holds: published (or still a
+ * draft), registration closed, then held, cancelled or still ahead.
+ */
+function driveSteps(drive) {
+  const steps = [
+    drive.published_at
+      ? { key: 'published', state: 'done', label: 'Published to donors', detail: formatShortDate(drive.published_at) }
+      : { key: 'published', state: drive.status === 'Cancelled' ? 'skipped' : 'pending', label: 'Draft: not published yet', detail: 'Donors cannot see or book it.' },
+  ]
+  if (drive.registration_closed_at && drive.status !== 'Cancelled') {
+    steps.push({ key: 'closed', state: 'done', label: 'Registration closed', detail: `${formatShortDate(drive.registration_closed_at)}. Bookings already held stand.` })
+  }
+  if (drive.status === 'Cancelled') {
+    steps.push({ key: 'end', state: 'stop', label: 'Cancelled', detail: drive.cancelled_at ? formatShortDate(drive.cancelled_at) : '' })
+  } else if (drive.status === 'Completed') {
+    steps.push({ key: 'end', state: 'done', label: 'Drive held', detail: `${formatShortDate(drive.event_date)} · ${preRegisteredCount(drive.pre_registered_count)}` })
+  } else {
+    steps.push({ key: 'end', state: 'pending', label: drive.status === 'Open' ? 'Running today' : 'Drive day', detail: `${formatShortDate(drive.event_date)} · ${daysAway(drive.event_date)}` })
+  }
+  return steps
+}
+
+
+
 
 function dateParts(value) {
   const d = new Date(`${String(value).slice(0, 10)}T00:00:00`)
@@ -656,28 +1033,25 @@ function timeLabel(value) {
   return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 
-function fillPercent(drive) {
-  if (!drive.capacity) return 0
-  return Math.round(((drive.registered_count ?? 0) / drive.capacity) * 100)
-}
+// The dot's colour: today's drive green, a draft, past or cancelled one as said.
+const STATUS_TONES = { Draft: 'neutral', Upcoming: 'info', Open: 'ok', Completed: 'neutral', Cancelled: 'crit' }
 
-// The same three levels as the appointment slots: open, filling up, full.
-function fillLevel(drive) {
-  const pct = fillPercent(drive)
-  if (pct >= 100) return 'full'
-  if (pct >= 75) return 'busy'
-  return 'open'
+function statusTone(drive) {
+  return STATUS_TONES[drive.status] ?? 'neutral'
 }
 
 async function loadDrives() {
   loadError.value = ''
   try {
     // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman ug na-cancel.
-    // { upcoming_drives_count, total_registered, units_collected_month (drives only), drives: [...] }
+    // { upcoming_drives_count, total_pre_registered, units_collected_month (drives only),
+    //   units_collected_by_month, drives: [...] }
     const data = await bloodCenterService.drives()
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
-    totalRegistered.value = data.total_registered ?? 0
     unitsCollectedMonth.value = data.units_collected_month ?? 0
+    // PHP sends an empty map as []; no key at all means an older server.
+    const byMonth = data.units_collected_by_month
+    unitsByMonth.value = byMonth == null ? null : (Array.isArray(byMonth) ? {} : byMonth)
     drives.value = data.drives ?? []
   } catch (err) {
     // Ipakita ang kapakyasan imbes mo-render ug empty state: managlahi ang
@@ -777,25 +1151,6 @@ onPageReturn(loadDrives)
 
 .btn-outline:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
 
-.btn-small {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--rb-border-strong);
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.btn-small:hover { background: var(--rb-surface-hover); border-color: var(--rb-border-hover); }
-a.btn-small { text-decoration: none; }
 
 .btn-danger {
   display: inline-flex;
@@ -814,27 +1169,9 @@ a.btn-small { text-decoration: none; }
 
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-ghost-danger {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--rb-accent-rgb), 0.3);
-  background: transparent;
-  color: var(--rb-accent-text);
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.btn-ghost-danger:hover:not(:disabled) { background: rgba(var(--rb-accent-rgb), 0.06); }
-.btn-ghost-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
-.btn-ghost-danger:focus-visible,
-.btn-small:focus-visible,
 .btn-danger:focus-visible,
 .seg__btn:focus-visible {
   outline: none;
@@ -943,7 +1280,9 @@ a.btn-small { text-decoration: none; }
 
 .drive {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 220px minmax(150px, 250px);
+  /* The figure is one number now (no capacity bar); the actions take the room,
+     up to Close registration + Registrations + Paper records + two icons. */
+  grid-template-columns: 60px minmax(0, 1fr) 130px 440px;
   align-items: center;
   gap: 20px;
   padding: 16px 18px;
@@ -951,34 +1290,30 @@ a.btn-small { text-decoration: none; }
 }
 
 .drive + .drive { border-top: 1px solid var(--rb-border); }
-.drive:hover { background: var(--rb-surface-hover); }
+.drive:hover { background: rgba(var(--rb-primary-rgb), 0.04); }
 
 .drive__date {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 64px;
-  padding: 6px 0 8px;
-  border: 1px solid var(--rb-border-strong);
+  justify-content: center;
+  width: 60px;
+  height: 64px;
+  border: 1px solid var(--rb-border);
   border-radius: 12px;
-  background: var(--rb-surface);
-  overflow: hidden;
+  background: var(--rb-surface-alt);
 }
 
 .drive__month {
-  align-self: stretch;
-  margin: -6px 0 4px;
-  padding: 3px 0;
-  background: var(--rb-primary);
-  color: #fff;
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-align: center;
+  letter-spacing: 0.08em;
+  color: var(--rb-primary-text);
 }
 
 .drive__day {
-  font-size: 22px;
+  margin: 1px 0;
+  font-size: 21px;
   font-weight: 800;
   line-height: 1;
   color: var(--rb-text-primary);
@@ -986,14 +1321,17 @@ a.btn-small { text-decoration: none; }
 }
 
 .drive__weekday {
-  margin-top: 3px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--rb-text-secondary);
 }
 
-.drive--today .drive__month { background: var(--rb-success); }
-.drive--done .drive__month { background: var(--rb-text-muted); }
+/* Today's drive is the one to act on. */
+.drive--today .drive__date { border-color: var(--rb-primary); background: var(--rb-primary); }
+.drive--today .drive__month,
+.drive--today .drive__day,
+.drive--today .drive__weekday { color: #fff; }
+.drive--done .drive__month { color: var(--rb-text-muted); }
 .drive--done .drive__title,
 .drive--done .drive__day { color: var(--rb-text-secondary); }
 
@@ -1020,20 +1358,24 @@ a.btn-small { text-decoration: none; }
   flex-wrap: wrap;
   gap: 4px 16px;
   margin: 6px 0 0;
+  min-width: 0;
 }
 
 .drive__fact {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   font-size: 12.5px;
   color: var(--rb-text-secondary);
 }
+.drive__fact :deep(.asset-icon) { flex-shrink: 0; color: var(--rb-text-muted); }
 
 .drive__note {
   margin: 8px 0 0;
-  padding-left: 10px;
-  border-left: 2px solid var(--rb-border-strong);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--rb-surface-alt);
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--rb-text-secondary);
@@ -1044,22 +1386,29 @@ a.btn-small { text-decoration: none; }
   overflow: hidden;
 }
 
-.status-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
+/* Status: the colour lives on the dot, never on the badge's fill. */
+.badge {
+  --tone: var(--rb-text-muted);
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rb-border);
+  background: var(--rb-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--rb-text-primary);
   white-space: nowrap;
 }
-
-.status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
-.status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.status-badge--full { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
-.status-badge--completed { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
-.status-badge--draft { background: transparent; color: var(--rb-text-secondary); border: 1px dashed var(--rb-border-strong); }
-.status-badge--cancelled { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
-.status-badge--closed { background: rgba(var(--rb-warning-rgb), 0.12); color: var(--rb-warning-text); }
+.badge__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--tone); flex-shrink: 0; }
+.badge--info { --tone: var(--rb-primary); }
+.badge--ok { --tone: var(--rb-success); }
+.badge--warn { --tone: var(--rb-warning); }
+.badge--crit { --tone: var(--rb-accent); }
+.badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
 /* Registrations */
 .drive__fill-head {
@@ -1078,39 +1427,18 @@ a.btn-small { text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 
-.progress-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--rb-border-strong);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.progress-fill--open { background: var(--rb-success); }
-.progress-fill--busy { background: var(--rb-warning); }
-.progress-fill--full { background: var(--rb-accent); }
-
-.drive__fill-foot {
-  margin: 5px 0 0;
-  font-size: 11.5px;
-  color: var(--rb-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
 
 .drive__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
 }
+.drive__actions .ui-btn { flex-shrink: 0; white-space: nowrap; }
 
 .drive__note--cancelled {
-  border-left-color: rgba(var(--rb-accent-rgb), 0.5);
+  background: rgba(var(--rb-accent-rgb), 0.06);
   color: var(--rb-accent-text);
 }
 
@@ -1213,7 +1541,6 @@ a.btn-small { text-decoration: none; }
   color: var(--rb-text-primary);
 }
 
-
 /* A calm note (what publishing does), not an error. */
 .form-notice {
   display: flex;
@@ -1230,6 +1557,14 @@ a.btn-small { text-decoration: none; }
 }
 
 .form-notice :deep(svg) { flex-shrink: 0; margin-top: 1px; }
+
+.form-notice--warn {
+  border-color: rgba(var(--rb-warning-rgb), 0.35);
+  background: rgba(var(--rb-warning-rgb), 0.08);
+  color: var(--rb-text-primary);
+}
+
+.form-notice--warn :deep(svg) { color: var(--rb-warning-text); }
 
 .cancel-impact {
   display: flex;
@@ -1309,17 +1644,6 @@ a.btn-small { text-decoration: none; }
   cursor: not-allowed;
 }
 
-.form-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-primary);
-  cursor: pointer;
-}
-
-.form-check input { width: 16px; height: 16px; accent-color: var(--rb-primary); }
 
 .modal-actions {
   display: flex;
@@ -1343,4 +1667,137 @@ a.btn-small { text-decoration: none; }
   .skeleton { animation: none !important; }
 }
 .drives-skeleton { padding: 16px 20px; }
+
+/* ---------- Dialog shell, as the system's CenterModal draws it ---------- */
+.modal-overlay { background: rgba(15, 23, 42, 0.5); }
+.modal-card { border-radius: 18px; box-shadow: 0 28px 70px -24px rgba(15, 23, 42, 0.55); }
+.modal-card__header { align-items: center; padding: 18px 24px 16px; }
+.modal-card__title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.modal-card__subtitle { margin-top: 4px; font-size: 13px; }
+.modal-card__close {
+  display: grid; flex-shrink: 0; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--rb-border-strong); border-radius: 10px;
+  background: var(--rb-surface); color: var(--rb-text-secondary);
+}
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.modal-form { padding: 20px 24px 24px; }
+
+.icon-btn {
+  display: grid; flex-shrink: 0; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px;
+  border: 1px solid var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-secondary);
+  cursor: pointer; transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.icon-btn:hover:not(:disabled) { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.icon-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn--danger:hover:not(:disabled) { color: var(--rb-accent-text); border-color: rgba(var(--rb-accent-rgb), 0.45); background: rgba(var(--rb-accent-rgb), 0.06); }
+
+/* ---------- Panel header: title with its search ---------- */
+.panel-header__lead { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1 1 auto; }
+.search { position: relative; flex: 0 1 300px; min-width: 180px; }
+.search__icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--rb-text-muted); pointer-events: none; }
+.search__input {
+  width: 100%; height: 36px; padding: 0 12px 0 34px; border: 1px solid var(--rb-border-strong); border-radius: 10px;
+  background: var(--rb-surface); font-family: inherit; font-size: 13px; color: var(--rb-text-primary);
+}
+.search__input::placeholder { color: var(--rb-placeholder); }
+.search__input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+
+/* ---------- Empty tab ---------- */
+.empty-state__last { margin: 6px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.empty-state__last strong { color: var(--rb-text-primary); font-weight: 600; }
+.empty-state__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+
+/* ---------- Rows open the record ---------- */
+.drive { cursor: pointer; }
+.drive:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+
+/* ---------- Drive record ---------- */
+.dd { display: flex; flex-direction: column; gap: 18px; }
+.dd-when { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); }
+.dd-when .drive__date { background: var(--rb-surface); }
+.dd-when.drive--today .drive__date { background: var(--rb-primary); }
+.dd-when__text { min-width: 0; }
+.dd-when__date { margin: 0; font-size: 16px; font-weight: 700; }
+.dd-when__sub { margin: 3px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.dd-section__title { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.dd-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--rb-surface-alt); font-size: 13px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.dd-note--cancelled { background: rgba(var(--rb-accent-rgb), 0.06); color: var(--rb-accent-text); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding-top: 16px; border-top: 1px solid var(--rb-border); }
+.fact { min-width: 0; }
+.fact--full { grid-column: 1 / -1; }
+.fact dt { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); }
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.fact__sub { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+
+/* The drive's history as a short line of steps, as on Donations. */
+.timeline { margin: 0; padding: 0; list-style: none; }
+.tl { position: relative; display: flex; gap: 12px; padding-bottom: 14px; }
+.tl:last-child { padding-bottom: 0; }
+.tl:not(:last-child)::before { content: ''; position: absolute; left: 10px; top: 24px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--rb-border); }
+.tl__dot {
+  position: relative; display: grid; flex-shrink: 0; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--rb-border-strong); background: var(--rb-surface); color: #fff;
+}
+.tl--done .tl__dot { border-color: var(--rb-success); background: var(--rb-success); }
+.tl--stop .tl__dot { border-color: var(--rb-accent); background: var(--rb-accent); }
+.tl--pending .tl__dot { border-style: dashed; }
+.tl--skipped { opacity: 0.6; }
+.tl__body { min-width: 0; padding-top: 1px; }
+.tl__label { margin: 0; font-size: 13.5px; font-weight: 700; }
+.tl--pending .tl__label, .tl--skipped .tl__label { color: var(--rb-text-secondary); }
+.tl__detail { margin: 2px 0 0; font-size: 12.5px; color: var(--rb-text-secondary); overflow-wrap: anywhere; }
+
+/* ---------- The month strip ---------- */
+.cal {
+  border: 1px solid var(--rb-border);
+  border-radius: 16px;
+  background: var(--rb-surface);
+  box-shadow: 0 1px 2px rgba(var(--rb-shadow-rgb), 0.03);
+}
+.cal__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 14px 18px 10px; }
+.cal__nav { display: flex; align-items: center; gap: 8px; }
+.cal__title { min-width: 150px; margin: 0; font-size: 15px; font-weight: 700; text-align: center; }
+.cal__figs { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; font-size: 12.5px; color: var(--rb-text-secondary); }
+.cal__figs strong { margin-right: 3px; font-size: 14px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+
+.cal__strip { display: grid; grid-auto-columns: minmax(30px, 1fr); grid-auto-flow: column; gap: 4px; padding: 4px 14px 10px; overflow-x: auto; }
+.cal__day {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 30px; padding: 6px 0 7px;
+  border: 1px solid transparent; border-radius: 10px; background: none; font: inherit; color: var(--rb-text-primary);
+  cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease;
+}
+.cal__day:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
+.cal__day:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.cal__wd { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; color: var(--rb-text-muted); }
+.cal__day--weekend .cal__wd { color: var(--rb-accent-text); opacity: 0.75; }
+.cal__num { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--rb-text-secondary); }
+.cal__day--has .cal__num { font-weight: 800; color: var(--rb-text-primary); }
+.cal__day--today { border-color: rgba(var(--rb-primary-rgb), 0.5); }
+.cal__day--today .cal__num { color: var(--rb-primary-text); }
+.cal__day--on, .cal__day--on:hover { border-color: var(--rb-primary); background: var(--rb-primary); }
+.cal__day--on .cal__wd, .cal__day--on .cal__num { color: #fff; opacity: 1; }
+.cal__dots { display: flex; gap: 2px; height: 6px; }
+.cal__dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; }
+.cal__dot--held { background: var(--rb-success); }
+.cal__dot--ahead { background: var(--rb-primary); }
+.cal__dot--draft { background: var(--rb-text-muted); }
+.cal__dot--cancelled { background: var(--rb-accent); }
+.cal__day--on .cal__dot { box-shadow: 0 0 0 1.5px #fff; }
+
+.cal__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 18px; border-top: 1px solid var(--rb-border); font-size: 11.5px; color: var(--rb-text-secondary); }
+.cal__legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.cal__legend-hint { margin-left: auto; color: var(--rb-text-muted); }
+.cal__jump { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--rb-primary-text); cursor: pointer; }
+.cal__jump:hover { text-decoration: underline; }
+.cal__jump:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--rb-focus-ring); }
+
+/* The picked day, beside the search; its x shows every drive again. */
+.date-chip {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.08);
+  color: var(--rb-primary-text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.date-chip:hover { background: rgba(var(--rb-primary-rgb), 0.14); }
+.date-chip:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
 </style>

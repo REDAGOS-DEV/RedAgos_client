@@ -16,6 +16,15 @@ class DonorService extends BaseService {
         return await this.request(`${this.resource}/register`, 'POST', payload);
     }
 
+    /**
+     * Continue on the registration page: one step's fields, checked by the
+     * server as the registration would check them. Stores nothing; a 422 names
+     * the fields, as the registration's does.
+     */
+    async checkRegistrationStep(step: number, payload: object): Promise<any> {
+        return await this.request(`${this.resource}/register/check`, 'POST', { ...payload, step });
+    }
+
     async dashboard(): Promise<any> {
         return await this.request(`${this.resource}/dashboard`, 'GET');
     }

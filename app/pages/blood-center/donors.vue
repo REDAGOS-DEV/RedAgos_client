@@ -2,9 +2,11 @@
   <div class="donors-page">
     <div class="donors-inner">
       <header class="header-row">
-        <div>
-          <h1 class="page-title">Donor Management</h1>
-        </div>
+        <h1 class="page-title">Donor Management</h1>
+        <button v-if="canManage" type="button" class="btn-primary" @click="openCreate">
+          <AssetIcon name="plus" :size="15" />
+          New Donor
+        </button>
       </header>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -77,11 +79,6 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loadingDonors }" />
               <span class="btn-text">Refresh</span>
             </button>
-
-            <button v-if="canManage" type="button" class="btn-primary" @click="openCreate">
-              <AssetIcon name="plus" :size="15" />
-              New Donor
-            </button>
           </div>
         </div>
 
@@ -106,7 +103,7 @@
                 <th scope="col" class="c-phone">Phone</th>
                 <th v-if="!contactOnly" scope="col" class="c-address">Address</th>
                 <th scope="col" class="c-last">Last donation</th>
-                <th scope="col" class="c-total num">Total</th>
+                <th scope="col" class="c-total">Total</th>
                 <th scope="col" class="c-elig">Eligibility</th>
                 <th scope="col" class="c-status">Status</th>
                 <th scope="col" class="c-actions" :style="{ width: `${actionsWidth}px` }">Actions</th>
@@ -114,7 +111,7 @@
             </thead>
 
             <tbody v-if="loadingDonors && !donors.length">
-              <SkeletonRows :columns="columnCount" :rows="6" />
+              <SkeletonRows :columns="columnCount" :rows="6" :cell-classes="columnClasses" />
             </tbody>
 
             <tbody v-else-if="!donors.length">
@@ -139,29 +136,44 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="donor in donors" :key="donor.uuid" class="donor-row">
+              <tr
+                v-for="donor in donors"
+                :key="donor.uuid"
+                class="donor-row"
+                :class="{ 'donor-row--open': canOpenRow(donor) }"
+                :tabindex="canOpenRow(donor) ? 0 : undefined"
+                :aria-label="canOpenRow(donor) ? `Open ${donor.name}'s profile` : undefined"
+                @click="canOpenRow(donor) && openProfile(donor)"
+                @keydown.enter.self="canOpenRow(donor) && openProfile(donor)"
+              >
                 <td class="c-id"><span class="donor-code">{{ donor.donorCode }}</span></td>
                 <td class="c-donor">
-                  <div class="donor-cell">
+                  <div class="person">
+                    <PersonAvatar :name="donor.name" />
+                    <div class="donor-cell">
                     <span class="donor-cell__name">{{ donor.name }}</span>
                     <span v-if="donor.notCheckedIn" class="donor-cell__other" title="Not yet checked in at any blood centre">Not checked in</span>
                     <span v-else-if="donor.otherCentre" class="donor-cell__other" title="Not yet checked in or registered at your centre">Other centre</span>
                     <span v-if="donor.subline" class="donor-cell__sub">{{ donor.subline }}</span>
                     <!-- Takes the Phone column's place when the panel is too narrow for it. -->
-                    <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}</span>
+                    <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}{{ donor.phoneShared ? ' · Shared' : '' }}</span>
+                    </div>
                   </div>
                 </td>
                 <td v-if="!contactOnly" class="c-group">
                   <span v-if="donor.bloodType" class="blood">{{ donor.bloodType }}</span>
                   <span v-else class="muted" title="Not typed yet">—</span>
                 </td>
-                <td class="c-phone nowrap">{{ donor.phone || '—' }}</td>
+                <td class="c-phone nowrap">
+                  {{ donor.phone || '—' }}
+                  <span v-if="donor.phone && donor.phoneShared" class="phone-shared">Shared</span>
+                </td>
                 <td v-if="!contactOnly" class="c-address" :title="donor.address">{{ donor.address || '—' }}</td>
                 <td class="c-last nowrap">
                   {{ donor.lastDonation || '—' }}
                   <span v-if="donor.lastDonationDeclared" class="declared" title="As the donor declared it; not recorded in RedAgos">*</span>
                 </td>
-                <td class="c-total num">
+                <td class="c-total">
                   <span class="total">
                     <span class="total__count">{{ donor.totalDonations }}</span>
                     <span v-if="donor.tier" class="tier" :class="`tier--${donor.tier.key}`">{{ donor.tier.label }}</span>
@@ -186,28 +198,30 @@
                   </span>
                   <span v-else class="muted" title="No donation yet">—</span>
                 </td>
-                <td class="c-actions">
+                <td class="c-actions" @click.stop>
                   <div class="row-actions">
                     <!-- Straight to the counter with this donor, no searching there: eligible donors only. -->
                     <template v-if="canStartDonation && donor.uuid">
                       <NuxtLink
                         v-if="!startDonationBlock(donor.eligibility)"
                         :to="counterLink(donor.uuid)"
-                        class="icon-btn"
+                        class="act-btn"
                         :aria-label="`Start a donation for ${donor.name} at the counter`"
                         title="Start donation"
                       >
-                        <AssetIcon name="heart" :size="15" />
+                        <AssetIcon name="heart" :size="13" />
+                        Start
                       </NuxtLink>
                       <button
                         v-else
                         type="button"
-                        class="icon-btn"
+                        class="act-btn"
                         disabled
                         :aria-label="`Cannot start a donation for ${donor.name}. ${startDonationBlock(donor.eligibility)}`"
                         :title="startDonationBlock(donor.eligibility)"
                       >
-                        <AssetIcon name="heart" :size="15" />
+                        <AssetIcon name="heart" :size="13" />
+                        Start
                       </button>
                     </template>
                     <button
@@ -248,27 +262,19 @@
           </table>
         </div>
 
-        <footer v-if="pager.total" class="pager">
-          <span class="pager__info">Showing {{ pager.from || 0 }}–{{ pager.to || 0 }} of {{ pager.total }}</span>
+        <footer class="pager">
+          <span class="pager__info">
+            <template v-if="pager.total">Showing {{ pager.from || 0 }}–{{ pager.to || 0 }} of </template>{{ pager.total }} record(s)
+          </span>
           <div class="pager__btns">
-            <button
-              type="button"
-              class="pager__btn"
-              :disabled="pager.page <= 1 || loadingDonors"
-              aria-label="Previous page"
-              @click="loadDonors(pager.page - 1)"
-            >
-              <AssetIcon name="chevron-left" :size="15" />
+            <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loadingDonors" @click="loadDonors(pager.page - 1)">
+              <AssetIcon name="chevron-left" :size="14" />
+              Prev
             </button>
-            <span class="pager__page">Page {{ pager.page }} of {{ pager.lastPage }}</span>
-            <button
-              type="button"
-              class="pager__btn"
-              :disabled="pager.page >= pager.lastPage || loadingDonors"
-              aria-label="Next page"
-              @click="loadDonors(pager.page + 1)"
-            >
-              <AssetIcon name="chevron-right" :size="15" />
+            <span class="pager__page">Page {{ pager.page }} / {{ pager.lastPage }}</span>
+            <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page >= pager.lastPage || loadingDonors" @click="loadDonors(pager.page + 1)">
+              Next
+              <AssetIcon name="chevron-right" :size="14" />
             </button>
           </div>
         </footer>
@@ -388,7 +394,10 @@
 
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label" for="d-phone">Phone</label>
+                  <div class="form-label-row">
+                    <label class="form-label" for="d-phone">Phone</label>
+                    <PhoneKindToggle v-model="form.data.phone_shared" size="sm" :disabled="!form.editable.contact || form.saving" />
+                  </div>
                   <PhoneField id="d-phone" v-model="form.data.phone" class="form-phone" autocomplete="off" :invalid="Boolean(fieldError('phone'))" :disabled="!form.editable.contact" />
                   <p v-if="fieldError('phone')" class="field-error">{{ fieldError('phone') }}</p>
                 </div>
@@ -447,6 +456,47 @@
             <button type="submit" form="donor-form" class="btn-primary" :disabled="form.saving || form.loading || !canSaveForm">
               <AssetIcon name="check" :size="15" />
               {{ form.saving ? 'Saving…' : 'Save Donor' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ============ SHARED NUMBER: SOMEONE ELSE'S PERSONAL ONE ============ -->
+    <!--
+      Shared typed for a number another account holds as Personal, as when a
+      son signed up in the portal with the family's only phone (project owner,
+      2026-11-12). Staff cannot change his; they confirm, and it is saved as
+      Shared. Escape closes this one first (onKeydown).
+    -->
+    <Transition name="modal">
+      <div v-if="sharedPhone.open" class="modal-overlay" @click.self="cancelSharedPhone">
+        <div
+          v-focus-trap
+          class="modal-card modal-card--sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="shared-phone-title"
+          aria-describedby="shared-phone-text"
+        >
+          <div class="modal-card__header">
+            <h2 id="shared-phone-title" class="modal-card__title">
+              <AssetIcon name="triangle-alert" :size="17" />
+              Shared number
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="cancelSharedPhone">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <div class="modal-card__body">
+            <p id="shared-phone-text" class="modal-text">{{ sharedPhone.message }}</p>
+          </div>
+
+          <div class="modal-card__footer">
+            <button type="button" class="btn-outline" @click="cancelSharedPhone">Cancel</button>
+            <button type="button" class="btn-primary" :disabled="form.saving" @click="confirmSharedPhone">
+              {{ form.saving ? 'Saving…' : 'Save as Shared' }}
             </button>
           </div>
         </div>
@@ -544,7 +594,13 @@
               </p>
 
               <dl class="facts">
-                <div class="fact"><dt>Phone</dt><dd>{{ profile.phone || '—' }}</dd></div>
+                <div class="fact">
+                  <dt>Phone</dt>
+                  <dd>
+                    {{ profile.phone || '—' }}
+                    <span v-if="profile.phone && profile.phoneShared" class="fact__sub">Shared</span>
+                  </dd>
+                </div>
                 <div class="fact">
                   <dt>Email</dt>
                   <dd>
@@ -809,10 +865,12 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import IdNumberField from '~/components/common/IdNumberField.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
+import PhoneKindToggle from '~/components/common/PhoneKindToggle.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { idNumberProblem } from '~/utils/validId'
 import { resolveApiAssetURL } from '~/api/BaseService'
 import AssetIcon from '~/components/common/AssetIcon.vue'
+import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
 import {
   GENDER_OPTIONS,
@@ -837,6 +895,9 @@ import {
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
+import { donorPrefillFromQuery } from '~/utils/driveRegistration'
+
+const route = useRoute()
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -933,14 +994,26 @@ const pager = reactive({ page: 1, lastPage: 1, total: 0, from: 0, to: 0 })
 
 const contactOnly = computed(() => donors.value.length > 0 && donors.value.every((d) => d.contactOnly))
 const columnCount = computed(() => (contactOnly.value ? 8 : 10))
+// The headings' classes, so the loading rows hide the same columns.
+const columnClasses = computed(() => [
+  'c-id', 'c-donor', ...(contactOnly.value ? [] : ['c-group']), 'c-phone', ...(contactOnly.value ? [] : ['c-address']),
+  'c-last', 'c-total', 'c-elig', 'c-status', 'c-actions',
+])
 
 // The table has fixed column widths so it fits its panel. The actions column
 // is sized for the buttons this role actually sees: 30px each, 6px apart,
 // plus the cell's padding. Never narrower than its "Actions" heading.
+// Start is worded (about 68px); the rest are 30px icons.
 const actionsWidth = computed(() => {
-  const buttons = (canStartDonation.value ? 1 : 0) + (canViewProfile.value ? 1 : 0) + (canManage.value ? 2 : 0)
-  return Math.max(84, 26 + buttons * 30 + Math.max(0, buttons - 1) * 6)
+  const icons = (canViewProfile.value ? 1 : 0) + (canManage.value ? 2 : 0)
+  const buttons = icons + (canStartDonation.value ? 1 : 0)
+  return Math.max(84, 34 + icons * 30 + (canStartDonation.value ? 68 : 0) + Math.max(0, buttons - 1) * 6)
 })
+
+/** A row opens the profile only where the eye button would. */
+function canOpenRow(donor) {
+  return canViewProfile.value && !donor.contactOnly
+}
 const hasFilters = computed(() => Boolean(search.value.trim() || bloodTypeId.value || statusFilter.value))
 
 const updatedAtLabel = computed(() => updatedAt.value
@@ -971,6 +1044,8 @@ function mapDonor(row) {
     subline: donorSubline(row.gender, row.birth_date),
     bloodType: row.blood_type || '',
     phone: formatPhone(row.phone),
+    // The household's number, which other donors may hold too (2026-11-12).
+    phoneShared: Boolean(row.phone && row.phone_shared),
     email: row.email || '',
     address: row.address || '',
     totalDonations: row.total_donations ?? 0,
@@ -996,12 +1071,12 @@ async function loadDonors(page = 1) {
   try {
     const res = await bloodCenterService.donors({ ...filterParams(), page, per_page: PER_PAGE })
     const rows = Array.isArray(res) ? res : (res?.data ?? [])
-    const unlisted = rows.length ? null : await findUnlisted()
+    const unlisted = rows.length ? [] : await findUnlisted()
     if (seq !== loadSeq) return
 
-    donors.value = unlisted ? [unlisted] : rows.map(mapDonor)
-    Object.assign(pager, unlisted
-      ? { page: 1, lastPage: 1, total: 1, from: 1, to: 1 }
+    donors.value = unlisted.length ? unlisted : rows.map(mapDonor)
+    Object.assign(pager, unlisted.length
+      ? { page: 1, lastPage: 1, total: unlisted.length, from: 1, to: unlisted.length }
       : {
           page: res?.current_page ?? page,
           lastPage: res?.last_page ?? 1,
@@ -1026,16 +1101,19 @@ async function loadDonors(page = 1) {
  * start their first visit instead of registering them twice.
  */
 async function findUnlisted() {
-  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return null
+  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return []
   const exact = unlistedLookup(search.value)
-  if (!exact) return null
+  if (!exact) return []
 
   try {
-    const found = await bloodCenterService.lookupDonor(exact)
-    return found?.uuid ? { ...mapDonor(found), notCheckedIn: true } : null
+    // Every match: a household's shared number finds the whole family (2026-11-12).
+    const found = await bloodCenterService.lookupDonors(exact)
+    return (found?.data ?? [])
+      .filter(row => row?.uuid)
+      .map(row => ({ ...mapDonor(row), notCheckedIn: true }))
   } catch {
     // Not found: the empty list says so.
-    return null
+    return []
   }
 }
 
@@ -1398,6 +1476,33 @@ function openCreate() {
     original: blankDonorForm(),
     editable: { ...ALL_EDITABLE },
   })
+  driveEntryToLink.value = null
+}
+
+// A drive roster's "Register as donor" (pages/blood-center/drive-registrations):
+// the form opens with what the person typed on the drive's link, and the new
+// donor is linked to their entry once saved.
+const driveEntryToLink = ref(null)
+
+function openCreateFromDrive() {
+  const prefill = donorPrefillFromQuery(route.query)
+  if (!prefill) return
+  openCreate()
+  Object.assign(form.data, Object.fromEntries(Object.entries(prefill.fields).filter(([, value]) => value)))
+  driveEntryToLink.value = { driveId: prefill.driveId, entryId: prefill.entryId }
+  navigateTo({ query: {} }, { replace: true })
+}
+
+async function linkToDriveEntry(uuid) {
+  const target = driveEntryToLink.value
+  driveEntryToLink.value = null
+  if (!target || !uuid) return ''
+  try {
+    await bloodCenterService.matchDriveRegistration(target.driveId, target.entryId, uuid)
+    return ' Linked to their drive registration.'
+  } catch {
+    return ' Link them on the drive\'s roster.'
+  }
 }
 
 async function openEdit(uuid) {
@@ -1425,6 +1530,7 @@ async function openEdit(uuid) {
 function closeForm() {
   if (form.saving) return
   form.open = false
+  sharedPhone.open = false
   resetPhoto()
 }
 
@@ -1455,7 +1561,23 @@ async function uploadPhoto(uuid) {
   }
 }
 
-async function submitForm() {
+/*
+ * Shared typed for someone else's Personal number: the server asks (409
+ * phone_personal_elsewhere) and the form is sent again once staff confirm.
+ */
+const sharedPhone = reactive({ open: false, message: '' })
+
+function cancelSharedPhone() {
+  if (form.saving) return
+  sharedPhone.open = false
+}
+
+async function confirmSharedPhone() {
+  await submitForm(null, { confirmSharedPhone: true })
+}
+
+// Bound to @submit, so the first argument is the event.
+async function submitForm(_event, { confirmSharedPhone = false } = {}) {
   if (!canSaveForm.value || form.saving) return
   form.saving = true
   form.error = ''
@@ -1466,11 +1588,12 @@ async function submitForm() {
     let message = ''
 
     if (form.mode === 'create') {
-      const res = await bloodCenterService.createDonor(registerPayload(form.data))
+      const res = await bloodCenterService.createDonor(registerPayload(form.data, { confirmSharedPhone }))
       uuid = (res?.data ?? res)?.uuid
       message = res?.message || `${form.data.first_name.trim()} has been registered.`
+      message += await linkToDriveEntry(uuid)
     } else {
-      const payload = editPayload(form.data, form.original)
+      const payload = editPayload(form.data, form.original, { confirmSharedPhone })
       if (Object.keys(payload).length) {
         const res = await bloodCenterService.updateDonor(uuid, payload)
         message = res?.message || 'Donor record updated.'
@@ -1479,6 +1602,7 @@ async function submitForm() {
       }
     }
 
+    sharedPhone.open = false
     const photoProblem = uuid ? await uploadPhoto(uuid) : ''
 
     // A walk-in leaves the desk able to use the portal: the sign-in is given as
@@ -1510,6 +1634,12 @@ async function submitForm() {
     await loadDonors(form.mode === 'create' ? 1 : pager.page)
     if (profileView.open && profileView.uuid === uuid) await loadProfile(uuid)
   } catch (err) {
+    if (err?.data?.code === 'phone_personal_elsewhere') {
+      Object.assign(sharedPhone, { open: true, message: err?.message || err?.data?.message || '' })
+      return
+    }
+
+    sharedPhone.open = false
     form.errors = err?.errors ?? err?.data?.errors ?? {}
     form.error = Object.keys(form.errors).length
       ? 'Please check the highlighted fields.'
@@ -1570,7 +1700,8 @@ function onKeydown(event) {
   if (event.key !== 'Escape') return
   // The sign-in window closes on Done only: it is the last sight of the password.
   if (credentials.value) return
-  if (emailView.open) closeEmail()
+  if (sharedPhone.open) cancelSharedPhone()
+  else if (emailView.open) closeEmail()
   else if (form.open) closeForm()
   else if (remind.open) closeRemind()
   else if (profileView.open) closeProfile()
@@ -1579,6 +1710,7 @@ function onKeydown(event) {
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   await Promise.all([loadDonors(), loadReference()])
+  openCreateFromDrive()
 })
 
 onBeforeUnmount(() => {
@@ -1592,7 +1724,10 @@ onBeforeUnmount(() => {
 // reloads in place. An open record or form stays as it was.
 onDeactivated(() => window.removeEventListener('keydown', onKeydown))
 onActivated(() => window.addEventListener('keydown', onKeydown))
-onPageReturn(() => loadDonors(pager.page))
+onPageReturn(() => {
+  loadDonors(pager.page)
+  openCreateFromDrive()
+})
 </script>
 
 <style scoped>
@@ -1706,7 +1841,6 @@ onPageReturn(() => loadDonors(pager.page))
 .btn-link:focus-visible,
 .icon-btn:focus-visible,
 .th-sort:focus-visible,
-.pager__btn:focus-visible,
 .modal-card__close:focus-visible,
 .inline-link:focus-visible {
   outline: none;
@@ -1923,30 +2057,32 @@ onPageReturn(() => loadDonors(pager.page))
 .c-id { width: 116px; }
 .c-group { width: 64px; }
 .c-phone { width: 120px; }
-.c-last { width: 124px; }
-.c-total { width: 84px; }
-.c-elig { width: 168px; }
-.c-status { width: 108px; }
+.c-last { width: 110px; }
+.c-total { width: 112px; }
+.c-elig { width: 152px; }
+.c-status { width: 98px; }
 
 .donor-cell__phone { display: none; }
+.phone-shared { display: block; font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
 
 /* Too narrow for Address beside the donor's name: it stays on the profile. */
 @container (max-width: 1100px) {
-  .c-address { display: none; }
+  .c-address, .donor-table tbody :deep(td.c-address) { display: none; }
 }
 
 /* The eligibility badge already gives the next date; the profile has the last. */
 @container (max-width: 1000px) {
-  .c-last { display: none; }
+  .c-last, .donor-table tbody :deep(td.c-last) { display: none; }
 }
 
-/* The phone moves under the donor's name. */
-@container (max-width: 900px) {
-  .c-phone { display: none; }
+/* The phone moves under the donor's name, so the name keeps its room
+   beside the avatar on a laptop's panel. */
+@container (max-width: 1300px) {
+  .c-phone, .donor-table tbody :deep(td.c-phone) { display: none; }
   .donor-cell__phone { display: block; }
 }
-.donor-row { transition: background 0.12s ease; }
-.donor-row:hover { background: var(--rb-surface-hover); }
+.donor-row { transition: background 0.12s ease; cursor: default; }
+.donor-row:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
 
 .th-sort {
   display: inline-flex;
@@ -1977,7 +2113,7 @@ onPageReturn(() => loadDonors(pager.page))
   font-family: var(--rb-font-mono);
   font-size: 12px;
   font-weight: 600;
-  color: var(--rb-primary-text);
+  color: var(--rb-text-secondary);
   white-space: nowrap;
 }
 
@@ -2020,19 +2156,21 @@ td.c-address {
   white-space: nowrap;
 }
 
-/* The count over its tier, so the column stays narrow. */
-.total { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; font-weight: 600; }
-.total__count { line-height: 1.2; }
+/* The count and its tier on one line, read left to right like the
+   eligibility beside it, so the two columns never run together. */
+.total { display: inline-flex; align-items: center; gap: 8px; }
+.total__count { min-width: 14px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
 
 /* Recognition, not state: neutral, with the tier's name doing the work. */
 .tier {
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
-  border-radius: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
   border: 1px solid var(--rb-border);
   background: var(--rb-surface-alt);
-  font-size: 10.5px;
+  font-size: 11px;
+  line-height: 1.5;
   font-weight: 600;
   color: var(--rb-text-secondary);
   white-space: nowrap;
@@ -2062,7 +2200,6 @@ td.c-address {
 .badge--crit { --tone: var(--rb-accent); }
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
-.row-actions { display: flex; gap: 6px; }
 
 .icon-btn {
   display: grid;
@@ -2096,20 +2233,7 @@ td.c-address {
 
 .pager__btns { display: flex; align-items: center; gap: 8px; }
 
-.pager__btn {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--rb-border-strong);
-  border-radius: 8px;
-  background: var(--rb-surface);
-  color: var(--rb-text-primary);
-  cursor: pointer;
-}
 
-.pager__btn:hover:not(:disabled) { background: var(--rb-surface-hover); }
-.pager__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .pager__page { font-variant-numeric: tabular-nums; }
 
 /* ---------- Empty state ---------- */
@@ -2232,6 +2356,8 @@ td.c-address {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
+/* A label with a control on its right: Phone | Personal · Shared. */
+.form-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
 .req { color: var(--rb-accent-text); }
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }
@@ -2475,6 +2601,71 @@ td.c-address {
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
   .spin { animation: none !important; }
+}
+
+/* ---------- Rows, as on Donations ---------- */
+.donor-row--open { cursor: pointer; }
+.donor-row--open:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.person__text { min-width: 0; }
+.person__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.person__hidden { color: var(--rb-text-secondary); }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+
+/* The row's next step, said in words. */
+.act-btn {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-family: inherit; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap;
+  cursor: pointer; transition: background 0.12s ease;
+}
+.act-btn:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.12); }
+.act-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- Record dialog ---------- */
+.dd { display: flex; flex-direction: column; gap: 18px; }
+.dd-donor { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); }
+.dd-donor__text { flex: 1; min-width: 0; }
+.dd-name { margin: 0; font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.dd-sub { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+.dd-blood { min-width: 44px; padding: 4px 10px; font-size: 13px; }
+.dd-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--rb-surface-alt); font-size: 13px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.dd-section__title { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding-top: 16px; border-top: 1px solid var(--rb-border); }
+.fact { min-width: 0; }
+.fact--full { grid-column: 1 / -1; }
+.fact dt { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); }
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.fact__sub { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.dd-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.dd-form { display: flex; flex-direction: column; gap: 10px; }
+
+.person .donor-cell { min-width: 0; }
+
+/* ---------- Dialog shell, as the system's CenterModal draws it ----------
+   These dialogs stack (Email and Edit open over the profile), so they keep
+   their own overlay; only the look follows CenterModal. */
+.modal-overlay { background: rgba(15, 23, 42, 0.5); }
+.modal-card { border-radius: 18px; box-shadow: 0 28px 70px -24px rgba(15, 23, 42, 0.55); }
+.modal-card__header { align-items: center; padding: 18px 24px 16px; }
+.modal-card__title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.modal-card__title :deep(.asset-icon) { display: none; }
+.modal-card__close {
+  display: grid; flex-shrink: 0; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--rb-border-strong); border-radius: 10px;
+  background: var(--rb-surface); color: var(--rb-text-secondary);
+}
+.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.modal-card__body { padding: 20px 24px 24px; }
+.modal-card__footer { padding: 14px 24px; }
+
+/* Loading rows as tall as the real ones (measured at 1366px), so nothing jumps. */
+.donor-table tbody :deep(tr[aria-hidden="true"] td) { height: 63px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+.donor-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
+/* Three lines (name, age, phone) once the phone moves under the name. */
+@container (max-width: 1300px) {
+  .donor-table tbody :deep(tr[aria-hidden="true"] td) { height: 81px; }
 }
 </style>
 

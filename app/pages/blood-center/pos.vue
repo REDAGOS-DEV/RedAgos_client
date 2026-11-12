@@ -62,6 +62,10 @@
             {{ scanQuery.trim().length >= 2 ? 'Results' : 'Waiting' }}
             <span v-if="!queueLoading && scanQuery.trim().length < 2 && queue.length" class="count-chip">{{ queue.length }}</span>
           </h2>
+          <span v-if="!listLoading && owingTotal > 0" class="queue-total">
+            {{ pesos(owingTotal) }}
+            <small>{{ category === 'patient' ? 'due in all' : 'billed in all' }}</small>
+          </span>
         </div>
 
         <!-- Owed by different people: a patient at this counter, or a hospital by statement. -->
@@ -135,14 +139,36 @@
             :aria-selected="bill?.request_id === b.request_id"
             @click="selectBill(b.request_id)"
           >
+            <span class="q-row__avatar" aria-hidden="true"><AssetIcon :name="category === 'patient' ? 'user' : 'building-2'" :size="16" /></span>
             <span class="q-row__top">
-              <span class="mono strong">{{ b.reference_number }}</span>
-              <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
+              <span class="q-row__ref">
+                <span class="mono strong">{{ b.reference_number }}</span>
+                <BillingBadge v-if="b.is_emergency" tone="danger">STAT</BillingBadge>
+              </span>
+              <span class="q-row__date">
+                <template v-if="b.date">{{ formatShortDay(b.date) }}</template>
+                <span v-if="b.walkIn" class="q-row__tag">Walk-in</span>
+              </span>
             </span>
-            <span class="q-row__who">{{ b.who }}</span>
+            <span class="q-row__who">
+              <span class="q-row__name">{{ b.name || b.who }}</span>
+              <span v-if="b.place" class="q-row__place">{{ b.place }}</span>
+            </span>
+            <span class="q-row__what">
+              <span v-for="code in b.bloodTypes" :key="code" class="q-row__blood">{{ code }}</span>
+              <span v-if="b.purpose" class="q-row__purpose">{{ b.purpose }}</span>
+            </span>
+            <span class="q-row__status">
+              <span v-if="b.status_label" class="q-row__pill" :class="{ 'q-row__pill--clear': !b.owing }">{{ b.status_label }}</span>
+            </span>
             <span class="q-row__amount" :class="{ 'q-row__amount--clear': !b.owing }">
-              {{ b.owing ? pesos(b.amount) : b.status_label }}
-              <small v-if="b.owing">{{ b.amountWord }}</small>
+              {{ b.owing ? pesos(b.amount) : '—' }}
+              <small v-if="b.owing && b.paid > 0">{{ pesos(b.paid) }} paid of {{ pesos(b.total) }}</small>
+              <small v-else-if="b.owing">{{ b.amountWord }}</small>
+            </span>
+            <span class="q-row__open" aria-hidden="true">
+              Open
+              <AssetIcon name="arrow-right" :size="14" />
             </span>
           </button>
         </div>
@@ -373,6 +399,40 @@
                   <button type="button" class="btn btn-primary" :disabled="saving || removeReason.length < 3" @click="submitRemoveDiscount">{{ saving ? 'Removing…' : 'Remove' }}</button>
                 </div>
               </div>
+
+              <!-- The payments already taken on this bill. One taken today can
+                   be voided here, as on the invoice (project owner, 2026-11-11). -->
+              <section v-if="!done && payments.length" class="paid" aria-labelledby="paid-title">
+                <h3 id="paid-title" class="paid__title">Payments</h3>
+                <ul class="paid__list">
+                  <li v-for="p in payments" :key="p.id" class="paid__row" :class="{ 'paid__row--void': p.status === 'voided' }">
+                    <span class="paid__main">
+                      <span class="paid__what">
+                        {{ p.payment_method_label }}
+                        <strong class="paid__amount">{{ pesos(p.amount_paid) }}</strong>
+                      </span>
+                      <span class="paid__meta">
+                        {{ paidAt(p.payment_date) }}
+                        <template v-if="p.receipt">
+                          · <NuxtLink :to="`/blood-center/receipt/${p.receipt.id}`" class="link mono">{{ p.receipt.receipt_number }}</NuxtLink>
+                        </template>
+                      </span>
+                    </span>
+                    <BillingBadge v-if="p.status === 'voided'" tone="muted">Voided</BillingBadge>
+                    <BillingBadge v-else-if="p.pending_void" tone="warning">Void pending</BillingBadge>
+                    <BillingBadge v-else-if="p.pending_correction" tone="warning">Correction pending</BillingBadge>
+                    <button
+                      v-else-if="canVoid && p.can_request_void"
+                      type="button"
+                      class="void-btn"
+                      :aria-label="`Void the ${p.payment_method_label} payment of ${pesos(p.amount_paid)}`"
+                      @click="openVoid([p])"
+                    >
+                      Void
+                    </button>
+                  </li>
+                </ul>
+              </section>
             </template>
           </section>
 
@@ -423,6 +483,12 @@
                   </button>
                   <button class="btn btn-outline" @click="nextCustomer">Next customer</button>
                 </div>
+                <!-- Recorded in error: voided whole, every part of a split with it. -->
+                <BillingBadge v-if="doneVoidPending" tone="warning">Void pending</BillingBadge>
+                <button v-else-if="doneVoidable.length" type="button" class="void-btn void-btn--done" @click="openVoid(doneVoidable, true)">
+                  <AssetIcon name="ban" :size="14" />
+                  Void payment
+                </button>
               </div>
 
               <!-- INVOICE PREVIEW: the live bill as the next invoice would show it -->
@@ -629,6 +695,72 @@
       @close="closingShift = false"
       @confirm="closeShift"
     />
+
+    <!-- VOID A PAYMENT: the Billing Supervisor's own is applied at once; anyone else's waits for their approval. -->
+    <Transition name="modal">
+      <div v-if="voidTarget" class="modal-overlay" @click.self="closeVoid">
+        <div
+          v-focus-trap
+          class="modal-card"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="void-title"
+          aria-describedby="void-text"
+          @dialog-escape="closeVoid"
+        >
+          <div class="modal-card__header">
+            <h2 id="void-title" class="modal-card__title">
+              <AssetIcon name="ban" :size="17" />
+              Void this payment?
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" :disabled="voidBusy" @click="closeVoid">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <form id="void-form" class="modal-card__body" @submit.prevent="submitVoid">
+            <dl class="void-what">
+              <div v-for="p in voidTarget.payments" :key="p.id">
+                <dt>
+                  {{ p.payment_method_label }}
+                  <span v-if="p.reference_number" class="mono void-what__ref">{{ p.reference_number }}</span>
+                </dt>
+                <dd>{{ pesos(p.amount_paid) }}</dd>
+              </div>
+              <div v-if="voidTarget.payments.length > 1" class="void-what__total">
+                <dt>Total</dt>
+                <dd>{{ pesos(voidTotal) }}</dd>
+              </div>
+            </dl>
+
+            <p id="void-text" class="modal-text">{{ voidMessage }}</p>
+
+            <label class="field">
+              <span class="field-label">Reason</span>
+              <input
+                ref="voidReasonInput"
+                v-model.trim="voidReason"
+                type="text"
+                maxlength="255"
+                class="input"
+                placeholder="e.g. Charged to the wrong patient"
+                aria-required="true"
+                :disabled="voidBusy"
+              >
+            </label>
+            <p v-if="voidError" class="field-error" role="alert">{{ voidError }}</p>
+          </form>
+
+          <div class="modal-card__footer">
+            <button type="button" class="btn btn-outline" :disabled="voidBusy" @click="closeVoid">Back</button>
+            <button type="submit" form="void-form" class="btn btn-danger" :disabled="voidBusy || voidReason.length < 3">
+              <template v-if="voidBusy">{{ isBillingHead ? 'Voiding…' : 'Sending…' }}</template>
+              <template v-else>{{ isBillingHead ? 'Void payment' : 'Request void' }}</template>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -797,6 +929,14 @@ function fromCounter(b) {
     reference_number: b.reference_number,
     is_emergency: b.is_emergency,
     who: `${b.patient_name || 'Patient'} · ${b.requesting_facility || '—'}`,
+    name: b.patient_name || 'Patient',
+    place: b.requesting_facility || '',
+    date: b.request_date,
+    walkIn: b.is_walk_in,
+    bloodTypes: b.blood_types ?? [],
+    purpose: b.purpose_label || '',
+    total: Number(b.total_amount) || 0,
+    paid: Number(b.collected) || 0,
     amount: b.outstanding,
     amountWord: b.is_payment_deferred ? 'deferred' : 'due',
     owing: b.takes_payment,
@@ -810,6 +950,14 @@ function fromStatement(s) {
     reference_number: s.request?.reference_number ?? '—',
     is_emergency: s.request?.is_emergency,
     who: s.request?.requesting_facility || '—',
+    name: s.request?.requesting_facility || '—',
+    place: s.request?.weekly_request?.reference_number ? `Weekly ${s.request.weekly_request.reference_number}` : 'Hospital invoice',
+    date: s.request?.request_date ?? s.created_at,
+    walkIn: false,
+    bloodTypes: s.request?.blood_types ?? [],
+    purpose: 'Replenishment',
+    total: Number(s.total_amount) || 0,
+    paid: Number(s.collected) || 0,
     amount: s.total_amount,
     amountWord: 'billed',
     owing: s.status === 'statement_only',
@@ -820,6 +968,16 @@ function fromStatement(s) {
 // The Waiting column: the queue, or the results once two letters are typed.
 const typing = computed(() => scanQuery.value.trim().length >= 2)
 const listRows = computed(() => (typing.value ? results.value : queue.value))
+/** "11 Nov", or "11 Nov 2025" from another year. */
+function formatShortDay(value) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return ''
+  const sameYear = date.getFullYear() === new Date().getFullYear()
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) })
+}
+
+// What the bills on the list owe together.
+const owingTotal = computed(() => listRows.value.reduce((sum, b) => sum + (b.owing ? Number(b.amount) || 0 : 0), 0))
 const listLoading = computed(() => (typing.value ? searching.value : queueLoading.value))
 const listHeading = computed(() => {
   if (typing.value) return 'Results'
@@ -959,6 +1117,7 @@ async function selectBill(requestId) {
   discountOpen.value = false
   removingDiscount.value = false
   paymentReady.value = false
+  forgetPayments()
 
   try {
     const res = await bloodCenterService.billingForRequest(requestId)
@@ -967,6 +1126,7 @@ async function selectBill(requestId) {
     category.value = bill.value?.is_statement_only ? 'weekly' : 'patient'
     payTab.value = category.value === 'weekly' ? 'settle' : 'method'
     resetPayment()
+    loadPayments()
   } catch (err) {
     toast('Bill Not Found', 'danger', err?.message || 'That bill could not be opened.')
     bill.value = null
@@ -1000,7 +1160,7 @@ function backToDetails() {
   nextTick(() => proceedBtn.value?.focus())
 }
 
-// The bill again after a discount or a settlement, staying on the payment step.
+// The bill again after a discount, a settlement or a void, staying on the payment step.
 async function refreshBill() {
   try {
     const res = await bloodCenterService.billingForRequest(bill.value.request_id)
@@ -1009,6 +1169,8 @@ async function refreshBill() {
   } catch {
     // The next pick reloads it.
   }
+
+  await loadPayments()
 }
 
 /* TAKE THE PAYMENT */
@@ -1174,8 +1336,9 @@ async function takePayment() {
     parts.value = []
     nextTick(() => printBtn.value?.focus())
 
-    // The bill, the queue and the drawer have all moved.
-    await Promise.all([loadShift(), loadQueue()])
+    // The bill, the queue and the drawer have all moved. The payments say
+    // whether the one just taken can still be voided.
+    await Promise.all([loadShift(), loadQueue(), loadPayments()])
   } catch (err) {
     const first = Object.values(err?.errors ?? {})[0]
     payError.value = (Array.isArray(first) ? first[0] : first) || err?.message || 'The payment could not be recorded.'
@@ -1196,9 +1359,170 @@ function nextCustomer() {
   results.value = []
   discountOpen.value = false
   removingDiscount.value = false
+  forgetPayments()
   payTab.value = category.value === 'weekly' ? 'settle' : 'method'
   resetPayment()
   nextTick(() => scanInput.value?.focus())
+}
+
+/*
+ * VOIDS (project owner, 2026-11-11). A payment recorded in error is voided at
+ * the counter, as it is on the invoice, and only on the day it was taken;
+ * later, money handed back is a refund, settled outside RedAgos. The Billing
+ * Supervisor's own void is applied at once; anyone else's waits for their
+ * approval. The server decides which payments may be voided
+ * (can_request_void) and refuses the rest.
+ */
+const { user, can, canFile } = useUser()
+const canVoid = computed(() => can('billing.record_payment') && can('corrections.request') && canFile('payment_void'))
+// The head's role may be any of theirs, not only the main one.
+const isBillingHead = computed(() => (user.value?.staff_roles ?? []).includes('billing_supervisor'))
+
+// The bill's payments, newest first, with what the cashier may do to each.
+const payments = ref([])
+const paymentsLatest = createLatest()
+
+function forgetPayments() {
+  paymentsLatest.invalidate()
+  payments.value = []
+}
+
+async function loadPayments() {
+  const ticket = paymentsLatest.begin()
+  const requestId = bill.value?.request_id
+
+  // A weekly bill is settled by the hospital; nothing is paid at the counter.
+  if (!requestId || bill.value?.is_statement_only) {
+    payments.value = []
+    return
+  }
+
+  try {
+    const res = await bloodCenterService.billingPayments(requestId)
+    if (paymentsLatest.isCurrent(ticket)) {
+      payments.value = [...(res?.payments ?? [])].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
+    }
+  } catch {
+    // The list keeps what it had; the invoice page shows them too.
+  }
+}
+
+/** A payment's time today, or its date on an earlier day. */
+function paidAt(iso) {
+  if (!iso) return '—'
+  const sameDay = new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) === todayIso
+  return sameDay ? formatTime(iso) : day(iso)
+}
+
+// The receipt just handed over, as its parts: one, or each part of a split.
+const receiptPayments = computed(() => {
+  const id = done.value?.receipt?.id
+  return id ? payments.value.filter((p) => p.receipt?.id === id) : []
+})
+const doneVoidPending = computed(() => receiptPayments.value.some((p) => p.pending_void))
+// Voided whole or not at all: offered only when every part may be.
+const doneVoidable = computed(() => {
+  const list = receiptPayments.value
+  return canVoid.value && list.length && list.every((p) => p.can_request_void) ? list : []
+})
+
+const voidTarget = ref(null)
+const voidReason = ref('')
+const voidError = ref('')
+const voidBusy = ref(false)
+const voidReasonInput = ref(null)
+
+const voidTotal = computed(() => (voidTarget.value?.payments ?? [])
+  .reduce((sum, p) => sum + Math.round(Number(p.amount_paid) * 100), 0) / 100)
+
+// What the void does: said plainly, before it is confirmed.
+const voidMessage = computed(() => {
+  const target = voidTarget.value
+  if (!target) return ''
+
+  const receipt = target.payments[0]?.receipt?.receipt_number
+  const ids = new Set(target.payments.map((p) => p.id))
+  const othersOnReceipt = payments.value.some((p) => p.receipt?.receipt_number === receipt && !ids.has(p.id) && p.status !== 'voided')
+  const whichReceipt = receipt ? `Receipt ${receipt}` : 'Its receipt'
+
+  if (!isBillingHead.value) {
+    return `The Billing Supervisor approves the void before it takes effect. Until then the payment and ${receipt ? `receipt ${receipt}` : 'its receipt'} stand.`
+  }
+
+  return `${whichReceipt} is voided${othersOnReceipt ? ' and reissued for the other parts' : ''}, and ${pesos(voidTotal.value)} goes back on the bill. This cannot be undone.`
+})
+
+function openVoid(list, fromDone = false) {
+  if (!list?.length) return
+
+  voidTarget.value = { payments: [...list], fromDone }
+  voidReason.value = ''
+  voidError.value = ''
+  // After v-focus-trap has focused its first button.
+  setTimeout(() => voidReasonInput.value?.focus())
+}
+
+function closeVoid() {
+  if (voidBusy.value) return
+  voidTarget.value = null
+}
+
+async function submitVoid() {
+  const target = voidTarget.value
+  if (!target || voidBusy.value || voidReason.value.length < 3) return
+
+  voidError.value = ''
+  voidBusy.value = true
+  const receipt = target.payments[0]?.receipt?.receipt_number
+  let filed = 0
+  let applied = 0
+
+  try {
+    // The server voids one payment at a time, so a split's parts go one by one.
+    for (const payment of target.payments) {
+      const response = await bloodCenterService.requestPaymentVoid(payment.id, voidReason.value)
+      filed += 1
+      if (response?.data?.status === 'approved') applied += 1
+    }
+  } catch (err) {
+    voidError.value = (filed ? `${filed} of ${target.payments.length} parts done. ` : '')
+      + (err?.message || 'The void could not be requested.')
+  } finally {
+    voidBusy.value = false
+  }
+
+  // A refusal part-way keeps the dialog open on what is left. The receipt on
+  // the last step is void once any part is, so the counter leaves it.
+  if (voidError.value) {
+    if (filed) {
+      target.payments = target.payments.slice(filed)
+      if (applied && target.fromDone) {
+        target.fromDone = false
+        done.value = null
+        resetPayment()
+      }
+      await Promise.all([refreshBill(), loadQueue({ quiet: true })])
+    }
+    return
+  }
+
+  voidTarget.value = null
+
+  if (!applied) {
+    toast('Void Requested', 'success', 'It is applied once the Billing Supervisor approves it.')
+    await loadPayments()
+    return
+  }
+
+  toast('Payment Voided', 'success', receipt ? `Receipt ${receipt} is void.` : 'The payment is void.')
+
+  // Voided from the receipt step: back to the payment, with the bill owed again.
+  if (target.fromDone) {
+    done.value = null
+    resetPayment()
+  }
+  await Promise.all([refreshBill(), loadQueue({ quiet: true }), loadShift()])
+  if (target.fromDone) nextTick(() => tenderedInput.value?.focus())
 }
 
 /*
@@ -1405,6 +1729,10 @@ onPageReturn(async () => {
 })
 
 function onCounterKeys(e) {
+  // The void dialog has the keys while it is open; its Escape closes only it,
+  // and reaches here after the dialog has already closed.
+  if (voidTarget.value || e.target?.closest?.('.modal-overlay')) return
+
   const typingInField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
   if ((e.key === '/' && !typingInField) || e.key === 'F2') {
     e.preventDefault()
@@ -1437,6 +1765,7 @@ useLiveRefresh(() => loadQueue({ quiet: true, background: true }), {
     || saving.value
     || discountOpen.value
     || removingDiscount.value
+    || Boolean(voidTarget.value)
     || openingShift.value
     || closingShift.value,
 })
@@ -1927,7 +2256,7 @@ onBeforeUnmount(() => {
 .counter--step-1 .queue > .field-error,
 .counter--step-1 .queue > .queue-list { grid-column: 1 / -1; }
 .counter--step-1 .queue .seg { align-self: center; }
-.counter--step-1 .queue-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-content: start; gap: 10px; margin-top: 4px; }
+.counter--step-1 .queue-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 /* Nothing waiting: said in the middle of the counter, with what comes next. */
 .counter--step-1 .queue-empty { grid-column: 1 / -1; min-height: 260px; justify-content: center; gap: 8px; }
 .queue-empty__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(var(--rb-success-rgb), 0.1); color: var(--rb-success-text); }
@@ -1949,4 +2278,120 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .steps__btn { padding: 8px; gap: 8px; }
 }
+
+/* ── Voids (2026-11-11) ── */
+/* The bill's payments, under what is due; a long list scrolls inside. */
+.paid { flex: none; display: flex; flex-direction: column; gap: 6px; }
+.paid__title { margin: 0; font-size: 12px; font-weight: 700; color: var(--rb-text-secondary); }
+.paid__list {
+  list-style: none; margin: 0; padding: 0; max-height: 176px; overflow-y: auto;
+  border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface);
+  scrollbar-width: thin; scrollbar-color: var(--rb-border-strong) transparent;
+}
+.paid__row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--rb-border); }
+.paid__row:last-child { border-bottom: 0; }
+.paid__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.paid__what { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--rb-text-primary); }
+.paid__amount { font-variant-numeric: tabular-nums; }
+.paid__meta { overflow: hidden; font-size: 11.5px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.paid__row--void .paid__what { color: var(--rb-text-muted); }
+.paid__row--void .paid__amount { text-decoration: line-through; }
+
+/* Void: quiet until it is wanted, red once it is. */
+.void-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none;
+  height: 26px; padding: 0 10px; border: 1px solid rgba(var(--rb-accent-rgb), .35); border-radius: 999px;
+  background: transparent; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--rb-accent-text); cursor: pointer;
+  transition: background-color .15s var(--rb-ease-out), border-color .15s var(--rb-ease-out);
+}
+.void-btn:hover { background: rgba(var(--rb-accent-rgb), .08); border-color: rgba(var(--rb-accent-rgb), .55); }
+.void-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.void-btn--done { height: 30px; margin-top: 2px; padding: 0 14px; }
+
+.btn-danger { background: var(--rb-accent); color: #fff; border: 1px solid var(--rb-accent); }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rb-accent) 88%, #000); }
+
+/* The void dialog, in the system's modal styles. */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: var(--rb-overlay);
+}
+.modal-card {
+  display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: calc(100vh - 40px);
+  background: var(--rb-surface); border: 1px solid var(--rb-border); border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), .28);
+}
+.modal-card__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; padding: 16px 20px; border-bottom: 1px solid var(--rb-border); }
+.modal-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; color: var(--rb-text-primary); }
+.modal-card__title :deep(.asset-icon) { color: var(--rb-accent-text); }
+.modal-card__close {
+  display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--rb-border); border-radius: 8px;
+  background: none; color: var(--rb-text-secondary); cursor: pointer;
+}
+.modal-card__close:hover:not(:disabled) { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
+.modal-card__close:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.modal-card__body { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 18px 20px; overflow-y: auto; }
+.modal-card__footer { display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; padding: 14px 20px; border-top: 1px solid var(--rb-border); }
+.modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--rb-text-primary); }
+
+.void-what { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--rb-surface-alt); font-variant-numeric: tabular-nums; }
+.void-what div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
+.void-what dt { min-width: 0; color: var(--rb-text-primary); }
+.void-what dd { margin: 0; font-weight: 700; color: var(--rb-text-primary); }
+.void-what__ref { margin-left: 6px; font-size: 11.5px; color: var(--rb-text-secondary); }
+.void-what__total { padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--rb-border-strong); }
+
+.modal-enter-active, .modal-leave-active { transition: opacity .18s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+
+@media (max-width: 640px) {
+  .modal-overlay { padding: 10px; align-items: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-enter-active, .modal-leave-active, .void-btn { transition: none; }
+}
+/* ---------- Waiting: one full row per bill (2026-11-11) ---------- */
+.queue-total { display: inline-flex; align-items: baseline; gap: 6px; font-size: 15px; font-weight: 800; color: var(--rb-text-primary); font-variant-numeric: tabular-nums; }
+.queue-total small { font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); }
+.counter--step-1 .q-row {
+  /* Fixed tracks, so every row's columns line up. */
+  grid-template-columns: 40px 180px minmax(0, 1.4fr) minmax(0, 1fr) 150px 170px 86px;
+  grid-template-areas: "avatar top who what status amount open";
+  gap: 0 18px; min-height: 64px; padding: 12px 16px; border-radius: 14px;
+}
+.q-row__avatar {
+  grid-area: avatar; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text);
+}
+.counter--step-1 .q-row__top { font-size: 14px; }
+.counter--step-1 .q-row__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; white-space: normal; }
+.q-row__name { overflow: hidden; font-size: 13.5px; font-weight: 700; color: var(--rb-text-primary); text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+.q-row__place { overflow: hidden; font-size: 12px; color: var(--rb-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.q-row__status { grid-area: status; }
+.q-row__pill {
+  display: inline-flex; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(var(--rb-warning-rgb), 0.4);
+  background: rgba(var(--rb-warning-rgb), 0.08); color: var(--rb-warning-text); font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.q-row__pill--clear { border-color: rgba(var(--rb-success-rgb), 0.4); background: rgba(var(--rb-success-rgb), 0.08); color: var(--rb-success-text); }
+.counter--step-1 .q-row__amount { font-size: 15px; }
+.q-row__open {
+  grid-area: open; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 9px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.4); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+}
+.q-row:hover .q-row__open { background: var(--rb-primary); border-color: var(--rb-primary); color: #fff; }
+
+/* The reference over its date; blood types and purpose in the middle. */
+.counter--step-1 .q-row__top { flex-direction: column; align-items: flex-start; gap: 3px; }
+.q-row__ref { display: inline-flex; align-items: center; gap: 6px; }
+.q-row__date { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rb-text-secondary); }
+.q-row__tag { padding: 0 7px; border-radius: 999px; background: rgba(var(--rb-purple-rgb), 0.12); color: var(--rb-purple-text); font-size: 10.5px; font-weight: 700; }
+.q-row__what { grid-area: what; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.q-row__blood {
+  display: inline-flex; justify-content: center; min-width: 38px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); font-size: 12px; font-weight: 700;
+}
+.q-row__purpose { font-size: 12px; color: var(--rb-text-secondary); white-space: nowrap; }
+.counter--step-1 .q-row__amount small { white-space: nowrap; }
 </style>

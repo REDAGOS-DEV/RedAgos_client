@@ -1,6 +1,15 @@
 <template>
-  <div class="dhq-strip" :class="toneClass">
-    <div class="dhq-strip__facts">
+  <div class="dhq-strip" :class="[toneClass, { 'dhq-strip--compact': compact }]">
+    <!-- Compact, inside the counter's questionnaire card: that card already says
+         the version, the source, the date and the consent, so only what wants a
+         second look stays, beside the actions. -->
+    <div v-if="compact" class="dhq-strip__facts">
+      <span v-if="meta?.available && meta.is_current_version === false" class="dhq-strip__fact dhq-strip__fact--warn">Superseded form</span>
+      <span v-if="meta?.available && flaggedCount" class="dhq-strip__fact dhq-strip__fact--warn">
+        {{ flaggedCount }} answer{{ flaggedCount === 1 ? '' : 's' }} to review
+      </span>
+    </div>
+    <div v-else class="dhq-strip__facts">
       <span class="dhq-strip__label">Health questionnaire</span>
 
       <template v-if="meta?.available">
@@ -64,6 +73,8 @@ const props = defineProps({
   meta: { type: Object, default: null },
   flaggedCount: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  // Inside a card that already gives the questionnaire's facts.
+  compact: { type: Boolean, default: false },
 })
 
 defineEmits(['open', 'refresh'])
@@ -173,4 +184,7 @@ function shortDate(value) {
   .dhq-strip { flex-direction: column; align-items: stretch; }
   .dhq-strip__actions { justify-content: flex-start; }
 }
+
+.dhq-strip--compact { padding: 0; border: 0; background: none; gap: 8px; }
+.dhq-strip--compact .dhq-strip__facts:empty { display: none; }
 </style>

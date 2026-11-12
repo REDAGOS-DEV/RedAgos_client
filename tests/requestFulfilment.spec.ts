@@ -277,15 +277,12 @@ describe('the walk-in form', () => {
     expect(walkInStepProblems(form, 'lookup')).toEqual([])
   })
 
-  it('checks every line against the indications its component allows', () => {
+  it('asks no indication on a walk-in line (project owner, 2026-11-11)', () => {
     const form = completed()
-    form.lines[0].indicationCode = 'R-5'
+    form.lines[0].indicationCode = ''
     form.lines[1].indicationCode = ''
 
-    expect(walkInStepProblems(form, 'details', COMPONENTS)).toEqual([
-      'Specify the indication for Packed RBC.',
-      'Select the indication for Fresh Frozen Plasma.',
-    ])
+    expect(walkInStepProblems(form, 'details', COMPONENTS)).toEqual([])
   })
 
   it('refuses the same component twice and a continuation above what is unallocated', () => {

@@ -121,6 +121,7 @@ describe('the appointments page', () => {
 
   it('finds a caller who has only given elsewhere by an exact ID', () => {
     expect(page).toContain('const exact = exactIdentifier(term)')
-    expect(page).toContain('bloodCenterService.lookupDonor(exact)')
+    // Every match: a household's shared number is several donors' (2026-11-12).
+    expect(page).toContain('bloodCenterService.lookupDonors(exact)')
   })
 })

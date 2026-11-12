@@ -388,12 +388,13 @@
               <span class="card__note">{{ data.drives.held }} in this period</span>
             </header>
             <table v-if="data.drives.list.length" class="table">
-              <thead><tr><th>Date</th><th>Drive</th><th>Booked</th></tr></thead>
+              <thead><tr><th>Date</th><th>Drive</th><th>Booked</th><th>Pre-registered</th></tr></thead>
               <tbody>
                 <tr v-for="d in data.drives.list" :key="d.id">
                   <td>{{ fmtDay(d.date) }}</td>
                   <td>{{ d.name }}</td>
-                  <td>{{ d.booked }}{{ d.capacity ? ` / ${d.capacity}` : '' }}</td>
+                  <td>{{ d.booked }}</td>
+                  <td>{{ d.pre_registered ?? 0 }}</td>
                 </tr>
               </tbody>
             </table>
@@ -943,8 +944,8 @@ function exportCsv() {
       rows.push([], ['Blood group', 'Donations'])
       d.donations.by_blood_group.forEach(g => rows.push([g.code, g.count]))
     } else if (tab.value === 'appointments') {
-      rows.push([], ['Drive', 'Date', 'Booked', 'Capacity'])
-      d.drives.list.forEach(x => rows.push([x.name, x.date, x.booked, x.capacity ?? '']))
+      rows.push([], ['Drive', 'Date', 'Booked', 'Pre-registered'])
+      d.drives.list.forEach(x => rows.push([x.name, x.date, x.booked, x.pre_registered ?? 0]))
     } else if (tab.value === 'overview') {
       rows.push([], ['Age bracket', 'Donations'])
       AGE_COLS.forEach(c => rows.push([c.label, d.donor_profile.total.age[c.key]]))

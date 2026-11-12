@@ -147,6 +147,14 @@ class BloodCenterService extends BaseService {
    * answers, without the scan. { data: { donor, appointment, open_donation,
    * health_questionnaire, prior_deferral } } (appointments.verify).
    */
+  /**
+   * The "Phlebotomist" choices, once the server lists them. Until it does this
+   * answers 404, and usePhlebotomists reads the names off donation records.
+   */
+  async collectionPhlebotomists(): Promise<any> {
+    return this.request(`${this.resource}/collection/phlebotomists`, 'GET')
+  }
+
   async counterArrival(donorUuid: string): Promise<any> {
     return this.request(`${this.resource}/collection/arrival/${donorUuid}`, 'GET')
   }
@@ -345,6 +353,12 @@ class BloodCenterService extends BaseService {
 
   async lookupDonor(params: Record<string, any> = {}): Promise<any> {
     return this.request(`${this.resource}/donors/lookup`, 'GET', params)
+  }
+
+  // Everyone an exact identifier names, as { data: [...] }: a household's
+  // shared mobile number finds the whole family (2026-11-12).
+  async lookupDonors(params: Record<string, any> = {}): Promise<any> {
+    return this.request(`${this.resource}/donors/lookup/matches`, 'GET', params)
   }
 
   async createDonor(payload: Record<string, any> = {}): Promise<any> {
@@ -1329,6 +1343,36 @@ class BloodCenterService extends BaseService {
   /** Cancel a drive: its waiting bookings are cancelled and those donors told the reason. */
   async cancelDrive(id: number | string, reason: string): Promise<any> {
     return this.request(`${this.resource}/drives/${id}/cancel`, 'POST', { reason })
+  }
+
+  /** A drive's roster: { drive, summary, data: [...] } — its link list, bookings, walk-ins and paper records. */
+  async driveRegistrations(id: number | string): Promise<any> {
+    return this.request(`${this.resource}/drives/${id}/registrations`, 'GET')
+  }
+
+  /** On the drive's day: check in someone from the list (linked to a donor). { data: { donor_uuid, appointment_id } } */
+  async checkInDriveRegistration(driveId: number | string, id: number | string): Promise<any> {
+    return this.request(`${this.resource}/drives/${driveId}/registrations/${id}/check-in`, 'POST')
+  }
+
+  /** On the drive's day: check in a walk-in. { data: { donor_uuid, appointment_id, walk_in } } */
+  async driveWalkIn(driveId: number | string, donorUuid: string): Promise<any> {
+    return this.request(`${this.resource}/drives/${driveId}/walk-ins`, 'POST', { donor_uuid: donorUuid })
+  }
+
+  /** Take someone off the drive's list. */
+  async withdrawDriveRegistration(driveId: number | string, id: number | string): Promise<any> {
+    return this.request(`${this.resource}/drives/${driveId}/registrations/${id}/withdraw`, 'POST')
+  }
+
+  /** Confirm that an entry is this existing donor. */
+  async matchDriveRegistration(driveId: number | string, id: number | string, donorUuid: string): Promise<any> {
+    return this.request(`${this.resource}/drives/${driveId}/registrations/${id}/match`, 'POST', { donor_uuid: donorUuid })
+  }
+
+  /** Undo a match made in error. */
+  async unmatchDriveRegistration(driveId: number | string, id: number | string): Promise<any> {
+    return this.request(`${this.resource}/drives/${driveId}/registrations/${id}/match`, 'DELETE')
   }
 
   async listNotifications(params: Record<string, any> = {}): Promise<any> {

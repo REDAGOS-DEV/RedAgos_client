@@ -6,8 +6,11 @@
  * barcode the same way and enforces uniqueness per facility.
  */
 
-/** What a donation barcode may hold: each bag's unit number is built from it. */
-export const BARCODE_PATTERN = /^[A-Z0-9-]{1,30}$/
+/**
+ * What a donation barcode may hold: digits only (project owner, 2026-11-11).
+ * Each bag's unit number is built from it (1234567-PRBC).
+ */
+export const BARCODE_PATTERN = /^\d{1,30}$/
 
 export interface PhlebotomyForm {
   blood_bag_type: string
@@ -75,7 +78,7 @@ export function phlebotomyProblems(form: PhlebotomyForm, day: Date | string, now
 
   if (!barcode) problems.push('Scan or type the donation barcode.')
   else if (!BARCODE_PATTERN.test(barcode)) {
-    problems.push('A donation barcode is up to 30 letters, numbers and dashes.')
+    problems.push('A donation barcode is numbers only, up to 30 digits.')
   }
 
   const started = atTimeOn(day, form.started_time)

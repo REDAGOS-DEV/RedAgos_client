@@ -2,9 +2,11 @@
   <div class="deferrals-page">
     <div class="deferrals-inner">
       <header class="header-row">
-        <div>
-          <h1 class="page-title">Deferrals</h1>
-        </div>
+        <h1 class="page-title">Deferrals</h1>
+        <button v-if="canDefer" type="button" class="btn-primary" @click="openNew">
+          <AssetIcon name="plus" :size="15" />
+          New Deferral
+        </button>
       </header>
 
       <div v-if="loadError" class="banner banner--error" role="alert">
@@ -46,10 +48,6 @@
               <AssetIcon name="refresh-cw" :size="14" :class="{ spin: loading }" />
               Refresh
             </button>
-            <button v-if="canDefer" type="button" class="btn-primary" @click="openNew">
-              <AssetIcon name="plus" :size="15" />
-              New Deferral
-            </button>
           </div>
         </div>
 
@@ -70,7 +68,7 @@
             </thead>
 
             <tbody v-if="loading && !rows.length">
-              <SkeletonRows :columns="8" :rows="6" />
+              <SkeletonRows :columns="8" :rows="6" :cell-classes="['c-id', 'c-donor', 'c-type', 'c-reason', 'c-from', 'c-until', 'c-status', 'c-actions']" />
             </tbody>
 
             <tbody v-else-if="!rows.length">
@@ -91,18 +89,31 @@
             </tbody>
 
             <tbody v-else>
-              <tr v-for="row in rows" :key="row.key" class="def-row">
+              <tr
+                v-for="row in rows"
+                :key="row.key"
+                class="def-row"
+                tabindex="0"
+                :aria-label="`Open deferral ${row.code}`"
+                @click="detail = row"
+                @keydown.enter.self="detail = row"
+              >
                 <td class="c-id">
                   <span class="code">{{ row.code }}</span>
                   <!-- Where it was decided (project owner, 2026-10-25): the counter's and a drive's paper screenings are listed too. -->
                   <span class="sub">{{ DEFERRAL_SOURCES[row.source] ?? '' }}</span>
                 </td>
                 <td class="c-donor">
-                  <template v-if="row.donor && !row.donor.blinded">
-                    <span class="donor__name">{{ row.donor.full_name }}</span>
-                    <span class="sub">{{ row.donor.donor_code }}</span>
-                  </template>
-                  <span v-else class="muted">Identity hidden</span>
+                  <div class="person">
+                    <PersonAvatar :name="row.donor?.full_name" :hidden="!(row.donor && !row.donor.blinded)" />
+                    <div class="person__text">
+                      <template v-if="row.donor && !row.donor.blinded">
+                        <span class="person__name">{{ row.donor.full_name }}</span>
+                        <span class="sub">{{ row.donor.donor_code }}</span>
+                      </template>
+                      <span v-else class="person__hidden">Identity hidden</span>
+                    </div>
+                  </div>
                 </td>
                 <td class="c-type">
                   <span class="badge" :class="`badge--${deferralKindBadge(row.kind).tone}`">
@@ -129,18 +140,23 @@
                     {{ deferralStatusBadge(row.status).label }}
                   </span>
                 </td>
-                <td class="c-actions">
-                  <button
-                    v-if="row.can?.lift"
-                    type="button"
-                    class="lift-btn"
-                    :aria-label="`Lift ${row.code}`"
-                    @click="askLift(row)"
-                  >
-                    <AssetIcon name="undo-2" :size="13" />
-                    Lift
-                  </button>
-                  <span v-else class="muted">—</span>
+                <td class="c-actions" @click.stop>
+                  <div class="row-actions">
+                    <button type="button" class="icon-btn" :aria-label="`View ${row.code}`" title="View" @click="detail = row">
+                      <AssetIcon name="eye" :size="15" />
+                    </button>
+                    <button
+                      v-if="row.can?.lift"
+                      type="button"
+                      class="act-btn"
+                      :aria-label="`Lift ${row.code}`"
+                      title="Lift this deferral"
+                      @click="askLift(row)"
+                    >
+                      <AssetIcon name="undo-2" :size="13" />
+                      Lift
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -148,7 +164,9 @@
         </div>
 
         <footer class="pager">
-          <span class="pager__info">{{ pager.total }} record(s)</span>
+          <span class="pager__info">
+            <template v-if="pager.total">Showing {{ pageFrom }}–{{ pageTo }} of </template>{{ pager.total }} record(s)
+          </span>
           <div class="pager__btns">
             <button type="button" class="btn-outline btn-outline--sm" :disabled="pager.page <= 1 || loading" @click="load(pager.page - 1)">
               <AssetIcon name="chevron-left" :size="14" />
@@ -175,38 +193,88 @@
       @submit="submitNew"
     />
 
-    <!-- ============ LIFT ============ -->
-    <Transition name="modal">
-      <div v-if="lifting.row" class="modal-overlay" @click.self="cancelLift">
-        <div class="modal-card modal-card--sm" role="alertdialog" aria-modal="true" aria-labelledby="lift-title">
-          <div class="modal-card__header">
-            <h2 id="lift-title" class="modal-card__title">
-              <AssetIcon name="undo-2" :size="17" />
-              Lift this deferral?
-            </h2>
-            <button type="button" class="modal-card__close" aria-label="Close" @click="cancelLift">
-              <AssetIcon name="x" :size="18" />
-            </button>
-          </div>
-          <div class="modal-card__body">
-            <p class="modal-text">
-              {{ lifting.row.code }}<template v-if="lifting.row.donor && !lifting.row.donor.blinded"> for {{ lifting.row.donor.full_name }}</template>
-              ({{ deferralKindBadge(lifting.row.kind).label.toLowerCase() }}{{ lifting.row.reason_code ? `, ${lifting.row.reason_code}` : '' }}).
-              Lifting it lets them donate again unless another deferral still stands. The record stays on this list<template v-if="lifting.row.source !== 'manual'">, and the visit keeps its outcome</template>.
-            </p>
-            <label class="form-label" for="lift-reason">Reason <span class="req">*</span></label>
-            <textarea id="lift-reason" v-model="lifting.reason" class="form-input form-textarea" rows="2" maxlength="1000" placeholder="e.g. Haemoglobin back in range on recheck" />
-            <p v-if="lifting.error" class="form-error" role="alert">{{ lifting.error }}</p>
-          </div>
-          <div class="modal-card__footer">
-            <button type="button" class="btn-outline" @click="cancelLift">Back</button>
-            <button type="button" class="btn-primary" :disabled="lifting.busy || !lifting.reason.trim()" @click="confirmLift">
-              {{ lifting.busy ? 'Lifting…' : 'Lift deferral' }}
-            </button>
+    <!-- ============ DETAIL ============ -->
+    <CenterModal v-if="detail" :title="`Deferral ${detail.code}`" eyebrow="Deferral record" size="md" @close="detail = null">
+      <template #meta>
+        <span class="badge" :class="`badge--${deferralKindBadge(detail.kind).tone}`">
+          <span class="badge__dot" aria-hidden="true" />
+          {{ deferralKindBadge(detail.kind).label }}
+        </span>
+        <span class="badge" :class="`badge--${deferralStatusBadge(detail.status).tone}`">
+          <span class="badge__dot" aria-hidden="true" />
+          {{ deferralStatusBadge(detail.status).label }}
+        </span>
+      </template>
+
+      <div class="dd">
+        <div class="dd-donor">
+          <PersonAvatar size="lg" :name="detail.donor?.full_name" :hidden="!(detail.donor && !detail.donor.blinded)" />
+          <div class="dd-donor__text">
+            <p class="dd-name">{{ detail.donor && !detail.donor.blinded ? detail.donor.full_name : 'Identity hidden' }}</p>
+            <p v-if="detail.donor && !detail.donor.blinded" class="dd-sub">{{ detail.donor.donor_code }}</p>
           </div>
         </div>
+
+        <dl class="facts">
+          <div class="fact fact--full">
+            <dt>Reason</dt>
+            <!-- The code; the reason only when asked, as the screen may face the donor. -->
+            <dd><DeferralCodeTag :code="detail.reason_code" :reason="detail.reason" /></dd>
+          </div>
+          <div class="fact">
+            <dt>From</dt>
+            <dd>{{ formatShortDate(detail.deferred_on) }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Until</dt>
+            <dd>{{ detail.ends_on ? formatShortDate(detail.ends_on) : 'No end date' }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Decided at</dt>
+            <dd>{{ DEFERRAL_SOURCES[detail.source] || '—' }}</dd>
+          </div>
+          <div class="fact">
+            <dt>Recorded by</dt>
+            <dd>{{ detail.recorded_by || '—' }}</dd>
+          </div>
+          <div v-if="detail.status === 'lifted'" class="fact fact--full">
+            <dt>Lifted</dt>
+            <dd>
+              {{ detail.lifted_at ? formatShortDate(detail.lifted_at) : 'Lifted' }}<template v-if="detail.lifted_by"> by {{ detail.lifted_by }}</template>
+              <span v-if="detail.lift_reason" class="fact__sub">{{ detail.lift_reason }}</span>
+            </dd>
+          </div>
+        </dl>
       </div>
-    </Transition>
+
+      <template #actions>
+        <button type="button" class="btn-outline" @click="detail = null">Close</button>
+        <button v-if="detail.can?.lift" type="button" class="btn-primary" @click="liftFromDetail">
+          <AssetIcon name="undo-2" :size="14" />
+          Lift deferral
+        </button>
+      </template>
+    </CenterModal>
+
+    <!-- ============ LIFT ============ -->
+    <CenterModal v-if="lifting.row" title="Lift this deferral?" size="sm" @close="cancelLift">
+      <div class="dd-form">
+        <p class="dd-text">
+          {{ lifting.row.code }}<template v-if="lifting.row.donor && !lifting.row.donor.blinded"> for {{ lifting.row.donor.full_name }}</template>
+          ({{ deferralKindBadge(lifting.row.kind).label.toLowerCase() }}{{ lifting.row.reason_code ? `, ${lifting.row.reason_code}` : '' }}).
+          Lifting it lets them donate again unless another deferral still stands. The record stays on this list<template v-if="lifting.row.source !== 'manual'">, and the visit keeps its outcome</template>.
+        </p>
+        <label class="form-label" for="lift-reason">Reason <span class="req">*</span></label>
+        <textarea id="lift-reason" v-model="lifting.reason" class="form-input form-textarea" rows="2" maxlength="1000" placeholder="e.g. Haemoglobin back in range on recheck" />
+        <p v-if="lifting.error" class="form-error" role="alert">{{ lifting.error }}</p>
+      </div>
+      <template #actions>
+        <button type="button" class="btn-outline" @click="cancelLift">Back</button>
+        <button type="button" class="btn-primary" :disabled="lifting.busy || !lifting.reason.trim()" @click="confirmLift">
+          {{ lifting.busy ? 'Lifting…' : 'Lift deferral' }}
+        </button>
+      </template>
+    </CenterModal>
   </div>
 </template>
 
@@ -217,6 +285,8 @@ import SelectField from '~/components/common/SelectField.vue'
 import AssetIcon from '~/components/common/AssetIcon.vue'
 import DeferralCodeTag from '~/components/BloodCenter/DeferralCodeTag.vue'
 import DeferralFormDialog from '~/components/BloodCenter/DeferralFormDialog.vue'
+import CenterModal from '~/components/ui/CenterModal.vue'
+import PersonAvatar from '~/components/ui/PersonAvatar.vue'
 import {
   DEFERRAL_STATUS_FILTERS,
   deferralKindBadge,
@@ -270,6 +340,11 @@ useNoticeToast(notice)
 const updatedAt = ref(null)
 const rows = ref([])
 const pager = reactive({ page: 1, lastPage: 1, total: 0 })
+const pageFrom = computed(() => (pager.total ? (pager.page - 1) * PER_PAGE + 1 : 0))
+const pageTo = computed(() => Math.min(pager.page * PER_PAGE, pager.total))
+
+/** The row whose record is open. */
+const detail = ref(null)
 
 const search = ref('')
 const statusFilter = ref('')
@@ -398,6 +473,13 @@ async function confirmLift() {
 
 /* ---------- keyboard and lifecycle ---------- */
 
+/** Lift from the record: the record closes and the lift dialog opens. */
+function liftFromDetail() {
+  const row = detail.value
+  detail.value = null
+  askLift(row)
+}
+
 function onKeydown(event) {
   if (event.key !== 'Escape') return
   if (lifting.row) cancelLift()
@@ -514,8 +596,7 @@ onPageReturn(() => load(pager.page))
 .btn-primary:focus-visible,
 .btn-outline:focus-visible,
 .btn-link:focus-visible,
-.lift-btn:focus-visible,
-.modal-card__close:focus-visible {
+.icon-btn:focus-visible {
   outline: none;
   box-shadow: var(--rb-focus-ring);
 }
@@ -652,22 +733,23 @@ onPageReturn(() => load(pager.page))
 
 .def-table tbody tr:last-child td { border-bottom: 0; }
 .def-row { transition: background 0.12s ease; }
-.def-row:hover { background: var(--rb-surface-hover); }
+.def-row:hover { background: rgba(var(--rb-primary-rgb), 0.06); }
 
-.c-id { width: 112px; }
+.c-id { width: 138px; }
+.c-id .sub { white-space: nowrap; }
 .c-type { width: 124px; }
 .c-from { width: 114px; }
 .c-until { width: 114px; }
 .c-status { width: 108px; }
-.c-actions { width: 92px; }
+.c-actions { width: 140px; }
 
 /* Narrow panels keep who, why, until when and where it stands. */
 @container (max-width: 940px) {
-  .c-from { display: none; }
+  .c-from, .def-table tbody :deep(td.c-from) { display: none; }
 }
 
 @container (max-width: 780px) {
-  .c-id { display: none; }
+  .c-id, .def-table tbody :deep(td.c-id) { display: none; }
 }
 
 .code { font-family: var(--rb-font-mono); font-size: 12px; font-weight: 600; color: var(--rb-text-secondary); white-space: nowrap; }
@@ -702,25 +784,7 @@ onPageReturn(() => load(pager.page))
 .badge--crit { --tone: var(--rb-accent); }
 .badge--neutral { --tone: var(--rb-text-muted); color: var(--rb-text-secondary); }
 
-.lift-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid rgba(var(--rb-primary-rgb), 0.3);
-  border-radius: 8px;
-  background: rgba(var(--rb-primary-rgb), 0.08);
-  color: var(--rb-primary-text);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
 
-.lift-btn:hover { background: rgba(var(--rb-primary-rgb), 0.14); border-color: rgba(var(--rb-primary-rgb), 0.45); }
 
 .empty-cell { padding: 0 !important; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 24px; text-align: center; }
@@ -755,70 +819,6 @@ onPageReturn(() => load(pager.page))
 .pager__btns { display: flex; align-items: center; gap: 8px; }
 .pager__page { font-variant-numeric: tabular-nums; }
 
-/* ---------- Modals ---------- */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--rb-overlay);
-}
-
-.modal-card {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 600px;
-  max-height: calc(100vh - 40px);
-  background: var(--rb-surface);
-  border: 1px solid var(--rb-border);
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(var(--rb-shadow-rgb), 0.28);
-}
-
-.modal-card--sm { max-width: 460px; }
-
-.modal-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--rb-border);
-  flex-shrink: 0;
-}
-
-.modal-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; }
-.modal-card__title :deep(.asset-icon) { color: var(--rb-text-secondary); }
-
-.modal-card__close {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--rb-border);
-  border-radius: 8px;
-  background: none;
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.modal-card__close:hover { color: var(--rb-text-primary); background: var(--rb-surface-hover); }
-.modal-card__body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; overflow-y: auto; min-height: 0; }
-
-.modal-card__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--rb-border);
-  flex-shrink: 0;
-}
-
-.modal-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
 
 .form-label { font-size: 12.5px; font-weight: 600; }
 .req { color: var(--rb-accent-text); }
@@ -834,8 +834,8 @@ onPageReturn(() => load(pager.page))
   line-height: 1.45;
 }
 
-/* Anchored on the page root: other portals ship unscoped dark .form-input rules. */
-.deferrals-page .form-input {
+/* Anchored on the dialog body: it is teleported, and other portals ship unscoped dark .form-input rules. */
+.dd-form .form-input {
   width: 100%;
   height: 38px;
   padding: 0 12px;
@@ -848,29 +848,73 @@ onPageReturn(() => load(pager.page))
   color-scheme: light dark;
 }
 
-.deferrals-page .form-input:disabled { background-color: var(--rb-surface-alt); color: var(--rb-text-secondary); cursor: not-allowed; }
-.deferrals-page .form-input::placeholder { color: var(--rb-placeholder); }
-.deferrals-page .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
+.dd-form .form-input:disabled { background-color: var(--rb-surface-alt); color: var(--rb-text-secondary); cursor: not-allowed; }
+.dd-form .form-input::placeholder { color: var(--rb-placeholder); }
+.dd-form .form-input:focus { outline: none; border-color: var(--rb-primary); box-shadow: var(--rb-focus-ring); }
 
-.deferrals-page .form-textarea { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
-
-.modal-enter-active,
-.modal-leave-active { transition: opacity 0.18s ease; }
-
-.modal-enter-from,
-.modal-leave-to { opacity: 0; }
+.dd-form .form-textarea { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
 
 @media (max-width: 760px) {
   .toolbar__filters { flex-basis: 100%; }
   .search { max-width: none; flex: 1 1 100%; }
   .toolbar__actions { width: 100%; }
-  .modal-overlay { padding: 10px; align-items: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
   .spin { animation: none !important; }
 }
+
+/* ---------- Rows, as on Donations ---------- */
+.def-row { cursor: pointer; }
+.def-row:focus-visible { outline: 2px solid var(--rb-primary-text); outline-offset: -2px; }
+.person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.person__text { min-width: 0; }
+.person__name { display: block; font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.person__hidden { color: var(--rb-text-secondary); }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+
+/* The row's next step, said in words. */
+.act-btn {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid rgba(var(--rb-primary-rgb), 0.45); background: rgba(var(--rb-primary-rgb), 0.06);
+  color: var(--rb-primary-text); font-family: inherit; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap;
+  cursor: pointer; transition: background 0.12s ease;
+}
+.act-btn:hover:not(:disabled) { background: rgba(var(--rb-primary-rgb), 0.12); }
+.act-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- Record dialog ---------- */
+.dd { display: flex; flex-direction: column; gap: 18px; }
+.dd-donor { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--rb-border); border-radius: 12px; background: var(--rb-surface-alt); }
+.dd-donor__text { flex: 1; min-width: 0; }
+.dd-name { margin: 0; font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.dd-sub { margin: 2px 0 0; font-size: 12px; color: var(--rb-text-secondary); }
+.dd-blood { min-width: 44px; padding: 4px 10px; font-size: 13px; }
+.dd-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--rb-surface-alt); font-size: 13px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.dd-section__title { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rb-text-secondary); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding-top: 16px; border-top: 1px solid var(--rb-border); }
+.fact { min-width: 0; }
+.fact--full { grid-column: 1 / -1; }
+.fact dt { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rb-text-secondary); }
+.fact dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.fact__sub { display: block; font-size: 11.5px; font-weight: 500; color: var(--rb-text-secondary); }
+.dd-text { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.dd-form { display: flex; flex-direction: column; gap: 10px; }
+
+.icon-btn {
+  display: grid; flex-shrink: 0; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px;
+  border: 1px solid var(--rb-border-strong); background: var(--rb-surface); color: var(--rb-text-secondary);
+  cursor: pointer; transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.icon-btn:hover:not(:disabled) { color: var(--rb-primary-text); border-color: rgba(var(--rb-primary-rgb), 0.45); background: var(--rb-surface-hover); }
+.icon-btn:focus-visible { outline: none; box-shadow: var(--rb-focus-ring); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Loading rows as tall as the real ones (measured at 1366px), so nothing jumps. */
+.def-table tbody :deep(tr[aria-hidden="true"] td) { height: 65px; padding: 0 10px; border-bottom: 1px solid var(--rb-border); }
+.def-table tbody :deep(tr[aria-hidden="true"] td:first-child) { padding-left: 16px; }
 </style>
 
 <style scoped>
