@@ -40,7 +40,7 @@ function drawnRow() {
     diastolic_bp: 80,
     temperature_c: '36.6',
     blood_bag_type: 'single',
-    donation_barcode: ' pd-0001\t',
+    donation_barcode: ' 0001\t',
     started_time: '09:30',
     ended_time: '09:41',
     volume_ml: '450',
@@ -130,7 +130,7 @@ describe('what a paper row sends', () => {
     expect([screened.getDate(), screened.getHours(), screened.getMinutes()]).toEqual([10, 9, 5])
     expect(payload.collection).toMatchObject({
       blood_bag_type: 'single',
-      donation_barcode: 'PD-0001',
+      donation_barcode: '0001',
       volume_ml: 450,
       phlebotomist_name: 'J. Cruz',
     })
@@ -246,7 +246,7 @@ describe('the paper records pages', () => {
   })
 
   it('registers a new donor through the paper route, with the Donors page helpers', () => {
-    expect(donor).toContain('bloodCenterService.registerPaperDonor(registerPayload(form))')
+    expect(donor).toContain('bloodCenterService.registerPaperDonor(registerPayload(form, { confirmSharedPhone }))')
   })
 
   it('never shows a name the viewer may not see', () => {

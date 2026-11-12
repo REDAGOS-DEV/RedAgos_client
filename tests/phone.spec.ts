@@ -124,6 +124,7 @@ describe('every phone text box is the phone field', () => {
     'app/pages/blood-center/donors.vue': 1,
     'app/pages/blood-center/settings.vue': 1,
     'app/pages/blood-center/staff.vue': 1,
+    'app/pages/drives/[token].vue': 3,
     'app/pages/donor/profile.vue': 3,
     'app/pages/hospital/settings.vue': 1,
     'app/pages/hospital/staff.vue': 1,

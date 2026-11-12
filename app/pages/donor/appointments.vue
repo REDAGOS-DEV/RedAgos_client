@@ -299,7 +299,7 @@
                   <button v-for="drive in bloodDrives" :key="drive.id" type="button" role="radio" class="choice choice--drive"
                     :class="{ 'choice--active': selectedDriveId === drive.id }"
                     :aria-checked="selectedDriveId === drive.id ? 'true' : 'false'"
-                    :disabled="driveSlotsLeft(drive) === 0 || driveTooEarly(drive)"
+                    :disabled="driveTooEarly(drive)"
                     @click="pickDrive(drive.id)">
                     <span class="choice__date">
                       <span class="choice__date-month">{{ dateParts(drive.date).month }}</span>
@@ -313,13 +313,8 @@
                       <span class="choice__meta">
                         <span><AssetIcon name="map-pin" :size="12" /> {{ drive.location }}</span>
                       </span>
-                      <span class="progress-track">
-                        <span class="progress-fill" :class="driveProgressClass(drive)"
-                          :style="{ width: driveProgressPct(drive) + '%' }" />
-                      </span>
                       <span class="choice__foot">
-                        <span>{{ drive.registered }} registered</span>
-                        <span>{{ driveSlotsLeft(drive) }} slots left</span>
+                        <span>{{ drive.registered }} pre-registered</span>
                       </span>
                       <span v-if="driveTooEarly(drive)" class="drive-card__note">
                         Before your next eligible date ({{ formatDate(nextEligibleDate) }})
@@ -824,7 +819,7 @@ async function applyQuery() {
 
   const id = Number(route.query.drive)
   const drive = bloodDrives.value.find(d => d.id === id)
-  if (drive && driveSlotsLeft(drive) > 0 && !driveTooEarly(drive)) pickDrive(drive.id)
+  if (drive && !driveTooEarly(drive)) pickDrive(drive.id)
   await nextTick()
   bookingEl.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 }
@@ -837,8 +832,8 @@ onActivated(() => {
 
 // Ang mo-return ra kay ang mga drive nga gi-post gyud sa blood center, ug
 // upcoming pa (event_date >= today), na-order by date.
-// Response: [{ id, name, location, date, registered, total_slots, status }]
-// status: 'Full' | 'Open' | 'Upcoming' — capitalized, ug walay 'closed'.
+// Response: [{ id, name, location, date, start_time, end_time, registered, status }]
+// status: 'Open' | 'Upcoming' — capitalized; walay limit ang drive.
 // Walay `time` field: ang event_date kay date-only sa database.
 const bloodDrives = ref([])
 const drivesLoading = ref(false)
@@ -849,7 +844,8 @@ async function fetchBloodDrives() {
   drivesError.value = ''
   try {
     // GET /api/blood-drives
-    // Ang `registered` kay live count sa active nga appointments.
+    // Ang `registered` kay live count sa pre-registered donors: bookings ug
+    // ang registration-link list. Walay limit ang drive (2026-11-12).
     const data = await bookingCatalogService.bloodDrives()
     bloodDrives.value = Array.isArray(data) ? data : []
   } catch (err) {
@@ -862,36 +858,16 @@ async function fetchBloodDrives() {
 }
 
 
-function driveSlotsLeft(drive) {
-  return Math.max((drive.total_slots ?? 0) - (drive.registered ?? 0), 0)
-}
-
-function driveProgressPct(drive) {
-  if (!drive.total_slots) return 0
-  return Math.round(((drive.registered ?? 0) / drive.total_slots) * 100)
-}
-
-// Ang server na ang mo-compute sa status ('Full' | 'Open' | 'Upcoming'), so
+// Ang server na ang mo-compute sa status ('Open' | 'Upcoming'), so
 // mapping ra ni sa CSS class. Ang pag-recompute diri kay mao gyud ang hinungdan
 // nga nag-drift ang duha ka logic — capitalized diay ang gipadala sa server.
 const DRIVE_STATUS_CLASS = {
-  Full: 'badge--full',
   Upcoming: 'badge--info',
   Open: 'badge--success',
 }
 
-const DRIVE_PROGRESS_CLASS = {
-  Full: 'progress-fill--full',
-  Upcoming: 'progress-fill--blue',
-  Open: 'progress-fill--green',
-}
-
 function driveStatusClass(drive) {
   return DRIVE_STATUS_CLASS[drive.status] || 'badge--info'
-}
-
-function driveProgressClass(drive) {
-  return DRIVE_PROGRESS_CLASS[drive.status] || 'progress-fill--blue'
 }
 
 // Fetch drives as soon as the donor switches to the "mobile drive" flow,

@@ -211,6 +211,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       { label: 'Complete the payment', keys: [['Enter']], note: 'in the amount field' },
     ],
     questions: [
+      { q: 'How do I void a payment at the counter?', a: 'Right after taking it, choose Void payment under the receipt; a split payment is voided with all its parts. For one taken earlier today, open the bill again and choose Void beside it under Payments. Give a reason. The Billing Supervisor\'s own void is applied at once; anyone else\'s is applied once the Billing Supervisor approves it.' },
       { q: 'How do I fix a wrong payment?', a: 'Open the invoice and find the payment under Payment history. Choose Correct to change the amount or method, or Void if it was recorded in error. A void is only possible on the day the payment was taken, and the Billing Supervisor approves both.' },
       { q: 'Why is a bill marked "Held"?', a: 'A patient bill holds the blood until it is paid in full, met by the government subsidy, or Issuance defers its payment. Once it is cleared, the units can be released.' },
       { q: 'What is a "Deferred" bill?', a: 'Issuance let its units go out before it was paid. It is still owed: take the payment at the counter as usual.' },

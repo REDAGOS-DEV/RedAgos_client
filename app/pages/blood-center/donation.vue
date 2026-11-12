@@ -470,11 +470,12 @@
           <input
             ref="barcodeInput"
             v-model="collectionForm.donation_barcode"
+            v-digits-only
             type="text"
+            inputmode="numeric"
             class="field__input field__input--mono"
             autocomplete="off"
             spellcheck="false"
-            autocapitalize="characters"
             maxlength="30"
             placeholder="Scan the sticker"
             @keydown.enter.prevent="startedInput?.focus()"

@@ -148,14 +148,17 @@
                     <span v-else-if="donor.otherCentre" class="donor-cell__other" title="Not yet checked in or registered at your centre">Other centre</span>
                     <span v-if="donor.subline" class="donor-cell__sub">{{ donor.subline }}</span>
                     <!-- Takes the Phone column's place when the panel is too narrow for it. -->
-                    <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}</span>
+                    <span v-if="donor.phone" class="donor-cell__sub donor-cell__phone">{{ donor.phone }}{{ donor.phoneShared ? ' · Shared' : '' }}</span>
                   </div>
                 </td>
                 <td v-if="!contactOnly" class="c-group">
                   <span v-if="donor.bloodType" class="blood">{{ donor.bloodType }}</span>
                   <span v-else class="muted" title="Not typed yet">—</span>
                 </td>
-                <td class="c-phone nowrap">{{ donor.phone || '—' }}</td>
+                <td class="c-phone nowrap">
+                  {{ donor.phone || '—' }}
+                  <span v-if="donor.phone && donor.phoneShared" class="phone-shared">Shared</span>
+                </td>
                 <td v-if="!contactOnly" class="c-address" :title="donor.address">{{ donor.address || '—' }}</td>
                 <td class="c-last nowrap">
                   {{ donor.lastDonation || '—' }}
@@ -388,7 +391,10 @@
 
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label" for="d-phone">Phone</label>
+                  <div class="form-label-row">
+                    <label class="form-label" for="d-phone">Phone</label>
+                    <PhoneKindToggle v-model="form.data.phone_shared" size="sm" :disabled="!form.editable.contact || form.saving" />
+                  </div>
                   <PhoneField id="d-phone" v-model="form.data.phone" class="form-phone" autocomplete="off" :invalid="Boolean(fieldError('phone'))" :disabled="!form.editable.contact" />
                   <p v-if="fieldError('phone')" class="field-error">{{ fieldError('phone') }}</p>
                 </div>
@@ -447,6 +453,47 @@
             <button type="submit" form="donor-form" class="btn-primary" :disabled="form.saving || form.loading || !canSaveForm">
               <AssetIcon name="check" :size="15" />
               {{ form.saving ? 'Saving…' : 'Save Donor' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ============ SHARED NUMBER: SOMEONE ELSE'S PERSONAL ONE ============ -->
+    <!--
+      Shared typed for a number another account holds as Personal, as when a
+      son signed up in the portal with the family's only phone (project owner,
+      2026-11-12). Staff cannot change his; they confirm, and it is saved as
+      Shared. Escape closes this one first (onKeydown).
+    -->
+    <Transition name="modal">
+      <div v-if="sharedPhone.open" class="modal-overlay" @click.self="cancelSharedPhone">
+        <div
+          v-focus-trap
+          class="modal-card modal-card--sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="shared-phone-title"
+          aria-describedby="shared-phone-text"
+        >
+          <div class="modal-card__header">
+            <h2 id="shared-phone-title" class="modal-card__title">
+              <AssetIcon name="triangle-alert" :size="17" />
+              Shared number
+            </h2>
+            <button type="button" class="modal-card__close" aria-label="Close" @click="cancelSharedPhone">
+              <AssetIcon name="x" :size="18" />
+            </button>
+          </div>
+
+          <div class="modal-card__body">
+            <p id="shared-phone-text" class="modal-text">{{ sharedPhone.message }}</p>
+          </div>
+
+          <div class="modal-card__footer">
+            <button type="button" class="btn-outline" @click="cancelSharedPhone">Cancel</button>
+            <button type="button" class="btn-primary" :disabled="form.saving" @click="confirmSharedPhone">
+              {{ form.saving ? 'Saving…' : 'Save as Shared' }}
             </button>
           </div>
         </div>
@@ -544,7 +591,13 @@
               </p>
 
               <dl class="facts">
-                <div class="fact"><dt>Phone</dt><dd>{{ profile.phone || '—' }}</dd></div>
+                <div class="fact">
+                  <dt>Phone</dt>
+                  <dd>
+                    {{ profile.phone || '—' }}
+                    <span v-if="profile.phone && profile.phoneShared" class="fact__sub">Shared</span>
+                  </dd>
+                </div>
                 <div class="fact">
                   <dt>Email</dt>
                   <dd>
@@ -809,6 +862,7 @@ import { bloodCenterService } from '~/api/bloodcenter/BloodCenterService'
 import DatePicker from '~/components/common/DatePicker.vue'
 import IdNumberField from '~/components/common/IdNumberField.vue'
 import PhoneField from '~/components/common/PhoneField.vue'
+import PhoneKindToggle from '~/components/common/PhoneKindToggle.vue'
 import SelectField from '~/components/common/SelectField.vue'
 import { idNumberProblem } from '~/utils/validId'
 import { resolveApiAssetURL } from '~/api/BaseService'
@@ -837,6 +891,9 @@ import {
 import { COLLECTION_ABILITIES } from '~/composables/useBloodCenterNav'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { onPageReturn } from '~/composables/useKeptAlive'
+import { donorPrefillFromQuery } from '~/utils/driveRegistration'
+
+const route = useRoute()
 
 definePageMeta({
   middleware: ['auth', 'department'],
@@ -971,6 +1028,8 @@ function mapDonor(row) {
     subline: donorSubline(row.gender, row.birth_date),
     bloodType: row.blood_type || '',
     phone: formatPhone(row.phone),
+    // The household's number, which other donors may hold too (2026-11-12).
+    phoneShared: Boolean(row.phone && row.phone_shared),
     email: row.email || '',
     address: row.address || '',
     totalDonations: row.total_donations ?? 0,
@@ -996,12 +1055,12 @@ async function loadDonors(page = 1) {
   try {
     const res = await bloodCenterService.donors({ ...filterParams(), page, per_page: PER_PAGE })
     const rows = Array.isArray(res) ? res : (res?.data ?? [])
-    const unlisted = rows.length ? null : await findUnlisted()
+    const unlisted = rows.length ? [] : await findUnlisted()
     if (seq !== loadSeq) return
 
-    donors.value = unlisted ? [unlisted] : rows.map(mapDonor)
-    Object.assign(pager, unlisted
-      ? { page: 1, lastPage: 1, total: 1, from: 1, to: 1 }
+    donors.value = unlisted.length ? unlisted : rows.map(mapDonor)
+    Object.assign(pager, unlisted.length
+      ? { page: 1, lastPage: 1, total: unlisted.length, from: 1, to: unlisted.length }
       : {
           page: res?.current_page ?? page,
           lastPage: res?.last_page ?? 1,
@@ -1026,16 +1085,19 @@ async function loadDonors(page = 1) {
  * start their first visit instead of registering them twice.
  */
 async function findUnlisted() {
-  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return null
+  if (bloodTypeId.value || statusFilter.value || !canViewProfile.value || !can('appointments.verify')) return []
   const exact = unlistedLookup(search.value)
-  if (!exact) return null
+  if (!exact) return []
 
   try {
-    const found = await bloodCenterService.lookupDonor(exact)
-    return found?.uuid ? { ...mapDonor(found), notCheckedIn: true } : null
+    // Every match: a household's shared number finds the whole family (2026-11-12).
+    const found = await bloodCenterService.lookupDonors(exact)
+    return (found?.data ?? [])
+      .filter(row => row?.uuid)
+      .map(row => ({ ...mapDonor(row), notCheckedIn: true }))
   } catch {
     // Not found: the empty list says so.
-    return null
+    return []
   }
 }
 
@@ -1398,6 +1460,33 @@ function openCreate() {
     original: blankDonorForm(),
     editable: { ...ALL_EDITABLE },
   })
+  driveEntryToLink.value = null
+}
+
+// A drive roster's "Register as donor" (pages/blood-center/drive-registrations):
+// the form opens with what the person typed on the drive's link, and the new
+// donor is linked to their entry once saved.
+const driveEntryToLink = ref(null)
+
+function openCreateFromDrive() {
+  const prefill = donorPrefillFromQuery(route.query)
+  if (!prefill) return
+  openCreate()
+  Object.assign(form.data, Object.fromEntries(Object.entries(prefill.fields).filter(([, value]) => value)))
+  driveEntryToLink.value = { driveId: prefill.driveId, entryId: prefill.entryId }
+  navigateTo({ query: {} }, { replace: true })
+}
+
+async function linkToDriveEntry(uuid) {
+  const target = driveEntryToLink.value
+  driveEntryToLink.value = null
+  if (!target || !uuid) return ''
+  try {
+    await bloodCenterService.matchDriveRegistration(target.driveId, target.entryId, uuid)
+    return ' Linked to their drive registration.'
+  } catch {
+    return ' Link them on the drive\'s roster.'
+  }
 }
 
 async function openEdit(uuid) {
@@ -1425,6 +1514,7 @@ async function openEdit(uuid) {
 function closeForm() {
   if (form.saving) return
   form.open = false
+  sharedPhone.open = false
   resetPhoto()
 }
 
@@ -1455,7 +1545,23 @@ async function uploadPhoto(uuid) {
   }
 }
 
-async function submitForm() {
+/*
+ * Shared typed for someone else's Personal number: the server asks (409
+ * phone_personal_elsewhere) and the form is sent again once staff confirm.
+ */
+const sharedPhone = reactive({ open: false, message: '' })
+
+function cancelSharedPhone() {
+  if (form.saving) return
+  sharedPhone.open = false
+}
+
+async function confirmSharedPhone() {
+  await submitForm(null, { confirmSharedPhone: true })
+}
+
+// Bound to @submit, so the first argument is the event.
+async function submitForm(_event, { confirmSharedPhone = false } = {}) {
   if (!canSaveForm.value || form.saving) return
   form.saving = true
   form.error = ''
@@ -1466,11 +1572,12 @@ async function submitForm() {
     let message = ''
 
     if (form.mode === 'create') {
-      const res = await bloodCenterService.createDonor(registerPayload(form.data))
+      const res = await bloodCenterService.createDonor(registerPayload(form.data, { confirmSharedPhone }))
       uuid = (res?.data ?? res)?.uuid
       message = res?.message || `${form.data.first_name.trim()} has been registered.`
+      message += await linkToDriveEntry(uuid)
     } else {
-      const payload = editPayload(form.data, form.original)
+      const payload = editPayload(form.data, form.original, { confirmSharedPhone })
       if (Object.keys(payload).length) {
         const res = await bloodCenterService.updateDonor(uuid, payload)
         message = res?.message || 'Donor record updated.'
@@ -1479,6 +1586,7 @@ async function submitForm() {
       }
     }
 
+    sharedPhone.open = false
     const photoProblem = uuid ? await uploadPhoto(uuid) : ''
 
     // A walk-in leaves the desk able to use the portal: the sign-in is given as
@@ -1510,6 +1618,12 @@ async function submitForm() {
     await loadDonors(form.mode === 'create' ? 1 : pager.page)
     if (profileView.open && profileView.uuid === uuid) await loadProfile(uuid)
   } catch (err) {
+    if (err?.data?.code === 'phone_personal_elsewhere') {
+      Object.assign(sharedPhone, { open: true, message: err?.message || err?.data?.message || '' })
+      return
+    }
+
+    sharedPhone.open = false
     form.errors = err?.errors ?? err?.data?.errors ?? {}
     form.error = Object.keys(form.errors).length
       ? 'Please check the highlighted fields.'
@@ -1570,7 +1684,8 @@ function onKeydown(event) {
   if (event.key !== 'Escape') return
   // The sign-in window closes on Done only: it is the last sight of the password.
   if (credentials.value) return
-  if (emailView.open) closeEmail()
+  if (sharedPhone.open) cancelSharedPhone()
+  else if (emailView.open) closeEmail()
   else if (form.open) closeForm()
   else if (remind.open) closeRemind()
   else if (profileView.open) closeProfile()
@@ -1579,6 +1694,7 @@ function onKeydown(event) {
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   await Promise.all([loadDonors(), loadReference()])
+  openCreateFromDrive()
 })
 
 onBeforeUnmount(() => {
@@ -1592,7 +1708,10 @@ onBeforeUnmount(() => {
 // reloads in place. An open record or form stays as it was.
 onDeactivated(() => window.removeEventListener('keydown', onKeydown))
 onActivated(() => window.addEventListener('keydown', onKeydown))
-onPageReturn(() => loadDonors(pager.page))
+onPageReturn(() => {
+  loadDonors(pager.page)
+  openCreateFromDrive()
+})
 </script>
 
 <style scoped>
@@ -1929,6 +2048,7 @@ onPageReturn(() => loadDonors(pager.page))
 .c-status { width: 108px; }
 
 .donor-cell__phone { display: none; }
+.phone-shared { display: block; font-size: 11px; font-weight: 600; color: var(--rb-text-secondary); }
 
 /* Too narrow for Address beside the donor's name: it stays on the profile. */
 @container (max-width: 1100px) {
@@ -2232,6 +2352,8 @@ td.c-address {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .form-label { font-size: 12.5px; font-weight: 600; color: var(--rb-text-primary); }
+/* A label with a control on its right: Phone | Personal · Shared. */
+.form-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
 .form-optional { margin-left: 4px; font-weight: 500; color: var(--rb-text-secondary); }
 .req { color: var(--rb-accent-text); }
 .field-error { margin: 0; font-size: 12px; color: var(--rb-accent-text); }

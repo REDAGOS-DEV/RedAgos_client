@@ -157,8 +157,9 @@
               <!--
                 First in the column because it is the question this page exists
                 to answer: is this person already a donor under another account?
-                The ID number, email and phone are unique, so a second account
-                never shares those; the server matches on name and date of birth.
+                The ID number and email are unique, so a second account never
+                shares those (a phone may be a household's, shared by several
+                donors since 2026-11-12); the server matches on name and date of birth.
               -->
               <section class="existing" aria-labelledby="existing-title">
                 <h3 id="existing-title" class="existing__title">

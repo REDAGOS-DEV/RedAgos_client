@@ -317,7 +317,7 @@
                   <span class="picked__name">{{ booking.drive.name }}</span>
                   <span class="picked__meta">
                     {{ formatShortDate(booking.drive.date) }}<template v-if="booking.drive.start_time"> · {{ booking.drive.start_time }}–{{ booking.drive.end_time }}</template><template v-if="booking.drive.location"> · {{ booking.drive.location }}</template>
-                    · {{ booking.drive.registered }}{{ booking.drive.max_capacity ? ` / ${booking.drive.max_capacity}` : '' }} registered
+                    · {{ booking.drive.pre_registered }} pre-registered
                   </span>
                 </div>
                 <button type="button" class="btn-link" @click="clearDrive">Use {{ centerName }}</button>
@@ -654,8 +654,11 @@ async function findDonors(term) {
     const exact = exactIdentifier(term)
     if (!results.length && exact) {
       try {
-        const found = await bloodCenterService.lookupDonor(exact)
-        if (found?.uuid) results = [mapCandidate({ ...found, ...(found.donation_summary ?? {}) })]
+        // Every match: a household's shared number finds the whole family (2026-11-12).
+        const found = await bloodCenterService.lookupDonors(exact)
+        results = (found?.data ?? [])
+          .filter(row => row?.uuid)
+          .map(row => mapCandidate({ ...row, ...(row.donation_summary ?? {}) }))
       } catch {
         // Not found: the empty list says so.
       }

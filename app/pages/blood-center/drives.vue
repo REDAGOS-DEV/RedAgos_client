@@ -14,7 +14,7 @@
       <!-- Figures, as on Inventory -->
       <StatStrip :columns="3">
         <StatItem :loading="loading" label="Upcoming drives" :value="upcomingDrivesCount" :hint="nextDriveLabel" icon="calendar" tone="primary" />
-        <StatItem :loading="loading" label="Booked donors" :value="totalRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
+        <StatItem :loading="loading" label="Pre-registered donors" :value="totalPreRegistered" hint="Across upcoming drives" icon="users" tone="purple" />
         <StatItem :loading="loading" label="Units collected" :value="unitsCollectedMonth" hint="At drives this month" icon="droplets" tone="success" />
       </StatStrip>
 
@@ -104,10 +104,6 @@
                   <AssetIcon name="users" :size="13" />
                   {{ drive.assigned_staff }}
                 </span>
-                <span v-if="drive.expected_participants" class="drive__fact">
-                  <AssetIcon name="clipboard-list" :size="13" />
-                  Expected {{ drive.expected_participants }}
-                </span>
               </p>
 
               <p v-if="drive.status === 'Cancelled'" class="drive__note drive__note--cancelled">
@@ -116,21 +112,11 @@
               <p v-else-if="drive.announcement" class="drive__note">{{ drive.announcement }}</p>
             </div>
 
-            <!-- Registrations against capacity -->
+            <!-- The one planning figure: bookings made ahead plus the link's list, live. -->
             <div class="drive__fill">
               <p class="drive__fill-head">
-                <strong>{{ drive.registered_count ?? 0 }}</strong>
-                <span>{{ drive.capacity ? `of ${drive.capacity} booked` : 'booked' }}</span>
-              </p>
-              <div class="progress-track">
-                <div
-                  class="progress-fill"
-                  :class="`progress-fill--${fillLevel(drive)}`"
-                  :style="{ width: `${Math.min(fillPercent(drive), 100)}%` }"
-                />
-              </div>
-              <p class="drive__fill-foot">
-                {{ drive.capacity ? `${Math.min(fillPercent(drive), 100)}% full` : 'No capacity limit' }}
+                <strong>{{ drive.pre_registered_count ?? 0 }}</strong>
+                <span>pre-registered</span>
               </p>
             </div>
 
@@ -174,6 +160,15 @@
               >
                 Cancel
               </button>
+              <!-- The list people put themselves on through the drive's link. -->
+              <NuxtLink
+                v-if="drive.status !== 'Draft'"
+                :to="`/blood-center/drive-registrations/${drive.id}`"
+                class="btn-small"
+              >
+                <AssetIcon name="users" :size="13" />
+                Registrations
+              </NuxtLink>
               <!-- A drive held on paper: type its records in once they are back. -->
               <NuxtLink
                 v-if="canRecordPaper && (drive.status === 'Completed' || drive.status === 'Open')"
@@ -217,38 +212,23 @@
 
             <div class="form-group">
               <label class="form-label" for="drive-date">Date</label>
-              <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" :disabled="scheduleLocked" />
+              <DatePicker id="drive-date" v-model="driveForm.event_date" :min="todayIso" />
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="drive-start">Starts</label>
-                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required :disabled="scheduleLocked">
+                <input id="drive-start" v-model="driveForm.start_time" type="time" class="form-input" required>
               </div>
               <div class="form-group">
                 <label class="form-label" for="drive-end">Ends</label>
-                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required :disabled="scheduleLocked">
+                <input id="drive-end" v-model="driveForm.end_time" type="time" class="form-input" required>
               </div>
             </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="drive-expected">Expected participants <span class="form-optional">optional</span></label>
-                <input id="drive-expected" v-model="driveForm.expected_participants" type="number" min="1" inputmode="numeric" class="form-input" placeholder="e.g. 120">
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="drive-capacity">Registration capacity <span class="form-optional">optional</span></label>
-                <input
-                  id="drive-capacity"
-                  v-model="driveForm.max_capacity"
-                  type="number"
-                  :min="editingDrive?.registered_count || 1"
-                  inputmode="numeric"
-                  class="form-input"
-                  placeholder="No limit"
-                >
-              </div>
-            </div>
+            <p v-if="movesBookings(editingDrive, driveForm)" class="form-notice form-notice--warn" role="status">
+              <AssetIcon name="triangle-alert" :size="14" />
+              <span>{{ bookedLabel(editingDrive.registered_count) }} booked. Their bookings move with the drive, and everyone booked or on its list is notified.</span>
+            </p>
 
             <div class="form-group">
               <label class="form-label" for="drive-staff">Assigned staff <span class="form-optional">optional</span></label>
@@ -260,16 +240,20 @@
               <textarea id="drive-note" v-model="driveForm.announcement" class="form-textarea" rows="3" placeholder="e.g. Bring a valid ID and eat before donating." />
             </div>
 
-            <label v-if="!editingDrive" class="form-check">
-              <input v-model="driveForm.publish" type="checkbox">
-              <span>Publish to donors now</span>
-            </label>
-
             <div class="modal-actions">
               <button type="button" class="ui-btn" @click="closeCreateModal">Discard</button>
-              <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
-                {{ submitLabel }}
+              <button v-if="editingDrive" type="submit" class="ui-btn ui-btn--primary" :disabled="submitting">
+                {{ submitting ? 'Saving…' : 'Save changes' }}
               </button>
+              <!-- A new drive: kept as a draft, or published to donors at once. -->
+              <template v-else>
+                <button type="submit" class="ui-btn" :disabled="submitting" @click="driveForm.publish = false">
+                  {{ submitting && !driveForm.publish ? 'Saving…' : 'Save as draft' }}
+                </button>
+                <button type="submit" class="ui-btn ui-btn--primary" :disabled="submitting" @click="driveForm.publish = true">
+                  {{ submitting && driveForm.publish ? 'Publishing…' : 'Create and publish' }}
+                </button>
+              </template>
             </div>
           </form>
         </div>
@@ -403,6 +387,7 @@ import {
   driveStatusLabel,
   driveTab,
   drivesFor,
+  movesBookings,
   registrationClosed,
 } from '~/utils/drives'
 import { onPageReturn } from '~/composables/useKeptAlive'
@@ -427,7 +412,7 @@ const actionError = ref('')
 const busyId = ref(null)
 
 // Ang mga key dinhi kay pareho gyud sa mga column sa `mobile_events`, dili ang
-// UI labels ('venue', 'capacity'). Usa ra ka vocabulary sa tibuok wire, so
+// UI labels ('venue'). Usa ra ka vocabulary sa tibuok wire, so
 // walay translation layer nga pwede mag-drift sa server.
 const driveForm = reactive(blankDriveForm())
 
@@ -442,15 +427,6 @@ function resetDriveForm() {
 
 // The drive being edited, or null when the modal creates one.
 const editingDrive = ref(null)
-
-// Naay naka-book: ang petsa ug oras dili na mausab (server: drive_schedule_locked).
-const scheduleLocked = computed(() => Boolean(editingDrive.value) && driveActions(editingDrive.value).scheduleLocked)
-
-const submitLabel = computed(() => {
-  if (editingDrive.value) return submitting.value ? 'Saving…' : 'Save changes'
-  if (submitting.value) return 'Creating…'
-  return driveForm.publish ? 'Create and publish' : 'Save as draft'
-})
 
 function openCreateModal() {
   editingDrive.value = null
@@ -600,14 +576,14 @@ function bookedLabel(count) {
 
 // All values start empty/zero — populated only from the API response.
 const upcomingDrivesCount = ref(0)
-const totalRegistered = ref(0)
+const totalPreRegistered = ref(0)
 const unitsCollectedMonth = ref(0)
 const drives = ref([])
 // drive shape: {
 //   id, name, facility_name, location, event_date, start_time, end_time,
-//   capacity (hard limit, null = none), expected_participants (estimate),
 //   registered_count (active bookings), assigned_staff, announcement,
-//   status: 'Draft' | 'Upcoming' | 'Open' | 'Full' | 'Completed' | 'Cancelled',
+//   status: 'Draft' | 'Upcoming' | 'Open' | 'Completed' | 'Cancelled',
+//   pre_registered_count (bookings made ahead + the link's list, live; no limit), registration_token (null while a draft),
 //   published_at, registration_open, registration_closed_at,
 //   cancelled_at, cancellation_reason,
 //   donor_preview: []   // always empty for now: no endpoint lists a drive's donors
@@ -656,27 +632,14 @@ function timeLabel(value) {
   return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 
-function fillPercent(drive) {
-  if (!drive.capacity) return 0
-  return Math.round(((drive.registered_count ?? 0) / drive.capacity) * 100)
-}
-
-// The same three levels as the appointment slots: open, filling up, full.
-function fillLevel(drive) {
-  const pct = fillPercent(drive)
-  if (pct >= 100) return 'full'
-  if (pct >= 75) return 'busy'
-  return 'open'
-}
-
 async function loadDrives() {
   loadError.value = ''
   try {
     // GET /api/blood-center/drives — facility-scoped, apil ang mga nahuman ug na-cancel.
-    // { upcoming_drives_count, total_registered, units_collected_month (drives only), drives: [...] }
+    // { upcoming_drives_count, total_pre_registered, units_collected_month (drives only), drives: [...] }
     const data = await bloodCenterService.drives()
     upcomingDrivesCount.value = data.upcoming_drives_count ?? 0
-    totalRegistered.value = data.total_registered ?? 0
+    totalPreRegistered.value = data.total_pre_registered ?? 0
     unitsCollectedMonth.value = data.units_collected_month ?? 0
     drives.value = data.drives ?? []
   } catch (err) {
@@ -943,7 +906,7 @@ a.btn-small { text-decoration: none; }
 
 .drive {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 220px minmax(150px, 250px);
+  grid-template-columns: 64px minmax(0, 1fr) 130px minmax(150px, 280px);
   align-items: center;
   gap: 20px;
   padding: 16px 18px;
@@ -1055,7 +1018,6 @@ a.btn-small { text-decoration: none; }
 
 .status-badge--upcoming { background: rgba(var(--rb-primary-rgb), 0.1); color: var(--rb-primary-text); }
 .status-badge--open { background: rgba(var(--rb-success-rgb), 0.12); color: var(--rb-success-text); }
-.status-badge--full { background: rgba(var(--rb-accent-rgb), 0.1); color: var(--rb-accent-text); }
 .status-badge--completed { background: var(--rb-surface-alt); color: var(--rb-text-secondary); border: 1px solid var(--rb-border); }
 .status-badge--draft { background: transparent; color: var(--rb-text-secondary); border: 1px dashed var(--rb-border-strong); }
 .status-badge--cancelled { background: rgba(var(--rb-accent-rgb), 0.08); color: var(--rb-accent-text); }
@@ -1078,29 +1040,6 @@ a.btn-small { text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 
-.progress-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--rb-border-strong);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.progress-fill--open { background: var(--rb-success); }
-.progress-fill--busy { background: var(--rb-warning); }
-.progress-fill--full { background: var(--rb-accent); }
-
-.drive__fill-foot {
-  margin: 5px 0 0;
-  font-size: 11.5px;
-  color: var(--rb-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
 
 .drive__actions {
   display: flex;
@@ -1231,6 +1170,14 @@ a.btn-small { text-decoration: none; }
 
 .form-notice :deep(svg) { flex-shrink: 0; margin-top: 1px; }
 
+.form-notice--warn {
+  border-color: rgba(var(--rb-warning-rgb), 0.35);
+  background: rgba(var(--rb-warning-rgb), 0.08);
+  color: var(--rb-text-primary);
+}
+
+.form-notice--warn :deep(svg) { color: var(--rb-warning-text); }
+
 .cancel-impact {
   display: flex;
   align-items: flex-start;
@@ -1309,17 +1256,6 @@ a.btn-small { text-decoration: none; }
   cursor: not-allowed;
 }
 
-.form-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rb-text-primary);
-  cursor: pointer;
-}
-
-.form-check input { width: 16px; height: 16px; accent-color: var(--rb-primary); }
 
 .modal-actions {
   display: flex;

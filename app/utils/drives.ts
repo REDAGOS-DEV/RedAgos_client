@@ -5,11 +5,12 @@
  * move, whether it takes bookings); these only decide how a drive is shown,
  * which buttons it offers, and what the form sends.
  *
- * Two figures, never one: `capacity` is the hard limit on bookings (null = no
- * limit) and `expected_participants` is a planning estimate nobody enforces.
+ * A drive has no booking limit and no staff estimate (project owner,
+ * 2026-11-12): one live figure, `pre_registered_count`, the bookings made
+ * ahead that stand plus the registration link's list not yet booked.
  */
 
-export type DriveStatus = 'Draft' | 'Upcoming' | 'Open' | 'Full' | 'Completed' | 'Cancelled'
+export type DriveStatus = 'Draft' | 'Upcoming' | 'Open' | 'Completed' | 'Cancelled'
 
 export interface Drive {
   id: number
@@ -18,9 +19,9 @@ export interface Drive {
   event_date: string
   start_time?: string | null
   end_time?: string | null
-  capacity?: number | null
-  expected_participants?: number | null
   registered_count?: number | null
+  pre_registered_count?: number | null
+  registration_token?: string | null
   assigned_staff?: string | null
   announcement?: string | null
   status: DriveStatus | string
@@ -74,8 +75,6 @@ export interface DriveActions {
   closeRegistration: boolean
   reopenRegistration: boolean
   cancel: boolean
-  /** Date and hours are fixed once a donor is booked. */
-  scheduleLocked: boolean
 }
 
 /** What a drive's row offers. A held or cancelled drive offers none of these. */
@@ -90,8 +89,23 @@ export function driveActions(drive: Drive): DriveActions {
     closeRegistration: live && !draft && !closed,
     reopenRegistration: live && !draft && closed,
     cancel: live,
-    scheduleLocked: (drive.registered_count ?? 0) > 0,
   }
+}
+
+/**
+ * Whether saving the form moves a drive someone is booked for. It may move
+ * (project owner, 2026-11-12): the bookings move with it and everyone booked
+ * or on its list is told, so the form says so before Save.
+ */
+export function movesBookings(
+  drive: Pick<Drive, 'event_date' | 'start_time' | 'end_time' | 'registered_count'> | null | undefined,
+  form: { event_date: string, start_time: string, end_time: string },
+): boolean {
+  if (!drive || (drive.registered_count ?? 0) <= 0) return false
+  const hhmm = (value: string | null | undefined) => String(value ?? '').slice(0, 5)
+  return String(form.event_date).slice(0, 10) !== String(drive.event_date).slice(0, 10)
+    || hhmm(form.start_time) !== hhmm(drive.start_time)
+    || hhmm(form.end_time) !== hhmm(drive.end_time)
 }
 
 export interface DriveForm {
@@ -100,14 +114,12 @@ export interface DriveForm {
   event_date: string
   start_time: string
   end_time: string
-  max_capacity: number | string | null
-  expected_participants: number | string | null
   assigned_staff: string
   announcement: string
   publish: boolean
 }
 
-/** A new drive: no capacity limit and no estimate until staff type one; published on save. */
+/** A new drive, published on save unless staff untick it. */
 export function blankDriveForm(): DriveForm {
   return {
     name: '',
@@ -115,8 +127,6 @@ export function blankDriveForm(): DriveForm {
     event_date: '',
     start_time: '08:00',
     end_time: '16:00',
-    max_capacity: '',
-    expected_participants: '',
     assigned_staff: '',
     announcement: '',
     publish: true,
@@ -131,19 +141,10 @@ export function driveFormFrom(drive: Drive): DriveForm {
     event_date: String(drive.event_date ?? '').slice(0, 10),
     start_time: String(drive.start_time ?? '08:00').slice(0, 5),
     end_time: String(drive.end_time ?? '16:00').slice(0, 5),
-    max_capacity: drive.capacity ?? '',
-    expected_participants: drive.expected_participants ?? '',
     assigned_staff: drive.assigned_staff ?? '',
     announcement: drive.announcement ?? '',
     publish: Boolean(drive.published_at),
   }
-}
-
-/** A blank count is null (no limit, no estimate); anything else a whole number. */
-export function countOrNull(value: unknown): number | null {
-  if (value === null || value === undefined || String(value).trim() === '') return null
-  const n = Number(value)
-  return Number.isFinite(n) ? Math.trunc(n) : null
 }
 
 /**
@@ -158,8 +159,6 @@ export function drivePayload(form: DriveForm, creating: boolean): Record<string,
     event_date: form.event_date,
     start_time: form.start_time || null,
     end_time: form.end_time || null,
-    max_capacity: countOrNull(form.max_capacity),
-    expected_participants: countOrNull(form.expected_participants),
     assigned_staff: text(form.assigned_staff),
     announcement: text(form.announcement),
   }

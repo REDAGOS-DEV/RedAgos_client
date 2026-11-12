@@ -347,7 +347,7 @@
                     {{ drive.event_date === data.today.date ? 'Today' : `${weekday(drive.event_date)}, ${dayMonth(drive.event_date)}` }}{{ drive.start_time ? ` · ${drive.start_time.slice(0, 5)}` : '' }}{{ drive.location ? ` · ${drive.location}` : '' }}
                   </p>
                   <p class="drive__count">
-                    {{ drive.registered }}{{ drive.max_capacity ? ` / ${drive.max_capacity}` : '' }} registered
+                    {{ drive.pre_registered }} pre-registered
                   </p>
                 </li>
               </ul>

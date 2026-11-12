@@ -191,7 +191,11 @@ export function unlistedLookup(term: string): { type: string, value: string } | 
   return null
 }
 
-/** The fields the Register / Edit donor form holds, all as strings. */
+/**
+ * The fields the Register / Edit donor form holds, as strings but one:
+ * whether the phone is the household's Shared number rather than the donor's
+ * Personal one (project owner, 2026-11-12).
+ */
 export interface DonorForm {
   first_name: string
   last_name: string
@@ -199,6 +203,7 @@ export interface DonorForm {
   birth_date: string
   blood_type_id: string
   phone: string
+  phone_shared: boolean
   email: string
   address: string
   occupation: string
@@ -216,6 +221,7 @@ export function blankDonorForm(): DonorForm {
     birth_date: '',
     blood_type_id: '',
     phone: '',
+    phone_shared: false,
     email: '',
     address: '',
     occupation: '',
@@ -237,6 +243,7 @@ export function donorFormFrom(profile: Record<string, any>): DonorForm {
     birth_date: text(profile.birth_date).slice(0, 10),
     blood_type_id: text(profile.blood_type_id),
     phone: formatPhone(profile.phone).replace(/\s/g, ''),
+    phone_shared: Boolean(profile.phone && profile.phone_shared),
     email: text(profile.email),
     address: text(profile.address),
     occupation: text(profile.occupation),
@@ -249,18 +256,31 @@ export function donorFormFrom(profile: Record<string, any>): DonorForm {
 
 const NUMERIC = new Set(['blood_type_id'])
 
+export interface DonorPayloadOptions {
+  /**
+   * Staff confirmed saving the number as Shared although it is someone
+   * else's Personal number (the server's 409 phone_personal_elsewhere).
+   */
+  confirmSharedPhone?: boolean
+}
+
 /**
  * What a Register form sends: every filled field, trimmed. The server treats
  * an empty string as a value, so blanks are left out rather than sent.
+ * Personal or Shared goes with a phone only.
  */
-export function registerPayload(form: DonorForm): Record<string, string | number> {
-  const payload: Record<string, string | number> = {}
+export function registerPayload(form: DonorForm, options: DonorPayloadOptions = {}): Record<string, string | number | boolean> {
+  const payload: Record<string, string | number | boolean> = {}
 
   for (const [key, raw] of Object.entries(form)) {
+    if (key === 'phone_shared') continue
     const value = String(raw ?? '').trim()
     if (value === '') continue
     payload[key] = NUMERIC.has(key) ? Number(value) : value
   }
+
+  if (payload.phone) payload.phone_shared = Boolean(form.phone_shared)
+  if (options.confirmSharedPhone) payload.confirm_shared_phone = true
 
   return payload
 }
@@ -270,11 +290,15 @@ export function registerPayload(form: DonorForm): Record<string, string | number
  * field sent as null so it is cleared on the server too. The valid ID (type
  * and number) is never sent; it is registered once and not edited here.
  */
-export function editPayload(form: DonorForm, original: DonorForm): Record<string, string | number | null> {
-  const payload: Record<string, string | number | null> = {}
+export function editPayload(
+  form: DonorForm,
+  original: DonorForm,
+  options: DonorPayloadOptions = {},
+): Record<string, string | number | boolean | null> {
+  const payload: Record<string, string | number | boolean | null> = {}
 
   for (const key of Object.keys(form) as (keyof DonorForm)[]) {
-    if (key === 'valid_id_type' || key === 'valid_id_number') continue
+    if (key === 'valid_id_type' || key === 'valid_id_number' || key === 'phone_shared') continue
 
     const value = String(form[key] ?? '').trim()
     const before = String(original[key] ?? '').trim()
@@ -282,6 +306,15 @@ export function editPayload(form: DonorForm, original: DonorForm): Record<string
 
     payload[key] = value === '' ? null : (NUMERIC.has(key) ? Number(value) : value)
   }
+
+  // Personal or Shared, when it changed and there is a number to mark; a
+  // cleared number is never Shared, which the server sees to.
+  const hasPhone = String(form.phone ?? '').trim() !== ''
+  if (hasPhone && Boolean(form.phone_shared) !== Boolean(original.phone_shared)) {
+    payload.phone_shared = Boolean(form.phone_shared)
+  }
+
+  if (options.confirmSharedPhone && Object.keys(payload).length) payload.confirm_shared_phone = true
 
   return payload
 }

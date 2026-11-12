@@ -218,11 +218,12 @@
               <span class="pdf__flabel">Donation barcode (sticker)</span>
               <input
                 v-model="form.donation_barcode"
+                v-digits-only
                 type="text"
+                inputmode="numeric"
                 class="pdf__input pdf__input--mono"
                 autocomplete="off"
                 spellcheck="false"
-                autocapitalize="characters"
                 maxlength="30"
                 placeholder="Scan or type the sticker"
               >

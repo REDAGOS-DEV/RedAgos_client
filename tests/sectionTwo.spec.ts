@@ -84,7 +84,7 @@ describe('the phlebotomist box', () => {
   function box(overrides: Record<string, unknown> = {}) {
     return {
       blood_bag_type: 'double',
-      donation_barcode: 'SEG-0001',
+      donation_barcode: '1000001',
       started_time: '09:00',
       ended_time: '09:12',
       volume_ml: 450,
@@ -122,6 +122,13 @@ describe('the phlebotomist box', () => {
 
   it('is ready when every line of the box is filled', () => {
     expect(phlebotomyProblems(box(), day, later)).toEqual([])
+  })
+
+  it('takes a donation barcode of digits only', () => {
+    for (const barcode of ['SEG-0001', '1234-567', 'ABC123']) {
+      expect(phlebotomyProblems(box({ donation_barcode: barcode }), day, later))
+        .toEqual(['A donation barcode is numbers only, up to 30 digits.'])
+    }
   })
 
   it('names each missing line', () => {

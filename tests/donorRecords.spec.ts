@@ -227,15 +227,16 @@ describe('the donors page', () => {
   })
 
   it('sends the server only what an edit changed', () => {
-    expect(page).toContain('editPayload(form.data, form.original)')
+    expect(page).toContain('editPayload(form.data, form.original, { confirmSharedPhone })')
   })
 
   // Only people checked in at a centre are listed (project owner,
   // 2026-11-01); anyone else is reached through the exact lookup.
   it('finds someone the list does not show by an exact identifier', () => {
-    expect(page).toContain('const unlisted = rows.length ? null : await findUnlisted()')
-    expect(page).toContain('bloodCenterService.lookupDonor(exact)')
-    expect(page).toMatch(/if \(bloodTypeId\.value \|\| statusFilter\.value \|\| !canViewProfile\.value \|\| !can\('appointments\.verify'\)\) return null/)
+    expect(page).toContain('const unlisted = rows.length ? [] : await findUnlisted()')
+    // Every match: a household's shared number is several donors' (2026-11-12).
+    expect(page).toContain('bloodCenterService.lookupDonors(exact)')
+    expect(page).toMatch(/if \(bloodTypeId\.value \|\| statusFilter\.value \|\| !canViewProfile\.value \|\| !can\('appointments\.verify'\)\) return \[\]/)
     expect(page).toContain('>Not checked in</span>')
   })
 
